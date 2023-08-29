@@ -2,11 +2,7 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.ContractMetadata
 import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
-import com.daml.network.codegen.java.cc.{
-  coin as coinCodegen,
-  fees as feesCodegen,
-  round as roundCodegen,
-}
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as paymentCodegen,
@@ -29,7 +25,6 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
-import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -815,14 +810,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
   private def time(n: Long) = CantonTimestamp.ofEpochSecond(n)
 
-  private var cIdCounter = 0
-  private def nextCid() = {
-    cIdCounter += 1
-    // Note: contract ids that appear in contract payloads need to pass contract id validation,
-    // otherwise JSON serialization will fail when storing contracts in the database.
-    LfContractId.assertFromString("00" + f"$cIdCounter%064x").coid
-  }
-
   private def walletInstall(endUserParty: PartyId) = {
     val templateId = installCodegen.WalletAppInstall.TEMPLATE_ID
     val template = new installCodegen.WalletAppInstall(
@@ -1108,26 +1095,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     Contract(
       identifier = templateId,
       contractId = new subsCodegen.SubscriptionRequest.ContractId(nextCid()),
-      payload = template,
-      metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
-    )
-  }
-
-  private def coin(owner: PartyId, amount: Double, createdAt: Long, ratePerRound: Double) = {
-    val templateId = coinCodegen.Coin.TEMPLATE_ID
-    val template = new coinCodegen.Coin(
-      svcParty.toProtoPrimitive,
-      owner.toProtoPrimitive,
-      new feesCodegen.ExpiringAmount(
-        new java.math.BigDecimal(amount),
-        new ccApiCodegen.round.Round(createdAt),
-        new feesCodegen.RatePerRound(new java.math.BigDecimal(ratePerRound)),
-      ),
-    )
-    Contract(
-      identifier = templateId,
-      contractId = new coinCodegen.Coin.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,

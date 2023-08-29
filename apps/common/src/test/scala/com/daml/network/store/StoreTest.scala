@@ -9,28 +9,42 @@ import com.daml.ledger.javaapi.data.{
   LedgerOffset,
   TransactionTree,
   TreeEvent,
-  Value as damlValue,
   Unit as damlUnit,
+  Value as damlValue,
 }
 import com.google.protobuf
-import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as coinCodegen}
+import com.daml.network.codegen.java.cc.{
+  api as apiCodegen,
+  coin as coinCodegen,
+  fees as feesCodegen,
+  round as roundCodegen,
+  schedule as scheduleCodegen,
+}
+import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
+import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
-  TransactionTreeUpdate,
   Reassignment,
   ReassignmentEvent,
   ReassignmentUpdate,
+  TransactionTreeUpdate,
 }
-import com.daml.network.util.{Contract, Trees}
+import com.daml.network.util.{CNNodeUtil, Contract, Trees}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.wordspec.AsyncWordSpec
 import com.daml.lf.data.Numeric
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
+import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
+import com.daml.network.codegen.java.da.time.types.RelTime
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.protocol.LfContractId
 
-import java.time.Instant
+import java.time.{Duration, Instant}
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -50,15 +64,175 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     */
   protected def validContractId(n: Int, suffix: String = "00"): String = "00" + s"0$n" * 31 + suffix
 
+  private var cIdCounter = 0
+
+  protected def nextCid() = {
+    cIdCounter += 1
+    // Note: contract ids that appear in contract payloads need to pass contract id validation,
+    // otherwise JSON serialization will fail when storing contracts in the database.
+    LfContractId.assertFromString("00" + f"$cIdCounter%064x").coid
+  }
+
+  private val enabledChoices = CNNodeUtil.defaultEnabledChoices
+  private val schedule: scheduleCodegen.Schedule[Instant, CoinConfig[USD]] =
+    CNNodeUtil.defaultCoinConfigSchedule(
+      NonNegativeFiniteDuration(Duration.ofMinutes(10)),
+      10,
+      dummyDomain,
+    )
+  protected def coinRules() = {
+    val templateId = coinCodegen.CoinRules.TEMPLATE_ID
+
+    val template = new coinCodegen.CoinRules(
+      svcParty.toProtoPrimitive,
+      schedule,
+      enabledChoices,
+      false,
+      false,
+    )
+    Contract(
+      identifier = templateId,
+      contractId = new coinCodegen.CoinRules.ContractId(nextCid()),
+      payload = template,
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
+    )
+  }
+
+  protected def coinRulesV1Test(n: Int) = {
+    val template = new CoinRulesV1Test(
+      svcParty.toProtoPrimitive,
+      CNNodeUtil.defaultCoinConfigSchedule(
+        NonNegativeFiniteDuration(Duration.ofMinutes(10)),
+        10,
+        dummyDomain,
+      ),
+      CNNodeUtil.defaultEnabledChoices,
+      true,
+      false,
+    )
+    Contract(
+      CoinRulesV1Test.TEMPLATE_ID,
+      new CoinRulesV1Test.ContractId(n.toString),
+      template,
+      ContractMetadata.Empty(),
+      protobuf.Any.getDefaultInstance,
+    )
+  }
+
+  protected def cnsRules() = {
+    val templateId = cnsCodegen.CnsRules.TEMPLATE_ID
+
+    val template = new cnsCodegen.CnsRules(
+      svcParty.toProtoPrimitive,
+      new cnsCodegen.CnsRulesConfig(
+        new RelTime(1_000_000),
+        new RelTime(1_000_000),
+        new java.math.BigDecimal(1.0).setScale(10),
+      ),
+    )
+    Contract(
+      identifier = templateId,
+      contractId = new cnsCodegen.CnsRules.ContractId(nextCid()),
+      payload = template,
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
+    )
+  }
+
+  protected val holdingFee = 1.0
+
+  protected def openMiningRound(svc: PartyId, round: Long, coinPrice: Double) = {
+    val template = new roundCodegen.OpenMiningRound(
+      svc.toProtoPrimitive,
+      new ccApiCodegen.round.Round(round),
+      numeric(coinPrice),
+      Instant.now(),
+      Instant.now().plusSeconds(600),
+      new RelTime(1_000_000),
+      CNNodeUtil.defaultTransferConfig(10, holdingFee),
+      CNNodeUtil.issuanceConfig(10.0, 10.0, 10.0),
+      new RelTime(1_000_000),
+    )
+
+    Contract(
+      roundCodegen.OpenMiningRound.TEMPLATE_ID,
+      new roundCodegen.OpenMiningRound.ContractId(round.toString),
+      template,
+      ContractMetadata.Empty(),
+      protobuf.Any.getDefaultInstance,
+    )
+  }
+
+  protected def closedMiningRound(svc: PartyId, round: Long) = {
+    val template = new roundCodegen.ClosedMiningRound(
+      svc.toProtoPrimitive,
+      new ccApiCodegen.round.Round(round),
+      numeric(1),
+      numeric(1),
+      numeric(1),
+    )
+
+    Contract(
+      roundCodegen.ClosedMiningRound.TEMPLATE_ID,
+      new roundCodegen.ClosedMiningRound.ContractId(nextCid()),
+      template,
+      ContractMetadata.Empty(),
+      protobuf.Any.getDefaultInstance,
+    )
+  }
+
+  protected def coin(owner: PartyId, amount: Double, createdAtRound: Long, ratePerRound: Double) = {
+    val templateId = coinCodegen.Coin.TEMPLATE_ID
+    val template = new coinCodegen.Coin(
+      svcParty.toProtoPrimitive,
+      owner.toProtoPrimitive,
+      new feesCodegen.ExpiringAmount(
+        numeric(amount),
+        new ccApiCodegen.round.Round(createdAtRound),
+        new feesCodegen.RatePerRound(numeric(ratePerRound)),
+      ),
+    )
+    Contract(
+      identifier = templateId,
+      contractId = new coinCodegen.Coin.ContractId(nextCid()),
+      payload = template,
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
+    )
+  }
+
+  protected def lockedCoin(
+      owner: PartyId,
+      amount: Double,
+      createdAtRound: Long,
+      ratePerRound: Double,
+  ) = {
+    val templateId = coinCodegen.LockedCoin.TEMPLATE_ID
+    val coinTemplate = coin(owner, amount, createdAtRound, ratePerRound).payload
+    val template = new coinCodegen.LockedCoin(
+      coinTemplate,
+      new ccApiCodegen.coin.TimeLock(java.util.List.of(), Instant.now()),
+    )
+    Contract(
+      identifier = templateId,
+      contractId = new coinCodegen.LockedCoin.ContractId(nextCid()),
+      payload = template,
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
+    )
+  }
+
   protected def appRewardCoupon(
       round: Int,
       provider: PartyId,
       featured: Boolean = false,
       amount: Numeric.Numeric = numeric(1.0),
+      contractId: String = nextCid(),
   ): Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon] =
     Contract(
       identifier = coinCodegen.AppRewardCoupon.TEMPLATE_ID,
-      contractId = new coinCodegen.AppRewardCoupon.ContractId(s"de#$round"),
+      contractId = new coinCodegen.AppRewardCoupon.ContractId(contractId),
       payload = new coinCodegen.AppRewardCoupon(
         svcParty.toProtoPrimitive,
         provider.toProtoPrimitive,
@@ -84,7 +258,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   ] =
     Contract(
       identifier = coinCodegen.ValidatorRewardCoupon.TEMPLATE_ID,
-      contractId = new coinCodegen.ValidatorRewardCoupon.ContractId(s"der#$round"),
+      contractId = new coinCodegen.ValidatorRewardCoupon.ContractId(nextCid()),
       payload = new coinCodegen.ValidatorRewardCoupon(
         svcParty.toProtoPrimitive,
         user.toProtoPrimitive,
@@ -94,6 +268,17 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
+
+  protected def featuredAppRight(providerParty: PartyId) = {
+    val template = new FeaturedAppRight(svcParty.toProtoPrimitive, providerParty.toProtoPrimitive)
+    Contract(
+      FeaturedAppRight.TEMPLATE_ID,
+      new FeaturedAppRight.ContractId(providerParty.toProtoPrimitive),
+      template,
+      ContractMetadata.Empty(),
+      protobuf.Any.getDefaultInstance,
+    )
+  }
 
   protected def toCreatedEvent[TCid <: ContractId[T], T](
       contract: Contract[TCid, T],
@@ -217,7 +402,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       childEventIds = childEventIds.asJava,
     )
 
-  protected val dummyDomain = StoreTest.dummyDomain
+  protected lazy val dummyDomain = StoreTest.dummyDomain
 
   protected val dummy2Domain = DomainId.tryFromString("dummy2::domain")
 

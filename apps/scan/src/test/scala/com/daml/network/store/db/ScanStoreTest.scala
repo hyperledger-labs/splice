@@ -4,20 +4,11 @@ import com.daml.ledger.javaapi.data.{ContractMetadata, DamlRecord}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
 import com.daml.network.codegen.java.cc.api.v1.coin.PaymentTransferContext
-import com.daml.network.codegen.java.cc.coin.{Coin, FeaturedAppRight}
-import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
+import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_Coin
 import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
-import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
-import com.daml.network.codegen.java.cc.{
-  coin as coinCodegen,
-  fees as feesCodegen,
-  round as roundCodegen,
-  schedule as scheduleCodegen,
-}
-import com.daml.network.codegen.java.cn.cns as cnsCodegen
-import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.da.types as daTypes
 import com.daml.network.config.{CNDbConfig, DomainConfig}
 import com.daml.network.environment.RetryProvider
@@ -30,21 +21,20 @@ import com.daml.network.history.{
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanDomainConfig}
 import com.daml.network.scan.store.ScanStore
-import com.daml.network.scan.store.ScanTxLogParser.{TxLogIndexRecord, TxLogEntry}
+import com.daml.network.scan.store.ScanTxLogParser.{TxLogEntry, TxLogIndexRecord}
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{StoreErrors, StoreTest, TxLogStore}
-import com.daml.network.util.{CNNodeUtil, Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
-import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import com.google.protobuf
-import java.time.{Duration, Instant}
+
+import java.time.Instant
 import java.util.Optional
 import scala.concurrent.Future
 
@@ -744,107 +734,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 
   protected lazy val transactionTreeSource = TxLogStore.TransactionTreeSource.ForTesting()
 
-  private val holdingFee = 1.0
   private lazy val user1 = userParty(1)
-  private val enabledChoices = CNNodeUtil.defaultEnabledChoices
-  private val schedule: scheduleCodegen.Schedule[Instant, CoinConfig[USD]] =
-    CNNodeUtil.defaultCoinConfigSchedule(
-      NonNegativeFiniteDuration(Duration.ofMinutes(10)),
-      10,
-      dummyDomain,
-    )
-
-  private var cIdCounter = 0
-
-  private def nextCid() = {
-    cIdCounter += 1
-    // Note: contract ids that appear in contract payloads need to pass contract id validation,
-    // otherwise JSON serialization will fail when storing contracts in the database.
-    LfContractId.assertFromString("00" + f"$cIdCounter%064x").coid
-  }
-
-  private def coinRules() = {
-    val templateId = coinCodegen.CoinRules.TEMPLATE_ID
-
-    val template = new coinCodegen.CoinRules(
-      svcParty.toProtoPrimitive,
-      schedule,
-      enabledChoices,
-      false,
-      false,
-    )
-    Contract(
-      identifier = templateId,
-      contractId = new coinCodegen.CoinRules.ContractId(nextCid()),
-      payload = template,
-      metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
-    )
-  }
-
-  private def cnsRules() = {
-    val templateId = cnsCodegen.CnsRules.TEMPLATE_ID
-
-    val template = new cnsCodegen.CnsRules(
-      svcParty.toProtoPrimitive,
-      new cnsCodegen.CnsRulesConfig(
-        new RelTime(1_000_000),
-        new RelTime(1_000_000),
-        new java.math.BigDecimal(1.0).setScale(10),
-      ),
-    )
-    Contract(
-      identifier = templateId,
-      contractId = new cnsCodegen.CnsRules.ContractId(nextCid()),
-      payload = template,
-      metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
-    )
-  }
-
-  private def coin(owner: PartyId, amount: Double, createdAt: Long, ratePerRound: Double) = {
-    val templateId = coinCodegen.Coin.TEMPLATE_ID
-    val template = new coinCodegen.Coin(
-      svcParty.toProtoPrimitive,
-      owner.toProtoPrimitive,
-      new feesCodegen.ExpiringAmount(
-        new java.math.BigDecimal(amount),
-        new ccApiCodegen.round.Round(createdAt),
-        new feesCodegen.RatePerRound(new java.math.BigDecimal(ratePerRound)),
-      ),
-    )
-    Contract(
-      identifier = templateId,
-      contractId = new coinCodegen.Coin.ContractId(nextCid()),
-      payload = template,
-      metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
-    )
-  }
-
-  private def lockedCoin(owner: PartyId, amount: Double, createdAt: Long, ratePerRound: Double) = {
-    val templateId = coinCodegen.LockedCoin.TEMPLATE_ID
-    val coinTemplate = new coinCodegen.Coin(
-      svcParty.toProtoPrimitive,
-      owner.toProtoPrimitive,
-      new feesCodegen.ExpiringAmount(
-        new java.math.BigDecimal(amount),
-        new ccApiCodegen.round.Round(createdAt),
-        new feesCodegen.RatePerRound(new java.math.BigDecimal(ratePerRound)),
-      ),
-    )
-    val template = new coinCodegen.LockedCoin(
-      coinTemplate,
-      new ccApiCodegen.coin.TimeLock(java.util.List.of(), Instant.now()),
-    )
-    Contract(
-      identifier = templateId,
-      contractId = new coinCodegen.LockedCoin.ContractId(nextCid()),
-      payload = template,
-      metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
-    )
-  }
 
   private def mkInputCoin() = {
     new ccApiCodegen.coin.transferinput.InputCoin(
@@ -1016,46 +906,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     )
   }
 
-  private def openMiningRound(svc: PartyId, round: Long, coinPrice: Double) = {
-    val template = new roundCodegen.OpenMiningRound(
-      svc.toProtoPrimitive,
-      new ccApiCodegen.round.Round(round),
-      new java.math.BigDecimal(coinPrice),
-      Instant.now(),
-      Instant.now().plusSeconds(600),
-      new RelTime(1_000_000),
-      CNNodeUtil.defaultTransferConfig(10, holdingFee),
-      CNNodeUtil.issuanceConfig(10.0, 10.0, 10.0),
-      new RelTime(1_000_000),
-    )
-
-    Contract(
-      roundCodegen.OpenMiningRound.TEMPLATE_ID,
-      new roundCodegen.OpenMiningRound.ContractId(n.toString),
-      template,
-      ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
-    )
-  }
-
-  private def closedMiningRound(svc: PartyId, round: Long) = {
-    val template = new roundCodegen.ClosedMiningRound(
-      svc.toProtoPrimitive,
-      new ccApiCodegen.round.Round(round),
-      new java.math.BigDecimal(1),
-      new java.math.BigDecimal(1),
-      new java.math.BigDecimal(1),
-    )
-
-    Contract(
-      roundCodegen.ClosedMiningRound.TEMPLATE_ID,
-      new roundCodegen.ClosedMiningRound.ContractId(n.toString),
-      template,
-      ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
-    )
-  }
-
   private def mkCoinExpire() =
     new coinCodegen.Coin_Expire(
       new roundCodegen.OpenMiningRound.ContractId(nextCid()),
@@ -1080,27 +930,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       new java.math.BigDecimal(changeToInitialAmountAsOfRoundZero),
       new java.math.BigDecimal(changeToHoldingFeesRate),
     ).toValue
-
-  private def coinRulesV1Test(n: Int) = {
-    val template = new CoinRulesV1Test(
-      svcParty.toProtoPrimitive,
-      CNNodeUtil.defaultCoinConfigSchedule(
-        NonNegativeFiniteDuration(Duration.ofMinutes(10)),
-        10,
-        dummyDomain,
-      ),
-      CNNodeUtil.defaultEnabledChoices,
-      true,
-      false,
-    )
-    Contract(
-      CoinRulesV1Test.TEMPLATE_ID,
-      new CoinRulesV1Test.ContractId(n.toString),
-      template,
-      ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
-    )
-  }
 
   private def validatorTraffic(validatorParty: PartyId) = {
     val template = new ValidatorTraffic(
@@ -1131,17 +960,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     Contract(
       ImportCrate.TEMPLATE_ID,
       new ImportCrate.ContractId(s"${receiver.toProtoPrimitive}::$n"),
-      template,
-      ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
-    )
-  }
-
-  private def featuredAppRight(providerParty: PartyId) = {
-    val template = new FeaturedAppRight(svcParty.toProtoPrimitive, providerParty.toProtoPrimitive)
-    Contract(
-      FeaturedAppRight.TEMPLATE_ID,
-      new FeaturedAppRight.ContractId(providerParty.toProtoPrimitive),
       template,
       ContractMetadata.Empty(),
       protobuf.Any.getDefaultInstance,

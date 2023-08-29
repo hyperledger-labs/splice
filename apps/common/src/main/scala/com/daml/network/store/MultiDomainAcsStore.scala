@@ -4,6 +4,7 @@ import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.transaction_filter.TransactionFilter as LapiTransactionFilter
+import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.ledger.javaapi.data.{
   ContractMetadata,
   CreatedEvent,
@@ -58,6 +59,15 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]]
+
+  /** Returns any contract of the same template as the passed companion.
+    */
+  def findAnyContractWithOffset[C, TCid <: ContractId[_], T](
+      companion: C
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[QueryResult[Option[ContractWithState[TCid, T]]]]
 
   /** Check if the contract is active on the current domain.
     */
@@ -159,6 +169,13 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Seq[Contract[TCid, T]]]
+
+  import language.existentials
+
+  def listAssignedContractsNotOnDomains(
+      excludedDomain: DomainId,
+      companions: TemplateCompanion[_ <: ContractId[T], T] forSome { type T <: Template }*
+  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]]
 
   private[network] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[T], T <: Template](
       companion: C

@@ -17,7 +17,7 @@ import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import io.circe.Json
 import slick.ast.FieldSymbol
-import slick.jdbc.{GetResult, JdbcType, PositionedParameters, SetParameter}
+import slick.jdbc.{GetResult, JdbcType, PositionedParameters, PositionedResult, SetParameter}
 import spray.json.{JsString, JsValue, JsonFormat, deserializationError}
 
 import java.sql.{PreparedStatement, ResultSet}
@@ -63,6 +63,21 @@ trait AcsJdbcTypes {
 
   protected implicit def contractIdGetResultOption[T]: GetResult[Option[ContractId[T]]] =
     GetResult.GetStringOption.andThen(_.map(new ContractId[T](_)))
+
+  protected implicit def contractIdArrayGetResult[T]: GetResult[Array[ContractId[T]]] =
+    (r: PositionedResult) => {
+      (r.rs
+        .getArray(r.skip.currentPos)
+        .getArray match {
+        case arr: Array[String] =>
+          arr
+        case x =>
+          throw new IllegalStateException(
+            s"Expected an array of strings, but got $x. Are you sure you selected a contract_id (text) array column?"
+          )
+      })
+        .map(new ContractId[T](_))
+    }
 
   protected implicit lazy val offsetJdbcType: JdbcType[Offset] =
     MappedColumnType.base[Offset, String](
@@ -129,6 +144,10 @@ trait AcsJdbcTypes {
     (partyId: Option[PartyId], pp: PositionedParameters) =>
       implicitly[SetParameter[Option[String2066]]]
         .apply(partyId.map(party => lengthLimited(party.toProtoPrimitive)), pp)
+
+  protected implicit lazy val memberIdSetParameter: SetParameter[Member] =
+    (memberId: Member, pp: PositionedParameters) =>
+      implicitly[SetParameter[String300]].apply(memberId.toLengthLimitedString, pp)
 
   protected implicit lazy val memberIdSetParameterOption: SetParameter[Option[Member]] =
     (memberIdO: Option[Member], pp: PositionedParameters) =>

@@ -52,6 +52,15 @@ class AcsJdbcTypesTest extends AsyncWordSpec with AcsJdbcTypes with BaseTest wit
         fetched <- storage.query(TestTable.result, "fetch")
       } yield fetched.head).futureValue should be(row)
     }
+
+    "read contract id arrays" in {
+      for {
+        result <- storage.querySingle(
+          sql"select ARRAY['a', 'b', 'c']".as[Array[ContractId[Any]]].headOption,
+          "array",
+        )
+      } yield result should be(Array("a", "b", "c").map(new ContractId[Any](_)))
+    }
   }
 
   case class TestRow(

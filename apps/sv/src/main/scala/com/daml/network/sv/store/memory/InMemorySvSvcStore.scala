@@ -1,32 +1,25 @@
 package com.daml.network.sv.store.memory
 
-import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.cc.{v1test as v1testcc, validatorlicense as vl}
-import com.daml.network.codegen.java.cn.cns.*
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.svcrules.*
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
-  ARC_CnsEntryContext,
-  ARC_CoinRules,
-}
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CnsEntryContext
 import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
-import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, ContractState, QueryResult}
+import com.daml.network.store.MultiDomainAcsStore.{ContractState, QueryResult}
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.SvSvcStore.DuplicateValidatorTrafficContracts
 import com.daml.network.sv.store.{ExpiredRewardCouponsBatch, SvStore, SvSvcStore}
@@ -51,29 +44,6 @@ class InMemorySvSvcStore(
 ) extends InMemoryCNNodeAppStoreWithoutHistory
     with SvSvcStore {
 
-  protected[this] override def listAssignedContractsNotOnDomain[C, I <: ContractId[?], P](
-      excludedDomain: DomainId,
-      c: C,
-  )(implicit
-      tc: TraceContext,
-      companion: ContractCompanion[C, I, P],
-  ): Future[Seq[AssignedContract[I, P]]] =
-    multiDomainAcsStore
-      .listAssignedContracts(c)
-      .map(_.filterNot(_.domain == excludedDomain))
-
-  override def lookupSvcRulesWithOffset(): Future[
-    MultiDomainAcsStore.QueryResult[Option[AssignedContract[SvcRules.ContractId, SvcRules]]]
-  ] = for {
-    c <- multiDomainAcsStore.findContractWithOffset(cn.svcrules.SvcRules.COMPANION)()
-  } yield c.map(_ flatMap (_.toAssignedContract))
-
-  override protected def lookupCoinRulesWithOffset()
-      : Future[QueryResult[Option[AssignedContract[CoinRules.ContractId, CoinRules]]]] = for {
-    result <- multiDomainAcsStore
-      .findContractWithOffset(cc.coin.CoinRules.COMPANION)((_: Any) => true)
-  } yield result map (_ flatMap (_.toAssignedContract))
-
   override def lookupCoinRulesV1TestWithOffset()(implicit
       tc: TraceContext
   ): Future[QueryResult[Option[Contract[CoinRulesV1Test.ContractId, CoinRulesV1Test]]]] =
@@ -84,13 +54,6 @@ class InMemorySvSvcStore(
           (_: Any) => true,
         )
     )
-
-  override protected def lookupCnsRulesWithOffset(): Future[MultiDomainAcsStore.QueryResult[Option[
-    AssignedContract[CnsRules.ContractId, CnsRules]
-  ]]] = for {
-    result <- multiDomainAcsStore
-      .findContractWithOffset(cn.cns.CnsRules.COMPANION)((_: Any) => true)
-  } yield result map (_ flatMap (_.toAssignedContract))
 
   override protected def listExpiredRoundBased[Id <: ContractId[T], T <: Template](
       companion: TemplateCompanion[Id, T]
@@ -117,7 +80,8 @@ class InMemorySvSvcStore(
       } yield result
 
   override def listConfirmations(
-      action: ActionRequiringConfirmation
+      action: ActionRequiringConfirmation,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[Contract[Confirmation.ContractId, Confirmation]]] = {
     for {
       domain <- defaultAcsDomainIdF
@@ -126,6 +90,7 @@ class InMemorySvSvcStore(
         domain,
         (c: Contract[Confirmation.ContractId, Confirmation]) =>
           c.payload.action.toValue == action.toValue,
+        limit,
       )
     } yield confirmations
   }
@@ -219,16 +184,16 @@ class InMemorySvSvcStore(
               totalCouponsLimit = totalCouponsLimit,
             )
           } yield appRewardGroups.map(group =>
-            ExpiredRewardCouponsBatch(closedRound, Seq.empty, group)
+            ExpiredRewardCouponsBatch(closedRound.contractId, Seq.empty, group)
           ) ++
             validatorRewardGroups.map(group =>
-              ExpiredRewardCouponsBatch(closedRound, group, Seq.empty)
+              ExpiredRewardCouponsBatch(closedRound.contractId, group, Seq.empty)
             )
         case None => Future(Seq())
       }
   }
 
-  override def lookupOldestClosedMiningRound()(implicit
+  override protected def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
   ): Future[Option[Contract[ClosedMiningRound.ContractId, ClosedMiningRound]]] = for {
     domain <- defaultAcsDomainIdF
@@ -237,51 +202,6 @@ class InMemorySvSvcStore(
       domain,
     )
   } yield rounds.sortBy(_.payload.round.number).headOption
-
-  override def listArchivableClosedMiningRounds()(implicit
-      tc: TraceContext
-  ): Future[Seq[QueryResult[Contract[ClosedMiningRound.ContractId, ClosedMiningRound]]]] = {
-    for {
-      domain <- defaultAcsDomainIdF
-      closedRounds <- multiDomainAcsStore.listContractsOnDomain(
-        cc.round.ClosedMiningRound.COMPANION,
-        domain,
-      )
-      archivableClosedRounds <- closedRounds.traverse(round => {
-        for {
-          appRewardCoupons <- listAppRewardCouponsOnDomain(
-            round.payload.round.number,
-            domain,
-            PageLimit(1L),
-          )
-          validatorRewardCoupons <- listValidatorRewardCouponsOnDomain(
-            round.payload.round.number,
-            domain,
-            PageLimit(1L),
-          )
-          action = new ARC_CoinRules(
-            new CRARC_MiningRound_Archive(
-              new CoinRules_MiningRound_Archive(
-                round.contractId
-              )
-            )
-          )
-          confirmationQueryResult <- lookupConfirmationByActionWithOffset(key.svParty, action)
-        } yield {
-          (
-            // archivable if ...
-            if (
-              // ... there are no unclaimed rewards left in this round
-              appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty &&
-              // ... and a confirmation to archive is not already created by this SV
-              confirmationQueryResult.value.isEmpty
-            ) Some(QueryResult(confirmationQueryResult.offset, round))
-            else None
-          )
-        }
-      })
-    } yield archivableClosedRounds.flatten
-  }
 
   override def lookupConfirmationByActionWithOffset(
       confirmer: PartyId,
@@ -350,18 +270,6 @@ class InMemorySvSvcStore(
     )
   } yield svOnboardings
 
-  override def listUnclaimedRewards(limit: Long)(implicit
-      tc: TraceContext
-  ): Future[Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]] = for {
-    domain <- defaultAcsDomainIdF
-    unclaimedRewards <- multiDomainAcsStore.filterContractsOnDomain(
-      cc.coin.UnclaimedReward.COMPANION,
-      domain,
-      (_: Contract[cc.coin.UnclaimedReward.ContractId, cc.coin.UnclaimedReward]) => true,
-      limit = PageLimit(limit),
-    )
-  } yield unclaimedRewards
-
   override def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Long)(
       implicit tc: TraceContext
   ): Future[Seq[Contract[MemberTraffic.ContractId, MemberTraffic]]] = for {
@@ -369,20 +277,10 @@ class InMemorySvSvcStore(
       cc.globaldomain.MemberTraffic.COMPANION,
       domainId,
       (co: Contract[cc.globaldomain.MemberTraffic.ContractId, cc.globaldomain.MemberTraffic]) =>
-        co.payload.memberId == memberId.toProtoPrimitive && co.payload.domainId == domainId.toProtoPrimitive,
+        co.payload.memberId == memberId.toProtoPrimitive,
       PageLimit(limit),
     )
   } yield memberTraffics
-
-  override def listAllCoinPriceVotes()(implicit
-      tc: TraceContext
-  ): Future[Seq[Contract[CoinPriceVote.ContractId, CoinPriceVote]]] = for {
-    domain <- defaultAcsDomainIdF
-    votes <- multiDomainAcsStore.listContractsOnDomain(
-      cn.svc.coinprice.CoinPriceVote.COMPANION,
-      domain,
-    )
-  } yield votes
 
   override def listMemberCoinPriceVotes()(implicit
       tc: TraceContext
@@ -536,7 +434,7 @@ class InMemorySvSvcStore(
     )
   }
 
-  override protected def lookupSvOnboardingConfirmedByNameWithOffset(
+  override def lookupSvOnboardingConfirmedByNameWithOffset(
       svName: String
   )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]]
@@ -620,63 +518,9 @@ class InMemorySvSvcStore(
     cratesForReceiver,
   )
 
-  import language.existentials
-
-  private[this] def listAssignedContractsNotOnDomainN(
-      excludedDomain: DomainId,
-      companions: TemplateCompanion[_ <: ContractId[T], T] forSome { type T <: Template }*
-  )(implicit tc: TraceContext) = Future
-    .traverse(companions)(listAssignedContractsNotOnDomain(excludedDomain, _))
-    .map(_.view.flatten)
-
-  private[this] def listLaggingSvcRulesFollowers(targetDomain: DomainId)(implicit
-      tc: TraceContext
-  ): Future[Seq[AssignedContract[?, ?]]] = {
-    import com.daml.network.codegen.java.cn.svcrules as svcr
-    for {
-      coinRulesO <- lookupCoinRules()
-      otherContracts <- listAssignedContractsNotOnDomainN(
-        targetDomain,
-        svcr.Vote.COMPANION,
-        svcr.VoteRequest.COMPANION,
-        svcr.Confirmation.COMPANION,
-        svcr.SvReward.COMPANION,
-        svcr.ElectionRequest.COMPANION,
-        so.SvOnboardingRequest.COMPANION,
-        so.SvOnboardingConfirmed.COMPANION,
-      )
-    } yield (otherContracts ++ coinRulesO
-      .filterNot(_.domain == targetDomain)
-      .toList).toSeq
-  }
-
-  override final def listSvcRulesTransferFollowers()(implicit
-      tc: TraceContext
-  ): Future[Seq[FollowTask[SvcRules.ContractId, SvcRules, _, _]]] = {
-    lookupSvcRules().flatMap(_.map { svcRules =>
-      listLaggingSvcRulesFollowers(svcRules.domain)
-        .map(_ map (FollowTask(svcRules, _)))
-    }.getOrElse(Future successful Seq.empty))
-  }
-
-  override final def listCoinRulesTransferFollowers()(implicit
-      tc: TraceContext
-  ): Future[Seq[FollowTask[cc.coin.CoinRules.ContractId, cc.coin.CoinRules, ?, ?]]] =
-    lookupCoinRules().flatMap(_.map { coinRules =>
-      listAssignedContractsNotOnDomainN(
-        coinRules.domain,
-        cc.round.OpenMiningRound.COMPANION,
-        cc.round.SummarizingMiningRound.COMPANION,
-        cc.round.IssuingMiningRound.COMPANION,
-        cc.round.ClosedMiningRound.COMPANION,
-        cc.coin.FeaturedAppRight.COMPANION,
-        cc.coin.SvcReward.COMPANION,
-        cc.coin.UnclaimedReward.COMPANION,
-        cc.validatorlicense.ValidatorLicense.COMPANION,
-      ).map(_.map(FollowTask(coinRules, _)).toSeq)
-    }.getOrElse(Future successful Seq.empty))
-
-  override protected def lookupCnsEntryByNameWithOffset(name: String): Future[
+  override def lookupCnsEntryByNameWithOffset(
+      name: String
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[AssignedContract[cn.cns.CnsEntry.ContractId, cn.cns.CnsEntry]]]
   ] = multiDomainAcsStore
     .findContractWithOffset(cn.cns.CnsEntry.COMPANION)(
@@ -684,7 +528,7 @@ class InMemorySvSvcStore(
     )
     .map(_.map(_.flatMap(_.toAssignedContract)))
 
-  override protected def listCnsEntryContextByCnsName(
+  private def listCnsEntryContextByCnsName(
       name: String
   )(implicit tc: TraceContext): Future[
     Seq[Contract[cn.cns.CnsEntryContext.ContractId, cn.cns.CnsEntryContext]]

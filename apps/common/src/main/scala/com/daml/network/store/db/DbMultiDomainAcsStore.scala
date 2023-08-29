@@ -41,6 +41,9 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
+import com.digitalasset.canton.admin.api.client.data.TemplateId
+import com.daml.ledger.javaapi.data as javab
 
 class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
     storage: DbStorage,
@@ -62,6 +65,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     with TxLogStore[TXI, TXE]
     with AcsTables
     with AcsQueries
+    with StoreErrors
     with NamedLogging
     with LimitHelpers {
 
@@ -101,6 +105,36 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       )
       .semiflatMap(contractWithStateFromRow(companion)(_))
       .value
+  }
+
+  /** Returns any contract of the same template as the passed companion.
+    */
+  override def findAnyContractWithOffset[C, TCid <: ContractId[_], T](companion: C)(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[QueryResult[Option[ContractWithState[TCid, T]]]] = waitUntilAcsIngested {
+    val templateId = companionClass.typeId(companion)
+    for {
+      resultWithOffset <- storage
+        .querySingle(
+          selectFromAcsTableWithOffset(
+            acsTableName,
+            storeId,
+            where = sql"""
+            template_id = $templateId
+             """,
+            orderLimit = sql"limit 1",
+          ).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
+          "findAnyContractWithOffset",
+        )
+        .getOrRaise(offsetExpectedError())
+      contractWithState <- resultWithOffset.row.traverse(contractWithStateFromRow(companion)(_))
+    } yield {
+      QueryResult(
+        resultWithOffset.offset,
+        contractWithState,
+      )
+    }
   }
 
   override def lookupContractStateById(id: ContractId[?])(implicit
@@ -209,6 +243,51 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         Future.successful(Seq.empty)
       } else {
         listContracts(companion, limit).map(_.map(_.contract))
+      }
+    }
+  }
+
+  import language.existentials
+
+  override def listAssignedContractsNotOnDomains(
+      excludedDomain: DomainId,
+      companions: TemplateCompanion[_ <: ContractId[T], T] forSome { type T <: javab.Template }*
+  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = waitUntilAcsIngested {
+    // TODO (#5314): properly check for the domain
+    resolveDomainId(tc).flatMap { thisDomain =>
+      if (thisDomain == excludedDomain) {
+        logger.warn(
+          "Tried to list contracts not on domain {} but this DB ACS Store is for domain {}.",
+          excludedDomain,
+          thisDomain,
+        )
+        Future.successful(Seq.empty)
+      } else {
+        val templateIdMap = companions
+          .map(c =>
+            TemplateId(
+              c.TEMPLATE_ID.getPackageId,
+              c.TEMPLATE_ID.getModuleName,
+              c.TEMPLATE_ID.getEntityName,
+            ) -> c
+          )
+          .toMap
+        val templateIds = templateIdMap.keys.mkString("(',", "','", "')")
+        for {
+          result <- storage.query(
+            (selectFromAcsTable(acsTableName) ++
+              sql"""
+                where store_id = $storeId
+                  and template_id IN #$templateIds
+                 """).toActionBuilder.as[AcsStoreRowTemplate],
+            "listAssignedContractsNotOnDomainN",
+          )
+          withState <- result.traverse(row =>
+            contractWithStateFromRow(
+              templateIdMap(row.templateId)
+            )(row)
+          )
+        } yield withState.flatMap(_.toAssignedContract)
       }
     }
   }

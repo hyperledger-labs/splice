@@ -262,7 +262,9 @@ object CNNodeUtil {
     // with one day corresponding to 24*60/2.5 rounds, i.e., one round
     // every 2.5 minutes.
     // Incentivizes users to actively merge their coins.
-    new cc.fees.RatePerRound(holdingFee.bigDecimal),
+    new cc.fees.RatePerRound(
+      holdingFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
+    ),
 
     // Fee for transferring some amount of coin to a new owner.
     defaultTransferFee,

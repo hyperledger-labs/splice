@@ -446,7 +446,10 @@ create table svc_acs_store
     -- the cnsEntryContextCid of a Confirmation contract:
     -- - if the action is of type ARC_CnsEntryContext
     -- - if the above's cnsEntryContextAction is of type CNSRARC_CollectInitialEntryPayment
-    action_cns_entry_context_cid  text
+    action_cns_entry_context_cid  text,
+
+    -- the provider partyid of a FeaturedAppRight contract
+    featured_app_right_provider text
 );
 
 -- ordered mining rounds

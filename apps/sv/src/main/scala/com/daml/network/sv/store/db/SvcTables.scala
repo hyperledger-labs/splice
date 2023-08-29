@@ -5,6 +5,7 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.validatorlicense as vl
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.store.db.AcsTables
 import com.daml.network.util.{CNNodeUtil, Contract}
@@ -38,6 +39,7 @@ object SvcTables extends AcsTables with NamedLogging {
       memberTrafficMember: Option[Member] = None,
       cnsEntryName: Option[String] = None,
       actionCnsEntryContextCid: Option[cn.cns.CnsEntryContext.ContractId] = None,
+      featuredAppRightProvider: Option[PartyId] = None,
   )
 
   object SvcAcsStoreRowData {
@@ -124,11 +126,21 @@ object SvcTables extends AcsTables with NamedLogging {
           }
         case cc.coin.CoinRules.TEMPLATE_ID =>
           tryToDecode(cc.coin.CoinRules.COMPANION, createdEvent)(SvcAcsStoreRowData(_))
+        case ccV1Test.coin.CoinRulesV1Test.TEMPLATE_ID =>
+          tryToDecode(ccV1Test.coin.CoinRulesV1Test.COMPANION, createdEvent)(SvcAcsStoreRowData(_))
         case cc.coin.Coin.TEMPLATE_ID =>
           tryToDecode(cc.coin.Coin.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
               coinRoundOfExpiry = Some(CNNodeUtil.coinExpiresAt(contract.payload).number),
+            )
+          }
+        case cc.coin.FeaturedAppRight.TEMPLATE_ID =>
+          tryToDecode(cc.coin.FeaturedAppRight.COMPANION, createdEvent) { contract =>
+            SvcAcsStoreRowData(
+              contract,
+              featuredAppRightProvider =
+                Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
             )
           }
         case cc.coin.LockedCoin.TEMPLATE_ID =>

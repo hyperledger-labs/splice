@@ -22,7 +22,6 @@ import com.daml.network.validator.store.db.DbValidatorStore
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
@@ -434,14 +433,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
     svcParty = svcParty,
     validatorParty = validator,
   )
-
-  private var cIdCounter = 0
-  private def nextCid() = {
-    cIdCounter += 1
-    // Note: contract ids that appear in contract payloads need to pass contract id validation,
-    // otherwise JSON serialization will fail when storing contracts in the database.
-    LfContractId.assertFromString("00" + f"$cIdCounter%064x").coid
-  }
 
   private def walletInstall(endUserParty: PartyId, endUserName: String) = {
     val templateId = walletCodegen.WalletAppInstall.TEMPLATE_ID

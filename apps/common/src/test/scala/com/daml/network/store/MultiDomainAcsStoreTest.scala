@@ -118,8 +118,9 @@ abstract class MultiDomainAcsStoreTest[
       _ shouldBe expected
     }
 
-  protected def c(i: Int): C = appRewardCoupon(i, svcParty)
-  protected def cFeatured(i: Int): C = appRewardCoupon(i, svcParty, true)
+  protected def c(i: Int): C = appRewardCoupon(i, svcParty, contractId = validContractId(i))
+  protected def cFeatured(i: Int): C =
+    appRewardCoupon(i, svcParty, true, contractId = validContractId(i))
 
   def transferInProgress(
       i: Int
