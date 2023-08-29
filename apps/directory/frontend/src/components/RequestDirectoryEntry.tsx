@@ -6,25 +6,20 @@ import { Box, Button, Stack, Typography, styled } from '@mui/material';
 
 import Searchbar from '../components/Searchbar';
 import { useDirectoryInstall, useLookupEntryByName, useRequestEntry } from '../hooks';
-import { config } from '../utils';
+import { config, ENTRY_NAME_SUFFIX, toFullEntryName } from '../utils';
 
 type NameLookupStatus = 'available' | 'taken' | 'loading';
 
-const entryNameSuffix = '.unverified.cns';
-const entryNameRegex = new RegExp(
-  `^[a-z0-9_-]{1,${40 - entryNameSuffix.length}}\\.unverified\\.cns$`
-);
+const entryNameRegex = new RegExp(`^[a-z0-9_-]{1,${40 - ENTRY_NAME_SUFFIX.length}}$`);
 const isEntryNameValid = (name: string) => {
   return entryNameRegex.test(name);
 };
-
-const toFullEntryName = (name: string) => `${name}${entryNameSuffix}`;
 
 const RequestDirectoryEntry: React.FC = () => {
   const [entryName, setEntryName] = useState<string>('');
 
   const [displayValidationResult, setDisplayValidationResult] = useState(false);
-  const { data: entryLookupResult, isLoading } = useLookupEntryByName(toFullEntryName(entryName));
+  const { data: entryLookupResult, isLoading } = useLookupEntryByName(entryName, ENTRY_NAME_SUFFIX);
 
   const nameLookupStatus: NameLookupStatus = isLoading
     ? 'loading'
@@ -57,10 +52,7 @@ const RequestDirectoryEntry: React.FC = () => {
         </Button>
       </Stack>
       {displayValidationResult && (
-        <SubscriptionBar
-          entryName={toFullEntryName(entryName)}
-          nameLookupStatus={nameLookupStatus}
-        />
+        <SubscriptionBar entryName={entryName} nameLookupStatus={nameLookupStatus} />
       )}
     </Stack>
   );
@@ -103,7 +95,7 @@ const SubscriptionBar: React.FC<{ entryName: string; nameLookupStatus: NameLooku
           variant="pill"
           id="request-entry-with-sub-button"
           text="Subscribe Now"
-          createPaymentRequest={() => requestEntry(entryName)}
+          createPaymentRequest={() => requestEntry({ entryName, suffix: ENTRY_NAME_SUFFIX })}
           redirectPath={`/post-payment?entryName=${encodeURIComponent(entryName)}`}
           walletPath={config.services.wallet.uiUrl}
         />
@@ -121,7 +113,7 @@ const SubscriptionBar: React.FC<{ entryName: string; nameLookupStatus: NameLooku
           {icon}
         </Box>
         <Typography display="inline" fontWeight="bold">
-          {entryName}
+          {toFullEntryName(entryName, ENTRY_NAME_SUFFIX)}
         </Typography>
         &nbsp;
         <Typography id="entry-name-validation-message" display="inline">

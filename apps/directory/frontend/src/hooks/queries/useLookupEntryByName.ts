@@ -3,19 +3,24 @@ import { Contract, useDirectoryClient, usePrimaryParty } from 'common-frontend';
 
 import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
+import { toFullEntryName } from '../../utils';
+
 type LookupEntryResponse = {
   entryContract?: Contract<DirectoryEntry>;
 };
 
-const useLookupEntryByName = (name?: string): UseQueryResult<LookupEntryResponse> => {
+const useLookupEntryByName = (
+  name: string,
+  suffix: string
+): UseQueryResult<LookupEntryResponse> => {
   const directoryClient = useDirectoryClient();
   const { data: primaryPartyId } = usePrimaryParty();
 
   return useQuery({
-    queryKey: ['lookupEntryByName', name],
+    queryKey: ['lookupEntryByName', name, suffix],
     queryFn: async () => {
       return directoryClient
-        .lookupEntryByName(name!)
+        .lookupEntryByName(toFullEntryName(name, suffix))
         .then(response => ({
           entryContract: response,
         }))
