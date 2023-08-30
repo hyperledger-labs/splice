@@ -951,8 +951,9 @@ commands:
           # because the interactive password prompt reads directly from
           # /dev/tty rather than stdin, and simple IO piping doesn't work
           command: |
-            /tmp/vpn-scripts/connect-vpn.expect $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD
+            /usr/bin/sudo touch /var/log/vpn.log
             /usr/bin/sudo chmod a+w /var/log/vpn.log
+            /tmp/vpn-scripts/connect-vpn.expect $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD
       - run:
           name: Define local hostname
           command: |
