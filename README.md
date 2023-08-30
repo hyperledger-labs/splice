@@ -147,6 +147,14 @@ clusters.)
 
 9. On MacOS, please install the following globally:
    1. Firefox, by following the process here: <https://www.firefox.com>
+10. Configure CircleCI.
+   Open `./.circleci/cluster-lock-users.json`, and add a line of the format
+   ```
+   "<circleci-username>": ["<local-username>"],
+   ```
+   where `circleci-username` is the username you are using for logging into CircleCI
+   (your GitHub username if you are logging into CircleCI using your GitHub account)
+   and `local-username` is the local username on your machine (as returned by `whoami`).
 
 ### Private Environment Variables
 
