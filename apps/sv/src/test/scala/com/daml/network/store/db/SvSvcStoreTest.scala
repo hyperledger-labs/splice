@@ -443,35 +443,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    "lookupCnsInitialPaymentConfirmationByCnsNameWithOffset" should {
-
-      "find the confirmation by the cns name" in {
-        val goodCnsName = cnsEntryContext(userParty(1), "good")
-        val goodConfirmation = confirmation(1, cnsEntryContextPaymentAction(goodCnsName.contractId))
-        val badCnsName = cnsEntryContext(userParty(2), "bad")
-        val badConfirmation = confirmation(2, cnsEntryContextPaymentAction(badCnsName.contractId))
-        val unrelatedConfirmation = confirmation(3, enabledChoicesTrueAction)
-        for {
-          store <- mkStore()
-          _ <- Future.traverse(
-            Seq(goodCnsName, badCnsName)
-          )(
-            dummyDomain.create(_)(store.multiDomainAcsStore)
-          )
-          _ <- Future.traverse(
-            Seq(goodConfirmation, badConfirmation, unrelatedConfirmation)
-          )(
-            dummyDomain.create(_)(store.multiDomainAcsStore)
-          )
-          result <- store.lookupCnsInitialPaymentConfirmationByCnsNameWithOffset(
-            storeSvParty,
-            "good",
-          )
-        } yield result.value should be(Some(goodConfirmation))
-      }
-
-    }
-
     "listExpiredSvOnboardingRequests" should {
 
       "return all expired SV onboarding requests" in {

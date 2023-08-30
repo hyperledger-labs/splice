@@ -13,9 +13,13 @@ import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CnsEntryContext
-import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment
+import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.{
+  CNSRARC_CollectInitialEntryPayment,
+  CNSRARC_RejectEntryInitialPayment,
+}
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
+import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
@@ -217,32 +221,111 @@ class InMemorySvSvcStore(
       )
     )
 
-  override def lookupCnsInitialPaymentConfirmationByCnsNameWithOffset(
+  override def lookupCnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset(
       confirmer: PartyId,
-      name: String,
+      paymentId: SubscriptionInitialPayment.ContractId,
   )(implicit
       tc: TraceContext
-  ): Future[QueryResult[Option[Contract[Confirmation.ContractId, Confirmation]]]] = for {
-    domain <- defaultAcsDomainIdF
-    cnsContextCids <- listCnsEntryContextByCnsName(name).map(_.map(_.contractId).toSet)
-    result <- multiDomainAcsStore.findContractOnDomainWithOffset(
-      cn.svcrules.Confirmation.COMPANION
-    )(
-      domain,
-      (co: Contract[Confirmation.ContractId, Confirmation]) =>
-        co.payload.confirmer == confirmer.toProtoPrimitive
-          && (co.payload.action match {
-            case arcCnsEntryContext: ARC_CnsEntryContext =>
-              arcCnsEntryContext.cnsEntryContextAction match {
-                case _: CNSRARC_CollectInitialEntryPayment =>
-                  cnsContextCids.contains(arcCnsEntryContext.cnsEntryContextCid)
-                case _ =>
-                  false
-              }
-            case _ => false
-          }),
-    )
-  } yield result
+  ): Future[QueryResult[Option[Contract[Confirmation.ContractId, Confirmation]]]] =
+    for {
+      domain <- defaultAcsDomainIdF
+      result <- multiDomainAcsStore.findContractOnDomainWithOffset(
+        cn.svcrules.Confirmation.COMPANION
+      )(
+        domain,
+        (co: Contract[Confirmation.ContractId, Confirmation]) =>
+          co.payload.confirmer == confirmer.toProtoPrimitive
+            && (co.payload.action match {
+              case arcCnsEntryContext: ARC_CnsEntryContext =>
+                arcCnsEntryContext.cnsEntryContextAction match {
+                  case a: CNSRARC_CollectInitialEntryPayment =>
+                    a.cnsEntryContext_CollectInitialEntryPaymentValue.paymentCid == paymentId
+                  case _ =>
+                    false
+                }
+              case _ => false
+            }),
+      )
+    } yield result
+
+  override def lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(
+      confirmer: PartyId,
+      paymentId: SubscriptionInitialPayment.ContractId,
+  )(implicit
+      tc: TraceContext
+  ): Future[QueryResult[Option[Contract[Confirmation.ContractId, Confirmation]]]] =
+    for {
+      domain <- defaultAcsDomainIdF
+      result <- multiDomainAcsStore.findContractOnDomainWithOffset(
+        cn.svcrules.Confirmation.COMPANION
+      )(
+        domain,
+        (co: Contract[Confirmation.ContractId, Confirmation]) =>
+          co.payload.confirmer == confirmer.toProtoPrimitive
+            && (co.payload.action match {
+              case arcCnsEntryContext: ARC_CnsEntryContext =>
+                arcCnsEntryContext.cnsEntryContextAction match {
+                  case a: CNSRARC_RejectEntryInitialPayment =>
+                    a.cnsEntryContext_RejectEntryInitialPaymentValue.paymentCid == paymentId
+                  case _ =>
+                    false
+                }
+              case _ => false
+            }),
+      )
+    } yield result
+
+  override def lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset(
+      confirmer: PartyId,
+      paymentId: SubscriptionInitialPayment.ContractId,
+  )(implicit
+      tc: TraceContext
+  ): Future[QueryResult[Option[Contract[Confirmation.ContractId, Confirmation]]]] =
+    for {
+      domain <- defaultAcsDomainIdF
+      result <- multiDomainAcsStore.findContractOnDomainWithOffset(
+        cn.svcrules.Confirmation.COMPANION
+      )(
+        domain,
+        (co: Contract[Confirmation.ContractId, Confirmation]) =>
+          co.payload.confirmer == confirmer.toProtoPrimitive
+            && (co.payload.action match {
+              case arcCnsEntryContext: ARC_CnsEntryContext =>
+                arcCnsEntryContext.cnsEntryContextAction match {
+                  case a: CNSRARC_CollectInitialEntryPayment =>
+                    a.cnsEntryContext_CollectInitialEntryPaymentValue.paymentCid == paymentId
+                  case a: CNSRARC_RejectEntryInitialPayment =>
+                    a.cnsEntryContext_RejectEntryInitialPaymentValue.paymentCid == paymentId
+                  case _ =>
+                    false
+                }
+              case _ => false
+            }),
+      )
+    } yield result
+
+  override def listInitialPaymentConfirmationByCnsName(
+      confirmer: PartyId,
+      name: String,
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]
+  ] = {
+    for {
+      domain <- defaultAcsDomainIdF
+      cnsContextCids <- listCnsEntryContextByCnsName(name).map(_.map(_.contractId).toSet)
+      result <- multiDomainAcsStore.filterContractsOnDomain(
+        cn.svcrules.Confirmation.COMPANION,
+        domain,
+        (co: Contract[Confirmation.ContractId, Confirmation]) =>
+          co.payload.confirmer == confirmer.toProtoPrimitive
+            && (co.payload.action match {
+              case arcCnsEntryContext: ARC_CnsEntryContext =>
+                cnsContextCids.contains(arcCnsEntryContext.cnsEntryContextCid)
+              case _ => false
+            }),
+      )
+    } yield result
+  }
 
   override def lookupSvOnboardingRequestByTokenWithOffset(token: String)(implicit
       tc: TraceContext
@@ -543,33 +626,16 @@ class InMemorySvSvcStore(
     )
   } yield contexts
 
-  override def listInitialPaymentConfirmationByCnsName(
-      confirmer: PartyId,
-      name: String,
-  )(implicit tc: TraceContext): Future[
-    Seq[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]
-  ] = {
-    for {
-      domain <- defaultAcsDomainIdF
-      cnsContextCids <- listCnsEntryContextByCnsName(name).map(_.map(_.contractId).toSet)
-      result <- multiDomainAcsStore.filterContractsOnDomain(
-        cn.svcrules.Confirmation.COMPANION,
-        domain,
-        (co: Contract[Confirmation.ContractId, Confirmation]) =>
-          co.payload.confirmer == confirmer.toProtoPrimitive
-            && (co.payload.action match {
-              case arcCnsEntryContext: ARC_CnsEntryContext =>
-                arcCnsEntryContext.cnsEntryContextAction match {
-                  case _: CNSRARC_CollectInitialEntryPayment =>
-                    cnsContextCids.contains(arcCnsEntryContext.cnsEntryContextCid)
-                  case _ =>
-                    false
-                }
-              case _ => false
-            }),
-      )
-    } yield result
-  }
+  override def lookupSubscriptionInitialPaymentWithOffset(
+      paymentCid: SubscriptionInitialPayment.ContractId
+  ): Future[
+    QueryResult[Option[
+      AssignedContract[SubscriptionInitialPayment.ContractId, SubscriptionInitialPayment]
+    ]]
+  ] = for {
+    result <- multiDomainAcsStore
+      .findContractWithOffset(SubscriptionInitialPayment.COMPANION)((_: Any) => true)
+  } yield result map (_ flatMap (_.toAssignedContract))
 
   override def lookupFeaturedAppRightWithOffset(
       providerPartyId: PartyId

@@ -345,9 +345,27 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
     ]]
   ]
 
-  def lookupCnsInitialPaymentConfirmationByCnsNameWithOffset(
+  def lookupCnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset(
       confirmer: PartyId,
-      name: String,
+      paymentId: sub.SubscriptionInitialPayment.ContractId,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    QueryResult[Option[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]]
+  ]
+
+  def lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(
+      confirmer: PartyId,
+      paymentId: sub.SubscriptionInitialPayment.ContractId,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    QueryResult[Option[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]]
+  ]
+
+  def lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset(
+      confirmer: PartyId,
+      paymentId: sub.SubscriptionInitialPayment.ContractId,
   )(implicit
       tc: TraceContext
   ): Future[
@@ -702,6 +720,20 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       multiDomainAcsStore
         .lookupContractByIdOnDomain(cn.cns.CnsEntryContext.COMPANION)(_, contractId)
     )
+
+  def lookupSubscriptionInitialPaymentWithOffset(
+      paymentCid: sub.SubscriptionInitialPayment.ContractId
+  ): Future[
+    QueryResult[Option[
+      AssignedContract[sub.SubscriptionInitialPayment.ContractId, sub.SubscriptionInitialPayment]
+    ]]
+  ]
+
+  def lookupSubscriptionInitialPayment(
+      paymentCid: sub.SubscriptionInitialPayment.ContractId
+  ): Future[Option[
+    AssignedContract[sub.SubscriptionInitialPayment.ContractId, sub.SubscriptionInitialPayment]
+  ]] = lookupSubscriptionInitialPaymentWithOffset(paymentCid).map(_.value)
 
   def listInitialPaymentConfirmationByCnsName(
       confirmer: PartyId,

@@ -102,6 +102,8 @@ data SvcRules_ActionRequiringConfirmation
 data CnsEntryContext_ActionRequiringConfirmation
   = CNSRARC_CollectInitialEntryPayment CnsEntryContext_CollectInitialEntryPayment
     -- ^ Automated action to collect initial payment of an cns entry.
+  | CNSRARC_RejectEntryInitialPayment CnsEntryContext_RejectEntryInitialPayment
+    -- ^ Automated action to reject initial payment of an cns entry.
   deriving (Eq, Show)
 
 -- | Information about members relevant to collective governance.
@@ -1100,6 +1102,7 @@ executeActionRequiringConfirmation svcRulesCid coinRulesCid act = case act of
   ARC_CnsEntryContext with .. ->
     case cnsEntryContextAction of
       CNSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise cnsEntryContextCid choiceArg
+      CNSRARC_RejectEntryInitialPayment choiceArg -> void $ exercise cnsEntryContextCid choiceArg
 
 -- Functions implementing instant-runoff voting
 -----------------------------------------------

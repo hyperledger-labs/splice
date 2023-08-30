@@ -15,6 +15,7 @@ import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsEntryContext}
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
+import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
@@ -309,42 +310,65 @@ class DbSvSvcStore(
     )).getOrRaise(offsetExpectedError())
   }
 
-  override def lookupCnsInitialPaymentConfirmationByCnsNameWithOffset(
+  override def lookupCnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset(
       confirmer: PartyId,
-      name: String,
+      paymentId: SubscriptionInitialPayment.ContractId,
   )(implicit
       tc: TraceContext
   ): Future[
     MultiDomainAcsStore.QueryResult[Option[
       Contract[Confirmation.ContractId, Confirmation]
     ]]
-  ] = waitUntilAcsIngested {
-    (for {
-      resultWithOffset <- storage
-        .querySingle(
-          selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
-            storeId,
-            where = sql"""
-                        template_id = ${Confirmation.TEMPLATE_ID}
-                    and confirmer = $confirmer
-                    and action_cns_entry_context_cid IN (
-                      select contract_id
-                      from #${DbSvSvcStore.tableName}
-                      where store_id = $storeId
-                        and template_id = ${CnsEntryContext.TEMPLATE_ID}
-                        and cns_entry_name = ${lengthLimited(name)}
-                    )
-                      """,
-            orderLimit = sql"limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
-          "lookupCnsInitialPaymentConfirmationByCnsNameWithOffset",
-        )
-    } yield MultiDomainAcsStore.QueryResult(
-      resultWithOffset.offset,
-      resultWithOffset.row.map(contractFromRow(Confirmation.COMPANION)(_)),
-    )).getOrRaise(offsetExpectedError())
-  }
+  ] = ???
+
+  override def lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(
+      confirmer: PartyId,
+      paymentId: SubscriptionInitialPayment.ContractId,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    MultiDomainAcsStore.QueryResult[Option[
+      Contract[Confirmation.ContractId, Confirmation]
+    ]]
+  ] = ???
+
+  override def lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset(
+      confirmer: PartyId,
+      paymentId: SubscriptionInitialPayment.ContractId,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    MultiDomainAcsStore.QueryResult[Option[
+      Contract[Confirmation.ContractId, Confirmation]
+    ]]
+  ] = ???
+
+  override def listInitialPaymentConfirmationByCnsName(
+      confirmer: PartyId,
+      name: String,
+  )(implicit tc: TraceContext): Future[Seq[Contract[Confirmation.ContractId, Confirmation]]] =
+    waitUntilAcsIngested {
+      for {
+        result <- storage
+          .query(
+            (selectFromAcsTable(DbSvSvcStore.tableName) ++
+              sql"""
+                    where template_id = ${Confirmation.TEMPLATE_ID}
+                      and confirmer = $confirmer
+                      and action_cns_entry_context_cid IN (
+                        select contract_id
+                        from #${DbSvSvcStore.tableName}
+                        where store_id = $storeId
+                          and template_id = ${CnsEntryContext.TEMPLATE_ID}
+                          and cns_entry_name = ${lengthLimited(name)}
+                      )
+                    limit ${sqlLimit(Limit.DefaultLimit)};
+                        """).toActionBuilder.as[AcsStoreRowTemplate],
+            "listInitialPaymentConfirmationByCnsName",
+          )
+        limited = applyLimit(Limit.DefaultLimit, result)
+      } yield limited.map(contractFromRow(Confirmation.COMPANION)(_))
+    }
 
   override def lookupSvOnboardingRequestByTokenWithOffset(
       token: String
@@ -863,32 +887,11 @@ class DbSvSvcStore(
     )
   }
 
-  override def listInitialPaymentConfirmationByCnsName(
-      confirmer: PartyId,
-      name: String,
-  )(implicit tc: TraceContext): Future[Seq[Contract[Confirmation.ContractId, Confirmation]]] =
-    waitUntilAcsIngested {
-      for {
-        result <- storage
-          .query(
-            (selectFromAcsTable(DbSvSvcStore.tableName) ++
-              sql"""
-                    where template_id = ${Confirmation.TEMPLATE_ID}
-                      and confirmer = $confirmer
-                      and action_cns_entry_context_cid IN (
-                        select contract_id
-                        from #${DbSvSvcStore.tableName}
-                        where store_id = $storeId
-                          and template_id = ${CnsEntryContext.TEMPLATE_ID}
-                          and cns_entry_name = ${lengthLimited(name)}
-                      )
-                    limit ${sqlLimit(Limit.DefaultLimit)};
-                        """).toActionBuilder.as[AcsStoreRowTemplate],
-            "listInitialPaymentConfirmationByCnsName",
-          )
-        limited = applyLimit(Limit.DefaultLimit, result)
-      } yield limited.map(contractFromRow(Confirmation.COMPANION)(_))
-    }
+  override def lookupSubscriptionInitialPaymentWithOffset(
+      paymentCid: SubscriptionInitialPayment.ContractId
+  ): Future[MultiDomainAcsStore.QueryResult[
+    Option[AssignedContract[SubscriptionInitialPayment.ContractId, SubscriptionInitialPayment]]
+  ]] = ???
 
   override def lookupFeaturedAppRightWithOffset(
       providerPartyId: PartyId

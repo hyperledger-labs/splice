@@ -14,7 +14,10 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CoinRules,
   ARC_SvcRules,
 }
-import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment
+import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.{
+  CNSRARC_CollectInitialEntryPayment,
+  CNSRARC_RejectEntryInitialPayment,
+}
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.{
   CRARC_MiningRound_Archive,
   CRARC_MiningRound_StartIssuing,
@@ -172,6 +175,12 @@ class ExecuteConfirmedActionTrigger(
                 // The cns context no longer exists, it doesn't make sense to retry collecting the payment.
                 Future.successful(true)
             }
+          case rejectPaymentAction: CNSRARC_RejectEntryInitialPayment =>
+            store
+              .lookupSubscriptionInitialPayment(
+                rejectPaymentAction.cnsEntryContext_RejectEntryInitialPaymentValue.paymentCid
+              )
+              .map(_.isEmpty)
           case action =>
             throw new UnsupportedOperationException(
               show"cns entry context $action is not yet supported"

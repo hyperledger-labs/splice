@@ -11,10 +11,14 @@ import com.daml.network.codegen.java.cc.api.v1.coin.AppTransferContext
 import com.daml.network.codegen.java.cn.cns.{
   CnsEntryContext,
   CnsEntryContext_CollectInitialEntryPayment,
+  CnsEntryContext_RejectEntryInitialPayment,
   CnsRules,
 }
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CnsEntryContext
-import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment
+import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.{
+  CNSRARC_CollectInitialEntryPayment,
+  CNSRARC_RejectEntryInitialPayment,
+}
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
 import com.daml.network.environment.CNLedgerConnection
@@ -24,7 +28,6 @@ import com.daml.network.sv.util.CnsUtil
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
-
 import cats.implicits.catsSyntaxApplicativeId
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -60,48 +63,85 @@ class CnsSubscriptionInitialPaymentTrigger(
     )
     svcStore.lookupCnsEntryContext(contextId).flatMap {
       case Some(cnsContext) =>
-        if (CnsUtil.isValidCnsContent(cnsContext)) {
-          for {
-            transferContextOpt <- svcStore.getSvcTransferContextForRound(payment.payload.round)
-            result <- transferContextOpt match {
-              case Some(transferContext) =>
+        val entryName = cnsContext.payload.name
+        for {
+          transferContextOpt <- svcStore.getSvcTransferContextForRound(payment.payload.round)
+          result <- transferContextOpt match {
+            case Some(transferContext) =>
+              def confirmToReject(reason: String) = confirmRejectPayment(
+                contextId,
+                payment.contractId,
+                entryName,
+                reason,
+                transferContext,
+              )
+              val entryUrl = cnsContext.payload.url
+              val entryDescription = cnsContext.payload.description
+
+              if (!CnsUtil.isValidEntryName(entryName)) {
+                confirmToReject(s"entry name ($entryName) is not valid")
+              } else if (!CnsUtil.isValidEntryUrl(entryUrl)) {
+                confirmToReject(s"entry url ($entryUrl) is not valid")
+              } else if (!CnsUtil.isValidEntryDescription(entryDescription)) {
+                confirmToReject(s"entry description ($entryDescription) is not valid")
+              } else {
                 svcStore
-                  .listInitialPaymentConfirmationByCnsName(svParty, cnsContext.payload.name)
+                  .listInitialPaymentConfirmationByCnsName(
+                    svParty,
+                    entryName,
+                  )
                   .flatMap { confirmations =>
-                    if (confirmations.isEmpty)
-                      svcStore.lookupCnsEntryByName(cnsContext.payload.name).flatMap {
+                    val otherPaymentAcceptedConfirmations = confirmations.filter { c =>
+                      c.payload.action match {
+                        case arcCnsEntryContext: ARC_CnsEntryContext =>
+                          arcCnsEntryContext.cnsEntryContextAction match {
+                            case a: CNSRARC_CollectInitialEntryPayment =>
+                              a.cnsEntryContext_CollectInitialEntryPaymentValue.paymentCid != payment.contractId
+                            case _ =>
+                              false
+                          }
+                        case _ => false
+                      }
+                    }
+                    // if there are existing accepted confirmation of other payment and with the same cns entry name, we will reject this payment.
+                    if (otherPaymentAcceptedConfirmations.isEmpty)
+                      svcStore.lookupCnsEntryByName(entryName).flatMap {
                         case None =>
                           // confirm to collect the payment and create the entry
                           confirmCollectPayment(
                             contextId,
                             payment.contractId,
-                            cnsContext.payload.name,
+                            entryName,
                             transferContext,
                           )
                         case Some(entry) =>
-                          TaskSuccess(
-                            s"skipping as entry already exists and owned by ${entry.payload.user}."
-                          ).pure[Future]
+                          confirmToReject(
+                            s"entry already exists and owned by ${entry.payload.user}."
+                          )
                       }
                     else {
-                      TaskSuccess(
-                        s"skipping as initial payment collection has been confirmed for this cns name: ${confirmations
+                      confirmToReject(
+                        s"other initial payment collection has been confirmed for the same cns name ($entryName) with confirmation ${otherPaymentAcceptedConfirmations
                             .map(_.contractId)}"
-                      ).pure[Future]
+                      )
                     }
                   }
-              case None =>
-                TaskSuccess(
-                  s"skipping as round ${payment.payload.round} is no longer active."
-                ).pure[Future]
+              }
+            case None =>
+              svcStore
+                .getSvcTransferContext()
+                .flatMap(
+                  confirmRejectPayment(
+                    contextId,
+                    payment.contractId,
+                    entryName,
+                    s"round ${payment.payload.round} is no longer active.",
+                    _,
+                  )
+                )
+          }
+        } yield result
 
-            }
-          } yield result
-        } else {
-          TaskSuccess(
-            s"skipping as invalid cns request $cnsContext."
-          ).pure[Future]
-        }
       case None =>
         TaskSuccess(
           s"skipping as associated cns entry context not found: $contextId."
@@ -125,6 +165,22 @@ class CnsSubscriptionInitialPaymentTrigger(
     ),
   )
 
+  private def cnsRejectEntryInitialPaymentAction(
+      paymentId: SubscriptionInitialPayment.ContractId,
+      transferContext: AppTransferContext,
+      cnsRulesCid: CnsRules.ContractId,
+      cnsEntryContextCid: CnsEntryContext.ContractId,
+  ): ActionRequiringConfirmation = new ARC_CnsEntryContext(
+    cnsEntryContextCid,
+    new CNSRARC_RejectEntryInitialPayment(
+      new CnsEntryContext_RejectEntryInitialPayment(
+        paymentId,
+        transferContext,
+        cnsRulesCid,
+      )
+    ),
+  )
+
   private def confirmCollectPayment(
       cnsContextCId: CnsEntryContext.ContractId,
       paymentCid: SubscriptionInitialPayment.ContractId,
@@ -139,9 +195,10 @@ class CnsSubscriptionInitialPaymentTrigger(
       cnsRules.contractId,
       cnsContextCId,
     )
-    queryResult <- svcStore.lookupCnsInitialPaymentConfirmationByCnsNameWithOffset(
+    // look up the confirmation for this payment created by this SV no matter if it is a acceptance or rejection
+    queryResult <- svcStore.lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset(
       svParty,
-      entryName,
+      paymentCid,
     )
     cmd = svcRules.exercise(
       _.exerciseSvcRules_ConfirmAction(
@@ -161,7 +218,7 @@ class CnsSubscriptionInitialPaymentTrigger(
             commandId = CNLedgerConnection.CommandId(
               "com.daml.network.sv.createCnsCollectInitialEntryPaymentConfirmation",
               Seq(svParty, svcParty),
-              entryName,
+              paymentCid.contractId,
             ),
             deduplicationOffset = offset,
           )
@@ -173,7 +230,64 @@ class CnsSubscriptionInitialPaymentTrigger(
           }
       case QueryResult(_, Some(_)) =>
         TaskSuccess(
-          s"skipping as confirmation from $svParty is already created for such entry name"
+          s"skipping as confirmation (either acceptance or rejection) from $svParty is already created for this payment $paymentCid"
+        ).pure[Future]
+
+    }
+  } yield taskOutcome
+
+  private def confirmRejectPayment(
+      cnsContextCId: CnsEntryContext.ContractId,
+      paymentCid: SubscriptionInitialPayment.ContractId,
+      entryName: String,
+      reason: String,
+      transferContext: AppTransferContext,
+  )(implicit tc: TraceContext) = for {
+    svcRules <- svcStore.getSvcRules()
+    cnsRules <- svcStore.getCnsRules()
+    action = cnsRejectEntryInitialPaymentAction(
+      paymentCid,
+      transferContext,
+      cnsRules.contractId,
+      cnsContextCId,
+    )
+
+    // look up the rejection confirmation for this payment created by this.
+    queryResult <- svcStore.lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(
+      svParty,
+      paymentCid,
+    )
+    cmd = svcRules.exercise(
+      _.exerciseSvcRules_ConfirmAction(
+        svParty.toProtoPrimitive,
+        action,
+      )
+    )
+    taskOutcome <- queryResult match {
+      case QueryResult(offset, None) =>
+        connection
+          .submit(
+            actAs = Seq(svParty),
+            readAs = Seq(svcParty),
+            update = cmd,
+          )
+          .withDedup(
+            commandId = CNLedgerConnection.CommandId(
+              "com.daml.network.sv.createCnsRejectInitialEntryPaymentConfirmation",
+              Seq(svParty, svcParty),
+              paymentCid.contractId,
+            ),
+            deduplicationOffset = offset,
+          )
+          .yieldUnit()
+          .map { _ =>
+            val msg = s"confirmed to reject payment $paymentCid for cns entry $entryName: $reason"
+            logger.warn(msg)
+            TaskSuccess(msg)
+          }
+      case QueryResult(_, Some(_)) =>
+        TaskSuccess(
+          s"skipping as confirmation of payment rejection from $svParty is already created for this payment $paymentCid"
         ).pure[Future]
 
     }

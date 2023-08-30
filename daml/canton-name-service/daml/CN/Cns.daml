@@ -101,6 +101,15 @@ template CnsRules
         -- return the created contracts
         pure (entryCid, subscriptionStateCid)
 
+    nonconsuming choice CnsRules_RejectEntryInitialPayment: CoinCreateSummary (ContractId Coin)
+      with
+        paymentCid: ContractId SubscriptionInitialPayment
+        transferContext : AppTransferContext
+      controller svc
+      do
+        exercise paymentCid SubscriptionInitialPayment_Reject with transferContext
+
+
 data CnsRulesConfig = CnsRulesConfig with
     renewalDuration : RelTime -- Length of interval within which user can renew. At the end the entry expires
     entryLifetime : RelTime -- Duration until an entry expires
@@ -147,6 +156,17 @@ template CnsEntryContext
           user
           paymentCid
           entryCid
+          transferContext
+
+    nonconsuming choice CnsEntryContext_RejectEntryInitialPayment : CoinCreateSummary (ContractId Coin)
+      with
+        paymentCid : ContractId SubscriptionInitialPayment
+        transferContext : AppTransferContext
+        cnsRulesCid : ContractId CnsRules
+      controller svc
+      do
+        exercise cnsRulesCid CnsRules_RejectEntryInitialPayment with
+          paymentCid
           transferContext
 
 

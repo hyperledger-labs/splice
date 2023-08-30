@@ -16,6 +16,8 @@ import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.util.FutureInstances.*
 import cats.syntax.parallel.*
+import com.digitalasset.canton.logging.SuppressionRule
+import org.slf4j.event.Level
 
 class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
@@ -37,7 +39,6 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(cnsDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(cnsDarPath)
       })
-      .withTrafficTopupsEnabled
 
   "cns" should {
     "allocate unique cns entries, even when multiple parties race for them" in { implicit env =>
@@ -54,12 +55,21 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
       val bobRefs = setupUser(bobStaticRefs)
 
       // Concurrently, request an entry as alice and bob
-      Seq(
-        aliceRefs,
-        bobRefs,
-      ).parTraverse { ref =>
-        Future { requestAndPayForEntry(ref, testEntryName) }
-      }.futureValue
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+        Seq(
+          aliceRefs,
+          bobRefs,
+        ).parTraverse { ref =>
+          Future { requestAndPayForEntry(ref, testEntryName) }
+        }.futureValue,
+        lines => {
+          forAll(lines) { line =>
+            line.message should (include(s"entry already exists and owned by") or include(
+              s"other initial payment collection has been confirmed for the same cns name"
+            ))
+          }
+        },
+      )
 
       val entry = eventually() {
         lookupEntryByName(testEntryName).value
@@ -86,11 +96,15 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
         val invalidNames =
           Seq("alice.company.unverified.cns", "alice$company.unverified.cns", "alice.cns")
         invalidNames.foreach { name =>
-          loggerFactory.assertLogs(
+          loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
             {
               requestAndPayForEntry(aliceRefs, name)
             },
-            _.warningMessage should include(s"entry name ($name) is not valid"),
+            lines => {
+              forAll(lines) { line =>
+                line.message should include(s"entry name ($name) is not valid")
+              }
+            },
           )
         }
       }
@@ -105,11 +119,15 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
         val invalidUrls =
           Seq("s3://alice.arn.cns", "http://asdklfjh%skldjfgh", s"https://${"alice-" * 50}.cns.com")
         invalidUrls.foreach { url =>
-          loggerFactory.assertLogs(
+          loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
             {
               requestAndPayForEntry(aliceRefs, "alice.unverified.cns", entryUrl = url)
             },
-            _.warningMessage should include(s"entry url ($url) is not valid"),
+            lines => {
+              forAll(lines) { line =>
+                line.message should include(s"entry url ($url) is not valid")
+              }
+            },
           )
         }
       }
@@ -123,11 +141,15 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
       clue("invalid entries(bad descriptions) are rejected") {
         val invalidDescriptions = Seq("Sample CNS Directory Entry Description -" * 50)
         invalidDescriptions.foreach { desc =>
-          loggerFactory.assertLogs(
+          loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
             {
               requestAndPayForEntry(aliceRefs, "alice.unverified.cns", entryDescription = desc)
             },
-            _.warningMessage should include(s"entry description ($desc) is not valid"),
+            lines => {
+              forAll(lines) { line =>
+                line.message should include(s"entry description ($desc) is not valid")
+              }
+            },
           )
         }
       }
@@ -164,11 +186,19 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
         .exerciseResult
         ._2
 
-    // Wait for subscription request to be ingested into store and accept it.
-    eventually()(inside(refs.wallet.listSubscriptionRequests()) { case Seq(storeRequest) =>
-      storeRequest.subscriptionRequest.contractId shouldBe subscriptionRequest
-      refs.wallet.acceptSubscriptionRequest(storeRequest.subscriptionRequest.contractId)
-    })
+    actAndCheck(
+      s"Wait for subscription request to be ingested into store and accept it.",
+      eventually() {
+        inside(refs.wallet.listSubscriptionRequests()) { case Seq(storeRequest) =>
+          storeRequest.subscriptionRequest.contractId shouldBe subscriptionRequest
+          refs.wallet.acceptSubscriptionRequest(storeRequest.subscriptionRequest.contractId)
+
+        }
+      },
+    )(
+      s" Wait for the payment to be accepted or rejected.",
+      _ => refs.wallet.listSubscriptionInitialPayments() shouldBe empty,
+    )
   }
 
   private def lookupEntryByName(

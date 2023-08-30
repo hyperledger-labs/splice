@@ -414,5 +414,49 @@ testDecentralizedCns = do
   renewedEntry.expiresAt === addRelTime entry.expiresAt defaultCnsRulesConfig.entryLifetime
   renewedSubscriptionState.nextPaymentDueAt === renewedEntry.expiresAt
 
+  -- SVs confirm to reject invalid entry payment of CNS request.
+
+  (entryContextToReject, subscriptionRequestToReject) <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+    name = "reject.darth.vader"
+    url = "invalid url which will be rejected by SVs by creating confirmations."
+    description = "CNS Description"
+    user = alice.primaryParty
+
+  coin <- tap app alice 1.5
+
+  paymentContext <- getPaymentTransferContext app alice
+  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequestToReject SubscriptionRequest_AcceptAndMakePayment with
+    inputs = [InputCoin $ toInterfaceContractId coin]
+    context = paymentContext
+    walletProvider = app.svc
+
+  -- SVs create confirmations for SVC to reject initial payment of the requested cns entry.
+  appContext <- getAppTransferContext app app.svcUser
+  let rejectInitialPaymentAction = ARC_CnsEntryContext with
+        cnsEntryContextCid = entryContextToReject
+        cnsEntryContextAction = CNSRARC_RejectEntryInitialPayment $ CnsEntryContext_RejectEntryInitialPayment with
+          paymentCid = initialPaymentCid
+          transferContext = appContext
+          cnsRulesCid
+
+  confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
+    submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = svParty
+      action = rejectInitialPaymentAction
+
+  confirmations <- query @Confirmation svc
+  length confirmations === 4
+
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
+    SvcRules_ExecuteConfirmedAction with
+      action = rejectInitialPaymentAction
+      coinRulesCid = None
+      confirmationCids
+
+  -- entry is not created
+  [] <- queryFilter @CnsEntry app.svc (\entry -> entry.user == alice.primaryParty && entry.name == "reject.darth.vader")
+  -- initial paynment is archived
+  None <- queryContractId @SubscriptionInitialPayment app.svc initialPaymentCid
+
   pure ()
 
