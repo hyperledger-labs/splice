@@ -11,8 +11,8 @@ import {
   installGcpBucketSecret,
   participantBootstrapDumpSecretName,
 } from 'cn-pulumi-common';
+import { domainFeesConfig } from 'cn-pulumi-common/src/domainFeesCfg';
 
-import { domainFeesConfig } from './domainFeesCfg';
 import {
   ValidatorOnboarding,
   installValidatorOnboardingSecret,

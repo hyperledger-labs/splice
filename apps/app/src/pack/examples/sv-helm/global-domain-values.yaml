@@ -1,0 +1,6 @@
+postgres: postgres
+postgresPassword: "secret"
+sequencerDriver:
+  type: "cometbft"
+  host: "cometbft-cometbft-rpc"
+  port: 26657

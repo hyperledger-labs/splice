@@ -41,6 +41,23 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
         },
       )
 
+      actAndCheck("Go to general information tab", click on "navlink-svc")(
+        "button for domain status appears",
+        _ => find(id("information-tab-canton-domain-status")) should not be empty,
+      )
+
+      actAndCheck(
+        "Click on domain status tab",
+        click on "information-tab-canton-domain-status",
+      )(
+        "Observe sequencer and mediator as active",
+        _ => {
+          val activeCells = findAll(className("active-value")).toSeq
+          activeCells should have length 2
+          forAll(activeCells)(_.text shouldBe "true")
+        },
+      )
+
       clue("SVs 1-4 have placed a coin price vote") {
         actAndCheck(
           "Opening coin price tab",

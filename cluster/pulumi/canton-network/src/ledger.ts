@@ -2,8 +2,8 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { Service } from '@pulumi/kubernetes/core/v1';
 import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
+import { domainFeesConfig } from 'cn-pulumi-common/src/domainFeesCfg';
 
-import { domainFeesConfig } from './domainFeesCfg';
 import { Postgres } from './postgres';
 
 export function installDomain(

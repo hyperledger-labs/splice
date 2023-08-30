@@ -10,3 +10,9 @@ export const TARGET_CLUSTER = requireEnv(
   'the cluster in which the global domain is running'
 );
 export const SV_NAME = 'DA-Helm-Test-Node';
+
+export const version = process.env.CHARTS_VERSION;
+export const localCharts = version == '' || version == undefined; // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)
+export const withDomainFees =
+  process.env.DOMAIN_FEES !== undefined && process.env.DOMAIN_FEES !== '';
+export const SV_NAMESPACE = process.env.SV_NAMESPACE || 'sv';

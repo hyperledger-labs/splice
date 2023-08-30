@@ -49,25 +49,6 @@ class SvcPreflightIntegrationTest
           svPassword,
           Some(svInfo),
           votedSvParties,
-          // TODO(#5954) Move this into testSvUi once external SVs also have their own sequencer/mediator.
-          {
-            actAndCheck("Go to general information tab", click on "navlink-svc")(
-              "button for domain status appears",
-              _ => find(id("information-tab-canton-domain-status")) should not be empty,
-            )
-            actAndCheck(
-              "Click on domain status tab",
-              click on "information-tab-canton-domain-status",
-            )(
-              "Observe sequencer and mediator as active",
-              _ => {
-                val activeCells = findAll(className("active-value")).toSeq
-                activeCells should have length 2
-                forAll(activeCells)(_.text shouldBe "true")
-              },
-            )
-            ()
-          },
         )
       }
     }

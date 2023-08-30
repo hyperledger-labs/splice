@@ -8,6 +8,7 @@ import {
   infraStack,
   InfrastructureOutputs,
 } from 'cn-pulumi-common';
+import { globalDomainSequencerDriver } from 'cn-pulumi-common/src/global-domain';
 import { exit } from 'process';
 
 import { installDocs } from './docs';
@@ -46,12 +47,6 @@ if (withDomainFees && !doubleSv) {
   );
   exit(1);
 }
-
-// TODO(#7344) remove once the driver is stable
-const disableCometBftDriver = process.env.DISABLE_COMETBFT_DRIVER === 'true';
-const globalDomainSequencerDriver = isDevNet && !disableCometBftDriver ? 'cometbft' : 'postgres';
-
-pulumi.log.error(`Initializing with global domain with ${globalDomainSequencerDriver}`);
 
 type BootstrapCliConfig = {
   cluster: string;

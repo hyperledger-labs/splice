@@ -222,6 +222,30 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "/cluster/helm/cn-global-domain/",
+      "compat": "true",
+      "name": "global-domain",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": "postgres",
+        "sequencerDriver": {
+          "host": "cometbft-cometbft-rpc",
+          "port": 26657,
+          "type": "cometbft"
+        },
+        "trafficControl": {}
+      }
+    },
+    "name": "global-domain",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "enableServerSideApply": "true"
     },
     "name": "k8s",
@@ -368,6 +392,9 @@
         "cometBFT": {
           "connectionUri": "http://cometbft-cometbft-rpc:26657",
           "enabled": true
+        },
+        "domain": {
+          "enable": true
         },
         "globalDomainUrl": "http://svrun.network.com.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",

@@ -4,7 +4,14 @@ import * as _ from 'lodash';
 import { ExactNamespace, isDevNet, loadYamlFromFile } from 'cn-pulumi-common';
 
 import { installCNSVHelmChart } from './helm';
-import { CLUSTER_BASENAME, REPO_ROOT, SV_NAME, TARGET_CLUSTER } from './utils';
+import {
+  CLUSTER_BASENAME,
+  localCharts,
+  REPO_ROOT,
+  SV_NAME,
+  TARGET_CLUSTER,
+  version,
+} from './utils';
 
 const cometBftValues = loadYamlFromFile(
   `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/cometbft-values.yaml`,
@@ -25,7 +32,7 @@ const privValidatorKeyContent = fs.readFileSync(
   'utf-8'
 );
 
-export function installCometBftNode(xns: ExactNamespace): void {
+export function installCometBftNode(xns: ExactNamespace): k8s.helm.v3.Release {
   new k8s.core.v1.Secret(
     'cometbft-keys',
     {
@@ -41,7 +48,7 @@ export function installCometBftNode(xns: ExactNamespace): void {
     },
     { dependsOn: [xns.ns] }
   );
-  installCNSVHelmChart(
+  return installCNSVHelmChart(
     xns,
     'cometbft',
     'cn-cometbft',
@@ -56,6 +63,7 @@ export function installCometBftNode(xns: ExactNamespace): void {
       },
       isDevNet: isDevNet,
     }),
-    true
+    localCharts,
+    version
   );
 }
