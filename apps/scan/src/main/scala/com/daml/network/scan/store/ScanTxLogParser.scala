@@ -597,6 +597,9 @@ object ScanTxLogParser {
         )
       )
 
+      // third child event is the burning of transferred coin by the SVC
+      val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(2))
+
       State(immutable.Queue(buyExtraTrafficEntry))
         // append the entries for rewards
         .appended(
@@ -605,6 +608,15 @@ object ScanTxLogParser {
             transferEvent,
             domainId,
             transferNode,
+            Some(event.getEventId()),
+          )
+        )
+        // append the balance change entry from burning the transferred coin
+        .appended(
+          State.fromCoinArchiveEvent(
+            tx,
+            coinArchiveEvent,
+            domainId,
             Some(event.getEventId()),
           )
         )
@@ -652,6 +664,9 @@ object ScanTxLogParser {
         )
       )
 
+      // third child event is the burning of transferred coin by the SVC
+      val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(2))
+
       State(immutable.Queue(buyExtraTrafficEntry))
         // append the entries for rewards
         .appended(
@@ -660,6 +675,15 @@ object ScanTxLogParser {
             transferEvent,
             domainId,
             transferNode,
+            Some(event.getEventId()),
+          )
+        )
+        // append the balance change entry from burning the transferred coin
+        .appended(
+          State.fromCoinArchiveEvent(
+            tx,
+            coinArchiveEvent,
+            domainId,
             Some(event.getEventId()),
           )
         )
@@ -675,25 +699,36 @@ object ScanTxLogParser {
       // second child event is burning of transferred coin by SVC
       val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
       // Adjust tx log entries for SVC since the coin it receives is immediately burnt
+      val stateFromBurntCoin =
+        State.fromCoinArchiveEvent(tx, coinArchiveEvent, domainId, Some(event.getEventId()))
+      stateFromPaymentCollection.appended(stateFromBurntCoin)
+    }
+
+    def fromCoinArchiveEvent(
+        tx: TransactionTree,
+        event: TreeEvent,
+        domainId: DomainId,
+        rootEventId: Option[String] = None,
+    ): State = {
       val burntCoin = tx.getEventsById.asScala
         .collectFirst {
-          case (_, c: CreatedEvent) if c.getContractId == coinArchiveEvent.getContractId =>
+          case (_, c: CreatedEvent) if c.getContractId == event.getContractId =>
             CoinCreate.unapply(c).map(_.payload)
         }
         .flatten
         .getOrElse(
           throw new RuntimeException(
-            s"The coin contract ${coinArchiveEvent.getContractId} " +
-              s"referenced by the coin archive event ${coinArchiveEvent.getEventId} " +
+            s"The coin contract ${event.getContractId} " +
+              s"referenced by the coin archive event ${event.getEventId} " +
               s"was not found in transaction ${tx.getTransactionId}"
           )
         )
-      val stateFromBurntCoin = State(
+      State(
         immutable.Queue(
           TxLogEntry.EmptyTxLogEntry(
             indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
               optOffset = Some(tx.getOffset()),
-              eventId = event.getEventId(),
+              eventId = rootEventId.getOrElse(event.getEventId()),
               domainId = domainId,
               round = burntCoin.amount.createdAt.number,
               // negative value for both initial amount and holding fee so that the total balance can be calculated correctly
@@ -703,8 +738,6 @@ object ScanTxLogParser {
           )
         )
       )
-
-      stateFromPaymentCollection.appended(stateFromBurntCoin)
     }
 
     def fromOpenMiningRoundCreate(

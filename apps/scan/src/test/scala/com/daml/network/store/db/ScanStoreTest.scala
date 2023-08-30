@@ -1,6 +1,6 @@
 package com.daml.network.store.db
 
-import com.daml.ledger.javaapi.data.{ContractMetadata, DamlRecord}
+import com.daml.ledger.javaapi.data.{ContractMetadata, DamlRecord, Unit as damlUnit}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
 import com.daml.network.codegen.java.cc.api.v1.coin.PaymentTransferContext
@@ -835,6 +835,18 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       mkTransferResult(round, ccSpent, holdingFee),
     )
 
+    val createdCoin = coin(receiver, ccSpent, round, holdingFee)
+    val coinCreateEvent = toCreatedEvent(createdCoin, signatories = Seq(receiver, svcParty))
+    val coinArchiveEvent = exercisedEvent(
+      createdCoin.contractId.contractId,
+      coinCodegen.Coin.TEMPLATE_ID,
+      Some(ccApiCodegen.coin.Coin.TEMPLATE_ID),
+      coinCodegen.Coin.CHOICE_Archive.name,
+      consuming = true,
+      new DamlRecord(),
+      damlUnit.getInstance(),
+    )
+
     mkExerciseTx(
       offset,
       exercisedEvent(
@@ -861,8 +873,11 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         ),
       ),
       Seq(
-        transfer, // the second child has to be a transfer, we don't care what the first is for store's purposes
-        transfer,
+        // we don't care what the first event is for the store's purposes
+        // also, the creation of the burnt coin should occur somewhere in the tx tree
+        coinCreateEvent,
+        transfer, // the second event has to be a transfer
+        coinArchiveEvent, // the third event has to be a coin burn
       ),
     )
   }
