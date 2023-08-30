@@ -9,15 +9,13 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.*
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.sv.automation.SvSvcAutomationService
-import com.daml.network.sv.automation.SvSvAutomationService
+import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
-import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
@@ -156,17 +154,13 @@ class JoiningNodeInitializer(
       svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
       _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
         for {
-          // TODO(#7048) this lock is a band-aid to reduce flakiness while waiting for the upstream fix; remove me
-          _ <- svcRulesLock.withLock("sequencer onboarding") {
-            // TODO(#7048) wait to ensure no currently in-flight transaction reaches the sequencer; remove me
-            Threading.sleep(5000)
+          _ <-
             localDomainNode.onboardLocalSequencerIfRequired(
               config.domains.global.alias,
               globalDomain,
               participantAdminConnection,
               svConnection,
             )
-          }
           _ <- localDomainNode.onboardLocalMediatorIfRequired(
             globalDomain,
             participantAdminConnection,
