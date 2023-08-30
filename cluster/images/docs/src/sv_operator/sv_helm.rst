@@ -432,6 +432,12 @@ that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-
 - Replace ``YOUR_HOSTNAME`` with the hostname that will be used for the ingress
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
 
+.. _helm-configure-global-domain:
+
+**For DevNet only** Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml`` as follows:
+
+- Set `postgresPassword` entry to the value you set in ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values.yaml``.
+
 Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` as follows:
 
 - Replace ``TARGET_CLUSTER`` in the `globalDomain.url` entry with |cn_cluster|, per the cluster to which you are connecting.
@@ -470,6 +476,7 @@ For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/exa
 - If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the `auth.audience` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Update the ``auth.jwksUrl`` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
+- **For DevNet only** Set `domain.enable` to `true`
 
 Your SV node will also be configured with a set of SV identities for your node to auto-approve as peer SVC members. The bundled artifacts consist of the lists of recommended values as follows:
 
@@ -507,6 +514,8 @@ Note that restoring from a participant identities backup will only result in a f
 This implies that you can only restore from the same participant identities backup once per network deployment.
 Also note that restoring from a participant identities backup is only possible if the participant is fresh and uninitialized, i.e., its database is completely empty.
 
+.. _helm-install:
+
 Installing the Helm Charts
 ++++++++++++++++++++++++++
 
@@ -518,11 +527,12 @@ reaches a stable state prior to moving on to the next step.
 
     helm repo update
     helm install postgres canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values.yaml --wait
+    helm install cometbft canton-network-helm/cn-cometbft -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml --wait
+    helm install global-domain canton-network-helm/cn-global-domain -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml --wait
     helm install participant canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml --wait
     helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml -f ${SV-IDENTITIES-FILE} --wait
     helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-validator-values.yaml --wait
     helm install scan canton-network-helm/cn-scan -n sv --version ${CHART_VERSION} --wait
-    helm install cometbft canton-network-helm/cn-cometbft -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml --wait
 
 Once this is running, you should be able to inspect the state of the
 cluster and observe pods running in each of the three new
@@ -542,6 +552,8 @@ namespaces. A typical query might look as follows:
     sv                participant-6fdff7fc4-vzg8c                                3/3     Running   1 (72m ago)   72m
     sv                postgres-0                                                 1/1     Running   0             120m
     sv                cometbft-6fdff7fc4-vzg8c                                   1/1     Running   0             120m
+    sv                global-domain-mediator-c57c9b55f                           1/1     Running   0             120m
+    sv                global-domain-sequencer-c57c9b55f                          1/1     Running   0             120m
 
 
 Note also that ``Pod`` restarts may happen during bringup,
@@ -712,6 +724,11 @@ Once logged in one should see a page with some SV collective information.
 The SV UI presents also some useful debug information for the CometBFT node. To see it, click on the "CometBFT Debug Info" tab.
 If your CometBFT is configured correctly, and it has connectivity to all other nodes, you should see ``n_peers`` that is equal to the size of the SVC, excluding your own node,
 and you should see all peer SV members listed as peers (their human-friendly names will be listed in the ``moniker`` fields).
+
+.. _sv-ui-global-domain:
+
+The SV UI also presents the status of your global domain node. To see it, click on the "Domain Node Status" tab.
+**For DevNet only:** If your global domain node is configured correctly then the sequencer and the mediator components should appear as active.
 
 
 .. _helm-scan-web-ui:

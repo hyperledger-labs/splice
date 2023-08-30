@@ -3,6 +3,26 @@
 Release Notes
 =============
 
+2023-09-04
+----------
+
+* Deployment updates:
+
+    * Each SV node now participates in operating the global domain (``devnet`` only)
+        * A new helm chart was introduced, ``global-domain`` that will deploy a global domain node. This helm chart is currently required only on the ``devnet`` deployment.
+          Follow the :ref:`configuration instructions <helm-configure-global-domain>` and the :ref:`deployment instruction <helm-install>` to also deploy the global-domain helm chart.
+          Please note that the order of deployment of the helm charts has been updated and the helm charts must be applied in the new order.
+        * Added a new value, ``domain.enable`` to the ``sv-values.yaml``. This must be set to `true` only for the ``devnet`` deployment. The default value is `false`.
+          Setting this to true will enable the usage of the components deployed as part of the global domain node and will make this SV node participate in
+          operating the global domain.
+
+* Documentation:
+
+    * Configuring the SV node to participate in operating the global domain (``devnet`` only)
+        * Added new entry to :ref:`Configuring the Helm Charts <helm-configure-global-domain>` that details the changes required for the ``global-domain-values.yaml``
+        * Included the new helm chart ``global-domain`` in the :ref:`Installing the Helm Charts <helm-install>` section and updated the helm deploy ordering
+        * Added new entry to :ref:`Logging into the SV UI <sv-ui-global-domain>` that  explains how to check if the components of the ``global-domain`` helm chart were installed correctly.
+
 2023-08-28
 ----------
 
