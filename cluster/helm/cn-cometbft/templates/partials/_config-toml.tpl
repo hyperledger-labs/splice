@@ -171,8 +171,7 @@ experimental_close_on_slow_client = false
 timeout_broadcast_tx_commit = "10s"
 
 # Maximum size of request body, in bytes
-max_body_bytes = 1000000
-
+max_body_bytes = 7000000
 # Maximum size of request header, in bytes
 max_header_bytes = 1048576
 
@@ -319,7 +318,7 @@ keep-invalid-txs-in-cache = false
 
 # Maximum size of a single transaction.
 # NOTE: the max size of a tx transmitted over the network is {max_tx_bytes}.
-max_tx_bytes = 1048576
+max_tx_bytes = 6291456
 
 # Maximum size of a batch of transactions to send to a peer
 # Including space needed by encoding (one varint per transaction).
