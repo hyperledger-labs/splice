@@ -1545,9 +1545,6 @@ jobs:
       - restore_sbt_cache
       - restore_precompiled_classes
       - restore_frontend_node_modules
-      - run:
-          # TODO(#7167): remove this once all clusters are beyond commit 3a7d28d
-          touch "canton/dars.lock"
       - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
@@ -1677,9 +1674,6 @@ jobs:
       - restore_sbt_cache
       - restore_precompiled_classes
       - restore_frontend_node_modules
-      - run:
-          # TODO(#7167): remove this once all clusters are beyond commit 3a7d28d
-          touch "canton/dars.lock"
       - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
