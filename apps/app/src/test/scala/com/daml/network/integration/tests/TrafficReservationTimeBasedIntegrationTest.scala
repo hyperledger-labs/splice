@@ -32,7 +32,7 @@ class TrafficReservationTimeBasedIntegrationTest
   private val testEntryDescription = "Sample CNS Directory Entry Description"
   private val rng = new Random(5)
   // Amount of traffic balance to try and consume every time when draining the traffic balance in multiple steps
-  private val balanceToConsumePerTry = 100_000L
+  private val balanceToConsumePerTry = 300_000L
   // reserved traffic should be enough to do 1 top-up even after traffic balance has been consumed
   private val reservedTraffic = balanceToConsumePerTry + 50_000L
 
@@ -60,7 +60,7 @@ class TrafficReservationTimeBasedIntegrationTest
             // reserved traffic amount (enough to do a top-up, some other txs and leave reserved traffic left over)
             config
               .focus(_.domains.global.buyExtraTraffic.targetThroughput)
-              .replace(NonNegativeNumeric.tryCreate(BigDecimal(150_000)))
+              .replace(NonNegativeNumeric.tryCreate(BigDecimal(250_000)))
           } else if (name.contains("bob"))
             config
               .focus(_.domains.global.buyExtraTraffic.targetThroughput)
@@ -68,7 +68,7 @@ class TrafficReservationTimeBasedIntegrationTest
           else
             config
               .focus(_.domains.global.buyExtraTraffic.targetThroughput)
-              .replace(NonNegativeNumeric.tryCreate(BigDecimal(200_000)))
+              .replace(NonNegativeNumeric.tryCreate(BigDecimal(300_000)))
         }(config)
       )
       .addConfigTransforms((_, config) =>

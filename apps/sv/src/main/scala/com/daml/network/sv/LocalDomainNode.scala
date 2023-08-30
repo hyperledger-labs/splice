@@ -6,23 +6,24 @@ import com.daml.network.environment.*
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.protocol.StaticDomainParameters
-import com.digitalasset.canton.sequencing.GrpcSequencerConnection
-import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
+import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
   NamespaceDelegationX,
   OwnerToKeyMappingX,
 }
+import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -250,6 +251,7 @@ final class LocalDomainNode(
       svConnection: SvConnection,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info("Adding sequencer identity transactions")
+    logger.info(domainAlias.toProtoPrimitive)
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
       identity <- sequencerAdminConnection.getIdentityTransactions(sequencerId.uid, domainId = None)
@@ -294,32 +296,41 @@ final class LocalDomainNode(
       )
       _ <- participantAdminConnection.modifyDomainConnectionConfig(
         domainAlias,
-        setSequencerEndpoint(sequencerPublicConfig),
+        addLocalSequencerConnection(sequencerPublicConfig),
       )
       _ = logger.info("Participant is now connected to new sequencer")
     } yield ()
   }
 
-  private def setSequencerEndpoint(
-      endpoint: ClientConfig
+  private def addLocalSequencerConnection(
+      sequencerConfig: ClientConfig
   )(implicit traceContext: TraceContext): DomainConnectionConfig => Option[DomainConnectionConfig] =
     conf =>
       conf.sequencerConnections.default match {
-        case con: GrpcSequencerConnection =>
-          val newEndpoints = LocalDomainNode.toEndpoints(endpoint)
-          if (con.endpoints == newEndpoints) {
-            logger.info("Participant already connected to sequencer")
+        case defaultConnection: GrpcSequencerConnection =>
+          val localEndpoint = LocalDomainNode.toEndpoint(sequencerConfig)
+          val localSequencerConnection =
+            new GrpcSequencerConnection(
+              NonEmpty.mk(Seq, localEndpoint),
+              transportSecurity = sequencerConfig.tls.isDefined,
+              customTrustCertificates = None,
+              SequencerAlias.Local,
+            )
+          val newConnections = SequencerConnections.many(
+            NonEmpty.mk(Seq, defaultConnection, localSequencerConnection),
+            PositiveInt.tryCreate(1),
+          )
+          if (conf.sequencerConnections == newConnections) {
+            logger.info("Sequencers already set.")
             None
           } else {
             Some(
               conf.copy(
-                sequencerConnections = conf.sequencerConnections.modify(
-                  SequencerAlias.Default,
-                  _ => con.copy(endpoints = newEndpoints),
-                )
+                sequencerConnections = newConnections
               )
             )
           }
+        case _ => None
       }
 
   override protected def onClosed() = {
@@ -332,5 +343,6 @@ object LocalDomainNode {
   // TODO(#5107) Consider using something other than a ClientConfig in the config file
   // to simplify conversion to GrpcSequencerConnection.
   private def toEndpoints(config: ClientConfig): NonEmpty[Seq[Endpoint]] =
-    NonEmpty.mk(Seq, Endpoint(config.address, config.port))
+    NonEmpty.mk(Seq, toEndpoint(config))
+  private def toEndpoint(config: ClientConfig): Endpoint = Endpoint(config.address, config.port)
 }
