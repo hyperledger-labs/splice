@@ -173,8 +173,6 @@ executed.
 
 A list of expected environment definitions is as follows:
 
-* `AUTH0_MANAGEMENT_API_TOKEN` - Management API Token generated from
-  the [Auth0 console](https://manage.auth0.com/dashboard/us/canton-network-dev/apis/management/explorer)
 * Auth0 Management API credentials (taken from the *API Explorer* application defined within each Auth0 tenant)
    * `AUTH0_CN_MANAGEMENT_API_CLIENT_ID`/`AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET` - Auth0 [API Explorer](https://manage.auth0.com/dashboard/us/canton-network-dev/applications/ECfosW3sLHUfHatCRLEGUQ9YG9XMs9aq/settings) settings page. (Note `canton-network-dev` tenant.)
    * `AUTH0_SV_MANAGEMENT_API_CLIENT_ID`/`AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET` - Auth0 [API Explorer](https://manage.auth0.com/dashboard/us/canton-network-sv-test/applications/OjD90OemoxGYTLqzmbSTDJlmCi6nbUnu/settings) settings apge. (Note `canton-network-sv-test` tenant.)
