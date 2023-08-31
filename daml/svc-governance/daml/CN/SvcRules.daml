@@ -881,7 +881,7 @@ template SvcRules with
         exercise coinRulesCid CoinRules_AdvanceOpenMiningRounds with ..
 
 
-    -- CNS payment collection driven directly by the leader
+    -- CNS entry and payment management driven directly by the leader
     -----------------------------------------------
 
     nonconsuming choice SvcRules_CollectEntryRenewalPayment : (ContractId CnsEntry, ContractId SubscriptionIdleState)
@@ -892,6 +892,15 @@ template SvcRules with
       do
         requireUnlocked lock
         exercise cnsEntryContextCid choiceArg
+
+    nonconsuming choice SvcRules_ExpireCnsEntry : ()
+      with
+        cnsEntryCid : ContractId CnsEntry
+        choiceArg : CnsEntry_Expire
+      controller leader
+      do
+        requireUnlocked lock
+        exercise cnsEntryCid choiceArg
 
 
     -- Reward management driven directly by the leader

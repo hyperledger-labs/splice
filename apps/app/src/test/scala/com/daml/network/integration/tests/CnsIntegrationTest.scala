@@ -16,8 +16,14 @@ import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.util.FutureInstances.*
 import cats.syntax.parallel.*
+import com.daml.network.codegen.java.cn.cns.CnsEntry
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
+
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+
+import scala.jdk.CollectionConverters.*
 
 class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
@@ -26,6 +32,8 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
   private val cnsDarPath = "daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar"
 
   private val testEntryName = "mycoolentry.unverified.cns"
+  private val testEntryUrl = "https://cns-dir-url.com"
+  private val testEntryDescription = "Sample CNS Directory Entry Description"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -85,6 +93,32 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
         entry.data.description,
         entry.data.expiresAt,
       )
+    }
+
+    "archive expired CNS entries" in { implicit env =>
+      clue("Creating a CNS entry that expires immediately") {
+        directoryBackend.listEntries("", 25) shouldBe empty
+        directoryBackend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+          actAs = Seq(svcParty),
+          commands = new CnsEntry(
+            svcParty.toProtoPrimitive,
+            svcParty.toProtoPrimitive,
+            testEntryName,
+            testEntryUrl,
+            testEntryDescription,
+            Instant.now().plus(1, ChronoUnit.SECONDS),
+          ).create.commands.asScala.toSeq,
+          optTimeout = None,
+        )
+        eventually()(
+          lookupEntryByName(testEntryName) should not be empty
+        )
+      }
+      clue("Waiting for the backend to expire the entry...") {
+        eventually()(
+          lookupEntryByName(testEntryName) shouldBe empty
+        )
+      }
     }
 
     "reject invalid entry names" in { implicit env =>

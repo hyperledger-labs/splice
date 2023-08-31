@@ -402,6 +402,14 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       _.expiresAt
     )
 
+  def listExpiredCnsEntries: ListExpiredContracts[
+    cn.cns.CnsEntry.ContractId,
+    cn.cns.CnsEntry,
+  ] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(cn.cns.CnsEntry.COMPANION)(
+      _.expiresAt
+    )
+
   def lookupSvOnboardingConfirmedByParty(
       svParty: PartyId
   )(implicit tc: TraceContext): Future[
