@@ -1111,14 +1111,6 @@ printTests := {
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
     (
-      "cometbft single node smoke tests",
-      "test-full-class-names-cometbft-single-node-smoke.log",
-      (t: String) => {
-        t.contains("SvOnboardingIntegrationTest") ||
-        t.contains("DistributedDomainIntegrationTest")
-      },
-    ),
-    (
       "Preflight tests",
       "test-full-class-names-preflight.log",
       (t: String) => isPreflightIntegrationTest(t),

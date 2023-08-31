@@ -59,9 +59,9 @@ workflows:
           - canton-network-vpn
         name: "scala_test wall clock time"
         test_names_file: "test-full-class-names.log"
-        start_canton_options: "-w -m"
+        start_canton_options: "-w -f -m"
         resource_class: "xlarge"
-        parallelism: 4
+        parallelism: 7
     - scala_test:
         <<: *notify-fail
         context:
@@ -128,18 +128,6 @@ workflows:
         start_canton_options: "-s -g"
         resource_class: "xlarge"
         parallelism: 1
-    - scala_test:
-        <<: *notify-fail
-        context:
-          - artifactory
-          - datadog
-          - slack-context
-          - canton-network-vpn
-        name: "scala_test cometbft smoke test"
-        test_names_file: "test-full-class-names-cometbft-single-node-smoke.log"
-        start_canton_options: "-w -f -m"
-        resource_class: "xlarge"
-        parallelism: 2
     - bundle:
         <<: *notify-fail
         context:
