@@ -1,3 +1,0 @@
-name: observability
-description: Prometheus deployment to bootstrap Prometheus & Grafana
-runtime: nodejs

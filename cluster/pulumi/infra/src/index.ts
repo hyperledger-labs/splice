@@ -1,6 +1,7 @@
 import { clusterBasename } from './config';
 import { configureIstio } from './istio';
 import { configureNetwork } from './network';
+import { configureObservability } from './observability';
 
 const network = configureNetwork(clusterBasename);
 
@@ -9,3 +10,4 @@ export const ingressNs = network.ingressNs.metadata.name;
 export const egressIp = network.egressIp.address;
 
 configureIstio(network.ingressNs, ingressIp);
+configureObservability();
