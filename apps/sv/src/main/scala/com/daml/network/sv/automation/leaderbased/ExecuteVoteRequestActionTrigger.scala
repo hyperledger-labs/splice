@@ -48,7 +48,6 @@ class ExecuteVoteRequestActionTrigger(
           )
         else
           for {
-            domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
             svcRules <- store.getSvcRules()
             requiredNumVotes = SvUtil.requiredNumVotes(svcRules)
             votes <- store.listEligibleVotes(voteRequestId)
@@ -56,29 +55,30 @@ class ExecuteVoteRequestActionTrigger(
             rejectVotes = votes.count(_.payload.accept == false)
             taskOutcome <-
               if (acceptVotes >= requiredNumVotes || rejectVotes >= requiredNumVotes) {
-                store.getCoinRules().flatMap { coinRules =>
-                  val coinRulesId = coinRules.contractId
-                  val cmd = svcRules.contractId.exerciseSvcRules_ExecuteDefiniteVote(
-                    voteRequestId,
-                    java.util.Optional.of(coinRulesId),
-                    votes
-                      .map(_.contractId)
-                      .asJava,
+                for {
+                  coinRules <- store.getCoinRules()
+                  coinRulesId = coinRules.contractId
+                  cmd = svcRules.exercise(
+                    _.exerciseSvcRules_ExecuteDefiniteVote(
+                      voteRequestId,
+                      java.util.Optional.of(coinRulesId),
+                      votes
+                        .map(_.contractId)
+                        .asJava,
+                    )
                   )
-                  svTaskContext.connection
-                    .submitWithResultNoDedup(
+                  _ <- svTaskContext.connection
+                    .submit(
                       Seq(store.key.svParty),
                       Seq(store.key.svcParty),
                       cmd,
-                      domainId,
                     )
-                    .map(_ =>
-                      TaskSuccess(
-                        s"executed the action $action as there are ${votes.size} vote(s) which is >=" +
-                          s" the required $requiredNumVotes votes."
-                      )
-                    )
-                }
+                    .noDedup
+                    .yieldResult()
+                } yield TaskSuccess(
+                  s"executed the action $action as there are ${votes.size} vote(s) which is >=" +
+                    s" the required $requiredNumVotes votes."
+                )
               } else
                 Future.successful(
                   TaskSuccess(

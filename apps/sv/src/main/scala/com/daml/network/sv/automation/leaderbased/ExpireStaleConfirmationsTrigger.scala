@@ -14,6 +14,8 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
+import ExpireStaleConfirmationsTrigger.*
+
 class ExpireStaleConfirmationsTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
@@ -28,15 +30,7 @@ class ExpireStaleConfirmationsTrigger(
       svTaskContext.svcStore.listStaleConfirmations,
       Confirmation.COMPANION,
     )
-    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
-      Confirmation.ContractId,
-      Confirmation,
-    ]]] {
-
-  type Task = ScheduledTaskTrigger.ReadyTask[AssignedContract[
-    Confirmation.ContractId,
-    Confirmation,
-  ]]
+    with SvTaskBasedTrigger[Task] {
 
   private val store = svTaskContext.svcStore
 
@@ -45,14 +39,24 @@ class ExpireStaleConfirmationsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       svcRules <- store.getSvcRules()
-      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
-      cmd = svcRules.contractId.exerciseSvcRules_ExpireStaleConfirmation(
-        task.work.contractId
+      cmd = svcRules.exercise(
+        _.exerciseSvcRules_ExpireStaleConfirmation(
+          task.work.contractId
+        )
       )
       _ <- svTaskContext.connection
-        .submitWithResultNoDedup(Seq(store.key.svParty), Seq(store.key.svcParty), cmd, domainId)
+        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .noDedup
+        .yieldResult()
     } yield TaskSuccess(
       s"successfully expired the confirmation with cid ${task.work.contractId}"
     )
   }
+}
+
+private[leaderbased] object ExpireStaleConfirmationsTrigger {
+  type Task = ScheduledTaskTrigger.ReadyTask[AssignedContract[
+    Confirmation.ContractId,
+    Confirmation,
+  ]]
 }

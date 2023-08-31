@@ -53,17 +53,19 @@ class ExpireElectionRequestsTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     svcRules <- store.getSvcRules()
-    domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
-    cmd = svcRules.contractId.exerciseSvcRules_ArchiveOutdatedElectionRequest(
-      task.contractId
+    cmd = svcRules.exercise(
+      _.exerciseSvcRules_ArchiveOutdatedElectionRequest(
+        task.contractId
+      )
     )
     _ <- svTaskContext.connection
-      .submitWithResultNoDedup(
+      .submit(
         Seq(store.key.svParty),
         Seq(store.key.svcParty),
         cmd,
-        domainId,
       )
+      .noDedup
+      .yieldResult()
   } yield TaskSuccess(
     s"successfully expired the election request with cid ${task.contractId}"
   )

@@ -41,7 +41,6 @@ class ElectionRequestTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       svcRules <- store.getSvcRules()
       currentLeader = svcRules.payload.leader
       self = store.key.svParty.toProtoPrimitive
@@ -50,17 +49,20 @@ class ElectionRequestTrigger(
       requestCids <- store.listElectionRequests(svcRules).map(_.map(_.contractId))
       taskOutcome <-
         if (requestCids.size >= requiredNumRequests) {
-          val cmd = svcRules.contractId.exerciseSvcRules_ElectLeader(
-            self,
-            requestCids.asJava,
+          val cmd = svcRules.exercise(
+            _.exerciseSvcRules_ElectLeader(
+              self,
+              requestCids.asJava,
+            )
           )
           connection
-            .submitWithResultAndOffsetNoDedup(
+            .submit(
               Seq(store.key.svParty),
               Seq(store.key.svcParty),
               cmd,
-              domainId,
             )
+            .noDedup
+            .yieldResultAndOffset()
             .flatMap(_ => store.getSvcRules())
             .map(svcRules => {
 

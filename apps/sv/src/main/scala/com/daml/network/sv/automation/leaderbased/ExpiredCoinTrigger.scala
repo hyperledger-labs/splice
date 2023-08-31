@@ -7,7 +7,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
+
+import ExpiredCoinTrigger.*
 
 class ExpiredCoinTrigger(
     override protected val context: TriggerContext,
@@ -23,13 +24,7 @@ class ExpiredCoinTrigger(
       svTaskContext.svcStore.listExpiredCoins,
       cc.coin.Coin.COMPANION,
     )
-    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
-      cc.coin.Coin.ContractId,
-      cc.coin.Coin,
-    ]]] {
-  type Task =
-    ScheduledTaskTrigger.ReadyTask[AssignedContract[cc.coin.Coin.ContractId, cc.coin.Coin]]
-
+    with SvTaskBasedTrigger[Task] {
   private val store = svTaskContext.svcStore
 
   override def completeTaskAsLeader(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
@@ -37,19 +32,28 @@ class ExpiredCoinTrigger(
       coinRules <- store.getCoinRules()
       latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
       svcRules <- store.getSvcRules()
-      cmd = svcRules.contractId
-        .exerciseSvcRules_Coin_Expire(
+      cmd = svcRules.exercise(
+        _.exerciseSvcRules_Coin_Expire(
           co.work.contractId,
           new cc.coin.Coin_Expire(
             latestOpenMiningRound.contractId,
             coinRules.contractId.toInterface(cc.api.v1.coin.CoinRules.INTERFACE),
           ),
         )
-      _ <- svTaskContext.connection.submitCommandsNoDedup(
-        Seq(store.key.svParty),
-        Seq(store.key.svcParty),
-        commands = cmd.commands.asScala.toSeq,
-        domainId = co.work.domain,
       )
+      _ <- svTaskContext.connection
+        .submit(
+          Seq(store.key.svParty),
+          Seq(store.key.svcParty),
+          update = cmd.update, // TODO (#7052) remove .update
+        )
+        .withDomainId(co.work.domain)
+        .noDedup
+        .yieldUnit()
     } yield TaskSuccess("archived expired coin")
+}
+
+object ExpiredCoinTrigger {
+  type Task =
+    ScheduledTaskTrigger.ReadyTask[AssignedContract[cc.coin.Coin.ContractId, cc.coin.Coin]]
 }

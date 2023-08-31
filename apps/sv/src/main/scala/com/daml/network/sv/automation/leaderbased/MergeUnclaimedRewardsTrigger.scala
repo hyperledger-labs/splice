@@ -58,20 +58,20 @@ class MergeUnclaimedRewardsTrigger(
     for {
       svcRules <- store.getSvcRules()
       coinRules <- store.getCoinRules()
-      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       arg = new SvcRules_MergeUnclaimedRewards(
         coinRules.contractId,
         unclaimedRewardsTask.contracts.map(_.contractId).asJava,
       )
-      cmd = svcRules.contractId.exerciseSvcRules_MergeUnclaimedRewards(arg)
+      cmd = svcRules.exercise(_.exerciseSvcRules_MergeUnclaimedRewards(arg))
       res <- for {
         outcome <- svTaskContext.connection
-          .submitWithResultNoDedup(
+          .submit(
             Seq(store.key.svParty),
             Seq(store.key.svcParty),
             cmd,
-            domainId,
           )
+          .noDedup
+          .yieldResult()
       } yield Some(outcome)
     } yield {
       res

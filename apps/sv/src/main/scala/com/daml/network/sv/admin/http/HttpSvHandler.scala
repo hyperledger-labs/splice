@@ -767,28 +767,25 @@ class HttpSvHandler(
                 Left("An SV with that name already exists.")
               )
             } else {
-              val cmd = (
-                svcRules.contractId
-                  .exerciseSvcRules_StartSvOnboarding(
-                    candidateName,
-                    candidateParty.toProtoPrimitive,
-                    token,
-                    svParty.toProtoPrimitive,
-                  )
+              val cmd = svcRules.exercise(
+                _.exerciseSvcRules_StartSvOnboarding(
+                  candidateName,
+                  candidateParty.toProtoPrimitive,
+                  token,
+                  svParty.toProtoPrimitive,
+                )
               )
               svcStoreWithIngestion.connection
-                .submitCommands(
-                  actAs = Seq(svParty),
-                  readAs = Seq(svcParty),
-                  commands = cmd.commands.asScala.toSeq,
+                .submit(actAs = Seq(svParty), readAs = Seq(svcParty), cmd)
+                .withDedup(
                   commandId = CNLedgerConnection.CommandId(
                     "com.daml.network.sv.startSvOnboarding",
                     Seq(svParty),
                     s"$token",
                   ),
                   deduplicationOffset = offset,
-                  domainId = globalDomain,
                 )
+                .yieldUnit()
                 .map { _ => Right(()) }
             }
           }

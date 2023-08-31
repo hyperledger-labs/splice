@@ -8,12 +8,13 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+
+import ExpireIssuingMiningRoundTrigger.*
 
 class ExpireIssuingMiningRoundTrigger(
     override protected val context: TriggerContext,
@@ -29,31 +30,34 @@ class ExpireIssuingMiningRoundTrigger(
       svTaskContext.svcStore.listExpiredIssuingMiningRounds,
       cc.round.IssuingMiningRound.COMPANION,
     )
-    with SvTaskBasedTrigger[
-      ScheduledTaskTrigger.ReadyTask[AssignedContract[
-        cc.round.IssuingMiningRound.ContractId,
-        cc.round.IssuingMiningRound,
-      ]]
-    ] {
+    with SvTaskBasedTrigger[Task] {
 
   val store = svTaskContext.svcStore
 
   override protected def completeTaskAsLeader(
-      task: ScheduledTaskTrigger.ReadyTask[
-        AssignedContract[IssuingMiningRound.ContractId, IssuingMiningRound]
-      ]
+      task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.work
     for {
       svcRules <- store.getSvcRules()
       coinRules <- store.getCoinRules()
-      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
-      cmd = svcRules.contractId.exerciseSvcRules_MiningRound_Close(
-        coinRules.contractId,
-        round.contractId,
+      cmd = svcRules.exercise(
+        _.exerciseSvcRules_MiningRound_Close(
+          coinRules.contractId,
+          round.contractId,
+        )
       )
       cid <- svTaskContext.connection
-        .submitWithResultNoDedup(Seq(store.key.svParty), Seq(store.key.svcParty), cmd, domainId)
+        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .noDedup
+        .yieldResult()
     } yield TaskSuccess(s"successfully created the closed mining round with cid $cid")
   }
+}
+
+private[leaderbased] object ExpireIssuingMiningRoundTrigger {
+  type Task = ScheduledTaskTrigger.ReadyTask[AssignedContract[
+    cc.round.IssuingMiningRound.ContractId,
+    cc.round.IssuingMiningRound,
+  ]]
 }

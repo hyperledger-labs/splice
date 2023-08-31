@@ -7,7 +7,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
+
+import ExpiredLockedCoinTrigger.*
 
 class ExpiredLockedCoinTrigger(
     override protected val context: TriggerContext,
@@ -23,15 +24,7 @@ class ExpiredLockedCoinTrigger(
       svTaskContext.svcStore.listLockedExpiredCoins,
       cc.coin.LockedCoin.COMPANION,
     )
-    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
-      cc.coin.LockedCoin.ContractId,
-      cc.coin.LockedCoin,
-    ]]] {
-  type Task =
-    ScheduledTaskTrigger.ReadyTask[
-      AssignedContract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]
-    ]
-
+    with SvTaskBasedTrigger[Task] {
   private val store = svTaskContext.svcStore
 
   override protected def completeTaskAsLeader(
@@ -40,20 +33,30 @@ class ExpiredLockedCoinTrigger(
     coinRules <- store.getCoinRules()
     latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
     svcRules <- store.getSvcRules()
-    cmd = svcRules.contractId
-      .exerciseSvcRules_LockedCoin_ExpireCoin(
+    cmd = svcRules.exercise(
+      _.exerciseSvcRules_LockedCoin_ExpireCoin(
         co.work.contractId,
         new cc.coin.LockedCoin_ExpireCoin(
           latestOpenMiningRound.contractId,
           coinRules.contractId.toInterface(cc.api.v1.coin.CoinRules.INTERFACE),
         ),
       )
+    )
     _ <- svTaskContext.connection
-      .submitCommandsNoDedup(
+      .submit(
         Seq(store.key.svParty),
         Seq(store.key.svcParty),
-        commands = cmd.commands.asScala.toSeq,
-        domainId = co.work.domain,
+        update = cmd.update, // TODO (#7052) remove .update
       )
+      .withDomainId(co.work.domain)
+      .noDedup
+      .yieldUnit()
   } yield TaskSuccess(s"archived expired locked coin")
+}
+
+object ExpiredLockedCoinTrigger {
+  type Task =
+    ScheduledTaskTrigger.ReadyTask[
+      AssignedContract[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin]
+    ]
 }

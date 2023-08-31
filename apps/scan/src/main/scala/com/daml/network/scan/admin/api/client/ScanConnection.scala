@@ -13,7 +13,6 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.store.AcsStoreDump
-import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{
   CNNodeUtil,
   Contract,
@@ -306,15 +305,8 @@ final class ScanConnection private (
       // that all crates have been ingested in scan.
       (openRounds, _) <- getOpenAndIssuingMiningRounds()
       // We're explicitly not checking for the round to be open, as we only need it to supply the CoinPrice for scan.
-      (openRound, domainId) = openRounds
-        .collectFirst(
-          Function.unlift(co =>
-            co.state match {
-              case ContractState.Assigned(domainId) => Some((co, domainId))
-              case ContractState.InFlight => None
-            }
-          )
-        )
+      openRound = openRounds
+        .collectFirst(Function.unlift(_.toAssignedContract))
         .getOrElse(
           throw Status.Code.FAILED_PRECONDITION.toStatus
             .withDescription(
@@ -323,7 +315,7 @@ final class ScanConnection private (
             .asRuntimeException()
         )
       crates <- listImportCrates(party)
-    } yield AcsStoreDump.ImportShipment(openRound, domainId, crates)
+    } yield AcsStoreDump.ImportShipment(openRound.toContractWithState, openRound.domain, crates)
   }
 
 }

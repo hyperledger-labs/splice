@@ -21,7 +21,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.SvApp
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.util.AssignedContract
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -106,7 +106,7 @@ class SvOnboardingRequestTrigger(
               .asRuntimeException()
           )
         } else {
-          confirm(party, name, svOnboarding.payload.token, svcRules, svOnboarding.domain)
+          confirm(party, name, svOnboarding.payload.token, svcRules)
         }
     } yield outcome
   }
@@ -149,14 +149,15 @@ class SvOnboardingRequestTrigger(
       name: String,
       reason: String,
       svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
-      domainId: DomainId,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val action = svcRulesConfirmSvOnboardingAction(party, name, reason)
     for {
       queryResult <- svcStore.lookupConfirmationByActionWithOffset(svParty, action)
-      cmd = svcRules.contractId.exerciseSvcRules_ConfirmAction(
-        svParty.toProtoPrimitive,
-        action,
+      cmd = svcRules.exercise(
+        _.exerciseSvcRules_ConfirmAction(
+          svParty.toProtoPrimitive,
+          action,
+        )
       )
       outcome <- queryResult match {
         case QueryResult(_, Some(_)) =>
@@ -167,18 +168,20 @@ class SvOnboardingRequestTrigger(
           )
         case QueryResult(offset, None) =>
           connection
-            .submitWithResult(
+            .submit(
               actAs = Seq(svParty),
               readAs = Seq(svcParty),
               update = cmd,
+            )
+            .withDedup(
               commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.sv.svOnboardingConfirmSvOnboardingConfirmation",
                 Seq(svParty, svcParty),
                 party.toProtoPrimitive,
               ),
               deduplicationConfig = DedupOffset(offset),
-              domainId = domainId,
             )
+            .yieldResult()
             .map { _ =>
               TaskSuccess(
                 s"created confirmation for confirming the candidate SV ${name} " +

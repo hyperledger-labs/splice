@@ -58,17 +58,20 @@ class GarbageCollectCoinPriceVotesTrigger(
           .toSeq
       _ <-
         if (nonMemberVoteCids.nonEmpty || memberDuplicatedVoteCids.nonEmpty) {
-          val cmd = svcRules.contractId
-            .exerciseSvcRules_GarbageCollectCoinPriceVotes(
+          val cmd = svcRules.exercise(
+            _.exerciseSvcRules_GarbageCollectCoinPriceVotes(
               nonMemberVoteCids.asJava,
               memberDuplicatedVoteCids.asJava,
             )
-          svTaskContext.connection.submitCommandsNoDedup(
-            Seq(store.key.svParty),
-            Seq(store.key.svcParty),
-            commands = cmd.commands.asScala.toSeq,
-            domainId = svcRules.domain,
           )
+          svTaskContext.connection
+            .submit(
+              Seq(store.key.svParty),
+              Seq(store.key.svcParty),
+              cmd,
+            )
+            .noDedup
+            .yieldUnit()
         } else Future.successful(())
     } yield TaskSuccess(
       s"Archived ${nonMemberVoteCids.size} non member votes and deduplicated votes for ${memberDuplicatedVoteCids.size} SVs"

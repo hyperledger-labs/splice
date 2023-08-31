@@ -62,9 +62,8 @@ class ExpireRewardCouponsTrigger(
   )(implicit
       tc: TraceContext
   ): Future[Int] = {
-    for {
-      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
-      validatorRewardCmd = svcRules.contractId.exerciseSvcRules_ClaimExpiredRewards(
+    val validatorRewardCmd = svcRules.exercise(
+      _.exerciseSvcRules_ClaimExpiredRewards(
         coinRules.contractId,
         new CoinRules_ClaimExpiredRewards(
           expiredRewardsTask.closedRound,
@@ -72,7 +71,9 @@ class ExpireRewardCouponsTrigger(
           Seq.empty.asJava,
         ),
       )
-      appRewardCmd = svcRules.contractId.exerciseSvcRules_ClaimExpiredRewards(
+    )
+    val appRewardCmd = svcRules.exercise(
+      _.exerciseSvcRules_ClaimExpiredRewards(
         coinRules.contractId,
         new CoinRules_ClaimExpiredRewards(
           expiredRewardsTask.closedRound,
@@ -80,16 +81,19 @@ class ExpireRewardCouponsTrigger(
           expiredRewardsTask.appCoupons.asJava,
         ),
       )
-      cmds = Seq(validatorRewardCmd, appRewardCmd)
+    )
+    val cmds = Seq(validatorRewardCmd, appRewardCmd)
+    for {
       _ <- Future.sequence(
         cmds.map(cmd =>
           svTaskContext.connection
-            .submitWithResultNoDedup(
+            .submit(
               Seq(store.key.svParty),
               Seq(store.key.svcParty),
               cmd,
-              domainId,
             )
+            .noDedup
+            .yieldResult()
         )
       )
     } yield cmds.size

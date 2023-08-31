@@ -15,7 +15,8 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
+
+import CompletedSvOnboardingTrigger.*
 
 //TODO(#3756) reconsider this trigger
 class CompletedSvOnboardingTrigger(
@@ -32,15 +33,7 @@ class CompletedSvOnboardingTrigger(
       svTaskContext.svcStore,
       SvcRules.COMPANION,
     )
-    with SvTaskBasedTrigger[AssignedContract[
-      SvcRules.ContractId,
-      SvcRules,
-    ]] {
-  type SvcRulesContract = AssignedContract[
-    SvcRules.ContractId,
-    SvcRules,
-  ]
-
+    with SvTaskBasedTrigger[SvcRulesContract] {
   private val store = svTaskContext.svcStore
 
   override def completeTaskAsLeader(
@@ -49,21 +42,29 @@ class CompletedSvOnboardingTrigger(
     for {
       svOnboardings <- store.listSvOnboardingRequestsBySvcMembers(svcRules)
       cmds = svOnboardings.map(co =>
-        svcRules.contractId
-          .exerciseSvcRules_ArchiveSvOnboardingRequest(co.contractId)
+        svcRules.exercise(_.exerciseSvcRules_ArchiveSvOnboardingRequest(co.contractId))
       )
       _ <- Future.sequence(
         cmds.map(cmd =>
-          svTaskContext.connection.submitCommandsNoDedup(
-            Seq(store.key.svParty),
-            Seq(store.key.svcParty),
-            commands = cmd.commands.asScala.toSeq,
-            domainId = svcRules.domain,
-          )
+          svTaskContext.connection
+            .submit(
+              Seq(store.key.svParty),
+              Seq(store.key.svcParty),
+              cmd,
+            )
+            .noDedup
+            .yieldUnit()
         )
       )
     } yield TaskSuccess(
       show"Archived ${cmds.size} `SvOnboardingRequest` contract(s) as the SV(s) are added to SVC."
     )
   }
+}
+
+private[leaderbased] object CompletedSvOnboardingTrigger {
+  type SvcRulesContract = AssignedContract[
+    SvcRules.ContractId,
+    SvcRules,
+  ]
 }

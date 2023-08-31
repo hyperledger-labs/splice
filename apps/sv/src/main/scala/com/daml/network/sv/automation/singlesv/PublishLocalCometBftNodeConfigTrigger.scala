@@ -42,8 +42,7 @@ class PublishLocalCometBftNodeConfigTrigger(
       tc: TraceContext
   ): Future[Seq[PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask]] =
     (for {
-      svcRulesRC <- OptionT(store.lookupSvcRules())
-      svcRules = svcRulesRC.contract
+      svcRules <- OptionT(store.lookupSvcRules())
       svNodeMemberInfo <- OptionT.fromOption[Future](
         CometBftNode.extractSvNodeMemberInfo(svcRules.payload, store.key.svParty)
       )
@@ -58,7 +57,7 @@ class PublishLocalCometBftNodeConfigTrigger(
         .contains(localSvNodeConfig)
     } yield PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask(
       svNodeMemberInfo.name,
-      svcRules,
+      svcRules.contract,
       localSvNodeConfig,
     )).value
       .map(_.toList)
@@ -67,21 +66,23 @@ class PublishLocalCometBftNodeConfigTrigger(
       task: PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask
   )(implicit
       tc: TraceContext
-  ): Future[TaskOutcome] =
-    for {
-      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
-      cmd = task.svcRules.contractId.exerciseSvcRules_SetDomainNodeConfig(
+  ): Future[TaskOutcome] = {
+    val cmd = task.svcRules.exercise(
+      _.exerciseSvcRules_SetDomainNodeConfig(
         store.key.svParty.toProtoPrimitive,
         SvUtil.defaultSvcDomainNumber, // TODO(#4901): do not use default, but reconcile all configured CometBFT networks
         task.damlSvNodeConfig,
       )
-      _ <- connection.submitWithResultNoDedup(
-        Seq(store.key.svParty),
-        Seq(store.key.svcParty),
-        cmd,
-        domainId = domainId,
-      )
+    )
+    for {
+      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
+      _ <- connection
+        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .withDomainId(domainId)
+        .noDedup
+        .yieldResult()
     } yield TaskSuccess(show"Updated SVC-wide CometBFT node configuration for ${store.key.svParty}")
+  }
 
   override protected def isStaleTask(
       task: PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask

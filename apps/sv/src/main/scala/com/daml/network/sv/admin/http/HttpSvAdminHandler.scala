@@ -179,7 +179,6 @@ class HttpSvAdminHandler(
         .updateCoinPriceVote(
           coinPrice,
           svcStoreWithIngestion,
-          globalDomain: DomainId,
           logger,
         )
         .flatMap {
@@ -206,7 +205,6 @@ class HttpSvAdminHandler(
           body.requester,
           body.ranking,
           svcStoreWithIngestion,
-          globalDomain,
         )
         .flatMap {
           case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
@@ -240,7 +238,6 @@ class HttpSvAdminHandler(
           body.description,
           body.expiration,
           svcStoreWithIngestion,
-          globalDomain,
         )
         .flatMap {
           case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
@@ -298,7 +295,6 @@ class HttpSvAdminHandler(
           body.reasonUrl,
           body.reasonDescription,
           svcStoreWithIngestion,
-          globalDomain,
         )
         .flatMap {
           case Left(cause) => Future.failed(HttpErrorHandler.badRequest(cause))
@@ -317,7 +313,6 @@ class HttpSvAdminHandler(
           body.reasonUrl,
           body.reasonDescription,
           svcStoreWithIngestion,
-          globalDomain,
           logger,
         )
         .flatMap {

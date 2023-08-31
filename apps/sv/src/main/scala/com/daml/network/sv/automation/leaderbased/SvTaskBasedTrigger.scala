@@ -57,7 +57,6 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
       tc: TraceContext
   ): Future[TaskOutcome] = {
     for {
-      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       queryResult <- store.lookupElectionRequestByRequesterWithOffset(
         store.key.svParty,
         svTaskContext.epoch,
@@ -74,26 +73,30 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
           val otherParties =
             svcRules.payload.members.keySet.asScala.to(Set) - currentLeader - self
           val ranking = self :: Random.shuffle(otherParties.toList) ++ List(currentLeader)
-          val cmd = svcRules.contractId.exerciseSvcRules_RequestElection(
-            self,
-            new cn.svcrules.electionrequestreason.ERR_LeaderUnavailable(
-              com.daml.ledger.javaapi.data.Unit.getInstance()
-            ),
-            ranking.asJava,
+          val cmd = svcRules.exercise(
+            _.exerciseSvcRules_RequestElection(
+              self,
+              new cn.svcrules.electionrequestreason.ERR_LeaderUnavailable(
+                com.daml.ledger.javaapi.data.Unit.getInstance()
+              ),
+              ranking.asJava,
+            )
           )
           svTaskContext.connection
-            .submitCommands(
+            .submit(
               actAs = Seq(store.key.svParty),
               readAs = Seq(store.key.svcParty),
-              commands = cmd.commands.asScala.toSeq,
+              update = cmd,
+            )
+            .withDedup(
               commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.sv.requestElection",
                 Seq(store.key.svParty, store.key.svcParty),
                 svTaskContext.epoch.toString,
               ),
               deduplicationOffset = offset,
-              domainId = domainId,
             )
+            .yieldUnit()
             .map(_ => {
               TaskSuccess(
                 s"successfully requested an election to replace inactive leader ${currentLeader}"

@@ -63,36 +63,36 @@ class ExecuteConfirmedActionTrigger(
         )
       else
         for {
-          domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
           svcRules <- store.getSvcRules()
           requiredNumConfirmations = SvUtil.requiredNumVotes(svcRules)
           confirmations <- store.listConfirmations(action)
           uniqueConfirmations = confirmations.distinctBy(_.payload.confirmer)
           taskOutcome <-
             if (uniqueConfirmations.size >= requiredNumConfirmations) {
-              store.getCoinRules().flatMap { coinRules =>
-                val coinRulesId = coinRules.contractId
-                val cmd = svcRules.contractId.exerciseSvcRules_ExecuteConfirmedAction(
-                  action,
-                  java.util.Optional.of(coinRulesId),
-                  uniqueConfirmations
-                    .map(_.contractId)
-                    .asJava, // TODO(#3300) report duplicated and add test cases to make sure no duplicated confirmations here
+              for {
+                coinRules <- store.getCoinRules()
+                coinRulesId = coinRules.contractId
+                cmd = svcRules.exercise(
+                  _.exerciseSvcRules_ExecuteConfirmedAction(
+                    action,
+                    java.util.Optional.of(coinRulesId),
+                    uniqueConfirmations
+                      .map(_.contractId)
+                      .asJava, // TODO(#3300) report duplicated and add test cases to make sure no duplicated confirmations here
+                  )
                 )
-                svTaskContext.connection
-                  .submitWithResultNoDedup(
+                _ <- svTaskContext.connection
+                  .submit(
                     Seq(store.key.svParty),
                     Seq(store.key.svcParty),
                     cmd,
-                    domainId,
                   )
-                  .map(_ =>
-                    TaskSuccess(
-                      show"executed an action $action as there are ${uniqueConfirmations.size} confirmation(s) which is >=" +
-                        show" the required $requiredNumConfirmations confirmations."
-                    )
-                  )
-              }
+                  .noDedup
+                  .yieldResult()
+              } yield TaskSuccess(
+                show"executed an action $action as there are ${uniqueConfirmations.size} confirmation(s) which is >=" +
+                  show" the required $requiredNumConfirmations confirmations."
+              )
             } else {
               Future.successful(
                 TaskSuccess(

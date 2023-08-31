@@ -2,6 +2,7 @@ package com.daml.network.util
 
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.network.http.v0.definitions as http
+import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.topology.DomainId
@@ -20,6 +21,10 @@ final case class AssignedContract[TCid, T](
     param("contract", _.contract),
     param("domain", _.domain),
   )
+
+  /** [[ContractWithState]] is strictly wider than this type. */
+  def toContractWithState: ContractWithState[TCid, T] =
+    ContractWithState(contract, ContractState.Assigned(domain))
 
   def toHttp(implicit elc: ErrorLoggingContext): http.AssignedContract =
     http.AssignedContract(

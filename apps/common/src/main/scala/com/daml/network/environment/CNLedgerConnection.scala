@@ -399,21 +399,6 @@ class CNLedgerConnection(
       .withDomainId(domainId, disclosedContracts)
       .yieldUnit()
 
-  def submitCommandsTransaction(
-      actAs: Seq[PartyId],
-      readAs: Seq[PartyId],
-      commands: Seq[Command],
-      commandId: CommandId,
-      deduplicationOffset: String,
-      domainId: DomainId,
-      disclosedContracts: DisclosedContracts = DisclosedContracts(),
-      priority: CommandPriority = CommandPriority.Low,
-  )(implicit tc: TraceContext): Future[Transaction] =
-    submit(actAs, readAs, commands, priority)
-      .withDedup(commandId, deduplicationOffset)
-      .withDomainId(domainId, disclosedContracts)
-      .yieldTransaction()
-
   def submitWithResultNoDedup[T](
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],

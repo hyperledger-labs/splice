@@ -262,7 +262,7 @@ class SvApp(
       //    but could also be imported through the stream of the SV party. By only creating the validator user here
       //    we ensure that the party migration has been completed before the contract is created.
       // 2. Concurrent DAR uploads currently break Canton's topology state management.
-      _ <- SvApp.initializeValidator(svcAutomation, globalDomain, config, retryProvider, logger)
+      _ <- SvApp.initializeValidator(svcAutomation, config, retryProvider, logger)
 
       // Ensure Daml-level invariants for the SV
       // ----------------------------------------
@@ -286,7 +286,6 @@ class SvApp(
           ensureCoinPriceVoteHasCoinPrice(
             _,
             svcAutomation,
-            globalDomain,
             logger,
           )
         )
@@ -598,7 +597,6 @@ class SvApp(
   private def ensureCoinPriceVoteHasCoinPrice(
       defaultCoinPriceVote: BigDecimal,
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-      globalDomain: DomainId,
       logger: TracedLogger,
   ): Future[Either[String, Unit]] =
     svcStoreWithIngestion.store.lookupCoinPriceVoteByThisSv().flatMap {
@@ -612,7 +610,6 @@ class SvApp(
             .updateCoinPriceVote(
               defaultCoinPriceVote,
               svcStoreWithIngestion,
-              globalDomain,
               logger,
             ),
           logger,
@@ -685,34 +682,32 @@ object SvApp {
             Left(s"This secret has already been used before, for onboarding validator $validator")
           )
         }
-        case QueryResult(offset, None) => {
+        case QueryResult(offset, None) =>
           svStore.lookupValidatorOnboardingBySecretWithOffset(secret).flatMap {
-            case QueryResult(_, Some(_)) => {
+            case QueryResult(_, Some(_)) =>
               Future.successful(
                 Left("A validator onboarding contract with this secret already exists.")
               )
-            }
-            case QueryResult(_, None) => {
-              svStoreWithIngestion.connection
-                .submit(actAs = Seq(svParty), readAs = Seq.empty, update = validatorOnboarding)
-                .withDedup(
-                  commandId = CNLedgerConnection
-                    .CommandId(
-                      "com.daml.network.sv.expectValidatorOnboarding",
-                      Seq(svParty),
-                      secret, // not a leak as this gets hashed before it's used
-                    ),
-                  deduplicationOffset = offset,
-                )
-                .withDomainId(domainId = globalDomain)
-                .yieldUnit()
-                .map(_ => {
-                  logger.info("Created new ValidatorOnboarding contract.")
-                  Right(())
-                })
-            }
+            case QueryResult(_, None) =>
+              for {
+                _ <- svStoreWithIngestion.connection
+                  .submit(actAs = Seq(svParty), readAs = Seq.empty, update = validatorOnboarding)
+                  .withDedup(
+                    commandId = CNLedgerConnection
+                      .CommandId(
+                        "com.daml.network.sv.expectValidatorOnboarding",
+                        Seq(svParty),
+                        secret, // not a leak as this gets hashed before it's used
+                      ),
+                    deduplicationOffset = offset,
+                  )
+                  .withDomainId(domainId = globalDomain)
+                  .yieldUnit()
+              } yield {
+                logger.info("Created new ValidatorOnboarding contract.")
+                Right(())
+              }
           }
-        }
       }
     } yield res
   }
@@ -720,7 +715,6 @@ object SvApp {
   def updateCoinPriceVote(
       desiredCoinPrice: BigDecimal,
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-      globalDomain: DomainId,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
     val svcStore = svcStoreWithIngestion.store
@@ -731,17 +725,21 @@ object SvApp {
       case Some(vote) =>
         for {
           svcRules <- svcStore.getSvcRules()
-          cmd = svcRules.contractId.exerciseSvcRules_UpdateCoinPriceVote(
-            svcStore.key.svParty.toProtoPrimitive,
-            vote.contractId,
-            desiredCoinPrice.bigDecimal,
+          cmd = svcRules.exercise(
+            _.exerciseSvcRules_UpdateCoinPriceVote(
+              svcStore.key.svParty.toProtoPrimitive,
+              vote.contractId,
+              desiredCoinPrice.bigDecimal,
+            )
           )
-          _ <- svcStoreWithIngestion.connection.submitCommandsNoDedup(
-            actAs = Seq(svcStore.key.svParty),
-            readAs = Seq(svcStore.key.svcParty),
-            commands = cmd.commands().asScala.toSeq,
-            domainId = globalDomain,
-          )
+          _ <- svcStoreWithIngestion.connection
+            .submit(
+              actAs = Seq(svcStore.key.svParty),
+              readAs = Seq(svcStore.key.svcParty),
+              update = cmd,
+            )
+            .noDedup
+            .yieldUnit()
         } yield Right(())
       case None =>
         Future.successful(
@@ -773,7 +771,6 @@ object SvApp {
       requester: String,
       ranking: Seq[String],
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-      globalDomain: DomainId,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -795,19 +792,23 @@ object SvApp {
           )
         case QueryResult(offset, None) =>
           val self = requester
-          val cmd = svcRules.contractId.exerciseSvcRules_RequestElection(
-            self,
-            new cn.svcrules.electionrequestreason.ERR_LeaderUnavailable(
-              com.daml.ledger.javaapi.data.Unit.getInstance()
-            ),
-            ranking.asJava,
+          val cmd = svcRules.exercise(
+            _.exerciseSvcRules_RequestElection(
+              self,
+              new cn.svcrules.electionrequestreason.ERR_LeaderUnavailable(
+                com.daml.ledger.javaapi.data.Unit.getInstance()
+              ),
+              ranking.asJava,
+            )
           )
           for {
             _ <- svcStoreWithIngestion.connection
-              .submitCommands(
+              .submit(
                 actAs = Seq(store.key.svParty),
                 readAs = Seq(store.key.svcParty),
-                commands = cmd.commands.asScala.toSeq,
+                cmd,
+              )
+              .withDedup(
                 commandId = CNLedgerConnection.CommandId(
                   "com.daml.network.sv.requestElection",
                   Seq(
@@ -817,8 +818,8 @@ object SvApp {
                   svcRules.payload.epoch.toString,
                 ),
                 deduplicationOffset = offset,
-                domainId = globalDomain,
               )
+              .yieldUnit()
           } yield Right(())
       }
     } yield result
@@ -831,7 +832,6 @@ object SvApp {
       reasonDescription: String,
       expiration: Json,
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-      globalDomain: DomainId,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -866,22 +866,25 @@ object SvApp {
               reason,
               java.util.Optional.of(decodedExpiration),
             )
-            cmd = svcRules.contractId.exerciseSvcRules_RequestVote(request)
-            _ <- svcStoreWithIngestion.connection.submitCommands(
-              actAs = Seq(svcStoreWithIngestion.store.key.svParty),
-              readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
-              commands = cmd.commands().asScala.toSeq,
-              commandId = CNLedgerConnection.CommandId(
-                "com.daml.network.sv.requestVote",
-                Seq(
-                  svcStoreWithIngestion.store.key.svcParty,
-                  svcStoreWithIngestion.store.key.svParty,
+            cmd = svcRules.exercise(_.exerciseSvcRules_RequestVote(request))
+            _ <- svcStoreWithIngestion.connection
+              .submit(
+                actAs = Seq(svcStoreWithIngestion.store.key.svParty),
+                readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
+                cmd,
+              )
+              .withDedup(
+                commandId = CNLedgerConnection.CommandId(
+                  "com.daml.network.sv.requestVote",
+                  Seq(
+                    svcStoreWithIngestion.store.key.svcParty,
+                    svcStoreWithIngestion.store.key.svParty,
+                  ),
+                  action.toString,
                 ),
-                action.toString,
-              ),
-              deduplicationOffset = offset,
-              domainId = globalDomain,
-            )
+                deduplicationOffset = offset,
+              )
+              .yieldUnit()
           } yield Right(())
       }
 
@@ -893,7 +896,6 @@ object SvApp {
       reasonUrl: String,
       reasonDescription: String,
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-      globalDomain: DomainId,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -909,30 +911,32 @@ object SvApp {
           for {
             svcRules <- svcStoreWithIngestion.store.getSvcRules()
             reason = new Reason(reasonUrl, reasonDescription)
-            cmd = svcRules.contractId
-              .exerciseSvcRules_CastVote(
+            cmd = svcRules.exercise(
+              _.exerciseSvcRules_CastVote(
                 voteRequestCid,
                 svcStoreWithIngestion.store.key.svParty.toProtoPrimitive,
                 isAccepted,
                 reason,
               )
-            res <- svcStoreWithIngestion.connection.submitWithResult(
-              actAs = Seq(svcStoreWithIngestion.store.key.svParty),
-              readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
-              update = cmd,
-              commandId = CNLedgerConnection.CommandId(
-                "com.daml.network.sv.castVote",
-                Seq(
-                  svcStoreWithIngestion.store.key.svcParty,
-                  svcStoreWithIngestion.store.key.svParty,
-                ),
-                voteRequestCid.contractId,
-              ),
-              deduplicationConfig = DedupOffset(
-                offset = offset
-              ),
-              domainId = globalDomain,
             )
+            res <- svcStoreWithIngestion.connection
+              .submit(
+                actAs = Seq(svcStoreWithIngestion.store.key.svParty),
+                readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
+                update = cmd,
+              )
+              .withDedup(
+                commandId = CNLedgerConnection.CommandId(
+                  "com.daml.network.sv.castVote",
+                  Seq(
+                    svcStoreWithIngestion.store.key.svcParty,
+                    svcStoreWithIngestion.store.key.svParty,
+                  ),
+                  voteRequestCid.contractId,
+                ),
+                deduplicationConfig = DedupOffset(offset = offset),
+              )
+              .yieldResult()
           } yield Right(res.exerciseResult)
       }
   }
@@ -943,7 +947,6 @@ object SvApp {
       reasonUrl: String,
       reasonDescription: String,
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-      globalDomain: DomainId,
       logger: TracedLogger,
   )(implicit
       ec: ExecutionContext,
@@ -962,19 +965,22 @@ object SvApp {
         case Some(_) =>
           for {
             svcRules <- svcStoreWithIngestion.store.getSvcRules()
-            cmd = svcRules.contractId
-              .exerciseSvcRules_UpdateVote(
+            cmd = svcRules.exercise(
+              _.exerciseSvcRules_UpdateVote(
                 voteCid,
                 svcStoreWithIngestion.store.key.svParty.toProtoPrimitive,
                 isAccepted,
                 reason,
               )
-            res <- svcStoreWithIngestion.connection.submitWithResultNoDedup(
-              actAs = Seq(svcStoreWithIngestion.store.key.svParty),
-              readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
-              update = cmd,
-              domainId = globalDomain,
             )
+            res <- svcStoreWithIngestion.connection
+              .submit(
+                actAs = Seq(svcStoreWithIngestion.store.key.svParty),
+                readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
+                update = cmd,
+              )
+              .noDedup
+              .yieldResult()
           } yield Some(res.exerciseResult)
       }
   }
@@ -1111,7 +1117,6 @@ object SvApp {
 
   private def initializeValidator(
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-      globalDomain: DomainId,
       config: SvAppBackendConfig,
       retryProvider: RetryProvider,
       logger: TracedLogger,
@@ -1142,15 +1147,19 @@ object SvApp {
               Future.unit
             case QueryResult(offset, None) =>
               logger.debug("Trying to create validator license for SV party")
-              val cmd = svcRules.contractId.exerciseSvcRules_OnboardValidator(
-                svParty.toProtoPrimitive,
-                svParty.toProtoPrimitive,
+              val cmd = svcRules.exercise(
+                _.exerciseSvcRules_OnboardValidator(
+                  svParty.toProtoPrimitive,
+                  svParty.toProtoPrimitive,
+                )
               )
               svcStoreWithIngestion.connection
-                .submitCommands(
+                .submit(
                   actAs = Seq(svParty),
                   readAs = Seq(store.key.svcParty),
-                  commands = cmd.commands().asScala.toSeq,
+                  cmd,
+                )
+                .withDedup(
                   commandId = CNLedgerConnection.CommandId(
                     "com.daml.network.sv.createSvValidatorLicense",
                     Seq(
@@ -1160,8 +1169,8 @@ object SvApp {
                     svParty.toProtoPrimitive,
                   ),
                   deduplicationOffset = offset,
-                  domainId = globalDomain,
                 )
+                .yieldUnit()
                 .map { _ =>
                   logger.info("Created validator license for SV party")
                 }
