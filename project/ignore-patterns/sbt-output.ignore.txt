@@ -81,4 +81,9 @@ stderr: Finishing shakeRun .*exception: AsyncCancelled
 # compiling daml-errors can be safely ignored
 .*compiling.*daml-errors.*
 
+# bundle ignore
+.*Error: ENOENT: no such file or directory.*
+.*\[.*info.*\].*Compiled with warnings.*
+.*\[.*info.*\].*Search for the keywords to learn more about each warning.*
+
 # Make sure to have a trailing newline

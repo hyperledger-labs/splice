@@ -26,7 +26,7 @@ parameters:
   # old files don’t pollute your build.
   cache-version:
     type: string
-    default: "19"
+    default: "20"
   run-job:
     type: enum
     enum: [build, deploy-cidaily, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-cidaily, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
@@ -791,7 +791,6 @@ commands:
       - execute_sbt_command:
           cmd: "Test/compile printTests"
           fail_on_error_in_output: false
-          cmd_retry_count: 2
       - run:
           name: Splitting tests
           command: |
@@ -1291,7 +1290,6 @@ jobs:
       - execute_sbt_command:
           # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
           cmd: "Test/compile bundle"
-          cmd_retry_count: 5
       - run:
           name: Copy bundle
           command: |
@@ -1548,7 +1546,6 @@ jobs:
       - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
-          cmd_retry_count: 2
           # TODO(#6153): we bumped this up to allow nix to rebuild everything if needed.
           # Instead, we should fetch the correct nix cache and avoid those rebuilds
           no_output_timeout: "20m"
@@ -1677,7 +1674,6 @@ jobs:
       - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
-          cmd_retry_count: 2
       - when:
           condition:
             not: << parameters.sync_with_cluster_version >>
