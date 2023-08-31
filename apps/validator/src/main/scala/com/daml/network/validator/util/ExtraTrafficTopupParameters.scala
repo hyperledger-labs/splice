@@ -42,6 +42,7 @@ object ExtraTrafficTopupParameters {
       if (expectedTopupParameters.topupAmount >= globalConfig.minTopupAmount)
         expectedTopupParameters
       else {
+        // TODO(#7472): Add warning log for this case
         // if the minTopupAmount is higher than expectedTopupAmount, adjust the topupInterval to
         // provide target traffic rate.
         // Note that the target rate is greater than the base rate at this point => the denominator is positive.

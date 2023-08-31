@@ -214,27 +214,11 @@ object SvcTables extends AcsTables with NamedLogging {
               validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
             )
           }
-        case cc.globaldomain.ValidatorTraffic.TEMPLATE_ID =>
-          tryToDecode(cc.globaldomain.ValidatorTraffic.COMPANION, createdEvent) { contract =>
-            SvcAcsStoreRowData(
-              contract,
-              validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
-              totalTrafficPurchased = Some(contract.payload.totalPurchased),
-            )
-          }
         case cc.globaldomain.MemberTraffic.TEMPLATE_ID =>
           tryToDecode(cc.globaldomain.MemberTraffic.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
-              memberTrafficMember = Some(
-                // TODO(#7424): Refactor this into a Member.tryFromProtoPrimitive method
-                Member
-                  .fromProtoPrimitive(contract.payload.memberId, "")
-                  .fold(
-                    err => throw new IllegalArgumentException(err.message),
-                    identity,
-                  )
-              ),
+              memberTrafficMember = Some(Member.tryFromProtoPrimitive(contract.payload.memberId)),
             )
           }
         case cn.cns.CnsRules.TEMPLATE_ID =>

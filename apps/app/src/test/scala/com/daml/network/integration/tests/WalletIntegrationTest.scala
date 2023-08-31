@@ -51,7 +51,6 @@ class WalletIntegrationTest
         )
       )
       .withTrafficTopupsEnabled
-      .withMemberTrafficInsteadOfValidatorTraffic
   }
 
   "A wallet" should {

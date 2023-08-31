@@ -82,7 +82,6 @@ class TrafficReservationTimeBasedIntegrationTest
             .replace(NonNegativeFiniteDuration.ofSeconds(0))
         )(config)
       )
-      .withMemberTrafficInsteadOfValidatorTraffic
   }
 
   "traffic reservation" in { implicit env =>

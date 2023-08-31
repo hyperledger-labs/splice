@@ -10,7 +10,7 @@ import qualified CC.API.V1.Coin as API
 
 import CC.Round (OpenMiningRound)
 import CC.Coin (Coin, CoinRules, CoinRules_DevNet_Tap(..), InvalidTransfer, InvalidTransferReason(..), FeaturedAppRight, FeaturedAppRight_Cancel(..), CoinRules_DevNet_FeatureApp(..),
-  CoinRules_BuyExtraTraffic(..), CoinRules_BuyMemberTraffic(..), CoinRules_Fetch(..), computeDomainFees)
+  CoinRules_BuyMemberTraffic(..), CoinRules_Fetch(..), computeDomainFees)
 import CC.GlobalDomain
 
 import CN.Util.ExpiringContract
@@ -42,10 +42,6 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
     CO_CompleteAcceptedTransfer cid -> handle AcceptedTransferOffer_Complete COO_CompleteAcceptedTransfer cid
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
-    -- TODO(#7081) - Remove this once we've switched over entirely to MemberTraffic contracts
-    CO_BuyExtraTraffic extraTraffic trafficCid minTopupInterval -> do
-      resultE <- catchAll $ handleBuyExtraTraffic extraTraffic trafficCid minTopupInterval
-      handleResult COO_BuyExtraTraffic resultE
     CO_BuyMemberTraffic trafficAmount memberId domainId minTopupInterval topupStateCid -> do
       resultE <- catchAll $ handleBuyMemberTraffic trafficAmount memberId domainId minTopupInterval topupStateCid
       handleResult COO_BuyMemberTraffic resultE
@@ -86,39 +82,6 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
 
     handleLeft : InvalidTransferReason -> Update [CoinOperationOutcome]
     handleLeft errorMsg = executeCoinOperationRec endUserP validatorP context inputs (COO_Error (errorMsg) :: prevResults) remainingOperations
-
-    -- TODO(#7081) - Remove this once we've switched over entirely to MemberTraffic contracts
-    handleBuyExtraTraffic extraTraffic intentOrTrafficCid minTopupInterval = do
-      -- protect against successive topups being too close together
-      case intentOrTrafficCid of
-        Left _ -> pure ()  -- nothing has to be done if a traffic contract is created freshly for a domain
-        Right trafficCid -> do
-          traffic <- fetch trafficCid
-          now <- getTime
-          require "enough time has elapsed since the last topup" (addRelTime traffic.lastPurchasedAt minTopupInterval <= now)
-      (coinRulesCid, coinRules) <- exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_Fetch validatorP)
-      newInputs <-
-        if (coinRules.isDevNet)
-          -- Tap enough CC to buy extra traffic on DevNet
-          then do
-            -- Calculate CC required to buy extra traffic
-            (trafficCostCc, _) <- computeDomainFees validatorP extraTraffic coinRules context
-            -- Calculate transfer fees to be paid
-            let outputs = [ API.TransferOutput with
-                            receiver = coinRules.svc
-                            amount = trafficCostCc
-                            receiverFeeRatio = 0.0
-                            lock = None ]
-            [fees] <- exercise context.coinRules (API.CoinRules_ComputeFees context.context validatorP outputs)
-            -- Tap enough CC to cover extra traffic purchase including fees
-            ccsum <- exercise coinRulesCid (CoinRules_DevNet_Tap validatorP (trafficCostCc + fees)
-              (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound))
-            let newCoin = toInterfaceContractId @API.Coin ccsum.coin
-            pure $ (API.InputCoin newCoin) :: inputs
-          else
-            pure inputs
-      exercise coinRulesCid
-        (CoinRules_BuyExtraTraffic newInputs context validatorP intentOrTrafficCid extraTraffic)
 
     handleBuyMemberTraffic: Int -> Text -> Text -> RelTime -> Optional (ContractId ValidatorTopUpState) -> Update (ContractId MemberTraffic, Optional (ContractId API.Coin))
     handleBuyMemberTraffic trafficAmount memberId domainId minTopupInterval topupStateCidO = do
@@ -192,11 +155,6 @@ data CoinOperation
   -- This CO is periodically sent by the wallet to automatically collect outstanding rewards and
   -- merge coin contracts
   | CO_MergeTransferInputs
-  -- TODO(#7081) - Remove this once we've switched over entirely to MemberTraffic contracts
-  | CO_BuyExtraTraffic with
-      extraTrafficAmount: Int
-      intentOrTrafficCid : Either (ContractId ValidatorTrafficCreationIntent) (ContractId ValidatorTraffic)
-      minTopupInterval: RelTime
   | CO_BuyMemberTraffic with
       trafficAmount : Int
       memberId : Text
@@ -216,7 +174,6 @@ data CoinOperationOutcome
   -- Using `Optional` here as the wallet reuses that type for returning a result,
   -- and needs to communicate to the caller whether a merge happend.
   | COO_MergeTransferInputs (Optional (ContractId API.Coin))
-  | COO_BuyExtraTraffic (ContractId ValidatorTraffic)
   | COO_BuyMemberTraffic (ContractId MemberTraffic)
   | COO_Tap (ContractId API.Coin)
   | COO_Error InvalidTransferReason

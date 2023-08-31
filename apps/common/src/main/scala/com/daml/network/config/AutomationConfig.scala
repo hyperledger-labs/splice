@@ -38,9 +38,4 @@ case class AutomationConfig(
       * publish/reconcile automation.
       */
     enableCometbftReconciliation: Boolean = true,
-    /** Only intended for PoC. Enables using MemberTraffic contracts instead of ValidatorTraffic contracts for domain fees.
-      *
-      * TODO(#7081): Remove this once we've switched over entirely to MemberTraffic contracts
-      */
-    useMemberTrafficInsteadOfValidatorTraffic: Boolean = false,
 ) {}

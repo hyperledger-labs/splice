@@ -14,7 +14,6 @@ import com.daml.network.codegen.java.cc.coin.invalidtransferreason.{
 }
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.{
   CO_AppPayment,
-  CO_BuyExtraTraffic,
   CO_BuyMemberTraffic,
   CO_CompleteAcceptedTransfer,
   CO_MergeTransferInputs,
@@ -33,7 +32,6 @@ import com.daml.network.history.{
   CoinArchive,
   CoinCreate,
   CoinExpire,
-  CoinRules_BuyExtraTraffic,
   CoinRules_BuyMemberTraffic,
   CnsRules_CollectInitialEntryPayment,
   CnsRules_CollectEntryRenewalPayment,
@@ -100,7 +98,7 @@ class UserWalletTxLogParser(
             // Unfortunately there is not a 1:1 correspondence between CoinOperationOutcome and child events in the
             // transaction tree:
             // - COO_Error does not produce any child event
-            // - COO_BuyExtraTraffic and COO_BuyMemberTraffic can produce up to 2 child events of interest
+            // - COO_BuyMemberTraffic can produce up to 2 child events of interest
             //   - tapping of coins to pay for extra traffic (only on DevNet)
             //   - the actual purchase of extra traffic
             // - all other outcomes produce exactly one child exercise event
@@ -127,58 +125,6 @@ class UserWalletTxLogParser(
                             (op, outcome, Left(outcome.invalidTransferReasonValue))
                           ),
                           nextChildEventId,
-                        )
-                      // TODO(#7081): Remove once we've completely switched over to the BuyMemberTraffic choice
-                      case (op: CO_BuyExtraTraffic, outcome) =>
-                        // Special handling for CO_BuyExtraTraffic to associate multiple events with it.
-                        // Since on DevNet, we auto-tap coins, there will be five associated events.
-                        // - CoinRules_Fetch
-                        // - OpenMiningRound_Fetch
-                        // - CoinRules_ComputeFees
-                        // - CoinRules_DevNet_Tap
-                        // - CoinRules_BuyExtraTraffic
-                        // The first 4 of these are related to identifying the amount of CC to tap to cover
-                        // the purchase and then actually tapping it.
-                        // On non-DevNet, there will be only 2 associated events: the CoinRules_Fetch and
-                        // the CoinRules_BuyExtraTraffic exercises.
-                        val (childEventCount, expectedChildEvents) = tree.getEventsById
-                          .get(exercised.getChildEventIds.get(nextChildEventId + 1)) match {
-                          // assume non-DevNet if the second event is the BuyExtraTraffic choice
-                          case e: ExercisedEvent if e.getChoice == "CoinRules_BuyExtraTraffic" =>
-                            (2, Seq("CoinRules_Fetch", "CoinRules_BuyExtraTraffic"))
-                          case _ =>
-                            (
-                              5,
-                              Seq(
-                                "CoinRules_Fetch",
-                                "OpenMiningRound_Fetch",
-                                "CoinRules_ComputeFees",
-                                "CoinRules_DevNet_Tap",
-                                "CoinRules_BuyExtraTraffic",
-                              ),
-                            )
-                        }
-                        val childEvents = exercised.getChildEventIds.asScala.toSeq
-                          .slice(nextChildEventId, nextChildEventId + childEventCount)
-                          .map(tree.getEventsById.get)
-                          .flatMap {
-                            case e: ExercisedEvent =>
-                              Seq(e)
-                            case e =>
-                              logger.warn(s"Unexpected event $e.")
-                              Seq()
-                          }
-                        if (childEvents.map(_.getChoice) != expectedChildEvents)
-                          logger.warn(
-                            s"Expected events $expectedChildEvents. Got ${childEvents.map(_.getChoice)}"
-                          )
-                        val eventsOfInterest = childEvents.filter(e =>
-                          Seq("CoinRules_BuyExtraTraffic", "CoinRules_DevNet_Tap")
-                            .contains(e.getChoice)
-                        )
-                        (
-                          result.appended((op, outcome, Right(eventsOfInterest))),
-                          nextChildEventId + childEventCount,
                         )
                       case (op: CO_BuyMemberTraffic, outcome) =>
                         // Special handling for CO_BuyMemberTraffic to associate multiple events with it.
@@ -289,10 +235,8 @@ class UserWalletTxLogParser(
                         details,
                       )
                     // The errors below should not produce notifications
-                    // TODO(#7081): Remove CO_BuyExtraTraffic from this list once we switch over to MemberTraffic contracts
                     case _: CO_AppPayment | _: CO_SubscriptionAcceptAndMakeInitialPayment |
-                        _: CO_MergeTransferInputs | _: CO_BuyExtraTraffic | _: CO_BuyMemberTraffic |
-                        _: CO_Tap =>
+                        _: CO_MergeTransferInputs | _: CO_BuyMemberTraffic | _: CO_Tap =>
                       State.empty
                     case _ => throw new RuntimeException(s"Invalid operation $op")
                   }
@@ -673,10 +617,6 @@ class UserWalletTxLogParser(
           // Buying domain traffic
           // ------------------------------------------------------------------
 
-          // TODO(#7081): Remove once we've fully switched over to MemberTraffic contracts
-          case CoinRules_BuyExtraTraffic(_) =>
-            now(State.fromBuyMemberTraffic(tree, exercised, domainId))
-
           case CoinRules_BuyMemberTraffic(_) =>
             now(State.fromBuyMemberTraffic(tree, exercised, domainId))
 
@@ -1030,7 +970,8 @@ object UserWalletTxLogParser {
       case object SubscriptionPaymentCollected
           extends TransferTransactionSubtype(SubscriptionPayment_Collect)
       case object WalletAutomation extends TransferTransactionSubtype(WalletAppInstall_ExecuteBatch)
-      case object ExtraTrafficPurchase extends TransferTransactionSubtype(CoinRules_BuyExtraTraffic)
+      case object ExtraTrafficPurchase
+          extends TransferTransactionSubtype(CoinRules_BuyMemberTraffic)
       case object InitialEntryPaymentCollection
           extends TransferTransactionSubtype(CnsRules_CollectInitialEntryPayment)
       case object EntryRenewalPaymentCollection

@@ -3,7 +3,6 @@ package com.daml.network.scan.store
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
-import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
@@ -113,15 +112,6 @@ trait ScanStore
   def getTopValidatorsByPurchasedTraffic(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[ValidatorPurchasedTraffic]]
-
-  def lookupValidatorTraffic(validatorParty: PartyId)(implicit tc: TraceContext): Future[
-    Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]
-  ]
-
-  def getTotalPaidValidatorTraffic(validatorParty: PartyId)(implicit
-      tc: TraceContext
-  ): Future[Long] =
-    lookupValidatorTraffic(validatorParty).map(_.fold(0L)(_.payload.totalPurchased))
 
   def getBaseRateTrafficLimitsAsOf(t: CantonTimestamp)(implicit
       tc: TraceContext
@@ -235,7 +225,6 @@ object ScanStore {
         mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
-        mkFilter(cc.globaldomain.ValidatorTraffic.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coinimport.ImportCrate.COMPANION)(co => co.payload.svc == svc),
       ) ++
         (if (scanConfig.enableCoinRulesUpgrade)

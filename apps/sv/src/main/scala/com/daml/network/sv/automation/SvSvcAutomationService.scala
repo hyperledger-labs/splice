@@ -80,22 +80,13 @@ class SvSvcAutomationService(
     }
   }
 
-  if (config.automation.useMemberTrafficInsteadOfValidatorTraffic)
-    registerTrigger(
-      new ReconcileSequencerLimitWithMemberTrafficTrigger(
-        triggerContext,
-        svcStore,
-        participantAdminConnection,
-      )
+  registerTrigger(
+    new ReconcileSequencerLimitWithMemberTrafficTrigger(
+      triggerContext,
+      svcStore,
+      participantAdminConnection,
     )
-  else
-    registerTrigger(
-      new ReconcileSequencerTrafficLimitWithPurchasedTrafficTrigger(
-        triggerContext,
-        svcStore,
-        participantAdminConnection,
-      )
-    )
+  )
 
   if (config.automation.enableLeaderReplacement) {
     registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))

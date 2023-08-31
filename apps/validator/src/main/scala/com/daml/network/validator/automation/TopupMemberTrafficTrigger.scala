@@ -52,6 +52,7 @@ class TopupMemberTrafficTrigger(
   private val validator = store.key.validatorParty
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
+    // TODO(#7472): Clean up noisy logs
     logger.debug("Executing top-up member traffic trigger")
     for {
       coinRules <- scanConnection.getCoinRules()

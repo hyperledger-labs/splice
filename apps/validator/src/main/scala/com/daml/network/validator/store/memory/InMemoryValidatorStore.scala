@@ -4,7 +4,6 @@ import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import com.daml.network.codegen.java.cc.globaldomain as domainCodegen
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
@@ -110,42 +109,6 @@ class InMemoryValidatorStore(
       multiDomainAcsStore.findContractOnDomainWithOffset(coinCodegen.ValidatorRight.COMPANION)(
         _,
         co => co.payload.user == party.toProtoPrimitive,
-      )
-    )
-
-  /** Lookup the validator-traffic contract for the given domain. */
-  override def lookupValidatorTrafficWithOffset(
-      domainId: DomainId
-  )(implicit tc: TraceContext): Future[
-    QueryResult[
-      Option[Contract[domainCodegen.ValidatorTraffic.ContractId, domainCodegen.ValidatorTraffic]]
-    ]
-  ] =
-    defaultAcsDomainIdF.flatMap(defaultDomainId =>
-      // TODO(#4913): read from all domains in the global domain
-      multiDomainAcsStore.findContractOnDomainWithOffset(domainCodegen.ValidatorTraffic.COMPANION)(
-        defaultDomainId,
-        traffic => traffic.payload.domainId == domainId.toProtoPrimitive,
-      )
-    )
-
-  override def lookupValidatorTrafficCreationIntentWithOffset(
-      domainId: DomainId
-  )(implicit tc: TraceContext): Future[
-    QueryResult[
-      Option[Contract[
-        domainCodegen.ValidatorTrafficCreationIntent.ContractId,
-        domainCodegen.ValidatorTrafficCreationIntent,
-      ]]
-    ]
-  ] =
-    defaultAcsDomainIdF.flatMap(defaultDomainId =>
-      // TODO(#4913): read from all domains in the global domain
-      multiDomainAcsStore.findContractOnDomainWithOffset(
-        domainCodegen.ValidatorTrafficCreationIntent.COMPANION
-      )(
-        defaultDomainId,
-        intent => intent.payload.domainId == domainId.toProtoPrimitive,
       )
     )
 

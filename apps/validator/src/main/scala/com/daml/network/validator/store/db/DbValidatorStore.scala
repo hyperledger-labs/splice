@@ -8,7 +8,6 @@ import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import com.daml.network.codegen.java.cc.globaldomain as domainCodegen
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topupCodegen
@@ -249,70 +248,6 @@ class DbValidatorStore(
     } yield QueryResult(
       resultWithOffset.offset,
       resultWithOffset.row.map(contractFromRow(coinCodegen.ValidatorRight.COMPANION)(_)),
-    )
-  }
-
-  /** Lookup the validator-traffic contract for the given domain. */
-  override def lookupValidatorTrafficWithOffset(
-      domainId: DomainId
-  )(implicit tc: TraceContext): Future[
-    QueryResult[
-      Option[Contract[domainCodegen.ValidatorTraffic.ContractId, domainCodegen.ValidatorTraffic]]
-    ]
-  ] = waitUntilAcsIngested {
-    for {
-      // TODO(#4913): read from all domains in the global domain
-      resultWithOffset <- storage
-        .querySingle(
-          selectFromAcsTableWithOffset(
-            DbValidatorStore.acsTableName,
-            storeId,
-            sql"""
-            template_id = ${domainCodegen.ValidatorTraffic.COMPANION.TEMPLATE_ID}
-              and traffic_domain_id = $domainId
-            """,
-            sql"limit 1",
-          ).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
-          "lookupValidatorTrafficWithOffset",
-        )
-        .getOrElse(throw offsetExpectedError())
-    } yield QueryResult(
-      resultWithOffset.offset,
-      resultWithOffset.row.map(contractFromRow(domainCodegen.ValidatorTraffic.COMPANION)(_)),
-    )
-  }
-
-  override def lookupValidatorTrafficCreationIntentWithOffset(
-      domainId: DomainId
-  )(implicit tc: TraceContext): Future[
-    QueryResult[
-      Option[Contract[
-        domainCodegen.ValidatorTrafficCreationIntent.ContractId,
-        domainCodegen.ValidatorTrafficCreationIntent,
-      ]]
-    ]
-  ] = waitUntilAcsIngested {
-    for {
-      // TODO(#4913): read from all domains in the global domain
-      resultWithOffset <- storage
-        .querySingle(
-          selectFromAcsTableWithOffset(
-            DbValidatorStore.acsTableName,
-            storeId,
-            sql"""
-            template_id = ${domainCodegen.ValidatorTrafficCreationIntent.COMPANION.TEMPLATE_ID}
-              and traffic_domain_id = $domainId
-            """,
-            sql"limit 1",
-          ).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
-          "lookupValidatorTrafficCreationIntentWithOffset",
-        )
-        .getOrElse(throw offsetExpectedError())
-    } yield QueryResult(
-      resultWithOffset.offset,
-      resultWithOffset.row.map(
-        contractFromRow(domainCodegen.ValidatorTrafficCreationIntent.COMPANION)(_)
-      ),
     )
   }
 

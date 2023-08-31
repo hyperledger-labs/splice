@@ -6,7 +6,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coinimport
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.globaldomain.{MemberTraffic, ValidatorTraffic}
+import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionIdleState
@@ -169,31 +169,6 @@ object LockedCoinExpireCoin extends ExerciseNodeCompanion {
 
   override val resDecoder = v1.coin.CoinExpireSummary.valueDecoder()
   override def resToValue(res: Res) = res.toValue
-}
-
-// TODO(#7081): Remove once we've switched over completely to MemberTraffic contracts
-object CoinRules_BuyExtraTraffic extends ExerciseNodeCompanion {
-  override type Tpl = coinCodegen.CoinRules
-  override type Arg = coinCodegen.CoinRules_BuyExtraTraffic
-  override type Res =
-    Tuple2[ValidatorTraffic.ContractId, Optional[v1.coin.Coin.ContractId]]
-  override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_BuyExtraTraffic
-  override val templateOrInterface = Left(coinCodegen.CoinRules.COMPANION)
-  override val argDecoder = coinCodegen.CoinRules_BuyExtraTraffic.valueDecoder()
-
-  override def argToValue(arg: Arg): Value = arg.toValue
-
-  override val resDecoder = Tuple2.valueDecoder(
-    cid => new ValidatorTraffic.ContractId(cid.asContractId().get().getValue),
-    PrimitiveValueDecoders.fromOptional(cid =>
-      new v1.coin.Coin.ContractId(cid.asContractId().get().getValue)
-    ),
-  )
-
-  override def resToValue(res: Res): Value = res.toValue(
-    trafficCid => trafficCid.toValue,
-    optionalCoin => DamlOptional.of(optionalCoin.map(_.toValue): Optional[Value]),
-  )
 }
 
 object CoinRules_BuyMemberTraffic extends ExerciseNodeCompanion {

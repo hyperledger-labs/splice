@@ -534,15 +534,6 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
       tc: TraceContext
   ): Future[Long]
 
-  // TODO(#7081): Remove once we have completely switched over to MemberTraffic contracts
-  def listDuplicateValidatorTrafficContracts(
-      validator: PartyId,
-      domainId: DomainId,
-      limit: Int,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Option[SvSvcStore.DuplicateValidatorTrafficContracts]]
-
   def listCoinPriceVotes()(implicit
       tc: TraceContext
   ): Future[
@@ -868,7 +859,6 @@ object SvSvcStore {
         mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.UnclaimedReward.COMPANION)(co => co.payload.svc == svc),
         mkFilter(vl.ValidatorLicense.COMPANION)(vl => vl.payload.svc == svc),
-        mkFilter(cc.globaldomain.ValidatorTraffic.COMPANION)(vt => vt.payload.svc == svc),
         mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt => vt.payload.svc == svc),
         mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.cns.CnsEntry.COMPANION)(co => co.payload.svc == svc),
@@ -922,19 +912,6 @@ object SvSvcStore {
     def toSeq: Seq[OpenMiningRoundContract] = Seq(oldest, middle, newest)
   }
 
-  type ValidatorTrafficContract =
-    Contract[cc.globaldomain.ValidatorTraffic.ContractId, cc.globaldomain.ValidatorTraffic]
-
-  case class DuplicateValidatorTrafficContracts(
-      reference: ValidatorTrafficContract,
-      duplicates: Seq[ValidatorTrafficContract],
-  ) extends PrettyPrinting {
-    override def pretty: Pretty[this.type] =
-      prettyOfClass(
-        param("reference", _.reference),
-        param("duplicates", _.duplicates),
-      )
-  }
 }
 
 case class ExpiredRewardCouponsBatch(

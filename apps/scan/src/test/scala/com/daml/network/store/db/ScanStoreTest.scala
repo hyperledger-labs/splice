@@ -7,14 +7,13 @@ import com.daml.network.codegen.java.cc.api.v1.coin.PaymentTransferContext
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_Coin
-import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
+import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
-import com.daml.network.codegen.java.da.types as daTypes
 import com.daml.network.config.{CNDbConfig, DomainConfig}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.history.{
   CoinExpire,
-  CoinRules_BuyExtraTraffic,
+  CoinRules_BuyMemberTraffic,
   LockedCoinExpireCoin,
   Transfer,
 }
@@ -30,7 +29,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{Member, PartyId}
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import com.google.protobuf
 
@@ -455,47 +454,54 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         val asOfEndOfRound = 5L
         val trafficPurchaseTrees = Seq(
           // user 1
-          coinRulesBuyExtraTrafficTransaction(
-            receiver = userParty(1),
+          coinRulesBuyMemberTrafficTransaction(
+            provider = userParty(1),
+            memberId = mkParticipantId("user-1"),
             round = 1,
             extraTraffic = 4,
             ccSpent = 2.0,
           )(_),
-          coinRulesBuyExtraTrafficTransaction(
-            receiver = userParty(1),
+          coinRulesBuyMemberTrafficTransaction(
+            provider = userParty(1),
+            memberId = mkParticipantId("user-1"),
             round = 2,
             extraTraffic = 4,
             ccSpent = 2.0,
           )(_),
-          coinRulesBuyExtraTrafficTransaction(
-            receiver = userParty(1),
+          coinRulesBuyMemberTrafficTransaction(
+            provider = userParty(1),
+            memberId = mkParticipantId("user-1"),
             round = 3,
             extraTraffic = 4,
             ccSpent = 2.0,
           )(_),
           // user 2
-          coinRulesBuyExtraTrafficTransaction(
-            receiver = userParty(2),
+          coinRulesBuyMemberTrafficTransaction(
+            provider = userParty(2),
+            memberId = mkParticipantId("user-2"),
             round = 1,
             extraTraffic = 4,
             ccSpent = 2.0,
           )(_),
           // user 3
-          coinRulesBuyExtraTrafficTransaction(
-            receiver = userParty(3),
+          coinRulesBuyMemberTrafficTransaction(
+            provider = userParty(3),
+            memberId = mkParticipantId("user-3"),
             round = 1,
             extraTraffic = 4,
             ccSpent = 3.0,
           )(_),
-          coinRulesBuyExtraTrafficTransaction(
-            receiver = userParty(3),
+          coinRulesBuyMemberTrafficTransaction(
+            provider = userParty(3),
+            memberId = mkParticipantId("user-3"),
             round = 2,
             extraTraffic = 4,
             ccSpent = 3.0,
           )(_),
           // user 4
-          coinRulesBuyExtraTrafficTransaction(
-            receiver = userParty(4),
+          coinRulesBuyMemberTrafficTransaction(
+            provider = userParty(4),
+            memberId = mkParticipantId("user-4"),
             round = 1000, // excluded
             extraTraffic = 400000,
             ccSpent = 2222.0,
@@ -588,26 +594,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               .lookupCoinRulesV1Test()
               .futureValue
               .map(_.contract) should be(Some(cr))
-          }
-        }
-      }
-
-    }
-
-    "lookupValidatorTraffic" should {
-
-      "return the validator traffic of the wanted validator" in {
-        val wanted = validatorTraffic(userParty(1))
-        val unwanted = validatorTraffic(userParty(2))
-        for {
-          store <- mkStore()
-          _ <- dummyDomain.create(wanted)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(unwanted)(store.multiDomainAcsStore)
-        } yield {
-          eventually() {
-            store
-              .lookupValidatorTraffic(userParty(1))
-              .futureValue should be(Some(wanted))
           }
         }
       }
@@ -814,8 +800,9 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       Optional.empty(),
     ).toValue
 
-  private def coinRulesBuyExtraTrafficTransaction(
-      receiver: PartyId,
+  private def coinRulesBuyMemberTrafficTransaction(
+      provider: PartyId,
+      memberId: Member,
       round: Long,
       extraTraffic: Long,
       ccSpent: Double,
@@ -823,7 +810,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     // This is a non-consuming choice, the store should not mind that some of the referenced contracts don't exist
     val coinRulesCid = nextCid()
 
-    val validatorTrafficCid = new ValidatorTraffic.ContractId(validContractId(round.toInt))
+    val memberTrafficCid = new MemberTraffic.ContractId(validContractId(round.toInt))
 
     val transfer = exercisedEvent(
       coinRulesCid,
@@ -831,12 +818,12 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       Some(ccApiCodegen.coin.CoinRules.TEMPLATE_ID),
       Transfer.choice.name,
       consuming = false,
-      mkCoinRulesTransfer(receiver, ccSpent),
+      mkCoinRulesTransfer(provider, ccSpent),
       mkTransferResult(round, ccSpent, holdingFee),
     )
 
-    val createdCoin = coin(receiver, ccSpent, round, holdingFee)
-    val coinCreateEvent = toCreatedEvent(createdCoin, signatories = Seq(receiver, svcParty))
+    val createdCoin = coin(provider, ccSpent, round, holdingFee)
+    val coinCreateEvent = toCreatedEvent(createdCoin, signatories = Seq(provider, svcParty))
     val coinArchiveEvent = exercisedEvent(
       createdCoin.contractId.contractId,
       coinCodegen.Coin.TEMPLATE_ID,
@@ -853,21 +840,22 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         coinRulesCid,
         coinCodegen.CoinRules.TEMPLATE_ID,
         None,
-        coinCodegen.CoinRules.CHOICE_CoinRules_BuyExtraTraffic.name,
+        coinCodegen.CoinRules.CHOICE_CoinRules_BuyMemberTraffic.name,
         consuming = false,
-        new coinCodegen.CoinRules_BuyExtraTraffic(
+        new coinCodegen.CoinRules_BuyMemberTraffic(
           java.util.List.of(),
           new PaymentTransferContext(
             new ccApiCodegen.coin.CoinRules.ContractId(coinRulesCid),
             mkTransferContext(),
           ),
-          receiver.toProtoPrimitive,
-          new daTypes.either.Right(validatorTrafficCid),
+          provider.toProtoPrimitive,
+          memberId.toProtoPrimitive,
+          dummyDomain.toProtoPrimitive,
           extraTraffic,
         ).toValue,
-        CoinRules_BuyExtraTraffic.resToValue(
+        CoinRules_BuyMemberTraffic.resToValue(
           new com.daml.network.codegen.java.da.types.Tuple2(
-            validatorTrafficCid,
+            memberTrafficCid,
             Optional.empty[com.daml.network.codegen.java.cc.api.v1.coin.Coin.ContractId](),
           )
         ),
@@ -945,26 +933,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       new java.math.BigDecimal(changeToInitialAmountAsOfRoundZero),
       new java.math.BigDecimal(changeToHoldingFeesRate),
     ).toValue
-
-  private def validatorTraffic(validatorParty: PartyId) = {
-    val template = new ValidatorTraffic(
-      svcParty.toProtoPrimitive,
-      validatorParty.toProtoPrimitive,
-      3,
-      1,
-      numeric(1),
-      numeric(1),
-      Instant.now(),
-      domain,
-    )
-    Contract(
-      ValidatorTraffic.TEMPLATE_ID,
-      new ValidatorTraffic.ContractId(n.toString),
-      template,
-      ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
-    )
-  }
 
   private def importCrate(receiver: PartyId, n: Int) = {
     val template = new ImportCrate(

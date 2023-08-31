@@ -24,7 +24,6 @@ class MemberTrafficIntegrationTest
       .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       // NOTE: automatic top-ups should be explicitly disabled for this test as currently written
       .withTrafficTopupsDisabled
-      .withMemberTrafficInsteadOfValidatorTraffic
   }
 
   "SV automation" should {

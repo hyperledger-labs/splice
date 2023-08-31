@@ -174,15 +174,6 @@ case class CNNodeEnvironmentDefinition(
       )(config)
     )
 
-  // TODO(#7081): Remove once we've switched over completely to MemberTraffic contracts
-  def withMemberTrafficInsteadOfValidatorTraffic: CNNodeEnvironmentDefinition =
-    addConfigTransform((_, config) =>
-      CNNodeConfigTransforms.updateAllAutomationConfigs(
-        _.focus(_.useMemberTrafficInsteadOfValidatorTraffic)
-          .replace(true)
-      )(config)
-    )
-
   def withCoinPrice(price: BigDecimal): CNNodeEnvironmentDefinition =
     addConfigTransforms((_, conf) => CNNodeConfigTransforms.setCoinPrice(price)(conf))
 

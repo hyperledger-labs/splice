@@ -7,7 +7,6 @@ import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import com.daml.network.codegen.java.cc.globaldomain as domainCodegen
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
@@ -106,25 +105,6 @@ object ValidatorTables extends AcsTables {
               contractExpiresAt = None,
               providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
             )
-          )
-        case domainCodegen.ValidatorTraffic.TEMPLATE_ID =>
-          tryToDecode(domainCodegen.ValidatorTraffic.COMPANION, createdEvent)(contract =>
-            ValidatorAcsStoreRowData(
-              contract = contract,
-              contractExpiresAt = None,
-              validatorParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
-              trafficDomainId = Some(DomainId.tryFromString(contract.payload.domainId)),
-            )
-          )
-        case domainCodegen.ValidatorTrafficCreationIntent.TEMPLATE_ID =>
-          tryToDecode(domainCodegen.ValidatorTrafficCreationIntent.COMPANION, createdEvent)(
-            contract =>
-              ValidatorAcsStoreRowData(
-                contract = contract,
-                contractExpiresAt = None,
-                validatorParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
-                trafficDomainId = Some(DomainId.tryFromString(contract.payload.domainId)),
-              )
           )
         case appManagerCodegen.AppConfiguration.TEMPLATE_ID =>
           tryToDecode(appManagerCodegen.AppConfiguration.COMPANION, createdEvent)(contract =>

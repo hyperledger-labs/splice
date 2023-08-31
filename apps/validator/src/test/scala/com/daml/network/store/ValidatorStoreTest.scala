@@ -5,7 +5,6 @@ import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import com.daml.network.codegen.java.cc.globaldomain as domainCodegen
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.topology.DomainId
 
@@ -91,52 +90,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
         } yield {
           result.value.value.contractId should be(
             right1.contractId
-          )
-        }
-      }
-    }
-
-    "lookupValidatorTrafficWithOffset" should {
-
-      "return correct results" in {
-        val signatories = Seq(validator)
-        for {
-          store <- mkStore()
-          unwantedContract = validatorTraffic(dummy2Domain)
-          wantedContract = validatorTraffic(dummyDomain)
-          _ <- dummyDomain.create(unwantedContract, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(wantedContract, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          result <- store.lookupValidatorTrafficWithOffset(dummyDomain)
-        } yield {
-          result.value.value.contractId should be(
-            wantedContract.contractId
-          )
-        }
-      }
-    }
-
-    "lookupValidatorTrafficCreationIntentWithOffset" should {
-
-      "return correct results" in {
-        val signatories = Seq(validator)
-        for {
-          store <- mkStore()
-          intent2 = validatorTrafficCreationIntent(dummy2Domain)
-          intent1 = validatorTrafficCreationIntent(dummyDomain)
-          _ <- dummyDomain.create(intent2, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(intent1, createdEventSignatories = signatories)(
-            store.multiDomainAcsStore
-          )
-          result <- store.lookupValidatorTrafficCreationIntentWithOffset(dummyDomain)
-        } yield {
-          result.value.value.contractId should be(
-            intent1.contractId
           )
         }
       }
@@ -477,42 +430,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
     Contract(
       identifier = templateId,
       contractId = new coinCodegen.ValidatorRight.ContractId(nextCid()),
-      payload = template,
-      metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
-    )
-  }
-
-  private def validatorTraffic(domainId: DomainId) = {
-    val templateId = domainCodegen.ValidatorTraffic.TEMPLATE_ID
-    val template = new domainCodegen.ValidatorTraffic(
-      svcParty.toProtoPrimitive,
-      validator.toProtoPrimitive,
-      1L,
-      1L,
-      new java.math.BigDecimal(1.0),
-      new java.math.BigDecimal(1.0),
-      Instant.EPOCH,
-      domainId.toProtoPrimitive,
-    )
-    Contract(
-      identifier = templateId,
-      contractId = new domainCodegen.ValidatorTraffic.ContractId(nextCid()),
-      payload = template,
-      metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
-    )
-  }
-
-  private def validatorTrafficCreationIntent(domainId: DomainId) = {
-    val templateId = domainCodegen.ValidatorTrafficCreationIntent.TEMPLATE_ID
-    val template = new domainCodegen.ValidatorTrafficCreationIntent(
-      validator.toProtoPrimitive,
-      domainId.toProtoPrimitive,
-    )
-    Contract(
-      identifier = templateId,
-      contractId = new domainCodegen.ValidatorTrafficCreationIntent.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,

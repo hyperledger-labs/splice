@@ -33,8 +33,6 @@ class LeaderBasedAutomationService(
     registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExecuteVoteRequestActionTrigger(triggerContext, svTaskContext))
   }
-  // TODO(#7081): Remove the ArchiveDuplicateValidatorTrafficTrigger once we've switched over entirely to MemberTraffic contracts
-  registerTrigger(new ArchiveDuplicateValidatorTrafficTrigger(triggerContext, svTaskContext))
   registerTrigger(new MergeMemberTrafficContractsTrigger(triggerContext, svTaskContext))
 
   if (config.automation.enableExpireCoin) {

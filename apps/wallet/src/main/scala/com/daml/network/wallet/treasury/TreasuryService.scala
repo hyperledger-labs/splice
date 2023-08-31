@@ -239,9 +239,6 @@ class TreasuryService(
 
         case _: coinoperation.CO_Tap => Future.unit
 
-        // TODO(#7081): Remove this once we've switched over to MemberTraffic contracts
-        case _: coinoperation.CO_BuyExtraTraffic => Future.unit
-
         // TODO(tech-debt): Ideally, we should modify the BuyMemberTraffic choice to also return
         //  the ValidatorTopUpState contract Id in the COOutcome and ingest these into the store
         //  in order to do the staleness check here. BuyMemberTraffic txs are always placed into
@@ -479,10 +476,6 @@ class TreasuryService(
     for {
       (disclosedCoinRules, coinRulesInterface) <- getCoinRules()
       (openRounds, issuingMiningRounds) <- scanConnection.getOpenAndIssuingMiningRounds()
-      tapsApproved <-
-        if (treasuryConfig.enableValidatorTrafficBalanceChecks) {
-          scanConnection.approveTaps(userStore.key.validatorParty, numTapOperations)
-        } else { Future.successful(true) }
       openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
       configUsd = openRound.payload.transferConfigUsd
       maxNumInputs = configUsd.maxNumInputs.intValue()
@@ -511,13 +504,6 @@ class TreasuryService(
       )
       validatorFeaturedAppRight <- walletManager.store.lookupValidatorFeaturedAppRight()
     } yield {
-      if (!tapsApproved) {
-        throw new StatusRuntimeException(
-          Status.ABORTED.withDescription(
-            show"Aborted operation - insufficient validator traffic balance to create coins"
-          )
-        )
-      }
       val createFeeUsd = configUsd.createFee.fee
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(

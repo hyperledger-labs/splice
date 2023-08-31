@@ -17,7 +17,7 @@ import CC.API.V1.Coin (CoinCreateSummary(..), CoinExpireSummary(..))
 import CC.API.V1.Round (Round(..))
 import CC.ValidatorLicense
 import CN.Wallet.Subscriptions
-import CC.GlobalDomain (initialValidatorTraffic, ValidatorTraffic, initialMemberTraffic, MemberTraffic)
+import CC.GlobalDomain (initialMemberTraffic, MemberTraffic)
 
 import qualified CN.CometBft as CometBft
 import CN.Cns
@@ -310,8 +310,6 @@ template SvcRules with
           coinPrice = None
           lastUpdatedAt = now
         -- create traffic contracts for the initial traffic grant to the SV
-        -- TODO(#7081) - Remove initial ValidatorTraffic creation once we've switched over entirely to MemberTraffic contracts
-        create (initialValidatorTraffic svc newMemberParty domainId config.initialTrafficGrant)
         create (initialMemberTraffic svc newMemberParticipantId domainId config.initialTrafficGrant)
         create SvcRules with
           svc
@@ -991,21 +989,6 @@ template SvcRules with
         staleConfirmation <- fetch staleConfirmationCid
         require "staleConfirmation is past expiresAt" (staleConfirmation.expiresAt <= now)
         archive staleConfirmationCid
-
-
-    -- TODO(#7081) - Remove this choice once we've switched over entirely to MemberTraffic contracts
-    -- Cleaning up duplicate validator traffic contracts
-    ----------------------------------------------------
-
-    nonconsuming choice SvcRules_ArchiveDuplicateValidatorTrafficContracts : ()
-      with
-        coinRulesCid : ContractId CoinRules
-        trafficCid : ContractId ValidatorTraffic
-        duplicateCids : [ContractId ValidatorTraffic]
-      controller leader
-      do
-        requireUnlocked lock
-        exercise coinRulesCid CoinRules_ArchiveDuplicateValidatorTrafficContracts with ..
 
     -- Batch merge of member traffic contracts
     -------------------------------------------

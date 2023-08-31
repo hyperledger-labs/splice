@@ -26,7 +26,6 @@ class ScanFrontendTimeBasedIntegrationTest
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
       .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       .withCoinPrice(coinPrice)
-      .withMemberTrafficInsteadOfValidatorTraffic
 
   def compareLeaderboardTable(
       resultRowClassName: String,

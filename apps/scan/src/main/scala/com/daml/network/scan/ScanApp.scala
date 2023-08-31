@@ -115,7 +115,6 @@ class ScanApp(
       handler = new HttpScanHandler(
         store,
         config,
-        clock,
         loggerFactory,
       )
 

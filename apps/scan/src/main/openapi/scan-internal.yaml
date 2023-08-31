@@ -301,46 +301,6 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /get-validator-traffic-balance:
-    get:
-      tags: [scan]
-      x-jvm-package: scan
-      operationId: "getValidatorTrafficBalance"
-      parameters:
-        - in: query
-          name: validatorParty
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GetValidatorTrafficBalanceResponse"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /check-and-update-validator-traffic-balance:
-    get:
-      tags: [scan]
-      x-jvm-package: scan
-      operationId: "checkAndUpdateValidatorTrafficBalance"
-      parameters:
-        - in: query
-          name: validatorParty
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/CheckAndUpdateValidatorTrafficBalanceResponse"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /bootstrap/import-crates:
     get:
       tags: [scan]

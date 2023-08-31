@@ -157,18 +157,6 @@ object ScanTables extends AcsTables {
               featuredAppRightProvider = None,
             )
           }
-        case cc.globaldomain.ValidatorTraffic.TEMPLATE_ID =>
-          tryToDecode(cc.globaldomain.ValidatorTraffic.COMPANION, createdEvent) { contract =>
-            ScanAcsStoreRowData(
-              contract = contract,
-              contractExpiresAt = None,
-              round = None,
-              validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
-              amount = None,
-              importCrateReceiver = None,
-              featuredAppRightProvider = None,
-            )
-          }
         case cc.coinimport.ImportCrate.TEMPLATE_ID =>
           tryToDecode(cc.coinimport.ImportCrate.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(

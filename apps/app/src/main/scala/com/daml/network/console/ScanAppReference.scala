@@ -206,24 +206,6 @@ abstract class ScanAppReference(
       httpCommand(HttpScanAppClient.GetTopValidatorsByPurchasedTraffic(round, limit))
     }
 
-  @Help.Summary("Get the available traffic balance for a validator")
-  def getValidatorTrafficBalance(
-      validatorParty: PartyId
-  ): HttpScanAppClient.ValidatorTrafficBalance =
-    consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetValidatorTrafficBalance(validatorParty))
-    }
-
-  @Help.Summary(
-    "Atomically check if the validator has any traffic balance available and if so, consume 1 unit"
-  )
-  def checkAndUpdateValidatorTrafficBalance(validatorParty: PartyId): Boolean =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpScanAppClient.CheckAndUpdateValidatorTrafficBalance(validatorParty)
-      )
-    }
-
   @Help.Summary(
     "List the import crates available for a party"
   )

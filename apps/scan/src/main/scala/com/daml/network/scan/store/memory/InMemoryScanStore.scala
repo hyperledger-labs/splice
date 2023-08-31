@@ -5,7 +5,6 @@ import cats.kernel.Monoid
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coin.CoinRules
-import com.daml.network.codegen.java.cc.globaldomain.ValidatorTraffic
 import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.environment.RetryProvider
@@ -325,16 +324,6 @@ class InMemoryScanStore(
         .take(limit)
     }
   }
-
-  override def lookupValidatorTraffic(validatorParty: PartyId)(implicit
-      tc: TraceContext
-  ): Future[Option[Contract[ValidatorTraffic.ContractId, ValidatorTraffic]]] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomain(ValidatorTraffic.COMPANION)(
-        _,
-        contract => contract.payload.validator == validatorParty.toProtoPrimitive,
-      )
-    )
 
   def listImportCrates(receiverParty: PartyId)(implicit
       tc: TraceContext

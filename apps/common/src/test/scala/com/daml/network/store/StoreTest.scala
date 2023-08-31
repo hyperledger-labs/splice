@@ -33,7 +33,7 @@ import com.daml.network.environment.ledger.api.{
 import com.daml.network.util.{CNNodeUtil, Contract, Trees}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.wordspec.AsyncWordSpec
 import com.daml.lf.data.Numeric
@@ -52,6 +52,9 @@ import scala.jdk.OptionConverters.*
 abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def mkPartyId(name: String) = PartyId.tryFromProtoPrimitive(name + "::dummy")
+
+  protected def mkParticipantId(name: String) =
+    ParticipantId.tryFromProtoPrimitive("PAR::" + name + "::dummy")
 
   protected val svcParty: PartyId = mkPartyId("svc")
 

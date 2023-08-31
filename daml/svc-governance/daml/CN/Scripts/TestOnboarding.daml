@@ -19,7 +19,7 @@ import CN.SvOnboarding
 import CC.Scripts.Util
 import CC.Scripts.Parameters
 import CN.Scripts.SvcTestUtils
-import CC.GlobalDomain (ValidatorTraffic, initialValidatorTraffic, MemberTraffic, initialMemberTraffic)
+import CC.GlobalDomain (MemberTraffic, initialMemberTraffic)
 import CC.Coin (CoinRules, Coin)
 import CC.Round
 import CC.Schedule
@@ -48,7 +48,7 @@ testOnboardValidator = do
 
 testInitialTrafficGrant : Script ()
 testInitialTrafficGrant = do
-  (app, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
+  (app, svc, _) <- initMainNetCollective
   -- we now have a collective with BFT for f = 1
 
   [(_, svcRules)] <- query @SvcRules svc
@@ -57,9 +57,7 @@ testInitialTrafficGrant = do
   -- check that the initial traffic contract with the initial grant amount is created for each SV
   let domainId = coinConfig.globalDomain.activeDomain
   let initialTrafficGrant = svcRules.config.initialTrafficGrant
-  forA_ (zip [sv1, sv2, sv3, sv4] ["sv1", "sv2", "sv3", "sv4"]) $ \(sv, svName) -> do
-    [(_, initialTraffic)] <- queryFilter @ValidatorTraffic svc (\r -> r.validator == sv)
-    initialTraffic === initialValidatorTraffic svc sv domainId initialTrafficGrant
+  forA_ ["sv1", "sv2", "sv3", "sv4"] $ \svName -> do
     let svParticipantId = svName <> "-participant-id"
     [(_, initialParticipantTraffic)] <- queryFilter @MemberTraffic svc (\r -> r.memberId == svParticipantId)
     initialParticipantTraffic === initialMemberTraffic svc svParticipantId domainId initialTrafficGrant

@@ -28,7 +28,6 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
       // NOTE: automatic top-ups should be explicitly disabled for this test as currently written
       .withTrafficTopupsDisabled
-      .withMemberTrafficInsteadOfValidatorTraffic
   }
 
   "A wallet" should {

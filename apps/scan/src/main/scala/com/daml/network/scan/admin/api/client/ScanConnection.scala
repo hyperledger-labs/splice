@@ -227,28 +227,6 @@ final class ScanConnection private (
     }
   }
 
-  def approveTaps(validatorParty: PartyId, numTapOperations: Int)(implicit
-      ec: ExecutionContext
-  ): Future[Boolean] = {
-    Future.foldLeft(
-      (1 to numTapOperations).map(_ =>
-        runHttpCmd(
-          config.adminApi.url,
-          HttpScanAppClient.CheckAndUpdateValidatorTrafficBalance(validatorParty),
-        )
-      )
-    )(true)(_ && _)
-  }
-
-  def getValidatorTrafficBalance(
-      validatorParty: PartyId
-  )(implicit ec: ExecutionContext): Future[HttpScanAppClient.ValidatorTrafficBalance] = {
-    runHttpCmd(
-      config.adminApi.url,
-      HttpScanAppClient.GetValidatorTrafficBalance(validatorParty),
-    )
-  }
-
   def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
       ec: ExecutionContext,
       mat: Materializer,

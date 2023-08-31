@@ -498,39 +498,6 @@ object HttpScanAppClient {
       totalPurchased: Double,
   )
 
-  case class GetValidatorTrafficBalance(validatorParty: PartyId)
-      extends BaseCommand[http.GetValidatorTrafficBalanceResponse, ValidatorTrafficBalance] {
-    override def submitRequest(
-        client: http.ScanClient,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetValidatorTrafficBalanceResponse] =
-      client.getValidatorTrafficBalance(validatorParty.toProtoPrimitive, headers)
-
-    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.GetValidatorTrafficBalanceResponse.OK(response) =>
-        Right(ValidatorTrafficBalance(response.remainingBalance, response.totalPurchased))
-    }
-  }
-
-  case class CheckAndUpdateValidatorTrafficBalance(validatorParty: PartyId)
-      extends BaseCommand[http.CheckAndUpdateValidatorTrafficBalanceResponse, Boolean] {
-    override def submitRequest(
-        client: http.ScanClient,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[
-      Throwable,
-      HttpResponse,
-    ], http.CheckAndUpdateValidatorTrafficBalanceResponse] =
-      client.checkAndUpdateValidatorTrafficBalance(validatorParty.toProtoPrimitive, headers)
-
-    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.CheckAndUpdateValidatorTrafficBalanceResponse.OK(response) =>
-        Right(response.approved)
-      case http.CheckAndUpdateValidatorTrafficBalanceResponse.NotFound(value) =>
-        Left(value.error)
-    }
-  }
-
   case class ListImportCrates(party: PartyId)
       extends BaseCommand[http.ListImportCratesResponse, Seq[
         ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]

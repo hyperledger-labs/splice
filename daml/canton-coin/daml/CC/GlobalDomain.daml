@@ -1,7 +1,6 @@
 -- | Types and contracts for managing domain fees
 module CC.GlobalDomain where
 
-import DA.Date
 import qualified DA.Set as Set
 import DA.Time
 
@@ -42,49 +41,6 @@ data DomainFeesConfig = DomainFeesConfig with
 validGlobalDomainConfig : GlobalDomainConfig -> Bool
 validGlobalDomainConfig config =
   config.activeDomain `Set.member` config.requiredDomains
-
--- TODO(#7081) - Remove this section once we have switched over completely to MemberTraffic contracts
-
--- Extra traffic tracking
--------------------------
-
--- | Expression of intent to purchase domain traffic (for the first time) by a validator operator.
-template ValidatorTrafficCreationIntent with
-    validator : Party -- ^ The party representing the validator node and its operator
-    domainId : Text -- ^ The id of the domain for which the validator wants to purchase extra traffic.
-  where
-    signatory validator
-
--- | The state of the extra domain traffic purchases of a validator operator.
-template ValidatorTraffic with
-    svc : Party
-    validator : Party -- ^ The party representing the validator node and its operator
-    totalPurchased : Int -- ^ The total number of bytes of extra traffic purchased by the validator so far
-    numPurchases: Int -- ^ Number of times the validator has purchased extra traffic
-    ccSpent: Decimal -- ^ Total CC spent on extra traffic over the validator's lifetime
-    usdSpent: Decimal -- ^ Total USD spent on extra traffic over the validator's lifetime
-    lastPurchasedAt: Time -- ^ Time when validator traffic was last purchased
-    domainId : Text -- ^ The id of the domain for which this contract tracks purchased extra traffic.
-  where
-    signatory svc
-    observer validator
-    -- TODO(M3-59): review whether the validator shouldn't be a signatory on this contract, as it is technically an asset.
-
-    ensure totalPurchased >= 0
-      && numPurchases >= 0
-      && ccSpent >= 0.0
-      && usdSpent >= 0.0
-
-initialValidatorTraffic : Party -> Party -> Text -> Int -> ValidatorTraffic
-initialValidatorTraffic svc validator domainId amount = ValidatorTraffic with
-  svc = svc
-  validator = validator
-  totalPurchased = amount
-  numPurchases = 0
-  ccSpent = 0.0
-  usdSpent = 0.0
-  lastPurchasedAt = time (date 1 Jan 1) 00 00 00
-  domainId
 
 
 -- Per sequencer member domain traffic tracking

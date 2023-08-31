@@ -5,7 +5,6 @@ import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import com.daml.network.codegen.java.cc.globaldomain as domainCodegen
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
@@ -53,24 +52,6 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
       party: PartyId
   )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]]
-  ]
-
-  /** Lookup the validator-traffic contract for the given domain. */
-  def lookupValidatorTrafficWithOffset(domainId: DomainId)(implicit tc: TraceContext): Future[
-    QueryResult[
-      Option[Contract[domainCodegen.ValidatorTraffic.ContractId, domainCodegen.ValidatorTraffic]]
-    ]
-  ]
-
-  def lookupValidatorTrafficCreationIntentWithOffset(
-      domainId: DomainId
-  )(implicit tc: TraceContext): Future[
-    QueryResult[
-      Option[Contract[
-        domainCodegen.ValidatorTrafficCreationIntent.ContractId,
-        domainCodegen.ValidatorTrafficCreationIntent,
-      ]]
-    ]
   ]
 
   def lookupValidatorTopUpStateWithOffset(
@@ -268,13 +249,6 @@ object ValidatorStore {
         ),
         mkFilter(coinCodegen.FeaturedAppRight.COMPANION)(co =>
           co.payload.svc == svc && co.payload.provider == validator
-        ),
-        mkFilter(domainCodegen.ValidatorTraffic.COMPANION)(co =>
-          co.payload.validator == validator &&
-            co.payload.svc == svc
-        ),
-        mkFilter(domainCodegen.ValidatorTrafficCreationIntent.COMPANION)(co =>
-          co.payload.validator == validator
         ),
         mkFilter(topUpCodegen.ValidatorTopUpState.COMPANION)(co =>
           co.payload.validator == validator

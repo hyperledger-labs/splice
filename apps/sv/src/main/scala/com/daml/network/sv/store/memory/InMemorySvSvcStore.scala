@@ -25,7 +25,6 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{ContractState, QueryResult}
 import com.daml.network.sv.config.SvDomainConfig
-import com.daml.network.sv.store.SvSvcStore.DuplicateValidatorTrafficContracts
 import com.daml.network.sv.store.{ExpiredRewardCouponsBatch, SvStore, SvSvcStore}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract, ContractWithState}
@@ -412,26 +411,6 @@ class InMemorySvSvcStore(
           .map(_.payload.totalPurchased.toLong)
           .sum
       )
-  }
-
-  // TODO(#7081): Remove once we have completely switched over to MemberTraffic contracts
-  override def listDuplicateValidatorTrafficContracts(
-      validator: PartyId,
-      domainId: DomainId,
-      limit: Int,
-  )(implicit traceContext: TraceContext): Future[Option[DuplicateValidatorTrafficContracts]] = {
-    multiDomainAcsStore
-      .filterContractsOnDomain(
-        cc.globaldomain.ValidatorTraffic.COMPANION,
-        domainId,
-        (vt: SvSvcStore.ValidatorTrafficContract) =>
-          vt.payload.validator == validator.toProtoPrimitive && vt.payload.domainId == domainId.toProtoPrimitive,
-      )
-      // sort the contracts by total purchased traffic, and ...
-      .map(_.sortWith(_.payload.totalPurchased > _.payload.totalPurchased))
-      // ... pick the one with the highest traffic as the reference contract and consider the rest duplicates
-      // upto a max of `limit` contracts
-      .map(vts => vts.headOption.map(DuplicateValidatorTrafficContracts(_, vts.slice(1, limit))))
   }
 
   override def listVotesByVoteRequests(

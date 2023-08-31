@@ -8,7 +8,7 @@ import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpired
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
-import com.daml.network.codegen.java.cc.globaldomain.{MemberTraffic, ValidatorTraffic}
+import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsEntryContext}
@@ -21,7 +21,6 @@ import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.store.{AcsStoreDump, Limit, LimitHelpers, MultiDomainAcsStore}
 import com.daml.network.sv.config.SvDomainConfig
-import com.daml.network.sv.store.SvSvcStore.DuplicateValidatorTrafficContracts
 import com.daml.network.sv.store.db.SvcTables.SvcAcsStoreRowData
 import com.daml.network.sv.store.{SvStore, SvSvcStore}
 import com.daml.network.util.Contract.Companion.Template
@@ -563,36 +562,6 @@ class DbSvSvcStore(
         )
         .value
     } yield sum.getOrElse(0L)
-  }
-
-  // TODO(#7081): Remove once we have completely switched over to MemberTraffic contracts
-  override def listDuplicateValidatorTrafficContracts(
-      validator: PartyId,
-      domainId: DomainId,
-      limit: Int,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[Option[SvSvcStore.DuplicateValidatorTrafficContracts]] = waitUntilAcsIngested {
-    for {
-      result <- storage
-        .query(
-          (selectFromAcsTable(DbSvSvcStore.tableName) ++
-            sql"""
-                 where store_id = $storeId
-                   and template_id = ${ValidatorTraffic.TEMPLATE_ID}
-                   and validator = $validator
-                 order by total_traffic_purchased desc
-                 limit $limit
-               """).toActionBuilder.as[AcsStoreRowTemplate],
-          "listDuplicateValidatorTrafficContracts",
-        )
-    } yield {
-      val contracts = result
-        .map(contractFromRow(ValidatorTraffic.COMPANION)(_))
-      // consider the highest traffic as the reference contract and the rest duplicates
-      contracts.headOption
-        .map(DuplicateValidatorTrafficContracts(_, contracts.drop(1)))
-    }
   }
 
   override def listVotesByVoteRequests(voteRequestCids: Seq[VoteRequest.ContractId])(implicit
