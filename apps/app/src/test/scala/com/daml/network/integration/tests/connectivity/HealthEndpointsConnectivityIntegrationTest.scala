@@ -53,7 +53,11 @@ class HealthEndpointsConnectivityIntegrationTest extends CNNodeIntegrationTest {
       _ => {
         sv1Backend.httpHealth.successOption.exists(_.active) shouldBe true
         sv1Backend.httpLive shouldBe true
-        sv1Backend.httpReady shouldBe true
+        loggerFactory.assertLoggedWarningsAndErrorsSeq(
+          sv1Backend.httpReady shouldBe true,
+          // There will be an error log if the readiness check returns false
+          lines => forAll(lines)(_.errorMessage should include("503")),
+        )
       },
     )
   }
