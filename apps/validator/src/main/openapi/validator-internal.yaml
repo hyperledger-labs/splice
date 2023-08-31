@@ -114,6 +114,8 @@ paths:
       responses:
         200:
           description: ok"
+        404:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
   /app-manager/apps/installed/{provider}/check-authorizization:
     post:
@@ -729,7 +731,8 @@ components:
       required:
         - version
         - name
-        - ui_url
+        - ui_uri
+        - allowed_redirect_uris
         - domains
         - release_configurations
       properties:
@@ -738,8 +741,12 @@ components:
           format: int64
         name:
           type: string
-        ui_url:
+        ui_uri:
           type: string
+        allowed_redirect_uris:
+          type: array
+          items:
+            type: string
         release_configurations:
           description: "Multiple release configurations are used to support rolling upgrades."
           type: array

@@ -109,7 +109,7 @@ const InstalledApp: React.FC<{ app: openapi.InstalledApp }> = ({ app }) => {
       wallet: config.services.wallet.uiUrl,
       clientId: app.provider,
     },
-    app.latestConfiguration.uiUrl
+    app.latestConfiguration.uiUri
   );
   const client = useAppManagerClient();
   const onLaunch = async (e: React.MouseEvent) => {

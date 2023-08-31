@@ -13,7 +13,8 @@ export type RegisterAppRequest = {
 const encodeConfiguration = (configuration: AppConfiguration) => ({
   version: configuration.version,
   name: configuration.name,
-  ui_url: configuration.uiUrl,
+  ui_uri: configuration.uiUri,
+  allowed_redirect_uris: configuration.allowedRedirectUris,
   release_configurations: configuration.releaseConfigurations.map(encodeReleaseConfiguration),
 });
 

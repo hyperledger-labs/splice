@@ -69,10 +69,12 @@ class AppManagerIntegrationTest
       requiredFor = Timespan(),
     )
 
+  private val redirectUri = "http://localhost:3420/redirect_me_here"
   private val configuration1_0 = AppConfiguration(
     0L,
     "splitwell",
     "http://localhost:3420",
+    Vector(redirectUri),
     Vector(
       releaseConfiguration1
     ),
@@ -131,6 +133,27 @@ class AppManagerIntegrationTest
       val downloadedDar = splitwellValidatorBackend.getDarFile(darHash)
       uploadedDar shouldBe downloadedDar
     }
+
+    "fail to authorize if the app does not exist" in { implicit env =>
+      val provider = splitwellBackend.getProviderPartyId()
+      val state = "dummyState"
+      val badRedirectUri = "https://nope.example.com"
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      // nope: aliceValidatorBackend.installApp(splitwell.appUrl)
+      assertThrowsAndLogsCommandFailures(
+        aliceAppManagerClient.authorizeApp(provider),
+        _.errorMessage should include(
+          s"App $provider does not exist."
+        ),
+      )
+      assertThrowsAndLogsCommandFailures(
+        aliceAppManagerClient.checkAppAuthorized(provider, badRedirectUri, state),
+        _.errorMessage should include(
+          s"App $provider does not exist."
+        ),
+      )
+    }
+
     "support app installation" in { implicit env =>
       val provider = splitwellBackend.getProviderPartyId()
       val splitwell = splitwellValidatorBackend.listRegisteredApps().loneElement
@@ -238,9 +261,10 @@ class AppManagerIntegrationTest
       val provider = splitwellBackend.getProviderPartyId()
       val state = "dummyState"
       val userId = aliceWalletClient.config.ledgerApiUser
-      val redirectUri = "https://example.com"
       val clientId = "dummclientid"
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val splitwell = splitwellValidatorBackend.listRegisteredApps().loneElement
+      aliceValidatorBackend.installApp(splitwell.appUrl)
       assertThrowsAndLogsCommandFailures(
         aliceAppManagerClient.checkAppAuthorized(provider, redirectUri, state),
         _.errorMessage should include("not authorized"),
@@ -266,6 +290,22 @@ class AppManagerIntegrationTest
       val verifier = JWT.require(algorithm).build()
       val decodedJwt = verifier.verify(token)
       decodedJwt.getSubject() shouldBe s"app.$provider.$userId"
+    }
+
+    "fail for an invalid redirect_uri" in { implicit env =>
+      val provider = splitwellBackend.getProviderPartyId()
+      val state = "dummyState"
+      val badRedirectUri = "https://nope.example.com"
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val splitwell = splitwellValidatorBackend.listRegisteredApps().loneElement
+      aliceValidatorBackend.installApp(splitwell.appUrl)
+      aliceAppManagerClient.authorizeApp(provider)
+      assertThrowsAndLogsCommandFailures(
+        aliceAppManagerClient.checkAppAuthorized(provider, badRedirectUri, state),
+        _.errorMessage should include(
+          "The provided redirectUri is not in the list of allowed redirect URIs."
+        ),
+      )
     }
 
     "json api proxy sets CORS headers" in { implicit env =>

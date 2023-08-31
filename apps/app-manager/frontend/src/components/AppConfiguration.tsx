@@ -130,8 +130,21 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({ data, 
             inputProps={{ className: 'app-config-ui-url-input' }}
             label="App UI URL"
             type="text"
-            value={data.uiUrl}
-            onChange={e => onChange({ ...data, uiUrl: e.target.value })}
+            value={data.uiUri}
+            onChange={e => onChange({ ...data, uiUri: e.target.value })}
+          />
+          {/* We don't have a UI design. Auth0 uses a text area for the "Allowed Callback URLS", so for now this works. */}
+          <TextField
+            inputProps={{ className: 'app-config-allowed-redirect-uris' }}
+            label="Allowed Redirect URIs (comma-separated)"
+            type="text"
+            value={data.allowedRedirectUris.join(',')}
+            onChange={e =>
+              onChange({
+                ...data,
+                allowedRedirectUris: e.target.value.replace(/\s/g, '').split(','),
+              })
+            }
           />
           <Stack direction="column">
             <Typography variant="h6">Release configurations</Typography>

@@ -1,18 +1,20 @@
 package com.daml.network.validator.admin.http
 
 import akka.http.scaladsl.model.Uri
-import com.daml.network.environment.{CNLedgerConnection}
-import com.daml.network.http.v0.{appManager as v0, definitions}
+import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.http.v0.{definitions, appManager as v0}
 import com.daml.network.validator.config.AppManagerConfig
 import com.daml.network.validator.store.AppManagerStore
+import com.daml.network.validator.store.AppManagerStore.AppConfiguration
 import com.daml.network.validator.util.OAuth2Manager
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 class HttpAppManagerHandler(
     config: AppManagerConfig,
@@ -51,23 +53,27 @@ class HttpAppManagerHandler(
   )(provider: String)(
       userId: String
   ): Future[v0.AppManagerResource.AuthorizeAppResponse] =
-    withNewTrace(workflowId) { _ => _ =>
-      for {
-        primaryParty <- ledgerConnection.getPrimaryParty(userId)
-        providerPartyId = PartyId.tryFromProtoPrimitive(provider)
-        appUserId = perAppUser(userId, providerPartyId)
-        _ <- ledgerConnection.createUserWithPrimaryParty(
-          appUserId,
-          primaryParty,
-          Seq.empty,
-          Some(CNLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID),
-        )
-        _ <- ledgerConnection.ensureUserMetadataAnnotation(
-          appUserId,
-          Map(PROVIDER_PARTY_USER_METADATA_KEY -> provider, USER_ID_USER_METADATA_KEY -> userId),
-          Some(CNLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID),
-        )
-      } yield v0.AppManagerResource.AuthorizeAppResponse.OK
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      val providerPartyId = PartyId.tryFromProtoPrimitive(provider)
+      checkAppExists(providerPartyId)(
+        v0.AppManagerResource.AuthorizeAppResponse.NotFound(_)
+      ) { _ =>
+        for {
+          primaryParty <- ledgerConnection.getPrimaryParty(userId)
+          appUserId = perAppUser(userId, providerPartyId)
+          _ <- ledgerConnection.createUserWithPrimaryParty(
+            appUserId,
+            primaryParty,
+            Seq.empty,
+            Some(CNLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID),
+          )
+          _ <- ledgerConnection.ensureUserMetadataAnnotation(
+            appUserId,
+            Map(PROVIDER_PARTY_USER_METADATA_KEY -> provider, USER_ID_USER_METADATA_KEY -> userId),
+            Some(CNLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID),
+          )
+        } yield v0.AppManagerResource.AuthorizeAppResponse.OK
+      }
     }
 
   // This is the endpoint that the app manager frontend calls after the user got redirected to /authorize
@@ -78,24 +84,37 @@ class HttpAppManagerHandler(
   )(provider: String, redirectUri: String, state: String)(
       userId: String
   ): Future[v0.AppManagerResource.CheckAppAuthorizedResponse] =
-    withNewTrace(workflowId) { _ => _ =>
-      ledgerConnection
-        .getUser(
-          perAppUser(userId, PartyId.tryFromProtoPrimitive(provider)),
-          Some(CNLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID),
-        )
-        .map { appUser =>
-          val authorizationCode = oauth2Manager.generateAuthorizationCode(appUser.getId)
-          // TODO(#6839) Consider just letting the frontend compute this instead of returning it here.
-          v0.AppManagerResource.CheckAppAuthorizedResponse.OK(
-            definitions.CheckAppAuthorizedResponse(
-              Uri(redirectUri)
-                .withQuery(Uri.Query("code" -> authorizationCode, "state" -> state))
-                .toString
+    withNewTrace(workflowId) { implicit traceContext => _ =>
+      val providerPartyId = PartyId.tryFromProtoPrimitive(provider)
+      checkAppExists(providerPartyId)(
+        v0.AppManagerResource.CheckAppAuthorizedResponse.Forbidden(_)
+      ) { appConfiguration =>
+        (for {
+          appUser <- ledgerConnection
+            .getUser(
+              perAppUser(userId, providerPartyId),
+              Some(CNLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID),
             )
-          )
-        }
-        .recover {
+        } yield {
+          val authorizationCode = oauth2Manager.generateAuthorizationCode(appUser.getId)
+          // see: https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics-09#section-2.1
+          if (!appConfiguration.configuration.allowedRedirectUris.contains(redirectUri)) {
+            v0.AppManagerResource.CheckAppAuthorizedResponse.Forbidden(
+              definitions.ErrorResponse(
+                s"The provided redirectUri is not in the list of allowed redirect URIs."
+              )
+            )
+          } else {
+            // TODO(#6839) Consider just letting the frontend compute this instead of returning it here.
+            v0.AppManagerResource.CheckAppAuthorizedResponse.OK(
+              definitions.CheckAppAuthorizedResponse(
+                Uri(redirectUri)
+                  .withQuery(Uri.Query("code" -> authorizationCode, "state" -> state))
+                  .toString
+              )
+            )
+          }
+        }).recover {
           case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
             v0.AppManagerResource.CheckAppAuthorizedResponse.Forbidden(
               definitions.ErrorResponse(
@@ -103,7 +122,25 @@ class HttpAppManagerHandler(
               )
             )
         }
+      }
     }
+
+  private def checkAppExists[T](
+      providerPartyId: PartyId
+  )(
+      doesNotExistF: definitions.ErrorResponse => T
+  )(existsF: AppConfiguration => Future[T])(implicit tc: TraceContext) = {
+    store.getLatestAppConfiguration(providerPartyId).transformWith {
+      case Success(appConfiguration) =>
+        existsF(appConfiguration)
+      case Failure(ex: StatusRuntimeException) if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
+        Future.successful(
+          doesNotExistF(definitions.ErrorResponse(s"App $providerPartyId does not exist."))
+        )
+      case Failure(ex) =>
+        Future.failed(ex)
+    }
+  }
 
   def listInstalledApps(
       respond: v0.AppManagerResource.ListInstalledAppsResponse.type

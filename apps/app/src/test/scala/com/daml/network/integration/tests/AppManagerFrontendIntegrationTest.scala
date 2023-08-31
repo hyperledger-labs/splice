@@ -45,7 +45,11 @@ class AppManagerFrontendIntegrationTest
         login(splitwellAppManagerUIPort, splitwellValidatorBackend.config.ledgerApiUser)
         textField(className("app-config-name-input")).underlying.sendKeys("splitwell")
         textField(className("app-config-ui-url-input")).underlying
-          .sendKeys(s"http://localhost:${splitwellSplitwellUIPort}")
+          .sendKeys(s"http://localhost:$splitwellSplitwellUIPort")
+        textField(className("app-config-allowed-redirect-uris")).underlying
+          .sendKeys(
+            s"http://localhost:$splitwellSplitwellUIPort,http://localhost:$splitwellSplitwellUIPort/another"
+          )
         click on className("add-release-configuration")
         textField(className("release-config-release-version-input")).underlying.sendKeys("1.0.0")
         click on className("release-config-add-domain-button")
@@ -113,7 +117,8 @@ class AppManagerFrontendIntegrationTest
       val configuration1_0 = AppConfiguration(
         0L,
         "splitwell",
-        s"http://localhost:${splitwellSplitwellUIPort}",
+        s"http://localhost:$splitwellSplitwellUIPort",
+        Vector(s"http://localhost:$splitwellSplitwellUIPort"),
         Vector(
           ReleaseConfiguration(
             domains = Vector.empty,

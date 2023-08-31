@@ -121,7 +121,7 @@ const RegisteredApp: React.FC<{ app: openapi.RegisteredApp }> = ({ app }) => {
 };
 
 const validAppConfiguration = (config: openapi.AppConfiguration): boolean =>
-  config.name !== '' && config.uiUrl !== '' && config.releaseConfigurations.length !== 0;
+  config.name !== '' && config.uiUri !== '' && config.releaseConfigurations.length !== 0;
 
 const RegisteredApps: React.FC = () => {
   const [appProviderUser, setAppProviderUser] = useState<string>('');
@@ -129,7 +129,8 @@ const RegisteredApps: React.FC = () => {
   const [appConfig, setAppConfig] = useState<openapi.AppConfiguration>({
     version: 0,
     name: '',
-    uiUrl: '',
+    uiUri: '',
+    allowedRedirectUris: [],
     releaseConfigurations: [],
   });
   const registeredAppsQuery = useRegisteredApps();
