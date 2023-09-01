@@ -15,6 +15,9 @@ import spray.json.JsValue
 
 object SvcTables extends AcsTables with NamedLogging {
 
+  final val CnsActionTypeCollectInitialEntryPayment = "CNSRARC_CollectInitialEntryPayment"
+  final val CnsActionTypeRejectEntryInitialPayment = "CNSRARC_RejectEntryInitialPayment"
+
   override protected def loggerFactory: NamedLoggerFactory = NamedLoggerFactory.root
 
   case class SvcAcsStoreRowData(
@@ -39,6 +42,8 @@ object SvcTables extends AcsTables with NamedLogging {
       memberTrafficMember: Option[Member] = None,
       cnsEntryName: Option[String] = None,
       actionCnsEntryContextCid: Option[cn.cns.CnsEntryContext.ContractId] = None,
+      actionCnsEntryContextPaymentId: Option[sub.SubscriptionInitialPayment.ContractId] = None,
+      actionCnsEntryContextArcType: Option[String] = None,
       featuredAppRightProvider: Option[PartyId] = None,
   )
 
@@ -56,22 +61,40 @@ object SvcTables extends AcsTables with NamedLogging {
           }
         case cn.svcrules.Confirmation.TEMPLATE_ID =>
           tryToDecode(cn.svcrules.Confirmation.COMPANION, createdEvent) { contract =>
+            val (
+              actionCnsEntryContextCid,
+              actionCnsEntryContextPaymentId,
+              actionCnsEntryContextArcType,
+            ) =
+              contract.payload.action match {
+                case arcCnsEntryContext: cn.svcrules.actionrequiringconfirmation.ARC_CnsEntryContext =>
+                  arcCnsEntryContext.cnsEntryContextAction match {
+                    case action: cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment =>
+                      (
+                        Some(arcCnsEntryContext.cnsEntryContextCid),
+                        Some(action.cnsEntryContext_CollectInitialEntryPaymentValue.paymentCid),
+                        Some("CNSRARC_CollectInitialEntryPayment"),
+                      )
+                    case action: cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_RejectEntryInitialPayment =>
+                      (
+                        Some(arcCnsEntryContext.cnsEntryContextCid),
+                        Some(action.cnsEntryContext_RejectEntryInitialPaymentValue.paymentCid),
+                        Some("CNSRARC_RejectEntryInitialPayment"),
+                      )
+                    case _ =>
+                      (None, None, None)
+                  }
+                case _ => (None, None, None)
+              }
             SvcAcsStoreRowData(
               contract,
               contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
               actionRequiringConfirmation =
                 Some(payloadJsonFromValue(contract.payload.action.toValue)),
               confirmer = Some(PartyId.tryFromProtoPrimitive(contract.payload.confirmer)),
-              actionCnsEntryContextCid = contract.payload.action match {
-                case arcCnsEntryContext: cn.svcrules.actionrequiringconfirmation.ARC_CnsEntryContext =>
-                  arcCnsEntryContext.cnsEntryContextAction match {
-                    case _: cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment =>
-                      Some(arcCnsEntryContext.cnsEntryContextCid)
-                    case _ =>
-                      None
-                  }
-                case _ => None
-              },
+              actionCnsEntryContextCid = actionCnsEntryContextCid,
+              actionCnsEntryContextPaymentId = actionCnsEntryContextPaymentId,
+              actionCnsEntryContextArcType = actionCnsEntryContextArcType,
             )
           }
         case cn.svcrules.ElectionRequest.TEMPLATE_ID =>

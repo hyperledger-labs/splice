@@ -325,16 +325,16 @@ create table scan_txlog_store
     extra_traffic_purchase_cc_spent                          numeric,
 
     -- provider of RecentActivityIndexRecord
-    recent_activity_provider                                 text, 
+    recent_activity_provider                                 text,
 
     -- sender of RecentActivityIndexRecord
-    recent_activity_sender                                   text, 
+    recent_activity_sender                                   text,
 
     -- receiver of RecentActivityIndexRecord
-    recent_activity_receiver                                 text, 
+    recent_activity_receiver                                 text,
 
     -- amount of RecentActivityIndexRecord
-    recent_activity_amount                                   numeric, 
+    recent_activity_amount                                   numeric,
 
     -- coin_price of RecentActivityIndexRecord
     recent_activity_coin_price                               numeric
@@ -445,11 +445,19 @@ create table svc_acs_store
 
     -- the cnsEntryContextCid of a Confirmation contract:
     -- - if the action is of type ARC_CnsEntryContext
-    -- - if the above's cnsEntryContextAction is of type CNSRARC_CollectInitialEntryPayment
+    -- - if the above's cnsEntryContextAction is of either type CNSRARC_CollectInitialEntryPayment or CNSRARC_RejectEntryInitialPayment
     action_cns_entry_context_cid  text,
 
+    -- the paymentCid of the cnsEntryContextAction from Confirmation contract:
+    -- - if the action is of type ARC_CnsEntryContext
+    -- - if the above's cnsEntryContextAction is of either type CNSRARC_CollectInitialEntryPayment or CNSRARC_RejectEntryInitialPayment
+    action_cns_entry_context_payment_id  text,
+
+    -- the cnsEntryContextAction type of a Confirmation contract
+    action_cns_entry_context_arc_type    text,
+
     -- the provider partyid of a FeaturedAppRight contract
-    featured_app_right_provider text
+    featured_app_right_provider   text
 );
 
 -- ordered mining rounds

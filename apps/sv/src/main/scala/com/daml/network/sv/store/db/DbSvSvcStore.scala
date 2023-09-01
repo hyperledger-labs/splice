@@ -96,6 +96,8 @@ class DbSvSvcStore(
             memberTrafficMember,
             cnsEntryName,
             actionCnsEntryContextCid,
+            actionCnsEntryContextPaymentId,
+            actionCnsEntryContextArcType,
             featuredAppRightProvider,
           ) =>
         val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
@@ -108,6 +110,7 @@ class DbSvSvcStore(
         val safeSvOnboardingToken = svOnboardingToken.map(lengthLimited)
         val safeSvCandidateName = svCandidateName.map(lengthLimited)
         val safeCnsEntryName = cnsEntryName.map(lengthLimited)
+        val safeActionCnsEntryContextArcType = actionCnsEntryContextArcType.map(lengthLimited)
         sqlu"""
               insert into svc_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
                                         contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
@@ -115,14 +118,14 @@ class DbSvSvcStore(
                                         confirmer, sv_onboarding_token, sv_candidate_party, sv_candidate_name, validator,
                                         total_traffic_purchased, voter, vote_request_cid, requester, election_request_epoch,
                                         import_crate_receiver, member_traffic_member, cns_entry_name, action_cns_entry_context_cid,
-                                        featured_app_right_provider)
+                                        action_cns_entry_context_payment_id, action_cns_entry_context_arc_type, featured_app_right_provider)
               values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
                       $coinRoundOfExpiry, $rewardRound, $rewardParty, $miningRound, $actionRequiringConfirmation,
                       $confirmer, $safeSvOnboardingToken, $svCandidateParty, $safeSvCandidateName, $validator,
                       $totalTrafficPurchased, $voter, $voteRequestCid, $requester, $electionRequestEpoch,
                       $importCrateReceiver, $memberTrafficMember, $safeCnsEntryName, $actionCnsEntryContextCid,
-                      $featuredAppRightProvider)
+                      $actionCnsEntryContextPaymentId, $safeActionCnsEntryContextArcType, $featuredAppRightProvider)
               on conflict do nothing
             """
     }
@@ -318,7 +321,30 @@ class DbSvSvcStore(
     MultiDomainAcsStore.QueryResult[Option[
       Contract[Confirmation.ContractId, Confirmation]
     ]]
-  ] = ???
+  ] = waitUntilAcsIngested {
+    (for {
+      resultWithOffset <- storage
+        .querySingle(
+          selectFromAcsTableWithOffset(
+            DbSvSvcStore.tableName,
+            storeId,
+            where = sql"""
+                        template_id = ${Confirmation.TEMPLATE_ID}
+                    and confirmer = $confirmer
+                    and action_cns_entry_context_payment_id = $paymentId
+                    and action_cns_entry_context_arc_type = ${lengthLimited(
+                SvcTables.CnsActionTypeCollectInitialEntryPayment
+              )}
+                      """,
+            orderLimit = sql"limit 1",
+          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          "lookupCnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset",
+        )
+    } yield MultiDomainAcsStore.QueryResult(
+      resultWithOffset.offset,
+      resultWithOffset.row.map(contractFromRow(Confirmation.COMPANION)(_)),
+    )).getOrRaise(offsetExpectedError())
+  }
 
   override def lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(
       confirmer: PartyId,
@@ -329,7 +355,30 @@ class DbSvSvcStore(
     MultiDomainAcsStore.QueryResult[Option[
       Contract[Confirmation.ContractId, Confirmation]
     ]]
-  ] = ???
+  ] = waitUntilAcsIngested {
+    (for {
+      resultWithOffset <- storage
+        .querySingle(
+          selectFromAcsTableWithOffset(
+            DbSvSvcStore.tableName,
+            storeId,
+            where = sql"""
+                        template_id = ${Confirmation.TEMPLATE_ID}
+                    and confirmer = $confirmer
+                    and action_cns_entry_context_payment_id = $paymentId
+                    and action_cns_entry_context_arc_type = ${lengthLimited(
+                SvcTables.CnsActionTypeRejectEntryInitialPayment
+              )}
+                      """,
+            orderLimit = sql"limit 1",
+          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          "lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset",
+        )
+    } yield MultiDomainAcsStore.QueryResult(
+      resultWithOffset.offset,
+      resultWithOffset.row.map(contractFromRow(Confirmation.COMPANION)(_)),
+    )).getOrRaise(offsetExpectedError())
+  }
 
   override def lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset(
       confirmer: PartyId,
@@ -340,7 +389,27 @@ class DbSvSvcStore(
     MultiDomainAcsStore.QueryResult[Option[
       Contract[Confirmation.ContractId, Confirmation]
     ]]
-  ] = ???
+  ] = waitUntilAcsIngested {
+    (for {
+      resultWithOffset <- storage
+        .querySingle(
+          selectFromAcsTableWithOffset(
+            DbSvSvcStore.tableName,
+            storeId,
+            where = sql"""
+                        template_id = ${Confirmation.TEMPLATE_ID}
+                    and confirmer = $confirmer
+                    and action_cns_entry_context_payment_id = $paymentId
+                      """,
+            orderLimit = sql"limit 1",
+          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          "lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset",
+        )
+    } yield MultiDomainAcsStore.QueryResult(
+      resultWithOffset.offset,
+      resultWithOffset.row.map(contractFromRow(Confirmation.COMPANION)(_)),
+    )).getOrRaise(offsetExpectedError())
+  }
 
   override def listInitialPaymentConfirmationByCnsName(
       confirmer: PartyId,
@@ -858,9 +927,32 @@ class DbSvSvcStore(
 
   override def lookupSubscriptionInitialPaymentWithOffset(
       paymentCid: SubscriptionInitialPayment.ContractId
-  ): Future[MultiDomainAcsStore.QueryResult[
+  )(implicit tc: TraceContext): Future[MultiDomainAcsStore.QueryResult[
     Option[AssignedContract[SubscriptionInitialPayment.ContractId, SubscriptionInitialPayment]]
-  ]] = ???
+  ]] = waitUntilAcsIngested {
+    for {
+      resultWithOffset <- storage
+        .querySingle(
+          selectFromAcsTableWithOffset(
+            DbSvSvcStore.tableName,
+            storeId,
+            where = sql"""
+                            template_id = ${SubscriptionInitialPayment.TEMPLATE_ID}
+                        and contract_id = $paymentCid
+                          """,
+            orderLimit = sql"limit 1",
+          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          "lookupSubscriptionInitialPaymentWithOffset",
+        )
+        .getOrRaise(offsetExpectedError())
+      withState <- resultWithOffset.row.traverse(
+        multiDomainAcsStore.contractWithStateFromRow(SubscriptionInitialPayment.COMPANION)(_)
+      )
+    } yield MultiDomainAcsStore.QueryResult(
+      resultWithOffset.offset,
+      withState.flatMap(_.toAssignedContract),
+    )
+  }
 
   override def lookupFeaturedAppRightWithOffset(
       providerPartyId: PartyId

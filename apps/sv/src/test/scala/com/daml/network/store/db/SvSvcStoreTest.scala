@@ -18,6 +18,7 @@ import com.daml.network.codegen.java.cn.cns.{
   CnsEntry,
   CnsEntryContext,
   CnsEntryContext_CollectInitialEntryPayment,
+  CnsEntryContext_RejectEntryInitialPayment,
   CnsRules,
 }
 import com.daml.network.codegen.java.cn.cometbft.CometBftConfigLimits
@@ -30,7 +31,10 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CoinRules,
   ARC_SvcRules,
 }
-import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment
+import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.{
+  CNSRARC_CollectInitialEntryPayment,
+  CNSRARC_RejectEntryInitialPayment,
+}
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.{
   CRARC_MiningRound_Archive,
   CRARC_SetEnabledChoices,
@@ -184,6 +188,16 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       noise = Seq(cnsEntry(userParty(2), "bad")),
     )(
       _.lookupCnsEntryByNameWithOffset("good")
+    )
+    def paymentId(n: Int) = new SubscriptionInitialPayment.ContractId(validContractId(n))
+    lookupTests("lookupSubscriptionInitialPaymentWithOffset")(
+      create = subscriptionInitialPayment(paymentId(1), userParty(1), svcParty, BigDecimal(1.0)),
+      noise = Seq(
+        subscriptionInitialPayment(paymentId(2), userParty(2), svcParty, BigDecimal(2.0)),
+        subscriptionInitialPayment(paymentId(3), userParty(3), svcParty, BigDecimal(3.0)),
+      ),
+    )(
+      _.lookupSubscriptionInitialPaymentWithOffset(paymentId(1))
     )
     lookupTests("lookupFeaturedAppRightWithOffset")(
       create = featuredAppRight(userParty(1)),
@@ -443,6 +457,68 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
+    "lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset" should {
+
+      "find the confirmation by the initial payment id" in {
+        val acceptedConfirmations =
+          (1 to 2).map(n =>
+            confirmation(
+              n,
+              cnsEntryContextPaymentAction(
+                cnsEntryContext(userParty(n), s"name$n").contractId,
+                isAccepted = true,
+                new SubscriptionInitialPayment.ContractId(validContractId(n)),
+              ),
+            )
+          )
+
+        val rejectedConfirmations =
+          (3 to 4).map(n =>
+            confirmation(
+              n,
+              cnsEntryContextPaymentAction(
+                cnsEntryContext(userParty(n), s"name$n").contractId,
+                isAccepted = false,
+                new SubscriptionInitialPayment.ContractId(validContractId(n)),
+              ),
+            )
+          )
+        val unrelatedConfirmation = confirmation(10, enabledChoicesTrueAction)
+
+        def lookupConfirmations(
+            lookup: SubscriptionInitialPayment.ContractId => Future[
+              QueryResult[Option[Contract[Confirmation.ContractId, Confirmation]]]
+            ]
+        ) = Future.sequence(
+          (1 to 4).map(n =>
+            lookup(new SubscriptionInitialPayment.ContractId(validContractId(n))).map(_.value)
+          )
+        )
+
+        for {
+          store <- mkStore()
+          _ <- Future.traverse(
+            acceptedConfirmations ++ rejectedConfirmations ++ Seq(unrelatedConfirmation)
+          )(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          results <- lookupConfirmations(
+            store.lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset(storeSvParty, _)
+          )
+          acceptedResults <- lookupConfirmations(
+            store.lookupCnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset(storeSvParty, _)
+          )
+          rejectedResults <- lookupConfirmations(
+            store.lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(storeSvParty, _)
+          )
+        } yield {
+          results should be((acceptedConfirmations ++ rejectedConfirmations).map(Some(_)))
+          acceptedResults should be(acceptedConfirmations.map(Some(_)) ++ Seq(None, None))
+          rejectedResults should be(Seq(None, None) ++ rejectedConfirmations.map(Some(_)))
+        }
+      }
+    }
+
     "listExpiredSvOnboardingRequests" should {
 
       "return all expired SV onboarding requests" in {
@@ -687,21 +763,34 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     new SRARC_RemoveMember(new SvcRules_RemoveMember(userParty(666).toProtoPrimitive))
   )
   private def cnsEntryContextPaymentAction(
-      contextCid: CnsEntryContext.ContractId
+      contextCid: CnsEntryContext.ContractId,
+      isAccepted: Boolean = true,
+      paymentId: SubscriptionInitialPayment.ContractId =
+        new SubscriptionInitialPayment.ContractId(validContractId(1)),
   ): ActionRequiringConfirmation = {
+    val appTransferContext = new AppTransferContext(
+      new v1.coin.CoinRules.ContractId(validContractId(1)),
+      new v1.round.OpenMiningRound.ContractId(validContractId(1)),
+      Optional.empty(),
+    )
     new ARC_CnsEntryContext(
       contextCid,
-      new CNSRARC_CollectInitialEntryPayment(
-        new CnsEntryContext_CollectInitialEntryPayment(
-          new SubscriptionInitialPayment.ContractId(validContractId(1)),
-          new AppTransferContext(
-            new v1.coin.CoinRules.ContractId(validContractId(1)),
-            new v1.round.OpenMiningRound.ContractId(validContractId(1)),
-            Optional.empty(),
-          ),
-          new CnsRules.ContractId(validContractId(1)),
+      if (isAccepted)
+        new CNSRARC_CollectInitialEntryPayment(
+          new CnsEntryContext_CollectInitialEntryPayment(
+            paymentId,
+            appTransferContext,
+            new CnsRules.ContractId(validContractId(1)),
+          )
         )
-      ),
+      else
+        new CNSRARC_RejectEntryInitialPayment(
+          new CnsEntryContext_RejectEntryInitialPayment(
+            paymentId,
+            appTransferContext,
+            new CnsRules.ContractId(validContractId(1)),
+          )
+        ),
     )
   }
 

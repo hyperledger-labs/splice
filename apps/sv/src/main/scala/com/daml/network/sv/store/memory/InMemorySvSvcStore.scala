@@ -500,13 +500,16 @@ class InMemorySvSvcStore(
 
   override def lookupSubscriptionInitialPaymentWithOffset(
       paymentCid: SubscriptionInitialPayment.ContractId
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[
       AssignedContract[SubscriptionInitialPayment.ContractId, SubscriptionInitialPayment]
     ]]
   ] = for {
     result <- multiDomainAcsStore
-      .findContractWithOffset(SubscriptionInitialPayment.COMPANION)((_: Any) => true)
+      .findContractWithOffset(SubscriptionInitialPayment.COMPANION)(
+        (co: Contract[SubscriptionInitialPayment.ContractId, SubscriptionInitialPayment]) =>
+          co.contractId == paymentCid
+      )
   } yield result map (_ flatMap (_.toAssignedContract))
 
   override def lookupFeaturedAppRightWithOffset(

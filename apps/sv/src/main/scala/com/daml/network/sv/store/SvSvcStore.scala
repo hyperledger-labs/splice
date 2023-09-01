@@ -707,7 +707,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
 
   def lookupSubscriptionInitialPaymentWithOffset(
       paymentCid: sub.SubscriptionInitialPayment.ContractId
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[Option[
       AssignedContract[sub.SubscriptionInitialPayment.ContractId, sub.SubscriptionInitialPayment]
     ]]
@@ -715,7 +715,7 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
 
   def lookupSubscriptionInitialPayment(
       paymentCid: sub.SubscriptionInitialPayment.ContractId
-  ): Future[Option[
+  )(implicit tc: TraceContext): Future[Option[
     AssignedContract[sub.SubscriptionInitialPayment.ContractId, sub.SubscriptionInitialPayment]
   ]] = lookupSubscriptionInitialPaymentWithOffset(paymentCid).map(_.value)
 

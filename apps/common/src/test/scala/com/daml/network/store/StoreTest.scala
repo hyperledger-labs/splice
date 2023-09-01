@@ -22,6 +22,8 @@ import com.daml.network.codegen.java.cc.{
 }
 import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subCodegen
+import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -271,6 +273,40 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
+
+  protected def subscriptionInitialPayment(
+      paymentId: subCodegen.SubscriptionInitialPayment.ContractId,
+      userParty: PartyId,
+      providerParty: PartyId,
+      amount: BigDecimal,
+  ) = {
+    val subscriptionData = new subCodegen.Subscription(
+      userParty.toProtoPrimitive,
+      providerParty.toProtoPrimitive,
+      providerParty.toProtoPrimitive,
+      svcParty.toProtoPrimitive,
+      new subCodegen.SubscriptionContext.ContractId(nextCid()),
+    )
+    val payData = new subCodegen.SubscriptionPayData(
+      new paymentCodegen.PaymentAmount(numeric(amount.bigDecimal), paymentCodegen.Currency.CC),
+      new RelTime(1L),
+      new RelTime(1L),
+    )
+    val template = new subCodegen.SubscriptionInitialPayment(
+      subscriptionData,
+      payData,
+      numeric(amount.bigDecimal),
+      new ccApiCodegen.coin.LockedCoin.ContractId(nextCid()),
+      new ccApiCodegen.round.Round(1L),
+    )
+    Contract(
+      subCodegen.SubscriptionInitialPayment.TEMPLATE_ID,
+      paymentId,
+      template,
+      ContractMetadata.Empty(),
+      protobuf.Any.getDefaultInstance,
+    )
+  }
 
   protected def featuredAppRight(providerParty: PartyId) = {
     val template = new FeaturedAppRight(svcParty.toProtoPrimitive, providerParty.toProtoPrimitive)
