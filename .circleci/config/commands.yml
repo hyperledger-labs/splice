@@ -464,6 +464,8 @@ commands:
 
                 <<# parameters.fail_on_error_in_output >>
                 # Check and report whether sbt has output errors
+                # TODO(tech-debt) fix for a testnet with an outdated `check-sbt-output` script, remove after 2023-09-04
+                sed -i '/daml-errors/d' sbt_output
                 .circleci/canton-scripts/check-sbt-output.sh "sbt_output"
                 <</ parameters.fail_on_error_in_output >>
             }
