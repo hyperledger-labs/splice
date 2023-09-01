@@ -57,6 +57,6 @@ spec:
   - name: cm-adm-api
     port: 5007
     protocol: TCP
-  - name: cd-metrics
+  - name: cm-metrics
     port: 10013
     protocol: TCP

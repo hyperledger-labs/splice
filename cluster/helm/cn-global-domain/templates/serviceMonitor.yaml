@@ -9,7 +9,7 @@ metadata:
 spec:
   endpoints:
 
-  - port: metrics
+  - port: cs-metrics
     interval: {{ .Values.metrics.interval }}
 
   selector:
@@ -30,7 +30,7 @@ metadata:
 spec:
   endpoints:
 
-  - port: metrics
+  - port: cm-metrics
     interval: {{ .Values.metrics.interval }}
 
   selector:
