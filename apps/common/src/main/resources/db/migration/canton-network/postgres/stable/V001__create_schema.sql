@@ -456,6 +456,13 @@ create table svc_acs_store
     -- the cnsEntryContextAction type of a Confirmation contract
     action_cns_entry_context_arc_type    text,
 
+    -- the contract-id of a subscription's context contract
+    -- used for a DB-level join of subscriptions and their context contracts
+    subscription_context_contract_id text,
+
+    -- subscriptions: when the next payment is due
+    subscription_next_payment_due_at bigint,
+
     -- the provider partyid of a FeaturedAppRight contract
     featured_app_right_provider   text
 );
@@ -537,3 +544,10 @@ create index svc_acs_store_sid_tid_acecc
     on svc_acs_store (store_id, template_id, action_cns_entry_context_cid)
     where action_cns_entry_context_cid is not null;
 
+create index svc_acs_store_sid_tid_sccid
+    on svc_acs_store (store_id, template_id, subscription_context_contract_id)
+    where subscription_context_contract_id is not null;
+
+create index svc_acs_store_sid_tid_snpd
+    on svc_acs_store (store_id, template_id, subscription_next_payment_due_at)
+    where subscription_next_payment_due_at is not null;

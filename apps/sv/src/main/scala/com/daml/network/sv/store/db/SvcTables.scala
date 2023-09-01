@@ -44,6 +44,8 @@ object SvcTables extends AcsTables with NamedLogging {
       actionCnsEntryContextCid: Option[cn.cns.CnsEntryContext.ContractId] = None,
       actionCnsEntryContextPaymentId: Option[sub.SubscriptionInitialPayment.ContractId] = None,
       actionCnsEntryContextArcType: Option[String] = None,
+      subscriptionContextContractId: Option[sub.SubscriptionContext.ContractId] = None,
+      subscriptionNextPaymentDueAt: Option[Timestamp] = None,
       featuredAppRightProvider: Option[PartyId] = None,
   )
 
@@ -269,6 +271,15 @@ object SvcTables extends AcsTables with NamedLogging {
         case sub.SubscriptionPayment.TEMPLATE_ID =>
           tryToDecode(sub.SubscriptionPayment.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(contract)
+          }
+        case sub.SubscriptionIdleState.TEMPLATE_ID =>
+          tryToDecode(sub.SubscriptionIdleState.COMPANION, createdEvent) { contract =>
+            SvcAcsStoreRowData(
+              contract,
+              subscriptionContextContractId = Some(contract.payload.subscriptionData.context),
+              subscriptionNextPaymentDueAt =
+                Some(Timestamp.assertFromInstant(contract.payload.nextPaymentDueAt)),
+            )
           }
         case t =>
           Left(s"Template $t cannot be decoded as an entry for the SVC store.")

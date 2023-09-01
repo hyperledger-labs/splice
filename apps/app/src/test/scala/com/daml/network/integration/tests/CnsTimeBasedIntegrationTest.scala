@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.cns as codegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -109,6 +110,60 @@ class CnsTimeBasedIntegrationTest
           )
           renewedEntry.data shouldBe newEntry
         }
+    }
+
+    "expire stale subscriptions" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val cnsRules = sv1ScanBackend.getCnsRules()
+
+      val subReqId = clue("Alice requests a cns entry") {
+        val cmd = cnsRules.contractId.exerciseCnsRules_RequestEntry(
+          testEntryName,
+          testEntryUrl,
+          testEntryDescription,
+          aliceUserParty.toProtoPrimitive,
+        )
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+          .submitWithResult(
+            userId = aliceWalletClient.config.ledgerApiUser,
+            actAs = Seq(aliceUserParty),
+            readAs = Seq.empty,
+            update = cmd,
+            disclosedContracts = DisclosedContracts(cnsRules).toLedgerApiDisclosedContracts,
+          )
+          .exerciseResult
+          ._2
+      }
+
+      aliceWalletClient.tap(50.0)
+      actAndCheck(
+        "Alice accepts subscription and waits for entry", {
+          aliceWalletClient.acceptSubscriptionRequest(subReqId)
+        },
+      )(
+        "Subscription and entry are created",
+        _ => {
+          aliceWalletClient.listSubscriptions() should have length 1
+          inside(lookupEntryByName(testEntryName)) { case Some(entry) =>
+            entry.data.name shouldBe testEntryName
+          }
+        },
+      )
+      // Stop validator so renewal does not happen
+      aliceValidatorBackend.stop()
+      advanceTime(Duration.ofDays(91))
+      eventually() {
+        lookupEntryByName(testEntryName) shouldBe empty
+      }
+      // Wait for subscription to be expired.
+      eventually() {
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(subCodegen.Subscription.COMPANION)(aliceUserParty) shouldBe empty
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(subCodegen.SubscriptionIdleState.COMPANION)(aliceUserParty) shouldBe empty
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(codegen.CnsEntryContext.COMPANION)(aliceUserParty) shouldBe empty
+      }
     }
   }
 

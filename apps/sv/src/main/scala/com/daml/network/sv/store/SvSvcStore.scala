@@ -32,6 +32,7 @@ import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract, TemplateJsonDecoder}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -411,6 +412,11 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
     multiDomainAcsStore.listExpiredFromPayloadExpiry(cn.cns.CnsEntry.COMPANION)(
       _.expiresAt
     )
+
+  def listExpiredCnsSubscriptions(
+      now: CantonTimestamp,
+      limit: Int,
+  )(implicit tc: TraceContext): Future[Seq[SvSvcStore.IdleCnsSubscription]]
 
   def lookupSvOnboardingConfirmedByParty(
       svParty: PartyId
@@ -862,6 +868,9 @@ object SvSvcStore {
         mkFilter(sub.SubscriptionPayment.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc && co.payload.subscriptionData.provider == svc
         ),
+        mkFilter(sub.SubscriptionIdleState.COMPANION)(co =>
+          co.payload.subscriptionData.svc == svc && co.payload.subscriptionData.provider == svc
+        ),
       ) ++
         (if (enableCoinRulesUpgrade)
            Map(mkFilter(v1testcc.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc))
@@ -906,6 +915,20 @@ object SvSvcStore {
     def toSeq: Seq[OpenMiningRoundContract] = Seq(oldest, middle, newest)
   }
 
+  case class IdleCnsSubscription(
+      state: Contract[
+        sub.SubscriptionIdleState.ContractId,
+        sub.SubscriptionIdleState,
+      ],
+      context: Contract[
+        cn.cns.CnsEntryContext.ContractId,
+        cn.cns.CnsEntryContext,
+      ],
+  ) extends PrettyPrinting {
+
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(param("state", _.state), param("context", _.context))
+  }
 }
 
 case class ExpiredRewardCouponsBatch(

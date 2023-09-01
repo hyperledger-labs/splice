@@ -53,12 +53,20 @@ import com.daml.network.codegen.java.cn.svcrules.{
   VoteRequest,
 }
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
-import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
+import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
+import com.daml.network.codegen.java.cn.wallet.subscriptions.{
+  Subscription,
+  SubscriptionContext,
+  SubscriptionIdleState,
+  SubscriptionInitialPayment,
+  SubscriptionPayData,
+}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{Limit, StoreTest}
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
+import com.daml.network.sv.store.SvSvcStore.IdleCnsSubscription
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.sv.store.{SvStore, SvSvcStore}
@@ -465,7 +473,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             confirmation(
               n,
               cnsEntryContextPaymentAction(
-                cnsEntryContext(userParty(n), s"name$n").contractId,
+                cnsEntryContext(n, s"name$n").contractId,
                 isAccepted = true,
                 new SubscriptionInitialPayment.ContractId(validContractId(n)),
               ),
@@ -477,7 +485,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             confirmation(
               n,
               cnsEntryContextPaymentAction(
-                cnsEntryContext(userParty(n), s"name$n").contractId,
+                cnsEntryContext(n, s"name$n").contractId,
                 isAccepted = false,
                 new SubscriptionInitialPayment.ContractId(validContractId(n)),
               ),
@@ -688,15 +696,62 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
+    "listExpiredCnsSubscriptions" should {
+
+      "return all entries where subscription_next_payment_due_at < now" in {
+        for {
+          store <- mkStore()
+          // 1 to 3 are expired, 4 to 6 are not
+          data = ((1 to 3).map(n => n -> Instant.now().minusSeconds(n * 1000L)) ++ (4 to 6)
+            .map(n => n -> Instant.now().plusSeconds(n * 1000L)))
+            .map { case (n, nextPaymentDueAt) =>
+              val contextContract =
+                cnsEntryContext(n, n.toString)
+              val idleStateContract =
+                subscriptionIdleState(
+                  n,
+                  nextPaymentDueAt,
+                  contextContract.contractId,
+                )
+
+              (contextContract, idleStateContract)
+            }
+          _ <- Future.traverse(data) { case (contextContract, idleContract) =>
+            for {
+              _ <- dummyDomain.create(contextContract, createdEventSignatories = Seq(svcParty))(
+                store.multiDomainAcsStore
+              )
+              _ <- dummyDomain.create(idleContract, createdEventSignatories = Seq(svcParty))(
+                store.multiDomainAcsStore
+              )
+            } yield ()
+          }
+        } yield {
+          val expected = data
+            .take(3)
+            .map { case (ctxContract, idleContract) =>
+              IdleCnsSubscription(idleContract, ctxContract)
+            }
+            .reverse
+          eventually() {
+            store
+              .listExpiredCnsSubscriptions(CantonTimestamp.now(), limit = 3)
+              .futureValue should be(expected)
+          }
+        }
+      }
+
+    }
+
     // TODO (#5314): this is missing tests for all the usages of "NotOnDomain"
 
     "listInitialPaymentConfirmationByCnsName" should {
 
       "find the confirmation by the cns name" in {
-        val goodCnsName = cnsEntryContext(userParty(1), "good")
+        val goodCnsName = cnsEntryContext(1, "good")
         val goodConfirmations =
           (1 to 3).map(n => confirmation(n, cnsEntryContextPaymentAction(goodCnsName.contractId)))
-        val badCnsName = cnsEntryContext(userParty(2), "bad")
+        val badCnsName = cnsEntryContext(2, "bad")
         val badConfirmations =
           (4 to 6).map(n => confirmation(n, cnsEntryContextPaymentAction(badCnsName.contractId)))
         val unrelatedConfirmations = (7 to 9).map(n => confirmation(n, enabledChoicesTrueAction))
@@ -952,10 +1007,10 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def cnsEntryContext(user: PartyId, name: String) = {
+  private def cnsEntryContext(n: Int, name: String) = {
     val template = new CnsEntryContext(
       svcParty.toProtoPrimitive,
-      user.toProtoPrimitive,
+      userParty(n).toProtoPrimitive,
       name,
       s"https://example.com/$name",
       s"Test with $name",
@@ -963,10 +1018,41 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     Contract(
       CnsEntryContext.TEMPLATE_ID,
-      new CnsEntryContext.ContractId(nextCid()),
+      new CnsEntryContext.ContractId(validContractId(n, "cc")),
       template,
       ContractMetadata.Empty(),
       protobuf.Any.getDefaultInstance,
+    )
+  }
+
+  private def subscriptionIdleState(
+      n: Int,
+      nextPaymentDueAt: Instant,
+      cnsEntryContextCid: CnsEntryContext.ContractId,
+  ) = {
+    val templateId = SubscriptionIdleState.TEMPLATE_ID
+    val template = new SubscriptionIdleState(
+      new Subscription.ContractId(validContractId(n, "aa")),
+      new Subscription(
+        userParty(n).toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        cnsEntryContextCid.toInterface(SubscriptionContext.INTERFACE),
+      ),
+      new SubscriptionPayData(
+        new PaymentAmount(numeric(BigDecimal("1")), Currency.CC),
+        new RelTime(1_000_000_000L),
+        new RelTime(1_000_000L),
+      ),
+      nextPaymentDueAt,
+    )
+    Contract(
+      identifier = templateId,
+      contractId = new SubscriptionIdleState.ContractId(s"$domain#$n"),
+      payload = template,
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 

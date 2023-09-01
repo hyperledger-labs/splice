@@ -15,7 +15,10 @@ import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsEntryContext}
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
-import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
+import com.daml.network.codegen.java.cn.wallet.subscriptions.{
+  SubscriptionIdleState,
+  SubscriptionInitialPayment,
+}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
@@ -25,6 +28,7 @@ import com.daml.network.sv.store.db.SvcTables.SvcAcsStoreRowData
 import com.daml.network.sv.store.{SvStore, SvSvcStore}
 import com.daml.network.util.Contract.Companion.Template
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -98,6 +102,8 @@ class DbSvSvcStore(
             actionCnsEntryContextCid,
             actionCnsEntryContextPaymentId,
             actionCnsEntryContextArcType,
+            subscriptionContextContractId,
+            subscriptionNextPaymentDueAt,
             featuredAppRightProvider,
           ) =>
         val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
@@ -118,16 +124,65 @@ class DbSvSvcStore(
                                         confirmer, sv_onboarding_token, sv_candidate_party, sv_candidate_name, validator,
                                         total_traffic_purchased, voter, vote_request_cid, requester, election_request_epoch,
                                         import_crate_receiver, member_traffic_member, cns_entry_name, action_cns_entry_context_cid,
-                                        action_cns_entry_context_payment_id, action_cns_entry_context_arc_type, featured_app_right_provider)
+                                        action_cns_entry_context_payment_id, action_cns_entry_context_arc_type, subscription_context_contract_id,
+                                        subscription_next_payment_due_at, featured_app_right_provider)
               values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
                       $coinRoundOfExpiry, $rewardRound, $rewardParty, $miningRound, $actionRequiringConfirmation,
                       $confirmer, $safeSvOnboardingToken, $svCandidateParty, $safeSvCandidateName, $validator,
                       $totalTrafficPurchased, $voter, $voteRequestCid, $requester, $electionRequestEpoch,
                       $importCrateReceiver, $memberTrafficMember, $safeCnsEntryName, $actionCnsEntryContextCid,
-                      $actionCnsEntryContextPaymentId, $safeActionCnsEntryContextArcType, $featuredAppRightProvider)
+                      $actionCnsEntryContextPaymentId, $safeActionCnsEntryContextArcType, $subscriptionContextContractId,
+                      $subscriptionNextPaymentDueAt, $featuredAppRightProvider)
               on conflict do nothing
             """
+    }
+  }
+
+  override def listExpiredCnsSubscriptions(
+      now: CantonTimestamp,
+      limit: Int,
+  )(implicit tc: TraceContext): Future[Seq[SvSvcStore.IdleCnsSubscription]] = waitUntilAcsIngested {
+    for {
+      joinedRows <- storage
+        .query(
+          sql"""
+              select
+                       idle.store_id,
+                       idle.event_number,
+                       idle.contract_id,
+                       idle.template_id,
+                       idle.create_arguments,
+                       idle.contract_metadata_created_at,
+                       idle.contract_metadata_contract_key_hash,
+                       idle.contract_metadata_driver_internal,
+                       idle.contract_expires_at,
+                       ctx.store_id,
+                       ctx.event_number,
+                       ctx.contract_id,
+                       ctx.template_id,
+                       ctx.create_arguments,
+                       ctx.contract_metadata_created_at,
+                       ctx.contract_metadata_contract_key_hash,
+                       ctx.contract_metadata_driver_internal,
+                       ctx.contract_expires_at
+              from     svc_acs_store idle
+              join     svc_acs_store ctx
+              on       idle.subscription_context_contract_id = ctx.contract_id
+                and      ctx.store_id = idle.store_id
+              where    idle.store_id = $storeId
+                and      idle.template_id = ${SubscriptionIdleState.COMPANION.TEMPLATE_ID}
+                and      ctx.template_id = ${CnsEntryContext.COMPANION.TEMPLATE_ID}
+                and      idle.subscription_next_payment_due_at < $now
+              order by idle.subscription_next_payment_due_at
+              limit    $limit
+          """.as[(AcsStoreRowTemplate, AcsStoreRowTemplate)],
+          "listExpiredCnsSubscriptions",
+        )
+    } yield joinedRows.map { case (idleRow, ctxRow) =>
+      val idleContract = contractFromRow(SubscriptionIdleState.COMPANION)(idleRow)
+      val ctxContract = contractFromRow(CnsEntryContext.COMPANION)(ctxRow)
+      SvSvcStore.IdleCnsSubscription(idleContract, ctxContract)
     }
   }
 

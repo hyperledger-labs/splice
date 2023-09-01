@@ -902,6 +902,15 @@ template SvcRules with
         requireUnlocked lock
         exercise cnsEntryCid choiceArg
 
+    nonconsuming choice SvcRules_ExpireSubscription : ()
+      with
+        subscriptionIdleStateCid: ContractId SubscriptionIdleState
+        choiceArg : SubscriptionIdleState_ExpireSubscription
+      controller leader
+      do
+        requireUnlocked lock
+        exercise subscriptionIdleStateCid choiceArg
+
 
     -- Reward management driven directly by the leader
     --------------------------------------------------

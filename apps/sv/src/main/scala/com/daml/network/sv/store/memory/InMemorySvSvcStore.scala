@@ -19,7 +19,10 @@ import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiring
 }
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
-import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
+import com.daml.network.codegen.java.cn.wallet.subscriptions.{
+  SubscriptionIdleState,
+  SubscriptionInitialPayment,
+}
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
@@ -28,9 +31,11 @@ import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.{SvStore, SvSvcStore}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract, ContractWithState}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import cats.syntax.traverse.*
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -383,6 +388,41 @@ class InMemorySvSvcStore(
         co: Contract[?, so.SvOnboardingRequest] => co.payload.candidateName == candidateName
       }
       .map(_ map (_ map (_.contract)))
+
+  override def listExpiredCnsSubscriptions(
+      now: CantonTimestamp,
+      limit: Int,
+  )(implicit tc: TraceContext): Future[Seq[SvSvcStore.IdleCnsSubscription]] = for {
+    domainId <- defaultAcsDomainIdF
+    dueSubscriptions <- multiDomainAcsStore.filterContractsOnDomain(
+      SubscriptionIdleState.COMPANION,
+      domainId,
+      filter = { e: Contract[?, SubscriptionIdleState] =>
+        now.toInstant.isAfter(e.payload.nextPaymentDueAt)
+      },
+    )
+    // Join with the CnsEntryContexts
+    subscriptionsWithContext <- dueSubscriptions.toList
+      .traverse { subscription =>
+        multiDomainAcsStore
+          .lookupContractByIdOnDomain(cn.cns.CnsEntryContext.COMPANION)(
+            domainId,
+            cn.cns.CnsEntryContext.ContractId.unsafeFromInterface(
+              subscription.payload.subscriptionData.context
+            ),
+          )
+          .map(context => (subscription, context))
+      }
+    // Only deliver the ones referencing an active cns entry context
+    result = subscriptionsWithContext
+      .sortBy(_._1.payload.nextPaymentDueAt)
+      .iterator
+      .collect { case (subscription, Some(context)) =>
+        SvSvcStore.IdleCnsSubscription(subscription, context)
+      }
+      .take(limit)
+      .toSeq
+  } yield result
 
   override def lookupSvOnboardingConfirmedByPartyOnDomain(svParty: PartyId, domainId: DomainId)(
       implicit tc: TraceContext
