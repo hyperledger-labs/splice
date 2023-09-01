@@ -100,7 +100,7 @@ function _cluster_apply() {
 
     VERSION_NUMBER=$(get-snapshot-version)
 
-    args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
+    local args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
           -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
 
     if [ -n "${IMAGE_TAG:-}" ]; then
@@ -112,6 +112,9 @@ function _cluster_apply() {
     else
         args+=(-c "FIXED_TOKENS=0")
     fi
+
+    _info "Applying Pulumi Infra Stack"
+    subcmd_infra_up
 
     _info "Applying Pulumi Stack"
 
@@ -1098,7 +1101,7 @@ function subcmd_pulumi() {
             ;;
     esac
 
-    args=(--cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}")
+    local args=(--cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}")
 
     case "${pulumi_cmd}" in
         whoami|org)
@@ -1158,7 +1161,7 @@ function subcmd_apply() {
         _warning "Overriding image tag: ${IMAGE_TAG} (was: ${VERSION_NUMBER})"
     fi
 
-    args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
+    local args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
           -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
 
     if [ -n "${IMAGE_TAG:-}" ]; then
@@ -1175,8 +1178,10 @@ function subcmd_apply() {
     _get_data_export_bucket_secret | subcmd_pulumi canton-network config set DATA_EXPORT_BUCKET_SA_KEY_JSON
 
     if [ -n "${preview:-}" ]; then
-        _info "Previewing apply."
         make -C "${REPO_ROOT}" cluster/helm/build -j
+        _info "Previewing apply for infra:"
+        subcmd_pulumi infra preview --show-sames --json "${args[@]}"
+        _info "Previewing apply for canton-network:"
         subcmd_pulumi canton-network preview --show-sames --json "${args[@]}"
     else
         _prompt_to_confirm
@@ -1193,6 +1198,7 @@ function subcmd_apply() {
             fi
         fi
 
+        subcmd_infra_up
         subcmd_pulumi canton-network up --yes --skip-preview "${args[@]}"
     fi
 }
@@ -1233,7 +1239,7 @@ function subcmd_apply_sv(){
         _error "Usage: $SCRIPTNAME apply_sv <target-domain-cluster> [<charts-version>]"
     fi
 
-    args=(-c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
+    local args=(-c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
     if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
         args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
     else
@@ -1268,7 +1274,7 @@ function subcmd_ci_apply_sv() {
         _error "This subcommand is available to CI jobs only."
     fi
 
-    args=(-c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
+    local args=(-c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
     if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
         args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
     else
