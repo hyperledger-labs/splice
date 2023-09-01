@@ -396,6 +396,8 @@ jobs:
                   cncluster wait sv-3 sv-web-ui
                   cncluster wait sv-4 validator-app
                   cncluster wait sv-4 sv-web-ui
+                  echo "Done waiting. All pods in the cluster are:"
+                  kubectl get pods -A
       - execute_sbt_command:
           pre_sbt_cmd: |
             set -eou pipefail
@@ -515,6 +517,9 @@ jobs:
                 cncluster wait_version $VERSION
                 cncluster wait sv validator-app
                 cncluster wait sv sv-web-ui
+                echo "Done waiting. All pods in the cluster are:"
+                kubectl get pods -A
+
       - run_bash_command_in_nix:
           cmd_name: Run SV preflight tests
           additional_nix_args: "--keep SV_DEV_NET_WEB_UI_PASSWORD \
