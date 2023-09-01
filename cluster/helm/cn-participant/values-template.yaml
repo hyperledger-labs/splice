@@ -21,3 +21,8 @@ participantAdminUserNameFrom:
     key: ledger-api-user
     name: cn-app-sv-ledger-api-auth
     optional: false
+
+metrics:
+  enable: false
+  release: prometheus-grafana-monitoring
+  interval: 30s

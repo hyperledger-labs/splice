@@ -70,6 +70,9 @@ export function installParticipant(
       postgresSchema: xns.logicalName + '_participant',
       participantAdminUserNameFrom,
       disableAutoInit,
+      metrics: {
+        enable: true,
+      },
     },
     dependsOn
   );
