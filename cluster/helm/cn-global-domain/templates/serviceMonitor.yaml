@@ -1,0 +1,44 @@
+{{- if .Values.metrics.enable }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    release: {{ .Values.metrics.release }}
+  name: sequencer
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpoints:
+
+  - port: metrics
+    interval: {{ .Values.metrics.interval }}
+
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-sequencer
+
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    release: {{ .Values.metrics.release }}
+  name: mediator
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpoints:
+
+  - port: metrics
+    interval: {{ .Values.metrics.interval }}
+
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-mediator
+
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+
+{{- end }}

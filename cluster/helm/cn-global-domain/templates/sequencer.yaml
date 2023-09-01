@@ -93,6 +93,8 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-sequencer
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}-sequencer
 spec:
   selector:
     app: {{ .Release.Name }}-sequencer

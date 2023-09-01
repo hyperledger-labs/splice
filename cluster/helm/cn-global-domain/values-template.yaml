@@ -12,3 +12,8 @@ resources:
 
 postgres: postgres.sv-1.svc.cluster.local
 postgresPassword: ""
+
+metrics:
+  enable: false
+  release: prometheus-grafana-monitoring
+  interval: 30s

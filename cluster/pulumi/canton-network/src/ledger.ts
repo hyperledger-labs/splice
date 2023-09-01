@@ -49,6 +49,9 @@ export function installGlobalDomain(
           maxBurstDuration: domainFeesConfig.maxBurstDuration,
         }
       : {},
+    metrics: {
+      enable: true,
+    },
   });
 }
 

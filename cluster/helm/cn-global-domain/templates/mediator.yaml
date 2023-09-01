@@ -48,6 +48,8 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-mediator
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}-mediator
 spec:
   selector:
     app: {{ .Release.Name }}-mediator
