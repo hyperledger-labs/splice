@@ -20,10 +20,13 @@ stdenv.mkDerivation {
     # Copy the specific folders to the output
     mkdir -p $out
     cp -R grafana/dashboards/Platform $out/platform
+    cp -R grafana/dashboards/Platform $out/filtered-platform
     cp -R grafana/dashboards/Participant $out/participant
+    cp -R grafana/dashboards/Participant $out/filtered-participant
     # Add the adhoc filter to all the dashboards
     # It has a default values set that filters out all the data to prevent running really expensive queries when we first load the dashboard
-    for file in $out/*/*.json; do
+    for file in $out/filtered-*/*.json; do
+        filtered_file=$(echo $file | sed s/.json/-filtered.json/)
         jq '.templating.list += [{
                     "datasource": {
                       "type": "prometheus",

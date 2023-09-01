@@ -5,9 +5,10 @@ import { Input } from '@pulumi/pulumi';
 
 const dashboardsPath = process.env.GRAFANA_DASHBOARDS;
 
-export function createGrafanaDashboards(namespace: Input<string>): void {
-  createConfigMapForFolder(namespace, 'platform');
-  createConfigMapForFolder(namespace, 'participant');
+export function createGrafanaDashboards(namespace: Input<string>, filtered: boolean): void {
+  const prefix = filtered ? 'filtered-' : '';
+  createConfigMapForFolder(namespace, `${prefix}platform`);
+  createConfigMapForFolder(namespace, `${prefix}participant`);
 }
 
 function createConfigMapForFolder(namespace: Input<string>, folder: string) {

@@ -2,6 +2,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { CLUSTER_DNS_NAME } from 'cn-pulumi-common';
 
+import { clusterBasename } from './config';
 import { createGrafanaDashboards } from './grafana-dashboards';
 
 function istioVirtualService(
@@ -146,5 +147,7 @@ export function configureObservability(): void {
 
   istioVirtualService(namespace, 'prometheus', 'prometheus-prometheus', 9090);
   istioVirtualService(namespace, 'grafana', 'grafana', 80);
-  createGrafanaDashboards(namespaceName);
+  // In the observability cluster, we install a version of the dashboards with a filter
+  // that prevents running expensive queries when the dashboard just loads
+  createGrafanaDashboards(namespaceName, clusterBasename == 'observability');
 }
