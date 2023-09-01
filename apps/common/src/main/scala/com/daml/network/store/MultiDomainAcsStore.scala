@@ -30,8 +30,9 @@ import com.daml.network.environment.ledger.api.{
 }
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.Contract.Companion.Interface
-import com.daml.network.util.{Contract, ContractWithState, AssignedContract, TemplateJsonDecoder}
+import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
 import com.daml.network.util.PrettyInstances.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.logging.NamedLogging
@@ -218,6 +219,10 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
 
   /** Get a snapshot of all contracts in the ACS encoded as JSON. */
   def getJsonAcsSnapshot(ignoredContracts: Set[Identifier]): Future[JsonAcsSnapshot]
+
+  /** Testing API: returns all contracts that have in-flight reassignments */
+  private[store] def listIncompleteReassignments()
+      : Future[Map[ContractId[_], NonEmpty[Set[ReassignmentId]]]]
 }
 
 object MultiDomainAcsStore {

@@ -357,6 +357,9 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   override def isReadyForAssign(contractId: ContractId[_], out: ReassignmentId): Future[Boolean] =
     ???
 
+  // TODO(#7398): Implement this
+  override private[store] def listIncompleteReassignments() = Future.successful(Map.empty)
+
   override def signalWhenIngestedOrShutdown(offset: String)(implicit
       tc: TraceContext
   ): Future[Unit] = {

@@ -559,14 +559,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   /** Testing APIs
     */
 
-  private[store] def contractStateEventsById: Future[Map[ContractId[_], ContractStateEvent]] =
-    Future.successful(
-      stateVar.contractStateEventsById.view
-        .mapValues(num => stateVar.contractStateEvents(num))
-        .toMap
-    )
-  private[store] def incompleteReassignmentsById
-      : Future[Map[ContractId[_], NonEmpty[Set[ReassignmentId]]]] =
+  override private[store] def listIncompleteReassignments() =
     Future.successful(stateVar.incompleteReassignmentsById)
 
   override def close(): Unit = ()

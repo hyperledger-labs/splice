@@ -1,6 +1,5 @@
 package com.daml.network.store.memory
 
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
 import com.daml.network.codegen.java.cn.wallet.payment.DeliveryOffer
 import com.daml.network.environment.RetryProvider
@@ -37,22 +36,6 @@ class InMemoryMultiDomainAcsStoreTest
       TestTxLogStoreParser,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )(actorSystem.dispatcher)
-
-  override def assertTestState(
-      contractStateEventsById: Map[ContractId[_], ContractStateEvent] = Map.empty,
-      incompleteTransfersById: Map[ContractId[_], NonEmpty[Set[ReassignmentId]]] = Map.empty,
-  )(implicit store: Store) =
-    for {
-      actualContractStateEventsById <- store.contractStateEventsById
-      actualIncompleteReassignmentsById <- store.incompleteReassignmentsById
-    } yield {
-      clue("contractStateEventsById") {
-        actualContractStateEventsById shouldBe contractStateEventsById
-      }
-      clue("incompleteTransfersById") {
-        actualIncompleteReassignmentsById shouldBe incompleteTransfersById
-      }
-    }
 
   "filter before limit" in {
     implicit val store = mkStore()
@@ -117,7 +100,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- d2.archive(c(1))
         _ <- assertLookupNone(c(1))
         _ <- assertList()
-        _ <- assertTestState()
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "assign before unassign" in {
@@ -135,7 +118,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- d2.archive(c(1))
         _ <- assertList()
         _ <- assertLookupNone(c(1))
-        _ <- assertTestState()
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "assign and archive before unassign" in {
@@ -153,7 +136,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- assertLookupNone(c(1))
         _ <- d1.unassign(c(1) -> d2, tf0, 1)
         _ <- assertList()
-        _ <- assertTestState()
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "assign before create" in {
@@ -171,7 +154,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- d2.archive(c(1))
         _ <- assertList()
         _ <- assertLookupNone(c(1))
-        _ <- assertTestState()
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "multiple early transfer ins" in {
@@ -199,7 +182,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- d3.archive(c(1))
         _ <- assertList()
         _ <- assertLookupNone(c(1))
-        _ <- assertTestState()
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "archive before create" in {
@@ -217,7 +200,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- assertList()
         _ <- d1.unassign(c(1) -> d2, tf0, 1)
         _ <- assertList()
-        _ <- assertTestState()
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "archive before assign" in {
@@ -239,7 +222,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- assertList()
         _ <- d2.unassign(c(1) -> d3, tf1, 2)
         _ <- assertList()
-        _ <- assertTestState()
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "incomplete unassign + assign" in {
@@ -256,7 +239,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- assertList(c(1) -> Some(d2))
         _ <- d2.archive(c(1))
         _ <- assertList()
-        _ <- assertTestState()
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "incomplete assign + unassign" in {
@@ -275,8 +258,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- assertList(c(1) -> Some(d2))
         _ <- d2.archive(c(1))
         _ <- assertList()
-        _ <- assertTestState(
-        )
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
 
@@ -290,12 +272,9 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- d1.assign(cFeatured(2) -> d2, tf1, 2)
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
-        _ <- assertTestState(
+        _ <- assertIncompleteReassignments(
           // We've not yet seen the unassign
-          contractStateEventsById = Map(
-            c(1).contractId -> ContractStateEvent(c(1).contractId, 1, StoreContractState.Archived)
-          ),
-          incompleteTransfersById = Map(c(1).contractId -> NonEmpty(Set, ReassignmentId(d2, tf0))),
+          Map(c(1).contractId -> NonEmpty(Set, ReassignmentId(d2, tf0)))
         )
       } yield succeed
     }
@@ -306,7 +285,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- acs()
         _ <- d1.create(cFeatured(1))
         _ <- d1.unassign(c(1) -> d2, tf0, 1)
-        _ <- assertTestState()
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "filtering of incomplete unassigns" in {
@@ -316,8 +295,7 @@ class InMemoryMultiDomainAcsStoreTest
         _ <- acs(
           incompleteOut = Seq((cFeatured(1), d1, d2, tf0, 1L))
         )
-        _ <- assertTestState(
-        )
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "stream transfers and report stale transfers" in {

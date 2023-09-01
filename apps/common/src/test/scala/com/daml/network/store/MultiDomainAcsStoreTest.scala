@@ -14,7 +14,6 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.topology.DomainId
 import com.google.protobuf
-import org.scalatest.Assertion
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
@@ -78,10 +77,16 @@ abstract class MultiDomainAcsStoreTest[
   protected type C = Contract[AppRewardCoupon.ContractId, AppRewardCoupon]
   protected type CReady = AssignedContract[AppRewardCoupon.ContractId, AppRewardCoupon]
 
-  protected def assertTestState(
-      contractStateEventsById: Map[ContractId[_], ContractStateEvent] = Map.empty,
-      incompleteTransfersById: Map[ContractId[_], NonEmpty[Set[ReassignmentId]]] = Map.empty,
-  )(implicit store: Store): Future[Assertion]
+  protected def assertIncompleteReassignments(
+      incompleteReassignmentsById: Map[ContractId[_], NonEmpty[Set[ReassignmentId]]] = Map.empty
+  )(implicit store: Store) =
+    for {
+      actualIncompleteReassignmentsById <- store.listIncompleteReassignments()
+    } yield {
+      clue("incompleteTransfersById") {
+        actualIncompleteReassignmentsById shouldBe incompleteReassignmentsById
+      }
+    }
 
   protected def assertList(
       expected: (C, Option[DomainId])*
@@ -209,7 +214,7 @@ abstract class MultiDomainAcsStoreTest[
         _ <- d1.archive(c(2))
         _ <- assertLookupNone(c(2))
         _ <- assertList()
-        _ <- assertTestState()
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "throws if the store primary party is not a stakeholder of the created event" in {
@@ -260,7 +265,7 @@ abstract class MultiDomainAcsStoreTest[
         _ <- d1.archive(c(1))
         _ <- assertLookupNone(c(1))
         _ <- assertList()
-        _ <- assertTestState()
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
 
@@ -272,7 +277,7 @@ abstract class MultiDomainAcsStoreTest[
         )
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
-        _ <- assertTestState()
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "filtering of create" in {
@@ -283,7 +288,7 @@ abstract class MultiDomainAcsStoreTest[
         _ <- d1.create(cFeatured(2))
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
-        _ <- assertTestState()
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "signals offsets as ingestion progresses" in {
