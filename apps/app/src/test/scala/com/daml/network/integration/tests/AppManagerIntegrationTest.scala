@@ -1,7 +1,5 @@
 package com.daml.network.integration.tests
 
-import akka.Done
-import akka.actor.CoordinatedShutdown
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.client.RequestBuilding.{Options, Post}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, StatusCodes, Uri}
@@ -310,11 +308,8 @@ class AppManagerIntegrationTest
 
     "json api proxy sets CORS headers" in { implicit env =>
       implicit val sys = env.actorSystem
-      implicit val ec = env.executionContext
-      CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
-        () =>
-          Http().shutdownAllConnectionPools().map(_ => Done)
-      }
+      registerHttpConnectionPoolsCleanup(env)
+
       val preflight =
         Options(s"${aliceValidatorBackend.config.appManager.value.appManagerApiUrl}/v1/user")
           .withHeaders(
@@ -341,13 +336,10 @@ class AppManagerIntegrationTest
     }
     "json api proxy is setup correctly" in { implicit env =>
       implicit val sys = env.actorSystem
-      implicit val ec = env.executionContext
       // We don't expose the full proxy through the ValidatorReference since it just adds a bunch of boilerplate
       // with little benefit so instead we just make the one request for testing manually here.
-      CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
-        () =>
-          Http().shutdownAllConnectionPools().map(_ => Done)
-      }
+      registerHttpConnectionPoolsCleanup(env)
+
       val getUser =
         Post(s"${aliceValidatorBackend.config.appManager.value.appManagerApiUrl}/v1/user")
           .withEntity(
@@ -377,11 +369,8 @@ class AppManagerIntegrationTest
     "app manager admin API auth is setup correctly" in { implicit env =>
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       implicit val sys = env.actorSystem
-      implicit val ec = env.executionContext
-      CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
-        () =>
-          Http().shutdownAllConnectionPools().map(_ => Done)
-      }
+      registerHttpConnectionPoolsCleanup(env)
+
       val splitwell = splitwellValidatorBackend.listRegisteredApps().loneElement
       val request = Post(s"${aliceValidatorBackend.httpClientConfig.url}/app-manager/apps/install")
         .withEntity(
@@ -420,11 +409,8 @@ class AppManagerIntegrationTest
     "app manager user API auth is setup correctly" in { implicit env =>
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       implicit val sys = env.actorSystem
-      implicit val ec = env.executionContext
-      CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
-        () =>
-          Http().shutdownAllConnectionPools().map(_ => Done)
-      }
+      registerHttpConnectionPoolsCleanup(env)
+
       val splitwell = splitwellValidatorBackend.listRegisteredApps().loneElement
       aliceValidatorBackend.installApp(splitwell.appUrl)
       val request = Post(

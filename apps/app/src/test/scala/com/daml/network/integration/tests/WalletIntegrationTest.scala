@@ -1,7 +1,5 @@
 package com.daml.network.integration.tests
 
-import akka.Done
-import akka.actor.CoordinatedShutdown
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCodes}
 import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
@@ -241,10 +239,8 @@ class WalletIntegrationTest
 
     "reject HS256 JWTs with invalid signatures" in { implicit env =>
       implicit val sys = env.actorSystem
-      CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
-        () =>
-          Http().shutdownAllConnectionPools().map(_ => Done)
-      }
+      registerHttpConnectionPoolsCleanup(env)
+
       import com.auth0.jwt.JWT
       import com.auth0.jwt.algorithms.Algorithm
 
@@ -271,10 +267,7 @@ class WalletIntegrationTest
 
     "reject HS256 JWTs with invalid audiences" in { implicit env =>
       implicit val sys = env.actorSystem
-      CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
-        () =>
-          Http().shutdownAllConnectionPools().map(_ => Done)
-      }
+      registerHttpConnectionPoolsCleanup(env)
 
       import com.auth0.jwt.JWT
 

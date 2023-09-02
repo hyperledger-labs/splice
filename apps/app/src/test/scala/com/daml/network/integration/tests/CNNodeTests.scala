@@ -1,6 +1,8 @@
 package com.daml.network.integration.tests
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, CoordinatedShutdown}
+import akka.Done
+import akka.http.scaladsl.Http
 import com.auth0.exception.Auth0Exception
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.auth.AuthUtil
@@ -355,6 +357,17 @@ object CNNodeTests {
     protected def startAllSync(nodes: CNNodeAppBackendReference*): Unit = {
       nodes.foreach(_.start())
       nodes.foreach(_.waitForInitialization())
+    }
+
+    def registerHttpConnectionPoolsCleanup(implicit
+        env: TestEnvironment[CNNodeEnvironmentImpl]
+    ): Unit = {
+      implicit val sys = env.actorSystem
+      implicit val ec = env.executionContext
+      CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
+        () =>
+          Http().shutdownAllConnectionPools().map(_ => Done)
+      }
     }
   }
 

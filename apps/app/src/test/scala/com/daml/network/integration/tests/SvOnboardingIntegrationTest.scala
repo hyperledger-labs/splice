@@ -1,7 +1,5 @@
 package com.daml.network.integration.tests
 
-import akka.Done
-import akka.actor.CoordinatedShutdown
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.client.RequestBuilding.Get
 import akka.http.scaladsl.model.StatusCodes
@@ -32,11 +30,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     sv1Backend.startSync()
 
     implicit val sys = env.actorSystem
-    implicit val ec = env.executionContext
-    CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
-      () =>
-        Http().shutdownAllConnectionPools().map(_ => Done)
-    }
+    registerHttpConnectionPoolsCleanup(env)
 
     val registerGet = Get(s"${sv1Backend.httpClientConfig.url}/admin/authorization")
 

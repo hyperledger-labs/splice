@@ -1,7 +1,5 @@
 package com.daml.network.integration.tests
 
-import akka.Done
-import akka.actor.CoordinatedShutdown
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.client.RequestBuilding.{Get, Post}
 import akka.http.scaladsl.model.StatusCodes
@@ -129,11 +127,8 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     aliceValidatorBackend.startSync()
 
     implicit val sys = env.actorSystem
-    implicit val ec = env.executionContext
-    CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
-      () =>
-        Http().shutdownAllConnectionPools().map(_ => Done)
-    }
+    registerHttpConnectionPoolsCleanup(env)
+
     val registerPost = Post(s"${aliceValidatorBackend.httpClientConfig.url}/register")
     def tokenHeader(token: String) = Seq(Authorization(OAuth2BearerToken(token)))
 
@@ -171,11 +166,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     aliceValidatorBackend.startSync()
 
     implicit val sys = env.actorSystem
-    implicit val ec = env.executionContext
-    CoordinatedShutdown(sys).addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "cleanup") {
-      () =>
-        Http().shutdownAllConnectionPools().map(_ => Done)
-    }
+    registerHttpConnectionPoolsCleanup(env)
 
     val listUsersGet = Get(s"${aliceValidatorBackend.httpClientConfig.url}/admin/users")
 
