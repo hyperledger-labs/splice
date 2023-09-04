@@ -6,7 +6,7 @@ paths:
   /status:
     get:
       tags: [common]
-      x-jvm-package: external.commonAdmin
+      x-jvm-package: external.common_admin
       operationId: "getHealthStatus"
       responses:
         "200":
@@ -18,7 +18,7 @@ paths:
   /version:
     get:
       tags: [common]
-      x-jvm-package: external.commonAdmin
+      x-jvm-package: external.common_admin
       operationId: "getVersion"
       responses:
         "200":
@@ -30,7 +30,7 @@ paths:
   /readyz:
     get:
       tags: [common]
-      x-jvm-package: external.commonAdmin
+      x-jvm-package: external.common_admin
       operationId: "isReady"
       responses:
         "200":
@@ -40,7 +40,7 @@ paths:
   /livez:
     get:
       tags: [common]
-      x-jvm-package: external.commonAdmin
+      x-jvm-package: external.common_admin
       operationId: "isLive"
       responses:
         "200":

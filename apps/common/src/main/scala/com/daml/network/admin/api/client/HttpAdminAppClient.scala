@@ -7,7 +7,7 @@ import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.environment.CNNodeStatus
 import com.daml.network.http.v0.definitions
-import com.daml.network.http.v0.external.commonAdmin as externalHttp
+import com.daml.network.http.v0.external.common_admin as externalHttp
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.tracing.TraceContext

@@ -17,7 +17,7 @@ import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus}
 import com.daml.network.http.v0.directory.DirectoryResource
-import com.daml.network.http.v0.external.commonAdmin.CommonAdminResource
+import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor

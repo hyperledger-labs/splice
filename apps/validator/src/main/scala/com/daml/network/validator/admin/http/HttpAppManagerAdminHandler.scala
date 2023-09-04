@@ -7,7 +7,7 @@ import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
-import com.daml.network.http.v0.{appManagerAdmin as v0, definitions}
+import com.daml.network.http.v0.{app_manager_admin as v0, definitions}
 import com.daml.network.validator.store.AppManagerStore
 import com.daml.network.validator.util.{DarUtil, HttpUtil}
 import com.daml.network.util.UploadablePackage

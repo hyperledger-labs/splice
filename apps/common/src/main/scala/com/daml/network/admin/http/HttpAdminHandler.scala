@@ -2,7 +2,7 @@ package com.daml.network.admin.http
 
 import com.daml.network.environment.{BuildInfo, CNNodeStatus}
 import com.daml.network.http.v0.definitions
-import com.daml.network.http.v0.external.commonAdmin as v0
+import com.daml.network.http.v0.external.common_admin as v0
 import com.digitalasset.canton.health.admin.data
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning

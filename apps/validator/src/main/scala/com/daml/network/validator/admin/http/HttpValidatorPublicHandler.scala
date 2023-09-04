@@ -1,6 +1,6 @@
 package com.daml.network.validator.admin.http
 
-import com.daml.network.http.v0.{definitions, validatorPublic as v0}
+import com.daml.network.http.v0.{definitions, validator_public as v0}
 import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning

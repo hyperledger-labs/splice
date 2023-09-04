@@ -2,7 +2,7 @@ package com.daml.network.validator.admin.http
 
 import akka.http.scaladsl.model.Uri
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.http.v0.{definitions, appManager as v0}
+import com.daml.network.http.v0.{definitions, app_manager as v0}
 import com.daml.network.validator.config.AppManagerConfig
 import com.daml.network.validator.store.AppManagerStore
 import com.daml.network.validator.store.AppManagerStore.AppConfiguration

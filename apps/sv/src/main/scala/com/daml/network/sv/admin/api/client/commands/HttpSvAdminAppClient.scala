@@ -14,8 +14,8 @@ import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.CNNodeStatus
 import com.daml.network.http.v0.definitions.CometBftNodeDumpResponse
-import com.daml.network.http.v0.svAdmin.GetCometBftNodeDebugDumpResponse
-import com.daml.network.http.v0.{definitions, svAdmin as http}
+import com.daml.network.http.v0.sv_admin.GetCometBftNodeDebugDumpResponse
+import com.daml.network.http.v0.{definitions, sv_admin as http}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.ErrorLoggingContext

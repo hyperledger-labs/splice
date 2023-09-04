@@ -4,7 +4,7 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.http.v0.validatorAdmin as http
+import com.daml.network.http.v0.validator_admin as http
 import com.daml.network.http.v0.definitions.OnboardUserRequest
 import com.daml.network.util.{Codec, ParticipantIdentitiesDump, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId

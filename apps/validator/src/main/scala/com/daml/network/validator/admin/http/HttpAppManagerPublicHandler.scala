@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.HttpClientBuilder
 import com.daml.network.environment.{BaseAppConnection, ParticipantAdminConnection}
-import com.daml.network.http.v0.{appManagerPublic as v0, definitions}
+import com.daml.network.http.v0.{app_manager_public as v0, definitions}
 import com.daml.network.validator.config.AppManagerConfig
 import com.daml.network.validator.store.AppManagerStore
 import com.daml.network.validator.util.OAuth2Manager

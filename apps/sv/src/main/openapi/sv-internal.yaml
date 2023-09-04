@@ -12,7 +12,7 @@ paths:
   /admin/validator/onboarding/ongoing:
     get:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "listOngoingValidatorOnboardings"
       responses:
         "200":
@@ -24,7 +24,7 @@ paths:
   /admin/validator/onboarding/prepare:
     post:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "prepareValidatorOnboarding"
       requestBody:
         required: true
@@ -44,7 +44,7 @@ paths:
   /admin/validator/licenses:
     get:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "listValidatorLicenses"
       responses:
         "200":
@@ -77,7 +77,7 @@ paths:
   /admin/domain/cometbft/debug:
     get:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "getCometBftNodeDebugDump"
       responses:
         "200":
@@ -97,7 +97,7 @@ paths:
   /admin/domain/sequencer/status:
     get:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "getSequencerNodeStatus"
       responses:
         "200":
@@ -115,7 +115,7 @@ paths:
   /admin/domain/mediator/status:
     get:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "getMediatorNodeStatus"
       responses:
         "200":
@@ -133,7 +133,7 @@ paths:
   /admin/sv/identity/approve:
     post:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "approveSvIdentity"
       requestBody:
         required: true
@@ -149,7 +149,7 @@ paths:
   /admin/sv/voterequests:
     get:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "listSvcRulesVoteRequests"
       responses:
         "200":
@@ -161,7 +161,7 @@ paths:
   /admin/sv/voterequests/{vote_request_contract_id}:
     get:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "lookupSvcRulesVoteRequest"
       parameters:
         - name: "vote_request_contract_id"
@@ -185,7 +185,7 @@ paths:
   /admin/sv/electionrequests/create:
     post:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "createElectionRequest"
       requestBody:
         required: true
@@ -201,7 +201,7 @@ paths:
   /admin/sv/electionrequests/get:
     get:
       tags: [ sv ]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "getElectionRequest"
       responses:
         "200":
@@ -215,7 +215,7 @@ paths:
   /admin/sv/votes:
     post:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "castVote"
       requestBody:
         required: true
@@ -230,7 +230,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
     put:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "updateVote"
       requestBody:
         required: true
@@ -252,7 +252,7 @@ paths:
   /admin/sv/votes-by-request-ids:
     post:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "BatchListVotesByVoteRequests"
       requestBody:
         required: true
@@ -270,7 +270,7 @@ paths:
   /admin/sv/voterequest/create:
     post:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "createVoteRequest"
       requestBody:
         required: true
@@ -286,7 +286,7 @@ paths:
   /admin/sv/coin-price/votes:
     get:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "ListCoinPriceVotes"
       responses:
         "200":
@@ -298,7 +298,7 @@ paths:
   /admin/sv/open-mining-rounds:
     get:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "ListOpenMiningRounds"
       responses:
         "200":
@@ -310,7 +310,7 @@ paths:
   /admin/sv/coin-price/vote:
     put:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "UpdateCoinPriceVote"
       requestBody:
         required: true
@@ -326,7 +326,7 @@ paths:
   /svc/trigger-acs-store-dump:
     post:
       tags: [ sv ]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "TriggerAcsDump"
       responses:
         "200":
@@ -340,7 +340,7 @@ paths:
   /svc/get-acs-store-dump:
     get:
       tags: [ sv ]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "GetAcsStoreDump"
       responses:
         "200":
@@ -354,7 +354,7 @@ paths:
   /admin/authorization:
     get:
       tags: [sv]
-      x-jvm-package: svAdmin
+      x-jvm-package: sv_admin
       operationId: "isAuthorized"
       responses:
         "200":

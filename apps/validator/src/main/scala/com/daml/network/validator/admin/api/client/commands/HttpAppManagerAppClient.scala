@@ -4,7 +4,7 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.http.v0.appManager as http
+import com.daml.network.http.v0.app_manager as http
 import com.daml.network.http.v0.definitions
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.topology.PartyId

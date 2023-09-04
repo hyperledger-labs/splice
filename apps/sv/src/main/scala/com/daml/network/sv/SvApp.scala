@@ -22,9 +22,9 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
-import com.daml.network.http.v0.external.commonAdmin.CommonAdminResource
+import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
-import com.daml.network.http.v0.svAdmin.SvAdminResource
+import com.daml.network.http.v0.sv_admin.SvAdminResource
 import com.daml.network.setup.ParticipantInitializer
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}

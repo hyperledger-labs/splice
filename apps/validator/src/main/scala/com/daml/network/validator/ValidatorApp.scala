@@ -19,14 +19,14 @@ import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
-import com.daml.network.http.v0.appManager.AppManagerResource
-import com.daml.network.http.v0.appManagerAdmin.AppManagerAdminResource
-import com.daml.network.http.v0.appManagerPublic.AppManagerPublicResource
-import com.daml.network.http.v0.external.commonAdmin.CommonAdminResource
+import com.daml.network.http.v0.app_manager.AppManagerResource
+import com.daml.network.http.v0.app_manager_admin.AppManagerAdminResource
+import com.daml.network.http.v0.app_manager_public.AppManagerPublicResource
+import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.external.wallet.WalletResource as ExternalWalletResource
 import com.daml.network.http.v0.validator.ValidatorResource
-import com.daml.network.http.v0.validatorAdmin.ValidatorAdminResource
-import com.daml.network.http.v0.validatorPublic.ValidatorPublicResource
+import com.daml.network.http.v0.validator_admin.ValidatorAdminResource
+import com.daml.network.http.v0.validator_public.ValidatorPublicResource
 import com.daml.network.http.v0.wallet.WalletResource as InternalWalletResource
 import com.daml.network.scan.admin.api.client.{ScanConnection, MinimalScanConnection}
 import com.daml.network.scan.config.ScanAppClientConfig

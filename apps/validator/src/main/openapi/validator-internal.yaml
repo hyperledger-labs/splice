@@ -11,8 +11,8 @@ paths:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
   /validator-user:
     get:
-      tags: [validatorPublic]
-      x-jvm-package: validatorPublic
+      tags: [validator_public]
+      x-jvm-package: validator_public
       operationId: "getValidatorUserInfo"
       responses:
         "200":
@@ -42,7 +42,7 @@ paths:
   /admin/users:
     post:
       tags: [validator]
-      x-jvm-package: validatorAdmin
+      x-jvm-package: validator_admin
       operationId: "onboardUser"
       requestBody:
         required: true
@@ -60,7 +60,7 @@ paths:
 
     get:
       tags: [validator]
-      x-jvm-package: validatorAdmin
+      x-jvm-package: validator_admin
       operationId: "listUsers"
       responses:
         "200":
@@ -73,7 +73,7 @@ paths:
   /admin/users/offboard:
     post:
       tags: [validator]
-      x-jvm-package: validatorAdmin
+      x-jvm-package: validator_admin
       operationId: "offboardUser"
       parameters:
         - in: query
@@ -90,7 +90,7 @@ paths:
   /admin/participant/identities:
     get:
       tags: [validator]
-      x-jvm-package: validatorAdmin
+      x-jvm-package: validator_admin
       operationId: "dumpParticipantIdentities"
       responses:
         "200":
@@ -102,8 +102,8 @@ paths:
 
   /app-manager/apps/installed/{provider}/authorize:
     post:
-      tags: [appManager]
-      x-jvm-package: appManager
+      tags: [app_manager]
+      x-jvm-package: app_manager
       operationId: "authorizeApp"
       parameters:
         - in: path
@@ -119,8 +119,8 @@ paths:
 
   /app-manager/apps/installed/{provider}/check-authorizization:
     post:
-      tags: [appManager]
-      x-jvm-package: appManager
+      tags: [app_manager]
+      x-jvm-package: app_manager
       operationId: "checkAppAuthorized"
       parameters:
         - in: path
@@ -154,8 +154,8 @@ paths:
 
   /app-manager/apps/installed/{provider}/approve-release-config:
     post:
-      tags: [appManagerAdmin]
-      x-jvm-package: appManagerAdmin
+      tags: [app_manager_admin]
+      x-jvm-package: app_manager_admin
       operationId: "approveAppReleaseConfiguration"
       parameters:
         - in: path
@@ -179,8 +179,8 @@ paths:
 
   /app-manager/oauth2/.well-known/openid-configuration:
     get:
-      tags: [appManagerPublic]
-      x-jvm-package: appManagerPublic
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
       operationId: "oauth2OpenIDConfiguration"
       responses:
         "200":
@@ -191,8 +191,8 @@ paths:
                 "$ref": "#/components/schemas/OpenIDConfigurationResponse"
   /app-manager/oauth2/.well-known/jwks.json:
     get:
-      tags: [appManagerPublic]
-      x-jvm-package: appManagerPublic
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
       operationId: "oauth2Jwks"
       responses:
         "200":
@@ -203,8 +203,8 @@ paths:
                 "$ref": "#/components/schemas/JwksResponse"
   /app-manager/oauth2/token:
     post:
-      tags: [appManagerPublic]
-      x-jvm-package: appManagerPublic
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
       operationId: "oauth2Token"
       requestBody:
         required: true
@@ -238,8 +238,8 @@ paths:
 
   /app-manager/apps/installed:
     get:
-      tags: [appManager]
-      x-jvm-package: appManager
+      tags: [app_manager]
+      x-jvm-package: app_manager
       operationId: "listInstalledApps"
       responses:
         "200":
@@ -250,8 +250,8 @@ paths:
                 "$ref": "#/components/schemas/ListInstalledAppsResponse"
   /app-manager/apps/install:
     post:
-      tags: [appManagerAdmin]
-      x-jvm-package: appManagerAdmin
+      tags: [app_manager_admin]
+      x-jvm-package: app_manager_admin
       operationId: "installApp"
       requestBody:
         required: true
@@ -267,8 +267,8 @@ paths:
 
   /app-manager/apps/registered:
     get:
-      tags: [appManager]
-      x-jvm-package: appManager
+      tags: [app_manager]
+      x-jvm-package: app_manager
       operationId: "listRegisteredApps"
       responses:
         "200":
@@ -279,8 +279,8 @@ paths:
                 "$ref": "#/components/schemas/ListRegisteredAppsResponse"
   /app-manager/apps/registered/{provider}/configuration/latest/configuration.json:
     get:
-      tags: [appManagerPublic]
-      x-jvm-package: appManagerPublic
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
       operationId: "getLatestAppConfiguration"
       parameters:
         - name: provider
@@ -299,8 +299,8 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /app-manager/apps/registered/{provider}/release/{version}/release.json:
     get:
-      tags: [appManagerPublic]
-      x-jvm-package: appManagerPublic
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
       operationId: "getAppRelease"
       parameters:
         - name: provider
@@ -324,8 +324,8 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /app-manager/apps/registered/{provider}/publish-release:
     post:
-      tags: [appManagerAdmin]
-      x-jvm-package: appManagerAdmin
+      tags: [app_manager_admin]
+      x-jvm-package: app_manager_admin
       operationId: "publishAppRelease"
       parameters:
         - name: provider
@@ -353,8 +353,8 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
   /app-manager/apps/registered/{provider}/update-configuration:
     post:
-      tags: [appManagerAdmin]
-      x-jvm-package: appManagerAdmin
+      tags: [app_manager_admin]
+      x-jvm-package: app_manager_admin
       operationId: "updateAppConfiguration"
       parameters:
         - name: provider
@@ -379,8 +379,8 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
   /app-manager/dars/{dar_hash}:
     get:
-      tags: [appManagerPublic]
-      x-jvm-package: appManagerPublic
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
       operationId: "getDarFile"
       parameters:
         - name: dar_hash
@@ -399,8 +399,8 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /app-manager/apps/register:
     post:
-      tags: [appManagerAdmin]
-      x-jvm-package: appManagerAdmin
+      tags: [app_manager_admin]
+      x-jvm-package: app_manager_admin
       operationId: "registerApp"
       requestBody:
         content:
@@ -436,8 +436,8 @@ paths:
   # harder to build the proxy because we need to do a URL rewrite.
   /v1/user:
     post:
-      tags: [appManagerPublic]
-      x-jvm-package: appManagerPublic
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
       operationId: "jsonApiUser"
       parameters:
         - in: header
@@ -460,8 +460,8 @@ paths:
                 type: object
   /v1/query:
     post:
-      tags: [appManagerPublic]
-      x-jvm-package: appManagerPublic
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
       operationId: "jsonApiQuery"
       parameters:
         - in: header
@@ -484,8 +484,8 @@ paths:
                 type: object
   /v1/create:
     post:
-      tags: [appManagerPublic]
-      x-jvm-package: appManagerPublic
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
       operationId: "jsonApiCreate"
       parameters:
         - in: header
@@ -508,8 +508,8 @@ paths:
                 type: object
   /v1/exercise:
     post:
-      tags: [appManagerPublic]
-      x-jvm-package: appManagerPublic
+      tags: [app_manager_public]
+      x-jvm-package: app_manager_public
       operationId: "jsonApiExercise"
       parameters:
         - in: header
