@@ -23,6 +23,7 @@ spec:
       containers:
         - name: {{ $fullName }}
           image: "{{ $.Values.imageRepo }}/{{ $.Values.imageName }}:{{ $.Values.cluster.imageTag }}"
+          imagePullPolicy: Always
           ports:
             - name: p2p
               containerPort: {{ .p2pPort }}
