@@ -3,6 +3,7 @@ package com.daml.network.sv.store
 import cats.implicits.toTraverseOps
 import com.daml.ledger.javaapi.data as javab
 import com.daml.ledger.javaapi.data.Identifier
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cc.coin.{CoinRules_MiningRound_Archive, UnclaimedReward}
@@ -23,15 +24,17 @@ import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{JsonAcsSnapshot, QueryResult}
+import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.sv.config.{SvAppBackendConfig, SvDomainConfig}
 import com.daml.network.sv.store.SvSvcStore.ignoredContractsForAcsDump
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract, TemplateJsonDecoder}
+import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -46,7 +49,14 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 
 /* Store used by the SV app for filtering contracts visible to the SVC party. */
-trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomain {
+trait SvSvcStore
+    extends CNNodeAppStoreWithHistory[
+      SvcTxLogParser.TxLogIndexRecord,
+      SvcTxLogParser.TxLogEntry,
+    ]
+    with ConfiguredDefaultDomain {
+
+  override protected def txLogParser = new SvcTxLogParser(loggerFactory)
 
   protected val outerLoggerFactory: NamedLoggerFactory
 
@@ -70,6 +80,43 @@ trait SvSvcStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDoma
   ] = multiDomainAcsStore
     .findAnyContractWithOffset(cn.svcrules.SvcRules.COMPANION)
     .map(_.map(_.flatMap(_.toAssignedContract)))
+
+  def listVoteResults(actionName: Option[String], executed: Option[Boolean], limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]]
+
+  protected def loadTxLogEntry(
+      txLogReader: TxLogStore.Reader[SvcTxLogParser.TxLogIndexRecord, SvcTxLogParser.TxLogEntry],
+      eventId: String,
+      domainId: DomainId,
+      acsContractId: Option[ContractId[?]],
+      dbType: String3,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[SvcTxLogParser.TxLogEntry] =
+    txLogReader.loadTxLogEntry(eventId, domainId, acsContractId, filterUnique(dbType))
+
+  protected def filterUnique(dbType: String3)(
+      entries: Seq[SvcTxLogParser.TxLogEntry],
+      eventId: String,
+  ): SvcTxLogParser.TxLogEntry = {
+    val res = entries.filter(e =>
+      e.indexRecord.eventId == eventId && e.indexRecord.companion.dbType == dbType
+    )
+    res match {
+      case entry +: Seq() =>
+        entry
+      case Seq() =>
+        throw new IllegalStateException(
+          s"SvcStore.filterUnique did not return any entry for event $eventId and dbType $dbType. "
+        )
+      case x =>
+        throw new IllegalStateException(
+          s"SvcStore.filterUnique returned ${x.size} entries for event $eventId and dbType $dbType."
+        )
+    }
+  }
 
   def lookupSvcRules()(implicit
       tc: TraceContext
@@ -786,12 +833,14 @@ object SvSvcStore {
       storage: Storage,
       config: SvAppBackendConfig,
       loggerFactory: NamedLoggerFactory,
+      connection: CNLedgerConnection,
       retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
-  ): SvSvcStore =
+  ): SvSvcStore = {
+    val treeSource = TransactionTreeSource.LedgerConnection(key.svcParty, connection)
     storage match {
       case _: MemoryStorage =>
         new InMemorySvSvcStore(
@@ -800,6 +849,7 @@ object SvSvcStore {
           config.enableCoinRulesUpgrade,
           loggerFactory,
           retryProvider,
+          treeSource,
         )
       case db: DbStorage =>
         new DbSvSvcStore(
@@ -809,8 +859,10 @@ object SvSvcStore {
           config.enableCoinRulesUpgrade,
           loggerFactory,
           retryProvider,
+          treeSource,
         )
     }
+  }
 
   val ignoredContractsForAcsDump: Set[Identifier] = Set(
     // Note: these three kinds of contracts are not included in an ACS dump due to the ExpireUnclaimedRewards trigger

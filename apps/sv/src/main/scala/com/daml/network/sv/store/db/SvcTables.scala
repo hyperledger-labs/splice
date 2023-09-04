@@ -8,9 +8,11 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.store.db.AcsTables
+import com.daml.network.sv.store.SvcTxLogParser
 import com.daml.network.util.{CNNodeUtil, Contract}
+import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{Member, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import spray.json.JsValue
 
 object SvcTables extends AcsTables with NamedLogging {
@@ -283,6 +285,47 @@ object SvcTables extends AcsTables with NamedLogging {
           }
         case t =>
           Left(s"Template $t cannot be decoded as an entry for the SVC store.")
+      }
+    }
+  }
+
+  case class SvcTxLogRowData(
+      eventId: String,
+      offset: Option[String],
+      domainId: DomainId,
+      indexRecordType: String3,
+      actionName: Option[String],
+      executed: Option[Boolean],
+  )
+
+  object SvcTxLogRowData {
+
+    def fromTxLogIndexRecord(record: SvcTxLogParser.TxLogIndexRecord): SvcTxLogRowData = {
+      record match {
+        case err @ SvcTxLogParser.TxLogIndexRecord.ErrorIndexRecord(offset, eventId, domainId) =>
+          SvcTxLogRowData(
+            eventId = eventId,
+            offset = Some(offset),
+            domainId = domainId,
+            indexRecordType = err.companion.dbType,
+            actionName = None,
+            executed = None,
+          )
+        case dv @ SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord(
+              offset,
+              eventId,
+              domainId,
+              actionName,
+              executed,
+            ) =>
+          SvcTxLogRowData(
+            eventId = eventId,
+            offset = Some(offset),
+            domainId = domainId,
+            indexRecordType = dv.companion.dbType,
+            actionName = Some(actionName),
+            executed = Some(executed),
+          )
       }
     }
   }

@@ -121,7 +121,6 @@ class ScanTxLogParser(
       tc: TraceContext
   ): Seq[ScanTxLogParser.TxLogEntry] = {
     val ret = parseTrees(tx, domain, tx.getRootEventIds.asScala.toList).entries
-    logger.debug(s"Extracted log entries: ${ret}")
     ret
   }
 

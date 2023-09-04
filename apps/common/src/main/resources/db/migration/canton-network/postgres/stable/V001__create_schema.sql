@@ -551,3 +551,31 @@ create index svc_acs_store_sid_tid_sccid
 create index svc_acs_store_sid_tid_snpd
     on svc_acs_store (store_id, template_id, subscription_next_payment_due_at)
     where subscription_next_payment_due_at is not null;
+
+create table svc_txlog_store
+(
+    like txlog_store_template including all,
+
+    -- reestablish foreign key constraint as that one is not copied by the LIKE statement above
+    foreign key (store_id) references store_descriptors (id),
+
+    -- index columns
+    ----------------
+
+    -- defines what type of index record this row represents.
+    -- parent traits (e.g. DefiniteVoteIndexRecord) are *not* present in the DB, only their subclasses
+    index_record_type                                        text not null,
+
+    unique (store_id, event_id, index_record_type),
+
+    -- actionName is an index of DefiniteVoteIndexRecord
+    action_name                                              text,
+
+    -- executed is an index of DefiniteVoteIndexRecord
+    executed                                                 boolean
+);
+
+create index svc_txlog_store_sid_irt_r_en
+    on svc_txlog_store (store_id, index_record_type, action_name, executed desc)
+    where svc_txlog_store.action_name is not null and executed is not null;
+

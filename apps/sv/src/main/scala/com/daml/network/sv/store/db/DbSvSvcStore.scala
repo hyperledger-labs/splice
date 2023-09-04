@@ -20,12 +20,13 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   SubscriptionInitialPayment,
 }
 import com.daml.network.environment.RetryProvider
+import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.store.{AcsStoreDump, Limit, LimitHelpers, MultiDomainAcsStore}
 import com.daml.network.sv.config.SvDomainConfig
-import com.daml.network.sv.store.db.SvcTables.SvcAcsStoreRowData
-import com.daml.network.sv.store.{SvStore, SvSvcStore}
+import com.daml.network.sv.store.db.SvcTables.{SvcAcsStoreRowData, SvcTxLogRowData}
+import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
 import com.daml.network.util.Contract.Companion.Template
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -48,13 +49,15 @@ class DbSvSvcStore(
     override protected[this] val enableCoinRulesUpgrade: Boolean,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    override protected val transactionTreeSource: TransactionTreeSource,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStoreWithoutHistory(
+) extends DbCNNodeAppStoreWithHistory[SvcTxLogParser.TxLogIndexRecord, SvcTxLogParser.TxLogEntry](
       storage,
-      DbSvSvcStore.tableName,
+      DbSvSvcStore.acsTableName,
+      DbSvSvcStore.txLogTableName,
       // TODO (#5544): change this to something better
       storeDescriptor = Json.obj(
         "name" -> Json.fromString("DbSvSvcStore"),
@@ -69,8 +72,8 @@ class DbSvSvcStore(
     with LimitHelpers
     with NamedLogging {
 
-  import multiDomainAcsStore.waitUntilAcsIngested
   import storage.DbStorageConverters.setParameterByteArray
+  import multiDomainAcsStore.waitUntilAcsIngested
 
   def storeId: Int = multiDomainAcsStore.storeId
 
@@ -139,6 +142,29 @@ class DbSvSvcStore(
     }
   }
 
+  override def ingestionTxLogInsert(record: SvcTxLogParser.TxLogIndexRecord)(implicit
+      tc: TraceContext
+  ): Either[String, DBIO[_]] = {
+    val SvcTxLogRowData(
+      eventId,
+      offset,
+      domainId,
+      indexRecordType,
+      actionName,
+      executed,
+    ) = SvcTxLogRowData.fromTxLogIndexRecord(record)
+    val safeEventId = lengthLimited(eventId)
+    val safeOffset = offset.map(lengthLimited)
+    val safeActionName = actionName.map(lengthLimited)
+    Right(sqlu"""
+          insert into svc_txlog_store(store_id, event_id, index_record_type, "offset", domain_id,
+          action_name, executed)
+          values ($storeId, $safeEventId, $indexRecordType, $safeOffset, $domainId,
+                  $safeActionName, $executed)
+          on conflict do nothing
+        """)
+  }
+
   override def listExpiredCnsSubscriptions(
       now: CantonTimestamp,
       limit: Int,
@@ -187,6 +213,7 @@ class DbSvSvcStore(
   }
 
   // TODO (#5314): this is not checking for domain
+
   override def lookupSvOnboardingConfirmedByPartyOnDomain(svParty: PartyId, domainId: DomainId)(
       implicit tc: TraceContext
   ): Future[MultiDomainAcsStore.QueryResult[
@@ -196,7 +223,7 @@ class DbSvSvcStore(
       result <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
               template_id = ${SvOnboardingConfirmed.TEMPLATE_ID}
@@ -219,7 +246,7 @@ class DbSvSvcStore(
     for {
       result <- storage
         .query(
-          (selectFromAcsTable(DbSvSvcStore.tableName) ++
+          (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                  where store_id = $storeId
                    and template_id = ${Confirmation.TEMPLATE_ID}
@@ -239,7 +266,7 @@ class DbSvSvcStore(
     for {
       result <- storage
         .query(
-          (selectFromAcsTable(DbSvSvcStore.tableName) ++
+          (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                  where store_id = $storeId
                    and template_id = ${AppRewardCoupon.TEMPLATE_ID}
@@ -261,7 +288,7 @@ class DbSvSvcStore(
       for {
         result <- storage
           .query(
-            (selectFromAcsTable(DbSvSvcStore.tableName) ++
+            (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
               sql"""
                    where store_id = $storeId
                      and template_id = ${ValidatorRewardCoupon.TEMPLATE_ID}
@@ -327,7 +354,7 @@ class DbSvSvcStore(
     waitUntilAcsIngested {
       (for {
         result <- storage.querySingle(
-          (selectFromAcsTable(DbSvSvcStore.tableName) ++
+          (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
             where store_id = $storeId
               and template_id = ${ClosedMiningRound.TEMPLATE_ID}
@@ -350,7 +377,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
                     template_id = ${Confirmation.TEMPLATE_ID}
@@ -381,7 +408,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
                         template_id = ${Confirmation.TEMPLATE_ID}
@@ -415,7 +442,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
                         template_id = ${Confirmation.TEMPLATE_ID}
@@ -449,7 +476,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
                         template_id = ${Confirmation.TEMPLATE_ID}
@@ -474,13 +501,13 @@ class DbSvSvcStore(
       for {
         result <- storage
           .query(
-            (selectFromAcsTable(DbSvSvcStore.tableName) ++
+            (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
               sql"""
                     where template_id = ${Confirmation.TEMPLATE_ID}
                       and confirmer = $confirmer
                       and action_cns_entry_context_cid IN (
                         select contract_id
-                        from #${DbSvSvcStore.tableName}
+                        from #${DbSvSvcStore.acsTableName}
                         where store_id = $storeId
                           and template_id = ${CnsEntryContext.TEMPLATE_ID}
                           and cns_entry_name = ${lengthLimited(name)}
@@ -502,7 +529,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
                       template_id = ${SvOnboardingRequest.TEMPLATE_ID}
@@ -533,7 +560,7 @@ class DbSvSvcStore(
       for {
         result <- storage
           .query(
-            (selectFromAcsTable(DbSvSvcStore.tableName) ++
+            (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
               sql"""
                  where store_id = $storeId
                    and template_id = ${SvOnboardingRequest.TEMPLATE_ID}
@@ -553,7 +580,7 @@ class DbSvSvcStore(
       waitUntilAcsIngested {
         for {
           rows <- storage.query(
-            (selectFromAcsTable(DbSvSvcStore.tableName) ++
+            (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
               sql"""
               where store_id = $storeId
                 and template_id = ${companion.TEMPLATE_ID}
@@ -581,7 +608,7 @@ class DbSvSvcStore(
     for {
       result <- storage
         .query(
-          (selectFromAcsTable(DbSvSvcStore.tableName) ++
+          (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                  where store_id = $storeId
                    and template_id = ${MemberTraffic.TEMPLATE_ID}
@@ -606,7 +633,7 @@ class DbSvSvcStore(
         .mkString("('", "','", "')")
       result <- storage
         .query(
-          (selectFromAcsTable(DbSvSvcStore.tableName) ++
+          (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                where store_id = $storeId
                  and template_id = ${CoinPriceVote.TEMPLATE_ID}
@@ -628,7 +655,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
                         template_id = ${SvOnboardingRequest.TEMPLATE_ID}
@@ -653,7 +680,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             sql"""
                           template_id = ${ValidatorLicense.TEMPLATE_ID}
@@ -677,7 +704,7 @@ class DbSvSvcStore(
         .querySingle(
           sql"""
                select sum(total_traffic_purchased)
-               from #${DbSvSvcStore.tableName}
+               from #${DbSvSvcStore.acsTableName}
                where store_id = $storeId
                 and template_id = ${MemberTraffic.TEMPLATE_ID}
                 and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
@@ -697,7 +724,7 @@ class DbSvSvcStore(
     for {
       result <- storage
         .query(
-          (selectFromAcsTable(DbSvSvcStore.tableName) ++
+          (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                  where store_id = $storeId
                    and template_id = ${CoinPriceVote.TEMPLATE_ID}
@@ -718,7 +745,7 @@ class DbSvSvcStore(
         resultWithOffset <- storage
           .querySingle(
             selectFromAcsTableWithOffset(
-              DbSvSvcStore.tableName,
+              DbSvSvcStore.acsTableName,
               storeId,
               sql"""
                             template_id = ${Vote.TEMPLATE_ID}
@@ -744,7 +771,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             sql"""
                           template_id = ${VoteRequest.TEMPLATE_ID}
@@ -767,7 +794,7 @@ class DbSvSvcStore(
     for {
       result <- storage
         .query(
-          (selectFromAcsTable(DbSvSvcStore.tableName) ++
+          (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                    where store_id = $storeId
                      and template_id = ${Vote.TEMPLATE_ID}
@@ -786,7 +813,7 @@ class DbSvSvcStore(
     for {
       result <- storage
         .querySingle(
-          (selectFromAcsTable(DbSvSvcStore.tableName) ++
+          (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                      where store_id = $storeId
                        and template_id = ${CoinPriceVote.TEMPLATE_ID}
@@ -808,7 +835,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
                             template_id = ${SvOnboardingRequest.TEMPLATE_ID}
@@ -833,7 +860,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
                               template_id = ${SvOnboardingConfirmed.TEMPLATE_ID}
@@ -858,7 +885,7 @@ class DbSvSvcStore(
     for {
       result <- storage
         .query(
-          (selectFromAcsTable(DbSvSvcStore.tableName) ++
+          (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                      where store_id = $storeId
                        and template_id = ${ElectionRequest.TEMPLATE_ID}
@@ -881,7 +908,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
                               template_id = ${ElectionRequest.TEMPLATE_ID}
@@ -907,7 +934,7 @@ class DbSvSvcStore(
     for {
       result <- storage
         .query(
-          (selectFromAcsTable(DbSvSvcStore.tableName) ++
+          (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                        where store_id = $storeId
                          and template_id = ${ElectionRequest.TEMPLATE_ID}
@@ -928,7 +955,7 @@ class DbSvSvcStore(
       openRound <- getLatestActiveOpenMiningRound()
       result <- storage
         .query(
-          (selectFromAcsTable(DbSvSvcStore.tableName) ++
+          (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                          where store_id = $storeId
                            and template_id = ${ImportCrate.TEMPLATE_ID}
@@ -960,7 +987,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
                         template_id = ${CnsEntry.TEMPLATE_ID}
@@ -989,7 +1016,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
                             template_id = ${SubscriptionInitialPayment.TEMPLATE_ID}
@@ -1018,7 +1045,7 @@ class DbSvSvcStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbSvSvcStore.tableName,
+            DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
                           template_id = ${FeaturedAppRight.TEMPLATE_ID}
@@ -1037,8 +1064,46 @@ class DbSvSvcStore(
       withState.flatMap(_.toAssignedContract),
     )
   }
+
+  def listVoteResults(actionName: Option[String], executed: Option[Boolean], limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]] = {
+    val dbType = SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord.dbType
+    val where = (actionName, executed) match {
+      case (Some(actionName), Some(executed)) =>
+        sql"""and action_name = ${lengthLimited(actionName)} and executed = ${executed}"""
+      case (Some(actionName), None) =>
+        sql"""and action_name = ${lengthLimited(actionName)}"""
+      case (None, Some(executed)) =>
+        sql"""and executed = ${executed}"""
+      case _ =>
+        sql""""""
+    }
+    for {
+      rows <- storage.query(
+        (sql"""
+             select event_id, domain_id
+             from svc_txlog_store
+             where store_id = $storeId
+                and index_record_type = ${dbType}
+                """ ++ where ++ sql"""
+             limit $limit;
+           """).toActionBuilder.as[(String, String)],
+        "listVoteResults",
+      )
+      entries <- rows.traverse { case (eventId, domainId) =>
+        loadTxLogEntry(txLogReader, eventId, DomainId.tryFromString(domainId), None, dbType)
+      }: Future[Seq[SvcTxLogParser.TxLogEntry]]
+      recentVoteResults = entries.collect {
+        case e: SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry => e
+      }
+    } yield recentVoteResults
+  }
 }
 
 object DbSvSvcStore {
-  val tableName = "svc_acs_store"
+
+  val acsTableName = "svc_acs_store"
+  val txLogTableName = "svc_txlog_store"
+
 }

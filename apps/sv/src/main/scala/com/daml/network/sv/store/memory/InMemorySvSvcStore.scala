@@ -1,5 +1,6 @@
 package com.daml.network.sv.store.memory
 
+import cats.implicits.toTraverseOps
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
@@ -27,15 +28,15 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{ContractState, QueryResult}
+import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.sv.config.SvDomainConfig
-import com.daml.network.sv.store.{SvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract, ContractWithState}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import cats.syntax.traverse.*
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -46,12 +47,46 @@ class InMemorySvSvcStore(
     override protected[this] val enableCoinRulesUpgrade: Boolean,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    override protected val transactionTreeSource: TransactionTreeSource,
 )(implicit
     override protected val
     ec: ExecutionContext
-) extends InMemoryCNNodeAppStoreWithoutHistory
+) extends InMemoryCNNodeAppStore[SvcTxLogParser.TxLogIndexRecord, SvcTxLogParser.TxLogEntry]
     with SvSvcStore {
   import InMemorySvSvcStore.*
+
+  override def listVoteResults(actionName: Option[String], executed: Option[Boolean], limit: Int)(
+      implicit tc: TraceContext
+  ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]] = {
+    for {
+      indexes <- txLog
+        .collectTxLogIndicesType[SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord]
+      ind = (actionName, executed) match {
+        case (Some(actionName), Some(executed)) =>
+          indexes.filter(_.actionName == actionName).filter(_.executed == executed)
+        case (Some(actionName), None) =>
+          indexes.filter(_.actionName == actionName)
+        case (None, Some(executed)) =>
+          indexes.filter(_.executed == executed)
+        case _ => indexes
+      }
+      records <- ind
+        .traverse { index =>
+          loadTxLogEntry(
+            txLogReader,
+            index.eventId,
+            index.domainId,
+            index.acsContractId,
+            index.companion.dbType,
+          )
+        }
+        .map {
+          _.collect { case entry: SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry =>
+            entry
+          }.take(limit)
+        }
+    } yield records
+  }
 
   override def lookupCoinRulesV1TestWithOffset()(implicit
       tc: TraceContext

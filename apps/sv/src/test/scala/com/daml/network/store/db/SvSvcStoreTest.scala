@@ -1,31 +1,27 @@
 package com.daml.network.store.db
 
-import com.daml.ledger.javaapi.data.ContractMetadata
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.{ContractMetadata, DamlRecord}
+import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.{AppTransferContext, EnabledChoices}
+import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin.{
   CoinRules_MiningRound_Archive,
   CoinRules_SetEnabledChoices,
 }
-import com.daml.network.codegen.java.cc.round.OpenMiningRound
-import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.api.v1.round.Round
-import com.daml.network.codegen.java.cc.coinimport.{ImportCrate, ImportPayload}
 import com.daml.network.codegen.java.cc.coinimport.importpayload.{IP_Coin, IP_ValidatorLicense}
+import com.daml.network.codegen.java.cc.coinimport.{ImportCrate, ImportPayload}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
-import com.daml.network.codegen.java.cn.cns.{
-  CnsEntry,
-  CnsEntryContext,
-  CnsEntryContext_CollectInitialEntryPayment,
-  CnsEntryContext_RejectEntryInitialPayment,
-  CnsRules,
-}
+import com.daml.network.codegen.java.cn.cns.*
 import com.daml.network.codegen.java.cn.cometbft.CometBftConfigLimits
 import com.daml.network.codegen.java.cn.svc.globaldomain.{
   DomainNodeConfigLimits,
   GlobalDomainConfig,
 }
+import com.daml.network.sv.store.SvSvcStore.IdleCnsSubscription
+import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CnsEntryContext,
   ARC_CoinRules,
@@ -41,17 +37,6 @@ import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfir
 }
 import com.daml.network.codegen.java.cn.svcrules.electionrequestreason.ERR_OtherReason
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_RemoveMember
-import com.daml.network.codegen.java.cn.svcrules.{
-  ActionRequiringConfirmation,
-  Confirmation,
-  ElectionRequest,
-  MemberInfo,
-  Reason,
-  SvcRules,
-  SvcRulesConfig,
-  SvcRules_RemoveMember,
-  VoteRequest,
-}
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.codegen.java.cn.wallet.subscriptions.{
@@ -64,9 +49,11 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.store.{Limit, StoreTest}
+import com.daml.network.store.{Limit, StoreTest, TxLogStore}
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
-import com.daml.network.sv.store.SvSvcStore.IdleCnsSubscription
+import com.daml.network.sv.history.SvcRulesExecuteDefiniteVote
+import com.daml.network.sv.store.SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry
+import com.daml.network.sv.store.SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.sv.store.{SvStore, SvSvcStore}
@@ -82,20 +69,15 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{
-  Identifier,
-  Member,
-  Namespace,
-  ParticipantId,
-  PartyId,
-  SequencerId,
-}
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import com.google.protobuf
 
 import java.time.Instant
+import java.util
 import java.util.{Collections, Optional}
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
 abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
@@ -798,6 +780,72 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
+    "listVoteResults" should {
+
+      "list all past VoteResults" in {
+        for {
+          store <- mkStore()
+          voteRequestContract = voteRequest(1, Instant.now().plusSeconds(1.toLong * 3600))
+          _ <- dummyDomain.create(voteRequestContract)(store.multiDomainAcsStore)
+          votes = (1 to 4).map(n => vote(n, voteRequestContract.contractId)).toList
+          result = mkExecuteDefiniteVoteResult(voteRequestContract)
+          _ <- Future.traverse(votes)(dummyDomain.create(_)(store.multiDomainAcsStore))
+          definitiveVoteTx <- dummyDomain.exercise(
+            contract = svcRules(),
+            interfaceId = Some(SvcRules.TEMPLATE_ID),
+            choiceName = SvcRulesExecuteDefiniteVote.choice.name,
+            mkExecuteDefiniteVote(
+              voteRequestContract.contractId,
+              votes.map(v => Vote.ContractId.fromContractId(v.contractId)).asJava,
+            ),
+            result.toValue,
+          )(
+            store.multiDomainAcsStore
+          )
+        } yield {
+          transactionTreeSource.addTree(definitiveVoteTx)
+          store
+            .listVoteResults(
+              Some("CRARC_SetEnabledChoices"),
+              Some(true),
+              1,
+            )
+            .futureValue
+            .toList
+            .loneElement shouldBe DefiniteVoteTxLogEntry(
+            new DefiniteVoteIndexRecord(
+              definitiveVoteTx.getOffset,
+              definitiveVoteTx.getRootEventIds.get(0),
+              dummyDomain,
+              "CRARC_SetEnabledChoices",
+              true,
+            ),
+            result.rejectedBy.asScala.toList,
+            result.acceptedBy.asScala.toList,
+            result.action,
+          )
+          store
+            .listVoteResults(
+              Some("CRARC_SetEnabledChoices"),
+              Some(false),
+              1,
+            )
+            .futureValue
+            .toList
+            .size shouldBe (0)
+          store
+            .listVoteResults(
+              None,
+              None,
+              1,
+            )
+            .futureValue
+            .toList
+            .size shouldBe (1)
+        }
+      }
+    }
+
   }
 
   lazy val enabledChoicesTrueAction = new ARC_CoinRules(
@@ -817,6 +865,27 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
   lazy val removeUserAction = new ARC_SvcRules(
     new SRARC_RemoveMember(new SvcRules_RemoveMember(userParty(666).toProtoPrimitive))
   )
+
+  private def mkExecuteDefiniteVote(
+      requestId: VoteRequest.ContractId,
+      voteIds: util.List[Vote.ContractId],
+  ): DamlRecord = {
+    new SvcRules_ExecuteDefiniteVote(
+      requestId,
+      Optional.empty(),
+      voteIds,
+    ).toValue
+  }
+
+  private def mkExecuteDefiniteVoteResult(
+      voteRequestContract: Contract[VoteRequest.ContractId, VoteRequest]
+  ): VoteResult = new VoteResult(
+    voteRequestContract.payload.action,
+    true,
+    (1 to 4).map(n => userParty(n).toProtoPrimitive).toList.asJava,
+    List.empty.asJava,
+  )
+
   private def cnsEntryContextPaymentAction(
       contextCid: CnsEntryContext.ContractId,
       isAccepted: Boolean = true,
@@ -877,6 +946,28 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     Contract(
       VoteRequest.TEMPLATE_ID,
       new VoteRequest.ContractId(validContractId(n)),
+      template,
+      ContractMetadata.Empty(),
+      protobuf.Any.getDefaultInstance,
+    )
+  }
+
+  private def vote(
+      n: Int,
+      voteRequestCid: VoteRequest.ContractId,
+  ): Contract[Vote.ContractId, Vote] = {
+    val template = new Vote(
+      svcParty.toProtoPrimitive,
+      voteRequestCid,
+      userParty(n).toProtoPrimitive,
+      true,
+      new Reason("url", "summary"),
+      Instant.now().plusSeconds(3600),
+    )
+
+    Contract(
+      Vote.TEMPLATE_ID,
+      new Vote.ContractId(validContractId((n))),
       template,
       ContractMetadata.Empty(),
       protobuf.Any.getDefaultInstance,
@@ -1119,6 +1210,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
   }
 
   protected def mkStore(): Future[SvSvcStore]
+  protected lazy val transactionTreeSource = TxLogStore.TransactionTreeSource.ForTesting()
 
   lazy val acsOffset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
   lazy val domain = dummyDomain.toProtoPrimitive
@@ -1129,6 +1221,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 }
 
 class InMemorySvSvcStoreTest extends SvSvcStoreTest {
+
   override protected def mkStore(): Future[InMemorySvSvcStore] = {
     val store = new InMemorySvSvcStore(
       SvStore.Key(storeSvParty, svcParty),
@@ -1136,6 +1229,7 @@ class InMemorySvSvcStoreTest extends SvSvcStoreTest {
       enableCoinRulesUpgrade = true,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      transactionTreeSource,
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
@@ -1174,6 +1268,7 @@ class DbSvSvcStoreTest
       enableCoinRulesUpgrade = true,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      transactionTreeSource,
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
