@@ -396,14 +396,7 @@ jobs:
           pre_sbt_cmd: |
             set -eou pipefail
             . cluster/deployment/<< parameters.cluster >>/.envrc.vars
-
-            # TODO(#7115) remove the usage check once all clusters have the updated script
-            if [[ -n $(./start-frontends.sh -h | grep "shared validator") ]]
-            then
-              NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" ./start-frontends.sh -d -v -p
-            else
-              NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" ./start-frontends.sh -d -p
-            fi
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" ./start-frontends.sh -d -v -p
           cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
           post_sbt_cmd: ./stop-frontends.sh
           additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
