@@ -377,25 +377,19 @@ jobs:
           condition:
             not: << parameters.sync_with_cluster_version >>
           steps:
-            # We use readiness of validator-app and UIs in all namespaces as an approximation to the cluster's readiness
             - run_bash_command_in_nix:
                 cmd_name: wait for deployment to finish
                 cluster: << parameters.cluster >>
                 cmd: |
                   VERSION=$(get-snapshot-version)
                   cncluster wait_version $VERSION
+                  # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
                   cncluster wait validator1 validator-app
-                  cncluster wait validator1 wallet-web-ui
                   cncluster wait splitwell validator-app
-                  cncluster wait splitwell wallet-web-ui
                   cncluster wait sv-1 validator-app
-                  cncluster wait sv-1 sv-web-ui
                   cncluster wait sv-2 validator-app
-                  cncluster wait sv-2 sv-web-ui
                   cncluster wait sv-3 validator-app
-                  cncluster wait sv-3 sv-web-ui
                   cncluster wait sv-4 validator-app
-                  cncluster wait sv-4 sv-web-ui
                   echo "Done waiting. All pods in the cluster are:"
                   kubectl get pods -A
       - execute_sbt_command:
@@ -508,15 +502,14 @@ jobs:
           condition:
             not: << parameters.sync_with_cluster_version >>
           steps:
-          # We use readiness of validator-app and SV web UI in the sv namespace as an approximation to the sv's readiness
           - run_bash_command_in_nix:
               cmd_name: wait for sv-runbook deployment to finish
               cluster: << parameters.cluster >>
               cmd: |
                 VERSION=$(get-snapshot-version)
                 cncluster wait_version $VERSION
+                # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
                 cncluster wait sv validator-app
-                cncluster wait sv sv-web-ui
                 echo "Done waiting. All pods in the cluster are:"
                 kubectl get pods -A
 

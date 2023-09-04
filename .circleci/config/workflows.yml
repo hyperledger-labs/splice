@@ -191,6 +191,7 @@ workflows:
         cluster: "cimain"
         requires:
           - deploy_cluster
+          - preflight_check
     - preflight_check:
         cluster: "cimain"
         <<: *main-branch-only
@@ -270,6 +271,7 @@ workflows:
           use_published_artifacts: true
           requires:
             - deploy_cluster
+            - preflight_check
             - publish_public_release
     - preflight_sv_check:
         <<: *main-branch-only
@@ -338,6 +340,7 @@ workflows:
           use_published_artifacts: true
           requires:
             - deploy_cluster
+            - preflight_check
             - publish_public_release
     - preflight_sv_check:
         <<: *main-branch-only
@@ -349,6 +352,7 @@ workflows:
         cluster: "devnet"
         requires:
           - deploy_sv_runbook
+          - preflight_check
 
 
   deploy_testnet:
@@ -435,6 +439,7 @@ workflows:
           restore_cluster: true
           requires:
             - deploy_cluster
+            - preflight_check
 
   testnet_health_check:
     when:
