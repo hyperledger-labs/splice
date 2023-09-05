@@ -72,6 +72,8 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import com.daml.network.directory.admin.http.HttpExternalDirectoryHandler
+import com.daml.network.http.v0.external.directory.DirectoryResource
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -511,6 +513,15 @@ class ValidatorApp(
 
       walletExternalHandler = new HttpExternalWalletHandler(walletManager, loggerFactory)
 
+      storeDomain <- store.domains.getDomainId(config.domains.global.alias)
+      directoryExternalHandler = new HttpExternalDirectoryHandler(
+        storeDomain,
+        ledgerClient.connection("HttpExternalDirectoryHandler", loggerFactory),
+        config.domains.global.alias,
+        retryProvider,
+        loggerFactory,
+      )
+
       publicHandler = new HttpValidatorPublicHandler(
         automation.store,
         config.ledgerApiUser,
@@ -579,6 +590,10 @@ class ValidatorApp(
                   ExternalWalletResource.routes(
                     walletExternalHandler,
                     AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
+                  ),
+                  DirectoryResource.routes(
+                    directoryExternalHandler,
+                    AuthExtractor(verifier, loggerFactory, "canton network directory realm"),
                   ),
                   ValidatorAdminResource.routes(
                     adminHandler,

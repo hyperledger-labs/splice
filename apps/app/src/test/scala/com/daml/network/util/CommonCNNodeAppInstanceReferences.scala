@@ -16,6 +16,7 @@ import com.daml.network.console.{
 }
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
+import com.daml.network.console.DirectoryExternalAppClientReference
 
 // TODO(#736): these should eventually be defined analogue to Canton's `participant1` references etc
 // however, this is likely only possible once we depend on Canton as a library
@@ -174,6 +175,12 @@ trait CommonCNNodeAppInstanceReferences {
     "aliceDirectory"
   )
 
+  def aliceDirectoryExternalClient(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): DirectoryExternalAppClientReference = rdpe(
+    "aliceDirectory"
+  )
+
   def bobDirectoryClient(implicit
       env: CNNodeTestConsoleEnvironment
   ): DirectoryAppClientReference = rdp(
@@ -252,6 +259,13 @@ trait CommonCNNodeAppInstanceReferences {
     env.directories.remote
       .find(_.name == name)
       .getOrElse(sys.error(s"remote directory [$name] not configured"))
+
+  def rdpe(
+      name: String
+  )(implicit env: CNNodeTestConsoleEnvironment): DirectoryExternalAppClientReference =
+    env.externalDirectories
+      .find(_.name == name)
+      .getOrElse(sys.error(s"remote external directory [$name] not configured"))
 
   def sw(
       name: String

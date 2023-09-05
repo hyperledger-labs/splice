@@ -257,6 +257,24 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     }
   }
 
+  "create directory entry" in { implicit env =>
+    initSvcWithSv1Only()
+    aliceValidatorBackend.startSync()
+    aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+    directoryBackend.waitForInitialization()
+    aliceDirectoryClient.requestDirectoryInstall()
+
+    val name = "alice"
+    val url = "https://alice-url.com"
+    val description = "A test CNS entry for alice"
+
+    val res = aliceDirectoryExternalClient.createDirectoryEntry(name, url, description)
+
+    res.name shouldBe name
+    res.url shouldBe url
+    res.description shouldBe description
+  }
+
   "onboard user multiple times" in { implicit env =>
     initSvcWithSv1Only()
     aliceValidatorBackend.startSync()

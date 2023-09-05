@@ -2,7 +2,11 @@ package com.daml.network.config
 
 import akka.http.scaladsl.model.Uri
 import com.daml.network.auth.AuthUtil
-import com.daml.network.directory.config.{DirectoryAppBackendConfig, DirectoryAppClientConfig}
+import com.daml.network.directory.config.{
+  DirectoryAppBackendConfig,
+  DirectoryAppClientConfig,
+  DirectoryAppExternalClientConfig,
+}
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.splitwell.config.{
   SplitwellAppBackendConfig,
@@ -17,8 +21,8 @@ import com.daml.network.validator.config.{
 }
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.domain.config.CommunityDomainConfig
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import monocle.macros.syntax.lens.*
@@ -107,6 +111,9 @@ object CNNodeConfigTransforms {
       updateAllDirectoryAppClientConfigs_(c =>
         c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
       ),
+      updateAllDirectoryAppExternalClientConfigs_(c =>
+        c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
+      ),
     )
     transforms.foldLeft(config)((c, tf) => tf(c))
   }
@@ -179,6 +186,7 @@ object CNNodeConfigTransforms {
   type CnAppConfigTransform[A] = A => A
   type DirectoryAppTransform = CnAppConfigTransform[DirectoryAppBackendConfig]
   type DirectoryClientConfigReader = CnAppConfigTransform[DirectoryAppClientConfig]
+  type DirectoryExternalClientConfigReader = CnAppConfigTransform[DirectoryAppExternalClientConfig]
   type ValidatorAppTransform = CnAppConfigTransform[ValidatorAppBackendConfig]
   type WalletAppClientTransform = CnAppConfigTransform[WalletAppClientConfig]
   type AppManagerAppClientTransform = CnAppConfigTransform[AppManagerAppClientConfig]
@@ -214,6 +222,13 @@ object CNNodeConfigTransforms {
       update: WalletAppClientTransform
   ): CNNodeConfigTransform =
     _.focus(_.walletAppClients).modify(_.map { case (name, config) =>
+      (name, update(config))
+    })
+
+  def updateAllDirectoryAppExternalClientConfigs_(
+      update: DirectoryExternalClientConfigReader
+  ): CNNodeConfigTransform =
+    _.focus(_.directoryAppExternalClients).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 

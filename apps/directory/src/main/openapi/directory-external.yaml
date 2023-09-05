@@ -1,0 +1,72 @@
+openapi: 3.0.0
+info:
+  title: Directory API
+  version: 0.0.1
+tags:
+  - name: directory
+paths:
+  /readyz:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
+  /livez:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
+  /status:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1status"
+  /version:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
+  /entry/create:
+    post:
+      tags: [directory]
+      x-jvm-package: external.directory
+      operationId: "createDirectoryEntry"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateDirectoryEntryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CreateDirectoryEntryResponse"
+        "400":
+          description: |
+            Invalid request, check the error response for details.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+components:
+  schemas:
+    CreateDirectoryEntryRequest:
+      type: object
+      required:
+        - name
+        - url
+        - description
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        description:
+          type: string
+    CreateDirectoryEntryResponse:
+      type: object
+      required:
+        - name
+        - url
+        - description
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        description:
+          type: string
+

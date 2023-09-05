@@ -752,21 +752,28 @@ lazy val `apps-directory` =
         npmName = "directory-openapi",
         openApiSpec = "directory-internal.yaml",
       ),
+      BuildCommon.TS.openApiSettings(
+        npmName = "directory-external-openapi",
+        openApiSpec = "directory-external.yaml",
+        directory = "external-openapi-ts-client",
+      ),
       BuildCommon.sharedAppSettings,
       Compile / guardrailTasks :=
-        List(
-          ScalaServer(
-            new File("apps/directory/src/main/openapi/directory-internal.yaml"),
-            pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
-            customExtraction = true,
-          ),
-          ScalaClient(
-            new File("apps/directory/src/main/openapi/directory-internal.yaml"),
-            pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
-          ),
-        ),
+        List("internal", "external").flatMap { scope =>
+          List(
+            ScalaServer(
+              new File(s"apps/directory/src/main/openapi/directory-$scope.yaml"),
+              pkg = "com.daml.network.http.v0",
+              framework = "akka-http",
+              customExtraction = true,
+            ),
+            ScalaClient(
+              new File(s"apps/directory/src/main/openapi/directory-$scope.yaml"),
+              pkg = "com.daml.network.http.v0",
+              framework = "akka-http",
+            ),
+          )
+        },
     )
 
 lazy val `apps-splitwell` =

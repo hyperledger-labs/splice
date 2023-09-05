@@ -7,11 +7,14 @@ import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.http.v0.directory as http
+import com.daml.network.http.v0.external.{directory as externalHttp}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
+import cats.data.EitherT
+import com.daml.network.http.v0.definitions
 
 object HttpDirectoryAppClient {
 
@@ -28,6 +31,43 @@ object HttpDirectoryAppClient {
         HttpClientBuilder().buildClient,
         host,
       )
+  }
+
+  abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = externalHttp.DirectoryClient
+
+    def createClient(host: String)(implicit
+        httpClient: HttpRequest => Future[HttpResponse],
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client = externalHttp.DirectoryClient.httpClient(HttpClientBuilder().buildClient, host)
+  }
+
+  case class CreateDirectoryEntry(name: String, url: String, description: String)
+      extends ExternalBaseCommand[
+        externalHttp.CreateDirectoryEntryResponse,
+        definitions.CreateDirectoryEntryResponse,
+      ] {
+
+    def submitRequest(client: externalHttp.DirectoryClient, headers: List[HttpHeader]): EitherT[
+      Future,
+      Either[Throwable, HttpResponse],
+      externalHttp.CreateDirectoryEntryResponse,
+    ] = {
+      val request = definitions.CreateDirectoryEntryRequest(
+        name,
+        url,
+        description,
+      )
+      client.createDirectoryEntry(request, headers = headers)
+    }
+
+    protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case externalHttp.CreateDirectoryEntryResponse.OK(res) =>
+      Right(res)
+    }
   }
 
   case class ListEntries(

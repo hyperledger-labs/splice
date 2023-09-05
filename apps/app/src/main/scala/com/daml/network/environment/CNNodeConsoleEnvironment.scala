@@ -1,10 +1,12 @@
 package com.daml.network.environment
 
 import com.daml.network.console.*
+import com.daml.network.directory.config.DirectoryAppExternalClientConfig
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvAppClientConfig
 import com.daml.network.util.ResourceTemplateDecoder
-import com.daml.network.validator.config.{AppManagerAppClientConfig, ValidatorAppClientConfig}
+import com.daml.network.validator.config.AppManagerAppClientConfig
+import com.daml.network.validator.config.ValidatorAppClientConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -178,6 +180,10 @@ class CNNodeConsoleEnvironment(
   lazy val appManagers: Seq[AppManagerAppClientReference] =
     environment.config.appManagerAppClients.toSeq.map(createAppManagerAppClientReference)
 
+  lazy val externalDirectories: Seq[DirectoryExternalAppClientReference] =
+    environment.config.directoryAppExternalClients.toSeq
+      .map(createDirectoryExternalAppClientReference)
+
   lazy val directories: NodeReferences[
     DirectoryAppReference,
     DirectoryAppClientReference,
@@ -245,6 +251,14 @@ class CNNodeConsoleEnvironment(
       name,
       this.environment.config.directoryClientsByString(name),
     )
+
+  private def createDirectoryExternalAppClientReference(
+      conf: (
+          InstanceName,
+          DirectoryAppExternalClientConfig,
+      )
+  ): DirectoryExternalAppClientReference =
+    new DirectoryExternalAppClientReference(this, conf._1.unwrap, conf._2)
 
   private def createSplitwellReference(name: String): SplitwellAppBackendReference =
     new SplitwellAppBackendReference(this, name)

@@ -5,7 +5,11 @@ import cats.data.Validated
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import com.daml.network.auth.AuthConfig
-import com.daml.network.directory.config.{DirectoryAppBackendConfig, DirectoryAppClientConfig}
+import com.daml.network.directory.config.{
+  DirectoryAppBackendConfig,
+  DirectoryAppClientConfig,
+  DirectoryAppExternalClientConfig,
+}
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.splitwell.config.{
   SplitwellAppBackendConfig,
@@ -63,6 +67,7 @@ case class CNNodeConfig(
     appManagerAppClients: Map[InstanceName, AppManagerAppClientConfig] = Map.empty,
     directoryApp: Option[DirectoryAppBackendConfig] = None,
     directoryAppClients: Map[InstanceName, DirectoryAppClientConfig] = Map.empty,
+    directoryAppExternalClients: Map[InstanceName, DirectoryAppExternalClientConfig] = Map.empty,
     splitwellApps: Map[InstanceName, SplitwellAppBackendConfig] = Map.empty,
     splitwellAppClients: Map[InstanceName, SplitwellAppClientConfig] = Map.empty,
     // TODO(#736): we want to remove all of the configurations options below:
@@ -527,6 +532,9 @@ object CNNodeConfig {
       deriveReader[DirectoryAppBackendConfig]
     implicit val directoryClientConfigReader: ConfigReader[DirectoryAppClientConfig] =
       deriveReader[DirectoryAppClientConfig]
+    implicit val directoryExternalClientConfigReader
+        : ConfigReader[DirectoryAppExternalClientConfig] =
+      deriveReader[DirectoryAppExternalClientConfig]
     implicit val splitwellDomainsReader: ConfigReader[SplitwellDomains] =
       deriveReader[SplitwellDomains]
     implicit val splitwellDomainConfigReader: ConfigReader[SplitwellDomainConfig] =
@@ -711,6 +719,9 @@ object CNNodeConfig {
       deriveWriter[DirectoryAppBackendConfig]
     implicit val directoryClientConfigWriter: ConfigWriter[DirectoryAppClientConfig] =
       deriveWriter[DirectoryAppClientConfig]
+    implicit val directoryExternalClientConfigWriter
+        : ConfigWriter[DirectoryAppExternalClientConfig] =
+      deriveWriter[DirectoryAppExternalClientConfig]
     implicit val splitwellDomains: ConfigWriter[SplitwellDomains] =
       deriveWriter[SplitwellDomains]
     implicit val splitwellDomainConfigWriter: ConfigWriter[SplitwellDomainConfig] =
