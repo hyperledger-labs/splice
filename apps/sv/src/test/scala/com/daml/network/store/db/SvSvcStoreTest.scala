@@ -84,6 +84,21 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
   "SvSvcStore" should {
 
+    def offsetFreeLookupTest[TCid <: ContractId[T], T, C <: Contract.Has[TCid, T]](
+        create: => Contract[TCid, T],
+        noise: => Seq[Contract[TCid, T]],
+    )(
+        fetch: SvSvcStore => Future[Option[C]]
+    ) = "return the entry if found" in {
+      val created = create
+      for {
+        store <- mkStore()
+        _ <- dummyDomain.create(created)(store.multiDomainAcsStore)
+        _ <- Future.traverse(noise)(dummyDomain.create(_)(store.multiDomainAcsStore))
+        result <- fetch(store)
+      } yield result.map(_.contract) should be(Some(created))
+    }
+
     def lookupTests[TCid <: ContractId[T], T, C <: Contract.Has[TCid, T]](
         name: String
     )(create: => Contract[TCid, T], noise: => Seq[Contract[TCid, T]] = Seq.empty)(
@@ -98,15 +113,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           } yield result should be(QueryResult(acsOffset.toHexString, None))
         }
 
-        "return the entry if found" in {
-          val created = create
-          for {
-            store <- mkStore()
-            _ <- dummyDomain.create(created)(store.multiDomainAcsStore)
-            _ <- Future.traverse(noise)(dummyDomain.create(_)(store.multiDomainAcsStore))
-            result <- fetch(store)
-          } yield result.value.map(_.contract) should be(Some(created))
-        }
+        offsetFreeLookupTest(create, noise)(fetch andThen (_ map (_.value)))
       }
     }
 
@@ -151,12 +158,12 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         QueryResult(acsOffset.toHexString, _)
       )
     )
-    lookupTests("lookupSvOnboardingConfirmedByPartyOnDomain")(
-      create = svOnboardingConfirmed("good", userParty(1)),
-      noise = Seq(svOnboardingConfirmed("bad", userParty(2))),
-    )( // TODO (#5314): add cases with a different domain
-      _.lookupSvOnboardingConfirmedByPartyOnDomain(userParty(1), dummyDomain)
-    )
+    "lookupSvOnboardingConfirmedByParty" should {
+      offsetFreeLookupTest(
+        create = svOnboardingConfirmed("good", userParty(1)),
+        noise = Seq(svOnboardingConfirmed("bad", userParty(2))),
+      )(_.lookupSvOnboardingConfirmedByParty(userParty(1)))
+    }
     lookupTests("lookupSvOnboardingConfirmedByNameWithOffset")(
       create = svOnboardingConfirmed("good", userParty(1)),
       noise = Seq(svOnboardingConfirmed("bad", userParty(2))),
@@ -224,6 +231,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val wontExpireAnyTimeSoon = coin(storeSvParty, 10.0, 2, 0.0001)
         for {
           store <- mkStore()
+          _ <- dummyDomain.create(svcRules())(store.multiDomainAcsStore)
           _ <- createMiningRoundsTriple(store, startRound = 3L) // oldest is round 3, newest is 5
           _ <- Future.traverse(
             Seq(expiresAtRound2, expiresAtRound3, expiresAtRound4, wontExpireAnyTimeSoon)
@@ -248,6 +256,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val wontExpireAnyTimeSoon = lockedCoin(storeSvParty, 10.0, 2, 0.0001)
         for {
           store <- mkStore()
+          _ <- dummyDomain.create(svcRules())(store.multiDomainAcsStore)
           _ <- createMiningRoundsTriple(store, startRound = 3L) // oldest is round 3, newest is 5
           _ <- Future.traverse(
             Seq(expiresAtRound2, expiresAtRound3, expiresAtRound4, wontExpireAnyTimeSoon)
@@ -362,7 +371,8 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listAppRewardCouponsGroupedByCounterparty(
-            round = 3,
+            roundNumber = 3,
+            roundDomain = dummyDomain,
             totalCouponsLimit = 1000,
           )
         } yield {
@@ -392,7 +402,8 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listValidatorRewardCouponsGroupedByCounterparty(
-            round = 3,
+            roundNumber = 3,
+            roundDomain = dummyDomain,
             totalCouponsLimit = 1000,
           )
         } yield {
@@ -416,6 +427,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val hasConfirmation = closedMiningRound(svcParty, round = 6)
         for {
           store <- mkStore()
+          _ <- dummyDomain.create(svcRules())(store.multiDomainAcsStore)
           _ <- Future.traverse(
             goodClosed :+ hasValidatorCoupon :+ hasAppCoupon :+ hasConfirmation
           )(
@@ -441,7 +453,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           )(store.multiDomainAcsStore)
           result <- store.listArchivableClosedMiningRounds()
         } yield {
-          result.map(_.value) should contain theSameElementsAs goodClosed
+          result.map(_.value) should contain theSameElementsAs goodClosed.map(
+            AssignedContract(_, dummyDomain)
+          )
         }
       }
 
@@ -1225,7 +1239,6 @@ class InMemorySvSvcStoreTest extends SvSvcStoreTest {
   override protected def mkStore(): Future[InMemorySvSvcStore] = {
     val store = new InMemorySvSvcStore(
       SvStore.Key(storeSvParty, svcParty),
-      svDomainConfig,
       enableCoinRulesUpgrade = true,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),

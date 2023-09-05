@@ -13,7 +13,7 @@ import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.Contract
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.drivers as proto
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
 import com.digitalasset.canton.tracing.TraceContext
@@ -57,7 +57,7 @@ class PublishLocalCometBftNodeConfigTrigger(
         .contains(localSvNodeConfig)
     } yield PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask(
       svNodeMemberInfo.name,
-      svcRules.contract,
+      svcRules,
       localSvNodeConfig,
     )).value
       .map(_.toList)
@@ -75,10 +75,8 @@ class PublishLocalCometBftNodeConfigTrigger(
       )
     )
     for {
-      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
       _ <- connection
         .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
-        .withDomainId(domainId)
         .noDedup
         .yieldResult()
     } yield TaskSuccess(show"Updated SVC-wide CometBFT node configuration for ${store.key.svParty}")
@@ -101,7 +99,7 @@ class PublishLocalCometBftNodeConfigTrigger(
 object PublishLocalCometBftNodeConfigTrigger {
   case class PublishLocalConfigTask(
       svNodeId: String,
-      svcRules: Contract[daml.svcrules.SvcRules.ContractId, daml.svcrules.SvcRules],
+      svcRules: AssignedContract[daml.svcrules.SvcRules.ContractId, daml.svcrules.SvcRules],
       localSvNodeConfig: proto.cometbft.SvNodeConfig,
   ) extends PrettyPrinting {
 

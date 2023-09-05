@@ -315,7 +315,7 @@ final class ScanConnection private (
             .asRuntimeException()
         )
       crates <- listImportCrates(party)
-    } yield AcsStoreDump.ImportShipment(openRound.toContractWithState, openRound.domain, crates)
+    } yield AcsStoreDump.ImportShipment(openRound, crates)
   }
 
 }

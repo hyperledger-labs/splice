@@ -11,7 +11,6 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionIdleSta
 import com.daml.network.sv.store.SvSvcStore
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class ExpiredCnsSubscriptionTrigger(
     override protected val context: TriggerContext,
@@ -32,19 +31,21 @@ class ExpiredCnsSubscriptionTrigger(
   override protected def completeTaskAsLeader(
       task: ScheduledTaskTrigger.ReadyTask[SvSvcStore.IdleCnsSubscription]
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
-    domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
     svcRules <- store.getSvcRules()
-    cmd = svcRules.contractId.exerciseSvcRules_ExpireSubscription(
-      task.work.state.contractId,
-      new SubscriptionIdleState_ExpireSubscription(store.key.svcParty.toProtoPrimitive),
+    cmd = svcRules.exercise(
+      _.exerciseSvcRules_ExpireSubscription(
+        task.work.state.contractId,
+        new SubscriptionIdleState_ExpireSubscription(store.key.svcParty.toProtoPrimitive),
+      )
     )
     result <- svTaskContext.connection
-      .submitCommandsNoDedup(
+      .submit(
         actAs = Seq(store.key.svParty),
         readAs = Seq(store.key.svcParty),
-        commands = cmd.commands.asScala.toSeq,
-        domainId = domainId,
+        cmd,
       )
+      .noDedup
+      .yieldUnit()
       .map(_ => TaskSuccess(s"archived expired cns subscription"))
 
   } yield result

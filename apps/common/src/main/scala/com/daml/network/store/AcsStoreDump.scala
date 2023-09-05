@@ -9,10 +9,16 @@ import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_ValidatorLic
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.util.Contract.Companion
-import com.daml.network.util.{Contract, ContractWithState, DisclosedContracts, TemplateJsonDecoder}
+import com.daml.network.util.{
+  AssignedContract,
+  Contract,
+  ContractWithState,
+  DisclosedContracts,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 
@@ -23,8 +29,7 @@ object AcsStoreDump {
 
   /** A shipment of crates ready for import -- sorry for the bad pun :D */
   case class ImportShipment(
-      openRound: ContractWithState[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound],
-      domainId: DomainId,
+      openRound: AssignedContract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound],
       crates: Seq[
         ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]
       ],
@@ -127,18 +132,18 @@ object AcsStoreDump {
         case crate +: otherCrates =>
           logger.debug(show"Attempting to receive $crate")
           ledgerConnection
-            .submitCommandsNoDedup(
+            .submit(
               actAs = Seq(party),
               readAs = useReadAs.toList,
-              commands = crate.contractId
-                .exerciseImportCrate_Receive(
+              crate.exercise(
+                _.exerciseImportCrate_Receive(
                   party.toProtoPrimitive,
                   shipment.openRound.contractId,
                 )
-                .commands()
-                .asScala
-                .toSeq,
-              shipment.domainId,
+              ),
+            )
+            .withDomainId(
+              shipment.openRound.domain,
               disclosedContracts =
                 // Explicit disclosure blows up when using contracts imported via party migration, as the
                 // createdAt timestamps of the imported contracts are wrong (see #6661).
@@ -146,8 +151,10 @@ object AcsStoreDump {
                 if (useReadAs.isDefined)
                   DisclosedContracts()
                 else
-                  DisclosedContracts(crate, shipment.openRound),
+                  DisclosedContracts(crate, shipment.openRound.toContractWithState),
             )
+            .noDedup
+            .yieldUnit()
             .flatMap(_ => receiveCrates(shipment.copy(crates = otherCrates)))
         case _ => Future.successful(Done)
       }
@@ -155,7 +162,7 @@ object AcsStoreDump {
     def getAndReceiveShipment(): Future[Done] = for {
       shipment <- getImportShipment(party, tc)
       _ = logger.debug(
-        show"Attempting to receive ${shipment.crates.size} crates on ${shipment.domainId} for $party"
+        show"Attempting to receive ${shipment.crates.size} crates on ${shipment.openRound.domain} for $party"
       )
       case Done <- receiveCrates(shipment)
     } yield {

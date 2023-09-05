@@ -46,9 +46,8 @@ class ExpiredLockedCoinTrigger(
       .submit(
         Seq(store.key.svParty),
         Seq(store.key.svcParty),
-        update = cmd.update, // TODO (#7052) remove .update
+        update = cmd,
       )
-      .withDomainId(co.work.domain)
       .noDedup
       .yieldUnit()
   } yield TaskSuccess(s"archived expired locked coin")

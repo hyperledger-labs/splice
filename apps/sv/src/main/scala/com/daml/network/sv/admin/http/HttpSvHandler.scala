@@ -258,7 +258,7 @@ class HttpSvHandler(
         svPartyId = svParty.toProtoPrimitive,
         svcPartyId = svcParty.toProtoPrimitive,
         votingThreshold = requiredNumVotes(svcRules),
-        latestMiningRound = latestOpenMiningRound.toHttp,
+        latestMiningRound = latestOpenMiningRound.contract.toHttp,
         coinRules = coinRules.toHttp,
         svcRules = svcRules.contract.toHttp,
       )

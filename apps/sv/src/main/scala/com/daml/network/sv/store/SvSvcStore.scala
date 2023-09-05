@@ -28,7 +28,7 @@ import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{JsonAcsSnapshot, QueryResult}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.sv.config.{SvAppBackendConfig, SvDomainConfig}
+import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.SvSvcStore.ignoredContractsForAcsDump
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
@@ -53,8 +53,7 @@ trait SvSvcStore
     extends CNNodeAppStoreWithHistory[
       SvcTxLogParser.TxLogIndexRecord,
       SvcTxLogParser.TxLogEntry,
-    ]
-    with ConfiguredDefaultDomain {
+    ] {
 
   override protected def txLogParser = new SvcTxLogParser(loggerFactory)
 
@@ -68,10 +67,7 @@ trait SvSvcStore
 
   def key: SvStore.Key
 
-  protected[this] def domainConfig: SvDomainConfig
   protected[this] def enableCoinRulesUpgrade: Boolean
-
-  override final def defaultAcsDomain = domainConfig.global.alias
 
   def lookupSvcRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[
@@ -203,27 +199,26 @@ trait SvSvcStore
       tc: TraceContext,
   ): Future[Option[SvSvcStore.OpenMiningRoundTriple]] =
     for {
-      domain <- defaultAcsDomainIdF
-      openMiningRounds <- multiDomainAcsStore.listContractsOnDomain(
-        cc.round.OpenMiningRound.COMPANION,
-        domain,
+      openMiningRounds <- multiDomainAcsStore.listAssignedContracts(
+        cc.round.OpenMiningRound.COMPANION
       )
-      result = openMiningRounds.sortBy(contract => contract.payload.round.number) match {
-        case Seq(oldest, middle, newest)
-            if oldest.payload.round.number + 1 == middle.payload.round.number &&
-              newest.payload.round.number - 1 == middle.payload.round.number =>
-          Some(
-            SvSvcStore.OpenMiningRoundTriple(
-              oldest = oldest,
-              middle = middle,
-              newest = newest,
-              domain = domain,
-            )
-          )
-        case _ =>
-          None
-      }
-    } yield result
+    } yield for {
+      newestOverallRound <- openMiningRounds.maxByOption(_.payload.round.number)
+      // all rounds are signed by svc; pick the domain with the highest round#
+      domain = newestOverallRound.domain
+      Seq(oldest, middle, newest) <- Some(
+        openMiningRounds
+          .filter(_.domain == domain)
+          .sortBy(_.payload.round.number)
+      )
+      if oldest.payload.round.number + 1 == middle.payload.round.number &&
+        newest.payload.round.number - 1 == middle.payload.round.number
+    } yield SvSvcStore.OpenMiningRoundTriple(
+      oldest = oldest.contract,
+      middle = middle.contract,
+      newest = newest.contract,
+      domain = domain,
+    )
 
   /** Get the triple of open mining rounds that should always be present after boostrapping. */
   final def getOpenMiningRoundTriple()(implicit
@@ -238,17 +233,19 @@ trait SvSvcStore
       )
     )
 
-  def lookupLatestActiveOpenMiningRound()(implicit
+  final def lookupLatestActiveOpenMiningRound()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Option[SvSvcStore.OpenMiningRoundContract]] =
-    lookupOpenMiningRoundTriple().map(_.map(_.newest))
+  ): Future[Option[SvSvcStore.OpenMiningRound[AssignedContract]]] =
+    lookupOpenMiningRoundTriple().map(_.map { triple =>
+      AssignedContract(triple.newest, triple.domain)
+    })
 
   /** get the latest active open mining round contract, which should always be present after bootstrapping. */
   def getLatestActiveOpenMiningRound()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[SvSvcStore.OpenMiningRoundContract] = lookupLatestActiveOpenMiningRound().map(
+  ): Future[SvSvcStore.OpenMiningRound[AssignedContract]] = lookupLatestActiveOpenMiningRound().map(
     _.getOrElse(
       throw new StatusRuntimeException(
         Status.NOT_FOUND.withDescription("No active OpenMiningRound contract")
@@ -284,9 +281,12 @@ trait SvSvcStore
   ): Future[Seq[Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]]]
 
   def listAppRewardCouponsGroupedByCounterparty(
-      round: Long,
+      roundNumber: Long,
+      roundDomain: DomainId,
       totalCouponsLimit: Long,
-  )(implicit tc: TraceContext): Future[Seq[Seq[cc.coin.AppRewardCoupon.ContractId]]]
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[Seq[cc.coin.AppRewardCoupon.ContractId]]]
 
   def listValidatorRewardCouponsOnDomain(
       round: Long,
@@ -297,13 +297,16 @@ trait SvSvcStore
   ]
 
   def listValidatorRewardCouponsGroupedByCounterparty(
-      round: Long,
+      roundNumber: Long,
+      roundDomain: DomainId,
       totalCouponsLimit: Long,
   )(implicit tc: TraceContext): Future[Seq[Seq[cc.coin.ValidatorRewardCoupon.ContractId]]]
 
-  protected def lookupOldestClosedMiningRound()(implicit
+  protected[this] def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
-  ): Future[Option[Contract[cc.round.ClosedMiningRound.ContractId, cc.round.ClosedMiningRound]]]
+  ): Future[
+    Option[AssignedContract[cc.round.ClosedMiningRound.ContractId, cc.round.ClosedMiningRound]]
+  ]
 
   final def getExpiredRewardsForOldestClosedMiningRound(totalCouponsLimit: Long = 100L)(implicit
       tc: TraceContext
@@ -314,10 +317,12 @@ trait SvSvcStore
           for {
             appRewardGroups <- listAppRewardCouponsGroupedByCounterparty(
               closedRound.payload.round.number,
+              closedRound.domain,
               totalCouponsLimit = totalCouponsLimit,
             )
             validatorRewardGroups <- listValidatorRewardCouponsGroupedByCounterparty(
               closedRound.payload.round.number,
+              closedRound.domain,
               totalCouponsLimit = totalCouponsLimit,
             )
           } yield appRewardGroups.map(group =>
@@ -341,11 +346,11 @@ trait SvSvcStore
     */
   def listArchivableClosedMiningRounds()(implicit tc: TraceContext): Future[
     Seq[QueryResult[
-      Contract[cc.round.ClosedMiningRound.ContractId, cc.round.ClosedMiningRound]
+      AssignedContract[cc.round.ClosedMiningRound.ContractId, cc.round.ClosedMiningRound]
     ]]
   ] = {
     for {
-      domain <- defaultAcsDomainIdF
+      domain <- getSvcRules().map(_.domain)
       closedRounds <- multiDomainAcsStore.listContractsOnDomain(
         cc.round.ClosedMiningRound.COMPANION,
         domain,
@@ -378,7 +383,7 @@ trait SvSvcStore
               appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty &&
               // ... and a confirmation to archive is not already created by this SV
               confirmationQueryResult.value.isEmpty
-            ) Some(QueryResult(confirmationQueryResult.offset, round))
+            ) Some(QueryResult(confirmationQueryResult.offset, AssignedContract(round, domain)))
             else None
           )
         }
@@ -469,18 +474,6 @@ trait SvSvcStore
       svParty: PartyId
   )(implicit tc: TraceContext): Future[
     Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]
-  ] =
-    defaultAcsDomainIdF
-      .flatMap(
-        lookupSvOnboardingConfirmedByPartyOnDomain(svParty, _)
-      )
-      .map(_.value)
-
-  def lookupSvOnboardingConfirmedByPartyOnDomain(
-      svParty: PartyId,
-      domainId: DomainId,
-  )(implicit tc: TraceContext): Future[
-    QueryResult[Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]]
   ]
 
   def lookupSvOnboardingConfirmedByName(
@@ -809,7 +802,7 @@ trait SvSvcStore
     getLatestActiveOpenMiningRound().flatMap(getTransferContext)
 
   private def getTransferContext(
-      openMiningRound: SvSvcStore.OpenMiningRoundContract
+      openMiningRound: SvSvcStore.OpenMiningRound[Contract.Has]
   )(implicit tc: TraceContext): Future[cc.api.v1.coin.AppTransferContext] = {
     for {
       featured <- lookupFeaturedAppRight(key.svcParty)
@@ -845,7 +838,6 @@ object SvSvcStore {
       case _: MemoryStorage =>
         new InMemorySvSvcStore(
           key,
-          config.domains,
           config.enableCoinRulesUpgrade,
           loggerFactory,
           retryProvider,

@@ -27,12 +27,11 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
-import com.daml.network.store.MultiDomainAcsStore.{ContractState, QueryResult}
-import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.sv.config.SvDomainConfig
+import MultiDomainAcsStore.QueryResult
+import TxLogStore.TransactionTreeSource
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract, ContractWithState}
+import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
@@ -43,7 +42,6 @@ import scala.jdk.CollectionConverters.*
 
 class InMemorySvSvcStore(
     override val key: SvStore.Key,
-    override protected[this] val domainConfig: SvDomainConfig,
     override protected[this] val enableCoinRulesUpgrade: Boolean,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
@@ -105,7 +103,7 @@ class InMemorySvSvcStore(
           Future.successful(Seq.empty[AssignedContract[Id, T]])
         ) { latest =>
           for {
-            domainId <- defaultAcsDomainIdF
+            domainId <- getSvcRules().map(_.domain)
             allExpired <- multiDomainAcsStore
               .filterContractsOnDomain(
                 companion,
@@ -146,12 +144,19 @@ class InMemorySvSvcStore(
       limit = limit,
     )
 
-  override def listAppRewardCouponsGroupedByCounterparty(round: Long, totalCouponsLimit: Long)(
-      implicit tc: TraceContext
+  override def listAppRewardCouponsGroupedByCounterparty(
+      roundNumber: Long,
+      roundDomain: DomainId,
+      totalCouponsLimit: Long,
+  )(implicit
+      tc: TraceContext
   ): Future[Seq[Seq[AppRewardCoupon.ContractId]]] = {
     for {
-      defaultDomain <- defaultAcsDomainIdF
-      appRewards <- listAppRewardCouponsOnDomain(round, defaultDomain, PageLimit(totalCouponsLimit))
+      appRewards <- listAppRewardCouponsOnDomain(
+        roundNumber,
+        roundDomain,
+        PageLimit(totalCouponsLimit),
+      )
       providerToCoupons = appRewards.foldLeft(
         Map[String, Seq[cc.coin.AppRewardCoupon.ContractId]]()
       ) { (m, r) =>
@@ -181,14 +186,14 @@ class InMemorySvSvcStore(
     )
 
   override def listValidatorRewardCouponsGroupedByCounterparty(
-      round: Long,
+      roundNumber: Long,
+      roundDomain: DomainId,
       totalCouponsLimit: Long,
   )(implicit tc: TraceContext): Future[Seq[Seq[ValidatorRewardCoupon.ContractId]]] = {
     for {
-      defaultDomain <- defaultAcsDomainIdF
       validatorRewards <- listValidatorRewardCouponsOnDomain(
-        round,
-        defaultDomain,
+        roundNumber,
+        roundDomain,
         PageLimit(totalCouponsLimit),
       )
       validatorToCoupons = validatorRewards.foldLeft(
@@ -206,13 +211,13 @@ class InMemorySvSvcStore(
 
   override protected def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
-  ): Future[Option[Contract[ClosedMiningRound.ContractId, ClosedMiningRound]]] = for {
-    domain <- defaultAcsDomainIdF
+  ): Future[Option[AssignedContract[ClosedMiningRound.ContractId, ClosedMiningRound]]] = for {
+    domain <- getSvcRules().map(_.domain)
     rounds <- multiDomainAcsStore.listContractsOnDomain(
       cc.round.ClosedMiningRound.COMPANION,
       domain,
     )
-  } yield rounds.minByOption(_.payload.round.number)
+  } yield rounds.minByOption(_.payload.round.number).map(AssignedContract(_, domain))
 
   override def lookupConfirmationByActionWithOffset(
       confirmer: PartyId,
@@ -428,10 +433,8 @@ class InMemorySvSvcStore(
       now: CantonTimestamp,
       limit: Int,
   )(implicit tc: TraceContext): Future[Seq[SvSvcStore.IdleCnsSubscription]] = for {
-    domainId <- defaultAcsDomainIdF
-    dueSubscriptions <- multiDomainAcsStore.filterContractsOnDomain(
+    dueSubscriptions <- multiDomainAcsStore.filterContracts(
       SubscriptionIdleState.COMPANION,
-      domainId,
       filter = { e: Contract[?, SubscriptionIdleState] =>
         now.toInstant.isAfter(e.payload.nextPaymentDueAt)
       },
@@ -440,11 +443,10 @@ class InMemorySvSvcStore(
     subscriptionsWithContext <- dueSubscriptions.toList
       .traverse { subscription =>
         multiDomainAcsStore
-          .lookupContractByIdOnDomain(cn.cns.CnsEntryContext.COMPANION)(
-            domainId,
+          .lookupContractById(cn.cns.CnsEntryContext.COMPANION)(
             cn.cns.CnsEntryContext.ContractId.unsafeFromInterface(
               subscription.payload.subscriptionData.context
-            ),
+            )
           )
           .map(context => (subscription, context))
       }
@@ -453,23 +455,20 @@ class InMemorySvSvcStore(
       .sortBy(_._1.payload.nextPaymentDueAt)
       .iterator
       .collect { case (subscription, Some(context)) =>
-        SvSvcStore.IdleCnsSubscription(subscription, context)
+        SvSvcStore.IdleCnsSubscription(subscription.contract, context.contract)
       }
       .take(limit)
       .toSeq
   } yield result
 
-  override def lookupSvOnboardingConfirmedByPartyOnDomain(svParty: PartyId, domainId: DomainId)(
-      implicit tc: TraceContext
-  ): Future[
-    QueryResult[Option[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]]
-  ] = {
-    multiDomainAcsStore.findContractOnDomainWithOffset(so.SvOnboardingConfirmed.COMPANION)(
-      domainId,
-      (co: Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]) =>
-        co.payload.svParty == svParty.toProtoPrimitive,
-    )
-  }
+  override def lookupSvOnboardingConfirmedByParty(svParty: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]] =
+    multiDomainAcsStore
+      .findContractWithOffset(so.SvOnboardingConfirmed.COMPANION)(
+        (co: Contract[?, SvOnboardingConfirmed]) => co.payload.svParty == svParty.toProtoPrimitive
+      )
+      .map(_.value map (_.contract))
 
   override def lookupSvOnboardingConfirmedByNameWithOffset(
       svName: String
@@ -535,7 +534,6 @@ class InMemorySvSvcStore(
   override def getImportShipmentFor(
       receiver: PartyId
   )(implicit tc: TraceContext): Future[AcsStoreDump.ImportShipment] = for {
-    domainId <- this.defaultAcsDomainIdF
     openRound <- this.getLatestActiveOpenMiningRound()
     // Listing all crates is OK, as we assume the number of crates is small.
     allCrates <- multiDomainAcsStore.listContracts(cc.coinimport.ImportCrate.COMPANION)
@@ -543,10 +541,7 @@ class InMemorySvSvcStore(
       crate.payload.receiver == receiver.toProtoPrimitive
     )
   } yield AcsStoreDump.ImportShipment(
-    // It would be better if we received the ContractWithState directly from the underlying store.
-    // This is OK though, as eventually the defaulAcsDomainIdF and the domain of the openRound should align.
-    ContractWithState(openRound, ContractState.Assigned(domainId)),
-    domainId,
+    openRound,
     cratesForReceiver,
   )
 

@@ -141,13 +141,12 @@ class ExecuteConfirmedActionTrigger(
           case confirmSvAction: SRARC_ConfirmSvOnboarding =>
             for {
               isSvOnboardingConfirmed <- store
-                .lookupSvOnboardingConfirmedByPartyOnDomain(
+                .lookupSvOnboardingConfirmedByParty(
                   PartyId.tryFromProtoPrimitive(
                     confirmSvAction.svcRules_ConfirmSvOnboardingValue.newMemberParty
-                  ),
-                  confirmation.domain,
+                  )
                 )
-                .map(_.value.nonEmpty)
+                .map(_.nonEmpty)
               newMemberParty = PartyId.tryFromProtoPrimitive(
                 confirmSvAction.svcRules_ConfirmSvOnboardingValue.newMemberParty
               )

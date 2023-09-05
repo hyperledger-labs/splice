@@ -16,11 +16,13 @@ import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.Contract
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+
+import ArchiveClosedMiningRoundsTrigger.*
 
 class ArchiveClosedMiningRoundsTrigger(
     override protected val context: TriggerContext,
@@ -29,11 +31,7 @@ class ArchiveClosedMiningRoundsTrigger(
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[
-      QueryResult[Contract[ClosedMiningRound.ContractId, ClosedMiningRound]]
-    ] {
-  private type Task = QueryResult[Contract[ClosedMiningRound.ContractId, ClosedMiningRound]]
-
+) extends PollingParallelTaskExecutionTrigger[Task] {
   private val svParty = store.key.svParty
   private val svcParty = store.key.svcParty
 
@@ -107,10 +105,11 @@ class ArchiveClosedMiningRoundsTrigger(
   override protected def isStaleTask(
       task: Task
   )(implicit tc: TraceContext): Future[Boolean] = {
+    val closedRound = task.value
+    val domainId = closedRound.domain
     for {
-      domainId <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
-      closedRound = task.value
-      // lookup closed mining round once again in the ACS to check if it was archived
+      // lookup closed mining round once again in the ACS to check if it was
+      // archived or reassigned
       closedRoundExists <- store.multiDomainAcsStore
         .lookupContractByIdOnDomain(cc.round.ClosedMiningRound.COMPANION)(
           domainId,
@@ -124,4 +123,9 @@ class ArchiveClosedMiningRoundsTrigger(
           existsClosedRoundArchivalConfirmation(closedRound.contractId)
     } yield isStale
   }
+}
+
+object ArchiveClosedMiningRoundsTrigger {
+  private[confirmation] type Task =
+    QueryResult[AssignedContract[ClosedMiningRound.ContractId, ClosedMiningRound]]
 }

@@ -1,5 +1,6 @@
 package com.daml.network.sv.store.db
 
+import cats.data.OptionT
 import cats.implicits.*
 import com.daml.ledger.javaapi.data as javab
 import com.daml.ledger.javaapi.data.codegen.ContractId
@@ -23,12 +24,18 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
-import com.daml.network.store.{AcsStoreDump, Limit, LimitHelpers, MultiDomainAcsStore}
+import com.daml.network.store.{
+  AcsStoreDump,
+  ConfiguredDefaultDomain,
+  Limit,
+  LimitHelpers,
+  MultiDomainAcsStore,
+}
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.SvcTables.{SvcAcsStoreRowData, SvcTxLogRowData}
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
 import com.daml.network.util.Contract.Companion.Template
-import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.util.{AssignedContract, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -45,7 +52,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class DbSvSvcStore(
     override val key: SvStore.Key,
     storage: DbStorage,
-    override protected[this] val domainConfig: SvDomainConfig,
+    domainConfig: SvDomainConfig,
     override protected[this] val enableCoinRulesUpgrade: Boolean,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
@@ -67,6 +74,7 @@ class DbSvSvcStore(
       ),
     )
     with SvSvcStore
+    with ConfiguredDefaultDomain
     with AcsTables
     with AcsQueries
     with LimitHelpers
@@ -74,6 +82,8 @@ class DbSvSvcStore(
 
   import storage.DbStorageConverters.setParameterByteArray
   import multiDomainAcsStore.waitUntilAcsIngested
+
+  override final def defaultAcsDomain = domainConfig.global.alias
 
   def storeId: Int = multiDomainAcsStore.storeId
 
@@ -212,33 +222,25 @@ class DbSvSvcStore(
     }
   }
 
-  // TODO (#5314): this is not checking for domain
-
-  override def lookupSvOnboardingConfirmedByPartyOnDomain(svParty: PartyId, domainId: DomainId)(
-      implicit tc: TraceContext
-  ): Future[MultiDomainAcsStore.QueryResult[
-    Option[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]
-  ]] = waitUntilAcsIngested {
-    for {
-      result <- storage
-        .querySingle(
-          selectFromAcsTableWithOffset(
-            DbSvSvcStore.acsTableName,
-            storeId,
-            where = sql"""
-              template_id = ${SvOnboardingConfirmed.TEMPLATE_ID}
-                and sv_candidate_party = $svParty
-              """,
-            orderLimit = sql"limit 1",
-          ).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
-          "lookupSvOnboardingConfirmedByPartyOnDomain",
-        )
-        .getOrRaise(offsetExpectedError())
-    } yield MultiDomainAcsStore.QueryResult(
-      result.offset,
-      result.row.map(contractFromRow(SvOnboardingConfirmed.COMPANION)(_)),
-    )
-  }
+  override def lookupSvOnboardingConfirmedByParty(svParty: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]] =
+    waitUntilAcsIngested {
+      for {
+        result <- storage
+          .querySingle(
+            (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
+              sql"""
+                where store_id = $storeId
+                  and template_id = ${SvOnboardingConfirmed.TEMPLATE_ID}
+                  and sv_candidate_party = $svParty
+                limit 1
+              """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+            "lookupSvOnboardingConfirmedByParty",
+          )
+          .value
+      } yield result.map(contractFromRow(SvOnboardingConfirmed.COMPANION)(_))
+    }
 
   override def listConfirmations(action: ActionRequiringConfirmation, limit: Limit)(implicit
       tc: TraceContext
@@ -302,10 +304,15 @@ class DbSvSvcStore(
       } yield limited.map(contractFromRow(ValidatorRewardCoupon.COMPANION)(_))
     }
 
-  override def listAppRewardCouponsGroupedByCounterparty(round: Long, totalCouponsLimit: Long)(
-      implicit tc: TraceContext
+  override def listAppRewardCouponsGroupedByCounterparty(
+      roundNumber: Long,
+      roundDomain: DomainId,
+      totalCouponsLimit: Long,
+  )(implicit
+      tc: TraceContext
   ): Future[Seq[Seq[AppRewardCoupon.ContractId]]] = waitUntilAcsIngested {
     for {
+      // TODO (#5314) only consider those on roundDomain
       result <- storage
         .query(
           sql"""
@@ -313,7 +320,7 @@ class DbSvSvcStore(
               from svc_acs_store
               where store_id = $storeId
                 and template_id = ${AppRewardCoupon.TEMPLATE_ID}
-                and reward_round = $round
+                and reward_round = $roundNumber
                 and reward_party is not null -- otherwise index is not used
               group by reward_party
               limit $totalCouponsLimit
@@ -324,11 +331,13 @@ class DbSvSvcStore(
   }
 
   override def listValidatorRewardCouponsGroupedByCounterparty(
-      round: Long,
+      roundNumber: Long,
+      roundDomain: DomainId,
       totalCouponsLimit: Long,
   )(implicit tc: TraceContext): Future[Seq[Seq[ValidatorRewardCoupon.ContractId]]] =
     waitUntilAcsIngested {
       for {
+        // TODO (#5314) only consider those on roundDomain
         result <- storage
           .query(
             sql"""
@@ -336,7 +345,7 @@ class DbSvSvcStore(
                 from svc_acs_store
                 where store_id = $storeId
                   and template_id = ${ValidatorRewardCoupon.TEMPLATE_ID}
-                  and reward_round = $round
+                  and reward_round = $roundNumber
                   and reward_party is not null -- otherwise index is not used
                 group by reward_party
                 limit $totalCouponsLimit
@@ -350,9 +359,11 @@ class DbSvSvcStore(
 
   override protected def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
-  ): Future[Option[Contract[ClosedMiningRound.ContractId, ClosedMiningRound]]] =
+  ): Future[Option[AssignedContract[ClosedMiningRound.ContractId, ClosedMiningRound]]] =
     waitUntilAcsIngested {
       (for {
+        svcRules <- OptionT(lookupSvcRules())
+        // TODO (#5314) only those domain-matching SvcRules
         result <- storage.querySingle(
           (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
@@ -364,7 +375,10 @@ class DbSvSvcStore(
            """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
           "lookupOldestClosedMiningRound",
         )
-      } yield contractFromRow(ClosedMiningRound.COMPANION)(result)).value
+      } yield AssignedContract(
+        contractFromRow(ClosedMiningRound.COMPANION)(result),
+        svcRules.domain,
+      )).value
     }
 
   override def lookupConfirmationByActionWithOffset(
@@ -599,7 +613,9 @@ class DbSvSvcStore(
             "listExpiredRoundBased",
           )
           contracts <- rows.traverse(multiDomainAcsStore.contractWithStateFromRow(companion)(_))
-        } yield contracts.flatMap(_.toAssignedContract)
+        } yield contracts.flatMap(
+          _.toAssignedContract
+        ) // TODO (#5314) only those domain-matching SvcRules
       }
 
   override def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Long)(
@@ -951,7 +967,6 @@ class DbSvSvcStore(
       tc: TraceContext
   ): Future[AcsStoreDump.ImportShipment] = waitUntilAcsIngested {
     for {
-      domainId <- defaultAcsDomainIdF
       openRound <- getLatestActiveOpenMiningRound()
       result <- storage
         .query(
@@ -968,14 +983,7 @@ class DbSvSvcStore(
       withState <- Future.traverse(limited)(
         multiDomainAcsStore.contractWithStateFromRow(ImportCrate.COMPANION)(_)
       )
-    } yield AcsStoreDump
-      .ImportShipment( // TODO (#5314): revisit this comment (also in the in-mem version)
-        // It would be better if we received the ContractWithState directly from the underlying store.
-        // This is OK though, as eventually the defaulAcsDomainIdF and the domain of the openRound should align.
-        ContractWithState(openRound, MultiDomainAcsStore.ContractState.Assigned(domainId)),
-        domainId,
-        withState,
-      )
+    } yield AcsStoreDump.ImportShipment(openRound, withState)
   }
 
   override def lookupCnsEntryByNameWithOffset(
