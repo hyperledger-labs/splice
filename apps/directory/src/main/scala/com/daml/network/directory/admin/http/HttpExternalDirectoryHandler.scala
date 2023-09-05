@@ -1,6 +1,7 @@
 package com.daml.network.directory.admin.http
 
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
+import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn.directory.DirectoryInstall
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.RetryProvider
@@ -32,7 +33,7 @@ class HttpExternalDirectoryHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends external.directory.DirectoryHandler[String]
+) extends external.directory.DirectoryHandler[TracedUser]
     with Spanning
     with NamedLogging {
 
@@ -40,8 +41,11 @@ class HttpExternalDirectoryHandler(
 
   override def createDirectoryEntry(
       respond: r0.CreateDirectoryEntryResponse.type
-  )(body: d0.CreateDirectoryEntryRequest)(user: String): Future[r0.CreateDirectoryEntryResponse] = {
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(
+      body: d0.CreateDirectoryEntryRequest
+  )(tuser: TracedUser): Future[r0.CreateDirectoryEntryResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    withSpan(s"$workflowId.createDirectoryEntry") { implicit traceContext => _ =>
       for {
         partyId <- connection.getPrimaryParty(user)
         installContractId <- getInstallContract(partyId)
