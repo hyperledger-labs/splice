@@ -166,7 +166,11 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     version
   );
 
-  const globalDomain = installGlobalDomainNode(svNamespace, password, postgres);
+  const globalDomain = installGlobalDomainNode(
+    svNamespace,
+    password,
+    svImagePullDeps.concat([postgres])
+  );
 
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
