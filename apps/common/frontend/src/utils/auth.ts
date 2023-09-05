@@ -9,7 +9,7 @@ export const oidcAuthToProviderProps = (config: AuthConfig): AuthProviderProps =
 
     // We include the `offline_access` scope to tell auth0 we want refresh tokens when we first authenticate.
     // The refresh tokens are then used to automatically retrieve new access tokens before they expire without re-authenticating.
-    const scope = `${token_scope} offline_access`;
+    const scope = [token_scope, 'offline_access'].filter(s => !!s).join(' ');
 
     const extraQueryParams = { audience: token_audience };
     const redirect_uri = window.location.origin;
