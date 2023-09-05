@@ -1,13 +1,12 @@
 import * as React from 'react';
-import BigNumber from 'bignumber.js';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
 import { Grid, Tab, Tabs, Typography, Box } from '@mui/material';
 
-import AmountSummary from '../components/AmountSummary';
 import Header from '../components/Header';
 import NetworkInfo from '../components/NetworkInfo';
 import TotalCoinBalance from '../components/TotalCoinBalance';
+import TotalRewards from '../components/TotalRewards';
 
 const Root: React.FC = () => {
   const navLinks = [
@@ -20,8 +19,6 @@ const Root: React.FC = () => {
   // so we need to set it as active manually.
   const currentPath = useLocation().pathname;
   const selected = navLinks.find(({ path }) => currentPath.includes(path)) || navLinks[0];
-
-  const totalRewardsIssued = BigNumber(1234567.324567523); // mock data
 
   return (
     <Grid container margin={4} pr={4} spacing={4} justifyContent="center" sx={{ width: 'auto' }}>
@@ -40,7 +37,7 @@ const Root: React.FC = () => {
       </Grid>
 
       <Grid item xs={12} lg={6}>
-        <AmountSummary title="Rewards" amount={totalRewardsIssued} />
+        <TotalRewards />
       </Grid>
 
       <Grid item xs={12} lg={6}>

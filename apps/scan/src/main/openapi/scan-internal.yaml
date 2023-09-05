@@ -179,7 +179,7 @@ paths:
                 "$ref": "#/components/schemas/GetCoinConfigForRoundResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /get-round-of-latest-data:
+  /round-of-latest-data:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -193,7 +193,7 @@ paths:
                 $ref: "#/components/schemas/GetRoundOfLatestDataResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /get-rewards-collected:
+  /rewards-collected:
     get:
       tags: [scan]
       x-jvm-package: scan

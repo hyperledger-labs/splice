@@ -9,6 +9,7 @@ import useLookupFeaturedAppRight from './useLookupFeaturedAppRight';
 import useRecentActivity from './useRecentActivity';
 import useTopAppProviders from './useTopAppProviders';
 import useTotalCoinBalance from './useTotalCoinBalance';
+import useTotalRewards from './useTotalRewards';
 
 export {
   ScanClientProvider,
@@ -22,4 +23,5 @@ export {
   useRecentActivity,
   useTopAppProviders,
   useTotalCoinBalance,
+  useTotalRewards,
 };
