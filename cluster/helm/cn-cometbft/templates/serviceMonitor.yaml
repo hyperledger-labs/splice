@@ -1,0 +1,24 @@
+{{- if .Values.metrics.enable }}
+{{- $fullRpcHostName := include "prefix" (list .Values "cometbft-rpc") }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    release: {{ .Values.metrics.release }}
+  name: cometbft
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpoints:
+
+  - port: cometbft-metrics
+    interval: {{ .Values.metrics.interval }}
+
+  selector:
+    matchLabels:
+      name: {{ $fullRpcHostName }}
+
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+
+{{- end }}

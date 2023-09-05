@@ -1498,6 +1498,11 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26656
         },
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "node": {
           "externalAddress": "mock.network.canton.global:26656",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
@@ -2332,6 +2337,11 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26666
         },
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "node": {
           "externalAddress": "mock.network.canton.global:26666",
           "id": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1",
@@ -3070,6 +3080,11 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26676
         },
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "node": {
           "externalAddress": "mock.network.canton.global:26676",
           "id": "0d8e87c54d199e85548ccec123c9d92966ec458c",
@@ -3734,6 +3749,11 @@
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26686
+        },
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
         },
         "node": {
           "externalAddress": "mock.network.canton.global:26686",

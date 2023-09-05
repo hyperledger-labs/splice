@@ -122,6 +122,9 @@ export function installCometBftNode(
     genesis: {
       chainId: `${CLUSTER_BASENAME}`,
     },
+    metrics: {
+      enable: true,
+    },
   });
   return Service.get(
     `${nodeConfig.identifier}-cometbft-rpc`,
