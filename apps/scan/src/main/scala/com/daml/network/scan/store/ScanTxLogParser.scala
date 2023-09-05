@@ -348,14 +348,14 @@ object ScanTxLogParser {
         indexRecord: TxLogIndexRecord.RecentActivityIndexRecord,
         provider: String,
         sender: String,
-        receiver: String,
+        receivers: Seq[String],
         amount: BigDecimal,
         coinPrice: BigDecimal,
     ) extends TxLogEntry {
       def toResponseItem = httpDef.ListRecentActivityResponseItem(
         provider = provider,
         sender = sender,
-        receiver = receiver,
+        receivers = Some(receivers.toVector),
         amount = Codec.encode(amount),
         coinPrice = Codec.encode(coinPrice),
       )
@@ -515,9 +515,9 @@ object ScanTxLogParser {
             ),
             provider = node.argument.value.transfer.provider,
             sender = node.argument.value.transfer.sender,
-            receiver = node.argument.value.transfer.outputs.asScala.headOption
+            receivers = node.argument.value.transfer.outputs.asScala
               .map(_.receiver)
-              .getOrElse(""),
+              .toVector,
             amount = node.result.value.summary.inputCoinAmount,
             coinPrice = node.result.value.summary.coinPrice,
           )

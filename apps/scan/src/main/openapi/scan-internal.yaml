@@ -571,8 +571,10 @@ components:
           type: string
         sender:
           type: string
-        receiver:
-          type: string
+        receivers:
+          type: array
+          items:
+            type: string
         amount:
           type: string
         coin_price:

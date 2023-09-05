@@ -656,7 +656,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               ),
             provider = user1.toProtoPrimitive,
             sender = user1.toProtoPrimitive,
-            receiver = user1.toProtoPrimitive,
+            receivers = Seq(user1.toProtoPrimitive),
             amount = BigDecimal(i),
             coinPrice = BigDecimal(1.0),
           )
