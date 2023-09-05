@@ -6,6 +6,10 @@ Release Notes
 2023-09-11
 ----------
 
+* Deployment updates:
+
+    * Please note an SV rename from `sbi` to `SBI-Holdings`.
+
 * Bugfixes:
 
     * Fixed an issue where the UIs would incorrectly include an `undefined` scope to requests towards an OIDC provider.
