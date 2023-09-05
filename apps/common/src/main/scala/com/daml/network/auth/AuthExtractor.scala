@@ -4,14 +4,15 @@ import akka.http.scaladsl.server.Directive1
 import akka.http.scaladsl.server.Directives.authenticateOAuth2
 import akka.http.scaladsl.server.directives.Credentials
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.NoTracing
+import com.digitalasset.canton.tracing.TraceContext
 
 object AuthExtractor {
+  final case class TracedUser(user: String, traceContext: TraceContext)
   def apply(
       verifier: SignatureVerifier,
       loggerFactory: NamedLoggerFactory,
       realm: String,
-  ): String => Directive1[String] = {
+  )(implicit traceContext: TraceContext): String => Directive1[TracedUser] = {
     new AuthExtractor(verifier, loggerFactory, realm).directiveForOperationId
   }
 }
@@ -20,9 +21,10 @@ class AuthExtractor(
     verifier: SignatureVerifier,
     override protected val loggerFactory: NamedLoggerFactory,
     realm: String,
-) extends NamedLogging
-    with NoTracing {
-  def directiveForOperationId(operationId: String): Directive1[String] = {
+)(implicit
+    traceContext: TraceContext
+) extends NamedLogging {
+  def directiveForOperationId(operationId: String): Directive1[AuthExtractor.TracedUser] = {
     authenticateOAuth2(
       realm,
       credentials =>
@@ -49,6 +51,6 @@ class AuthExtractor(
             }
           case Credentials.Missing => None
         },
-    )
+    ).map(user => AuthExtractor.TracedUser(user, traceContext))
   }
 }

@@ -10,7 +10,7 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
-import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
+import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.*
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
@@ -563,7 +563,7 @@ class ValidatorApp(
           )
         )
       ) {
-        newTraceContext { traceContext =>
+        withTraceContext { implicit traceContext =>
           requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {
               concat(
@@ -590,16 +590,16 @@ class ValidatorApp(
                           automation.connection,
                           loggerFactory,
                           "canton network validator operator realm",
-                        )(operationId).tflatMap(_ => provide(()))
+                        )(traceContext)(operationId)
                       } else {
-                        provide(())
+                        provide(AuthExtractor.TracedUser("", traceContext))
                       },
                   ),
                   ValidatorPublicResource.routes(
                     publicHandler,
                     _ => provide(()),
                   ),
-                  CommonAdminResource.routes(commonAdminHandler, _ => provide(())),
+                  CommonAdminResource.routes(commonAdminHandler, _ => provide(traceContext)),
                 ) ++
                   appManagerHandlersO.toList.flatMap {
                     case (adminHandler, handler, publicHandler) =>
@@ -613,9 +613,9 @@ class ValidatorApp(
                               automation.connection,
                               loggerFactory,
                               "app manager admin realm",
-                            )(
+                            )(traceContext)(
                               operationId
-                            ).tflatMap(_ => provide(())),
+                            ),
                         ),
                         AppManagerResource.routes(
                           handler,

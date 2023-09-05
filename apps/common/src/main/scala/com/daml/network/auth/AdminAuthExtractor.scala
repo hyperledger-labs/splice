@@ -9,6 +9,7 @@ import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.http.v0.definitions.ErrorResponse
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Printer
 import io.circe.syntax.EncoderOps
 
@@ -23,7 +24,7 @@ object AdminAuthExtractor {
       ledgerConnection: CNLedgerConnection,
       loggerFactory: NamedLoggerFactory,
       realm: String,
-  ): String => Directive1[String] = {
+  )(implicit traceContext: TraceContext): String => Directive1[AuthExtractor.TracedUser] = {
     new AdminAuthExtractor(
       verifier,
       adminParty,
@@ -43,17 +44,23 @@ final class AdminAuthExtractor(
     ledgerConnection: CNLedgerConnection,
     override protected val loggerFactory: NamedLoggerFactory,
     realm: String,
-) extends AuthExtractor(verifier, loggerFactory, realm) {
+)(implicit
+    traceContext: TraceContext
+) extends AuthExtractor(verifier, loggerFactory, realm)(traceContext) {
 
-  override def directiveForOperationId(operationId: String): Directive1[String] = {
+  override def directiveForOperationId(
+      operationId: String
+  ): Directive1[AuthExtractor.TracedUser] = {
     super
       .directiveForOperationId(operationId)
-      .flatMap(user =>
+      .flatMap { tuser =>
+        val AuthExtractor.TracedUser(user, traceContext) = tuser
+        implicit val tc = traceContext
         onComplete(
           ledgerConnection.getOptionalPrimaryParty(user) zip ledgerConnection.getUserActAs(user)
         ).flatMap {
           case Success((Some(party), actAs)) if party == adminParty && actAs.contains(adminParty) =>
-            provide(user)
+            provide(tuser)
           case _ =>
             logger.warn(s"Authorization Failed for $adminParty")
             val contentType = MediaTypes.`application/json`
@@ -75,7 +82,7 @@ final class AdminAuthExtractor(
               )
             )
         }
-      )
+      }
   }
 
 }

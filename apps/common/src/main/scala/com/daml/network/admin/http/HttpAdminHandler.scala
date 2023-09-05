@@ -5,9 +5,8 @@ import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.external.common_admin as v0
 import com.digitalasset.canton.health.admin.data
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
-
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -17,23 +16,26 @@ class HttpAdminHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.CommonAdminHandler[Unit]
+) extends v0.CommonAdminHandler[TraceContext]
     with Spanning
     with NamedLogging {
-  private val workflowId = this.getClass.getSimpleName
+  protected val workflowId = this.getClass.getSimpleName
 
   def getHealthStatus(
       respond: v0.CommonAdminResource.GetHealthStatusResponse.type
-  )()(extracted: Unit): Future[v0.CommonAdminResource.GetHealthStatusResponse] =
-    withNewTrace(workflowId) { _ => _ =>
+  )()(extracted: TraceContext): Future[v0.CommonAdminResource.GetHealthStatusResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getHealthStatus") { _ => _ =>
       status
         .map(s => respond.OK(CNNodeStatus.toHttpNodeStatus(s)))
     }
+  }
 
   override def getVersion(
       respond: v0.CommonAdminResource.GetVersionResponse.type
-  )()(extracted: Unit): Future[v0.CommonAdminResource.GetVersionResponse] =
-    withNewTrace(workflowId) { _ => _ =>
+  )()(extracted: TraceContext): Future[v0.CommonAdminResource.GetVersionResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getVersion") { _ => _ =>
       Future(
         respond.OK(
           definitions.Version(
@@ -46,22 +48,29 @@ class HttpAdminHandler(
         )
       )
     }
+  }
 
   override def isLive(
       respond: v0.CommonAdminResource.IsLiveResponse.type
-  )()(extracted: Unit): Future[v0.CommonAdminResource.IsLiveResponse] = {
-    withNewTrace(workflowId) { _ => _ =>
-      Future(respond.OK)
+  )()(extracted: TraceContext): Future[v0.CommonAdminResource.IsLiveResponse] = {
+    {
+      implicit val tc = extracted
+      withSpan(s"$workflowId.isLive") { _ => _ =>
+        Future(respond.OK)
+      }
     }
   }
 
   override def isReady(
       respond: v0.CommonAdminResource.IsReadyResponse.type
-  )()(extracted: Unit): Future[v0.CommonAdminResource.IsReadyResponse] = {
-    withNewTrace(workflowId) { _ => _ =>
-      status.map { s =>
-        if (s.isActive.exists(identity)) respond.OK
-        else respond.ServiceUnavailable
+  )()(extracted: TraceContext): Future[v0.CommonAdminResource.IsReadyResponse] = {
+    {
+      implicit val tc = extracted
+      withSpan(s"$workflowId.isReady") { _ => _ =>
+        status.map { s =>
+          if (s.isActive.exists(identity)) respond.OK
+          else respond.ServiceUnavailable
+        }
       }
     }
   }

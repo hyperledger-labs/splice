@@ -3,6 +3,7 @@ package com.daml.network.environment
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
 import akka.stream.Materializer
 import com.daml.network.admin.api.client.HttpAdminAppClient
+import com.daml.network.admin.api.client.TraceContextPropagation.*
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.util.TemplateJsonDecoder
@@ -50,10 +51,12 @@ abstract class BaseAppConnection(
   ): Future[Result] = {
     val client: command.Client = command.createClient(url.toString())
     for {
-      response <- EitherTUtil.toFuture(command.submitRequest(client, headers).leftMap[Throwable] {
-        case Left(throwable) => throwable
-        case Right(response) => new BaseAppConnection.UnexpectedHttpResponse(response)
-      })
+      response <- EitherTUtil.toFuture(
+        command.submitRequest(client, tc.propagate(headers)).leftMap[Throwable] {
+          case Left(throwable) => throwable
+          case Right(response) => new BaseAppConnection.UnexpectedHttpResponse(response)
+        }
+      )
       result <- toFuture(command.handleResponse(response))
     } yield result
   }

@@ -37,24 +37,27 @@ class HttpScanHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.ScanHandler[Unit]
+) extends v0.ScanHandler[TraceContext]
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
 
   def getSvcPartyId(
       response: v0.ScanResource.GetSvcPartyIdResponse.type
-  )()(extracted: Unit): Future[v0.ScanResource.GetSvcPartyIdResponse] =
-    withNewTrace(workflowId) { _ => _ =>
+  )()(extracted: TraceContext): Future[v0.ScanResource.GetSvcPartyIdResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getSvcPartyId") { _ => _ =>
       Future.successful(definitions.GetSvcPartyIdResponse(store.svcParty.toProtoPrimitive))
     }
+  }
 
   def getOpenAndIssuingMiningRounds(
       response: v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse.type
   )(
       body: com.daml.network.http.v0.definitions.GetOpenAndIssuingMiningRoundsRequest
-  )(extracted: Unit): Future[v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(extracted: TraceContext): Future[v0.ScanResource.GetOpenAndIssuingMiningRoundsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getOpenAndIssuingMiningRounds") { _ => _ =>
       for {
         domainId <- store.defaultAcsDomainIdF
         issuingRounds <- store.multiDomainAcsStore.listContractsOnDomain(
@@ -90,6 +93,7 @@ class HttpScanHandler(
         )
       }
     }
+  }
 
   /** We choose the smallest-tickDuration of all non-closed rounds as the TTL.
     * Using this policy, clients will always know about any newly-created rounds before their `opensAt`.
@@ -140,8 +144,9 @@ class HttpScanHandler(
       response: v0.ScanResource.GetCoinRulesResponse.type
   )(
       body: com.daml.network.http.v0.definitions.GetCoinRulesRequest
-  )(extracted: Unit): Future[v0.ScanResource.GetCoinRulesResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(extracted: TraceContext): Future[v0.ScanResource.GetCoinRulesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getCoinRules") { _ => _ =>
       for {
         coinRulesO <- store.lookupCoinRules()
         coinRules = coinRulesO getOrElse {
@@ -166,13 +171,15 @@ class HttpScanHandler(
         )
       }
     }
+  }
 
   def getCoinRulesV1Test(
       response: v0.ScanResource.GetCoinRulesV1TestResponse.type
   )(
       body: com.daml.network.http.v0.definitions.GetCoinRulesRequest
-  )(extracted: Unit): Future[v0.ScanResource.GetCoinRulesV1TestResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(extracted: TraceContext): Future[v0.ScanResource.GetCoinRulesV1TestResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getCoinRulesV1Test") { _ => _ =>
       if (!config.enableCoinRulesUpgrade) {
         throw new StatusRuntimeException(
           Status.UNIMPLEMENTED.withDescription("CoinRules upgrades are disabled")
@@ -204,13 +211,15 @@ class HttpScanHandler(
         )
       }
     }
+  }
 
   def getCnsRules(
       response: v0.ScanResource.GetCnsRulesResponse.type
   )(
       body: com.daml.network.http.v0.definitions.GetCnsRulesRequest
-  )(extracted: Unit): Future[v0.ScanResource.GetCnsRulesResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(extracted: TraceContext): Future[v0.ScanResource.GetCnsRulesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getCnsRules") { _ => _ =>
       for {
         cnsRulesO <- store.lookupCnsRules()
         cnsRules = cnsRulesO getOrElse {
@@ -234,11 +243,12 @@ class HttpScanHandler(
         )
       }
     }
-
+  }
   def getClosedRounds(
       response: v0.ScanResource.GetClosedRoundsResponse.type
-  )()(extracted: Unit): Future[v0.ScanResource.GetClosedRoundsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )()(extracted: TraceContext): Future[v0.ScanResource.GetClosedRoundsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getClosedRounds") { _ => _ =>
       for {
         domainId <- store.defaultAcsDomainIdF
         rounds <- store.multiDomainAcsStore.listContractsOnDomain(
@@ -250,11 +260,13 @@ class HttpScanHandler(
         definitions.GetClosedRoundsResponse(filteredRounds.toVector.map(r => r.toHttp))
       }
     }
+  }
 
   def listFeaturedAppRights(
       response: v0.ScanResource.ListFeaturedAppRightsResponse.type
-  )()(extracted: Unit): Future[v0.ScanResource.ListFeaturedAppRightsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )()(extracted: TraceContext): Future[v0.ScanResource.ListFeaturedAppRightsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listFeaturedAppRights") { _ => _ =>
       for {
         domainId <- store.defaultAcsDomainIdF
         apps <- store.multiDomainAcsStore.listContractsOnDomain(
@@ -265,13 +277,15 @@ class HttpScanHandler(
         definitions.ListFeaturedAppRightsResponse(apps.toVector.map(a => a.toHttp))
       }
     }
+  }
 
   def lookupFeaturedAppRight(
       response: com.daml.network.http.v0.scan.ScanResource.LookupFeaturedAppRightResponse.type
-  )(providerPartyId: String)(extracted: Unit): Future[
+  )(providerPartyId: String)(extracted: TraceContext): Future[
     com.daml.network.http.v0.scan.ScanResource.LookupFeaturedAppRightResponse
-  ] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.lookupFeaturedAppRight") { _ => _ =>
       for {
         domainId <- store.defaultAcsDomainIdF
         right <- store.findFeaturedAppRight(
@@ -282,11 +296,15 @@ class HttpScanHandler(
         definitions.LookupFeaturedAppRightResponse(right.map(r => r.toHttp))
       }
     }
+  }
 
   def getTotalCoinBalance(
       response: v0.ScanResource.GetTotalCoinBalanceResponse.type
-  )(asOfEndOfRound: Long)(extracted: Unit): Future[v0.ScanResource.GetTotalCoinBalanceResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(
+      asOfEndOfRound: Long
+  )(extracted: TraceContext): Future[v0.ScanResource.GetTotalCoinBalanceResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getTotalCoinBalance") { _ => _ =>
       for {
         total <- store.getTotalCoinBalance(asOfEndOfRound)
       } yield {
@@ -295,11 +313,13 @@ class HttpScanHandler(
         )
       }
     }
+  }
 
   def getCoinConfigForRound(
       response: v0.ScanResource.GetCoinConfigForRoundResponse.type
-  )(round: Long)(extracted: Unit): Future[v0.ScanResource.GetCoinConfigForRoundResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(round: Long)(extracted: TraceContext): Future[v0.ScanResource.GetCoinConfigForRoundResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getCoinConfigForRound") { _ => _ =>
       store
         .getCoinConfigForRound(round)
         .map(cfg =>
@@ -319,11 +339,12 @@ class HttpScanHandler(
         )
         .transform(HttpErrorHandler.onGrpcNotFound(s"Round ${round} not found"))
     }
-
+  }
   def getRoundOfLatestData(
       response: v0.ScanResource.GetRoundOfLatestDataResponse.type
-  )()(extracted: Unit): Future[v0.ScanResource.GetRoundOfLatestDataResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )()(extracted: TraceContext): Future[v0.ScanResource.GetRoundOfLatestDataResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getRoundOfLatestData") { _ => _ =>
       store
         .getRoundOfLatestData()
         .map { case (round, effectiveAt) =>
@@ -334,11 +355,15 @@ class HttpScanHandler(
         }
         .transform(HttpErrorHandler.onGrpcNotFound("No data has been made available yet"))
     }
+  }
 
   def getRewardsCollected(
       response: v0.ScanResource.GetRewardsCollectedResponse.type
-  )(round: Option[Long])(extracted: Unit): Future[v0.ScanResource.GetRewardsCollectedResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(
+      round: Option[Long]
+  )(extracted: TraceContext): Future[v0.ScanResource.GetRewardsCollectedResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getRewardsCollected") { _ => _ =>
       round
         .fold(store.getTotalRewardsCollectedEver())(store.getRewardsCollectedInRound(_))
         .map { case amount =>
@@ -349,14 +374,16 @@ class HttpScanHandler(
         }
         .transform(HttpErrorHandler.onGrpcNotFound("No data has been made available yet"))
     }
+  }
 
   def getTopProvidersByAppRewards(
       response: v0.ScanResource.GetTopProvidersByAppRewardsResponse.type
   )(
       asOfEndOfRound: Long,
       limit: Int,
-  )(extracted: Unit): Future[v0.ScanResource.GetTopProvidersByAppRewardsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(extracted: TraceContext): Future[v0.ScanResource.GetTopProvidersByAppRewardsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getTopProvidersByAppRewards") { _ => _ =>
       // TODO(#4965): Provide an upper bound for limit
       store
         .getTopProvidersByAppRewards(asOfEndOfRound, limit)
@@ -374,14 +401,15 @@ class HttpScanHandler(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
         )
     }
-
+  }
   def getTopValidatorsByValidatorRewards(
       response: v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse.type
   )(
       asOfEndOfRound: Long,
       limit: Int,
-  )(extracted: Unit): Future[v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(extracted: TraceContext): Future[v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getTopValidatorsByValidatorRewards") { _ => _ =>
       // TODO(#4965): Provide an upper bound for limit
       store
         .getTopValidatorsByValidatorRewards(asOfEndOfRound, limit)
@@ -399,14 +427,15 @@ class HttpScanHandler(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
         )
     }
-
+  }
   override def getTopValidatorsByPurchasedTraffic(
       response: ScanResource.GetTopValidatorsByPurchasedTrafficResponse.type
   )(
       asOfEndOfRound: Long,
       limit: Int,
-  )(extracted: Unit): Future[ScanResource.GetTopValidatorsByPurchasedTrafficResponse] = {
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(extracted: TraceContext): Future[ScanResource.GetTopValidatorsByPurchasedTrafficResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getTopValidatorsByPurchasedTraffic") { _ => _ =>
       // TODO(#4965): Provide an upper bound for limit
       store
         .getTopValidatorsByPurchasedTraffic(asOfEndOfRound, limit)
@@ -432,8 +461,9 @@ class HttpScanHandler(
 
   override def listImportCrates(respond: v0.ScanResource.ListImportCratesResponse.type)(
       receiverPartyId: String
-  )(extracted: Unit): Future[v0.ScanResource.ListImportCratesResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(extracted: TraceContext): Future[v0.ScanResource.ListImportCratesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listImportCrates") { _ => _ =>
       {
         for {
           crates <- store.listImportCrates(PartyId.tryFromProtoPrimitive(receiverPartyId))
@@ -452,15 +482,18 @@ class HttpScanHandler(
         )
       }
     }
+  }
 
   override def listRecentActivity(
       respond: v0.ScanResource.ListRecentActivityResponse.type
-  )()(extracted: Unit): Future[v0.ScanResource.ListRecentActivityResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )()(extracted: TraceContext): Future[v0.ScanResource.ListRecentActivityResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listRecentActivity") { _ => _ =>
       for {
         recentActivities <- store.listRecentActivity(10)
       } yield definitions.ListRecentActivityResponse(
         recentActivities.map(_.toResponseItem).toVector
       )
     }
+  }
 }

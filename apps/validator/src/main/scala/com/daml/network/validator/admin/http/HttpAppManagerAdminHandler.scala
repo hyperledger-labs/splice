@@ -6,6 +6,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
+import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.http.v0.{app_manager_admin as v0, definitions}
 import com.daml.network.validator.store.AppManagerStore
@@ -51,7 +52,7 @@ class HttpAppManagerAdminHandler(
     tracer: Tracer,
     httpClient: HttpRequest => Future[HttpResponse],
     mat: Materializer,
-) extends v0.AppManagerAdminHandler[Unit]
+) extends v0.AppManagerAdminHandler[TracedUser]
     with Spanning
     with NamedLogging {
 
@@ -61,8 +62,9 @@ class HttpAppManagerAdminHandler(
       providerUserId: String,
       configuration: String,
       release: (java.io.File, Option[String], ContentType),
-  )(extracted: Unit): Future[v0.AppManagerAdminResource.RegisterAppResponse] =
-    withNewTrace(workflowId) { implicit tc => _ =>
+  )(tuser: TracedUser): Future[v0.AppManagerAdminResource.RegisterAppResponse] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.registerApp") { _ => _ =>
       decode[definitions.AppConfiguration](configuration) match {
         case Left(err) =>
           Future.successful(
@@ -101,7 +103,7 @@ class HttpAppManagerAdminHandler(
           }
       }
     }
-
+  }
   def registerAppMapFileField(
       fieldName: String,
       fileName: Option[String],
@@ -113,15 +115,17 @@ class HttpAppManagerAdminHandler(
   def publishAppRelease(
       respond: v0.AppManagerAdminResource.PublishAppReleaseResponse.type
   )(provider: String, release: (File, Option[String], ContentType))(
-      extracted: Unit
-  ): Future[v0.AppManagerAdminResource.PublishAppReleaseResponse] =
-    withNewTrace(workflowId) { implicit tc => _ =>
+      tuser: TracedUser
+  ): Future[v0.AppManagerAdminResource.PublishAppReleaseResponse] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.publishAppRelease") { _ => _ =>
       val providerParty = PartyId.tryFromProtoPrimitive(provider)
       for {
         _ <- store.getLatestAppConfiguration(providerParty) // Check that app is registered
         _ <- storeAppRelease(providerParty, release._1)
       } yield v0.AppManagerAdminResource.PublishAppReleaseResponse.Created
     }
+  }
 
   def publishAppReleaseMapFileField(
       fieldName: String,
@@ -154,9 +158,10 @@ class HttpAppManagerAdminHandler(
   def updateAppConfiguration(
       respond: v0.AppManagerAdminResource.UpdateAppConfigurationResponse.type
   )(provider: String, body: definitions.UpdateAppConfigurationRequest)(
-      extracted: Unit
-  ): Future[v0.AppManagerAdminResource.UpdateAppConfigurationResponse] =
-    withNewTrace(workflowId) { implicit tc => _ =>
+      tuser: TracedUser
+  ): Future[v0.AppManagerAdminResource.UpdateAppConfigurationResponse] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.updateAppConfiguration") { _ => _ =>
       val providerParty = PartyId.tryFromProtoPrimitive(provider)
       validateAppConfiguration(providerParty, body.configuration).flatMap {
         case Left(err) => Future.successful(err)
@@ -168,6 +173,7 @@ class HttpAppManagerAdminHandler(
           } yield v0.AppManagerAdminResource.UpdateAppConfigurationResponse.Created
       }
     }
+  }
 
   private def validateAppConfiguration(
       provider: PartyId,
@@ -200,8 +206,9 @@ class HttpAppManagerAdminHandler(
 
   def installApp(respond: v0.AppManagerAdminResource.InstallAppResponse.type)(
       body: definitions.InstallAppRequest
-  )(extracted: Unit): Future[v0.AppManagerAdminResource.InstallAppResponse] =
-    withNewTrace(workflowId) { implicit tc => _ =>
+  )(tuser: TracedUser): Future[v0.AppManagerAdminResource.InstallAppResponse] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.installApp") { _ => _ =>
       val appUrl = AppManagerStore.AppUrl(body.appUrl)
       for {
         configuration <- HttpUtil.getHttpJson[definitions.AppConfiguration](
@@ -231,13 +238,14 @@ class HttpAppManagerAdminHandler(
         )
       } yield v0.AppManagerAdminResource.InstallAppResponse.Created
     }
-
+  }
   def approveAppReleaseConfiguration(
       respond: v0.AppManagerAdminResource.ApproveAppReleaseConfigurationResponse.type
   )(provider: String, body: definitions.ApproveAppReleaseConfigurationRequest)(
-      extracted: Unit
-  ): Future[v0.AppManagerAdminResource.ApproveAppReleaseConfigurationResponse] =
-    withNewTrace(workflowId) { implicit tc => _ =>
+      tuser: TracedUser
+  ): Future[v0.AppManagerAdminResource.ApproveAppReleaseConfigurationResponse] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.approveAppReleaseConfiguration") { _ => _ =>
       val providerParty = PartyId.tryFromProtoPrimitive(provider)
       for {
         config <- store.getAppConfiguration(providerParty, body.configurationVersion)
@@ -275,6 +283,7 @@ class HttpAppManagerAdminHandler(
         )
       } yield v0.AppManagerAdminResource.ApproveAppReleaseConfigurationResponse.OK
     }
+  }
 
   private def ensureDar(appUrl: AppManagerStore.AppUrl, darHash: String)(implicit
       tc: TraceContext

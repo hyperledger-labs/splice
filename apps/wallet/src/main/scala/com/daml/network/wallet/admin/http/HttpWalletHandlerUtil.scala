@@ -15,12 +15,10 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.digitalasset.canton.topology.PartyId
+import scala.concurrent.{ExecutionContext, Future}
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{ExecutionContext, Future}
-
 trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
-
   protected val walletManager: UserWalletManager
   protected val store: WalletStore = walletManager.store
   private val validatorParty: PartyId = store.walletKey.validatorParty
@@ -30,8 +28,8 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
       templateCompanion: Contract.Companion.Template[TCid, T],
       user: String,
       mkResponse: Vector[d0.Contract] => ResponseT,
-  )(implicit ec: ExecutionContext, tracer: Tracer): Future[ResponseT] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(implicit ec: ExecutionContext, traceContext: TraceContext, tracer: Tracer): Future[ResponseT] =
+    withSpan(s"$workflowId.listContracts") { _ => _ =>
       for {
         userStore <- getUserStore(user)
         contracts <- userStore.multiDomainAcsStore.listContracts(

@@ -1,5 +1,6 @@
 package com.daml.network.validator.admin.http
 
+import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, validator_admin as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
@@ -25,7 +26,7 @@ class HttpValidatorAdminHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.ValidatorAdminHandler[Unit]
+) extends v0.ValidatorAdminHandler[TracedUser]
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
@@ -35,48 +36,57 @@ class HttpValidatorAdminHandler(
       respond: v0.ValidatorAdminResource.OnboardUserResponse.type
   )(
       body: definitions.OnboardUserRequest
-  )(fake: Unit): Future[v0.ValidatorAdminResource.OnboardUserResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+  )(tuser: TracedUser): Future[v0.ValidatorAdminResource.OnboardUserResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    withSpan(s"$workflowId.onboardUser") { _ => span =>
       val name = body.name
       span.setAttribute("name", name)
       onboard(name).map(p => definitions.OnboardUserResponse(p))
     }
+  }
 
   def listUsers(
       respond: v0.ValidatorAdminResource.ListUsersResponse.type
-  )()(fake: Unit): Future[
+  )()(tuser: TracedUser): Future[
     v0.ValidatorAdminResource.ListUsersResponse
-  ] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  ] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    withSpan(s"$workflowId.listUsers") { _ => _ =>
       store.listUsers().map(us => definitions.ListUsersResponse(us.toVector))
     }
+  }
 
   def offboardUser(
       respond: v0.ValidatorAdminResource.OffboardUserResponse.type
-  )(username: String)(fake: Unit): Future[
+  )(username: String)(tuser: TracedUser): Future[
     v0.ValidatorAdminResource.OffboardUserResponse
-  ] = withNewTrace(workflowId) { implicit traceContext => _ =>
-    offboardUser(username)
-      .map(_ => v0.ValidatorAdminResource.OffboardUserResponse.OK)
-      .recover({
-        case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
-          v0.ValidatorAdminResource
-            .OffboardUserResponseNotFound(definitions.ErrorResponse(e.getMessage()))
-      })
+  ] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    withSpan(s"$workflowId.offboardUser") { _ => _ =>
+      offboardUser(username)
+        .map(_ => v0.ValidatorAdminResource.OffboardUserResponse.OK)
+        .recover({
+          case e: StatusRuntimeException if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+            v0.ValidatorAdminResource
+              .OffboardUserResponseNotFound(definitions.ErrorResponse(e.getMessage()))
+        })
+    }
   }
 
   def dumpParticipantIdentities(
       respond: v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse.type
   )()(
-      fake: Unit
-  ): Future[v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+      tuser: TracedUser
+  ): Future[v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    withSpan(s"$workflowId.dumpParticipantIdentities") { _ => _ =>
       identitiesStore
         .getParticipantIdentitiesDump()
         .map(response =>
           v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse.OK(response.toHttp)
         )
     }
+  }
 
   private def onboard(name: String)(implicit traceContext: TraceContext): Future[String] = {
     ValidatorUtil

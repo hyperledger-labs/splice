@@ -1,6 +1,7 @@
 package com.daml.network.wallet.admin.http
 
 import com.daml.network.admin.http.HttpErrorHandler
+import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.codegen.java.cn.wallet.transferoffer as transferOffersCodegen
 import com.daml.network.environment.CNLedgerConnection
@@ -21,15 +22,16 @@ class HttpExternalWalletHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends external.wallet.WalletHandler[String]
+) extends external.wallet.WalletHandler[TracedUser]
     with HttpWalletHandlerUtil {
 
   protected val workflowId = this.getClass.getSimpleName
 
   override def createTransferOffer(respond: r0.CreateTransferOfferResponse.type)(
       request: d0.CreateTransferOfferRequest
-  )(user: String): Future[r0.CreateTransferOfferResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(tuser: TracedUser): Future[r0.CreateTransferOfferResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    withSpan(s"$workflowId.createTransferOffer") { _ => _ =>
       val userWalletStore = getUserWallet(user).store
       userWalletStore
         .getLatestTransferOfferEventByTrackingId(request.trackingId)
@@ -82,12 +84,14 @@ class HttpExternalWalletHandler(
         }
         .transform(HttpErrorHandler.onGrpcAlreadyExists("CreateTransferOffer duplicate command"))
     }
+  }
 
   override def listTransferOffers(
       respond: r0.ListTransferOffersResponse.type
   )()(
-      user: String
+      tuser: TracedUser
   ): Future[r0.ListTransferOffersResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
     listContracts(
       transferOffersCodegen.TransferOffer.COMPANION,
       user,
@@ -99,8 +103,9 @@ class HttpExternalWalletHandler(
       respond: r0.GetTransferOfferStatusResponse.type
   )(
       trackingId: String
-  )(user: String): Future[r0.GetTransferOfferStatusResponse] = withNewTrace(workflowId) {
-    implicit traceContext => _ =>
+  )(tuser: TracedUser): Future[r0.GetTransferOfferStatusResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    withSpan(s"$workflowId.getTransferOfferStatus") { _ => _ =>
       for {
         userStore <- getUserStore(user)
         txLogEntry <- userStore.getLatestTransferOfferEventByTrackingId(trackingId)
@@ -113,13 +118,14 @@ class HttpExternalWalletHandler(
             )
           )(status => r0.GetTransferOfferStatusResponseOK(status.toStatusResponse))
       }
+    }
   }
 
   override def createBuyTrafficRequest(respond: r0.CreateBuyTrafficRequestResponse.type)(
       body: d0.RequestBuyTrafficRequest
-  )(cted: String): Future[r0.CreateBuyTrafficRequestResponse] = ???
+  )(tuser: TracedUser): Future[r0.CreateBuyTrafficRequestResponse] = ???
 
   override def getBuyTrafficRequestStatus(
       respond: r0.GetBuyTrafficRequestStatusResponse.type
-  )(trackingId: String)(extracted: String): Future[r0.GetBuyTrafficRequestStatusResponse] = ???
+  )(trackingId: String)(tuser: TracedUser): Future[r0.GetBuyTrafficRequestStatusResponse] = ???
 }

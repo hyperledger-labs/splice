@@ -12,7 +12,7 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
-import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
+import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cc.v1test as ccV1Test
@@ -352,13 +352,13 @@ class SvApp(
           )
         )
       ) {
-        newTraceContext { traceContext =>
+        withTraceContext { implicit traceContext =>
           requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {
               concat(
                 SvResource.routes(
                   handler,
-                  _ => provide(()),
+                  _ => provide(traceContext),
                 ),
                 SvAdminResource.routes(
                   adminHandler,
@@ -370,7 +370,7 @@ class SvApp(
                     "canton network sv admin realm",
                   ),
                 ),
-                CommonAdminResource.routes(commonAdminHandler, _ => provide(())),
+                CommonAdminResource.routes(commonAdminHandler, _ => provide(traceContext)),
               )
             }
           }

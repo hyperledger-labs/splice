@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.Directives.*
 import akka.stream.Materializer
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
+import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
@@ -111,12 +111,12 @@ class DirectoryApp(
       )
 
       routes = cors() {
-        newTraceContext { traceContext =>
+        withTraceContext { traceContext =>
           requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {
               concat(
-                DirectoryResource.routes(handler, _ => provide(())),
-                CommonAdminResource.routes(adminHandler, _ => provide(())),
+                DirectoryResource.routes(handler, _ => provide(traceContext)),
+                CommonAdminResource.routes(adminHandler, _ => provide(traceContext)),
               )
             }
           }

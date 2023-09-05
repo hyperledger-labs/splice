@@ -38,7 +38,7 @@ object HttpDirectoryAppClient {
       ]] {
 
     def submitRequest(client: Client, headers: List[HttpHeader]) =
-      client.listEntries(Some(namePrefix), pageSize)
+      client.listEntries(Some(namePrefix), pageSize, headers = headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
@@ -59,7 +59,7 @@ object HttpDirectoryAppClient {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ) = client.lookupEntryByParty(party.toProtoPrimitive)
+    ) = client.lookupEntryByParty(party.toProtoPrimitive, headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
@@ -82,7 +82,7 @@ object HttpDirectoryAppClient {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ) = client.lookupEntryByName(name)
+    ) = client.lookupEntryByName(name, headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
@@ -101,7 +101,7 @@ object HttpDirectoryAppClient {
         client: Client,
         headers: List[HttpHeader],
     ) =
-      client.getProviderPartyId()
+      client.getProviderPartyId(headers)
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetProviderPartyIdResponse.OK(response) =>

@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.admin.api.TraceContextDirectives.newTraceContext
+import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.config.SharedCNNodeAppParameters
@@ -126,12 +126,12 @@ class ScanApp(
       )
 
       routes = cors() {
-        newTraceContext { traceContext =>
+        withTraceContext { traceContext =>
           requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {
               concat(
-                ScanResource.routes(handler, _ => provide(())),
-                CommonAdminResource.routes(adminHandler, _ => provide(())),
+                ScanResource.routes(handler, _ => provide(traceContext)),
+                CommonAdminResource.routes(adminHandler, _ => provide(traceContext)),
               )
             }
           }

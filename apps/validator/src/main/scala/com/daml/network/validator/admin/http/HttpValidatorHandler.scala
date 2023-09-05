@@ -1,5 +1,6 @@
 package com.daml.network.validator.admin.http
 
+import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, validator as v0}
@@ -23,18 +24,21 @@ class HttpValidatorHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.ValidatorHandler[String]
+) extends v0.ValidatorHandler[TracedUser]
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
 
   def register(
       respond: v0.ValidatorResource.RegisterResponse.type
-  )(body: Option[Json])(ledgerApiUser: String): Future[v0.ValidatorResource.RegisterResponse] =
-    withNewTrace(workflowId) { implicit traceContext => span =>
+  )(body: Option[Json])(tracedUser: TracedUser): Future[v0.ValidatorResource.RegisterResponse] = {
+    implicit val TracedUser(ledgerApiUser, traceContext) = tracedUser
+
+    withSpan(s"$workflowId.register") { _ => span =>
       span.setAttribute("name", ledgerApiUser)
       onboard(ledgerApiUser).map(p => definitions.RegistrationResponse(p))
     }
+  }
 
   private def onboard(name: String)(implicit traceContext: TraceContext): Future[String] = {
     ValidatorUtil

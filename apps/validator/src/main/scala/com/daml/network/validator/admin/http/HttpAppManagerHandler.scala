@@ -1,6 +1,7 @@
 package com.daml.network.validator.admin.http
 
 import akka.http.scaladsl.model.Uri
+import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.http.v0.{definitions, app_manager as v0}
 import com.daml.network.validator.config.AppManagerConfig
@@ -25,7 +26,7 @@ class HttpAppManagerHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.AppManagerHandler[String]
+) extends v0.AppManagerHandler[TracedUser]
     with Spanning
     with NamedLogging {
 
@@ -51,9 +52,10 @@ class HttpAppManagerHandler(
   def authorizeApp(
       respond: v0.AppManagerResource.AuthorizeAppResponse.type
   )(provider: String)(
-      userId: String
-  ): Future[v0.AppManagerResource.AuthorizeAppResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+      tuser: TracedUser
+  ): Future[v0.AppManagerResource.AuthorizeAppResponse] = {
+    implicit val TracedUser(userId, traceContext) = tuser
+    withSpan(s"$workflowId.authorizeApp") { _ => _ =>
       val providerPartyId = PartyId.tryFromProtoPrimitive(provider)
       checkAppExists(providerPartyId)(
         v0.AppManagerResource.AuthorizeAppResponse.NotFound(_)
@@ -75,6 +77,7 @@ class HttpAppManagerHandler(
         } yield v0.AppManagerResource.AuthorizeAppResponse.OK
       }
     }
+  }
 
   // This is the endpoint that the app manager frontend calls after the user got redirected to /authorize
   // as part of the OAuth2 flow to confirm that they
@@ -82,9 +85,10 @@ class HttpAppManagerHandler(
   def checkAppAuthorized(
       respond: v0.AppManagerResource.CheckAppAuthorizedResponse.type
   )(provider: String, redirectUri: String, state: String)(
-      userId: String
-  ): Future[v0.AppManagerResource.CheckAppAuthorizedResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+      tuser: TracedUser
+  ): Future[v0.AppManagerResource.CheckAppAuthorizedResponse] = {
+    implicit val TracedUser(userId, traceContext) = tuser
+    withSpan(s"$workflowId.checkAppAuthorized") { _ => _ =>
       val providerPartyId = PartyId.tryFromProtoPrimitive(provider)
       checkAppExists(providerPartyId)(
         v0.AppManagerResource.CheckAppAuthorizedResponse.Forbidden(_)
@@ -124,6 +128,7 @@ class HttpAppManagerHandler(
         }
       }
     }
+  }
 
   private def checkAppExists[T](
       providerPartyId: PartyId
@@ -144,21 +149,23 @@ class HttpAppManagerHandler(
 
   def listInstalledApps(
       respond: v0.AppManagerResource.ListInstalledAppsResponse.type
-  )()(userId: String): Future[
+  )()(tuser: TracedUser): Future[
     v0.AppManagerResource.ListInstalledAppsResponse
-  ] =
-    withNewTrace(workflowId) { implicit tc => _ =>
+  ] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.listInstalledApps") { _ => _ =>
       store
         .listInstalledApps()
         .map(apps => definitions.ListInstalledAppsResponse(apps.map(_.toHttp).toVector))
     }
-
+  }
   def listRegisteredApps(
       respond: v0.AppManagerResource.ListRegisteredAppsResponse.type
-  )()(userId: String): Future[
+  )()(tuser: TracedUser): Future[
     v0.AppManagerResource.ListRegisteredAppsResponse
-  ] =
-    withNewTrace(workflowId) { implicit tc => _ =>
+  ] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.listRegisteredApps") { _ => _ =>
       store
         .listRegisteredApps()
         .map(apps =>
@@ -167,4 +174,5 @@ class HttpAppManagerHandler(
           )
         )
     }
+  }
 }

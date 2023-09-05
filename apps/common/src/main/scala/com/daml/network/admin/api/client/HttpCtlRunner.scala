@@ -7,6 +7,7 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.HttpCommand
+import com.daml.network.admin.api.client.TraceContextPropagation.*
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 
@@ -40,7 +41,7 @@ class HttpCtlRunner(
 
     for {
       response <- command
-        .submitRequest(client, headers)
+        .submitRequest(client, tc.propagate(headers))
         .leftMap(resp =>
           resp match {
             case Left(httpErr: HttpCommandException) => throw httpErr

@@ -5,7 +5,7 @@ import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.http.v0.{definitions, directory as v0}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.annotation.nowarn
@@ -17,24 +17,31 @@ class HttpDirectoryHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.DirectoryHandler[Unit]
+) extends v0.DirectoryHandler[TraceContext]
     with Spanning
     with NamedLogging {
+
+  private val workflowId = this.getClass.getSimpleName
 
   override def listEntries(
       respond: v0.DirectoryResource.ListEntriesResponse.type
   )(namePrefix: Option[String], pageSize: Int)(
-      extracted: Unit
-  ): Future[v0.DirectoryResource.ListEntriesResponse] =
-    withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
+      extracted: TraceContext
+  ): Future[v0.DirectoryResource.ListEntriesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listEntries") { _ => _ =>
       for { entries <- store.listEntries(namePrefix.getOrElse(""), pageSize) } yield definitions
         .ListEntriesResponse(entries.map(_.toHttp).toVector)
     }
+  }
 
   override def lookupEntryByParty(
       respond: v0.DirectoryResource.LookupEntryByPartyResponse.type
-  )(party: String)(extracted: Unit): Future[v0.DirectoryResource.LookupEntryByPartyResponse] =
-    withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
+  )(
+      party: String
+  )(extracted: TraceContext): Future[v0.DirectoryResource.LookupEntryByPartyResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.lookupEntryByParty") { _ => _ =>
       store
         .lookupEntryByParty(PartyId.tryFromProtoPrimitive(party))
         .flatMap {
@@ -50,11 +57,15 @@ class HttpDirectoryHandler(
             )
         }
     }
+  }
 
   override def lookupEntryByName(
       respond: v0.DirectoryResource.LookupEntryByNameResponse.type
-  )(name: String)(extracted: Unit): Future[v0.DirectoryResource.LookupEntryByNameResponse] =
-    withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
+  )(
+      name: String
+  )(extracted: TraceContext): Future[v0.DirectoryResource.LookupEntryByNameResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.lookupEntryByName") { _ => _ =>
       store.lookupEntryByName(name).flatMap {
         case Some(entry) =>
           Future.successful(
@@ -66,12 +77,13 @@ class HttpDirectoryHandler(
           Future.failed(HttpErrorHandler.notFound(s"No directory entry found for name: $name"))
       }
     }
-
+  }
   @nowarn("cat=unused")
   override def getProviderPartyId(
       respond: v0.DirectoryResource.GetProviderPartyIdResponse.type
-  )()(extracted: Unit): Future[v0.DirectoryResource.GetProviderPartyIdResponse] =
-    withNewTrace("HttpDirectoryHandler") { implicit traceContext => _ =>
+  )()(extracted: TraceContext): Future[v0.DirectoryResource.GetProviderPartyIdResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getProviderPartyId") { implicit traceContext => _ =>
       Future.successful(
         v0.DirectoryResource.GetProviderPartyIdResponse.OK(
           definitions.GetProviderPartyIdResponse(
@@ -80,4 +92,5 @@ class HttpDirectoryHandler(
         )
       )
     }
+  }
 }

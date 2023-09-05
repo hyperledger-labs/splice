@@ -64,7 +64,7 @@ class HttpSvHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.SvHandler[Unit]
+) extends v0.SvHandler[TraceContext]
     with Spanning
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
@@ -77,8 +77,9 @@ class HttpSvHandler(
       respond: v0.SvResource.OnboardValidatorResponse.type
   )(
       body: definitions.OnboardValidatorRequest
-  )(fake: Unit): Future[v0.SvResource.OnboardValidatorResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(extracted: TraceContext): Future[v0.SvResource.OnboardValidatorResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.onboardValidator") { _ => _ =>
       Codec.decode(Codec.Party)(body.partyId) match {
         case Right(partyId) =>
           svStore.lookupValidatorOnboardingBySecret(body.secret).flatMap {
@@ -110,13 +111,15 @@ class HttpSvHandler(
           Future.failed(HttpErrorHandler.badRequest(error))
       }
     }
+  }
 
   def startSvOnboarding(
       respond: v0.SvResource.StartSvOnboardingResponse.type
   )(
       body: definitions.StartSvOnboardingRequest
-  )(fake: Unit): Future[v0.SvResource.StartSvOnboardingResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(extracted: TraceContext): Future[v0.SvResource.StartSvOnboardingResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.startSvOnboarding") { _ => _ =>
       SvOnboardingToken.verifyAndDecode(body.token) match {
         case Left(error) =>
           Future.failed(
@@ -153,11 +156,15 @@ class HttpSvHandler(
             }
       }
     }
+  }
 
   def getSvOnboardingStatus(
       respond: v0.SvResource.GetSvOnboardingStatusResponse.type
-  )(svPartyOrName: String)(fake: Unit): Future[SvResource.GetSvOnboardingStatusResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(
+      svPartyOrName: String
+  )(extracted: TraceContext): Future[SvResource.GetSvOnboardingStatusResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getSvOnboardingStatus") { _ => _ =>
       Codec.decode(Codec.Party)(svPartyOrName) match {
         case Left(error) =>
           for {
@@ -200,11 +207,13 @@ class HttpSvHandler(
           }
       }
     }
+  }
 
   def devNetOnboardValidatorPrepare(
       respond: v0.SvResource.DevNetOnboardValidatorPrepareResponse.type
-  )()(fake: Unit): Future[v0.SvResource.DevNetOnboardValidatorPrepareResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )()(extracted: TraceContext): Future[v0.SvResource.DevNetOnboardValidatorPrepareResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.devNetOnboardValidatorPrepare") { _ => _ =>
       if (isDevNet) {
         val secret = generateRandomOnboardingSecret()
         val expiresIn = NonNegativeFiniteDuration.ofHours(1)
@@ -233,11 +242,13 @@ class HttpSvHandler(
         )
       }
     }
+  }
 
   def getSvcInfo(
       respond: v0.SvResource.GetSvcInfoResponse.type
-  )()(fake: Unit): Future[v0.SvResource.GetSvcInfoResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )()(extracted: TraceContext): Future[v0.SvResource.GetSvcInfoResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getSvcInfo") { _ => _ =>
       for {
         latestOpenMiningRound <- svcStore.getLatestActiveOpenMiningRound()
         coinRules <- svcStore.getCoinRules()
@@ -252,23 +263,27 @@ class HttpSvHandler(
         svcRules = svcRules.contract.toHttp,
       )
     }
+  }
 
   def getCometBftNodeStatus(
       respond: SvResource.GetCometBftNodeStatusResponse.type
-  )()(extracted: Unit): Future[
+  )()(extracted: TraceContext): Future[
     SvResource.GetCometBftNodeStatusResponse
-  ] = withNewTrace(workflowId) { implicit tc => _ =>
-    withClientOrNotFound(respond.NotFound) {
-      _.nodeStatus()
-        .map(status =>
-          CometBftStatusOrError(
-            response = CometBftNodeStatusResponse(
-              status.nodeInfo.id,
-              status.syncInfo.catchingUp,
-              BigDecimal(status.validatorInfo.votingPower),
-            ).some
+  ] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getCometBftNodeStatus") { _ => _ =>
+      withClientOrNotFound(respond.NotFound) {
+        _.nodeStatus()
+          .map(status =>
+            CometBftStatusOrError(
+              response = CometBftNodeStatusResponse(
+                status.nodeInfo.id,
+                status.syncInfo.catchingUp,
+                BigDecimal(status.validatorInfo.votingPower),
+              ).some
+            )
           )
-        )
+      }
     }
   }
 
@@ -276,8 +291,9 @@ class HttpSvHandler(
       respond: v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse.type
   )(
       body: definitions.OnboardSvPartyMigrationAuthorizeRequest
-  )(fake: Unit): Future[v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(extracted: TraceContext): Future[v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.onboardSvPartyMigrationAuthorize") { _ => _ =>
       (for {
         participantId <- Codec.decode(Codec.Participant)(body.participantId)
         candidateParty <- Codec.decode(Codec.Party)(body.candidatePartyId)
@@ -312,13 +328,15 @@ class HttpSvHandler(
         } yield res
       }).fold(errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)), identity)
     }
+  }
 
   def onboardSvMediator(
       respond: v0.SvResource.OnboardSvMediatorResponse.type
   )(
       body: definitions.OnboardSvMediatorRequest
-  )(fake: Unit): Future[v0.SvResource.OnboardSvMediatorResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(extracted: TraceContext): Future[v0.SvResource.OnboardSvMediatorResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.onboardSvMediator") { _ => _ =>
       (for {
         mediatorId <- Codec.decode(Codec.Mediator)(body.mediatorId)
       } yield {
@@ -328,13 +346,15 @@ class HttpSvHandler(
         _.map(_ => v0.SvResource.OnboardSvMediatorResponseOK),
       )
     }
+  }
 
   def onboardSvSequencer(
       respond: v0.SvResource.OnboardSvSequencerResponse.type
   )(
       body: definitions.OnboardSvSequencerRequest
-  )(fake: Unit): Future[v0.SvResource.OnboardSvSequencerResponse] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(extracted: TraceContext): Future[v0.SvResource.OnboardSvSequencerResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.onboardSvSequencer") { _ => _ =>
       (for {
         sequencerId <- Codec.decode(Codec.Sequencer)(body.sequencerId)
         sequencerConnection <- localDomainNode
@@ -351,6 +371,7 @@ class HttpSvHandler(
         ),
       )
     }
+  }
 
   private def withClientOrNotFound[T](
       notFound: ErrorResponse => T
@@ -746,8 +767,8 @@ class HttpSvHandler(
       candidateName: String,
       candidateParty: PartyId,
       token: String,
-  ): Future[Either[String, Unit]] =
-    withNewTrace(workflowId) { implicit traceContext => _ =>
+  )(implicit tc: TraceContext): Future[Either[String, Unit]] = {
+    withSpan(s"$workflowId.startSvOnboarding") { _ => _ =>
       for {
         svcRules <- svcStore.getSvcRules()
         lookup <- svcStore.lookupSvOnboardingRequestByTokenWithOffset(token)
@@ -792,4 +813,5 @@ class HttpSvHandler(
         }
       } yield outcome
     }
+  }
 }

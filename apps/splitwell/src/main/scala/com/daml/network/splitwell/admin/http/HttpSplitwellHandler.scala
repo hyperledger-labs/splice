@@ -9,7 +9,7 @@ import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{Codec, ContractWithState}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -24,16 +24,17 @@ class HttpSplitwellHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends v0.SplitwellHandler[Unit]
+) extends v0.SplitwellHandler[TraceContext]
     with Spanning
     with NamedLogging {
-
+  private val workflowId = this.getClass.getSimpleName
   import HttpSplitwellHandler.*
 
   def listGroups(respond: v0.SplitwellResource.ListGroupsResponse.type)(
       party: String
-  )(extracted: Unit): scala.concurrent.Future[v0.SplitwellResource.ListGroupsResponse] =
-    withNewTrace("HttpSplitwellHandler") { implicit traceContext => _ =>
+  )(extracted: TraceContext): scala.concurrent.Future[v0.SplitwellResource.ListGroupsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listGroups") { _ => _ =>
       val userParty = Codec.tryDecode(Codec.Party)(party)
       for {
         // TODO(M4-02): check (or simulate check) of the user's cross-participant access token
@@ -42,11 +43,15 @@ class HttpSplitwellHandler(
         definitions.ListGroupsResponse(groups.map(encodeContractWithState).toVector)
       }
     }
+  }
 
   def listGroupInvites(respond: v0.SplitwellResource.ListGroupInvitesResponse.type)(
       party: String
-  )(extracted: Unit): scala.concurrent.Future[v0.SplitwellResource.ListGroupInvitesResponse] =
-    withNewTrace("HttpSplitwellHandler") { implicit traceContext => _ =>
+  )(
+      extracted: TraceContext
+  ): scala.concurrent.Future[v0.SplitwellResource.ListGroupInvitesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listGroupInvites") { _ => _ =>
       val userParty = Codec.tryDecode(Codec.Party)(party)
       for {
         groupInvites <- store.listGroupInvites(userParty)
@@ -56,13 +61,15 @@ class HttpSplitwellHandler(
         )
       }
     }
+  }
 
   def listAcceptedGroupInvites(
       respond: v0.SplitwellResource.ListAcceptedGroupInvitesResponse.type
   )(party: String, groupId: String)(
-      extracted: Unit
-  ): Future[v0.SplitwellResource.ListAcceptedGroupInvitesResponse] =
-    withNewTrace("HttpSplitwellHandler") { implicit traceContext => _ =>
+      extracted: TraceContext
+  ): Future[v0.SplitwellResource.ListAcceptedGroupInvitesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listAcceptedGroupInvites") { _ => _ =>
       val userParty = Codec.tryDecode(Codec.Party)(party)
       for {
         acceptedGroupInvites <- store.listAcceptedGroupInvites(userParty, groupId)
@@ -72,13 +79,15 @@ class HttpSplitwellHandler(
         )
       }
     }
+  }
 
   def listBalanceUpdates(
       respond: v0.SplitwellResource.ListBalanceUpdatesResponse.type
   )(party: String, groupId: String, ownerPartyId: String)(
-      extracted: Unit
-  ): Future[v0.SplitwellResource.ListBalanceUpdatesResponse] =
-    withNewTrace("HttpSplitwellHandler") { implicit traceContext => _ =>
+      extracted: TraceContext
+  ): Future[v0.SplitwellResource.ListBalanceUpdatesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listBalanceUpdates") { _ => _ =>
       val userParty = Codec.tryDecode(Codec.Party)(party)
       for {
         balanceUpdates <- store.listBalanceUpdates(userParty, groupKey(groupId, ownerPartyId))
@@ -90,13 +99,15 @@ class HttpSplitwellHandler(
         )
       }
     }
+  }
 
   def listBalances(
       respond: v0.SplitwellResource.ListBalancesResponse.type
   )(party: String, groupId: String, ownerPartyId: String)(
-      extracted: Unit
-  ): Future[v0.SplitwellResource.ListBalancesResponse] =
-    withNewTrace("HttpSplitwellHandler") { implicit traceContext => _ =>
+      extracted: TraceContext
+  ): Future[v0.SplitwellResource.ListBalancesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listBalances") { _ => _ =>
       val userParty = Codec.tryDecode(Codec.Party)(party)
       val javaUserParty = userParty.toProtoPrimitive
       for {
@@ -154,11 +165,15 @@ class HttpSplitwellHandler(
         definitions.ListBalancesResponse(balances.map { case (k, v) => k -> Codec.encode(v) })
       }
     }
+  }
 
   def listSplitwellInstalls(
       respond: v0.SplitwellResource.ListSplitwellInstallsResponse.type
-  )(party: String)(extracted: Unit): Future[v0.SplitwellResource.ListSplitwellInstallsResponse] =
-    withNewTrace("HttpSplitwellHandler") { implicit traceContext => _ =>
+  )(
+      party: String
+  )(extracted: TraceContext): Future[v0.SplitwellResource.ListSplitwellInstallsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listSplitwellInstalls") { _ => _ =>
       val userParty = Codec.tryDecode(Codec.Party)(party)
       for {
         installs <- store.listSplitwellInstalls(userParty)
@@ -175,11 +190,13 @@ class HttpSplitwellHandler(
         )
       }
     }
+  }
 
   def listSplitwellRules(
       respond: v0.SplitwellResource.ListSplitwellRulesResponse.type
-  )()(extracted: Unit): Future[v0.SplitwellResource.ListSplitwellRulesResponse] =
-    withNewTrace("HttpSplitwellHandler") { implicit traceContext => _ =>
+  )()(extracted: TraceContext): Future[v0.SplitwellResource.ListSplitwellRulesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listSplitwellRules") { _ => _ =>
       for {
         rules <- store.listSplitwellRules()
       } yield {
@@ -188,18 +205,21 @@ class HttpSplitwellHandler(
         )
       }
     }
-
+  }
   override def getProviderPartyId(
       respond: v0.SplitwellResource.GetProviderPartyIdResponse.type
-  )()(fake: Unit): Future[v0.SplitwellResource.GetProviderPartyIdResponse] =
-    withNewTrace("HttpSplitwellHandler") { _ => _ =>
+  )()(extracted: TraceContext): Future[v0.SplitwellResource.GetProviderPartyIdResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getProviderPartyId") { _ => _ =>
       Future.successful(definitions.GetProviderPartyIdResponse(Codec.encode(providerParty)))
     }
+  }
 
   override def getSplitwellDomainIds(
       respond: v0.SplitwellResource.GetSplitwellDomainIdsResponse.type
-  )()(fake: Unit): Future[v0.SplitwellResource.GetSplitwellDomainIdsResponse] =
-    withNewTrace("HttpSplitwellHandler") { _ => _ =>
+  )()(extracted: TraceContext): Future[v0.SplitwellResource.GetSplitwellDomainIdsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getSplitwellDomainIds") { _ => _ =>
       Future.successful(
         definitions.GetSplitwellDomainIdsResponse(
           splitwellDomains.preferred.toProtoPrimitive,
@@ -207,11 +227,15 @@ class HttpSplitwellHandler(
         )
       )
     }
+  }
 
   def getConnectedDomains(respond: v0.SplitwellResource.GetConnectedDomainsResponse.type)(
       party: String
-  )(extracted: Unit): scala.concurrent.Future[v0.SplitwellResource.GetConnectedDomainsResponse] =
-    withNewTrace("HttpSplitwellHandler") { implicit traceContext => _ =>
+  )(
+      extracted: TraceContext
+  ): scala.concurrent.Future[v0.SplitwellResource.GetConnectedDomainsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getConnectedDomains") { _ => _ =>
       for {
         mappings <- participantAdminConnection.listPartyToParticipant(
           filterParty = party
@@ -227,6 +251,7 @@ class HttpSplitwellHandler(
           .toVector
       )
     }
+  }
 
   private def groupKey(groupId: String, ownerPartyId: String): splitwellCodegen.GroupKey =
     new splitwellCodegen.GroupKey(
