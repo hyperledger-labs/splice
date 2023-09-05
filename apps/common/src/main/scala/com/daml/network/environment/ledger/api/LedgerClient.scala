@@ -7,7 +7,6 @@ import com.daml.grpc.adapter.client.akka.ClientAdapter
 import com.daml.ledger.api.v1.*
 import com.daml.ledger.api.v1.admin.*
 import com.daml.ledger.javaapi.data.{
-  Command,
   CreateUserRequest,
   CreateUserResponse,
   GetLedgerEndResponse,
@@ -18,7 +17,6 @@ import com.daml.ledger.javaapi.data.{
   ListUserRightsRequest,
   ListUserRightsResponse,
   RevokeUserRightsRequest,
-  Transaction,
   TransactionTree,
   User,
 }
@@ -71,7 +69,7 @@ private[environment] class LedgerClient(
     ec: ExecutionContext,
     elc: ErrorLoggingContext,
 ) extends Closeable {
-  import LedgerClient.{CompletionStreamResponse, GetUpdatesRequest}
+  import LedgerClient.{CompletionStreamResponse, GetUpdatesRequest, SubmitAndWaitFor}
 
   private def withCredentials[T <: AbstractStub[T]](
       stub: T
@@ -184,18 +182,18 @@ private[environment] class LedgerClient(
     )
   }
 
-  private def submitAndWaitRequest(
+  def submitAndWait[Z](
       workflowId: String,
       applicationId: String,
       commandId: String,
-      deduplicationOffsetOrDuration: DedupConfig,
+      deduplicationConfig: DedupConfig,
       actAs: Seq[String],
       readAs: Seq[String],
       commands: Seq[HasCommands],
       disclosedContracts: DisclosedContracts,
-  ): CommandServiceOuterClass.SubmitAndWaitRequest = {
+      waitFor: SubmitAndWaitFor[Z],
+  )(implicit ec: ExecutionContext): Future[Z] = {
     val commandsBuilder = CommandsOuterClass.Commands.newBuilder
-    commandsBuilder
       .setWorkflowId(workflowId)
       .setCommandId(commandId)
       .setApplicationId(applicationId)
@@ -205,7 +203,7 @@ private[environment] class LedgerClient(
         HasCommands.toCommands(commands.asJava).asScala.map(_.toProtoCommand).asJava
       }
       .addAllDisclosedContracts(disclosedContracts.toLedgerApiDisclosedContracts.asJava)
-    deduplicationOffsetOrDuration match {
+    deduplicationConfig match {
       case DedupOffset(offset) =>
         commandsBuilder.setDeduplicationOffset(offset)
       case DedupDuration(duration) =>
@@ -213,95 +211,16 @@ private[environment] class LedgerClient(
       case NoDedup =>
     }
 
-    CommandServiceOuterClass.SubmitAndWaitRequest
+    val request = CommandServiceOuterClass.SubmitAndWaitRequest
       .newBuilder()
       .setCommands(commandsBuilder.build)
       .build()
-  }
 
-  def submitAndWait(
-      workflowId: String,
-      applicationId: String,
-      commandId: String,
-      deduplicationConfig: DedupConfig,
-      actAs: Seq[String],
-      readAs: Seq[String],
-      commands: Seq[HasCommands],
-      disclosedContracts: DisclosedContracts,
-  )(implicit ec: ExecutionContext): Future[String] = {
-    val request = submitAndWaitRequest(
-      workflowId,
-      applicationId,
-      commandId,
-      deduplicationConfig,
-      actAs,
-      readAs,
-      commands,
-      disclosedContracts,
-    )
     for {
       stub <- withCredentials(commandServiceStub)
       res <- wrapFuture(
-        stub
-          .submitAndWaitForTransactionId(request, _)
-      ).map(response => response.getCompletionOffset)
-    } yield res
-  }
-
-  def submitAndWaitForTransaction(
-      workflowId: String,
-      applicationId: String,
-      commandId: String,
-      deduplicationConfig: DedupConfig,
-      actAs: Seq[String],
-      readAs: Seq[String],
-      commands: Seq[Command],
-      disclosedContracts: DisclosedContracts,
-  )(implicit ec: ExecutionContext): Future[Transaction] = {
-    val request = submitAndWaitRequest(
-      workflowId,
-      applicationId,
-      commandId,
-      deduplicationConfig,
-      actAs,
-      readAs,
-      commands,
-      disclosedContracts,
-    )
-    for {
-      stub <- withCredentials(commandServiceStub)
-      res <- wrapFuture(
-        stub.submitAndWaitForTransaction(request, _)
-      ).map(response => Transaction.fromProto(response.getTransaction))
-    } yield res
-  }
-
-  def submitAndWaitForTransactionTree(
-      workflowId: String,
-      applicationId: String,
-      commandId: String,
-      deduplicationConfig: DedupConfig,
-      actAs: Seq[String],
-      readAs: Seq[String],
-      commands: Seq[Command],
-      disclosedContracts: DisclosedContracts,
-  )(implicit ec: ExecutionContext): Future[TransactionTree] = {
-    val request = submitAndWaitRequest(
-      workflowId,
-      applicationId,
-      commandId,
-      deduplicationConfig,
-      actAs,
-      readAs,
-      commands,
-      disclosedContracts,
-    )
-    for {
-      stub <- withCredentials(commandServiceStub)
-      res <- wrapFuture(
-        stub
-          .submitAndWaitForTransactionTree(request, _)
-      ).map(response => TransactionTree.fromProto(response.getTransaction))
+        waitFor.stubSubmit(stub, request, _)
+      ).map(waitFor.mapResponse)
     } yield res
   }
 
@@ -610,6 +529,47 @@ object LedgerClient {
         endInclusive = end,
         filter = Some(filterForParty(party)),
       )
+  }
+
+  private[environment] sealed abstract class SubmitAndWaitFor[+Z] {
+    import SubmitAndWaitFor.*
+    private[LedgerClient] type RawResponse
+    private[LedgerClient] val stubSubmit: StubSubmit[RawResponse]
+    private[LedgerClient] val mapResponse: RawResponse => Z
+  }
+
+  private[environment] object SubmitAndWaitFor {
+    import com.daml.ledger.api.v1.CommandServiceOuterClass as CSOC
+    import com.daml.ledger.javaapi.data as jdata
+
+    val CompletionOffset: SubmitAndWaitFor[String] =
+      impl((_: CSOC.SubmitAndWaitForTransactionIdResponse).getCompletionOffset)(
+        _.submitAndWaitForTransactionId(_, _)
+      )
+
+    val Transaction: SubmitAndWaitFor[jdata.Transaction] =
+      impl { response: CSOC.SubmitAndWaitForTransactionResponse =>
+        jdata.Transaction.fromProto(response.getTransaction)
+      }(_.submitAndWaitForTransaction(_, _))
+
+    val TransactionTree: SubmitAndWaitFor[jdata.TransactionTree] =
+      impl { response: CSOC.SubmitAndWaitForTransactionTreeResponse =>
+        jdata.TransactionTree.fromProto(response.getTransaction)
+      }(_.submitAndWaitForTransactionTree(_, _))
+
+    private type StubSubmit[R] = (
+        CommandServiceGrpc.CommandServiceStub,
+        CSOC.SubmitAndWaitRequest,
+        StreamObserver[R],
+    ) => Unit
+
+    private[this] def impl[R, Z](mapResponse0: R => Z)(
+        stubSubmit0: StubSubmit[R]
+    ): SubmitAndWaitFor[Z] = new SubmitAndWaitFor[Z] {
+      type RawResponse = R
+      override val stubSubmit = stubSubmit0
+      override val mapResponse = mapResponse0
+    }
   }
 
   final case class GetTreeUpdatesResponse(
