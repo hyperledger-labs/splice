@@ -58,7 +58,6 @@ class WalletSurviveCantonRestartIntegrationTest
       )
       // Do not allocate validator users here, as we deal with all of them manually
       .withAllocatedUsers(extraIgnoredValidatorPrefixes = Seq(""))
-      .withTrafficTopupsEnabled
       .withManualStart
   }
 

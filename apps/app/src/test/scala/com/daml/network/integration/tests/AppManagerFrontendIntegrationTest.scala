@@ -36,6 +36,7 @@ class AppManagerFrontendIntegrationTest
         CNNodeConfigTransforms.onlySv1,
         (_, config) => CNNodeConfigTransforms.disableSplitwellUserDomainConnections(config),
       )
+      .withTrafficTopupsDisabled
 
   "app manager" should {
 

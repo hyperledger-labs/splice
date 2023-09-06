@@ -39,6 +39,9 @@ class WalletTxLogIntegrationTest
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndCoinMerging
+      // disable top-ups to prevent extra traffic purchase txs entering the tx log non-deterministically
+      // and interfering with the tests in this suite.
+      .withTrafficTopupsDisabled
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
       )

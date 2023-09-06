@@ -25,7 +25,6 @@ class BootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
         this.getClass.getSimpleName,
       )
       .clearConfigTransforms()
-      .withTrafficTopupsEnabled
       .addConfigTransform((_, config) => useSelfSignedTokensForLedgerApiAuth("test")(config))
       // We reduce the polling interval here primarily for the top-up trigger to ensure that a top-up happens as soon as
       // possible during the validator setup and other txs do not get throttled for want of traffic.

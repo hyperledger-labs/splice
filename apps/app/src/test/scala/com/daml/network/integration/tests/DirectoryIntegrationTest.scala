@@ -27,9 +27,9 @@ import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 
-class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
+class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
-  import DFDirectoryIntegrationTest.*
+  import DirectoryIntegrationTest.*
 
   private val testEntryName = "mycoolentry.unverified.cns"
   private val testEntryUrl = "https://cns-dir-url.com"
@@ -43,7 +43,6 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
       )
-      .withTrafficTopupsEnabled
 
   "Directory service" should {
 
@@ -454,7 +453,7 @@ class DFDirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUt
   }
 }
 
-object DFDirectoryIntegrationTest {
+object DirectoryIntegrationTest {
 
   // Helper classes to make it easier to write test code interacting with a users' services
   case class StaticUserRefs(

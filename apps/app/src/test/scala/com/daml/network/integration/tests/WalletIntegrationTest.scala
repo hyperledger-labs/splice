@@ -48,7 +48,6 @@ class WalletIntegrationTest
           )
         )
       )
-      .withTrafficTopupsEnabled
   }
 
   "A wallet" should {

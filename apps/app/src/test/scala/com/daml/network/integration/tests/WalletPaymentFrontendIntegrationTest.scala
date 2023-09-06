@@ -24,7 +24,6 @@ class WalletPaymentFrontendIntegrationTest
       .simpleTopology(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .withCoinPrice(coinPrice)
-      .withTrafficTopupsEnabled
 
   "A wallet payments UI" should {
 

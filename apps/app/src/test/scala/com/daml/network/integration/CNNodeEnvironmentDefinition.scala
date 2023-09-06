@@ -142,7 +142,7 @@ case class CNNodeEnvironmentDefinition(
       )
     )
 
-  def withTrafficTopupsEnabled: CNNodeEnvironmentDefinition =
+  private def withTrafficTopupsEnabled: CNNodeEnvironmentDefinition =
     addConfigTransform((_, config) =>
       CNNodeConfigTransforms.updateAllValidatorConfigs { case (name, validatorConfig) =>
         val domainFeesEnabledConfig = validatorConfig
@@ -231,6 +231,7 @@ case class CNNodeEnvironmentDefinition(
       .addConfigTransformsToFront((_, conf) =>
         CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
       )
+      .withTrafficTopupsDisabled
 
   override lazy val environmentFactory: EnvironmentFactory[CNNodeEnvironmentImpl] =
     CNNodeEnvironmentFactory
@@ -254,6 +255,7 @@ object CNNodeEnvironmentDefinition extends CommonCNNodeAppInstanceReferences {
     fromResources(Seq("simple-topology.conf"), testName)
       .withAllocatedUsers()
       .withInitializedNodes()
+      .withTrafficTopupsEnabled
 
   def simpleTopologyWithSimTime(testName: String): CNNodeEnvironmentDefinition =
     simpleTopology(testName).withSimTime
