@@ -45,9 +45,9 @@ if (!isDevNet) {
   console.error('Launching in non-devnet mode');
 }
 
-const doubleSv = (process.env.DOUBLE_SV !== undefined && process.env.DOUBLE_SV !== '') || !isDevNet;
-if (doubleSv) {
-  console.error('Launching with a double SV');
+const singleSv = (process.env.SINGLE_SV !== undefined && process.env.SINGLE_SV !== '') || !isDevNet;
+if (singleSv) {
+  console.error('Launching with a single SV');
 }
 
 type BootstrapCliConfig = {
@@ -206,7 +206,11 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       .concat(loopback !== null ? loopback : [])
   );
 
-  const sv34NameSet = new Set<string>(['Canton-Foundation-3', 'Canton-Foundation-4']);
+  const sv234NameSet = new Set<string>([
+    'Canton-Foundation-2',
+    'Canton-Foundation-3',
+    'Canton-Foundation-4',
+  ]);
 
   const allApprovedSvIdentities = (
     isDevNet
@@ -218,8 +222,8 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
         )
   ).approvedSvIdentities;
 
-  const approvedSvIdentities = doubleSv
-    ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv34NameSet.has(id.name))
+  const approvedSvIdentities = singleSv
+    ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv234NameSet.has(id.name))
     : allApprovedSvIdentities;
 
   const svValues: ChartValues = {
@@ -227,7 +231,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       TARGET_CLUSTER: TARGET_CLUSTER,
       YOUR_SV_NAME: SV_NAME,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
-      'Digital-Asset': isDevNet ? 'Canton-Foundation-2' : 'Digital-Asset',
     }),
     participantBootstrappingDump: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }

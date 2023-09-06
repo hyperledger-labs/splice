@@ -34,16 +34,16 @@ if (approveSvRunbook) {
   console.error('Approving SV used in SV runbook');
 }
 
-const doubleSv = (process.env.DOUBLE_SV !== undefined && process.env.DOUBLE_SV !== '') || !isDevNet;
-if (doubleSv) {
-  console.error('Launching with a double SV');
+const singleSv = (process.env.SINGLE_SV !== undefined && process.env.SINGLE_SV !== '') || !isDevNet;
+if (singleSv) {
+  console.error('Launching with a single SV');
 }
 
 const withDomainFees =
   (process.env.DOMAIN_FEES !== undefined && process.env.DOMAIN_FEES !== '') || !isDevNet;
-if (withDomainFees && !doubleSv) {
+if (withDomainFees && !singleSv) {
   console.error(
-    `Currently, you cannot enable domain fees with more than one SV, please also set DOUBLE_SV to 1 and rerun (${doubleSv})`
+    `Currently, you cannot enable domain fees with more than one SV, please also set SINGLE_SV to 1 and rerun (${singleSv})`
   );
   exit(1);
 }
@@ -91,7 +91,11 @@ const svRunbookApprovedSvIdentities = [
   },
 ];
 
-const sv34NameSet = new Set<string>(['Canton-Foundation-3', 'Canton-Foundation-4']);
+const sv234NameSet = new Set<string>([
+  'Canton-Foundation-2',
+  'Canton-Foundation-3',
+  'Canton-Foundation-4',
+]);
 
 const allApprovedSvIdentities = (
   isDevNet
@@ -103,8 +107,8 @@ const allApprovedSvIdentities = (
       )
 ).approvedSvIdentities.concat(approveSvRunbook ? svRunbookApprovedSvIdentities : []);
 
-const approvedSvIdentities = doubleSv
-  ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv34NameSet.has(id.name))
+const approvedSvIdentities = singleSv
+  ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv234NameSet.has(id.name))
   : allApprovedSvIdentities;
 
 function joinViaSv1(
@@ -187,27 +191,25 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     sequencerDriver: globalDomainSequencerDriver,
   });
 
-  installSvNode({
-    auth0Client,
-    nodename: 'sv-2',
-    onboardingName: isDevNet ? 'Canton-Foundation-2' : 'Digital-Asset',
-    validatorWalletUser: isDevNet
-      ? 'auth0|64afbc353bbc7ca776e27bf4'
-      : 'auth0|64529b6852dd694167351045',
-    onboarding: joinViaSv1(sv1, SV2_KEY, postgresDB1),
-    withDomainFees,
-    approvedSvIdentities,
-    withScan: true,
-    withDirectoryBackend: false,
-    expectedValidatorOnboardings: [],
-    isDevNet,
-    backupConfig: backupConfig,
-    withDomainNode: isDevNet,
-    auth0ValidatorAppName: 'sv2_validator',
-    bootstrappingDumpConfig,
-    sequencerDriver: globalDomainSequencerDriver,
-  });
-  if (!doubleSv) {
+  if (!singleSv) {
+    installSvNode({
+      auth0Client,
+      nodename: 'sv-2',
+      onboardingName: 'Canton-Foundation-2',
+      validatorWalletUser: 'auth0|64afbc353bbc7ca776e27bf4',
+      onboarding: joinViaSv1(sv1, SV2_KEY, postgresDB1),
+      withDomainFees,
+      approvedSvIdentities,
+      withScan: true,
+      withDirectoryBackend: false,
+      expectedValidatorOnboardings: [],
+      isDevNet,
+      backupConfig: backupConfig,
+      withDomainNode: isDevNet,
+      auth0ValidatorAppName: 'sv2_validator',
+      bootstrappingDumpConfig,
+      sequencerDriver: globalDomainSequencerDriver,
+    });
     installSvNode({
       auth0Client,
       nodename: 'sv-3',
