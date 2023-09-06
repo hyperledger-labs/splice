@@ -1143,6 +1143,10 @@ function subcmd_apply() {
                 preview="yes"
                 shift
                 ;;
+            --skip-infra)
+                skipInfra="yes"
+                shift
+                ;;
             -*)
                 _error "Unknown option $1"
                 ;;
@@ -1198,7 +1202,11 @@ function subcmd_apply() {
             fi
         fi
 
-        subcmd_infra_up
+        if [ -z "${skipInfra:-}" ]; then
+            subcmd_infra_up
+        else
+            _info "Skipping infra deployment"
+        fi
         subcmd_pulumi canton-network up --yes --skip-preview "${args[@]}"
     fi
 }

@@ -284,7 +284,7 @@ are stored in the deployment directory for the given cluster.
 subcommands. A few highlights include the following:
 
 * `cncluster apply` - Apply the current working copy's `canton-network`
-  Pulumi stack to a cluster. The presence of all images referenced by that
+  and `infra` Pulumi stacks to a cluster. The presence of all images referenced by that
   configuration is confirmed prior to application of the manifest.
       * The tag for the images to be deployed can be overridden with an
         optional parameter. If this is specified, then the docker image
@@ -292,6 +292,7 @@ subcommands. A few highlights include the following:
       * To docker image check can also be bypassed by setting the
         `CNCLUSTER_SKIP_DOCKER_CHECK` environment variable to 1. This
         can also be added to `.envrc.private`.
+      * One can skip redeploying the `infra` stack by supplying the `--skip-infra` flag.
 * `cncluster pdown` - Take down any installed resources populated with
   the `canton-network` Pulumi stack.
 * `cncluster create` - Create a new instance of the CN cluster in GCE,
