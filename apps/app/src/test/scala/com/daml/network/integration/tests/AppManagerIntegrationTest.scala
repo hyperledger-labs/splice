@@ -82,6 +82,7 @@ class AppManagerIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
+      .withTrafficTopupsDisabled
       .addConfigTransforms(
         CNNodeConfigTransforms.onlySv1,
         (_, config) => CNNodeConfigTransforms.disableSplitwellUserDomainConnections(config),
