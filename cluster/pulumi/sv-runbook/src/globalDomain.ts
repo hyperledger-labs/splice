@@ -15,7 +15,7 @@ export function installGlobalDomainNode(
   postgresPassword: Output<string>,
   dependencies: Resource[]
 ): k8s.helm.v3.Release {
-  const cometbft = installCometBftNode(svNamespace);
+  const cometbft = installCometBftNode(svNamespace, dependencies);
 
   if (includesCometBftGlobalDomainNode) {
     const globalDomainValues: ChartValues = {
