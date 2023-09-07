@@ -1,0 +1,7 @@
+apiVersion: v2
+name: cn-postgres-metrics
+type: application
+version: VERSION_NUMBER
+appVersion: IMAGE_TAG
+
+description: Canton Network PGSQL Metrics Extraction

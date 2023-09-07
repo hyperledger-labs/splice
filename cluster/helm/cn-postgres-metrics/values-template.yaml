@@ -1,0 +1,13 @@
+resources:
+  limits:
+    cpu: "2"
+    memory: 1Gi
+  requests:
+    cpu: "2"
+    memory: 1Gi
+
+postgres:
+  hostname: "postgres"
+  port: "5432"
+  password: ""
+
