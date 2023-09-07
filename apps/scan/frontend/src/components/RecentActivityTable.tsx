@@ -1,21 +1,35 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, TitledTable, Loading, ErrorDisplay } from 'common-frontend';
-import { PartyId } from 'common-frontend';
+import { AmountDisplay, ErrorDisplay, Loading, PartyId, TitledTable } from 'common-frontend';
 import { useRecentActivity } from 'common-frontend/scan-api';
+import { ListRecentActivityResponseItem } from 'scan-openapi';
 
-import { TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import { Button, Stack, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
 export const RecentActivityTable: React.FC = () => {
   const recentActivityQuery = useRecentActivity();
-  switch (recentActivityQuery.status) {
-    case 'loading':
-      return <Loading />;
-    case 'error':
-      return <ErrorDisplay message={'Could not retrieve recent activity'} />;
-    case 'success':
-      return (
+  const hasNoActivities = (pagedActivities: ListRecentActivityResponseItem[][]): boolean => {
+    return (
+      pagedActivities === undefined ||
+      pagedActivities.length === 0 ||
+      pagedActivities.every(p => p === undefined || p.length === 0)
+    );
+  };
+  const isLoading = recentActivityQuery.isLoading;
+  const isError = recentActivityQuery.isError;
+
+  const pagedActivities = recentActivityQuery.data ? recentActivityQuery.data.pages : [];
+
+  return (
+    <Stack spacing={4} direction="column">
+      {isLoading ? (
+        <Loading />
+      ) : isError ? (
+        <ErrorDisplay message={'Error while fetching recent activity.'} />
+      ) : hasNoActivities(pagedActivities) ? (
+        <Typography variant="h6">No recent activity available yet</Typography>
+      ) : (
         <TitledTable title="Recent Activity">
           <TableHead>
             <TableRow>
@@ -27,13 +41,50 @@ export const RecentActivityTable: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {recentActivityQuery.data.activities.map((activity, index) => {
-              return <ActivityRow key={'activity-' + index} activity={activity} />;
-            })}
+            {pagedActivities.map(
+              activities =>
+                activities &&
+                activities.map(activity => (
+                  <ActivityRow key={'activity-' + activity.eventId} activity={activity} />
+                ))
+            )}
           </TableBody>
         </TitledTable>
-      );
-  }
+      )}
+      <ViewMoreButton
+        label={
+          recentActivityQuery.isFetchingNextPage
+            ? 'Loading more...'
+            : recentActivityQuery.hasNextPage
+            ? 'Load More'
+            : 'Nothing more to load'
+        }
+        loadMore={() => recentActivityQuery.fetchNextPage()}
+        disabled={!recentActivityQuery.hasNextPage}
+      />
+    </Stack>
+  );
+};
+
+interface ViewMoreButtonProps {
+  loadMore: () => void;
+  label: string;
+  disabled: boolean;
+}
+
+const ViewMoreButton: React.FC<ViewMoreButtonProps> = ({ loadMore, label, disabled = false }) => {
+  return (
+    <Button
+      id="view-more-transactions"
+      variant="outlined"
+      size="small"
+      color="secondary"
+      onClick={loadMore}
+      disabled={disabled}
+    >
+      {label}
+    </Button>
+  );
 };
 
 export default RecentActivityTable;

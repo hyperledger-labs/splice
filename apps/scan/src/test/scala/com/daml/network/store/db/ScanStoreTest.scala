@@ -706,7 +706,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         } yield {
           eventually() {
             store
-              .listRecentActivity(limit)
+              .listRecentActivity(None, limit)
               .futureValue
               .map(stripEventId)
               .toList should be(expectedActivities.map(stripEventId))

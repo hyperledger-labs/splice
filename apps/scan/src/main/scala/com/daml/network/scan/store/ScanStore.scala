@@ -140,7 +140,10 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
-  def listRecentActivity(limit: Int)(implicit
+  def listRecentActivity(
+      beginAfterEventId: Option[String],
+      limit: Int,
+  )(implicit
       tc: TraceContext
   ): Future[Seq[ScanTxLogParser.TxLogEntry.RecentActivityLogEntry]]
 

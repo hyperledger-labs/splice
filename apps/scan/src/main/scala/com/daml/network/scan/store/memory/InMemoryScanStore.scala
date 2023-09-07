@@ -226,7 +226,10 @@ class InMemoryScanStore(
       }),
     )
 
-  override def listRecentActivity(limit: Int)(implicit
+  override def listRecentActivity(
+      beginAfterEventId: Option[String],
+      limit: Int,
+  )(implicit
       tc: TraceContext
   ): Future[Seq[ScanTxLogParser.TxLogEntry.RecentActivityLogEntry]] = {
     for {

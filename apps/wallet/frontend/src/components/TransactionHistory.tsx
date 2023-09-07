@@ -55,10 +55,7 @@ const TransactionHistory: React.FC = () => {
       {isLoading ? (
         <Loading />
       ) : isError ? (
-        <ErrorDisplay
-          message={'Error while fetching either transactions or coin price.'}
-          // renderAs="tr"
-        />
+        <ErrorDisplay message={'Error while fetching either transactions or coin price.'} />
       ) : hasNoTransactions(pagedTransactions) ? (
         <Typography variant="h6">No Transactions yet</Typography>
       ) : (
