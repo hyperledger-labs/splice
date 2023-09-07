@@ -484,11 +484,12 @@ class TreasuryService(
         val imr = r.payload
         (imr.round, imr)
       }.toMap
-      domainId <- walletManager.store.domains.waitForDomainConnection(
-        walletManager.store.defaultAcsDomain
-      )
+      contractsToDisclose = DisclosedContracts(
+        disclosedCoinRules,
+        openRound,
+      ) addAll openIssuingRounds
       validatorRights <- walletManager.store.multiDomainAcsStore
-        .listContractsOnDomain(coinCodegen.ValidatorRight.COMPANION, domainId)
+        .listContracts(coinCodegen.ValidatorRight.COMPANION)
       coinInputsAndQuantity <- userStore.listSortedCoinsAndQuantity(
         maxNumInputs,
         openRound.payload.round.number,
@@ -551,11 +552,6 @@ class TreasuryService(
             .map(r => r.contractId.toInterface(v1.coin.FeaturedAppRight.INTERFACE))
             .toJava,
         )
-        val contractsToDisclose =
-          DisclosedContracts(
-            disclosedCoinRules,
-            openRound,
-          ) addAll openIssuingRounds
         Some(
           (
             inputs,

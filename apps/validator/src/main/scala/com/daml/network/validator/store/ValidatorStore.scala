@@ -11,7 +11,11 @@ import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.store.{
+  CNNodeAppStoreWithoutHistory,
+  ConfiguredDefaultDomain,
+  MultiDomainAcsStore,
+}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
 import com.daml.network.validator.config.ValidatorDomainConfig
@@ -28,7 +32,10 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
+trait ValidatorStore
+    extends WalletStore
+    with CNNodeAppStoreWithoutHistory
+    with ConfiguredDefaultDomain {
   import ValidatorStore.templatesMovedByMyAutomation
 
   /** The key identifying the parties considered by this store. */

@@ -1,5 +1,6 @@
 package com.daml.network.validator.store.memory
 
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
@@ -8,8 +9,8 @@ import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.InMemoryCNNodeAppStoreWithoutHistory
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.store.{InMemoryCNNodeAppStoreWithoutHistory, PageLimit}
+import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.util.{Contract, ContractWithState}
 import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.ValidatorStore
@@ -41,40 +42,28 @@ class InMemoryValidatorStore(
       endUserParty: PartyId
   )(implicit tc: TraceContext): Future[Option[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
-  ]] = for {
-    domainId <- defaultAcsDomainIdF
-    install <- multiDomainAcsStore.findContractOnDomain(installCodegen.WalletAppInstall.COMPANION)(
-      domainId,
-      (co: Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]) =>
-        co.payload.endUserParty == endUserParty.toProtoPrimitive,
-    )
-  } yield install
+  ]] = findOnlyContract(installCodegen.WalletAppInstall.COMPANION) {
+    payload: installCodegen.WalletAppInstall =>
+      payload.endUserParty == endUserParty.toProtoPrimitive
+  }
 
   override def lookupInstallByName(
       endUserName: String
   )(implicit tc: TraceContext): Future[Option[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
-  ]] = for {
-    domainId <- defaultAcsDomainIdF
-    install <- multiDomainAcsStore.findContractOnDomain(installCodegen.WalletAppInstall.COMPANION)(
-      domainId,
-      (co: Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]) =>
-        co.payload.endUserName == endUserName,
-    )
-  } yield install
+  ]] = findOnlyContract(installCodegen.WalletAppInstall.COMPANION) {
+    payload: installCodegen.WalletAppInstall =>
+      payload.endUserName == endUserName
+  }
 
   override def lookupValidatorFeaturedAppRight()(implicit
       tc: TraceContext
   ): Future[
     Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
-  ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomain(coinCodegen.FeaturedAppRight.COMPANION)(
-        _,
-        (co: Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]) =>
-          co.payload.provider == walletKey.validatorParty.toProtoPrimitive,
-      )
-    )
+  ] = findOnlyContract(coinCodegen.FeaturedAppRight.COMPANION) {
+    payload: coinCodegen.FeaturedAppRight =>
+      payload.provider == walletKey.validatorParty.toProtoPrimitive
+  }
 
   override def lookupWalletInstallByNameWithOffset(
       endUserName: String
@@ -228,4 +217,18 @@ class InMemoryValidatorStore(
         c.payload.provider == provider.toProtoPrimitive &&
           c.payload.jsonHash == releaseConfigurationHash.toHexString
     )
+
+  private[this] def findOnlyContract[C, TCid <: ContractId[_], T](companion: C)(
+      filter: T => Boolean
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Option[Contract[TCid, T]]] =
+    for {
+      maybeContract <- multiDomainAcsStore.filterContracts(
+        companion,
+        (c: Contract[?, T]) => filter(c.payload),
+        PageLimit(1),
+      )
+    } yield maybeContract.headOption map (_.contract)
 }
