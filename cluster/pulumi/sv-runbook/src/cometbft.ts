@@ -68,6 +68,7 @@ export function installCometBftNode(
       isDevNet: isDevNet,
     }),
     localCharts,
-    version
+    version,
+    dependencies
   );
 }
