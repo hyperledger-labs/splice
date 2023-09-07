@@ -2,7 +2,12 @@ package com.daml.network.validator.automation
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import com.daml.network.automation.CNNodeAppAutomationService
+import com.daml.network.automation.{
+  AssignTrigger,
+  CNNodeAppAutomationService,
+  TransferFollowTrigger,
+}
+import TransferFollowTrigger.Task as FollowTask
 import com.daml.network.config.{AutomationConfig, BackupDumpConfig}
 import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -87,4 +92,24 @@ class ValidatorAutomationService(
       )
     )
   )
+
+  registerTrigger(
+    new TransferFollowTrigger(
+      triggerContext,
+      store,
+      connection,
+      store.key.validatorParty,
+      implicit tc =>
+        scanConnection.getCoinRules().flatMap { coinRulesCWS =>
+          coinRulesCWS.toAssignedContract
+            .map { coinRules =>
+              store
+                .listCoinRulesTransferFollowers(coinRules)
+                .map(_ map (FollowTask(coinRules, _)))
+            }
+            .getOrElse(Future successful Seq.empty)
+        },
+    )
+  )
+  registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.validatorParty))
 }

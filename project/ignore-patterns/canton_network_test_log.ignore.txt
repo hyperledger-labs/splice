@@ -43,6 +43,9 @@ ErrorBoundary caught an unhandled promise rejection AbortError: Aborted
 # TODO(#3933) remove once when canton team has completed a proper fix to #3933
 LOCAL_VERDICT_INACTIVE_CONTRACTS.+Rejected transaction is referring to inactive contracts
 
+# TODO(#5314) remove when DbMultiDomainAcsStore supports multi-domain
+Tried to list contracts .*on domain .* but this DB ACS Store is for domain
+
 # Testcontainers tries to read the configuration file but it's not available on CI
 Attempted to read Testcontainers configuration file at file:
 
