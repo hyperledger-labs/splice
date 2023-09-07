@@ -1,5 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
-import { Auth0Client, isDevNet, loadYamlFromFile, requireEnv } from 'cn-pulumi-common';
+import { Auth0Client, isDevNet, loadYamlFromFile, REPO_ROOT } from 'cn-pulumi-common';
 import {
   BackupConfig,
   installGcpBucket,
@@ -20,8 +20,6 @@ import { installSvNode, SvOnboarding } from './sv';
 import { installValidator1 } from './validator1';
 
 /// Toplevel Chart Installs
-
-const REPO_ROOT = requireEnv('REPO_ROOT', 'root directory of the repo');
 
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');

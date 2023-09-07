@@ -12,6 +12,7 @@ export const config = new pulumi.Config();
 
 export const HELM_CHART_TIMEOUT_SEC = 480;
 
+export const REPO_ROOT = requireEnv('REPO_ROOT', 'root directory of the repo');
 export const CLUSTER_BASENAME = config.require('CLUSTER_BASENAME');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 export const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
