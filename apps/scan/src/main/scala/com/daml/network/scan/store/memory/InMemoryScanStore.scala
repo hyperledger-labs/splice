@@ -232,10 +232,17 @@ class InMemoryScanStore(
   )(implicit
       tc: TraceContext
   ): Future[Seq[ScanTxLogParser.TxLogEntry.RecentActivityLogEntry]] = {
+    def filter(txi: ScanTxLogParser.TxLogIndexRecord) = txi match {
+      case _: ScanTxLogParser.TxLogIndexRecord.RecentActivityIndexRecord => true
+      case _ => false
+    }
+    val indices = beginAfterEventId.fold(
+      txLog.filterTxLogIndicesByOffset(0, limit)(filter)
+    )(
+      txLog.filterTxLogIndicesAfterEventId(_, limit)(filter)
+    )
     for {
-      indexes <- txLog
-        .collectTxLogIndicesType[ScanTxLogParser.TxLogIndexRecord.RecentActivityIndexRecord]
-      records <- indexes
+      records <- indices
         .traverse { index =>
           loadTxLogEntry(
             txLogReader,

@@ -19,7 +19,6 @@ const useRecentActivity = (): UseInfiniteQueryResult<ListRecentActivityResponseI
       return lastPage && lastPage[lastPage.length - 1].eventId;
     },
     keepPreviousData: true,
-    refetchInterval: false,
   });
 };
 

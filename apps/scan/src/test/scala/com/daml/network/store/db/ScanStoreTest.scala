@@ -645,7 +645,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     "listRecentActivity" should {
       "return the most recent activities" in {
         val limit = 10
-        val nrActivities = 11
+        val nrActivities = 20
         val activities = (1 to nrActivities).map { i =>
           TxLogEntry.RecentActivityLogEntry(
             TxLogIndexRecord
@@ -663,8 +663,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         }.toList
         def stripEventId(activity: TxLogEntry.RecentActivityLogEntry) =
           activity.copy(indexRecord = activity.indexRecord.copy(eventId = ""))
-        // recent activity returns most recent 10 activities
-        val expectedActivities = activities.reverse.take(limit).toList
+        val expectedFirstPage = activities.reverse.take(limit).toList
+        val expectedSecondPage = activities.reverse.drop(limit).take(limit).toList
 
         def transferFromActivity(
             store: ScanStore,
@@ -705,11 +705,18 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           }
         } yield {
           eventually() {
-            store
+            val firstPage = store
               .listRecentActivity(None, limit)
               .futureValue
-              .map(stripEventId)
-              .toList should be(expectedActivities.map(stripEventId))
+              .toList
+
+            firstPage.map(stripEventId) should be(expectedFirstPage.map(stripEventId))
+
+            store
+              .listRecentActivity(Some(firstPage.last.indexRecord.eventId), limit)
+              .futureValue
+              .toList
+              .map(stripEventId) should be(expectedSecondPage.map(stripEventId))
           }
         }
       }

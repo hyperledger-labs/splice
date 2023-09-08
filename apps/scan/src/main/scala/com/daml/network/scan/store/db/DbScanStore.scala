@@ -246,14 +246,30 @@ class DbScanStore(
       val dbType = ScanTxLogParser.TxLogIndexRecord.RecentActivityIndexRecord.dbType
       for {
         rows <- storage.query(
-          sql"""
+          beginAfterEventId.fold(
+            sql"""
                 select event_id, domain_id 
                 from scan_txlog_store
                 where store_id = $storeId
                   and index_record_type = ${dbType}
                 order by entry_number desc
                 limit $limit;
-          """.as[(String, String)],
+          """.as[(String, String)]
+          )(beginAfterEventId => sql"""
+                select event_id, domain_id
+                from scan_txlog_store
+                where store_id = $storeId
+                  and index_record_type = ${dbType}
+                  and entry_number < (
+                      select entry_number
+                      from scan_txlog_store
+                      where store_id = $storeId
+                      and event_id = ${lengthLimited(beginAfterEventId)}
+                      and index_record_type = ${dbType}
+                  )
+                order by entry_number desc
+                limit $limit;
+           """.as[(String, String)]),
           "listRecentActivity",
         )
         entries <- rows.traverse { case (eventId, domainId) =>
