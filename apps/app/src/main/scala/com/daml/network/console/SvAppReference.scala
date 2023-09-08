@@ -4,7 +4,12 @@ import akka.actor.ActorSystem
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.round as cr
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
-import com.daml.network.codegen.java.cn.svcrules.{ActionRequiringConfirmation, Vote, VoteRequest}
+import com.daml.network.codegen.java.cn.svcrules.{
+  ActionRequiringConfirmation,
+  Vote,
+  VoteRequest,
+  VoteResult,
+}
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.NetworkAppClientConfig
@@ -219,6 +224,29 @@ class SvAppBackendReference(
     consoleEnvironment.run {
       httpCommand(
         HttpSvAdminAppClient.ListVoteRequests
+      )
+    }
+  }
+
+  @Help.Summary("List vote results")
+  def listVoteResults(
+      actionName: Option[String],
+      executed: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: BigInt,
+  ): Seq[VoteResult] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.ListVoteResults(
+          actionName,
+          executed,
+          requester,
+          effectiveFrom,
+          effectiveTo,
+          limit,
+        )()
       )
     }
   }

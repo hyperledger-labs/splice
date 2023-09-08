@@ -572,7 +572,13 @@ create table svc_txlog_store
     action_name                                              text,
 
     -- executed is an index of DefiniteVoteIndexRecord
-    executed                                                 boolean
+    executed                                                 boolean,
+
+    -- requester is an index of DefiniteVoteIndexRecord
+    requester                                                text,
+
+    -- effective_at is an index of DefiniteVoteIndexRecord
+    effective_at                                             text
 );
 
 create index svc_txlog_store_sid_irt_r_en

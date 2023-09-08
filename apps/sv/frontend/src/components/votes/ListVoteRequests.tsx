@@ -33,18 +33,52 @@ import {
 import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
 
-import { ActionRequiringConfirmation, SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import {
+  ActionRequiringConfirmation,
+  SvcRules,
+  VoteResult,
+} from '@daml.js/svc-governance/lib/CN/SvcRules';
 import { ContractId } from '@daml/types';
 
 import { VoteRequest } from '../../../../../common/frontend/daml.js/svc-governance-0.1.0/lib/CN/SvcRules';
 import { useSvcInfos } from '../../contexts/SvContext';
-import { useListSvcRulesVoteRequests } from '../../hooks/useListVoteRequests';
+import {
+  useListSvcRulesVoteRequests,
+  useListSvcRulesVoteResults,
+} from '../../hooks/useListVoteRequests';
 import { useListVotes } from '../../hooks/useListVotes';
 import { config } from '../../utils';
 import VoteRequestModalContent from './VoteRequestModalContent';
+import ActionView from './actions/views/ActionView';
+
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+dayjs.extend(utc);
 
 const ListVoteRequests: React.FC = () => {
   const listVoteRequestsQuery = useListSvcRulesVoteRequests();
+
+  const listVoteResultsExecuted = useListSvcRulesVoteResults(
+    {
+      executed: true,
+      effectiveTo: dayjs.utc().format('YYYY-MM-DDTHH:mm:ss[Z]'),
+    },
+    10
+  );
+  const listVoteResultsPlanned = useListSvcRulesVoteResults(
+    {
+      executed: true,
+      effectiveFrom: dayjs.utc().format('YYYY-MM-DDTHH:mm:ss[Z]'),
+    },
+    10
+  );
+  const listVoteResultsRejected = useListSvcRulesVoteResults(
+    {
+      executed: false,
+    },
+    10
+  );
+
   const voteRequestIds = listVoteRequestsQuery.data
     ? listVoteRequestsQuery.data.map(v => v.contractId)
     : [];
@@ -92,11 +126,25 @@ const ListVoteRequests: React.FC = () => {
       .map(([Cid, _]) => Cid);
   }, [votesQuery.data, votingThreshold]);
 
-  if (listVoteRequestsQuery.isLoading || svcInfosQuery.isLoading || votesQuery.isLoading) {
+  if (
+    listVoteRequestsQuery.isLoading ||
+    svcInfosQuery.isLoading ||
+    votesQuery.isLoading ||
+    listVoteResultsExecuted.isLoading ||
+    listVoteResultsPlanned.isLoading ||
+    listVoteResultsRejected.isLoading
+  ) {
     return <Loading />;
   }
 
-  if (listVoteRequestsQuery.isError || svcInfosQuery.isError || votesQuery.isError) {
+  if (
+    listVoteRequestsQuery.isError ||
+    svcInfosQuery.isError ||
+    votesQuery.isError ||
+    listVoteResultsExecuted.isError ||
+    listVoteResultsPlanned.isError ||
+    listVoteResultsRejected.isError
+  ) {
     return <p>Error, something went wrong.</p>;
   }
 
@@ -151,7 +199,7 @@ const ListVoteRequests: React.FC = () => {
     }
     return 'Action tag not defined.';
   }
-
+  // TODO(#7613): remove isDevNet flag and add feature in release_notes
   return (
     <>
       <Typography mt={6} variant="h4">
@@ -179,6 +227,34 @@ const ListVoteRequests: React.FC = () => {
         tableBodyId={'sv-voting-in-progress-table-body'}
         staled={false}
       />
+      {svcInfosQuery.data?.svcRules.payload.isDevNet && (
+        <Stack>
+          <Typography mt={6} variant="h5">
+            Planned
+          </Typography>
+          <ListVoteResultsTable
+            voteResults={listVoteResultsPlanned.data! || []}
+            getAction={getAction}
+            tableBodyId={'sv-vote-results-planned-table-body'}
+          />
+          <Typography mt={6} variant="h5">
+            Executed
+          </Typography>
+          <ListVoteResultsTable
+            voteResults={listVoteResultsExecuted.data! || []}
+            getAction={getAction}
+            tableBodyId={'sv-vote-results-executed-table-body'}
+          />
+          <Typography mt={6} variant="h5">
+            Rejected
+          </Typography>
+          <ListVoteResultsTable
+            voteResults={listVoteResultsRejected.data! || []}
+            getAction={getAction}
+            tableBodyId={'sv-vote-results-executed-table-body'}
+          />
+        </Stack>
+      )}
       {voteRequestsStaled.length > 0 && (
         <Stack>
           <Typography mt={6} variant="h5">
@@ -386,6 +462,122 @@ const ListVoteRequestsTable: React.FC<ListVoteRequestsTableProps> = ({
                 url={request.payload.reason.url}
                 openModalWithVoteRequest={openModalWithVoteRequest}
                 staled={staled}
+              />
+            );
+          })}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+};
+
+interface VoteResultRowProps {
+  action: string;
+  voteResult: VoteResult;
+  idx: number;
+}
+
+const VoteResultRow: React.FC<VoteResultRowProps> = ({ action, voteResult, idx }) => {
+  const [open, setOpen] = useState(-1);
+
+  return (
+    <>
+      <TableRow key={idx} className="vote-result-row">
+        <TableCell>
+          <IconButton
+            aria-label="expand row"
+            size="small"
+            onClick={() => setOpen(open === idx ? -1 : idx)}
+          >
+            {open === idx ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+          </IconButton>
+        </TableCell>
+        <TableCell className="vote-row-action">
+          <CopyableTypography text={action} maxWidth={'300px'} />
+        </TableCell>
+        <TableCell className="vote-row-requester">
+          <CopyableTypography text={voteResult.requester} maxWidth={'300px'} />
+        </TableCell>
+        <TableCell className="vote-row-vote-status" color="default">
+          <Stack spacing={4} direction="row">
+            <Typography id={'vote-result-rejected-count-' + idx} variant="h6">
+              <ClearIcon color="error" fontSize="inherit" /> {voteResult.rejectedBy.length}
+            </Typography>
+            <Typography id={'vote-result-accepted-count-' + idx} variant="h6">
+              <CheckIcon color="success" fontSize="inherit" /> {voteResult.acceptedBy.length}
+            </Typography>
+          </Stack>
+        </TableCell>
+        <TableCell>
+          <DateDisplay datetime={new Date(voteResult.effectiveAt).toLocaleString()} />
+        </TableCell>
+      </TableRow>
+      <TableRow>
+        <TableCell colSpan={5} sx={{ paddingBottom: 0, paddingTop: 0, border: '0px' }}>
+          <Collapse in={open === idx} timeout="auto" unmountOnExit>
+            <Box
+              sx={{
+                width: '100%',
+                backgroundColor: 'rgba(50,50,50,0.4)',
+                minHeight: 36,
+                textAlign: 'center',
+                alignItems: 'center',
+                fontSize: 18,
+              }}
+            >
+              <TableContainer>
+                <Table
+                  style={{ tableLayout: 'fixed' }}
+                  size="small"
+                  className="sv-sub-result-table"
+                >
+                  <TableBody>
+                    <TableRow>
+                      <ActionView action={voteResult.action} />
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </>
+  );
+};
+
+interface ListVoteResultsTableProps {
+  voteResults: VoteResult[];
+  getAction: (action: ActionRequiringConfirmation, staled: boolean) => string;
+  tableBodyId: string;
+}
+
+const ListVoteResultsTable: React.FC<ListVoteResultsTableProps> = ({
+  voteResults,
+  getAction,
+  tableBodyId,
+}) => {
+  return (
+    <TableContainer>
+      <Table style={{ tableLayout: 'auto' }} id="sv-voting-action-needed-table">
+        <TableHead>
+          <TableRow>
+            <TableCell></TableCell>
+            <TableCell>Action</TableCell>
+            <TableCell>Requester</TableCell>
+            <TableCell>Vote Status</TableCell>
+            <TableCell>Effective At</TableCell>
+            <TableCell></TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody id={tableBodyId}>
+          {voteResults.map((result, index) => {
+            return (
+              <VoteResultRow
+                key={index}
+                action={getAction(result.action, false)}
+                voteResult={result}
+                idx={index}
               />
             );
           })}

@@ -234,6 +234,8 @@ data Reason = Reason with
 data VoteResult = VoteResult with
     action : ActionRequiringConfirmation
     executed : Bool
+    requester: Party
+    effectiveAt: Time
     acceptedBy : [Party]
     rejectedBy : [Party]
   deriving (Eq, Show)
@@ -638,11 +640,25 @@ template SvcRules with
           executeActionRequiringConfirmation self coinRulesCid request.action
         -- store the result of this vote on the return value of the choice
         -- for display in a transaction history
+        now <- getTime
         pure $ VoteResult with
           action = request.action
           executed = execute
+          requester = request.requester
+          effectiveAt = case request.action of
+                  ARC_CoinRules with .. ->
+                    case coinRulesAction of
+                      CRARC_AddFutureCoinConfigSchedule choiceArg -> choiceArg.newScheduleItem._1
+                      CRARC_RemoveFutureCoinConfigSchedule choiceArg -> choiceArg.scheduleTime
+                      CRARC_UpdateFutureCoinConfigSchedule choiceArg -> choiceArg.scheduleItem._1
+                      CRARC_MiningRound_Archive _ -> now
+                      CRARC_MiningRound_StartIssuing _ -> now
+                      CRARC_SetEnabledChoices _ -> now
+                  ARC_SvcRules with .. -> now
+                  ARC_CnsEntryContext with .. -> now
           acceptedBy = map (.voter) $ filter (.accept) votes
           rejectedBy = map (.voter) $ filter (\vote -> not vote.accept) votes
+
 
     nonconsuming choice SvcRules_VoteRequest_Expire : ()
       with

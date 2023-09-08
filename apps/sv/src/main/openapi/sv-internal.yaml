@@ -158,6 +158,24 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListSvcRulesVoteRequestsResponse"
+  /admin/sv/voteresults:
+    post:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "listSvcRulesVoteResults"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ListVoteResultsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListSvcRulesVoteResultsResponse"
   /admin/sv/voterequests/{vote_request_contract_id}:
     get:
       tags: [sv]
@@ -619,6 +637,24 @@ components:
         candidateKey:
           type: string
 
+    ListVoteResultsRequest:
+      type: object
+      required:
+        - limit
+      properties:
+        actionName:
+          type: string
+        executed:
+          type: boolean
+        requester:
+          type: string
+        effectiveFrom:
+          type: string
+        effectiveTo:
+          type: string
+        limit:
+          type: integer
+
     CreateElectionRequest:
       type: object
       required:
@@ -671,6 +707,16 @@ components:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListSvcRulesVoteResultsResponse:
+      type: object
+      required:
+        - svc_rules_vote_results
+      properties:
+        svc_rules_vote_results:
+          type: array
+          items:
+            type: object
 
     LookupSvcRulesVoteRequestResponse:
       type: object

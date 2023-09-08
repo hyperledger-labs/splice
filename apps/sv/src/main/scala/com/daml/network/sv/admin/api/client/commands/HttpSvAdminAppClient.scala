@@ -9,7 +9,12 @@ import com.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
-import com.daml.network.codegen.java.cn.svcrules.{ActionRequiringConfirmation, Vote, VoteRequest}
+import com.daml.network.codegen.java.cn.svcrules.{
+  ActionRequiringConfirmation,
+  Vote,
+  VoteRequest,
+  VoteResult,
+}
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.CNNodeStatus
@@ -252,6 +257,51 @@ object HttpSvAdminAppClient {
       response.svcRulesVoteRequests
         .traverse(req => Contract.fromHttp(VoteRequest.COMPANION)(req))
         .leftMap(_.toString)
+    }
+  }
+
+  case class ListVoteResults(
+      actionName: Option[String],
+      executed: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: BigInt,
+  )() extends BaseCommand[http.ListSvcRulesVoteResultsResponse, Seq[
+        VoteResult
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListSvcRulesVoteResultsResponse] =
+      client.listSvcRulesVoteResults(
+        body = definitions.ListVoteResultsRequest(
+          actionName,
+          executed,
+          requester,
+          effectiveFrom,
+          effectiveTo,
+          limit,
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListSvcRulesVoteResultsResponse.OK(response) =>
+      Right(
+        response.svcRulesVoteResults
+          .map(e =>
+            decoder.decodeValue(
+              VoteResult.valueDecoder(),
+              VoteResult._packageId,
+              "CN.SvcRules",
+              "VoteResult",
+            )(e)
+          )
+          .toSeq
+      )
     }
   }
 

@@ -29,6 +29,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
 import MultiDomainAcsStore.QueryResult
 import TxLogStore.TransactionTreeSource
+import com.daml.network.sv.store.SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract}
@@ -37,6 +38,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -53,22 +55,32 @@ class InMemorySvSvcStore(
     with SvSvcStore {
   import InMemorySvSvcStore.*
 
-  override def listVoteResults(actionName: Option[String], executed: Option[Boolean], limit: Int)(
-      implicit tc: TraceContext
+  override def listVoteResults(
+      actionName: Option[String],
+      executed: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: Int,
+  )(implicit
+      tc: TraceContext
   ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]] = {
     for {
       indexes <- txLog
         .collectTxLogIndicesType[SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord]
-      ind = (actionName, executed) match {
-        case (Some(actionName), Some(executed)) =>
-          indexes.filter(_.actionName == actionName).filter(_.executed == executed)
-        case (Some(actionName), None) =>
-          indexes.filter(_.actionName == actionName)
-        case (None, Some(executed)) =>
-          indexes.filter(_.executed == executed)
-        case _ => indexes
+      ind = actionName match {
+        case Some(actionName) => indexes.filter(_.actionName == actionName)
+        case None => indexes
       }
-      records <- ind
+      ind2 = executed match {
+        case Some(executed) => ind.filter(_.executed == executed)
+        case None => ind
+      }
+      ind3 = requester match {
+        case Some(requester) => ind2.filter(_.requester == requester)
+        case None => ind2
+      }
+      records <- ind3
         .traverse { index =>
           loadTxLogEntry(
             txLogReader,
@@ -80,8 +92,25 @@ class InMemorySvSvcStore(
         }
         .map {
           _.collect { case entry: SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry =>
-            entry
-          }.take(limit)
+            val effectiveAt = Instant
+              .parse(entry.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].effectiveAt)
+            (effectiveFrom, effectiveTo) match {
+              case (Some(effectiveFromDate), Some(effectiveToDate))
+                  if effectiveAt.isAfter(Instant.parse(effectiveFromDate)) && effectiveAt.isBefore(
+                    Instant.parse(effectiveToDate)
+                  ) =>
+                Some(entry)
+              case (Some(effectiveFromDate), None)
+                  if effectiveAt.isAfter(Instant.parse(effectiveFromDate)) =>
+                Some(entry)
+              case (None, Some(effectiveToDate))
+                  if effectiveAt.isBefore(Instant.parse(effectiveToDate)) =>
+                Some(entry)
+              case (None, None) =>
+                Some(entry)
+              case _ => None
+            }
+          }.flatten.take(limit)
         }
     } yield records
   }
