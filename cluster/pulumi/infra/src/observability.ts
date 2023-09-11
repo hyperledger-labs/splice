@@ -44,12 +44,16 @@ function istioVirtualService(
   );
 }
 
-export function configureObservability(): void {
-  const namespace = new k8s.core.v1.Namespace('observabilty', {
-    metadata: {
-      name: 'observability',
+export function configureObservability(dependsOn: pulumi.Resource[] = []): void {
+  const namespace = new k8s.core.v1.Namespace(
+    'observabilty',
+    {
+      metadata: {
+        name: 'observability',
+      },
     },
-  });
+    { dependsOn }
+  );
   const namespaceName = namespace.metadata.name;
   new k8s.helm.v3.Release('observability-metrics', {
     name: 'prometheus-grafana-monitoring',

@@ -10,4 +10,6 @@ export const ingressNs = network.ingressNs.metadata.name;
 export const egressIp = network.egressIp.address;
 
 configureIstio(network.ingressNs, ingressIp);
-configureObservability();
+
+const observabilityDependsOn = [network];
+configureObservability(observabilityDependsOn);

@@ -305,7 +305,7 @@ workflows:
         context:
           - artifactory
           - slack-context
-        workflow_names: "deploy_cidaily cidaily_health_check"
+        workflow_names: "deploy_cilr cilr_health_check"
     - deploy_cluster:
         context:
           - artifactory
@@ -589,7 +589,7 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "deploy_cidaily"
+          workflow_names: "deploy_cilr"
       - preflight_check:
           cluster: "cilr"
           context:
