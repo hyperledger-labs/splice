@@ -10,6 +10,7 @@ app_charts := \
 	cn-istio-gateway \
 	cn-participant \
 	cn-postgres \
+	cn-postgres-metrics \
 	cn-scan \
 	cn-splitwell-app \
 	cn-splitwell-web-ui \

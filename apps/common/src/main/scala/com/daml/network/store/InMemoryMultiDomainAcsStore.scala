@@ -474,11 +474,11 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   def filterTxLogIndicesByOffset(offset: Int, limit: Int)(filter: TXI => Boolean): Seq[TXI] =
     stateVar.txLog.view.drop(offset).filter(filter).take(limit).toSeq
 
-  def filterTxLogIndicesAfterEventId(domainId: DomainId, beginAfterEventId: String, limit: Int)(
+  def filterTxLogIndicesAfterEventId(beginAfterEventId: String, limit: Int)(
       filter: TXI => Boolean
   ): Seq[TXI] =
     stateVar.txLog.view
-      .filter(txi => txi.domainId == domainId && filter(txi))
+      .filter(txi => filter(txi))
       .dropWhile(_.eventId != beginAfterEventId)
       .slice(1, 1 + limit)
       .toSeq

@@ -41,6 +41,15 @@ class ParticipantIdentitiesExportIntegrationTest extends ParticipantIdentitiesIm
         )
       )
     }
+
+    clue("Checking exported key names") {
+      val keyNames = svParticipantDump.keys.map(_.name.value)
+      val prefix = "sv1Participant"
+      keyNames should contain(s"$prefix-namespace")
+      keyNames should contain(s"$prefix-signing")
+      keyNames should contain(s"$prefix-encryption")
+    }
+
     val validatorParticipantDump =
       clue("Getting participant identities dump from Alice's validator") {
         aliceValidatorBackend.dumpParticipantIdentities()
@@ -52,6 +61,14 @@ class ParticipantIdentitiesExportIntegrationTest extends ParticipantIdentitiesIm
           Some(validatorPartyBefore),
         )
       )
+    }
+
+    clue("Checking exported key names") {
+      val keyNames = validatorParticipantDump.keys.map(_.name.value)
+      val prefix = "aliceParticipant"
+      keyNames should contain(s"$prefix-namespace")
+      keyNames should contain(s"$prefix-signing")
+      keyNames should contain(s"$prefix-encryption")
     }
   }
 }

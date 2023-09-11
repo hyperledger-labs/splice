@@ -34,6 +34,7 @@ object BuildCommon {
     lazy val npmLint =
       taskKey[Unit]("checks formatting of frontend code, but does not fix anything")
     lazy val npmFix = taskKey[Unit]("fixes formatting of frontend code")
+    lazy val npmTest = taskKey[Unit]("run all frontend unit tests")
 
     lazy val compileOpenApi = taskKey[Seq[File]]("build typescript code")
     lazy val frontendWorkspace = settingKey[String]("npm workspace to bundle")
@@ -1265,7 +1266,9 @@ object BuildCommon {
             cacheFileDependencies = Set(commonInternalOpenApiFile, commonExternalOpenApiFile),
             directory = directory,
           )
-        }
+
+        },
+      cleanFiles += { baseDirectory.value / directory },
     )
 
     def generateOpenApiClient(
@@ -1276,10 +1279,6 @@ object BuildCommon {
         cacheFileDependencies: Set[File] = Set.empty[File],
         directory: String,
     ): Def.Initialize[Task[Seq[File]]] = Def.task {
-      import better.files._
-      import _root_.io.circe._
-      import _root_.io.circe.parser._
-
       val log = streams.value.log
       val cacheDir = streams.value.cacheDirectory / directory
 
@@ -1306,14 +1305,6 @@ object BuildCommon {
           ),
           log,
         )
-
-        // Add empty check task to make npm happy
-        val packageJson =
-          File((baseDirectory.value / directory / "package.json").toString)
-
-        val packageJsonContent = packageJson.contentAsString
-        val doc: Json =
-          parse(packageJsonContent).getOrElse(sys.error("Failed to parse package.json"))
 
         (baseDirectory.value / directory ** "*").get.toSet
       }

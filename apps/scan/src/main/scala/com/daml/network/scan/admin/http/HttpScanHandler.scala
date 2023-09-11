@@ -486,11 +486,14 @@ class HttpScanHandler(
 
   override def listRecentActivity(
       respond: v0.ScanResource.ListRecentActivityResponse.type
-  )()(extracted: TraceContext): Future[v0.ScanResource.ListRecentActivityResponse] = {
+  )(
+      request: definitions.ListRecentActivityRequest
+  )(extracted: TraceContext): Future[v0.ScanResource.ListRecentActivityResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.listRecentActivity") { _ => _ =>
+      val beginAfterId = if (request.beginAfterId.exists(_.isEmpty)) None else request.beginAfterId
       for {
-        recentActivities <- store.listRecentActivity(10)
+        recentActivities <- store.listRecentActivity(beginAfterId, request.pageSize.toInt)
       } yield definitions.ListRecentActivityResponse(
         recentActivities.map(_.toResponseItem).toVector
       )

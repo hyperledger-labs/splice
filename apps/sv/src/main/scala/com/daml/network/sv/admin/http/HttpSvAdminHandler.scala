@@ -4,6 +4,7 @@ import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.cn.svcrules.VoteResult
 import com.daml.network.config.BackupDumpConfig
 import com.daml.network.environment.{
   CNNodeStatus,
@@ -17,12 +18,16 @@ import com.daml.network.http.v0.definitions.{
   CreateElectionRequest,
   CreateVoteRequest,
   ErrorResponse,
+  ListVoteResultsRequest,
   UpdateVoteRequest,
 }
+import com.daml.network.util.JsonUtil
 import com.daml.network.http.v0.sv_admin.SvAdminResource
 import com.daml.network.http.v0.{definitions, sv_admin as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.sv.cometbft.CometBftClient
+import com.daml.network.sv.store.SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
@@ -35,8 +40,11 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import slick.jdbc.PostgresProfile
 
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 class HttpSvAdminHandler(
     globalDomain: DomainId,
@@ -53,7 +61,10 @@ class HttpSvAdminHandler(
     templateJsonDecoder: TemplateJsonDecoder,
 ) extends v0.SvAdminHandler[TracedUser]
     with Spanning
-    with NamedLogging {
+    with NamedLogging
+    with AcsJdbcTypes {
+
+  val profile: slick.jdbc.JdbcProfile = PostgresProfile
 
   implicit private val loggingContext: ErrorLoggingContext =
     ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
@@ -271,6 +282,47 @@ class HttpSvAdminHandler(
       } yield {
         definitions.ListSvcRulesVoteRequestsResponse(
           svcRulesVoteRequests.map(_.toHttp).toVector
+        )
+      }
+    }
+  }
+
+  def listSvcRulesVoteResults(
+      respond: SvAdminResource.ListSvcRulesVoteResultsResponse.type
+  )(
+      body: ListVoteResultsRequest
+  )(tuser: TracedUser): Future[v0.SvAdminResource.ListSvcRulesVoteResultsResponse] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.listSvcRulesVoteResults") { _ => _ =>
+      for {
+        voteResults <- svcStore.listVoteResults(
+          body.actionName,
+          body.executed,
+          body.requester,
+          body.effectiveFrom,
+          body.effectiveTo,
+          body.limit.intValue,
+        )
+      } yield {
+        definitions.ListSvcRulesVoteResultsResponse(
+          voteResults
+            .map(res =>
+              JsonUtil.sprayJsValueToCirceJson(
+                payloadJsonFromValue(
+                  new VoteResult(
+                    res.action,
+                    res.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].executed,
+                    res.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].requester,
+                    Instant.parse(
+                      res.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].effectiveAt
+                    ),
+                    res.acceptedBy.asJava,
+                    res.rejectedBy.asJava,
+                  ).toValue
+                )
+              )
+            )
+            .toVector
         )
       }
     }

@@ -77,7 +77,14 @@ trait SvSvcStore
     .findAnyContractWithOffset(cn.svcrules.SvcRules.COMPANION)
     .map(_.map(_.flatMap(_.toAssignedContract)))
 
-  def listVoteResults(actionName: Option[String], executed: Option[Boolean], limit: Int)(implicit
+  def listVoteResults(
+      actionName: Option[String],
+      executed: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: Int,
+  )(implicit
       tc: TraceContext
   ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]]
 

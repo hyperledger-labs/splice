@@ -373,6 +373,48 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
         }
       }
     }
+
+    "listCoinRulesTransferFollowers" should {
+      val filtered = ValidatorStore.contractFilter(storeKey)
+      val handled = ValidatorStore.templatesMovedByMyAutomation.view.map(_.TEMPLATE_ID).toSet
+      // "not handled" usually means "handled by a separate automation"
+      val knownNotHandled =
+        Seq(
+          validatorLicenseCodegen.ValidatorLicense.COMPANION -> "handled by SvSvc",
+          coinCodegen.FeaturedAppRight.COMPANION -> "handled by SvSvc",
+          topUpCodegen.ValidatorTopUpState.COMPANION -> "tied to a specific domainId, never migrated",
+        ).view.map { case (c, reason) => (c.TEMPLATE_ID, reason) }.toMap
+
+      "handle every listened-to contract type not handled elsewhere" in {
+        filtered.ingestionFilter.templateIds should contain allElementsOf handled
+      }
+
+      "either handle or not handle each template" in {
+        forEvery(Table(("template", "reason"), knownNotHandled.toSeq: _*)) { (templateId, reason) =>
+          handled shouldNot contain(templateId) withClue reason
+        }
+        // ^ does part of v but with better error messages
+        handled should contain noElementsOf knownNotHandled.keySet
+      }
+
+      // How do we ensure that new templates get migration added somewhere?  If
+      // they are queried in an app, they need to be added to *some* ingestion
+      // filter, so the author will naturally pick one.  The idea is that we
+      // compare
+      //
+      //  1. the list the system effectively forces everyone to update, the
+      //     ingestion filters, to
+      //  2. the lists that are *not* checked except at domain migration time,
+      //
+      // and (hopefully) forestall overlooked required changes that way.
+
+      "give reason for all listened-to contract types not handled" in {
+        val observablyUnhandled = filtered.ingestionFilter.templateIds diff handled
+        val mistakes = observablyUnhandled diff knownNotHandled.keySet
+        (observablyUnhandled should contain theSameElementsAs knownNotHandled.keySet
+          withClue s"did you add $mistakes?")
+      }
+    }
   }
 
   private lazy val user1 = userParty(1)

@@ -36,7 +36,7 @@ class ParticipantIdentitiesStore(
           .map(keyBytes =>
             ParticipantIdentitiesDump.ParticipantKey(
               keyBytes.toByteArray,
-              keyM.publicKeyWithName.name.map(_.toString),
+              keyM.publicKeyWithName.name.map(_.unwrap),
             )
           )
       )

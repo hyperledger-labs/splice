@@ -3,7 +3,7 @@ package com.daml.network.wallet.store
 import cats.syntax.traverseFilter.*
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.store.{CNNodeAppStoreWithoutHistory, ConfiguredDefaultDomain}
+import com.daml.network.store.CNNodeAppStoreWithoutHistory
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.topology.PartyId
@@ -14,7 +14,7 @@ import scala.concurrent.{ExecutionContext, Future}
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation
   * that require the visibility of the validator user.
   */
-trait WalletStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomain {
+trait WalletStore extends CNNodeAppStoreWithoutHistory {
 
   protected implicit val ec: ExecutionContext
 

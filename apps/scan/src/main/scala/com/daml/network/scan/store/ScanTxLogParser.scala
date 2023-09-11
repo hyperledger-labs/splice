@@ -353,6 +353,7 @@ object ScanTxLogParser {
         coinPrice: BigDecimal,
     ) extends TxLogEntry {
       def toResponseItem = httpDef.ListRecentActivityResponseItem(
+        eventId = indexRecord.eventId,
         provider = provider,
         sender = sender,
         receivers = Some(receivers.toVector),

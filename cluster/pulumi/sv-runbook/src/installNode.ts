@@ -14,6 +14,7 @@ import {
   loadYamlFromFile,
   participantBootstrapDumpSecretName,
   readAndInstallParticipantBootstrapDump,
+  REPO_ROOT,
 } from 'cn-pulumi-common';
 import { exit } from 'process';
 
@@ -32,7 +33,6 @@ import {
 import {
   CLUSTER_BASENAME,
   localCharts,
-  REPO_ROOT,
   SV_NAME,
   SV_NAMESPACE,
   TARGET_CLUSTER,

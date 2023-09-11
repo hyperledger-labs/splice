@@ -138,9 +138,23 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
 const ENABLE_CLOUD_SQL = 'true' === (process.env.ENABLE_CLOUD_SQL ?? 'false');
 
 export function installPostgres(xns: ExactNamespace, name: string): Postgres {
+  let ret: Postgres;
   if (ENABLE_CLOUD_SQL) {
-    return new CloudPostgres(xns, name);
+    ret = new CloudPostgres(xns, name);
   } else {
-    return new CNPostgres(xns, name);
+    ret = new CNPostgres(xns, name);
   }
+  installCNHelmChart(
+    xns,
+    'postgres-metrics',
+    'cn-postgres-metrics',
+    {
+      postgres: {
+        hostname: ret.address,
+        password: ret.password,
+      },
+    },
+    [ret]
+  );
+  return ret;
 }

@@ -109,13 +109,12 @@ class InMemoryUserWalletStore(
       case _: UserWalletTxLogParser.TransferOfferStatusTxLogIndexRecord =>
         false
     }
+    val indices = beginAfterEventId.fold(
+      txLog.filterTxLogIndicesByOffset(0, limit)(filter)
+    )(
+      txLog.filterTxLogIndicesAfterEventId(_, limit)(filter)
+    )
     for {
-      domain <- domains.waitForDomainConnection(defaultAcsDomain)
-      indices = beginAfterEventId.fold(
-        txLog.filterTxLogIndicesByOffset(0, limit)(filter)
-      )(
-        txLog.filterTxLogIndicesAfterEventId(domain, _, limit)(filter)
-      )
       entries <- Future.traverse(indices)(i =>
         txLogReader.loadTxLogEntry(i.eventId, i.domainId, i.acsContractId)
       )

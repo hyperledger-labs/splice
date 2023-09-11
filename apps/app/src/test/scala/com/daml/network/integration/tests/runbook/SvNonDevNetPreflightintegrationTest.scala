@@ -152,7 +152,3 @@ final class Sv1NonDevNetPreflightIntegrationTest extends SvNonDevNetPreflightInt
     testRecentAcsDump("sv-1")
   }
 }
-
-final class Sv2NonDevNetPreflightIntegrationTest extends SvNonDevNetPreflightIntegrationTestBase {
-  override protected def svNumber = 2
-}

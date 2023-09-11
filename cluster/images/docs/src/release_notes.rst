@@ -9,6 +9,7 @@ Release Notes
 * Deployment updates:
 
     * Please note an SV rename from `sbi` to `SBI-Holdings`.
+    * Please note an increase in database volume size from `80Gi` to `160Gi`.
 
 * Bugfixes:
 

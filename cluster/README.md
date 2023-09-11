@@ -24,7 +24,7 @@
         - [Pod error states](#pod-error-states)
         - [Check for Cluster Updates](#check-for-cluster-updates)
         - [Check for Autoscaler Activity](#check-for-autoscaler-activity)
-      - [Canton Ledger Prometheus Metrics](#canton-ledger-prometheus-metrics)
+      - [Prometheus Metrics and Grafana Dashboards](#prometheus-metrics-and-grafana-dashboards)
       - [Alerts](#alerts)
     - [Checking Pod Node Assignments and Memory Usage](#checking-pod-node-assignments-and-memory-usage)
     - [Managing GKE Kubernetes Versions](#managing-gke-kubernetes-versions)
@@ -284,7 +284,7 @@ are stored in the deployment directory for the given cluster.
 subcommands. A few highlights include the following:
 
 * `cncluster apply` - Apply the current working copy's `canton-network`
-  Pulumi stack to a cluster. The presence of all images referenced by that
+  and `infra` Pulumi stacks to a cluster. The presence of all images referenced by that
   configuration is confirmed prior to application of the manifest.
       * The tag for the images to be deployed can be overridden with an
         optional parameter. If this is specified, then the docker image
@@ -292,6 +292,7 @@ subcommands. A few highlights include the following:
       * To docker image check can also be bypassed by setting the
         `CNCLUSTER_SKIP_DOCKER_CHECK` environment variable to 1. This
         can also be added to `.envrc.private`.
+      * One can skip redeploying the `infra` stack by supplying the `--skip-infra` flag.
 * `cncluster pdown` - Take down any installed resources populated with
   the `canton-network` Pulumi stack.
 * `cncluster create` - Create a new instance of the CN cluster in GCE,
@@ -593,14 +594,46 @@ log_id("events") AND
 (jsonPayload.source.component="cluster-autoscaler" OR jsonPayload.source.component="default-scheduler")
 ```
 
-#### Canton Ledger Prometheus Metrics
+#### Prometheus Metrics and Grafana Dashboards
 
-We expose prometheus metrics for our three participants and the domain on the following urls:
+##### Prometheus Metrics
 
-- Global Domain: `http://${cluster}.network.canton.global:10313/metrics`
-- SVC Participant: `http://${cluster}.network.canton.global:10013/metrics`
-- Validator1 Participant: `http://${cluster}.network.canton.global:10113/metrics`
-- Splitwell Participant: `http://${cluster}.network.canton.global:10213/metrics`
+We collect metrics from various components in the system into Prometheus, which is deployed in every cluster. At the moment, in addition to basic k8s metrics, metrics are also collected from:
+- Participants (the entry point to the ledger for each validator/user)
+- Sequencers (the component in the Canton domain responsible for ensuring a total order between all messages on that domain)
+- Mediators (the component in the Canton domain responsible for collecting and verifying confirmations from participants)
+- CometBFT (the replication service currently used to create a BFT sequencing service)
+- PostgreSQL
+
+Prometheus may be configured to collect more metrics by deploying `ServiceMonitor` resources in k8s. We typically do that as part of the Helm chart of the corresponding component. To access and see the raw collected data in Prometheus, browse to `prometheus.<CLUSTER_DNS>`
+
+##### Grafana Dashboards
+
+Grafana is used to visualize Prometheus metrics in various ways, aggregated into Dashboards. We deploy two types of dashboards in all clusters:
+
+- Those built by the platform-enablement team and are part of the
+open source observability
+example [here](https://github.com/digital-asset/daml-platform-observability-example/tree/main/grafana/dashboards). Check `grafana-dashboards.nix` to see how we get the dashboards. These are installed in the `platform` and `participant` folders in Grafana.
+
+- Custom dashboards built by us. To add a new dashboard, add its JSON definition to a file in `cluster/grafana-dashboards`. It will then be pushed to the cluster via the `infra` Pulumi stack, under the `canton-network` folder in Grafana.
+
+To access Grafana on a given cluster, browse to `grafana.<CLUSTER_DNS>` and login with the credentials in [our shared passwords document](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit?ouid=103930368588823687273&usp=docs_home&ths=true).
+
+##### The Observability Cluster
+
+In addition to the per-cluster observability stacks, we maintain also an `observability` cluster which collects metrics data from CircleCI runs. You can access Grafana on that cluster at `https://grafana.observability.network.canton.global`.
+
+In that cluster, we add an ad hoc filter using the `build_num` label with
+a default value of `non_existing`.
+The main reason is to prevent loading a lot of metric series when first opening the dashboard (as all the metrics are
+labeled for each CI run job with a different `build_num`, this would load a lot of series in prometheus leading to
+really high memory usage), and allowing us to filter
+for a specific `build_num` much easier.
+
+This filter will in turn have the side effect of not having any data when first opening a dashboard, but the user would
+have to select an existing build num and adjust the time period to match the time of the CI run for the data to be
+fetched.
+
 
 #### Alerts
 

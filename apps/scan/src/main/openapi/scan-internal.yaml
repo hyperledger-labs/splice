@@ -320,10 +320,16 @@ paths:
               schema:
                 "$ref": "#/components/schemas/ListImportCratesResponse"
   /recent-activity:
-    get:
+    post:
       tags: [scan]
       x-jvm-package: scan
       operationId: "listRecentActivity"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ListRecentActivityRequest"
       responses:
         "200":
           description: ok
@@ -549,6 +555,16 @@ components:
           items:
             # TODO(#6073): consider using a more precise type; i.e., no 'MaybeCached'
             $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
+    ListRecentActivityRequest:
+      type: object
+      required:
+        - page_size
+      properties:
+        begin_after_id:
+          type: string
+        page_size:
+          type: integer
+          format: int64
     ListRecentActivityResponse:
       type: object
       required:
@@ -561,12 +577,15 @@ components:
     ListRecentActivityResponseItem:
       type: object
       required:
+        - event_id
         - provider
         - sender
         - receiver
         - amount
         - coin_price
       properties:
+        event_id:
+          type: string
         provider:
           type: string
         sender:

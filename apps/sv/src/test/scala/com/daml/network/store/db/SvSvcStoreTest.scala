@@ -822,6 +822,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             .listVoteResults(
               Some("CRARC_SetEnabledChoices"),
               Some(true),
+              None,
+              None,
+              None,
               1,
             )
             .futureValue
@@ -833,6 +836,8 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
               dummyDomain,
               "CRARC_SetEnabledChoices",
               true,
+              result.requester,
+              result.effectiveAt.toString,
             ),
             result.rejectedBy.asScala.toList,
             result.acceptedBy.asScala.toList,
@@ -842,6 +847,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             .listVoteResults(
               Some("CRARC_SetEnabledChoices"),
               Some(false),
+              None,
+              None,
+              None,
               1,
             )
             .futureValue
@@ -850,6 +858,33 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           store
             .listVoteResults(
               None,
+              None,
+              None,
+              None,
+              None,
+              1,
+            )
+            .futureValue
+            .toList
+            .size shouldBe (1)
+          store
+            .listVoteResults(
+              None,
+              None,
+              None,
+              Some(Instant.now().plusSeconds(3600).toString),
+              None,
+              1,
+            )
+            .futureValue
+            .toList
+            .size shouldBe (0)
+          store
+            .listVoteResults(
+              None,
+              None,
+              None,
+              Some(Instant.now().minusSeconds(3600).toString),
               None,
               1,
             )
@@ -896,6 +931,8 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
   ): VoteResult = new VoteResult(
     voteRequestContract.payload.action,
     true,
+    voteRequestContract.payload.requester,
+    Instant.now(),
     (1 to 4).map(n => userParty(n).toProtoPrimitive).toList.asJava,
     List.empty.asJava,
   )

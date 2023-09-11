@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      volumes:
+        - name: postgres-password
+          secret:
+            secretName: {{ .Release.Name }}-secrets
+            items:
+              - key: postgresPassword
+                path: postgresPassword
+      containers:
+      - name: {{ .Release.Name }}
+        image: quay.io/prometheuscommunity/postgres-exporter:v0.13.2
+        env:
+          - name: DATA_SOURCE_PASS_FILE
+            value: /tmp/pwd
+          - name: DATA_SOURCE_USER
+            value: cnadmin
+          - name: DATA_SOURCE_URI
+            value: {{ .Values.postgres.hostname }}:{{ .Values.postgres.port }}/postgres?sslmode=disable
+        volumeMounts:
+          - name: postgres-password
+            mountPath: "/tmp/pwd"
+            subPath: postgresPassword
+            readOnly: true
+      initContainers:
+      # If postgres is not yet ready, postgres-exporter fails when initializing the collector
+      # but never retries nor indicates non-readiness, so we unfortunatly need to wait for it
+      # to be ready before spinning up postgres-exporter.
+      - name: {{ .Release.Name }}-init-postgres
+        image: postgres:14
+        command: ['sh', '-c', "until pg_isready -h {{ .Values.postgres.hostname }} -p {{ .Values.postgres.port }}; do echo waiting for postgres at hostname {{ .Values.postgres.hostname }}, port {{ .Values.postgres.port }}; sleep 2; done"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  ports:
+  - name: postgres-metrics
+    port: 9187
+    protocol: TCP
+  selector:
+    app: {{ .Release.Name }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    release: prometheus-grafana-monitoring
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpoints:
+
+  - port: postgres-metrics
+    interval: 30s
+
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}

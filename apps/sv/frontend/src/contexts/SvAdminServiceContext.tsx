@@ -13,7 +13,9 @@ import {
   ListOngoingValidatorOnboardingsResponse,
   ListOpenMiningRoundsResponse,
   ListSvcRulesVoteRequestsResponse,
+  ListSvcRulesVoteResultsResponse,
   ListValidatorLicensesResponse,
+  ListVoteResultsRequest,
   ListVotesResponse,
   LookupSvcRulesVoteRequestResponse,
   Middleware,
@@ -47,6 +49,14 @@ export interface SvAdminClient {
     expiration: RelTime
   ) => Promise<void>;
   listSvcRulesVoteRequests: () => Promise<ListSvcRulesVoteRequestsResponse>;
+  listSvcRulesVoteResults: (
+    limit: number,
+    actionName?: string,
+    requester?: string,
+    effectiveFrom?: string,
+    effectiveTo?: string,
+    executed?: boolean
+  ) => Promise<ListSvcRulesVoteResultsResponse>;
   lookupSvcRulesVoteRequest: (
     voteRequestContractId: string
   ) => Promise<LookupSvcRulesVoteRequestResponse>;
@@ -123,6 +133,24 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       },
       listSvcRulesVoteRequests: async (): Promise<ListSvcRulesVoteRequestsResponse> => {
         return await svAdminClient.listSvcRulesVoteRequests();
+      },
+      listSvcRulesVoteResults: async (
+        limit: number,
+        actionName?: string,
+        requester?: string,
+        effectiveFrom?: string,
+        effectiveTo?: string,
+        executed?: boolean
+      ): Promise<ListSvcRulesVoteResultsResponse> => {
+        const request: ListVoteResultsRequest = {
+          actionName: actionName,
+          executed: executed,
+          requester: requester,
+          effectiveFrom: effectiveFrom,
+          effectiveTo: effectiveTo,
+          limit: limit,
+        };
+        return await svAdminClient.listSvcRulesVoteResults(request);
       },
       lookupSvcRulesVoteRequest: async (
         voteRequestContractId: string

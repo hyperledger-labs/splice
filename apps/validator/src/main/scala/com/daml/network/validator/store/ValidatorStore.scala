@@ -1,6 +1,8 @@
 package com.daml.network.validator.store
 
 import cats.syntax.traverseFilter.*
+import com.daml.ledger.javaapi.data.Template
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
@@ -9,9 +11,13 @@ import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.store.{
+  CNNodeAppStoreWithoutHistory,
+  ConfiguredDefaultDomain,
+  MultiDomainAcsStore,
+}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
 import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.db.DbValidatorStore
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
@@ -26,7 +32,11 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
+trait ValidatorStore
+    extends WalletStore
+    with CNNodeAppStoreWithoutHistory
+    with ConfiguredDefaultDomain {
+  import ValidatorStore.templatesMovedByMyAutomation
 
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key
@@ -167,6 +177,14 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
     appManagerCodegen.ApprovedReleaseConfiguration.ContractId,
     appManagerCodegen.ApprovedReleaseConfiguration,
   ]]]]
+
+  final def listCoinRulesTransferFollowers(
+      coinRules: AssignedContract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]
+  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
+    multiDomainAcsStore.listAssignedContractsNotOnDomains(
+      coinRules.domain,
+      templatesMovedByMyAutomation: _*
+    )
 }
 
 object ValidatorStore {
@@ -226,6 +244,24 @@ object ValidatorStore {
       param("svcParty", _.svcParty),
     )
   }
+
+  import language.existentials
+
+  private type ConstrainedTemplate = Contract.Companion.Template[_ <: ContractId[T], T] forSome {
+    type T <: Template
+  }
+
+  private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
+    Seq[ConstrainedTemplate](
+      walletCodegen.WalletAppInstall.COMPANION,
+      coinCodegen.Coin.COMPANION,
+      coinCodegen.ValidatorRight.COMPANION,
+      appManagerCodegen.AppConfiguration.COMPANION,
+      appManagerCodegen.AppRelease.COMPANION,
+      appManagerCodegen.RegisteredApp.COMPANION,
+      appManagerCodegen.InstalledApp.COMPANION,
+      appManagerCodegen.ApprovedReleaseConfiguration.COMPANION,
+    )
 
   /** Contract of a wallet store for a specific validator party. */
   def contractFilter(key: Key): MultiDomainAcsStore.ContractFilter = {

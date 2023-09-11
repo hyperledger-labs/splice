@@ -162,15 +162,19 @@ class DbSvSvcStore(
       indexRecordType,
       actionName,
       executed,
+      requester,
+      effectiveAt,
     ) = SvcTxLogRowData.fromTxLogIndexRecord(record)
     val safeEventId = lengthLimited(eventId)
     val safeOffset = offset.map(lengthLimited)
     val safeActionName = actionName.map(lengthLimited)
+    val safeRequester = requester.map(lengthLimited)
+    val safeEffectiveAt = effectiveAt.map(lengthLimited)
     Right(sqlu"""
           insert into svc_txlog_store(store_id, event_id, index_record_type, "offset", domain_id,
-          action_name, executed)
+          action_name, executed, requester, effective_at)
           values ($storeId, $safeEventId, $indexRecordType, $safeOffset, $domainId,
-                  $safeActionName, $executed)
+                  $safeActionName, $executed, $safeRequester, $safeEffectiveAt)
           on conflict do nothing
         """)
   }
@@ -1073,19 +1077,38 @@ class DbSvSvcStore(
     )
   }
 
-  def listVoteResults(actionName: Option[String], executed: Option[Boolean], limit: Int)(implicit
+  def listVoteResults(
+      actionName: Option[String],
+      executed: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: Int,
+  )(implicit
       tc: TraceContext
   ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]] = {
     val dbType = SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord.dbType
-    val where = (actionName, executed) match {
-      case (Some(actionName), Some(executed)) =>
-        sql"""and action_name = ${lengthLimited(actionName)} and executed = ${executed}"""
-      case (Some(actionName), None) =>
-        sql"""and action_name = ${lengthLimited(actionName)}"""
-      case (None, Some(executed)) =>
-        sql"""and executed = ${executed}"""
-      case _ =>
-        sql""""""
+    val actionNameCondition = actionName match {
+      case Some(actionName) => sql"""and action_name = ${lengthLimited(actionName)}"""
+      case None => sql""""""
+    }
+    val executedCondition = executed match {
+      case Some(executed) => sql"""and executed = ${executed}"""
+      case None => sql""""""
+    }
+    val effectivenessCondition = (effectiveFrom, effectiveTo) match {
+      case (Some(effectiveFrom), Some(effectiveTo)) =>
+        sql"""and effective_at between ${lengthLimited(effectiveFrom)} and ${lengthLimited(
+            effectiveTo
+          )}"""
+      case (Some(effectiveFrom), None) =>
+        sql"""and effective_at > ${lengthLimited(effectiveFrom)}"""
+      case (None, Some(effectiveTo)) => sql"""and effective_at < ${lengthLimited(effectiveTo)}"""
+      case (None, None) => sql""""""
+    }
+    val requesterCondition = requester match {
+      case Some(requester) => sql"""and requester = ${lengthLimited(requester)}"""
+      case None => sql""""""
     }
     for {
       rows <- storage.query(
@@ -1094,7 +1117,7 @@ class DbSvSvcStore(
              from svc_txlog_store
              where store_id = $storeId
                 and index_record_type = ${dbType}
-                """ ++ where ++ sql"""
+                """ ++ actionNameCondition ++ executedCondition ++ requesterCondition ++ effectivenessCondition ++ sql"""
              limit $limit;
            """).toActionBuilder.as[(String, String)],
         "listVoteResults",

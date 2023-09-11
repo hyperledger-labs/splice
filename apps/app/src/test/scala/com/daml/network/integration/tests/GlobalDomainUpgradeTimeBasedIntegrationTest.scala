@@ -353,7 +353,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
     }
 
   // check scan for other contracts' transfer:
-  // TODO (#5958) check coin and wallet contracts
+  // TODO (#7468) check coin and wallet contracts
   // TODO (#5959) check directory contracts
   }
 
