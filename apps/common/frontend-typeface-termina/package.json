@@ -7,8 +7,5 @@
   "license": "ISC",
   "main": "index.css",
   "private": "true",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "types": "index.d.ts"
 }

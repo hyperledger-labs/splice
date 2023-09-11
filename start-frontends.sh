@@ -64,6 +64,13 @@ function start_frontend() {
     npm start 2>&1 | tee -a $log_file" C-m
 }
 
+function start_test() {
+  local app=$1
+  local frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
+
+  tmux_cmd "${app}-test" "${frontend_dir}" "npm run test"
+}
+
 function usage() {
   echo "Usage: ./start-frontends.sh <flags>"
   echo "Flags:"
@@ -74,6 +81,7 @@ function usage() {
   echo "  -v   run frontends with a shared validator for all users"
   echo "  -s   run frontends with multiple super validators for Sv*IntegrationTest in CI"
   echo "  -m   run frontends with app manager frontends"
+  echo "  -t   start interactive/live vitest suites for frontends"
 }
 
 # default values
@@ -83,8 +91,9 @@ use_preflight_frontends=0
 shared_validator_for_users=0
 multiple_svs=0
 app_manager=0
+run_tests=0
 
-while getopts "hdapvsm" arg; do
+while getopts "hdapvsmt" arg; do
   case ${arg} in
     h)
       usage
@@ -108,6 +117,9 @@ while getopts "hdapvsm" arg; do
     m)
       app_manager=1
       ;;
+    t)
+      run_tests=1
+      ;;
     ?)
       usage
       exit 1
@@ -125,20 +137,29 @@ LOG_DIR="${REPO_ROOT}/log"
 tmux new-session -d -s "${tmux_session}"
 mkdir -p "${LOG_DIR}"
 
-# listen & auto-rebuild common-frontend code when its src changes
-tmux_cmd "common-frontend" "$REPO_ROOT/apps" "npm run start --workspace common-frontend 2>&1 | tee ${LOG_DIR}/npm-common.log"
+function wait_for_workspace_build() {
+  local workspace=$1
+  local index=$2 # relative to apps/
 
-count=0
-while [ ! -f "$REPO_ROOT/apps/common/frontend/lib/index.js" ]
-do
-    echo "Waiting for common-frontend to start..."
-    sleep 1
-    count=$(( ++count ))
-    if [ "$count" -ge "100" ]; then
-      echo "Failure to start common-frontend, exiting"
-      exit 1
-    fi
-done
+  tmux_cmd "$workspace" "$REPO_ROOT/apps" "npm run start --workspace $workspace 2>&1 | tee ${LOG_DIR}/npm-$workspace.log"
+
+  local count=0
+  while [ ! -f "$REPO_ROOT/apps/$index" ]
+  do
+      echo "Waiting for $workspace to start..."
+      sleep 1
+      count=$(( ++count ))
+      if [ "$count" -ge "100" ]; then
+        echo "Failure to start $workspace, exiting"
+        exit 1
+      fi
+  done
+}
+
+# listen & auto-rebuild common-test-utils code when its src changes
+wait_for_workspace_build "common-test-utils" "common/frontend-test-utils/lib/cjs/package.json"
+# listen & auto-rebuild common-frontend code when its src changes
+wait_for_workspace_build "common-frontend" "common/frontend/lib/index.js"
 
 # The set of frontends we want to start as part of typical integration testing
 function start_local_frontends() {
@@ -190,9 +211,19 @@ function start_preflight_frontends() {
   start_frontend   directory 3004 alice   "preflight" $enable_test_auth "rs-256" "https" "${NETWORK_APPS_ADDRESS}"
 }
 
-if [ $use_preflight_frontends -eq 0 ]; then
-  start_local_frontends
-else
+# The set of tests we want to start for local unit testing
+function start_local_tests() {
+  start_test app-manager
+  start_test directory
+  start_test scan
+  start_test splitwell
+  start_test sv
+  start_test wallet
+}
+
+if [ $run_tests -eq 1 ]; then
+  start_local_tests
+elif [ $use_preflight_frontends -eq 1 ]; then
   if [ "$enable_test_auth" == "true" ]; then
     start_preflight_frontends
     echo "$NETWORK_APPS_ADDRESS" > start-frontends-network-address
@@ -200,8 +231,9 @@ else
     echo "enable_test_auth was set to false, -p is incompatible with -a"
     exit 1
   fi
+else
+  start_local_frontends
 fi
-
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}

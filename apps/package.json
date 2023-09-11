@@ -1,5 +1,6 @@
 {
   "workspaces": [
+    "common/frontend-test-utils",
     "common/frontend-typeface-termina",
     "common/frontend",
     "directory/frontend",

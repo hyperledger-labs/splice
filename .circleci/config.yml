@@ -1210,6 +1210,28 @@ jobs:
           extra_env_vars: DAML_DEBUG=1
       - collect_test_timings_and_send_to_datadog
 
+  # Run UI unit tests
+  ui_test:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_sbt_test_job
+      - execute_sbt_command:
+          cmd: "apps-common-frontend/compile"
+      # TODO(#7634) -- include this build step in npmTest's compile task to consolidate
+      - run_bash_command_in_nix:
+          cmd_name: "Build test dependencies"
+          cmd: "cd apps && npm run build --workspace=common-frontend --workspace=common-test-utils"
+      - execute_sbt_command:
+          cmd: "apps-common-frontend/npmTest"
+          fail_on_error_in_output: false # TODO(#7579) -- turn this back on when we figure out what to ignore/what not to
+      - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
+
   # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
   # work on anything but the Scala tests is duplicated across all parallel runs of this job
   scala_test:
@@ -2082,6 +2104,12 @@ workflows:
         start_canton_options: "-s -g"
         resource_class: "xlarge"
         parallelism: 1
+    - ui_test:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
     - bundle:
         <<: *notify-fail
         context:

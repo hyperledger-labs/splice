@@ -591,6 +591,11 @@ lazy val `apps-common-frontend` = {
               "common-frontend",
               log,
             )
+            BuildCommon.TS.runBuildCommand(
+              npmRootDir.value,
+              "common-test-utils",
+              log,
+            )
             (baseDirectory.value / "lib" ** "*").get.toSet
           }
         (baseDirectory.value / "lib", cache(sourceFiles))
@@ -610,6 +615,17 @@ lazy val `apps-common-frontend` = {
         val log = streams.value.log
         runCommand(
           Seq("npm", "run", "fix", "--workspaces", "--if-present"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      // TODO(#7579) -- like npmLint and npmFix above, we could/should run vitest per project.
+      // In this case, we really want to do that asap to better parallelize the task in CI.
+      npmTest := {
+        val log = streams.value.log
+        runCommand(
+          Seq("npm", "run", "test", "--workspaces", "--if-present"),
           log,
           None,
           Some(npmRootDir.value),
