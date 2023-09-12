@@ -4,6 +4,7 @@ import {
   Auth0Client,
   BackupConfig,
   ChartValues,
+  envFlag,
   exactNamespace,
   fetchAndInstallParticipantBootstrapDump,
   fixedTokens,
@@ -11,6 +12,7 @@ import {
   infraStack,
   installGcpBucket,
   installGcpBucketSecret,
+  isDevNet,
   loadYamlFromFile,
   participantBootstrapDumpSecretName,
   readAndInstallParticipantBootstrapDump,
@@ -40,12 +42,11 @@ import {
   withDomainFees,
 } from './utils';
 
-const isDevNet = process.env.NON_DEVNET === undefined || process.env.NON_DEVNET === '';
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');
 }
 
-const singleSv = (process.env.SINGLE_SV !== undefined && process.env.SINGLE_SV !== '') || !isDevNet;
+const singleSv = envFlag('SINGLE_SV') || !isDevNet;
 if (singleSv) {
   console.error('Launching with a single SV');
 }
