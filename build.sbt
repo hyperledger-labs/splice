@@ -624,8 +624,12 @@ lazy val `apps-common-frontend` = {
       // In this case, we really want to do that asap to better parallelize the task in CI.
       npmTest := {
         val log = streams.value.log
+        (Test / compile).value
+        npmInstall.value
+        BuildCommon.TS.runBuildCommand(npmRootDir.value, "common-frontend", log)
+        BuildCommon.TS.runBuildCommand(npmRootDir.value, "common-test-utils", log)
         runCommand(
-          Seq("npm", "run", "test", "--workspaces", "--if-present"),
+          Seq("npm", "run", "test:sbt", "--workspaces", "--if-present"),
           log,
           None,
           Some(npmRootDir.value),
