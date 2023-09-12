@@ -58,6 +58,7 @@
     "lint:check": "eslint --max-warnings=0 -- src",
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "start": "react-scripts start",
-    "test": "vitest"
+    "test": "vitest",
+    "test:sbt": "vitest --run"
   }
 }

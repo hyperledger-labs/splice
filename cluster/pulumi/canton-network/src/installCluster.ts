@@ -1,12 +1,16 @@
 import * as pulumi from '@pulumi/pulumi';
-import { Auth0Client, isDevNet, loadYamlFromFile, REPO_ROOT } from 'cn-pulumi-common';
 import {
+  Auth0Client,
   BackupConfig,
-  installGcpBucket,
-  GcpBucketConfig,
   BootstrappingDumpConfig,
-  infraStack,
+  envFlag,
+  GcpBucketConfig,
   InfrastructureOutputs,
+  REPO_ROOT,
+  infraStack,
+  installGcpBucket,
+  isDevNet,
+  loadYamlFromFile,
 } from 'cn-pulumi-common';
 import { globalDomainSequencerDriver } from 'cn-pulumi-common/src/global-domain';
 import { exit } from 'process';
@@ -21,24 +25,19 @@ import { installValidator1 } from './validator1';
 
 /// Toplevel Chart Installs
 
-if (!isDevNet) {
-  console.error('Launching in non-devnet mode');
-}
+console.error(`Launching with isDevNet: ${isDevNet}`);
 
-const approveSvRunbook =
-  (process.env.APPROVE_SV_RUNBOOK !== undefined && process.env.APPROVE_SV_RUNBOOK !== '') ||
-  isDevNet;
+const approveSvRunbook = envFlag('APPROVE_SV_RUNBOOK') || isDevNet;
 if (approveSvRunbook) {
   console.error('Approving SV used in SV runbook');
 }
 
-const singleSv = (process.env.SINGLE_SV !== undefined && process.env.SINGLE_SV !== '') || !isDevNet;
+const singleSv = envFlag('SINGLE_SV') || !isDevNet;
 if (singleSv) {
   console.error('Launching with a single SV');
 }
 
-const withDomainFees =
-  (process.env.DOMAIN_FEES !== undefined && process.env.DOMAIN_FEES !== '') || !isDevNet;
+const withDomainFees = envFlag('DOMAIN_FEES') || !isDevNet;
 if (withDomainFees && !singleSv) {
   console.error(
     `Currently, you cannot enable domain fees with more than one SV, please also set SINGLE_SV to 1 and rerun (${singleSv})`

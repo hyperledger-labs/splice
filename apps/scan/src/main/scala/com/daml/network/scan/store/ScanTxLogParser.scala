@@ -3,6 +3,7 @@ package com.daml.network.scan.store
 import cats.Monoid
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
+import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.{CoinCreateSummary, CoinExpireSummary}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.fees.ExpiringAmount
@@ -17,12 +18,13 @@ import io.grpc.Status
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
-import scala.math.BigDecimal.javaBigDecimal2bigDecimal
+import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
 import com.daml.network.environment.ledger.api.ActiveContract
 import com.daml.network.environment.ledger.api.IncompleteReassignmentEvent
 import com.daml.network.http.v0.definitions as httpDef
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.topology.DomainId
+import java.time.ZoneOffset
 
 class ScanTxLogParser(
     override val loggerFactory: NamedLoggerFactory
@@ -346,19 +348,27 @@ object ScanTxLogParser {
 
     final case class RecentActivityLogEntry(
         indexRecord: TxLogIndexRecord.RecentActivityIndexRecord,
+        date: Instant,
         provider: String,
-        sender: String,
-        receivers: Seq[String],
-        amount: BigDecimal,
+        sender: (String, BigDecimal),
+        receivers: Seq[(String, BigDecimal)],
+        senderHoldingFees: BigDecimal,
         coinPrice: BigDecimal,
+        appRewardsUsed: BigDecimal,
+        validatorRewardsUsed: BigDecimal,
     ) extends TxLogEntry {
       def toResponseItem = httpDef.ListRecentActivityResponseItem(
         eventId = indexRecord.eventId,
+        offset = indexRecord.optOffset,
+        domainId = indexRecord.domainId.toProtoPrimitive,
+        date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
         provider = provider,
-        sender = sender,
-        receivers = Some(receivers.toVector),
-        amount = Codec.encode(amount),
+        sender = httpDef.PartyAndAmount(sender._1, Codec.encode(sender._2)),
+        receivers = receivers.map(r => httpDef.PartyAndAmount(r._1, Codec.encode(r._2))).toVector,
+        holdingFees = Some(Codec.encode(senderHoldingFees)),
         coinPrice = Codec.encode(coinPrice),
+        appRewardsUsed = Some(Codec.encode(appRewardsUsed)),
+        validatorRewardsUsed = Some(Codec.encode(validatorRewardsUsed)),
       )
     }
   }
@@ -514,13 +524,14 @@ object ScanTxLogParser {
               eventId = rootEventId.getOrElse(event.getEventId()),
               domainId = domainId,
             ),
+            date = tx.getEffectiveAt,
             provider = node.argument.value.transfer.provider,
-            sender = node.argument.value.transfer.sender,
-            receivers = node.argument.value.transfer.outputs.asScala
-              .map(_.receiver)
-              .toVector,
-            amount = node.result.value.summary.inputCoinAmount,
+            sender = parseSender(node.argument.value, node.result.value),
+            receivers = parseReceivers(node.argument.value, node.result.value),
+            senderHoldingFees = node.result.value.summary.holdingFees,
             coinPrice = node.result.value.summary.coinPrice,
+            appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
+            validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
           )
         )
       )
@@ -742,4 +753,86 @@ object ScanTxLogParser {
   private def amountAsOfRoundZero(amount: ExpiringAmount) =
     amount.initialAmount + amount.ratePerRound.rate * BigDecimal(amount.createdAt.number)
 
+  // TODO(#7631) copied from UserWalletStore, this should be reused from a common lib.
+  private def parseSender(
+      arg: v1.coin.CoinRules_Transfer,
+      res: v1.coin.TransferResult,
+  ): (String, BigDecimal) = {
+    val sender = arg.transfer.sender
+
+    // Input coins, excluding holding fees
+    val netInput = res.summary.inputCoinAmount - res.summary.holdingFees
+
+    // Output coins going back to the sender, after deducting transfer fees
+    val netOutput = parseOutputAmounts(arg, res)
+      .filter(o => o.output.receiver == sender && o.output.lock.isEmpty)
+      .map(o => o.output.amount - o.senderFee)
+      .sum
+
+    // Leftover change
+    val netChange = BigDecimal(res.summary.senderChangeAmount)
+
+    // Net change in the balance of the senders
+    sender -> (netOutput + netChange - netInput)
+  }
+
+  /** Returns a list of receivers and their net balance changes */
+  private def parseReceivers(
+      arg: v1.coin.CoinRules_Transfer,
+      res: v1.coin.TransferResult,
+  ): Seq[(String, BigDecimal)] = {
+    def netBalanceChange(o: OutputWithFees) =
+      if (o.output.lock.isEmpty) {
+        o.output.amount - o.receiverFee
+      } else {
+        -o.receiverFee
+      }
+
+    // Note: the same receiver party can appear multiple times in the transfer result
+    // The code below merges balance changes for the same receiver, while preserving
+    // the order of receivers.
+    parseOutputAmounts(arg, res)
+      .filter(_.output.receiver != arg.transfer.sender)
+      .map(o => o.output.receiver -> netBalanceChange(o))
+      .foldLeft(immutable.ListMap.empty[String, BigDecimal])((acc, receiver) =>
+        acc.updatedWith(receiver._1)(prev => Some(prev.fold(receiver._2)(_ + receiver._2)))
+      )
+      .toList
+  }
+
+  /** A requested output of a transfer, together with the actual fees paid for the transfer.
+    *
+    * @param output Contains the receiver and the gross amount received (before deducting fees).
+    * @param senderFee Actual amount of fees paid by the sender.
+    * @param receiverFee Actual amount of fees paid by the receiver.
+    */
+  private final case class OutputWithFees(
+      output: v1.coin.TransferOutput,
+      senderFee: BigDecimal,
+      receiverFee: BigDecimal,
+  )
+
+  private def parseOutputAmounts(
+      arg: v1.coin.CoinRules_Transfer,
+      res: v1.coin.TransferResult,
+  ): Seq[OutputWithFees] = {
+    assert(
+      arg.transfer.outputs.size() == res.summary.outputFees.size(),
+      "Each output should have a corresponding fee",
+    )
+    val outputsWithFees = arg.transfer.outputs.asScala.toSeq.zip(res.summary.outputFees.asScala)
+
+    outputsWithFees
+      .map { case (out, fee) =>
+        OutputWithFees(
+          output = out,
+          senderFee = setDamlDecimalScale(BigDecimal(fee) * (BigDecimal(1) - out.receiverFeeRatio)),
+          receiverFee = setDamlDecimalScale(BigDecimal(fee) * out.receiverFeeRatio),
+        )
+      }
+  }
+
+  /** Returns the input number modified such that it has the same number of decimal places as a daml decimal */
+  private def setDamlDecimalScale(x: BigDecimal): BigDecimal =
+    x.setScale(10, RoundingMode.HALF_EVEN)
 }

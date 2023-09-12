@@ -49,12 +49,6 @@ jobs:
       - record_job_start_time
       - setup_sbt_test_job
       - execute_sbt_command:
-          cmd: "apps-common-frontend/compile"
-      # TODO(#7634) -- include this build step in npmTest's compile task to consolidate
-      - run_bash_command_in_nix:
-          cmd_name: "Build test dependencies"
-          cmd: "cd apps && npm run build --workspace=common-frontend --workspace=common-test-utils"
-      - execute_sbt_command:
           cmd: "apps-common-frontend/npmTest"
           fail_on_error_in_output: false # TODO(#7579) -- turn this back on when we figure out what to ignore/what not to
       - cleanup_sbt_test_job

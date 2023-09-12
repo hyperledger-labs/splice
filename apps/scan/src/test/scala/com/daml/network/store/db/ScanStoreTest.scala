@@ -36,6 +36,7 @@ import com.google.protobuf
 import java.time.Instant
 import java.util.Optional
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters.*
 
 abstract class ScanStoreTest extends StoreTest with HasExecutionContext with StoreErrors {
 
@@ -646,6 +647,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       "return the most recent activities" in {
         val limit = 10
         val nrActivities = 20
+        val now = java.time.Instant.EPOCH
+
         val activities = (1 to nrActivities).map { i =>
           TxLogEntry.RecentActivityLogEntry(
             TxLogIndexRecord
@@ -654,10 +657,13 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
                 s"$i",
                 domainId = dummyDomain,
               ),
+            date = now,
             provider = user1.toProtoPrimitive,
-            sender = user1.toProtoPrimitive,
-            receivers = Seq(user1.toProtoPrimitive),
-            amount = BigDecimal(i),
+            sender = (user1.toProtoPrimitive, BigDecimal(i)),
+            receivers = Seq((user2.toProtoPrimitive, BigDecimal(i))),
+            senderHoldingFees = BigDecimal(0.0),
+            appRewardsUsed = BigDecimal(0.0),
+            validatorRewardsUsed = BigDecimal(0.0),
             coinPrice = BigDecimal(1.0),
           )
         }.toList
@@ -672,20 +678,31 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             activity: TxLogEntry.RecentActivityLogEntry,
             offset: String,
         ) = {
+          val senderParty = PartyId.tryFromProtoPrimitive(activity.sender._1)
+          val senderAmount = activity.sender._2 * -1
+          val receiverParty = PartyId.tryFromProtoPrimitive(activity.receivers(0)._1)
+          val receiverAmount = activity.receivers(0)._2
           dummyDomain
             .exercise(
-              coinRulesContract,
+              contract = coinRulesContract,
               interfaceId = Some(ccApiCodegen.coin.CoinRules.TEMPLATE_ID),
-              Transfer.choice.name,
-              mkCoinRulesTransfer(user1, activity.amount.toDouble),
-              mkTransferResult(
+              choiceName = Transfer.choice.name,
+              choiceArgument = mkCoinRules_Transfer(
+                mkTransferInputOutput(
+                  senderParty,
+                  senderParty,
+                  List(mkInputCoin()),
+                  List(mkTransferOutput(receiverParty, receiverAmount)),
+                )
+              ),
+              exerciseResult = mkTransferResult(
                 round = 2,
                 changeToInitialAmountAsOfRoundZero = 0,
                 changeToHoldingFeesRate = holdingFee,
-                inputCoinAmount = activity.amount.toDouble,
+                inputCoinAmount = senderAmount.toDouble,
                 coinPrice = activity.coinPrice.toDouble,
               ),
-              offset,
+              offset = offset,
             )(
               store.multiDomainAcsStore
             )
@@ -728,6 +745,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
   protected lazy val transactionTreeSource = TxLogStore.TransactionTreeSource.ForTesting()
 
   private lazy val user1 = userParty(1)
+  private lazy val user2 = userParty(2)
 
   private def mkInputCoin() = {
     new ccApiCodegen.coin.transferinput.InputCoin(
@@ -735,11 +753,15 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     )
   }
 
-  private def mkTransferOutput(receiver: PartyId, amount: Double) =
+  private def mkTransferOutput(
+      receiver: PartyId,
+      amount: BigDecimal,
+      receiverFeeRatio: BigDecimal = BigDecimal(0.0),
+  ): ccApiCodegen.coin.TransferOutput =
     new ccApiCodegen.coin.TransferOutput(
       receiver.toProtoPrimitive,
-      new java.math.BigDecimal(0.0),
-      new java.math.BigDecimal(amount),
+      receiverFeeRatio.bigDecimal,
+      amount.bigDecimal,
       Optional.empty(),
     )
 
@@ -757,6 +779,25 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     java.util.Map.of(),
     Optional.empty(),
   )
+
+  private def mkTransferInputOutput(
+      sender: PartyId,
+      provider: PartyId,
+      transferInputs: List[ccApiCodegen.coin.TransferInput],
+      transferOutputs: List[ccApiCodegen.coin.TransferOutput],
+  ): ccApiCodegen.coin.Transfer =
+    new ccApiCodegen.coin.Transfer(
+      sender.toProtoPrimitive,
+      provider.toProtoPrimitive,
+      transferInputs.asJava,
+      transferOutputs.asJava,
+    )
+
+  private def mkCoinRules_Transfer(transfer: ccApiCodegen.coin.Transfer) =
+    new ccApiCodegen.coin.CoinRules_Transfer(
+      transfer,
+      mkTransferContext(),
+    ).toValue
 
   private def mkCoinRulesTransfer(receiver: PartyId, amount: Double) =
     new ccApiCodegen.coin.CoinRules_Transfer(

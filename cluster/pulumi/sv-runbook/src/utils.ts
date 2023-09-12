@@ -1,4 +1,4 @@
-import { requireEnv } from 'cn-pulumi-common';
+import { envFlag, requireEnv } from 'cn-pulumi-common';
 
 export const CLUSTER_BASENAME = requireEnv(
   'GCP_CLUSTER_BASENAME',
@@ -12,6 +12,5 @@ export const SV_NAME = 'DA-Helm-Test-Node';
 
 export const version = process.env.CHARTS_VERSION;
 export const localCharts = version == '' || version == undefined; // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)
-export const withDomainFees =
-  process.env.DOMAIN_FEES !== undefined && process.env.DOMAIN_FEES !== '';
+export const withDomainFees = envFlag('DOMAIN_FEES');
 export const SV_NAMESPACE = process.env.SV_NAMESPACE || 'sv';

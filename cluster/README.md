@@ -1245,7 +1245,7 @@ Network. Steps to do this are as follows:
 
 ## Cluster Data Dumps
 
-At the time of writing, only TestNet style deployments (i.e., deployment triggered with `export NON_DEVNET=1`) produce
+At the time of writing, only TestNet style deployments (i.e., deployment triggered with `export IS_DEVNET=false`) produce
 data dumps. The setup for this works as follows.
 
 All validator apps in a TestNet style deployment get provisioned with a key for

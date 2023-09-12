@@ -17,7 +17,45 @@ export const CLUSTER_BASENAME = config.require('CLUSTER_BASENAME');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 export const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
 
-export const isDevNet = process.env.NON_DEVNET === undefined || process.env.NON_DEVNET === '';
+/// Environment variables
+
+export function requireEnv(name: string, msg = ''): string {
+  const value = process.env[name];
+
+  if (!value) {
+    console.error(
+      `Environment variable ${name} is undefined.` + (msg != '' ? `(should define: ${msg})` : '')
+    );
+    process.exit(1);
+  } else {
+    return value;
+  }
+}
+
+export function envFlag(flagName: string, defaultFlag = false): boolean {
+  const varVal = process.env[flagName];
+
+  let flag = defaultFlag;
+
+  if (varVal) {
+    const val = varVal.toLowerCase();
+
+    if (val === 't' || val === 'true' || val === 'y' || val === 'yes' || val === '1') {
+      flag = true;
+    } else if (val === 'f' || val === 'false' || val === 'n' || val === 'no' || val === '0') {
+      flag = false;
+    } else {
+      console.error(`Flag environment variable ${flagName} has unexpected value: ${varVal}.`);
+      process.exit(1);
+    }
+  }
+
+  console.error(`Environment Flag ${flagName} = ${flag} (${varVal})`);
+
+  return flag;
+}
+
+export const isDevNet = envFlag('IS_DEVNET', true);
 
 // Refrence to upstream infrastructure stack.
 export const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);
@@ -212,18 +250,3 @@ export function installCNHelmChart(
 // The pulumi documentation also doesn't suggest a better type than this. ¯\_(ツ)_/¯
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ChartValues = { [key: string]: any };
-
-/// Environment variables
-
-export function requireEnv(name: string, msg = ''): string {
-  const value = process.env[name];
-
-  if (!value) {
-    console.error(
-      `Environment variable ${name} is undefined.` + (msg != '' ? `(should define: ${msg})` : '')
-    );
-    process.exit(1);
-  } else {
-    return value;
-  }
-}

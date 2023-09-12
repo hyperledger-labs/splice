@@ -61,6 +61,7 @@
     "lint:check": "eslint --ignore-pattern src/com/* --max-warnings=0 -- src",
     "lint:fix": "eslint --ignore-pattern src/com/* --fix --max-warnings=0 -- src",
     "start": "react-scripts start",
-    "test": "vitest"
+    "test": "vitest",
+    "test:sbt": "vitest --run"
   }
 }

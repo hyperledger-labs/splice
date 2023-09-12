@@ -50,6 +50,7 @@
     "build": "react-scripts build",
     "check": "npm run format:check && npm run lint:check",
     "test": "vitest",
+    "test:sbt": "vitest --run",
     "eject": "react-scripts eject",
     "fix": "npm run format:fix && npm run lint:fix",
     "format:check": "prettier --check -- src",
