@@ -578,23 +578,47 @@ components:
       type: object
       required:
         - event_id
+        - date
+        - domain_id
         - provider
         - sender
-        - receiver
-        - amount
+        - receivers
+        - total_input
+        - total_output
         - coin_price
       properties:
         event_id:
           type: string
+        offset:
+          type: string
+        domain_id:
+          type: string
+        date:
+          type: string
+          format: date-time
         provider:
           type: string
         sender:
-          type: string
+          $ref: "#/components/schemas/PartyAndAmount"
         receivers:
           type: array
           items:
-            type: string
-        amount:
+            $ref: "#/components/schemas/PartyAndAmount"
+        holding_fees:
           type: string
         coin_price:
+          type: string
+        app_rewards_used:
+          type: string
+        validator_rewards_used:
+          type: string
+    PartyAndAmount:
+      type: object
+      required:
+        - party
+        - amount
+      properties:
+        party:
+          type: string
+        amount:
           type: string

@@ -1,8 +1,15 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, ErrorDisplay, Loading, PartyId, TitledTable } from 'common-frontend';
+import {
+  AmountDisplay,
+  ErrorDisplay,
+  Loading,
+  PartyId,
+  RateDisplay,
+  TitledTable,
+} from 'common-frontend';
 import { useRecentActivity } from 'common-frontend/scan-api';
-import { ListRecentActivityResponseItem } from 'scan-openapi';
+import { ListRecentActivityResponseItem, PartyAndAmount } from 'scan-openapi';
 
 import { Button, Stack, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import Typography from '@mui/material/Typography';
@@ -36,7 +43,8 @@ export const RecentActivityTable: React.FC = () => {
               <TableCell>Provider</TableCell>
               <TableCell>Sender</TableCell>
               <TableCell>Receiver</TableCell>
-              <TableCell align="right">Amount</TableCell>
+              <TableCell align="right">Sender Balance Change</TableCell>
+              <TableCell align="right">Total Receivers Balance Change</TableCell>
               <TableCell align="right">Price</TableCell>
             </TableRow>
           </TableHead>
@@ -92,27 +100,31 @@ export default RecentActivityTable;
 const ActivityRow: React.FC<{
   activity: {
     provider: string;
-    sender: string;
-    receivers?: string[];
-    amount: string;
+    sender: PartyAndAmount;
+    receivers: PartyAndAmount[];
     coinPrice: string;
   };
 }> = ({ activity }) => {
-  const { amount, provider, receivers, sender, coinPrice } = activity;
-  const someReceivers = receivers || [];
+  const { provider, receivers, sender, coinPrice } = activity;
   let receiver;
-
-  if (someReceivers.length === 0) {
+  let receiversTotalAmount;
+  if (receivers.length === 0) {
     receiver = (
       <Typography className="receiver" data-selenium-text="Automation" variant="body1">
-        Automation
+        Network burn
       </Typography>
     );
-  } else if (someReceivers.length === 1) {
-    receiver = <PartyId className="receiver" partyId={someReceivers[0]} />;
+    receiversTotalAmount = BigNumber(0);
+  } else if (receivers.length === 1) {
+    const r = receivers[0];
+    receiver = <PartyId className="receiver" partyId={r.party} />;
+    receiversTotalAmount = r.amount;
   } else {
+    receiversTotalAmount = receivers
+      .map(p => BigNumber(p.amount))
+      .reduce((prev, cur) => prev.plus(cur));
     receiver = (
-      <Typography className="receiver" data-selenium-text="Multiple Recipients" variant="body1">
+      <Typography className="receiver" data-selenium-text="Multiple Receivers" variant="body1">
         Multiple Recipients
       </Typography>
     );
@@ -124,20 +136,37 @@ const ActivityRow: React.FC<{
         <PartyId partyId={provider} />
       </TableCell>
       <TableCell>
-        <PartyId partyId={sender} />
+        <PartyId partyId={sender.party} />
       </TableCell>
       <TableCell>{receiver}</TableCell>
       <TableCell align="right">
-        <AmountDisplay amount={amount} currency="CC" />
+        <RecentAmountDisplay amountCC={BigNumber(sender.amount)} />
       </TableCell>
       <TableCell align="right">
-        <AmountDisplay
-          amount={amount}
-          currency="CC"
-          convert="CCtoUSD"
-          coinPrice={new BigNumber(coinPrice)}
-        />
+        <RecentAmountDisplay amountCC={BigNumber(receiversTotalAmount)} />
+      </TableCell>
+      <TableCell align="right">
+        <RateDisplay base="CC" quote="USD" coinPrice={BigNumber(coinPrice)} />
       </TableCell>
     </TableRow>
+  );
+};
+
+interface TransactionAmountProps {
+  amountCC: BigNumber;
+}
+
+const RecentAmountDisplay: React.FC<TransactionAmountProps> = ({ amountCC }) => {
+  // This is forcing <AmountDisplay> to show a "+" sign for positive balance changes.
+  // If the balance change is negative, the number already contains the minus sign.
+  const sign = amountCC.isPositive() ? '+' : '';
+
+  return (
+    <Stack direction="column">
+      <Typography className="tx-amount-cc">
+        {sign}
+        <AmountDisplay amount={amountCC} currency="CC" />
+      </Typography>
+    </Stack>
   );
 };

@@ -217,6 +217,17 @@ abstract class ScanAppReference(
         HttpScanAppClient.ListImportCrates(party)
       )
     }
+
+  import com.daml.network.http.v0.definitions.ListRecentActivityResponseItem
+  def listRecentActivity(
+      beginAfterEventId: Option[String],
+      pageSize: Int,
+  ): Seq[ListRecentActivityResponseItem] =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.ListRecentActivity(beginAfterEventId, pageSize)
+      )
+    }
 }
 
 final class ScanAppBackendReference(
