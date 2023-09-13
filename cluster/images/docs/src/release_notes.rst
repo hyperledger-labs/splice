@@ -3,6 +3,14 @@
 Release Notes
 =============
 
+2023-09-18
+----------
+
+* Bugfixes:
+
+    * When configured to operate a local domain node, the SV app now waits for the local CometBFT node to fully catch up before onboarding the local sequencer and mediator nodes.
+      This leads to clearer log messages while the SV app is initializing and improves domain performance by avoiding spam caused by local sequencer nodes that are lagging behind during initialization.
+
 2023-09-11
 ----------
 

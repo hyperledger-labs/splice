@@ -10,7 +10,12 @@ import com.daml.network.environment.*
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
-import com.daml.network.sv.cometbft.CometBftNode
+import com.daml.network.sv.cometbft.{
+  CometBftClient,
+  CometBftConnectionConfig,
+  CometBftHttpRpcClient,
+  CometBftNode,
+}
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
@@ -159,6 +164,7 @@ class JoiningNodeInitializer(
       svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
       _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
         for {
+          _ <- waitUntilCometBftNodeHasCaughtUp
           _ <-
             localDomainNode.onboardLocalSequencerIfRequired(
               config.domains.global.alias,
@@ -190,6 +196,43 @@ class JoiningNodeInitializer(
     SvConnection(sponsorConfig, retryProvider, loggerFactory).flatMap(con =>
       f(con).andThen(_ => con.close())
     )
+  }
+
+  private def newCometBftClient = {
+    cometBftNode.map(node =>
+      new CometBftClient(
+        new CometBftHttpRpcClient(
+          CometBftConnectionConfig(node.cometBftConfig.connectionUri),
+          loggerFactory,
+        ),
+        loggerFactory,
+      )
+    )
+  }
+
+  private def waitUntilCometBftNodeHasCaughtUp = {
+    newCometBftClient
+      .map(cometBftClient =>
+        retryProvider.waitUntil(
+          "CometBFT node has caught up",
+          cometBftClient
+            .nodeStatus()
+            .map(status =>
+              if (status.syncInfo.catchingUp) {
+                throw Status.FAILED_PRECONDITION
+                  .withDescription(
+                    s"CometBFT node is still catching up; currently at block ${status.syncInfo.latestBlockHeight}."
+                  )
+                  .asRuntimeException()
+              }
+            ),
+          logger,
+        )
+      )
+      .getOrElse({
+        logger.info("No CometBFT node found, so not waiting on CometBFT sync.")
+        Future.unit
+      })
   }
 
   /** Private class to share svStore, svcPartyHosting, and global domain-id
