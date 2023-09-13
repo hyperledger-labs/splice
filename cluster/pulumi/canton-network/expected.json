@@ -5109,7 +5109,6 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
-        "disableAdminAuth": true,
         "extraDomains": [
           {
             "alias": "splitwell",

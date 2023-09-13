@@ -2,6 +2,7 @@ package com.daml.network.integration.tests.runbook
 
 import akka.http.scaladsl.model.Uri
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
+import com.daml.network.util.{Auth0Util, K8sUtil}
 import monocle.macros.syntax.lens.*
 import org.scalatest.OptionValues.*
 
@@ -14,6 +15,22 @@ trait PreflightIntegrationTestUtil {
   // We cache this because we only need it for one test case in each suite
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   var validatorOnboardingSecret: Option[String] = None
+
+  protected def getAuth0ClientCredential(
+      clientId: String,
+      audience: String,
+      auth0: Auth0Util,
+  ): String = {
+    // lookup token from a cached k8s secret, or request a new one from auth0 if not found or expired
+    val cachedToken =
+      K8sUtil.PreflightTokenAccessor.getPreflightToken(clientId)
+
+    cachedToken.getOrElse {
+      val token = auth0.getToken(clientId, audience)
+      K8sUtil.PreflightTokenAccessor.savePreflightToken(clientId, token)
+      token
+    }.accessToken
+  }
 
   protected def insertValidatorOnboardingSecret(conf: CNNodeConfig): CNNodeConfig = {
     CNNodeConfigTransforms.updateAllValidatorConfigs_(vc => {

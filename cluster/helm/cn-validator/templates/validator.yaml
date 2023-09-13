@@ -102,10 +102,6 @@ spec:
             canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.target-throughput = {{ (.Values.topup).targetThroughput }}
             canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.min-topup-interval = {{ (.Values.topup).minTopupInterval }}
         {{- end }}
-        {{- if .Values.disableAdminAuth }}
-        - name: CN_APP_VALIDATOR_ENABLE_ADMIN_AUTH
-          value: "false"
-        {{- end }}
         {{- with .Values.participantIdentitiesBackup }}
         - name: ADDITIONAL_CONFIG_CN_APP_VALIDATOR_PARTICIPANT_IDENTITIES_BACKUP
           value: |

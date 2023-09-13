@@ -339,6 +339,7 @@ lazy val `apps-common` =
     .settings(
       libraryDependencies ++= Seq(
         google_cloud_storage,
+        kubernetes_client,
         Dependencies.daml_lf_validation,
         scalatestScalacheck % Test,
         scalapb_runtime_grpc,
@@ -1080,6 +1081,7 @@ lazy val `apps-app` =
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
       libraryDependencies += google_cloud_storage,
       libraryDependencies += auth0,
+      libraryDependencies += kubernetes_client,
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(
         CantonDependencies.opentelemetry_api,

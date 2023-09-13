@@ -577,6 +577,7 @@ components:
     ListRecentActivityResponseItem:
       type: object
       required:
+        - activity_type
         - event_id
         - date
         - domain_id
@@ -587,6 +588,8 @@ components:
         - total_output
         - coin_price
       properties:
+        activity_type:
+          type: string
         event_id:
           type: string
         offset:

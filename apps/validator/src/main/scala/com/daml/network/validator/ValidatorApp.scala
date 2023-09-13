@@ -598,17 +598,13 @@ class ValidatorApp(
                   ValidatorAdminResource.routes(
                     adminHandler,
                     operationId =>
-                      if (config.enableAdminAuth) {
-                        AdminAuthExtractor(
-                          verifier,
-                          validatorParty,
-                          automation.connection,
-                          loggerFactory,
-                          "canton network validator operator realm",
-                        )(traceContext)(operationId)
-                      } else {
-                        provide(AuthExtractor.TracedUser("", traceContext))
-                      },
+                      AdminAuthExtractor(
+                        verifier,
+                        validatorParty,
+                        automation.connection,
+                        loggerFactory,
+                        "canton network validator operator realm",
+                      )(traceContext)(operationId),
                   ),
                   ValidatorPublicResource.routes(
                     publicHandler,

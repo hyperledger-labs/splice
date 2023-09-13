@@ -657,6 +657,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
                 s"$i",
                 domainId = dummyDomain,
               ),
+            activityType = TxLogEntry.RecentActivityType.Transfer,
             date = now,
             provider = user1.toProtoPrimitive,
             sender = (user1.toProtoPrimitive, BigDecimal(i)),

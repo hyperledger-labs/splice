@@ -44,7 +44,6 @@ export type ValidatorConfig = {
   appDars?: string[];
   validatorPartyHint?: string;
   extraDomains?: ExtraDomain[];
-  disableAdminAuth?: boolean;
   svSponsorAddress?: string;
   additionalConfig?: string;
   additionalUsers?: k8s.types.input.core.v1.EnvVar[];
@@ -114,7 +113,6 @@ export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
             minTopupInterval: domainFeesConfig.minTopupInterval,
           }
         : {},
-      disableAdminAuth: config.disableAdminAuth,
       disableAllocateLedgerApiUserParty: config.disableAllocateLedgerApiUserParty,
       participantIdentitiesBackup: backupConfig,
       additionalConfig: config.additionalConfig,

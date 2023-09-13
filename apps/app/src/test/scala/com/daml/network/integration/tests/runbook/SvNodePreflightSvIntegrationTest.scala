@@ -12,6 +12,7 @@ import scala.util.Random
 
 class SvNodePreflightSvIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
+    with PreflightIntegrationTestUtil
     with SvUiIntegrationTestUtil
     with FrontendLoginUtil
     with WalletFrontendTestUtil
@@ -135,13 +136,15 @@ class SvNodePreflightSvIntegrationTest
     }
   }
 
-  // The SV node runs only once per cluster deployment and only on some clusters
-  // so for now we accept that each this queries a new token on Auth0 and contributes
-  // to our token limit.
   "Dumping participant identities works" in { implicit env =>
     val auth0 = auth0UtilFromEnvVars("https://canton-network-sv-test.us.auth0.com", Some("sv"))
-    val token =
-      auth0.getToken("bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn", "https://validator.example.com/api")
+
+    val token = getAuth0ClientCredential(
+      "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn",
+      "https://validator.example.com/api",
+      auth0,
+    )
+
     val svValidatorClient = vc("svTestValidator").copy(token = Some(token))
     svValidatorClient.dumpParticipantIdentities()
   }

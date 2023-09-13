@@ -46,7 +46,21 @@ class ScanTxLogParser(
           case Transfer(node) =>
             State.fromTransfer(tree, root, domainId, node)
           case Mint(node) =>
-            State.fromCoinCreateSummary(tree, exercised, domainId, node.result.value)
+            State.fromCoinCreateSummary(
+              tree,
+              exercised,
+              domainId,
+              node.result.value,
+              TxLogEntry.RecentActivityType.Mint,
+            )
+          case Tap(node) =>
+            State.fromCoinCreateSummary(
+              tree,
+              exercised,
+              domainId,
+              node.result.value,
+              TxLogEntry.RecentActivityType.Tap,
+            )
           case ImportCrate_Receive(_) =>
             State.empty
           case CoinRules_BuyMemberTraffic(node) =>
@@ -345,9 +359,27 @@ object ScanTxLogParser {
     object OpenMiningRoundLogEntry {
       val transaction_type = "open_mining_round"
     }
+    sealed trait RecentActivityType {
+      def name: String
+    }
+    object RecentActivityType {
+      case object Transfer extends RecentActivityType {
+        val name = "Transfer"
+      }
+      case object NetworkBurn extends RecentActivityType {
+        val name = "Network burn"
+      }
+      case object Mint extends RecentActivityType {
+        val name = "Mint"
+      }
+      case object Tap extends RecentActivityType {
+        val name = "Tap"
+      }
+    }
 
     final case class RecentActivityLogEntry(
         indexRecord: TxLogIndexRecord.RecentActivityIndexRecord,
+        activityType: RecentActivityType,
         date: Instant,
         provider: String,
         sender: (String, BigDecimal),
@@ -358,6 +390,7 @@ object ScanTxLogParser {
         validatorRewardsUsed: BigDecimal,
     ) extends TxLogEntry {
       def toResponseItem = httpDef.ListRecentActivityResponseItem(
+        activityType = activityType.name,
         eventId = indexRecord.eventId,
         offset = indexRecord.optOffset,
         domainId = indexRecord.domainId.toProtoPrimitive,
@@ -419,6 +452,7 @@ object ScanTxLogParser {
         event: TreeEvent,
         domainId: DomainId,
         ccsum: CoinCreateSummary[T],
+        activityType: TxLogEntry.RecentActivityType,
     ): State = {
       val coinCid = ccsum.coin.contractId
       val coin = tx.getEventsById.asScala
@@ -434,6 +468,27 @@ object ScanTxLogParser {
           )
         }
 
+      val recentActivityEntry = State(
+        immutable.Queue(
+          TxLogEntry.RecentActivityLogEntry(
+            indexRecord = TxLogIndexRecord.RecentActivityIndexRecord(
+              offset = tx.getOffset(),
+              eventId = event.getEventId(),
+              domainId = domainId,
+            ),
+            activityType = activityType,
+            date = tx.getEffectiveAt,
+            provider = coin.owner,
+            sender = (coin.owner, BigDecimal(0)),
+            receivers = Vector((coin.owner, coin.amount.initialAmount)),
+            senderHoldingFees = 0,
+            coinPrice = ccsum.coinPrice,
+            appRewardsUsed = BigDecimal(0),
+            validatorRewardsUsed = BigDecimal(0),
+          )
+        )
+      )
+
       State(
         immutable.Queue(
           ScanTxLogParser.entryFromCoin(
@@ -443,7 +498,7 @@ object ScanTxLogParser {
             coin.amount,
           )
         )
-      )
+      ).appended(recentActivityEntry)
     }
 
     def fromTransfer(
@@ -515,7 +570,8 @@ object ScanTxLogParser {
           )
         )
       )
-
+      val receivers = parseReceivers(node.argument.value, node.result.value)
+      val sender = parseSender(node.argument.value, node.result.value)
       val recentActivityEntry = State(
         immutable.Queue(
           TxLogEntry.RecentActivityLogEntry(
@@ -524,10 +580,13 @@ object ScanTxLogParser {
               eventId = rootEventId.getOrElse(event.getEventId()),
               domainId = domainId,
             ),
+            activityType =
+              if (receivers.isEmpty) TxLogEntry.RecentActivityType.NetworkBurn
+              else TxLogEntry.RecentActivityType.Transfer,
             date = tx.getEffectiveAt,
             provider = node.argument.value.transfer.provider,
-            sender = parseSender(node.argument.value, node.result.value),
-            receivers = parseReceivers(node.argument.value, node.result.value),
+            sender = sender,
+            receivers = receivers,
             senderHoldingFees = node.result.value.summary.holdingFees,
             coinPrice = node.result.value.summary.coinPrice,
             appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),

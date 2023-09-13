@@ -15,16 +15,16 @@ import scala.collection.mutable
 class Validator1PreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice-validator1", "bob-validator1")
     with FrontendLoginUtil
+    with PreflightIntegrationTestUtil
     with DirectoryFrontendTestUtil
     with WalletFrontendTestUtil
     with SplitwellFrontendTestUtil {
 
   private val auth0Users: mutable.Map[String, Auth0User] = mutable.Map.empty[String, Auth0User]
+  private val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com")
 
   override def beforeEach() = {
     super.beforeEach();
-
-    val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com")
 
     val aliceUser = retryAuth0Calls(auth0.createUser());
     logger.debug(
@@ -53,9 +53,18 @@ class Validator1PreflightIntegrationTest
     limitValidator1Users()
   }
 
-  private def limitValidator1Users() = {
+  private def validator1Client = {
     val env = provideEnvironment
-    val validator1Client = env.validators.remote.find(_.name == "validator1").value
+    val token = getAuth0ClientCredential(
+      "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
+      "https://canton.network.global",
+      auth0,
+    )
+
+    vc("validator1")(env).copy(token = Some(token))
+  }
+
+  private def limitValidator1Users() = {
     val users = validator1Client.listUsers()
     val validatorWalletUser =
       "auth0|63e3d75ff4114d87a2c1e4f5" // TODO(tech-debt): consider de-hardcoding this
@@ -282,10 +291,7 @@ class Validator1PreflightIntegrationTest
     }
   }
 
-  // TODO(#6247): Adjust this once this endpoint requires auth.
   "can dump participant identities of validator1" in { _ =>
-    val env = provideEnvironment
-    val validator1Client = env.validators.remote.find(_.name == "validator1").value
     validator1Client.dumpParticipantIdentities()
   }
 

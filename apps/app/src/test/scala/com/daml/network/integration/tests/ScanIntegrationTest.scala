@@ -10,6 +10,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
+import com.daml.network.scan.store.ScanTxLogParser
 
 class ScanIntegrationTest
     extends CNNodeIntegrationTest
@@ -33,27 +34,34 @@ class ScanIntegrationTest
 
   "list recent activity" in { implicit env =>
     val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
-    // TODO(#7633) Tap is currently not added to recent activity
+    val bobTapAmount = 1000.0
+    val aliceTapAmount = 1000.0
+
     clue("Tap to get some coins") {
-      aliceWalletClient.tap(500.0)
-      aliceWalletClient.tap(500.0)
-      bobWalletClient.tap(500.0)
-      bobWalletClient.tap(500.0)
+      aliceWalletClient.tap(aliceTapAmount)
+      bobWalletClient.tap(bobTapAmount)
     }
     clue("Alice's balance reflects taps")({
       eventually() {
         checkBalance(
           aliceWalletClient,
           None,
-          expectedUnlockedQtyRange = (1000.0 - 1, 1000.0),
+          expectedUnlockedQtyRange = (aliceTapAmount - 1, aliceTapAmount),
           exactly(0),
           exactly(0),
         )
       }
     })
 
+    val transferAmount = 100.0
     clue("Transfer some CC to alice")({
-      p2pTransfer(bobValidatorBackend, bobWalletClient, aliceWalletClient, aliceUserParty, 100.0)
+      p2pTransfer(
+        bobValidatorBackend,
+        bobWalletClient,
+        aliceWalletClient,
+        aliceUserParty,
+        transferAmount,
+      )
     })
 
     clue("Alice receives the transfer")({
@@ -61,7 +69,8 @@ class ScanIntegrationTest
         checkBalance(
           aliceWalletClient,
           None,
-          expectedUnlockedQtyRange = (1100.0 - 1, 1100.0),
+          expectedUnlockedQtyRange =
+            (aliceTapAmount + transferAmount - 1, aliceTapAmount + transferAmount),
           exactly(0),
           exactly(0),
         )
@@ -70,7 +79,8 @@ class ScanIntegrationTest
         checkBalance(
           bobWalletClient,
           None,
-          expectedUnlockedQtyRange = (900 - 2, 900),
+          expectedUnlockedQtyRange =
+            (bobTapAmount - transferAmount - 2, bobTapAmount - transferAmount),
           exactly(0),
           exactly(0),
         )
@@ -79,21 +89,37 @@ class ScanIntegrationTest
 
     eventually() {
       // only look at activities that bob sent to prevent flakes, some activities occur on startup before this test.
-      val activities = sv1ScanBackend.listRecentActivity(None, 10).filter { recentActivity =>
-        PartyId.tryFromProtoPrimitive(recentActivity.sender.party) == bobUserParty
-      }
+      val transferActivities =
+        sv1ScanBackend.listRecentActivity(None, 10).filter { recentActivity =>
+          PartyId.tryFromProtoPrimitive(
+            recentActivity.sender.party
+          ) == bobUserParty && recentActivity.activityType == ScanTxLogParser.TxLogEntry.RecentActivityType.Transfer.name
+        }
 
-      activities should have size (1)
-      val activityFromTest = activities.head
+      transferActivities should have size (1)
+      val transferActivity = transferActivities.head
       // bob transferred 100 + fees
-      BigDecimal(activityFromTest.sender.amount) should beWithin(
-        BigDecimal(-100.0 - 1.1),
-        BigDecimal(-100.0),
+      BigDecimal(transferActivity.sender.amount) should beWithin(
+        BigDecimal(-1 * (transferAmount + 1.1)),
+        BigDecimal(-1 * transferAmount),
       )
       // alice receives transfer
-      activityFromTest.receivers
+      transferActivity.receivers
         .map(r => BigDecimal(r.amount))
-        .sum shouldBe BigDecimal(100.0)
+        .sum shouldBe BigDecimal(transferAmount)
+
+      val tapActivities = sv1ScanBackend.listRecentActivity(None, 10).filter { recentActivity =>
+        recentActivity.activityType == ScanTxLogParser.TxLogEntry.RecentActivityType.Tap.name && recentActivity.receivers
+          .map(r => PartyId.tryFromProtoPrimitive(r.party))
+          .contains(bobUserParty)
+      }
+
+      val tapActivity = tapActivities.head
+      // bob tapped
+      tapActivity.receivers should have size (1)
+      BigDecimal(tapActivity.receivers(0).amount) shouldBe (BigDecimal(bobTapAmount))
+      // no sender for tap
+      BigDecimal(tapActivity.sender.amount) shouldBe (BigDecimal(0))
     }
   }
 }

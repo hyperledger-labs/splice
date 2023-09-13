@@ -40,6 +40,7 @@ export const RecentActivityTable: React.FC = () => {
         <TitledTable title="Recent Activity">
           <TableHead>
             <TableRow>
+              <TableCell>Type</TableCell>
               <TableCell>Provider</TableCell>
               <TableCell>Sender</TableCell>
               <TableCell>Receiver</TableCell>
@@ -99,21 +100,18 @@ export default RecentActivityTable;
 
 const ActivityRow: React.FC<{
   activity: {
+    activityType: string;
     provider: string;
     sender: PartyAndAmount;
     receivers: PartyAndAmount[];
     coinPrice: string;
   };
 }> = ({ activity }) => {
-  const { provider, receivers, sender, coinPrice } = activity;
+  const { activityType, provider, receivers, sender, coinPrice } = activity;
   let receiver;
   let receiversTotalAmount;
   if (receivers.length === 0) {
-    receiver = (
-      <Typography className="receiver" data-selenium-text="Automation" variant="body1">
-        Network burn
-      </Typography>
-    );
+    receiver = <PartyId partyId={sender.party} />;
     receiversTotalAmount = BigNumber(0);
   } else if (receivers.length === 1) {
     const r = receivers[0];
@@ -132,6 +130,11 @@ const ActivityRow: React.FC<{
 
   return (
     <TableRow>
+      <TableCell>
+        <Typography className="activity_type" variant="body1">
+          {activityType}
+        </Typography>
+      </TableCell>
       <TableCell>
         <PartyId partyId={provider} />
       </TableCell>
