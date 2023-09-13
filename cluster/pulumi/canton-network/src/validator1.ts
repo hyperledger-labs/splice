@@ -55,9 +55,6 @@ export async function installValidator1(
     extraDomains: [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
     svSponsorAddress: 'http://sv-app.sv-1:5014',
     onboarding,
-    // TODO(#6247) Enable auth here once Validator1PreflightIntegrationTest
-    // supports this.
-    disableAdminAuth: isDevNet,
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     extraDependsOn,
     auth0AppName: 'validator1',

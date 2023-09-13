@@ -138,8 +138,6 @@ case class ValidatorAppBackendConfig(
     enableCoinRulesUpgrade: Boolean = false,
     treasury: TreasuryConfig = TreasuryConfig(),
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
-    // TODO(#6247) Remove the option to disable this
-    enableAdminAuth: Boolean = true,
     participantIdentitiesBackup: Option[BackupDumpConfig] = None,
     appManager: Option[AppManagerConfig] = None,
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.

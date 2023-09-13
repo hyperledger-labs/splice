@@ -5,6 +5,8 @@ import com.auth0.client.mgmt.ManagementAPI
 import com.auth0.client.mgmt.filter.UserFilter
 import com.auth0.json.mgmt.users.User
 import scala.jdk.CollectionConverters.*
+import com.daml.network.auth.OAuthApi.TokenResponse
+import com.daml.network.auth.AuthToken
 
 class Auth0User(val id: String, val email: String, val password: String, val auth0: Auth0Util)
     extends AutoCloseable {
@@ -44,11 +46,13 @@ class Auth0Util(
     page.getItems().asScala.toList
   }
 
-  def getToken(clientId: String, audience: String) = {
+  def getToken(clientId: String, audience: String): AuthToken = {
     val client = api.clients().get(clientId).execute()
     val clientSecret = client.getClientSecret()
     val appApi = new AuthAPI(domain, clientId, clientSecret)
-    appApi.requestToken(audience).execute().getAccessToken()
+    val response = appApi.requestToken(audience).execute()
+
+    AuthToken(TokenResponse(response.getAccessToken(), response.getExpiresIn()))
   }
 
   private def requestManagementAPIToken(): String =
