@@ -28,7 +28,7 @@ import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.http.v0.validator_admin.ValidatorAdminResource
 import com.daml.network.http.v0.validator_public.ValidatorPublicResource
 import com.daml.network.http.v0.wallet.WalletResource as InternalWalletResource
-import com.daml.network.scan.admin.api.client.{ScanConnection, MinimalScanConnection}
+import com.daml.network.scan.admin.api.client.{MinimalScanConnection, ScanConnection}
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.setup.ParticipantInitializer
 import com.daml.network.store.MultiDomainAcsStore.QueryResult

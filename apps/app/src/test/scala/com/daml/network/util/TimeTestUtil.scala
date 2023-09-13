@@ -266,6 +266,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
     * test failures.
     *
     * TODO(#5317): Modify this to be less susceptible to flakes.
+    * TODO (#7609): consider using automation control
     */
   @nowarn("msg=match may not be exhaustive")
   def advanceTimeAndWaitForRoundAutomation(

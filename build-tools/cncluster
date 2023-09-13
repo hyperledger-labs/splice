@@ -721,15 +721,34 @@ function _cluster_reset() {
     # TODO(#4560): Use an empty passphrase until we manage secrets
     local -x PULUMI_CONFIG_PASSPHRASE=''
 
-    _info "Uninstalling Pulumi canton-network stack"
-    _uses_pulumi_stack canton-network
-    subcmd_pulumi canton-network down --yes --skip-preview
-
-    _info "Uninstalling Pulumi sv-runbook stack"
-    _uses_pulumi_stack sv-runbook
-    subcmd_pulumi sv-runbook down --yes --skip-preview
+    _down_stack canton-network
+    _down_stack sv-runbook
 
     _info "Cluster in reset/idle state."
+}
+
+function _down_stack() {
+    STACK=$1
+
+    _info "Uninstalling Pulumi ${STACK} stack"
+    _uses_pulumi_stack "$STACK"
+
+    ERRFILE="./tmp_ERRFILE"
+    ERRMSG=""
+
+    subcmd_pulumi "$STACK" down --yes --skip-preview 2> >(tee ${ERRFILE} >&2) || ERRMSG=$(<${ERRFILE})
+    rm -rf "$ERRFILE"
+
+    case "${ERRMSG}" in
+        *"the stack is currently locked"*)
+            echo "Retrying because of lock on stack $STACK"
+            subcmd_pulumi "$STACK" cancel --yes
+            subcmd_prefresh
+            _down_stack "$STACK"
+
+            echo "Reset complete. In case a subsequent 'cncluster apply' fails, refer to the documentation on manual cleanup (https://github.com/DACH-NY/canton-network-node/tree/main/cluster#manually-deploying-via-ci)"
+            ;;
+    esac
 }
 
 function subcmd_reset() {

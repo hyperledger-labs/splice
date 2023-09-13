@@ -7,6 +7,7 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.http.v0.definitions
 import com.daml.network.util.ParticipantIdentitiesDump
+import com.daml.network.validator.ValidatorApp
 import com.daml.network.validator.admin.api.client.commands.{
   HttpAppManagerAdminAppClient,
   HttpAppManagerAppClient,
@@ -21,6 +22,7 @@ import com.daml.network.validator.config.{
   ValidatorAppBackendConfig,
   ValidatorAppClientConfig,
 }
+import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
@@ -241,6 +243,21 @@ final class ValidatorAppBackendReference(
   )
 
   protected val nodes = consoleEnvironment.environment.validators
+
+  @Help.Summary(
+    "Returns the state of this app. May only be called while the app is running."
+  )
+  def appState: ValidatorApp.State = _appState[ValidatorApp.State, ValidatorApp]
+
+  @Help.Summary(
+    "Returns the automation service for the wallet of the given user. May only be called while the app is running."
+  )
+  def userWalletAutomation(userName: String): UserWalletAutomationService = {
+    appState.walletManager
+      .lookupUserWallet(userName)
+      .getOrElse(throw new RuntimeException(s"User ${userName} doesn't exist"))
+      .automation
+  }
 
   @Help.Summary("Return local validator app config")
   override def config: ValidatorAppBackendConfig =

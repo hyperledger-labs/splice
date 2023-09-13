@@ -6,7 +6,8 @@ import com.daml.lf.archive.DarParser
 import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.{CNNodeBackendConfig, NetworkAppClientConfig}
-import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
+import com.daml.network.environment.{CNNodeBase, CNNodeConsoleEnvironment, CNNodeStatus}
+import com.daml.network.util.HasHealth
 import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.NonNegativeDuration
@@ -35,6 +36,7 @@ import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId}
 import java.io.File
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
+import scala.reflect.ClassTag
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -232,6 +234,35 @@ trait CNNodeAppBackendReference extends CNNodeAppReference with LocalInstanceRef
   def startSync(): Unit = {
     this.start()
     waitForInitialization()
+  }
+
+  @Help.Summary(
+    "Returns the state of this app. May only be called while the app is running."
+  )
+  protected def _appState[S <: AutoCloseable & HasHealth, NB <: CNNodeBase[S]](implicit
+      tag: ClassTag[NB]
+  ): S = {
+    (for {
+      bootstrap <- nodes
+        .getRunning(this.name)
+        .toRight(s"NodeBootstrap does not exist.")
+      node <- bootstrap.getNode
+        .toRight(s"NodeBootstrap doesn't have any running node.")
+      cnNode <- node match {
+        case n: NB => Right(n)
+        case other =>
+          Left(
+            s"Expected running node to be of type ${tag.runtimeClass.getSimpleName}, but found type ${other.getClass.getSimpleName}."
+          )
+      }
+      state <- cnNode.getState.toRight("Node doesn't have any app state.")
+    } yield state).fold(
+      reason =>
+        throw new RuntimeException(
+          s"The app state of ${this.name} is currently not accessible. $reason"
+        ),
+      x => x,
+    )
   }
 }
 

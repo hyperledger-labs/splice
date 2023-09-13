@@ -138,6 +138,7 @@ class SplitwellTimeBasedIntegrationTest
         ),
       )
       eventually()(bobWalletClient.listAppPaymentRequests() should not be empty)
+      // TODO (#7609): replace with stopping and starting triggers
       splitwellBackend.stop() // to avoid the automation triggering before the round change
       inside(bobWalletClient.listAppPaymentRequests()) { case Seq(request) =>
         bobWalletClient.acceptAppPaymentRequest(request.appPaymentRequest.contractId)

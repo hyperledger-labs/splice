@@ -180,6 +180,7 @@ class WalletTimeBasedIntegrationTest
         },
         cancelAllSubscriptions(aliceWalletClient, aliceValidatorBackend),
       ) {
+        // TODO (#7609): replace with stopping and starting triggers
         bracket(
           clue("Stopping directory backend so that payments aren't collected.") {
             directoryBackend.stop()
@@ -192,6 +193,7 @@ class WalletTimeBasedIntegrationTest
             "Wait for a payment on the first subscription to become possible", {
               // We time the advances so that automation doesn't trigger before
               // payments can be made.
+              // TODO (#7609): consider replacing with stopping and starting triggers
               advanceTimeAndWaitForRoundAutomation(Duration.ofDays(59).minus(Duration.ofMinutes(9)))
               advanceTimeToRoundOpen
             },
@@ -614,6 +616,7 @@ class WalletTimeBasedIntegrationTest
         actAndCheck(
           "Advance time until directory entry is up for renewal", {
             // We time the advances so that automation doesn't trigger before payments can be made.
+            // TODO (#7609): consider replacing with stopping and starting triggers
             advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(17)))
             advanceTimeToRoundOpen
           },

@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.config.NetworkAppClientConfig
+import com.daml.network.directory.DirectoryApp
 import com.daml.network.directory.admin.api.client.commands.HttpDirectoryAppClient
 import com.daml.network.directory.config.{DirectoryAppBackendConfig, DirectoryAppClientConfig}
 import com.daml.network.environment.CNNodeConsoleEnvironment
@@ -74,6 +75,11 @@ class DirectoryAppBackendReference(
   )
 
   protected val nodes = consoleEnvironment.environment.directories
+
+  @Help.Summary(
+    "Returns the state of this app. May only be called while the app is running."
+  )
+  def appState: DirectoryApp.State = _appState[DirectoryApp.State, DirectoryApp]
 
   /** Remote participant this directory app is configured to interact with. */
   lazy val participantClient =

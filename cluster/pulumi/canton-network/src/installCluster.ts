@@ -27,7 +27,10 @@ import { installValidator1 } from './validator1';
 
 console.error(`Launching with isDevNet: ${isDevNet}`);
 
-const approveSvRunbook = envFlag('APPROVE_SV_RUNBOOK') || isDevNet;
+// This flag determines whether to add a approved SV entry of 'DA-Helm-Test-Node'
+// An 'DA-Helm-Test-Node' entry is already added to `approved-sv-id-values-dev.yaml` so it is added by default for devnet deployment.
+// This flag is only relevant to non-devnet deployment.
+const approveSvRunbook = envFlag('APPROVE_SV_RUNBOOK');
 if (approveSvRunbook) {
   console.error('Approving SV used in SV runbook');
 }

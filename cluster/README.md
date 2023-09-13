@@ -9,10 +9,13 @@
     - [Connecting Locally Hosted Canton Components to a Cluster](#connecting-locally-hosted-canton-components-to-a-cluster)
     - [Network Configuration Within Kubernetes](#network-configuration-within-kubernetes)
   - [Cluster Tooling](#cluster-tooling)
+  - [Pulumi and Helm](#pulumi-and-helm)
     - [Manual Google Cloud Configuration](#manual-google-cloud-configuration)
     - [Docker Image Hosting](#docker-image-hosting)
     - [Cluster Management Operations](#cluster-management-operations)
+    - [DevNet and TestNet](#devnet-and-testnet)
     - [Manually Deploying via CI](#manually-deploying-via-ci)
+      - [Optional deployment settings](#optional-deployment-settings)
       - [Confirming the Deployment](#confirming-the-deployment)
     - [Observing Cluster Operation](#observing-cluster-operation)
       - [Kubectl and `cncluster` operations.](#kubectl-and-cncluster-operations)
@@ -25,9 +28,13 @@
         - [Check for Cluster Updates](#check-for-cluster-updates)
         - [Check for Autoscaler Activity](#check-for-autoscaler-activity)
       - [Prometheus Metrics and Grafana Dashboards](#prometheus-metrics-and-grafana-dashboards)
+        - [Prometheus Metrics](#prometheus-metrics)
+        - [Grafana Dashboards](#grafana-dashboards)
+        - [The Observability Cluster](#the-observability-cluster)
       - [Alerts](#alerts)
     - [Checking Pod Node Assignments and Memory Usage](#checking-pod-node-assignments-and-memory-usage)
     - [Managing GKE Kubernetes Versions](#managing-gke-kubernetes-versions)
+      - [Automatic GKE Cluster Upgrades](#automatic-gke-cluster-upgrades)
   - [Interacting with a Canton Network Cluster](#interacting-with-a-canton-network-cluster)
     - [Gaining Access to a Cluster](#gaining-access-to-a-cluster)
       - [Fixing Connection Issues in kubectl](#fixing-connection-issues-in-kubectl)
@@ -35,25 +42,26 @@
     - [Deploy a Build to a Cluster](#deploy-a-build-to-a-cluster)
     - [Add a Component to the Build](#add-a-component-to-the-build)
     - [Modifying a Deployed Cluster](#modifying-a-deployed-cluster)
+    - [Manual Cleanup for an Interrupted Deployment](#manual-cleanup-for-an-interrupted-deployment)
     - [Memory Settings](#memory-settings)
   - [TLS Certificate Provisioning](#tls-certificate-provisioning)
     - [Adding TLS to {insert-service-here}](#adding-tls-to-insert-service-here)
     - [Force-updating the certificate](#force-updating-the-certificate)
-  - [Auth0 secrets](#auth0-secrets)
-  - [Participant User Configuration](#participant-user-configuration)
+  - [Participant Admin User Configuration](#participant-admin-user-configuration)
   - [Token configuration](#token-configuration)
   - [Testing the SV Helm Runbook](#testing-the-sv-helm-runbook)
+  - [Testing the SV Helm Runbook against a local build manually](#testing-the-sv-helm-runbook-against-a-local-build-manually)
   - [SV Operations](#sv-operations)
     - [Approving new SVs](#approving-new-svs)
       - [Approving via SV API](#approving-via-sv-api)
       - [Approving via SV config](#approving-via-sv-config)
+  - [Interacting with Canton Network UIs](#interacting-with-canton-network-uis)
   - [Configuring a New GCP Project](#configuring-a-new-gcp-project)
   - [Cluster Data Dumps](#cluster-data-dumps)
-      - [Test and CircleCI setup](#test-and-circleci-setup)
-      - [Pruning Data Dumps](#pruning-data-dumps)
-      - [Bootstrapping from a Cluster Data Dump](#bootstrapping-from-a-cluster-data-dump)
-  - [Appendix: Kubernetes Resources](#appendix-kubernetes-resources)
-    - [Manifests](#manifests)
+    - [Test and CircleCI setup](#test-and-circleci-setup)
+    - [Pruning Data Dumps](#pruning-data-dumps)
+    - [Bootstrapping from a Cluster Data Dump](#bootstrapping-from-a-cluster-data-dump)
+  - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
 Google Cloud APIs. If you have `direnv` installed (which you should),
@@ -231,7 +239,7 @@ infrastructure script.
      - *Secrets not containing the right values*: decode the secret using something like
        `kubectl get secret -n sv-1 cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps -o 'jsonpath={.data.json-credentials}' | base64 -d`
        or use `k9s` to navigate to the secrets overview using `:secrets` and press `x` on the secret of interest.
-     - *Cancelled pulumi holding the lock*: release the lock using `cncluster pulumi canton-network cancel`
+     - *Cancelled pulumi holding the lock*: release the lock using `cncluster pulumi canton-network cancel`. `cncluster reset` will also cancel and retry the reset on detecting a held Pulumi lock. See also the section on [Manual Cleanup for an Interrupted Deployment](#manual_cleanup_for_an_interrupted_deployment)
      - See also the section on [Modifying a Deployed Cluster](#modifying-a-deployed-cluster)
 1. The Pulumi and Helm charts may now be edited and `cncluster apply`
    once again used to apply only the changes to the cluster.
@@ -909,6 +917,28 @@ Alternatively, you can also modify an installed chart, e.g. to change the values
 1. Edit `vals.yaml`: delete the first line ("USER-SUPPLIED VALUES:"), and modify whatever values you with to change
 1. Run `helm upgrade -n <namespace> <name> $REPO_ROOT/cluster/helm/target/<your-helm-chart>.tgz -f vals.yaml
 
+### Manual Cleanup for an Interrupted Deployment
+
+After an interrupted `cncluster apply`, running `cncluster reset` may not be enough to clean up, and subsequent `apply`s may fail with errors like:
+
+```
+  kubernetes:core/v1:Namespace (splitwell):
+    error: resource splitwell was not successfully created by the Kubernetes API server : namespaces "splitwell" already exists
+
+  kubernetes:core/v1:Namespace (docs):
+    error: resource docs was not successfully created by the Kubernetes API server : namespaces "docs" already exists
+
+  kubernetes:core/v1:Namespace (sv-1):
+    error: resource sv-1 was not successfully created by the Kubernetes API server : namespaces "sv-1" already exists
+
+  ...
+```
+
+This can be remedied by deleting the offending namespaces and rerunning `apply`:
+
+```
+kubectl delete namespace sv-1 sv-2 sv-3 sv-4 validator1 splitwell docs
+```
 
 ### Memory Settings
 

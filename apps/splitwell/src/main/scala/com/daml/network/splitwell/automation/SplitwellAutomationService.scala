@@ -3,9 +3,9 @@ package com.daml.network.splitwell.automation
 import akka.stream.Materializer
 import cats.syntax.apply.*
 import com.daml.network.automation.{
+  AssignTrigger,
   CNNodeAppAutomationService,
   TransferFollowTrigger,
-  AssignTrigger,
 }
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}

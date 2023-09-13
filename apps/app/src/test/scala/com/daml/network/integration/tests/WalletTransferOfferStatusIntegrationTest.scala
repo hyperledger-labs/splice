@@ -90,7 +90,7 @@ class WalletTransferOfferStatusIntegrationTest
       val offerCid = createTransferOffer(aliceUserParty, bobUserParty)
 
       // Stop validator so it doesn't immediately move from Accepted to Completed
-      // TODO (#6408): replace with stopping and starting AcceptedTransferOfferTrigger
+      // TODO (#7609): replace with stopping and starting AcceptedTransferOfferTrigger
       bracket(aliceValidatorBackend.stop(), aliceValidatorBackend.startSync()) {
         actAndCheck(
           "Bob accepts the transfer offer",

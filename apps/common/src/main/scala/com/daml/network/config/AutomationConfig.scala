@@ -1,6 +1,9 @@
 package com.daml.network.config
 
+import com.daml.network.automation.Trigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+
+import scala.reflect.ClassTag
 
 case class AutomationConfig(
     /** How many automation tasks should be run in parallel per kind of task. */
@@ -38,4 +41,16 @@ case class AutomationConfig(
       * publish/reconcile automation.
       */
     enableCometbftReconciliation: Boolean = true,
-) {}
+    /** Only intended for testing. List of triggers (identified by the name of the corresponding scala class)
+      * that start in a paused state. Unless such a trigger is resumed manually, it is guaranteed to never perform
+      * any work.
+      */
+    pausedTriggers: Set[String] = Set.empty,
+) {
+  def withPausedTrigger[T <: Trigger](implicit tag: ClassTag[T]): AutomationConfig = copy(
+    pausedTriggers = pausedTriggers + tag.runtimeClass.getCanonicalName
+  )
+  def withResumedTrigger[T <: Trigger](implicit tag: ClassTag[T]): AutomationConfig = copy(
+    pausedTriggers = pausedTriggers - tag.runtimeClass.getCanonicalName
+  )
+}

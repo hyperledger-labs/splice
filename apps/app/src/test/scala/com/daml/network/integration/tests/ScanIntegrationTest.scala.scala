@@ -9,6 +9,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
 
 class ScanIntegrationTest
     extends CNNodeIntegrationTest
@@ -31,7 +32,7 @@ class ScanIntegrationTest
       .withoutAutomaticRewardsCollectionAndCoinMerging
 
   "list recent activity" in { implicit env =>
-    val (aliceUserParty, _) = onboardAliceAndBob()
+    val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
     // TODO(#7633) Tap is currently not added to recent activity
     clue("Tap to get some coins") {
       aliceWalletClient.tap(500.0)
@@ -77,15 +78,20 @@ class ScanIntegrationTest
     })
 
     eventually() {
-      val activities = sv1ScanBackend.listRecentActivity(None, 10)
-      activities.size shouldBe (1)
+      // only look at activities that bob sent to prevent flakes, some activities occur on startup before this test.
+      val activities = sv1ScanBackend.listRecentActivity(None, 10).filter { recentActivity =>
+        PartyId.tryFromProtoPrimitive(recentActivity.sender.party) == bobUserParty
+      }
+
+      activities should have size (1)
+      val activityFromTest = activities.head
       // bob transferred 100 + fees
-      BigDecimal(activities.head.sender.amount) should beWithin(
+      BigDecimal(activityFromTest.sender.amount) should beWithin(
         BigDecimal(-100.0 - 1.1),
         BigDecimal(-100.0),
       )
       // alice receives transfer
-      activities.head.receivers
+      activityFromTest.receivers
         .map(r => BigDecimal(r.amount))
         .sum shouldBe BigDecimal(100.0)
     }
