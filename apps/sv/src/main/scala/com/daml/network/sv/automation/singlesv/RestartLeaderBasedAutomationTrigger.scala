@@ -10,10 +10,8 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.util.AssignedContract
-
 import com.daml.network.sv.automation.LeaderBasedAutomationService
 import com.daml.network.sv.automation.leaderbased.SvTaskBasedTrigger
-
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.time.Clock
@@ -60,6 +58,8 @@ class RestartLeaderBasedAutomationTrigger(
 
   private def closeService(): Unit =
     epochStateVar.foreach(epochState => Lifecycle.close(epochState.leaderBasedAutomation)(logger))
+
+  def epochState: Option[EpochState] = epochStateVar
 
   appLevelRetryProvider.runOnShutdown_(new RunOnShutdown {
     override def name = s"shutdown per-epoch retry provider"

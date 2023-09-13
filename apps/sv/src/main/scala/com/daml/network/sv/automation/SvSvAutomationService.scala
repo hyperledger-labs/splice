@@ -1,7 +1,7 @@
 package com.daml.network.sv.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{CNNodeAppAutomationService, AssignTrigger}
+import com.daml.network.automation.{AssignTrigger, CNNodeAppAutomationService}
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import com.daml.network.sv.config.SvAppBackendConfig

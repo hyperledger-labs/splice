@@ -47,7 +47,7 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
         })
   })(TraceContext.empty)
 
-  override def run(): Unit = blocking {
+  override def run(paused: Boolean): Unit = blocking {
     // Using synchronized here, as we otherwise have to write cleanup code for recovering from a concurrent call
     synchronized {
       withNewTrace("run processing loop")(implicit tc =>
@@ -97,4 +97,8 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
     )
   }
 
+  // See https://github.com/akka/akka-stream-contrib/blob/main/src/main/scala/akka/stream/contrib/Valve.scala
+  override def pause(): Future[Unit] = ???
+  override def resume(): Unit = ???
+  override def runOnce()(implicit traceContext: TraceContext): Future[Boolean] = ???
 }

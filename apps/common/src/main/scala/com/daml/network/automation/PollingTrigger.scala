@@ -11,7 +11,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.RetryUtil.ErrorKind
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.Future
+import scala.concurrent.{Future, Promise, blocking}
 import scala.util.{Failure, Success}
 
 /** A trigger that regularly executes work.
@@ -33,6 +33,34 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     */
   def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean]
 
+  private def performWorkIfNotPaused()(implicit
+      traceContext: TraceContext
+  ): Future[Boolean] =
+    blocking {
+      synchronized {
+        if (pausedVar) {
+          // If the trigger is paused, wait until the next polling interval
+          logger.trace("Skipping work, trigger is paused")
+          Future.successful(false)
+        } else {
+          assert(
+            runningTaskFinishedVar.isEmpty,
+            "performWorkIfNotPaused may not be called concurrently",
+          )
+          runningTaskFinishedVar = Some(Promise())
+          performWorkIfAvailable().andThen { case _ =>
+            blocking {
+              synchronized {
+                assert(runningTaskFinishedVar.nonEmpty)
+                runningTaskFinishedVar.foreach(_.success(()))
+                runningTaskFinishedVar = None
+              }
+            }
+          }
+        }
+      }
+    }
+
   implicit private val loggingContext: ErrorLoggingContext =
     ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
 
@@ -49,9 +77,10 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
 
   override def isHealthy: Boolean = pollingLoopRef.get().exists(!_.isCompleted)
 
-  override def run(): Unit = LoggerUtil.logOnThrow {
+  override def run(paused: Boolean): Unit = LoggerUtil.logOnThrow {
 
     require(pollingLoopRef.get().isEmpty, "run must not be called twice")
+    pausedVar = paused
 
     // We create a top-level tid for the trigger polling loop for ease of navigation in lnav using 'o' and 'O'
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
@@ -95,7 +124,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
                 exitPollingLoop()
               } else if (workDone) {
                 // If productive work was done in the previous iteration, then we loop without a delay.
-                pollingLoop(performWorkIfAvailable())
+                pollingLoop(performWorkIfNotPaused())
               } else {
                 logger.trace(
                   show"No work performed. Sleeping for ${context.config.pollingInterval}"
@@ -126,4 +155,33 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
         timeouts.shutdownNetwork.duration,
       )
     )
+
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  private var pausedVar: Boolean = false
+
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  private var runningTaskFinishedVar: Option[Promise[Unit]] = None
+
+  override def pause(): Future[Unit] = blocking {
+    synchronized {
+      pausedVar = true
+      runningTaskFinishedVar.fold(Future.unit)(_.future)
+    }
+  }
+  override def resume(): Unit = blocking {
+    synchronized {
+      pausedVar = false
+    }
+  }
+  override def runOnce()(implicit traceContext: TraceContext): Future[Boolean] = {
+    blocking {
+      synchronized {
+        assert(
+          pausedVar,
+          "The trigger must be paused, otherwise there might be concurrent invocations of performWorkIfAvailable",
+        )
+      }
+    }
+    performWorkIfAvailable()
+  }
 }

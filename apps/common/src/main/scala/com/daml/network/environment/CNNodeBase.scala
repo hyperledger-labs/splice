@@ -239,6 +239,10 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     val initConnection = client.connection(this.getClass.getSimpleName, loggerFactory)
     waitForUser(initConnection).flatMap(_ => initializeNode(client))
   }
+  private[network] def getState = initializeF.value match {
+    case Some(Success(state)) => Some(state)
+    case _ => None
+  }
 
   initializeF.foreach { _ =>
     logger.info(s"Initialization complete, running on version ${BuildInfo.compiledVersion}")

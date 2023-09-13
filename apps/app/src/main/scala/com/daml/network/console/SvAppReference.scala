@@ -15,7 +15,10 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
 import com.daml.network.http.v0.definitions
+import com.daml.network.sv.SvApp
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
+import com.daml.network.sv.automation.LeaderBasedAutomationService
+import com.daml.network.sv.automation.singlesv.RestartLeaderBasedAutomationTrigger
 import com.daml.network.sv.config.{SvAppBackendConfig, SvAppClientConfig}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{BaseInspection, Help}
@@ -139,6 +142,22 @@ class SvAppBackendReference(
   )
 
   protected val nodes = consoleEnvironment.environment.svs
+
+  @Help.Summary(
+    "Returns the state of this app. May only be called while the app is running."
+  )
+  def appState: SvApp.State = _appState[SvApp.State, SvApp]
+
+  @Help.Summary(
+    "Returns the current leader based automation. Do not keep references to the result, as this automation gets replaced whenever the SVC leader changes."
+  )
+  def leaderBasedAutomation: LeaderBasedAutomationService = {
+    appState.svcAutomation
+      .trigger[RestartLeaderBasedAutomationTrigger]
+      .epochState
+      .getOrElse(throw new RuntimeException("LeaderBasedAutomation is not fully started up"))
+      .leaderBasedAutomation
+  }
 
   @Help.Summary("Return sv app config")
   def config: SvAppBackendConfig =

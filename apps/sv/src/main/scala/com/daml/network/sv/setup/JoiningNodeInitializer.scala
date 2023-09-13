@@ -125,7 +125,12 @@ class JoiningNodeInitializer(
             )
             svcStore = newSvcStore(svStore.key)
             svcAutomation =
-              newSvSvcAutomationService(svStore, svcStore, ledgerClient, cometBftNode)
+              newSvSvcAutomationService(
+                svStore,
+                svcStore,
+                ledgerClient,
+                cometBftNode,
+              )
             _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- retryProvider.ensureThatB(
               show"the SvcRules list the SV party ${svcStore.key.svParty} as a member",

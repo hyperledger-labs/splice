@@ -88,6 +88,7 @@ class CnsTimeBasedIntegrationTest
         // Advance so we're within the renewalInterval + make sure that we have
         // an open round that we can use. We time the advances so that
         // automation doesn't trigger before payments can be made.
+        // TODO (#7609): consider replacing with stopping and starting triggers
         advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(1)))
         advanceTimeToRoundOpen
         val renewedEntry = clue(
@@ -150,6 +151,7 @@ class CnsTimeBasedIntegrationTest
         },
       )
       // Stop validator so renewal does not happen
+      // TODO (#7609): replace with stopping and starting triggers
       aliceValidatorBackend.stop()
       advanceTime(Duration.ofDays(91))
       eventually() {

@@ -1,7 +1,7 @@
 package com.daml.network.wallet.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{CNNodeAppAutomationService, AssignTrigger, UnassignTrigger}
+import com.daml.network.automation.{AssignTrigger, CNNodeAppAutomationService, UnassignTrigger}
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}

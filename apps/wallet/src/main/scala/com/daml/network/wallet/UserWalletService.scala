@@ -71,7 +71,7 @@ class UserWalletService(
     loggerFactory,
   )
 
-  private val automation = new UserWalletAutomationService(
+  val automation = new UserWalletAutomationService(
     store,
     treasury,
     ledgerClient,

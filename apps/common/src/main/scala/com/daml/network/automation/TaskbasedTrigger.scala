@@ -41,7 +41,7 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
   protected def isStaleTask(task: T)(implicit tc: TraceContext): Future[Boolean]
 
   /** Processes the task with a retry and returns whether that was successful. */
-  final protected def processTaskWithRetry(task: T): Future[Boolean] =
+  final protected def processTaskWithRetry(task: T): Future[Boolean] = {
     // Creating a new trace here, as multiple requests can be processed in parallel.
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
       def processTaskWithStalenessCheck(): Future[TaskOutcome] =
@@ -103,5 +103,6 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
             Success(false)
         }
     }
+  }
 
 }

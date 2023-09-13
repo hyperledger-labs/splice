@@ -37,4 +37,14 @@ abstract class PollingParallelTaskExecutionTrigger[T: Pretty]()(implicit
       // TODO(M3-83): consider building support for batching the commands resulting from the different tasks
       tasksSucceeded <- tasks.parTraverse(processTaskWithRetry)
     } yield tasksSucceeded.exists(succeeded => succeeded)
+
+  override def runOnce()(implicit traceContext: TraceContext): Future[Boolean] = {
+    for {
+      tasks <- retrieveTasks()
+      workDone <- tasks.headOption match {
+        case None => Future.successful(false)
+        case Some(task) => processTaskWithRetry(task)
+      }
+    } yield workDone
+  }
 }

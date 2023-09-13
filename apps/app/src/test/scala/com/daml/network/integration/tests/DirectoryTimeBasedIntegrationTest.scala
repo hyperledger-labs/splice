@@ -108,6 +108,7 @@ class DirectoryTimeBasedIntegrationTest
         // Advance so we're within the renewalInterval + make sure that we have
         // an open round that we can use. We time the advances so that
         // automation doesn't trigger before payments can be made.
+        // TODO (#7609): consider replacing with stopping and starting triggers
         advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(1)))
         advanceTimeToRoundOpen
         val renewedEntry = clue(
@@ -163,6 +164,7 @@ class DirectoryTimeBasedIntegrationTest
         },
       )
       // Stop validator so renewal does not happen
+      // TODO (#7609): replace with stopping and starting triggers
       aliceValidatorBackend.stop()
       advanceTime(Duration.ofDays(91))
       eventually() {
@@ -197,6 +199,7 @@ class DirectoryTimeBasedIntegrationTest
         )
       }
       // to avoid automation triggering before the round change
+      // TODO (#7609): replace with stopping and starting triggers
       bracket(directoryBackend.stop(), directoryBackend.startSync()) {
         clue("Alice accepts the subscription") {
           aliceWalletClient.acceptSubscriptionRequest(subReqId)
@@ -208,10 +211,12 @@ class DirectoryTimeBasedIntegrationTest
         directoryBackend.lookupEntryByName(testEntryName)
       }
       // to avoid automation triggering before the round change
+      // TODO (#7609): replace with stopping and starting triggers
       bracket(directoryBackend.stop(), directoryBackend.startSync()) {
         // Advance so we're within the renewalInterval + make sure that we have
         // an open round that we can use. We time the advances so that
         // automation doesn't trigger before payments can be made.
+        // TODO (#7609): consider replacing with stopping and starting triggers
         advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(1)))
         advanceTimeToRoundOpen
         eventually() {

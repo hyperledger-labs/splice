@@ -10,10 +10,11 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.console.LedgerApiExtensions.*
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.config.ScanAppClientConfig
+import com.daml.network.splitwell.SplitwellApp
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.splitwell.config.{SplitwellAppBackendConfig, SplitwellAppClientConfig}
 import com.daml.network.store.MultiDomainAcsStore.ContractState
-import com.daml.network.util.{Contract, ContractWithState, AssignedContract}
+import com.daml.network.util.{AssignedContract, Contract, ContractWithState}
 import com.digitalasset.canton.console.{
   BaseInspection,
   ExternalLedgerApiClient,
@@ -474,6 +475,11 @@ final class SplitwellAppBackendReference(
   )
 
   override protected val nodes = consoleEnvironment.environment.splitwells
+
+  @Help.Summary(
+    "Returns the state of this app. May only be called while the app is running."
+  )
+  def appState: SplitwellApp.State = _appState[SplitwellApp.State, SplitwellApp]
 
   override lazy val ledgerApi = participantClient
 
