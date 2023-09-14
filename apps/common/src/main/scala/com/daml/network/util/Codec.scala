@@ -14,7 +14,7 @@ import com.digitalasset.canton.topology.{
   SequencerId,
   UniqueIdentifier,
 }
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 
 /** Trait for values used in our requests.
   * Dec is the Scala representation while Enc is the representation used in code generated for the serialization format, e.g., Codec[BigDecimal, String].
@@ -137,8 +137,6 @@ object Codec {
   }
 
   private def failedToDecode(err: String) = {
-    throw new StatusRuntimeException(
-      Status.INVALID_ARGUMENT.withDescription(s"Failed to decode: $err")
-    )
+    throw Status.INVALID_ARGUMENT.withDescription(s"Failed to decode: $err").asRuntimeException()
   }
 }

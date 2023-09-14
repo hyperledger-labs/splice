@@ -27,7 +27,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.traffic.MemberTrafficStatus
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import java.time.Instant
@@ -156,22 +156,22 @@ class TopupMemberTrafficTrigger(
         .lookupInstallByParty(store.key.validatorParty)
         .map(
           _.getOrElse(
-            throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription(
+            throw Status.NOT_FOUND
+              .withDescription(
                 s"No wallet install contract for validator ${store.key.validatorParty}."
               )
-            )
+              .asRuntimeException()
           )
         )
       validatorWalletUser = walletInstall.payload.endUserName
       validatorWallet = walletManager
         .lookupUserWallet(validatorWalletUser)
         .getOrElse(
-          throw new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription(
+          throw Status.NOT_FOUND
+            .withDescription(
               s"No wallet found for validator user $validatorWalletUser."
             )
-          )
+            .asRuntimeException()
         )
     } yield validatorWallet.treasury
   }

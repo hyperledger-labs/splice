@@ -9,7 +9,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 import monocle.macros.syntax.lens.*
 
 import scala.concurrent.{blocking, ExecutionContext, Future, Promise}
@@ -38,9 +38,7 @@ class InMemoryDomainStore(
       .get(alias)
       .fold[Future[DomainId]](
         Future.failed(
-          new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription(s"Domain alias $alias not found")
-          )
+          Status.NOT_FOUND.withDescription(s"Domain alias $alias not found").asRuntimeException()
         )
       )(Future.successful(_))
 

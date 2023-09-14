@@ -394,11 +394,11 @@ class HttpSvHandler(
         } yield
           if (maybeConfirmed.isDefined) maybeConfirmed
           else
-            throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription(
+            throw Status.NOT_FOUND
+              .withDescription(
                 s"SvOnboardingConfirmed contract not found yet"
               )
-            ),
+              .asRuntimeException(),
         logger,
       )
       .recover {

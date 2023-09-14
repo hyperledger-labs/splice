@@ -58,7 +58,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -168,12 +168,12 @@ class TreasuryService(
         p.future
       case Dropped =>
         Future.failed(
-          new StatusRuntimeException(
-            Status.ABORTED.withDescription(
+          Status.ABORTED
+            .withDescription(
               show"Aborted operation - likely because there are too many operations (currently ${queue
                   .size()}, max ${treasuryConfig.queueSize}) already in flight: $operation"
             )
-          )
+            .asRuntimeException()
         )
       case QueueOfferResult.Failure(cause) => Future.failed(cause)
       case QueueClosed =>

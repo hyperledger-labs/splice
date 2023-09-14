@@ -12,7 +12,7 @@ import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.{ExecutionContext, Future}
@@ -45,9 +45,7 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
     walletManager
       .lookupUserWallet(user)
       .getOrElse(
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription(show"User ${user.singleQuoted}")
-        )
+        throw Status.NOT_FOUND.withDescription(show"User ${user.singleQuoted}").asRuntimeException()
       )
 
   /** Executes a wallet action by calling a choice on the WalletInstall contract for the given user.
