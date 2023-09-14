@@ -24,12 +24,12 @@ export const useSvcInfos = (): UseQueryResult<SvUiState> => {
     queryFn: async () => {
       const resp = await getSvcInfo();
       return {
-        svUser: resp.svUser,
-        svPartyId: resp.svPartyId,
-        svcPartyId: resp.svcPartyId,
-        votingThreshold: resp.votingThreshold,
-        coinRules: Contract.decodeOpenAPI(resp.coinRules, CoinRules),
-        svcRules: Contract.decodeOpenAPI(resp.svcRules, SvcRules),
+        svUser: resp.sv_user,
+        svPartyId: resp.sv_party_id,
+        svcPartyId: resp.svc_party_id,
+        votingThreshold: resp.voting_threshold,
+        coinRules: Contract.decodeOpenAPI(resp.coin_rules, CoinRules),
+        svcRules: Contract.decodeOpenAPI(resp.svc_rules, SvcRules),
       };
     },
   });

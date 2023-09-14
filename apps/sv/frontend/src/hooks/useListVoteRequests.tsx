@@ -18,8 +18,8 @@ export const useListSvcRulesVoteRequests = (): UseQueryResult<Contract<VoteReque
   return useQuery({
     queryKey: ['listSvcRulesVoteRequests'],
     queryFn: async () => {
-      const { svcRulesVoteRequests } = await listSvcRulesVoteRequests();
-      return svcRulesVoteRequests;
+      const { svc_rules_vote_requests } = await listSvcRulesVoteRequests();
+      return svc_rules_vote_requests.map(c => Contract.decodeOpenAPI(c, VoteRequest));
     },
   });
 };
@@ -41,7 +41,7 @@ export const useListSvcRulesVoteResults = (
     ],
     keepPreviousData: true,
     queryFn: async () => {
-      const { svcRulesVoteResults } = await listSvcRulesVoteResults(
+      const { svc_rules_vote_results } = await listSvcRulesVoteResults(
         limit,
         query.actionName,
         query.requester,
@@ -49,7 +49,7 @@ export const useListSvcRulesVoteResults = (
         query.effectiveTo,
         query.executed
       );
-      return svcRulesVoteResults;
+      return svc_rules_vote_results;
     },
   });
 };

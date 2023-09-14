@@ -9,7 +9,7 @@ export const useProviderPartyId = (): UseQueryResult<string> => {
     queryKey: ['providerPartyId'],
     queryFn: async () => {
       const response = await splitwellClient.getProviderPartyId();
-      return response.providerPartyId;
+      return response.provider_party_id;
     },
   });
 };

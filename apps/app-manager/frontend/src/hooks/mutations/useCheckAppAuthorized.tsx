@@ -17,7 +17,7 @@ export const useCheckAppAuthorized = (): UseMutationResult<
   return useMutation({
     mutationFn: async ({ provider, redirectUri, state }): Promise<string> => {
       return (await appManagerClient.checkAppAuthorized(provider, redirectUri!, state!))
-        .redirectUri;
+        .redirect_uri;
     },
   });
 };

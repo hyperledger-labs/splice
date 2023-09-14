@@ -9,8 +9,8 @@ export const useValidatorLicenses = (): UseQueryResult<Contract<ValidatorLicense
   return useQuery({
     queryKey: ['listValidatorLicenses'],
     queryFn: async () => {
-      const { validatorLicenses } = await listValidatorLicenses();
-      return validatorLicenses;
+      const { validator_licenses } = await listValidatorLicenses();
+      return validator_licenses;
     },
   });
 };

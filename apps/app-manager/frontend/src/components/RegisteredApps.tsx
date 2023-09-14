@@ -109,10 +109,10 @@ const RegisteredApp: React.FC<{ app: openapi.RegisteredApp }> = ({ app }) => {
         </Stack>
       </CardContent>
       <CardActions>
-        <Link href={app.appUrl} className="registered-app-link">
+        <Link href={app.app_url} className="registered-app-link">
           Install URL
         </Link>
-        <IconButton onClick={() => navigator.clipboard.writeText(app.appUrl)}>
+        <IconButton onClick={() => navigator.clipboard.writeText(app.app_url)}>
           <ContentCopyIcon fontSize={'small'} />
         </IconButton>
       </CardActions>
@@ -121,7 +121,7 @@ const RegisteredApp: React.FC<{ app: openapi.RegisteredApp }> = ({ app }) => {
 };
 
 const validAppConfiguration = (config: openapi.AppConfiguration): boolean =>
-  config.name !== '' && config.uiUri !== '' && config.releaseConfigurations.length !== 0;
+  config.name !== '' && config.ui_uri !== '' && config.release_configurations.length !== 0;
 
 const RegisteredApps: React.FC = () => {
   const [appProviderUser, setAppProviderUser] = useState<string>('');
@@ -129,9 +129,9 @@ const RegisteredApps: React.FC = () => {
   const [appConfig, setAppConfig] = useState<openapi.AppConfiguration>({
     version: 0,
     name: '',
-    uiUri: '',
-    allowedRedirectUris: [],
-    releaseConfigurations: [],
+    ui_uri: '',
+    allowed_redirect_uris: [],
+    release_configurations: [],
   });
   const registeredAppsQuery = useRegisteredApps();
   const registerAppMutation = useRegisterApp();

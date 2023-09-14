@@ -18,7 +18,7 @@ import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.{CallCredentials, Status, StatusRuntimeException}
+import io.grpc.{CallCredentials, Status}
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
@@ -34,7 +34,7 @@ abstract class BaseAppConnection(
 
   protected def toFuture[T](e: Either[String, T]): Future[T] =
     e.fold(
-      err => Future.failed(new StatusRuntimeException(Status.INTERNAL.withDescription(err))),
+      err => Future.failed(Status.INTERNAL.withDescription(err).asRuntimeException()),
       Future.successful,
     )
 

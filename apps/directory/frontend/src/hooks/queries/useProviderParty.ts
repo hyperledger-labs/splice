@@ -8,7 +8,7 @@ const useProviderParty = (): UseQueryResult<string> => {
     queryKey: ['fetchProviderParty'],
     refetchInterval: false, // provider party ID is static
     queryFn: async () => {
-      return directoryClient.getProviderPartyId().then(response => response.providerPartyId);
+      return directoryClient.getProviderPartyId().then(response => response.provider_party_id);
     },
   });
 };

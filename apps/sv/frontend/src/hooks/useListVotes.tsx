@@ -14,10 +14,10 @@ export const useListVotes = (contractIds: ContractId<VoteRequest>[]): UseQueryRe
       if (contractIds.length === 0) {
         return [];
       }
-      const { svcRulesVotes } = await listVotesByVoteRequests(contractIds);
-      return svcRulesVotes.map(vote => {
+      const { svc_rules_votes } = await listVotesByVoteRequests(contractIds);
+      return svc_rules_votes.map(vote => {
         return {
-          contractId: vote.contractId,
+          contractId: vote.contract_id,
           requestCid: vote.payload.requestCid,
           voter: vote.payload.voter,
           accept: vote.payload.accept,

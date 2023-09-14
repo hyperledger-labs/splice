@@ -17,7 +17,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.concurrent.TrieMap
@@ -141,9 +141,9 @@ class UserWalletManager(
   def offboardUser(username: String): Unit = {
     endUserWalletsMap.remove(username) match {
       case None =>
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription(s"No wallet service found for user ${username}")
-        )
+        throw Status.NOT_FOUND
+          .withDescription(s"No wallet service found for user ${username}")
+          .asRuntimeException()
       case Some((userRetryProvider, walletService)) =>
         userRetryProvider.close()
         walletService.close()

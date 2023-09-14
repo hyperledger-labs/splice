@@ -24,7 +24,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -181,16 +181,16 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getCoinRulesV1Test") { _ => _ =>
       if (!config.enableCoinRulesUpgrade) {
-        throw new StatusRuntimeException(
-          Status.UNIMPLEMENTED.withDescription("CoinRules upgrades are disabled")
-        )
+        throw Status.UNIMPLEMENTED
+          .withDescription("CoinRules upgrades are disabled")
+          .asRuntimeException()
       }
       for {
         coinRulesO <- store.lookupCoinRulesV1Test()
         coinRules = coinRulesO.getOrElse(
-          throw new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription("found no upgraded coinrules instance")
-          )
+          throw Status.NOT_FOUND
+            .withDescription("found no upgraded coinrules instance")
+            .asRuntimeException()
         )
       } yield {
         val response = MaybeCachedContractWithState(

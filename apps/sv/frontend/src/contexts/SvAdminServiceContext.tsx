@@ -158,45 +158,45 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         return await svAdminClient.lookupSvcRulesVoteRequest(voteRequestContractId);
       },
       castVote: async (
-        voteRequestContractId,
-        isAccepted,
-        reasonUrl,
-        reasonDescription
+        vote_request_contract_id,
+        is_accepted,
+        reason_url,
+        reason_description
       ): Promise<void> => {
         const request: CastVoteRequest = {
-          voteRequestContractId,
-          isAccepted,
-          reasonUrl,
-          reasonDescription,
+          vote_request_contract_id,
+          is_accepted,
+          reason_url,
+          reason_description,
         };
         return await svAdminClient.castVote(request);
       },
       updateVote: async (
-        voteContractId,
-        isAccepted,
-        reasonUrl,
-        reasonDescription
+        vote_contract_id,
+        is_accepted,
+        reason_url,
+        reason_description
       ): Promise<void> => {
         const request: UpdateVoteRequest = {
-          voteContractId,
-          isAccepted,
-          reasonUrl,
-          reasonDescription,
+          vote_contract_id,
+          is_accepted,
+          reason_url,
+          reason_description,
         };
         return await svAdminClient.updateVote(request);
       },
       listVotesByVoteRequests: async (
-        voteRequestContractIds: string[]
+        vote_request_contract_ids: string[]
       ): Promise<ListVotesResponse> => {
         const request: BatchListVotesByVoteRequestsRequest = {
-          voteRequestContractIds,
+          vote_request_contract_ids,
         };
         return await svAdminClient.batchListVotesByVoteRequests(request);
       },
       prepareValidatorOnboarding: async (
-        expiresIn: number
+        expires_in: number
       ): Promise<PrepareValidatorOnboardingResponse> => {
-        const request: PrepareValidatorOnboardingRequest = { expiresIn };
+        const request: PrepareValidatorOnboardingRequest = { expires_in };
         return await svAdminClient.prepareValidatorOnboarding(request);
       },
       listOngoingValidatorOnboardings:
@@ -210,7 +210,7 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         return await svAdminClient.listCoinPriceVotes();
       },
       updateDesiredCoinPrice: async (coinPrice: BigNumber): Promise<void> => {
-        const request: UpdateCoinPriceVoteRequest = { coinPrice: coinPrice.toString() };
+        const request: UpdateCoinPriceVoteRequest = { coin_price: coinPrice.toString() };
         return await svAdminClient.updateCoinPriceVote(request);
       },
       listOpenMiningRounds: async (): Promise<ListOpenMiningRoundsResponse> => {

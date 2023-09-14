@@ -5,8 +5,8 @@ import { useAppManagerAdminClient } from '../../contexts/AppManagerServiceContex
 export const useInstallApp = (): UseMutationResult<void, unknown, string, unknown> => {
   const appManagerClient = useAppManagerAdminClient();
   return useMutation({
-    mutationFn: async (appUrl: string) => {
-      await appManagerClient.installApp({ appUrl });
+    mutationFn: async (app_url: string) => {
+      await appManagerClient.installApp({ app_url });
     },
   });
 };

@@ -30,7 +30,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import java.security.interfaces.ECPrivateKey
@@ -408,7 +408,7 @@ class JoiningNodeInitializer(
           svOnboardingConfirmed <- svOnboardingConfirmedOpt match {
             case Some(sc) => Future.successful(sc)
             case None =>
-              throw new StatusRuntimeException(Status.NOT_FOUND.withDescription(description))
+              throw Status.NOT_FOUND.withDescription(description).asRuntimeException()
           }
         } yield svOnboardingConfirmed,
         logger,
@@ -592,16 +592,16 @@ class JoiningNodeInitializer(
             if (SvApp.isSvcMemberParty(svcStore.key.svParty, c.contract)) {
               Future.successful(())
             } else {
-              throw new StatusRuntimeException(
-                Status.FAILED_PRECONDITION.withDescription(
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
                   show"SvcRules found but $svParty is not a member"
                 )
-              )
+                .asRuntimeException()
             }
           case None =>
-            throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription(show"SvcRules contract not found")
-            )
+            throw Status.NOT_FOUND
+              .withDescription(show"SvcRules contract not found")
+              .asRuntimeException()
         }
       } yield (),
       logger,

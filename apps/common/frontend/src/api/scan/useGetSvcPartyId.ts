@@ -9,7 +9,7 @@ const useGetSvcPartyId = (): UseQueryResult<string> => {
     queryKey: ['scan-api', 'getSvcPartyId'],
     queryFn: async () => {
       const response = await scanClient.getSvcPartyId();
-      return response.svcPartyId;
+      return response.svc_party_id;
     },
   });
 };

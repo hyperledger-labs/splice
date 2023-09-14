@@ -12,7 +12,7 @@ import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.util.AssignedContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -57,11 +57,11 @@ class ExpireAcceptedTransferOfferTrigger(
           )
         case _ =>
           Future.failed(
-            new StatusRuntimeException(
-              Status.INTERNAL.withDescription(
+            Status.INTERNAL
+              .withDescription(
                 s"User ($user) is unexpectedly neither sender (${task.work.contract.payload.sender}) nor receiver (${task.work.contract.payload.receiver})"
               )
-            )
+              .asRuntimeException()
           )
       }
     } yield TaskSuccess("expired accepted transfer offer")

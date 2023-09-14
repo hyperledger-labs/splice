@@ -20,7 +20,7 @@ export const useBalanceUpdates = (
           group.payload.id.unpack,
           group.payload.owner
         )
-      ).balanceUpdates;
+      ).balance_updates;
       return balanceUpdates.reverse().map(c => Contract.decodeOpenAPI(c, BalanceUpdate));
     },
   });

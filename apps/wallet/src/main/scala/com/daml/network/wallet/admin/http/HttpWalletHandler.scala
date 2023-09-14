@@ -34,7 +34,7 @@ import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.retry.RetryUtil.*
 import io.circe.Json
 import io.grpc.protobuf.StatusProto
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -652,11 +652,11 @@ class HttpWalletHandler(
     actual match {
       case result: ExpectedCOO if clazz.isInstance(result) => process(result)
       case failedOperation: coinoperationoutcome.COO_Error =>
-        throw new StatusRuntimeException(
-          Status.FAILED_PRECONDITION.withDescription(
+        throw Status.FAILED_PRECONDITION
+          .withDescription(
             s"the coin operation failed with a Daml exception: ${failedOperation}."
           )
-        )
+          .asRuntimeException()
       case _ =>
         ErrorUtil.internalErrorGrpc(
           s"expected to receive a coin operation outcome of type $clazz or `COO_Error` but received type ${actual.getClass} with value: $actual"

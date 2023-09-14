@@ -64,7 +64,7 @@ const Home: React.FC = () => {
           const domainId = rules.domainId;
           if (
             !requestedInstalls.find(requested => requested === domainId) &&
-            !installs.data.find(install => install.domainId === domainId)
+            !installs.data.find(install => install.domain_id === domainId)
           ) {
             console.debug(
               `SplitwellInstall not found for domain ${domainId}, creating SplitwellInstallRequest`

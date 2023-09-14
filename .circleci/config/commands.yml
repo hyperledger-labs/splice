@@ -252,8 +252,9 @@ commands:
           # - The branch name
           # - The NPM package lock file
           # - OpenAPI definitions, since we do not currently version them, so cannot rely on their version number in package-lock
+          # - The BuildCommon sbt file, because it has settings that may affect openapi-typescript generation
           # - rev: to allow for updating the cache when sources have changed
-          key: &frontend_npm_install_key frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} rev:{{ .Revision }}
+          key: &frontend_npm_install_key frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} rev:{{ .Revision }}
           paths:
             - /tmp/npm_install
 
@@ -269,9 +270,9 @@ commands:
             # Try to download a cache with an exact match
             - *frontend_npm_install_key
             # Then, try to download a cache from the same branch
-            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }}
+            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} buildcommon:{{ checksum "project/BuildCommon.scala" }}
             # Then, try to download a cache from main branch
-            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:main package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }}
+            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:main package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} buildcommon:{{ checksum "project/BuildCommon.scala" }}
       - run:
           name: Extracting archive of npm dependencies
           command: |
@@ -1041,6 +1042,11 @@ commands:
         default: C05DT77QF5M
     steps:
       - set-failed-parallel-run-url
+      - run:
+          name: Dump input sent to slack/notify
+          command: |
+            echo "Sending the following as input to slack/notify"
+            echo "{ \"text\": \"*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)\" }"
       # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
       # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
       - slack/notify:

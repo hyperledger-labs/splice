@@ -11,10 +11,10 @@ const useGetCoinRules = (): UseQueryResult<Contract<CoinRules>> => {
     queryKey: ['scan-api', 'getCoinRules', CoinRules],
     queryFn: async () => {
       const response = await scanClient.getCoinRules({});
-      if (!response.coinRulesUpdate.contract) {
+      if (!response.coin_rules_update.contract) {
         throw new Error(`There was no CoinRules contract in response: ${JSON.stringify(response)}`);
       }
-      return Contract.decodeOpenAPI(response.coinRulesUpdate.contract, CoinRules);
+      return Contract.decodeOpenAPI(response.coin_rules_update.contract, CoinRules);
     },
   });
 };

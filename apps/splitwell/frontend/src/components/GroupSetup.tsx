@@ -52,7 +52,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
     (rawValue: string) => {
       try {
         const decodedInvite = JSON.parse(rawValue);
-        const inviteContract = Contract.decodeOpenAPI(decodedInvite, GroupInvite);
+        const inviteContract = Contract.fromJsonString<GroupInvite>(rawValue);
         const inviteDomainId = (decodedInvite as { domainId: string }).domainId;
         const inviteRules = rulesMap.get(inviteDomainId);
         setGroupInvite({
@@ -85,6 +85,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
         inviteContract: { contract: inviteContract, domainId: inviteDomainId },
         rules: inviteRules,
       } = groupInvite;
+
       joinGroup.mutate({
         party,
         provider,

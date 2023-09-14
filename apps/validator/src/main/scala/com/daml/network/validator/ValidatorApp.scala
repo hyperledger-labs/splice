@@ -68,7 +68,7 @@ import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerCon
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -247,11 +247,11 @@ class ValidatorApp(
         _ <- validatorLicenseResult match {
           case QueryResult(_, Some(_)) => Future.successful(())
           case _ =>
-            throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription(
+            throw Status.NOT_FOUND
+              .withDescription(
                 show"ValidatorLicense for ${store.key.validatorParty}"
               )
-            )
+              .asRuntimeException()
         }
       } yield (),
       logger,

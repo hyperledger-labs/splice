@@ -16,7 +16,7 @@ export const useSplitwellDomains = (): UseQueryResult<SplitwellDomains> => {
       const domainsResponse = await splitwellClient.getSplitwellDomainIds();
       const domains: SplitwellDomains = {
         preferred: domainsResponse.preferred,
-        others: domainsResponse.otherDomainIds,
+        others: domainsResponse.other_domain_ids,
       };
       console.debug(`Splitwell domains from provider: ${JSON.stringify(domains)}`);
       return domains;

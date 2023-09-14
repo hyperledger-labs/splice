@@ -30,7 +30,7 @@ export const useSplitwellInstalls = (): UseQueryResult<SplitwellInstall[]> => {
           d => splitwellDomainIds.preferred === d || splitwellDomainIds.others.includes(d)
         );
         const connectedDomainsWithoutInstall = connectedSplitwellDomainIds.filter(
-          connected => !data.find(installed => connected === installed.domainId)
+          connected => !data.find(installed => connected === installed.domain_id)
         );
         if (connectedDomainsWithoutInstall.length === 0) {
           console.debug(

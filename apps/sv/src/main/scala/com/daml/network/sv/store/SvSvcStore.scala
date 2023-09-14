@@ -42,7 +42,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -131,9 +131,7 @@ trait SvSvcStore
   ): Future[AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
     lookupSvcRules().map(
       _.getOrElse(
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription("No active SvcRules contract")
-        )
+        throw Status.NOT_FOUND.withDescription("No active SvcRules contract").asRuntimeException()
       )
     )
 
@@ -167,9 +165,7 @@ trait SvSvcStore
   ): Future[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
     lookupCoinRules().map(
       _.map(_.contract).getOrElse(
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription("No active CoinRules contract")
-        )
+        throw Status.NOT_FOUND.withDescription("No active CoinRules contract").asRuntimeException()
       )
     )
 
@@ -192,9 +188,7 @@ trait SvSvcStore
   ): Future[Contract[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]] =
     lookupCnsRules().map(
       _.map(_.contract).getOrElse(
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription("No active CnsRules contract")
-        )
+        throw Status.NOT_FOUND.withDescription("No active CnsRules contract").asRuntimeException()
       )
     )
 
@@ -234,9 +228,9 @@ trait SvSvcStore
   ): Future[SvSvcStore.OpenMiningRoundTriple] =
     lookupOpenMiningRoundTriple().map(
       _.getOrElse(
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription("No triple of OpenMiningRound contracts")
-        )
+        throw Status.NOT_FOUND
+          .withDescription("No triple of OpenMiningRound contracts")
+          .asRuntimeException()
       )
     )
 
@@ -254,9 +248,9 @@ trait SvSvcStore
       tc: TraceContext,
   ): Future[SvSvcStore.OpenMiningRound[AssignedContract]] = lookupLatestActiveOpenMiningRound().map(
     _.getOrElse(
-      throw new StatusRuntimeException(
-        Status.NOT_FOUND.withDescription("No active OpenMiningRound contract")
-      )
+      throw Status.NOT_FOUND
+        .withDescription("No active OpenMiningRound contract")
+        .asRuntimeException()
     )
   )
 

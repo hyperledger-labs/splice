@@ -41,9 +41,9 @@ const Timespan: React.FC<{ timespan: openapi.Timespan }> = ({ timespan }) => (
 const ReleaseConfiguration: React.FC<{ config: openapi.ReleaseConfiguration }> = ({ config }) => {
   return (
     <Stack sx={{ margin: '20px' }} spacing={2} className="release-configuration">
-      <Timespan timespan={config.requiredFor} />
+      <Timespan timespan={config.required_for} />
       <Stack direction="row">
-        <Typography variant="h6">Release version: {config.releaseVersion}</Typography>
+        <Typography variant="h6">Release version: {config.release_version}</Typography>
       </Stack>
       <Typography variant="h6">Required Domains</Typography>
       <Table>
@@ -84,14 +84,14 @@ const UnapprovedReleaseConfiguration: React.FC<{
   const approveAppReleaseConfiguration = useApproveAppReleaseConfiguration();
   return (
     <Card variant="outlined" className="unapproved-release-configuration">
-      <ReleaseConfiguration config={config.releaseConfiguration} />
+      <ReleaseConfiguration config={config.release_configuration} />
       <Button
         className="approve-release-configuration-button"
         onClick={() =>
           approveAppReleaseConfiguration.mutate({
             provider,
-            configurationVersion,
-            releaseConfigurationIndex: config.releaseConfigurationIndex,
+            configuration_version: configurationVersion,
+            release_configuration_index: config.release_configuration_index,
           })
         }
       >
@@ -109,7 +109,7 @@ const InstalledApp: React.FC<{ app: openapi.InstalledApp }> = ({ app }) => {
       wallet: config.services.wallet.uiUrl,
       clientId: app.provider,
     },
-    app.latestConfiguration.uiUri
+    app.latest_configuration.ui_uri
   );
   const client = useAppManagerClient();
   const onLaunch = async (e: React.MouseEvent) => {
@@ -119,19 +119,19 @@ const InstalledApp: React.FC<{ app: openapi.InstalledApp }> = ({ app }) => {
   return (
     <Card className="installed-app" variant="outlined">
       <CardContent>
-        <Typography className="installed-app-name">{app.latestConfiguration.name}</Typography>
+        <Typography className="installed-app-name">{app.latest_configuration.name}</Typography>
         <DirectoryEntry partyId={app.provider} />
         <Typography variant="h5">Unapproved Release Configurations</Typography>
-        {app.unapprovedReleaseConfigurations.map((config, i) => (
+        {app.unapproved_release_configurations.map((config, i) => (
           <UnapprovedReleaseConfiguration
             key={i}
             config={config}
             provider={app.provider}
-            configurationVersion={app.latestConfiguration.version}
+            configurationVersion={app.latest_configuration.version}
           />
         ))}
         <Typography variant="h5">Approved Release Configurations</Typography>
-        {app.approvedReleaseConfigurations.map((config, i) => (
+        {app.approved_release_configurations.map((config, i) => (
           <ApprovedReleaseConfiguration key={i} config={config} />
         ))}
       </CardContent>

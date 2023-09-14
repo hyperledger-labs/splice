@@ -781,9 +781,7 @@ class CNLedgerConnection(
           if (missing.isEmpty) {
             ()
           } else {
-            throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription(show"packages for $missing")
-            )
+            throw Status.NOT_FOUND.withDescription(show"packages for $missing").asRuntimeException()
           }
         },
         logger,

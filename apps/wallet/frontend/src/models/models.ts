@@ -23,9 +23,9 @@ export interface WalletBalance {
 }
 
 export interface TransactionSubtype {
-  templateId: string;
+  template_id: string;
   choice: string;
-  coinOperation?: string;
+  coin_operation?: string;
 }
 
 export type Transaction = Transfer | BalanceChange | Notification | Unknown;

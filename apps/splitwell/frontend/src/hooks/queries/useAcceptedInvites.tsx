@@ -16,7 +16,7 @@ export const useAcceptedInvites = (
     queryKey: ['acceptedInvites', groupId, party],
     queryFn: async () => {
       const invites = (await splitwellClient.listAcceptedGroupInvites(party, groupId))
-        .acceptedGroupInvites;
+        .accepted_group_invites;
       return invites.map(c => Contract.decodeOpenAPI(c, AcceptedGroupInvite));
     },
     structuralSharing: (oldData, newData) =>

@@ -512,9 +512,10 @@ object RetryProvider {
     ): ErrorKind = {
       val errorKind = outcome match {
         case Failure(
-              ex @ GrpcException(status @ GrpcStatus(statusCode, Some(description)), trailers)
+              ex @ GrpcException(status @ GrpcStatus(statusCode, someDescription), trailers)
             ) =>
-          val errorCategory = ErrorCodeUtils.errorCategoryFromString(description)
+          val description = someDescription.getOrElse("No description provided")
+          val errorCategory = someDescription.flatMap(ErrorCodeUtils.errorCategoryFromString)
           val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
           val errorDetails = ErrorDetails.from(statusProto)
 

@@ -8,8 +8,8 @@ export const useCoinPriceVotes = (): UseQueryResult<CoinPriceVote[]> => {
   return useQuery({
     queryKey: ['listCoinPriceVotes'],
     queryFn: async () => {
-      const { coinPriceVotes } = await listCoinPriceVotes();
-      return coinPriceVotes.map(vote => {
+      const { coin_price_votes } = await listCoinPriceVotes();
+      return coin_price_votes.map(vote => {
         return {
           sv: vote.payload.sv,
           coinPrice: vote.payload.coinPrice,

@@ -173,7 +173,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
   switch (subtype.choice) {
     case 'WalletAppInstall_ExecuteBatch':
       // WalletAutomation
-      switch (subtype.coinOperation) {
+      switch (subtype.coin_operation) {
         case 'CO_CompleteAcceptedTransfer':
           text = 'P2P Payment Failed';
           break;

@@ -7,7 +7,7 @@ export const buildSplitwellMock = (splitwellUrl: string): RestHandler[] => [
     (_, res, ctx) => {
       return res(
         ctx.json({
-          providerPartyId:
+          provider_party_id:
             'splitwell__provider::122087c9aa69ea8ab1b674bbb7c39e47d03c15b6ffaf7343b58b4a6b71c9d9fc6ce1',
         })
       );

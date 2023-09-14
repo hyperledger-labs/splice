@@ -9,7 +9,7 @@ import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -144,7 +144,7 @@ private[validator] object ValidatorUtil {
         ) {
           val msg = s"Tried to offboard the validator's user: $endUserName"
           logger.warn(msg)
-          Future.failed(new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription(msg)))
+          Future.failed(Status.INVALID_ARGUMENT.withDescription(msg).asRuntimeException())
         } else {
           Future.unit
         }
