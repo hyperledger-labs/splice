@@ -252,8 +252,9 @@ commands:
           # - The branch name
           # - The NPM package lock file
           # - OpenAPI definitions, since we do not currently version them, so cannot rely on their version number in package-lock
+          # - The BuildCommon sbt file, because it has settings that may affect openapi-typescript generation
           # - rev: to allow for updating the cache when sources have changed
-          key: &frontend_npm_install_key frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} rev:{{ .Revision }}
+          key: &frontend_npm_install_key frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} rev:{{ .Revision }}
           paths:
             - /tmp/npm_install
 
@@ -269,9 +270,9 @@ commands:
             # Try to download a cache with an exact match
             - *frontend_npm_install_key
             # Then, try to download a cache from the same branch
-            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} build-common:{{ checksum "project/BuildCommon.scala" }}
+            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} buildcommon:{{ checksum "project/BuildCommon.scala" }}
             # Then, try to download a cache from main branch
-            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:main package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} build-common:{{ checksum "project/BuildCommon.scala" }}
+            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:main package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} buildcommon:{{ checksum "project/BuildCommon.scala" }}
       - run:
           name: Extracting archive of npm dependencies
           command: |
