@@ -48,15 +48,15 @@ const ReleaseConfigurationEditor: React.FC<ReleaseConfigurationEditorProps> = ({
           inputProps={{ className: 'release-config-release-version-input' }}
           label="Release version"
           type="text"
-          value={data.releaseVersion}
-          onChange={e => onChange({ ...data, releaseVersion: e.target.value })}
+          value={data.release_version}
+          onChange={e => onChange({ ...data, release_version: e.target.value })}
         />
         <DesktopDateTimePicker
           label={`Enter start time`}
-          value={data.requiredFor._from}
+          value={data.required_for._from}
           readOnly={false}
           onChange={date =>
-            onChange({ ...data, requiredFor: { ...data.requiredFor, _from: date || undefined } })
+            onChange({ ...data, required_for: { ...data.required_for, _from: date || undefined } })
           }
           slotProps={{
             textField: {
@@ -67,10 +67,10 @@ const ReleaseConfigurationEditor: React.FC<ReleaseConfigurationEditorProps> = ({
         />
         <DesktopDateTimePicker
           label={`Enter end time`}
-          value={data.requiredFor.to}
+          value={data.required_for.to}
           readOnly={false}
           onChange={date =>
-            onChange({ ...data, requiredFor: { ...data.requiredFor, to: date || undefined } })
+            onChange({ ...data, required_for: { ...data.required_for, to: date || undefined } })
           }
           slotProps={{
             textField: {
@@ -99,18 +99,18 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({ data, 
   const onReleaseConfigChange = (releaseConfig: openapi.ReleaseConfiguration, i: number) =>
     onChange({
       ...data,
-      releaseConfigurations: [
-        ...data.releaseConfigurations.slice(0, i),
+      release_configurations: [
+        ...data.release_configurations.slice(0, i),
         releaseConfig,
-        ...data.releaseConfigurations.slice(i + 1),
+        ...data.release_configurations.slice(i + 1),
       ],
     });
   const onAddReleaseConfiguration = () =>
     onChange({
       ...data,
-      releaseConfigurations: [
-        ...data.releaseConfigurations,
-        { domains: [], releaseVersion: '', requiredFor: {} },
+      release_configurations: [
+        ...data.release_configurations,
+        { domains: [], release_version: '', required_for: {} },
       ],
     });
 
@@ -130,19 +130,19 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({ data, 
             inputProps={{ className: 'app-config-ui-url-input' }}
             label="App UI URL"
             type="text"
-            value={data.uiUri}
-            onChange={e => onChange({ ...data, uiUri: e.target.value })}
+            value={data.ui_uri}
+            onChange={e => onChange({ ...data, ui_uri: e.target.value })}
           />
           {/* We don't have a UI design. Auth0 uses a text area for the "Allowed Callback URLS", so for now this works. */}
           <TextField
             inputProps={{ className: 'app-config-allowed-redirect-uris' }}
             label="Allowed Redirect URIs (comma-separated)"
             type="text"
-            value={data.allowedRedirectUris.join(',')}
+            value={data.allowed_redirect_uris.join(',')}
             onChange={e =>
               onChange({
                 ...data,
-                allowedRedirectUris: e.target.value.replace(/\s/g, '').split(','),
+                allowed_redirect_uris: e.target.value.replace(/\s/g, '').split(','),
               })
             }
           />
@@ -151,7 +151,7 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({ data, 
             <Button className="add-release-configuration" onClick={onAddReleaseConfiguration}>
               Add release configuration
             </Button>
-            {data.releaseConfigurations.map((config, i) => (
+            {data.release_configurations.map((config, i) => (
               <ReleaseConfigurationEditor
                 data={config}
                 onChange={data => onReleaseConfigChange(data, i)}

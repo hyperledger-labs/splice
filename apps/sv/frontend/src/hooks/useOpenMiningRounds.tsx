@@ -9,8 +9,8 @@ export const useOpenMiningRounds = (): UseQueryResult<Contract<OpenMiningRound>[
   return useQuery({
     queryKey: ['listOpenMiningRounds'],
     queryFn: async () => {
-      const { openMiningRounds } = await listOpenMiningRounds();
-      return openMiningRounds;
+      const { open_mining_rounds } = await listOpenMiningRounds();
+      return open_mining_rounds;
     },
   });
 };

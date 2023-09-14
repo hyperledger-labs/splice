@@ -9,7 +9,7 @@ import {
   TitledTable,
 } from 'common-frontend';
 import { useRecentActivity } from 'common-frontend/scan-api';
-import { ListRecentActivityResponseItem, PartyAndAmount } from 'scan-openapi';
+import { ListRecentActivityResponseItem } from 'scan-openapi';
 
 import { Button, Stack, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import Typography from '@mui/material/Typography';
@@ -53,9 +53,7 @@ export const RecentActivityTable: React.FC = () => {
             {pagedActivities.map(
               activities =>
                 activities &&
-                activities.map(activity => (
-                  <ActivityRow key={'activity-' + activity.eventId} activity={activity} />
-                ))
+                activities.map(activity => <ActivityRow key={activity.event_id} {...activity} />)
             )}
           </TableBody>
         </TitledTable>
@@ -98,16 +96,13 @@ const ViewMoreButton: React.FC<ViewMoreButtonProps> = ({ loadMore, label, disabl
 
 export default RecentActivityTable;
 
-const ActivityRow: React.FC<{
-  activity: {
-    activityType: string;
-    provider: string;
-    sender: PartyAndAmount;
-    receivers: PartyAndAmount[];
-    coinPrice: string;
-  };
-}> = ({ activity }) => {
-  const { activityType, provider, receivers, sender, coinPrice } = activity;
+const ActivityRow: React.FC<ListRecentActivityResponseItem> = ({
+  activity_type,
+  provider,
+  receivers,
+  sender,
+  coin_price,
+}) => {
   let receiver;
   let receiversTotalAmount;
   if (receivers.length === 0) {
@@ -132,7 +127,7 @@ const ActivityRow: React.FC<{
     <TableRow>
       <TableCell>
         <Typography className="activity_type" variant="body1">
-          {activityType}
+          {activity_type}
         </Typography>
       </TableCell>
       <TableCell>
@@ -149,7 +144,7 @@ const ActivityRow: React.FC<{
         <RecentAmountDisplay amountCC={BigNumber(receiversTotalAmount)} />
       </TableCell>
       <TableCell align="right">
-        <RateDisplay base="CC" quote="USD" coinPrice={BigNumber(coinPrice)} />
+        <RateDisplay base="CC" quote="USD" coinPrice={BigNumber(coin_price)} />
       </TableCell>
     </TableRow>
   );

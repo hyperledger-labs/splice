@@ -9,8 +9,8 @@ export const useValidatorOnboardings = (): UseQueryResult<Contract<ValidatorOnbo
   return useQuery({
     queryKey: ['listOngoingValidatorOnboardings'],
     queryFn: async () => {
-      const { ongoingValidatorOnboardings } = await listOngoingValidatorOnboardings();
-      return ongoingValidatorOnboardings;
+      const { ongoing_validator_onboardings } = await listOngoingValidatorOnboardings();
+      return ongoing_validator_onboardings.map(c => Contract.decodeOpenAPI(c, ValidatorOnboarding));
     },
   });
 };

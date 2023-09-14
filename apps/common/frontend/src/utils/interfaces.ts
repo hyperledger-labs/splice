@@ -28,11 +28,12 @@ export interface AssignedContract<T> {
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const Contract = {
+  // TODO(#7670) - try to improve type safety of openAPI contract decoding
   decodeOpenAPI: <T extends object, K, I extends string>(
     c: OpenAPIContract,
     tmpl: ContractTypeCompanion<T, K, I>
   ): Contract<T> => ({
-    contractId: c.contractId as ContractId<T>,
+    contractId: c.contract_id as ContractId<T>,
     payload: tmpl.decoder.runWithException(c.payload),
     metadata: {
       createdAt: c.metadata.createdAt,
@@ -49,6 +50,8 @@ export const Contract = {
     payload: tmpl.encode(c.payload),
     metadata: c.metadata,
   }),
+  // TODO(#7670) -- trust that our json string is valid, perhaps eventually use zod to validate
+  fromJsonString: <T extends object>(j: string): Contract<T> => JSON.parse(j),
 };
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
@@ -59,7 +62,7 @@ export const AssignedContract = {
     tmpl: Template<T, K>
   ): AssignedContract<T> | undefined {
     const c = cws.contract;
-    const domainId = cws.domainId;
+    const domainId = cws.domain_id;
     return c && domainId ? { contract: Contract.decodeOpenAPI(c, tmpl), domainId } : undefined;
   },
 
@@ -69,7 +72,7 @@ export const AssignedContract = {
   ): AssignedContract<T> {
     return {
       contract: Contract.decodeOpenAPI(contract.contract, tmpl),
-      domainId: contract.domainId,
+      domainId: contract.domain_id,
     };
   },
 };

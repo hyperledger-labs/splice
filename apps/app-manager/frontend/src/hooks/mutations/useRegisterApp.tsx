@@ -13,15 +13,15 @@ export type RegisterAppRequest = {
 const encodeConfiguration = (configuration: AppConfiguration) => ({
   version: configuration.version,
   name: configuration.name,
-  ui_uri: configuration.uiUri,
-  allowed_redirect_uris: configuration.allowedRedirectUris,
-  release_configurations: configuration.releaseConfigurations.map(encodeReleaseConfiguration),
+  ui_uri: configuration.ui_uri,
+  allowed_redirect_uris: configuration.allowed_redirect_uris,
+  release_configurations: configuration.release_configurations.map(encodeReleaseConfiguration),
 });
 
 const encodeReleaseConfiguration = (configuration: ReleaseConfiguration) => ({
-  release_version: configuration.releaseVersion,
+  release_version: configuration.release_version,
   domains: configuration.domains,
-  required_for: configuration.requiredFor,
+  required_for: configuration.required_for,
 });
 
 export const useRegisterApp = (): UseMutationResult<void, unknown, RegisterAppRequest, unknown> => {

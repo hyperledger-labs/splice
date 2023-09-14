@@ -13,6 +13,6 @@ export const useVoteRequest = (
   return useQuery({
     queryKey: ['listSvcRulesVoteRequests', contractId],
     queryFn: async () =>
-      contractId ? (await lookupSvcRulesVoteRequest(contractId)).svcRulesVoteRequest : undefined,
+      contractId ? (await lookupSvcRulesVoteRequest(contractId)).svc_rules_vote_request : undefined,
   });
 };

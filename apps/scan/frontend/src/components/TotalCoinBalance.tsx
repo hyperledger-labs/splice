@@ -16,7 +16,7 @@ export const TotalCoinBalance: React.FC = () => {
       return (
         <AmountSummary
           title="Total Coin Balance"
-          amount={new BigNumber(totalCoinBalanceQuery.data.totalBalance)}
+          amount={new BigNumber(totalCoinBalanceQuery.data.total_balance)}
           idCC="total-coin-balance-cc"
         />
       );

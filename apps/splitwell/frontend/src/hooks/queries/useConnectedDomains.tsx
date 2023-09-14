@@ -14,7 +14,7 @@ export const useConnectedDomains = (): UseQueryResult<string[] | null> => {
       if (primaryPartyId) {
         console.debug('Querying for connected domains');
         const response = await splitwellClient.getConnectedDomains(primaryPartyId);
-        const domainIds = response.domainIds;
+        const domainIds = response.domain_ids;
         console.debug(`Connected domains: ${domainIds}`);
         return domainIds;
       } else {

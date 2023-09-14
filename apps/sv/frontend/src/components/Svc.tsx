@@ -132,7 +132,7 @@ function getCometBftDebugData(
       <JSONPretty
         id="comet-bft-debug-abci"
         style={{ fontSize: '10pt' }}
-        data={data.response?.abciInfo}
+        data={data.response?.abci_info}
         theme={JSONPrettyMon}
       />
       <JSONPretty
@@ -150,7 +150,7 @@ function getCometBftDebugData(
       <JSONPretty
         id="comet-bft-debug-network"
         style={{ fontSize: '10pt' }}
-        data={data.response?.networkInfo}
+        data={data.response?.network_info}
         theme={JSONPrettyMon}
       />
     </div>
@@ -167,7 +167,7 @@ const StatusDisplay: React.FC<{ status: UseQueryResult<NodeStatus> }> = ({ statu
 
   const data = status.data;
 
-  if (data.notInitialized) {
+  if (data.not_initialized) {
     return <div>Not initialized</div>;
   }
 

@@ -339,9 +339,9 @@ commands:
             # Try to download a cache with an exact match
             - *frontend_npm_install_key
             # Then, try to download a cache from the same branch
-            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }}
+            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} build-common:{{ checksum "project/BuildCommon.scala" }}
             # Then, try to download a cache from main branch
-            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:main package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }}
+            - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:main package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} build-common:{{ checksum "project/BuildCommon.scala" }}
       - run:
           name: Extracting archive of npm dependencies
           command: |

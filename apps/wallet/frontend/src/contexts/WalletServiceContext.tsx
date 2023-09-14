@@ -126,7 +126,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
     return {
       list: async (): Promise<ListResponse> => {
         const res = await walletClient.list();
-        return { coins: res.coins, lockedCoins: res.lockedCoins };
+        return { coins: res.coins, lockedCoins: res.locked_coins };
       },
       tap: async amount => {
         const request = { amount: amount };
@@ -135,36 +135,36 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       getBalance: async (): Promise<WalletBalance> => {
         const balance = await walletClient.getBalance();
         return {
-          availableCC: new BigNumber(balance.effectiveUnlockedQty),
+          availableCC: new BigNumber(balance.effective_unlocked_qty),
         };
       },
-      listTransactions: async (beginAfterId?: string): Promise<Transaction[]> => {
-        const request: ListTransactionsRequest = { pageSize: 10, beginAfterId };
+      listTransactions: async (begin_after_id?: string): Promise<Transaction[]> => {
+        const request: ListTransactionsRequest = { page_size: 10, begin_after_id };
         const response = await walletClient.listTransactions(request);
         return response.items.flatMap<Transaction>(item => {
-          const id = item.eventId;
+          const id = item.event_id;
           const receivers = (item.receivers || []).map(r => ({
             amount: new BigNumber(r.amount),
             party: r.party,
           }));
-          const { date, transactionSubtype } = item;
+          const { date, transaction_subtype } = item;
 
-          if (item.transactionType === 'balance_change') {
-            const coinPrice = new BigNumber(item.coinPrice!);
+          if (item.transaction_type === 'balance_change') {
+            const coinPrice = new BigNumber(item.coin_price!);
             const balanceChange: BalanceChange = {
               transactionType: 'balance_change',
-              transactionSubtype,
+              transactionSubtype: transaction_subtype,
               id,
               date,
               receivers,
               coinPrice,
             };
             return [balanceChange];
-          } else if (item.transactionType === 'transfer') {
-            const coinPrice = new BigNumber(item.coinPrice!);
+          } else if (item.transaction_type === 'transfer') {
+            const coinPrice = new BigNumber(item.coin_price!);
             const transfer: Transfer = {
               transactionType: 'transfer',
-              transactionSubtype,
+              transactionSubtype: transaction_subtype,
               id,
               date,
               receivers,
@@ -175,19 +175,19 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
               coinPrice,
             };
             return [transfer];
-          } else if (item.transactionType === 'notification') {
+          } else if (item.transaction_type === 'notification') {
             const notification: Notification = {
               transactionType: 'notification',
-              transactionSubtype,
+              transactionSubtype: transaction_subtype,
               id,
               date,
               details: item.details!,
             };
             return [notification];
-          } else if (item.transactionType === 'unknown') {
+          } else if (item.transaction_type === 'unknown') {
             const unknown: Unknown = {
               transactionType: 'unknown',
-              transactionSubtype,
+              transactionSubtype: transaction_subtype,
               id,
               date,
             };
@@ -200,11 +200,11 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       createTransferOffer: async (receiverPartyId, amount, description, expiresAt, trackingId) => {
         const request = {
-          receiverPartyId: receiverPartyId,
+          receiver_party_id: receiverPartyId,
           amount: amount.isInteger() ? amount.toFixed(1) : amount.toString(),
           description: description,
-          expiresAt: expiresAt.getTime() * 1000,
-          trackingId: trackingId,
+          expires_at: expiresAt.getTime() * 1000,
+          tracking_id: trackingId,
         };
         await externalWalletClient.createTransferOffer(request);
       },
@@ -226,7 +226,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       listAcceptedTransferOffers: async (): Promise<ListAcceptedTransferOffersResponse> => {
         const res = await walletClient.listAcceptedTransferOffers();
         return {
-          acceptedOffersList: res.acceptedOffers.map(c =>
+          acceptedOffersList: res.accepted_offers.map(c =>
             Contract.decodeOpenAPI(c, AcceptedTransferOffer)
           ),
         };
@@ -258,7 +258,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       listSubscriptionRequests: async (): Promise<ListSubscriptionRequestsResponse> => {
         const res = await walletClient.listSubscriptionRequests();
         return {
-          subscriptionRequestsList: res.subscriptionRequests.map(sr => {
+          subscriptionRequestsList: res.subscription_requests.map(sr => {
             const subscription = Contract.decodeOpenAPI(
               sr.subscriptionRequest,
               SubscriptionRequest
@@ -297,9 +297,9 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       userStatus: async () => {
         const res = await walletClient.userStatus();
         return {
-          userOnboarded: res.userOnboarded,
-          userWalletInstalled: res.userWalletInstalled,
-          partyId: res.partyId,
+          userOnboarded: res.user_onboarded,
+          userWalletInstalled: res.user_wallet_installed,
+          partyId: res.party_id,
         };
       },
       selfGrantFeaturedAppRights: async () => {

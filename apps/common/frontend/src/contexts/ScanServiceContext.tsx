@@ -39,12 +39,12 @@ export const ScanClientProvider: React.FC<React.PropsWithChildren<ScanProps>> = 
     return {
       getCoinPrice: async () => {
         const request: GetOpenAndIssuingMiningRoundsRequest = {
-          cachedOpenMiningRoundContractIds: [],
-          cachedIssuingRoundContractIds: [],
+          cached_open_mining_round_contract_ids: [],
+          cached_issuing_round_contract_ids: [],
         };
         const openAndIssuingMiningRounds = await scanClient.getOpenAndIssuingMiningRounds(request);
 
-        const openOpenRounds = Object.values(openAndIssuingMiningRounds.openMiningRounds)
+        const openOpenRounds = Object.values(openAndIssuingMiningRounds.open_mining_rounds)
           .map(mybCached => Contract.decodeOpenAPI(mybCached.contract!, OpenMiningRound))
           .filter(omr => Date.parse(omr.payload.opensAt) <= Date.now());
 
@@ -59,23 +59,23 @@ export const ScanClientProvider: React.FC<React.PropsWithChildren<ScanProps>> = 
       },
       getCoinRules: async () => {
         const response = await scanClient.getCoinRules({});
-        if (!response.coinRulesUpdate.contract) {
+        if (!response.coin_rules_update.contract) {
           throw new Error(
             `There was no coin rules contract in response: ${JSON.stringify(response)}`
           );
         }
-        return Contract.decodeOpenAPI(response.coinRulesUpdate.contract, CoinRules);
+        return Contract.decodeOpenAPI(response.coin_rules_update.contract, CoinRules);
       },
       lookupFeaturedAppRight: async (partyId: Party) => {
         const response = await scanClient.lookupFeaturedAppRight(partyId);
         return (
-          response.featuredAppRight &&
-          Contract.decodeOpenAPI(response.featuredAppRight, FeaturedAppRight)
+          response.featured_app_right &&
+          Contract.decodeOpenAPI(response.featured_app_right, FeaturedAppRight)
         );
       },
       getSvcPartyId: async () => {
         const response = await scanClient.getSvcPartyId();
-        return response.svcPartyId;
+        return response.svc_party_id;
       },
     };
   }, [url]);

@@ -1,25 +1,24 @@
 import { UseMutationResult, useMutation } from '@tanstack/react-query';
+import { ApproveAppReleaseConfigurationRequest } from 'validator-openapi';
 
 import { useAppManagerAdminClient } from '../../contexts/AppManagerServiceContext';
 
-export type ApproveAppReleaseConfigurationRequest = {
+type Request = ApproveAppReleaseConfigurationRequest & {
   provider: string;
-  configurationVersion: number;
-  releaseConfigurationIndex: number;
 };
 
 export const useApproveAppReleaseConfiguration = (): UseMutationResult<
   void,
   unknown,
-  ApproveAppReleaseConfigurationRequest,
+  Request,
   unknown
 > => {
   const appManagerClient = useAppManagerAdminClient();
   return useMutation({
-    mutationFn: async ({ provider, configurationVersion, releaseConfigurationIndex }) => {
+    mutationFn: async ({ provider, configuration_version, release_configuration_index }) => {
       await appManagerClient.approveAppReleaseConfiguration(provider, {
-        configurationVersion,
-        releaseConfigurationIndex,
+        configuration_version,
+        release_configuration_index,
       });
     },
   });

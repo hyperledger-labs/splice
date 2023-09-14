@@ -15,8 +15,8 @@ const useLookupFeaturedAppRight = (
       const response = await scanClient.lookupFeaturedAppRight(primaryPartyId!);
 
       return (
-        response.featuredAppRight &&
-        Contract.decodeOpenAPI(response.featuredAppRight, FeaturedAppRight)
+        response.featured_app_right &&
+        Contract.decodeOpenAPI(response.featured_app_right, FeaturedAppRight)
       );
     },
     enabled: !!primaryPartyId,

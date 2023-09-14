@@ -11,7 +11,7 @@ export const useGroupInvites = (party: string): UseQueryResult<AssignedContract<
   return useQuery({
     queryKey: ['groupInvites', party],
     queryFn: async () => {
-      const groupInvites = (await splitwellClient.listGroupInvites(party)).groupInvites;
+      const groupInvites = (await splitwellClient.listGroupInvites(party)).group_invites;
       return groupInvites.flatMap(c => {
         const d = AssignedContract.decodeContractWithState(c, GroupInvite);
         return d === undefined ? [] : [d];

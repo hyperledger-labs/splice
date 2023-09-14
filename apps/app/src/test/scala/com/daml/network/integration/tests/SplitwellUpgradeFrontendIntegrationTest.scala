@@ -127,6 +127,7 @@ class SplitwellUpgradeFrontendIntegrationTest
             groupsBefore should have size 2
             groupsBefore
           }
+
           actAndCheck(
             "Alice accepts bob's request",
             click on className("add-user-link") withClue "alice accepts bob's request",
