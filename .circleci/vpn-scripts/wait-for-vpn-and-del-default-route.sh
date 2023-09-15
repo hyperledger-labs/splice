@@ -5,7 +5,7 @@ set -u
 
 count=0
 ret=42
-while [ ${count} -lt 60 ]; do
+while [ ${count} -lt 180 ]; do
   if [ "$(curl checkip.amazonaws.com)" == "$VPN_HOST_IP" ]; then
     echo "Check IP passed"
     ret=0
