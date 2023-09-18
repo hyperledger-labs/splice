@@ -15,7 +15,7 @@ export const TotalRewards: React.FC = () => {
     case 'success':
       return (
         <AmountSummary
-          title="Total Rewards"
+          title="Total App & Validator Rewards"
           amount={new BigNumber(totalRewardsQuery.data.amount)}
           idCC="total-rewards-cc"
         />
