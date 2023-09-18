@@ -2274,18 +2274,21 @@ workflows:
       equal: [ deploy-cilr, << pipeline.parameters.run-job >> ]
     jobs:
     - docker_images_push:
+        <<: *main-branch-only
         <<: *notify-fail
         context:
           - artifactory
           - datadog
           - slack-context
     - wait_for_previous_pipeline:
+        <<: *main-branch-only
         <<: *notify-fail
         context:
           - artifactory
           - slack-context
         workflow_names: "deploy_cilr cilr_health_check"
     - deploy_cluster:
+        <<: *main-branch-only
         context:
           - artifactory
           - datadog
@@ -2296,6 +2299,7 @@ workflows:
            - wait_for_previous_pipeline
     - preflight_check:
         cluster: "cilr"
+        <<: *main-branch-only
         <<: *non_devnet_preflight_params
         context:
           - artifactory
@@ -2306,12 +2310,14 @@ workflows:
           - docker_images_push
           - deploy_cluster
     - publish_public_release:
+        <<: *main-branch-only
         requires:
           - preflight_check
         context:
           - artifactory
           - datadog
     - deploy_sv_runbook:
+          <<: *main-branch-only
           context:
             - artifactory
             - datadog
@@ -2323,6 +2329,7 @@ workflows:
             - preflight_check
             - publish_public_release
     - preflight_sv_check:
+        <<: *main-branch-only
         context:
           - artifactory
           - canton-network-vpn
@@ -2563,6 +2570,7 @@ workflows:
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
+          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
@@ -2570,6 +2578,7 @@ workflows:
           workflow_names: "deploy_cilr"
       - preflight_check:
           cluster: "cilr"
+          <<: *main-branch-only
           <<: *non_devnet_preflight_params
           context:
             - artifactory
