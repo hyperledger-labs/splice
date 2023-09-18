@@ -3,8 +3,12 @@
 Release Notes
 =============
 
-2023-09-18
+2023-09-25
 ----------
+
+* Frontend updates:
+
+    * New history view of past SVC governance votes and actions, listing separately "Action Needed", "In Progress", "Planned", "Executed" and "Rejected" votes.
 
 * Bugfixes:
 
