@@ -1,7 +1,9 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
-import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
+import { envFlag, ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
+
+const enableCloudSql = envFlag('ENABLE_CLOUD_SQL', false);
 
 const project = gcp.organizations.getProjectOutput({});
 
@@ -135,11 +137,9 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
 
 // toplevel
 
-const ENABLE_CLOUD_SQL = 'true' === (process.env.ENABLE_CLOUD_SQL ?? 'false');
-
 export function installPostgres(xns: ExactNamespace, name: string): Postgres {
   let ret: Postgres;
-  if (ENABLE_CLOUD_SQL) {
+  if (enableCloudSql) {
     ret = new CloudPostgres(xns, name);
   } else {
     ret = new CNPostgres(xns, name);
