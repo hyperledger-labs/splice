@@ -9,10 +9,8 @@ import cats.implicits.{
 }
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
-import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.*
-import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.*
@@ -23,12 +21,7 @@ import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvUtil, SvcRulesLock}
-import com.daml.network.util.CNNodeUtil.{
-  defaultCnsConfig,
-  defaultCoinConfig,
-  defaultCoinConfigSchedule,
-  defaultEnabledChoices,
-}
+import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig, defaultEnabledChoices}
 import com.daml.network.util.{AssignedContract, GcpBucket, TemplateJsonDecoder, UploadablePackage}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
@@ -525,47 +518,9 @@ class FoundingNodeInitializer(
                 )
             }
         }
-        _ <- createUpgradedCoinRulesIfEnabled()
       } yield ()
     }
 
-    private def createUpgradedCoinRulesIfEnabled(): Future[Unit] =
-      if (config.enableCoinRulesUpgrade)
-        createUpgradedCoinRules()
-      else
-        Future.unit
-
-    private def createUpgradedCoinRules(): Future[Unit] = {
-      for {
-        _ <- svcStore.lookupCoinRulesV1TestWithOffset().flatMap {
-          case QueryResult(offset, None) =>
-            svcStoreWithIngestion.connection.submitWithResult(
-              actAs = Seq(svcParty),
-              readAs = Seq.empty,
-              update = new ccV1Test.coin.CoinRulesV1Test(
-                svcParty.toProtoPrimitive,
-                defaultCoinConfigSchedule(
-                  foundingConfig.initialTickDuration,
-                  foundingConfig.initialMaxNumInputs,
-                  domainId,
-                ),
-                defaultEnabledChoices,
-                foundingConfig.isDevNet,
-                false,
-              ).create(),
-              commandId = CNLedgerConnection.CommandId(
-                "com.daml.network.svc.initiateCoinRulesUpgrade",
-                Seq(svcParty),
-              ),
-              deduplicationConfig = DedupOffset(offset),
-              domainId = domainId,
-            )
-          case QueryResult(_, Some(_)) =>
-            logger.info("Upgraded CoinRules (V1Test) contract already exists")
-            Future.successful(())
-        }
-      } yield logger.debug("Created an upgraded CoinRules (V1Test) contract")
-    }
   }
 
   // TODO(#5364): inline these methods if they are used only once, or share them properly

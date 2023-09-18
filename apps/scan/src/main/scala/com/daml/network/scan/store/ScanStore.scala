@@ -2,7 +2,6 @@ package com.daml.network.scan.store
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
@@ -46,19 +45,13 @@ trait ScanStore
   protected[this] def scanConfig: ScanAppBackendConfig
 
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter =
-    ScanStore.contractFilter(svcParty, scanConfig)
+    ScanStore.contractFilter(svcParty)
 
   override final def defaultAcsDomain = scanConfig.domains.global.alias
 
   def lookupCoinRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
-
-  def lookupCoinRulesV1Test()(implicit tc: TraceContext): Future[
-    Option[
-      ContractWithState[ccV1Test.coin.CoinRulesV1Test.ContractId, ccV1Test.coin.CoinRulesV1Test]
-    ]
-  ]
 
   def lookupCnsRules()(implicit
       tc: TraceContext
@@ -210,8 +203,7 @@ object ScanStore {
   }
 
   def contractFilter(
-      svcParty: PartyId,
-      scanConfig: ScanAppBackendConfig,
+      svcParty: PartyId
   ): MultiDomainAcsStore.ContractFilter = {
     import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
@@ -229,10 +221,7 @@ object ScanStore {
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
         mkFilter(cc.coinimport.ImportCrate.COMPANION)(co => co.payload.svc == svc),
-      ) ++
-        (if (scanConfig.enableCoinRulesUpgrade)
-           Map(mkFilter(ccV1Test.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc))
-         else Map.empty),
+      ),
     )
   }
 }

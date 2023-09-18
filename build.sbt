@@ -57,16 +57,12 @@ lazy val root = (project in file("."))
     `cn-util-daml`,
     `canton-coin-api-daml`,
     `canton-coin-daml`,
-    `canton-coin-v1test-daml`,
-    `canton-coin-v2test-daml`,
     `canton-name-service-daml`,
     `wallet-payments-daml`,
     `wallet-daml`,
-    `wallet-v1test-daml`,
     `directory-daml`,
     `splitwell-daml`,
     `svc-governance-daml`,
-    `svc-governance-v1test-daml`,
     `validator-lifecycle-daml`,
     `app-manager-daml`,
     `build-tools-dar-lock-checker`,
@@ -189,28 +185,6 @@ lazy val `canton-coin-daml` =
           (`canton-coin-api-daml` / Compile / damlBuild).value,
     )
 
-lazy val `canton-coin-v1test-daml` =
-  project
-    .in(file("daml/upgrade-tests/cc-upgrade-test"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`cn-util-daml` / Compile / damlBuild).value ++
-          (`canton-coin-daml` / Compile / damlBuild).value,
-    )
-
-lazy val `canton-coin-v2test-daml` =
-  project
-    .in(file("daml/upgrade-tests/coin-upgrade-test"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`cn-util-daml` / Compile / damlBuild).value ++
-          (`canton-coin-daml` / Compile / damlBuild).value,
-    )
-
 lazy val `svc-governance-daml` =
   project
     .in(file("daml/svc-governance"))
@@ -223,20 +197,6 @@ lazy val `svc-governance-daml` =
           (`canton-coin-api-daml` / Compile / damlBuild).value ++
           (`canton-name-service-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value,
-    )
-
-lazy val `svc-governance-v1test-daml` =
-  project
-    .in(file("daml/upgrade-tests/svc-governance-upgrade-test"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`svc-governance-daml` / Compile / damlBuild).value ++
-          (`cn-util-daml` / Compile / damlBuild).value ++
-          (`canton-coin-daml` / Compile / damlBuild).value ++
-          (`canton-coin-v1test-daml` / Compile / damlBuild).value ++
-          (`canton-coin-api-daml` / Compile / damlBuild).value,
     )
 
 lazy val `validator-lifecycle-daml` =
@@ -270,19 +230,6 @@ lazy val `wallet-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`canton-coin-daml` / Compile / damlBuild).value ++ (`wallet-payments-daml` / Compile / damlBuild).value,
-    )
-
-lazy val `wallet-v1test-daml` =
-  project
-    .in(file("daml/upgrade-tests/wallet-upgrade-test"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`canton-coin-v1test-daml` / Compile / damlBuild).value ++
-          (`canton-coin-daml` / Compile / damlBuild).value ++
-          (`wallet-payments-daml` / Compile / damlBuild).value ++
-          (`wallet-daml` / Compile / damlBuild).value,
     )
 
 lazy val `directory-daml` =
@@ -329,10 +276,7 @@ lazy val `apps-common` =
       `canton-community-testing` % "test",
       `canton-coin-daml`,
       `canton-name-service-daml`,
-      `canton-coin-v1test-daml`,
-      `canton-coin-v2test-daml`,
       `wallet-daml` % "test",
-      `wallet-v1test-daml` % "test",
       `splitwell-daml` % "test",
     )
     .enablePlugins(BuildInfoPlugin)
@@ -391,7 +335,6 @@ lazy val `apps-validator` =
       `apps-sv` % "compile->compile;test->test",
       `wallet-daml`,
       `apps-wallet`,
-      `canton-coin-v1test-daml`,
       `app-manager-daml`,
     )
     .settings(
@@ -426,7 +369,6 @@ lazy val `apps-sv` =
       `apps-directory`, // Required for the SvSvcStore to also store all CNS entries and related contracts
       `validator-lifecycle-daml`,
       `svc-governance-daml`,
-      `svc-governance-v1test-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(
@@ -722,7 +664,6 @@ lazy val `apps-wallet` =
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
       `wallet-daml`,
-      `canton-coin-v1test-daml`,
       // TODO (#2676) Remove this once we have multi-domain interface support.
       `directory-daml`,
       `splitwell-daml`,
@@ -1063,7 +1004,6 @@ lazy val `apps-app` =
     .dependsOn(
       `wallet-payments-daml`,
       `wallet-daml`,
-      `wallet-v1test-daml`,
       `apps-splitwell`,
       `apps-directory`,
       `apps-validator`,

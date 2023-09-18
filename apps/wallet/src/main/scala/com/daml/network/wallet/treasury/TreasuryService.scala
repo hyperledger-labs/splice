@@ -441,16 +441,9 @@ class TreasuryService(
       tc: TraceContext,
       ec: ExecutionContext,
   ) =
-    if (treasuryConfig.enableCoinRulesUpgrade) {
-      logger.debug("Using upgraded coinRules")
-      for {
-        rules <- scanConnection.getCoinRulesV1Test()
-      } yield (rules, rules.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
-    } else {
-      for {
-        rules <- scanConnection.getCoinRules()
-      } yield (rules, rules.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
-    }
+    for {
+      rules <- scanConnection.getCoinRules()
+    } yield (rules, rules.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
 
   /** Select transfer inputs and transfer context to satisfy the coin operations.
     * Currently, this function selects all unlocked coins and all currently redeemable app- and validator rewards.

@@ -3,13 +3,11 @@ package com.daml.network.scan.store.db
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
-import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn
 import com.daml.network.store.db.AcsTables
 import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanTxLogParser
 import com.daml.network.scan.store.ScanTxLogParser.TxLogIndexRecord
 import com.digitalasset.canton.config.CantonRequireTypes.String3
@@ -29,8 +27,7 @@ object ScanTables extends AcsTables {
   object ScanAcsStoreRowData {
 
     def fromCreatedEvent(
-        createdEvent: CreatedEvent,
-        scanConfig: ScanAppBackendConfig,
+        createdEvent: CreatedEvent
     ): Either[String, ScanAcsStoreRowData] = {
       createdEvent.getTemplateId match {
         case cc.coin.CoinRules.TEMPLATE_ID =>
@@ -47,18 +44,6 @@ object ScanTables extends AcsTables {
           }
         case cn.cns.CnsRules.TEMPLATE_ID =>
           tryToDecode(cn.cns.CnsRules.COMPANION, createdEvent) { contract =>
-            ScanAcsStoreRowData(
-              contract = contract,
-              contractExpiresAt = None,
-              round = None,
-              validator = None,
-              amount = None,
-              importCrateReceiver = None,
-              featuredAppRightProvider = None,
-            )
-          }
-        case ccV1Test.coin.CoinRulesV1Test.TEMPLATE_ID if scanConfig.enableCoinRulesUpgrade =>
-          tryToDecode(ccV1Test.coin.CoinRulesV1Test.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
               contractExpiresAt = None,

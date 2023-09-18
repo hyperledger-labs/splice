@@ -7,7 +7,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cc.coin.{CoinRules_MiningRound_Archive, UnclaimedReward}
-import com.daml.network.codegen.java.cc.{v1test as v1testcc, validatorlicense as vl}
+import com.daml.network.codegen.java.cc.validatorlicense as vl
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CoinRules,
@@ -63,11 +63,9 @@ trait SvSvcStore
     outerLoggerFactory.append("store", "svcParty")
 
   override lazy val acsContractFilter =
-    SvSvcStore.contractFilter(key.svcParty, key.svParty, enableCoinRulesUpgrade)
+    SvSvcStore.contractFilter(key.svcParty, key.svParty)
 
   def key: SvStore.Key
-
-  protected[this] def enableCoinRulesUpgrade: Boolean
 
   def lookupSvcRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[
@@ -145,15 +143,6 @@ trait SvSvcStore
   ] = multiDomainAcsStore
     .findAnyContractWithOffset(cc.coin.CoinRules.COMPANION)
     .map(_.map(_.flatMap(_.toAssignedContract)))
-
-  def lookupCoinRulesV1TestWithOffset(
-  )(implicit tc: TraceContext): Future[
-    QueryResult[Option[
-      Contract[v1testcc.coin.CoinRulesV1Test.ContractId, v1testcc.coin.CoinRulesV1Test]
-    ]]
-  ] = multiDomainAcsStore
-    .findAnyContractWithOffset(v1testcc.coin.CoinRulesV1Test.COMPANION)
-    .map(_.map(_.map(_.contract)))
 
   def lookupCoinRules()(implicit
       tc: TraceContext
@@ -839,7 +828,6 @@ object SvSvcStore {
       case _: MemoryStorage =>
         new InMemorySvSvcStore(
           key,
-          config.enableCoinRulesUpgrade,
           loggerFactory,
           retryProvider,
           treeSource,
@@ -849,7 +837,6 @@ object SvSvcStore {
           key,
           db,
           config.domains,
-          config.enableCoinRulesUpgrade,
           loggerFactory,
           retryProvider,
           treeSource,
@@ -869,7 +856,6 @@ object SvSvcStore {
   def contractFilter(
       svcParty: PartyId,
       svParty: PartyId,
-      enableCoinRulesUpgrade: Boolean,
   ): MultiDomainAcsStore.ContractFilter = {
     import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
@@ -917,9 +903,6 @@ object SvSvcStore {
           co.payload.subscriptionData.svc == svc && co.payload.subscriptionData.provider == svc
         ),
       ) ++
-        (if (enableCoinRulesUpgrade)
-           Map(mkFilter(v1testcc.coin.CoinRulesV1Test.COMPANION)(co => co.payload.svc == svc))
-         else Map.empty) ++
         DirectoryStore.directoryTemplateFilters(svcParty),
     )
   }

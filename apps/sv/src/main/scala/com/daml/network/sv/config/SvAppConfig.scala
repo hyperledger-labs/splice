@@ -136,7 +136,6 @@ case class SvAppBackendConfig(
     svPartyHint: Option[String] = None,
     onboarding: Option[SvOnboardingConfig] = None,
     initialCoinPriceVote: Option[BigDecimal] = None,
-    enableCoinRulesUpgrade: Boolean = false,
     cometBftConfig: Option[CometBftConfig] = None,
     localDomainNode: Option[SvDomainNodeConfig],
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,

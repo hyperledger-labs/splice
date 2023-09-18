@@ -1,11 +1,7 @@
 package com.daml.network.scan.admin.http
 
 import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.codegen.java.cc.{
-  coin as coinCodegen,
-  round as roundCodegen,
-  v1test as ccV1Test,
-}
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cc.round.{
   IssuingMiningRound,
   OpenMiningRound,
@@ -15,7 +11,6 @@ import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
 import com.daml.network.http.v0.scan.ScanResource
-import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{Codec, Contract, ContractMetadataUtil}
@@ -24,7 +19,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -32,7 +26,6 @@ import java.time.ZoneOffset
 
 class HttpScanHandler(
     store: ScanStore,
-    config: ScanAppBackendConfig,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -158,46 +151,6 @@ class HttpScanHandler(
             case Some(cachedContractId) if cachedContractId == coinRules.contractId.contractId =>
               logger.debug(
                 show"Not sending ${PrettyContractId(coinCodegen.CoinRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
-              )
-              None
-            case Some(_) // else: coin rules are cached but outdated.
-                | None =>
-              Some(coinRules.contract.toHttp)
-          },
-          domainId = coinRules.state.fold(domain => Some(domain.toProtoPrimitive), None),
-        )
-        definitions.GetCoinRulesResponse(
-          coinRulesUpdate = response
-        )
-      }
-    }
-  }
-
-  def getCoinRulesV1Test(
-      response: v0.ScanResource.GetCoinRulesV1TestResponse.type
-  )(
-      body: com.daml.network.http.v0.definitions.GetCoinRulesRequest
-  )(extracted: TraceContext): Future[v0.ScanResource.GetCoinRulesV1TestResponse] = {
-    implicit val tc = extracted
-    withSpan(s"$workflowId.getCoinRulesV1Test") { _ => _ =>
-      if (!config.enableCoinRulesUpgrade) {
-        throw Status.UNIMPLEMENTED
-          .withDescription("CoinRules upgrades are disabled")
-          .asRuntimeException()
-      }
-      for {
-        coinRulesO <- store.lookupCoinRulesV1Test()
-        coinRules = coinRulesO.getOrElse(
-          throw Status.NOT_FOUND
-            .withDescription("found no upgraded coinrules instance")
-            .asRuntimeException()
-        )
-      } yield {
-        val response = MaybeCachedContractWithState(
-          body.cachedCoinRulesContractId match {
-            case Some(cachedContractId) if cachedContractId == coinRules.contractId.contractId =>
-              logger.debug(
-                show"Not sending ${PrettyContractId(ccV1Test.coin.CoinRulesV1Test.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
               )
               None
             case Some(_) // else: coin rules are cached but outdated.

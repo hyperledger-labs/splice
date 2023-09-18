@@ -119,9 +119,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     lookupTests("lookupSvcRulesWithOffset")(svcRules())(_.lookupSvcRulesWithOffset())
     lookupTests("lookupCoinRulesWithOffset")(coinRules())(_.lookupCoinRulesWithOffset())
-    lookupTests("lookupCoinRulesV1TestWithOffset")(coinRulesV1Test(1))(
-      _.lookupCoinRulesV1TestWithOffset()
-    )
     lookupTests("lookupCnsRulesWithOffset")(cnsRules())(
       _.lookupCnsRulesWithOffset()
     )
@@ -1276,7 +1273,6 @@ class InMemorySvSvcStoreTest extends SvSvcStoreTest {
   override protected def mkStore(): Future[InMemorySvSvcStore] = {
     val store = new InMemorySvSvcStore(
       SvStore.Key(storeSvParty, svcParty),
-      enableCoinRulesUpgrade = true,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       transactionTreeSource,
@@ -1303,7 +1299,7 @@ class DbSvSvcStoreTest
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         Seq(
-          "dar/canton-coin-0.1.1.dar",
+          "dar/canton-coin-0.1.0.dar",
           "dar/validator-lifecycle-0.1.0.dar",
           "dar/svc-governance-0.1.0.dar",
         )
@@ -1315,7 +1311,6 @@ class DbSvSvcStoreTest
       SvStore.Key(storeSvParty, svcParty),
       storage,
       svDomainConfig,
-      enableCoinRulesUpgrade = true,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       transactionTreeSource,

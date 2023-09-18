@@ -17,5 +17,4 @@ package com.daml.network.wallet.config
 case class TreasuryConfig(
     batchSize: Int = 10,
     queueSize: Int = 20,
-    enableCoinRulesUpgrade: Boolean = false,
 )

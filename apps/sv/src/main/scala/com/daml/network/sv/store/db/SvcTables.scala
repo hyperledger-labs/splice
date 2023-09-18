@@ -5,7 +5,6 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.validatorlicense as vl
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.store.db.AcsTables
 import com.daml.network.sv.store.SvcTxLogParser
@@ -153,8 +152,6 @@ object SvcTables extends AcsTables with NamedLogging {
           }
         case cc.coin.CoinRules.TEMPLATE_ID =>
           tryToDecode(cc.coin.CoinRules.COMPANION, createdEvent)(SvcAcsStoreRowData(_))
-        case ccV1Test.coin.CoinRulesV1Test.TEMPLATE_ID =>
-          tryToDecode(ccV1Test.coin.CoinRulesV1Test.COMPANION, createdEvent)(SvcAcsStoreRowData(_))
         case cc.coin.Coin.TEMPLATE_ID =>
           tryToDecode(cc.coin.Coin.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(

@@ -10,7 +10,6 @@ import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCode
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.http.v0.{definitions, scan as http}
@@ -166,41 +165,6 @@ object HttpScanAppClient {
       case http.GetCoinRulesResponse.OK(response) =>
         for {
           coinRules <- ContractWithState.handleMaybeCached(coinCodegen.CoinRules.COMPANION)(
-            cachedCoinRules,
-            response.coinRulesUpdate,
-          )
-        } yield coinRules
-    }
-  }
-
-  case class GetCoinRulesV1Test(
-      cachedCoinRules: Option[ContractWithState[CoinRulesV1Test.ContractId, CoinRulesV1Test]]
-  ) extends BaseCommand[
-        http.GetCoinRulesV1TestResponse,
-        ContractWithState[CoinRulesV1Test.ContractId, CoinRulesV1Test],
-      ] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCoinRulesV1TestResponse] = {
-      import MultiDomainAcsStore.ContractState.*
-      client.getCoinRulesV1Test(
-        GetCoinRulesRequest(
-          cachedCoinRules.map(_.contractId.contractId),
-          cachedCoinRules.flatMap(_.state match {
-            case Assigned(domain) => Some(domain.toProtoPrimitive)
-            case InFlight => None
-          }),
-        ),
-        headers,
-      )
-    }
-
-    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.GetCoinRulesV1TestResponse.OK(response) =>
-        for {
-          coinRules <- ContractWithState.handleMaybeCached(CoinRulesV1Test.COMPANION)(
             cachedCoinRules,
             response.coinRulesUpdate,
           )

@@ -15,7 +15,6 @@ import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
-import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.{cc, cn}
@@ -411,11 +410,6 @@ class SvApp(
       SvApp.svcGovernancePackage,
       SvApp.validatorLifecyclePackage,
       SvApp.directoryPackage,
-    ).prependedAll(
-      if (config.enableCoinRulesUpgrade)
-        Seq(SvApp.coinV1TestPackage)
-      else
-        Seq.empty
     )
 
   private def newTrafficBalanceService(participantAdminConnection: ParticipantAdminConnection) = {
@@ -1195,11 +1189,6 @@ object SvApp {
 
     // See `Compile / resourceGenerators` in build.sbt
     lazy val resourcePath: String = "dar/canton-coin-0.1.0.dar"
-  }
-  val coinV1TestPackage: UploadablePackage = new UploadablePackage {
-    lazy val packageId: String = ccV1Test.coin.CoinRulesV1Test.COMPANION.TEMPLATE_ID.getPackageId
-
-    lazy val resourcePath: String = "dar/canton-coin-0.1.1.dar"
   }
   val svcGovernancePackage: UploadablePackage = new UploadablePackage {
     lazy val packageId: String = cn.svcrules.SvcRules.COMPANION.TEMPLATE_ID.getPackageId
