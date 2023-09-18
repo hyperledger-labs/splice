@@ -748,6 +748,11 @@ function _down_stack() {
 
             echo "Reset complete. In case a subsequent 'cncluster apply' fails, refer to the documentation on manual cleanup (https://github.com/DACH-NY/canton-network-node/tree/main/cluster#manually-deploying-via-ci)"
             ;;
+
+        *)
+            _error "Failed uninstalling stack $STACK, aborting"
+            exit 1
+            ;;
     esac
 }
 
