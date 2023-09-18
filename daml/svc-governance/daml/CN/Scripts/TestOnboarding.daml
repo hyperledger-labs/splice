@@ -172,8 +172,13 @@ testSvOnboarding = do
           ]
         governanceKeys = [GovernanceKeyConfig with pubKey = "==base-64-pubKey-1"]
         sequencingKeys = []
+
+  let sequencerConfig = Some SequencerConfig with
+        sequencerId = "sequencer-id"
+        url = "sequencer.address:1234"
   let newNodeConfig = DomainNodeConfig with
         cometBft = cometBftConfig
+        sequencer = sequencerConfig
   submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_SetDomainNodeConfig with
     sv = svX
     domainNumber = svcRules.config.globalDomain.lastDomainNumber

@@ -17,10 +17,12 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardingStatus
 import com.daml.network.sv.util.SvOnboardingToken
 import com.digitalasset.canton.console.CommandFailure
+import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 import scala.util.Random
 
 class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
@@ -374,6 +376,35 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     }
     sv4Backend.waitForInitialization()
     sv4ValidatorBackend.waitForInitialization()
+
+    eventually() {
+      val memberInfosFromSv1 = sv1Backend.getSvcInfo().svcRules.payload.members
+      forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { svBackend =>
+        val svParty = svBackend.getSvcInfo().svParty
+        val globalDomain = svBackend.config.domains.global.alias
+        val sequencerConnections = svBackend.participantClient.domains
+          .config(globalDomain)
+          .value
+          .sequencerConnections
+          .connections
+          .forgetNE
+        val localSequencerUrl = inside(sequencerConnections) {
+          case Seq(
+                GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _)
+              ) =>
+            defaultSequencerEndpoint.forgetNE.map(_.toURI(false)).headOption.value
+          case Seq(
+                GrpcSequencerConnection(_, _, _, _),
+                GrpcSequencerConnection(localSequencerEndpoint, _, _, _),
+              ) =>
+            localSequencerEndpoint.forgetNE.map(_.toURI(false)).headOption.value
+        }
+        forAll(memberInfosFromSv1.get(svParty.toProtoPrimitive).domainNodes.values()) {
+          domainNode =>
+            domainNode.sequencer.toScala.value.url shouldBe localSequencerUrl.toString
+        }
+      }
+    }
   }
 
   // remaining states are tested as part of "SVs can onboard new SVs"

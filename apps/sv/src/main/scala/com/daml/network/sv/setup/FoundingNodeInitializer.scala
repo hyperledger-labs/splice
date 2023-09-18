@@ -14,7 +14,7 @@ import com.daml.network.environment.*
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.*
-import com.daml.network.sv.LocalDomainNode
+import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.automation.SvSvcAutomationService
 import com.daml.network.sv.automation.SvSvAutomationService
 import com.daml.network.sv.cometbft.CometBftNode
@@ -149,13 +149,19 @@ class FoundingNodeInitializer(
         cometBftNode,
       )
       _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
+      withSvcStore = new WithSvcStore(svcAutomation, globalDomain)
       _ <- retryProvider.ensureThatB(
         show"the SvcRules and CoinRules are bootstrapped",
         svcStore.lookupSvcRules().map(_.isDefined), {
-          new WithSvcStore(svcAutomation, globalDomain).foundCollective()
+          withSvcStore.foundCollective()
         },
         logger,
       )
+      // The previous foundCollective step will set the domain node config if SvcRules is not yet bootstrapped.
+      // This is for the case that SvcRules is already bootstrapped but setting the domain node config is required,
+      // for example if the founding SV node restarted after bootstrapping the SvcRules.
+      // We only set the domain sequencer config if the existing one is different here.
+      _ <- withSvcStore.setSequencerConfigIfRequired(Some(localDomainNode))
       svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
     } yield (
       globalDomain,
@@ -322,6 +328,16 @@ class FoundingNodeInitializer(
       } yield ()
     }
 
+    def setSequencerConfigIfRequired(localDomainNode: Option[LocalDomainNode]): Future[Unit] = {
+      SvApp.setSequencerConfigIfRequired(
+        svcStore,
+        localDomainNode,
+        svcStoreWithIngestion.connection,
+        retryProvider,
+        logger,
+      )
+    }
+
     private def importAcsSnapshot(): Future[Option[Seq[cc.round.OpenMiningRound]]] =
       foundingConfig.bootstrappingDump match {
         case None =>
@@ -449,7 +465,10 @@ class FoundingNodeInitializer(
               case None =>
                 for {
                   optOpenMiningRounds <- importAcsSnapshot()
-                  founderDomainNodes <- SvUtil.getFounderDomainNodeConfig(cometBftNode)
+                  founderDomainNodes <- SvUtil.getFounderDomainNodeConfig(
+                    cometBftNode,
+                    localDomainNode,
+                  )
                   _ = logger
                     .info(s"Bootstrapping SVC as $svcParty with BFT nodes $founderDomainNodes")
                   _ <- svcStoreWithIngestion.connection

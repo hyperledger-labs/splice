@@ -38,7 +38,7 @@ class SvOnboardingConfigIntegrationTest extends CNNodeIntegrationTest with SvTes
       sv2OnboardedBackend.start()
       sv2OnboardedBackend.waitForInitialization()
       val svcInfoFromSv2Onboarded = sv2OnboardedBackend.getSvcInfo()
-      svcInfoFromSv2Onboarded shouldBe svcInfoFromSv2
+      svcInfoFromSv2Onboarded shouldEqual svcInfoFromSv2
     }
   }
 }

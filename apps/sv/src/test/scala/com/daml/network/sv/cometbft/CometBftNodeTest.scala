@@ -14,6 +14,7 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
 import com.daml.network.sv.util.SvUtil
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.util.Optional
 import scala.jdk.CollectionConverters.*
 
 class CometBftNodeTest extends AnyWordSpec with BaseTest {
@@ -104,7 +105,8 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
                   ).asJava,
                   Seq[GovernanceKeyConfig]().asJava,
                   Seq[SequencingKeyConfig]().asJava,
-                )
+                ),
+                Optional.empty(),
               )
             ).asJava,
           ),

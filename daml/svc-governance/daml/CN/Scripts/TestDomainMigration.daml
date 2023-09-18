@@ -48,6 +48,9 @@ testDomainMigration = do
           nodes = Map.fromList [("nodeId-1-" <> partyToText sv, CometBftNodeConfig ("pubKey-" <> partyToText sv) 1)]
           sequencingKeys = []
           governanceKeys = []
+        sequencer = Some SequencerConfig with
+          sequencerId = "sequencer-id"
+          url = "sequencer.address:1234"
 
   -- The SVC marks the domain as operational
   executeSvcRulesConfigChange app $ \config ->

@@ -15,6 +15,7 @@ import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
+import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.{cc, cn}
@@ -1108,6 +1109,63 @@ object SvApp {
   private[sv] def isDevNet(
       svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
   ): Boolean = svcRules.payload.isDevNet
+
+  private[sv] def setSequencerConfigIfRequired(
+      svcStore: SvSvcStore,
+      localDomainNode: Option[LocalDomainNode],
+      connection: CNLedgerConnection,
+      retryProvider: RetryProvider,
+      logger: TracedLogger,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Unit] = {
+    logger.debug("Setting sequencer config")
+    val svParty = svcStore.key.svParty
+    val svcParty = svcStore.key.svcParty
+    val svcDomainNum = SvUtil.defaultSvcDomainNumber
+
+    def setConfigIfRequired() = for {
+      localSequencerConfig <- SvUtil.getSequencerConfig(localDomainNode).map(_.toJava)
+      svcRules <- svcStore.getSvcRules()
+      // TODO(#4901): do not use default, but reconcile all configured CometBFT networks
+      memberInfo = Option(svcRules.payload.members.get(svParty.toProtoPrimitive))
+        .getOrElse(throw new IllegalArgumentException(s"SV $svParty is not party of the SVC"))
+      existingConfig = java.util.Optional
+        .ofNullable(memberInfo.domainNodes.get(svcDomainNum))
+        .flatMap(_.sequencer)
+      _ <-
+        if (existingConfig != localSequencerConfig) {
+          val nodeConfig = new DomainNodeConfig(
+            Option(memberInfo.domainNodes.get(svcDomainNum))
+              .map(_.cometBft)
+              .getOrElse(SvUtil.emptyCometBftConfig),
+            localSequencerConfig,
+          )
+          val cmd = svcRules.exercise(
+            _.exerciseSvcRules_SetDomainNodeConfig(
+              svParty.toProtoPrimitive,
+              svcDomainNum,
+              nodeConfig,
+            )
+          )
+          connection
+            .submit(Seq(svParty), Seq(svcParty), cmd)
+            .noDedup
+            .yieldResult()
+        } else {
+          logger.info(s"Not setting domain node config because it is the same as the existing one.")
+          Future.unit
+        }
+    } yield ()
+
+    retryProvider
+      .retryForAutomation(
+        s"setting domain config for $svParty",
+        setConfigIfRequired(),
+        logger,
+      )
+  }
 
   private def initializeValidator(
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
