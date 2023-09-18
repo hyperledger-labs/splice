@@ -42,7 +42,6 @@
           cluster: "_CLUSTERNAME_"
           requires:
             - deploy_cluster
-            - preflight_check
       - preflight_check:
           <<: *main-branch-never
           context:
