@@ -179,6 +179,8 @@ class JoiningNodeInitializer(
           )
         } yield ()
       }
+      _ <- new WithSvStore(svAutomation, svcPartyHosting, globalDomain)
+        .setSequencerConfigIfRequired(svcAutomation, localDomainNode)
     } yield (
       globalDomain,
       svcPartyHosting,
@@ -252,6 +254,13 @@ class JoiningNodeInitializer(
         svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore]
     ): Future[Unit] = {
       new WithSvcStore(svcStoreWithIngestion).startOnboardingWithSvcPartyHosted()
+    }
+
+    def setSequencerConfigIfRequired(
+        svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+        localDomainNode: Option[LocalDomainNode],
+    ): Future[Unit] = {
+      new WithSvcStore(svcStoreWithIngestion).setSequencerConfigIfRequired(localDomainNode)
     }
 
     /** A private class to share the svcStoreWithIngestion across utility methods. */
@@ -344,6 +353,16 @@ class JoiningNodeInitializer(
             logger,
           )
         } yield ()
+      }
+
+      def setSequencerConfigIfRequired(localDomainNode: Option[LocalDomainNode]): Future[Unit] = {
+        SvApp.setSequencerConfigIfRequired(
+          svcStore,
+          localDomainNode,
+          svcStoreWithIngestion.connection,
+          retryProvider,
+          logger,
+        )
       }
     }
 

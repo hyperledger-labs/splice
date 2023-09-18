@@ -53,7 +53,6 @@ class DbSvSvcStore(
     override val key: SvStore.Key,
     storage: DbStorage,
     domainConfig: SvDomainConfig,
-    override protected[this] val enableCoinRulesUpgrade: Boolean,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     override protected val transactionTreeSource: TransactionTreeSource,

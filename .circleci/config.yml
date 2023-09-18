@@ -2178,7 +2178,6 @@ workflows:
         cluster: "cimain"
         requires:
           - deploy_cluster
-          - preflight_check
     - preflight_check:
         cluster: "cimain"
         <<: *main-branch-only
@@ -2258,7 +2257,6 @@ workflows:
           use_published_artifacts: true
           requires:
             - deploy_cluster
-            - preflight_check
             - publish_public_release
     - preflight_sv_check:
         <<: *main-branch-only
@@ -2390,7 +2388,6 @@ workflows:
           use_published_artifacts: true
           requires:
             - deploy_cluster
-            - preflight_check
             - publish_public_release
     - preflight_sv_check:
         <<: *main-branch-only
@@ -2489,7 +2486,6 @@ workflows:
           restore_cluster: true
           requires:
             - deploy_cluster
-            - preflight_check
 
   testnet_health_check:
     when:
@@ -2670,7 +2666,6 @@ workflows:
           cluster: "scratchneta"
           requires:
             - deploy_cluster
-            - preflight_check
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -2746,7 +2741,6 @@ workflows:
           cluster: "scratchnetb"
           requires:
             - deploy_cluster
-            - preflight_check
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -2822,7 +2816,6 @@ workflows:
           cluster: "scratchnetc"
           requires:
             - deploy_cluster
-            - preflight_check
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -2898,7 +2891,6 @@ workflows:
           cluster: "scratchnetd"
           requires:
             - deploy_cluster
-            - preflight_check
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -2974,7 +2966,6 @@ workflows:
           cluster: "scratchnete"
           requires:
             - deploy_cluster
-            - preflight_check
       - preflight_check:
           <<: *main-branch-never
           context:

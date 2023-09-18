@@ -54,6 +54,12 @@ data DomainState
 -- Member-level configuration
 -- ==========================
 
+-- | Config for a sequencer.
+data SequencerConfig = SequencerConfig with
+    sequencerId : Text
+    url: Text
+  deriving (Eq, Show)
+
 -- | A map from domain-numbers to the configuration of a member's node for this domain.
 type DomainNodeConfigMap = Map.Map Int DomainNodeConfig
 
@@ -64,6 +70,9 @@ data DomainNodeConfig = DomainNodeConfig with
 
     cometBft : CometBftConfig
     -- ^ The configuration of this member's CometBFT nodes and keys.
+
+    sequencer : Optional SequencerConfig
+    -- ^ The configuration of this member's optional local sequencer.
   deriving (Eq, Show)
 
 noDomainNodes : DomainNodeConfigMap

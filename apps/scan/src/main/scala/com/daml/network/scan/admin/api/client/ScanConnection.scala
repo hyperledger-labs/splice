@@ -6,7 +6,6 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -157,14 +156,6 @@ final class ScanConnection private (
           coinRules
         }
     }
-  }
-
-  def getCoinRulesV1Test()(implicit
-      ec: ExecutionContext,
-      mat: Materializer,
-  ): Future[ContractWithState[CoinRulesV1Test.ContractId, CoinRulesV1Test]] = {
-    // Note that we did not implement caching here as part of this upgrade PoC
-    runHttpCmd(config.adminApi.url, HttpScanAppClient.GetCoinRulesV1Test(None))
   }
 
   def getLatestOpenMiningRound()(implicit

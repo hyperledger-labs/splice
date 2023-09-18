@@ -5,7 +5,6 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
-import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -66,7 +65,7 @@ class DbScanStore(
   override def ingestionAcsInsert(createdEvent: CreatedEvent)(implicit
       tc: TraceContext
   ): Either[String, DBIO[_]] = {
-    ScanAcsStoreRowData.fromCreatedEvent(createdEvent, scanConfig).map {
+    ScanAcsStoreRowData.fromCreatedEvent(createdEvent).map {
       case ScanAcsStoreRowData(
             contract,
             contractExpiresAt,
@@ -154,28 +153,6 @@ class DbScanStore(
       } yield contractWithState
     }
 
-  override def lookupCoinRulesV1Test()(implicit tc: TraceContext): Future[
-    Option[ContractWithState[CoinRulesV1Test.ContractId, CoinRulesV1Test]]
-  ] = waitUntilAcsIngested {
-    for {
-      row <- storage
-        .querySingle(
-          (selectFromAcsTable(DbScanStore.acsTableName) ++
-            sql"""
-                where store_id = $storeId
-                  and template_id = ${CoinRulesV1Test.TEMPLATE_ID}
-                order by event_number desc
-                limit 1;
-               """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
-          "lookupCoinRulesV1Test",
-        )
-        .value
-      contractWithState <- row.traverse(
-        multiDomainAcsStore.contractWithStateFromRow(CoinRulesV1Test.COMPANION)(_)
-      )
-    } yield contractWithState
-  }
-
   override def lookupCnsRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[CnsRules.ContractId, CnsRules]]] =
@@ -248,7 +225,7 @@ class DbScanStore(
         rows <- storage.query(
           beginAfterEventId.fold(
             sql"""
-                select event_id, domain_id 
+                select event_id, domain_id
                 from scan_txlog_store
                 where store_id = $storeId
                   and index_record_type = ${dbType}

@@ -13,7 +13,6 @@ import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.*
-import com.daml.network.codegen.java.cc.v1test as ccV1Test
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
@@ -161,14 +160,7 @@ class ValidatorApp(
         lazy val packageId: String = directoryCodegen.DirectoryInstall.TEMPLATE_ID.getPackageId
         lazy val resourcePath: String = "dar/directory-service-0.1.0.dar"
       },
-    ) ++ Seq(new UploadablePackage {
-      // should be the same as package dependency in wallet app
-      lazy val packageId: String =
-        ccV1Test.coin.CoinRulesV1Test.COMPANION.TEMPLATE_ID.getPackageId
-
-      // See `Compile / resourceGenerators` in build.sbt
-      lazy val resourcePath: String = "dar/canton-coin-0.1.1.dar"
-    }).filter(_ => config.enableCoinRulesUpgrade)
+    )
     for {
       _ <- participantAdminConnection.uploadDarFiles(darFiles)
     } yield {

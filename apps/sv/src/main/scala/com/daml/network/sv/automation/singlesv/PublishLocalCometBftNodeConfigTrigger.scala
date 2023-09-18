@@ -9,6 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn as daml
 import com.daml.network.codegen.java.cn.cometbft.SequencingKeyConfig
+import com.daml.network.codegen.java.cn.svc.globaldomain.SequencerConfig
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.store.SvSvcStore
@@ -20,8 +21,10 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 /** A trigger to publish the node-id's and validator keys of an SV's CometBFT nodes
   * to the SVC-wide shared configuration of what validators should be used in the network.
@@ -47,17 +50,19 @@ class PublishLocalCometBftNodeConfigTrigger(
         CometBftNode.extractSvNodeMemberInfo(svcRules.payload, store.key.svParty)
       )
       localSvNodeConfig <- OptionT.liftF(cometBftNode.getLocalNodeConfig())
+      domainNodeConfig = svNodeMemberInfo.domainNodes.asScala
+        .get(SvUtil.defaultSvcDomainNumber)
       // create a task if the local config is different than the one we have published to the SVC
       // or if no domain bft is configured
       if
       // "TODO(#4901): reconcile all configured CometBFT networks"
-      !svNodeMemberInfo.domainNodes.asScala
-        .get(SvUtil.defaultSvcDomainNumber)
+      !domainNodeConfig
         .map(domainNodeConfig => CometBftNode.svNodeConfigToProto(domainNodeConfig.cometBft))
         .contains(localSvNodeConfig)
     } yield PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask(
       svNodeMemberInfo.name,
       svcRules,
+      domainNodeConfig.flatMap(_.sequencer.toScala).toJava,
       localSvNodeConfig,
     )).value
       .map(_.toList)
@@ -93,13 +98,13 @@ class PublishLocalCometBftNodeConfigTrigger(
       contract.isEmpty || task.localSvNodeConfig != currentNodeConfig
     }
   }
-
 }
 
 object PublishLocalCometBftNodeConfigTrigger {
   case class PublishLocalConfigTask(
       svNodeId: String,
       svcRules: AssignedContract[daml.svcrules.SvcRules.ContractId, daml.svcrules.SvcRules],
+      sequencerConfig: Optional[SequencerConfig],
       localSvNodeConfig: proto.cometbft.SvNodeConfig,
   ) extends PrettyPrinting {
 
@@ -130,7 +135,8 @@ object PublishLocalCometBftNodeConfigTrigger {
             .map(key => new daml.cometbft.GovernanceKeyConfig(key.pubKey))
             .asJava,
           localSvNodeConfig.sequencingKeys.map(key => new SequencingKeyConfig(key.pubKey)).asJava,
-        )
+        ),
+        sequencerConfig,
       )
   }
 }

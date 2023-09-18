@@ -1,11 +1,17 @@
 package com.daml.network.sv.util
 
-import com.daml.network.codegen.java.cn.cometbft.{CometBftConfig, CometBftConfigLimits}
+import cats.syntax.traverse.*
+import com.daml.network.codegen.java.cn.cometbft.{
+  CometBftConfig,
+  CometBftConfigLimits,
+  CometBftNodeConfig,
+}
 import com.daml.network.codegen.java.cn.svc.globaldomain.{
   DomainConfig,
   DomainNodeConfig,
   DomainNodeConfigLimits,
   GlobalDomainConfig,
+  SequencerConfig,
 }
 import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRulesConfig}
 import com.daml.network.codegen.java.cn.{cometbft, svc}
@@ -14,6 +20,7 @@ import com.daml.network.config.BackupDumpConfig
 import com.daml.network.environment.BuildInfo
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.store.MultiDomainAcsStore.JsonAcsSnapshot
+import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.{BackupDump, Contract}
@@ -27,11 +34,12 @@ import java.nio.file.{Path, Paths}
 import java.security.interfaces.{ECPrivateKey, ECPublicKey}
 import java.security.spec.{EncodedKeySpec, PKCS8EncodedKeySpec, X509EncodedKeySpec}
 import java.security.{KeyFactory, SecureRandom, Signature}
-import java.time.{Duration as JavaDuration, Instant}
+import java.time.{Instant, Duration as JavaDuration}
 import java.util.Base64
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 object SvUtil {
 
@@ -48,6 +56,12 @@ object SvUtil {
   )
 
   val defaultSvcDomainNumber = 0L;
+  val emptyCometBftConfig = new CometBftConfig(
+    Map.empty[String, CometBftNodeConfig].asJava,
+    List.empty.asJava,
+    List.empty.asJava,
+  )
+
   private val defaultInitialTrafficGrant = 1000_000L
 
   private def defaultSvcGlobalDomainConfig = new GlobalDomainConfig(
@@ -64,41 +78,58 @@ object SvUtil {
 
   )
 
+  def getSequencerConfig(localDomainNode: Option[LocalDomainNode])(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[SequencerConfig]] = localDomainNode.map { node =>
+    node.sequencerAdminConnection.getSequencerId.map { sequencerId =>
+      new SequencerConfig(
+        sequencerId.toProtoPrimitive,
+        node.getSequencerPublicUri.toString,
+      )
+    }
+  }.sequence
+
   def getFounderDomainNodeConfig(
-      cometBftNode: Option[CometBftNode]
+      cometBftNode: Option[CometBftNode],
+      localDomainNode: LocalDomainNode,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[java.util.Map[java.lang.Long, DomainNodeConfig]] = {
-    cometBftNode.fold {
-      // No BFT node are configured
-      Future.successful(Map[java.lang.Long, DomainNodeConfig]().asJava)
-    } { node =>
-      node
-        .getLocalNodeConfig()
-        .map { nodeConfig =>
-          Map(
-            long2Long(defaultSvcDomainNumber) -> new DomainNodeConfig(
-              new CometBftConfig(
-                nodeConfig.cometbftNodes.view
-                  .mapValues(config =>
-                    new cometbft.CometBftNodeConfig(
-                      config.validatorPubKey,
-                      config.votingPower,
-                    )
-                  )
-                  .toMap
-                  .asJava,
-                nodeConfig.governanceKeys
-                  .map(key => new cometbft.GovernanceKeyConfig(key.pubKey))
-                  .asJava,
-                nodeConfig.sequencingKeys
-                  .map(key => new cometbft.SequencingKeyConfig(key.pubKey))
-                  .asJava,
+    for {
+      nodeConfigOpt <- cometBftNode
+        .map(_.getLocalNodeConfig())
+        .sequence
+      cometBftConfig = nodeConfigOpt
+        .map { cometBftNodeConfig =>
+          new CometBftConfig(
+            cometBftNodeConfig.cometbftNodes.view
+              .mapValues(config =>
+                new cometbft.CometBftNodeConfig(
+                  config.validatorPubKey,
+                  config.votingPower,
+                )
               )
-            )
-          ).asJava
+              .toMap
+              .asJava,
+            cometBftNodeConfig.governanceKeys
+              .map(key => new cometbft.GovernanceKeyConfig(key.pubKey))
+              .asJava,
+            cometBftNodeConfig.sequencingKeys
+              .map(key => new cometbft.SequencingKeyConfig(key.pubKey))
+              .asJava,
+          )
         }
+        .getOrElse(SvUtil.emptyCometBftConfig)
+      sequencerConfig <- getSequencerConfig(Some(localDomainNode))
+    } yield {
+      Map(
+        long2Long(defaultSvcDomainNumber) -> new DomainNodeConfig(
+          cometBftConfig,
+          sequencerConfig.toJava,
+        )
+      ).asJava
     }
   }
 

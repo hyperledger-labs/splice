@@ -582,25 +582,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       }
     }
 
-    "lookupCoinRulesV1Test" should {
-
-      "find the coin rules" in {
-        val cr = coinRulesV1Test(1)
-        for {
-          store <- mkStore()
-          _ <- dummyDomain.create(cr)(store.multiDomainAcsStore)
-        } yield {
-          eventually() {
-            store
-              .lookupCoinRulesV1Test()
-              .futureValue
-              .map(_.contract) should be(Some(cr))
-          }
-        }
-      }
-
-    }
-
     "listImportCrates" should {
 
       "return all import crates of a receiver" in {
@@ -1023,7 +1004,6 @@ class InMemoryScanStoreTest extends ScanStoreTest {
       ScanAppBackendConfig(
         storage = CNDbConfig.Memory(),
         svUser = endUserParty.toProtoPrimitive,
-        enableCoinRulesUpgrade = true,
         participantClient = null,
         domains = new ScanDomainConfig(DomainConfig(DomainAlias.tryCreate(domain))),
       ),
@@ -1053,7 +1033,7 @@ class DbScanStoreTest
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         Seq(
-          "dar/canton-coin-0.1.1.dar",
+          "dar/canton-coin-0.1.0.dar",
           "dar/canton-name-service-0.1.0.dar",
         )
       )
@@ -1066,7 +1046,6 @@ class DbScanStoreTest
       ScanAppBackendConfig(
         storage = CNDbConfig.Memory(), // Note: this field is not used by the store
         svUser = endUserParty.toProtoPrimitive,
-        enableCoinRulesUpgrade = true,
         participantClient = null,
         domains = new ScanDomainConfig(DomainConfig(DomainAlias.tryCreate(domain))),
       ),

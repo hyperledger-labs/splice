@@ -5,7 +5,6 @@ import cats.kernel.Monoid
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coin.CoinRules
-import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
@@ -39,14 +38,6 @@ class InMemoryScanStore(
     for {
       contracts <- multiDomainAcsStore
         .listContracts(cc.coin.CoinRules.COMPANION, HardLimit(1))
-    } yield contracts.headOption
-
-  override def lookupCoinRulesV1Test()(implicit
-      tc: TraceContext
-  ): Future[Option[ContractWithState[CoinRulesV1Test.ContractId, CoinRulesV1Test]]] =
-    for {
-      contracts <- multiDomainAcsStore
-        .listContracts(CoinRulesV1Test.COMPANION, HardLimit(1))
     } yield contracts.headOption
 
   override def lookupCnsRules()(implicit

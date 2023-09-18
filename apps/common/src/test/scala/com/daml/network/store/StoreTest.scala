@@ -41,7 +41,6 @@ import org.scalatest.wordspec.AsyncWordSpec
 import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
-import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.protocol.LfContractId
@@ -101,27 +100,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       payload = template,
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,
-    )
-  }
-
-  protected def coinRulesV1Test(n: Int) = {
-    val template = new CoinRulesV1Test(
-      svcParty.toProtoPrimitive,
-      CNNodeUtil.defaultCoinConfigSchedule(
-        NonNegativeFiniteDuration(Duration.ofMinutes(10)),
-        10,
-        dummyDomain,
-      ),
-      CNNodeUtil.defaultEnabledChoices,
-      true,
-      false,
-    )
-    Contract(
-      CoinRulesV1Test.TEMPLATE_ID,
-      new CoinRulesV1Test.ContractId(n.toString),
-      template,
-      ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 

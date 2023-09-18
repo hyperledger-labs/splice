@@ -26,6 +26,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import io.grpc.Status
 
+import java.net.URI
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Connections to the domain node (composed of sequencer + mediator) operated by the SV running this SV app.
@@ -244,6 +245,9 @@ final class LocalDomainNode(
           Future.unit
       }
 
+  def getSequencerPublicUri: URI =
+    LocalDomainNode.toEndpoint(sequencerPublicConfig).toURI(sequencerPublicConfig.tls.isDefined)
+
   private def onboardLocalSequencer(
       domainAlias: DomainAlias,
       domainId: DomainId,
@@ -280,12 +284,12 @@ final class LocalDomainNode(
               Some(snapshot.sequencerSnapshot),
             )
           case NodeStatus.Success(_) =>
-            logger.info("Mediator is already initialized")
+            logger.info("Sequencer is already initialized")
             Future.unit
           case NodeStatus.Failure(err) =>
             Future.failed(
               Status.UNAVAILABLE
-                .withDescription(s"Failed to query status endpoint of mediator $err")
+                .withDescription(s"Failed to query status endpoint of sequencer $err")
                 .asRuntimeException()
             )
         },

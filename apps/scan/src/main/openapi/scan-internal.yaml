@@ -73,24 +73,6 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetCoinRulesResponse"
-  /api/v1test/coin-rules:
-    post:
-      tags: [scan]
-      x-jvm-package: scan
-      operationId: "getCoinRulesV1Test"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/GetCoinRulesRequest"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/GetCoinRulesResponse"
   /cns-rules:
     post:
       tags: [scan]

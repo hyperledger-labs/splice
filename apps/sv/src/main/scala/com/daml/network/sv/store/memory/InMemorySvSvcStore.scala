@@ -7,9 +7,7 @@ import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpired
 import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
-import com.daml.network.codegen.java.cc.v1test.coin.CoinRulesV1Test
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
-import com.daml.network.codegen.java.cc.{v1test as v1testcc, validatorlicense as vl}
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.svcrules.*
@@ -44,7 +42,6 @@ import scala.jdk.CollectionConverters.*
 
 class InMemorySvSvcStore(
     override val key: SvStore.Key,
-    override protected[this] val enableCoinRulesUpgrade: Boolean,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     override protected val transactionTreeSource: TransactionTreeSource,
@@ -114,13 +111,6 @@ class InMemorySvSvcStore(
         }
     } yield records
   }
-
-  override def lookupCoinRulesV1TestWithOffset()(implicit
-      tc: TraceContext
-  ): Future[QueryResult[Option[Contract[CoinRulesV1Test.ContractId, CoinRulesV1Test]]]] =
-    multiDomainAcsStore
-      .findContractWithOffset(v1testcc.coin.CoinRulesV1Test.COMPANION)((_: Any) => true)
-      .map(_ map (_ map (_.contract)))
 
   override protected def listExpiredRoundBased[Id <: ContractId[T], T <: Template](
       companion: TemplateCompanion[Id, T]
@@ -376,8 +366,8 @@ class InMemorySvSvcStore(
   override def lookupValidatorLicenseWithOffset(validator: PartyId)(implicit
       tc: TraceContext
   ): Future[QueryResult[Option[Contract[ValidatorLicense.ContractId, ValidatorLicense]]]] = for {
-    cws <- multiDomainAcsStore.findContractWithOffset(vl.ValidatorLicense.COMPANION) {
-      co: Contract[?, vl.ValidatorLicense] => co.payload.validator == validator.toProtoPrimitive
+    cws <- multiDomainAcsStore.findContractWithOffset(ValidatorLicense.COMPANION) {
+      co: Contract[?, ValidatorLicense] => co.payload.validator == validator.toProtoPrimitive
     }
   } yield cws map (_ map (_.contract))
 

@@ -135,7 +135,6 @@ case class ValidatorAppBackendConfig(
     override val automation: AutomationConfig = AutomationConfig(),
     domains: ValidatorDomainConfig,
     onboarding: Option[ValidatorOnboardingConfig],
-    enableCoinRulesUpgrade: Boolean = false,
     treasury: TreasuryConfig = TreasuryConfig(),
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     participantIdentitiesBackup: Option[BackupDumpConfig] = None,
