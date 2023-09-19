@@ -1,11 +1,11 @@
 daml/app-manager/.daml/dist/app-manager-0.1.0.dar fdd4cedee9ac6bc2b67f153cb71553d3b68eabdb1a8357c703d0d7482af67a0e
 daml/canton-coin-api/.daml/dist/canton-coin-api-0.1.0.dar a0e969bee24da8df7498a43cef97b77a2bf71afefba7ae6372e0119c5f3d5c15
-daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar 749f11cd47422f7389b7371b01116d3424b53eb0dad5901db1345b79213b4f3b
-daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar 6957dce5340ab902b41aed6c380dbd538f86947679ae6d69d896aa15516eaa0d
+daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar 1479d36a3c5da44f18f3cc9e713a3e9d6d2196d94ca5215ef94f86e7385bad5b
+daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar 4e9d9bb119656a63dc01595016fba46ebe4d41fc2207ffed398ddf48c1967e96
 daml/cn-util/.daml/dist/cn-util-0.1.0.dar 8de3effc944378fabae1a5a4a33a8d8383bd80187c22855d77870b6349516641
-daml/directory-service/.daml/dist/directory-service-0.1.0.dar 30486633b02214c6531862d0b504db7e663d3c0895c19eb9edf7d2e4286419d9
-daml/splitwell/.daml/dist/splitwell-0.1.0.dar 9ae180155041f624963cce34eb66797dd4dc06d53c66b6f4fdd7e81a7ed72c92
-daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar fbf97c7946d4d070ca0f123e76a2e833248546dd8bda8a7674ef55475028f515
+daml/directory-service/.daml/dist/directory-service-0.1.0.dar 973f05ca299594fc2433a40bbac5c1dbc9b780dd74b108aea2bff179834efaa0
+daml/splitwell/.daml/dist/splitwell-0.1.0.dar 0f783bb49dc480a580e837c6d3274f41b9a9e8f81f276a43f46658fe5195e665
+daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar 523348860f0bddb261319397d8f90b548ff444a6ca79f4c83f8d1e0cd4794108
 daml/validator-lifecycle/.daml/dist/validator-lifecycle-0.1.0.dar 3dba23849f7f93aa271249bcf3fc4c12fe3ef51dd1865dd6cf4213e6f1b74fa5
 daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar 330da59b05269c250e5ebe38ceec3e34bb4c859ad62660ae4397e4bab258f6d7
-daml/wallet/.daml/dist/wallet-0.1.0.dar 775014f2c1563b2244dc02a09862f47a4f28f753a40ee8ca41f49b2bcc5cd204
+daml/wallet/.daml/dist/wallet-0.1.0.dar f930984241aa2bf428763ea84c091cf322eee78f25c249bd016d5b6948df744c
