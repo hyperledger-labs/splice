@@ -10,4 +10,7 @@ export const ingressNs = network.ingressNs.metadata.name;
 export const egressIp = network.egressIp.address;
 
 configureIstio(network.ingressNs, ingressIp);
-configureObservability();
+
+// Ensures that images required from Quay for observability can be pulled
+const observabilityDependsOn = [network];
+configureObservability(observabilityDependsOn);

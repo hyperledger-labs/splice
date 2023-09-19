@@ -23,13 +23,13 @@ non_devnet_preflight_params: &non_devnet_preflight_params
 
 parameters:
   # Bump this when you change the definition of what is being cached to make sure
-  # old files don’t pollute your build.
+  # old files don't pollute your build.
   cache-version:
     type: string
     default: "20"
   run-job:
     type: enum
-    enum: [build, deploy-cidaily, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-cidaily, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
+    enum: [build, deploy-cidaily, deploy-cilr, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-cidaily, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
     default: build
   # Tag the current commit for the next TestNet release, overwriting the existing tag if it exists.
   mark-for-testnet:
@@ -72,7 +72,7 @@ notify-fail: &notify-fail
 cluster-parameter: &cluster-parameter
   cluster:
     type: enum
-    enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "devnet", "testnet", "testnet-preview", "observability"]
+    enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "cilr", "devnet", "testnet", "testnet-preview", "observability"]
 commands:
   setup_nix:
     description: Set up Nix
@@ -482,7 +482,7 @@ commands:
         default: ""
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "devnet", "testnet", "testnet-preview", "none", "observability"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "cilr", "devnet", "testnet", "testnet-preview", "none", "observability"]
         default: "none"
     steps:
       - run_bash_command_in_nix:
@@ -607,7 +607,7 @@ commands:
         default: false
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "devnet", "testnet", "testnet-preview", "none", "observability"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "cilr", "devnet", "testnet", "testnet-preview", "none", "observability"]
         default: "none"
       additional_nix_args:
         type: string
@@ -2290,6 +2290,75 @@ workflows:
         requires:
           - deploy_sv_runbook
 
+  deploy_cilr:
+    when:
+      equal: [ deploy-cilr, << pipeline.parameters.run-job >> ]
+    jobs:
+    - docker_images_push:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - wait_for_previous_pipeline:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
+        workflow_names: "deploy_cilr cilr_health_check"
+    - deploy_cluster:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "cilr"
+        requires:
+           - docker_images_push
+           - wait_for_previous_pipeline
+    - preflight_check:
+        cluster: "cilr"
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        requires:
+          - docker_images_push
+          - deploy_cluster
+    - publish_public_release:
+        <<: *main-branch-only
+        requires:
+          - preflight_check
+        context:
+          - artifactory
+          - datadog
+    - deploy_sv_runbook:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "cilr"
+        use_published_artifacts: true
+        requires:
+          - deploy_cluster
+          - preflight_check
+          - publish_public_release
+    - preflight_sv_check:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        cluster: "cilr"
+        requires:
+          - deploy_sv_runbook
+
   deploy_devnet:
     when:
       equal: [ deploy-devnet, << pipeline.parameters.run-job >> ]
@@ -2507,6 +2576,29 @@ workflows:
       - preflight_check:
           <<: *main-branch-only
           cluster: "cidaily"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          requires:
+             - wait_for_previous_pipeline
+
+  cilr_health_check:
+    when:
+      equal: [ healthcheck-cilr, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for deployments, concurrent preflight checks are fine.
+          workflow_names: "deploy_cilr"
+      - preflight_check:
+          <<: *main-branch-only
+          cluster: "cilr"
           context:
             - artifactory
             - canton-network-vpn
