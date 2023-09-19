@@ -22,7 +22,7 @@ def main() {
         false
       case NodeStatus.NotInitialized(_) =>
         logger.info("Initializing domain")
-        sequencer.domain.bootstrap(
+        com.digitalasset.canton.console.EnterpriseConsoleMacros.bootstrap.domain(
           "domain",
           staticParameters(sequencer),
           domainOwners = Seq(sequencer),

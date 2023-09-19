@@ -78,9 +78,10 @@ template Pong
       signatory initiator, responder
       observer observers
 
-      controller initiator can
-        Ack : ()
-          do return ()
+      choice Ack : ()
+        controller initiator
+          do
+            return ()
 
 template Explode
   with
@@ -111,12 +112,10 @@ template Explode
           mrg <- create Merge with id, initiator, validators, responders, path
           return (mrg, cnt)
 
-    controller initiator can
-      ExpireExplode :
-          ()
+    choice ExpireExplode : ()
+      controller initiator
         do
           return ()
-
 
 template Merge
   with
@@ -154,12 +153,10 @@ template Merge
             clps <- create Collapse with id, initiator, validators, responders, path = newPath
             return (Right clps)
 
-    controller initiator can
-      ExpireMerge :
-          ()
+    choice ExpireMerge : ()
+      controller initiator
         do
           return ()
-
 template Collapse
   with
     id : Text
@@ -178,12 +175,10 @@ template Collapse
         do
           return ()
 
-    controller initiator can
-      ExpireCollapse :
-          ()
+    choice ExpireCollapse : ()
+      controller initiator
         do
           return ()
-
 
 template Cycle
   with
@@ -192,11 +187,12 @@ template Cycle
   where
     signatory owner
 
-    controller owner can
-      Repeat : ContractId Cycle
+    choice Repeat : ContractId Cycle
+      controller owner
         do
           create Cycle with id, owner
-      Void : ()
+    choice Void : ()
+      controller owner
         do
           return ()
 

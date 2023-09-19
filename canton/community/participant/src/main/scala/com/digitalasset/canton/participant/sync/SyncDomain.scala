@@ -54,7 +54,9 @@ import com.digitalasset.canton.participant.pruning.{
 }
 import com.digitalasset.canton.participant.store.ActiveContractSnapshot.ActiveContractIdsChange
 import com.digitalasset.canton.participant.store.{
+  ContractChange,
   ParticipantNodePersistentState,
+  StateChangeType,
   StoredContract,
   SyncDomainEphemeralState,
   SyncDomainPersistentState,
@@ -133,7 +135,8 @@ class SyncDomain(
     extends NamedLogging
     with StartAndCloseable[Either[SyncDomainInitializationError, Unit]]
     with TransferSubmissionHandle
-    with HealthComponent {
+    with HealthComponent
+    with HasCloseContext {
 
   val topologyClient: DomainTopologyClientWithInit = domainHandle.topologyClient
 
@@ -257,6 +260,9 @@ class SyncDomain(
       staticDomainParameters.protocolVersion,
       timeouts,
       futureSupervisor,
+      persistent.activeContractStore,
+      persistent.contractStore,
+      persistent.enableAdditionalConsistencyChecks,
       loggerFactory,
     )
     ephemeral.recordOrderPublisher.setAcsChangeListener(listener)
@@ -280,7 +286,6 @@ class SyncDomain(
   private val repairProcessor: RepairProcessor =
     new RepairProcessor(
       ephemeral.requestCounterAllocator,
-      ephemeral.phase37Synchronizer,
       loggerFactory,
     )
 
@@ -311,9 +316,10 @@ class SyncDomain(
       repairProcessor,
       inFlightSubmissionTracker,
       loggerFactory,
+      metrics,
     )
 
-  def getTrafficControlState: Future[Option[MemberTrafficStatus]] =
+  def getTrafficControlState(implicit tc: TraceContext): Future[Option[MemberTrafficStatus]] =
     trafficStateController.getState
 
   def authorityOfInSnapshotApproximation(requestingAuthority: Set[LfPartyId])(implicit
@@ -329,15 +335,13 @@ class SyncDomain(
     def withMetadataSeq(cids: Seq[LfContractId]): Future[Seq[StoredContract]] =
       persistent.contractStore
         .lookupManyUncached(cids)
-        .map(_.map {
-          case (cid, None) =>
-            ErrorUtil.internalError(
-              new IllegalStateException(
-                s"Contract $cid is in the active contract store but not in the contract store"
-              )
+        .valueOr { missingContractId =>
+          ErrorUtil.internalError(
+            new IllegalStateException(
+              s"Contract $missingContractId is in the active contract store but not in the contract store"
             )
-          case (_, Some(sc)) => sc
-        })
+          )
+        }
 
     def lookupChangeMetadata(change: ActiveContractIdsChange): Future[AcsChange] = {
       for {
@@ -363,7 +367,7 @@ class SyncDomain(
                 c.contract,
                 ContractMetadataAndTransferCounter(
                   c.contract.metadata,
-                  change.activations(c.contractId),
+                  change.activations(c.contractId).transferCounter,
                 ),
               )
             )
@@ -375,7 +379,7 @@ class SyncDomain(
                   c.contract,
                   ContractStakeholdersAndTransferCounter(
                     c.contract.metadata.stakeholders,
-                    change.deactivations(c.contractId),
+                    change.deactivations(c.contractId).transferCounter,
                   ),
                 )
             )
@@ -411,11 +415,31 @@ class SyncDomain(
         contractIdChanges <- persistent.activeContractStore
           .changesBetween(fromExclusive, toInclusive)
         changes <- contractIdChanges.parTraverse { case (toc, change) =>
-          lookupChangeMetadata(change).map(ch => (RecordTime.fromTimeOfChange(toc), ch))
+          val changeWithAdjustedTransferCountersForUnassignments = ActiveContractIdsChange(
+            change.activations,
+            change.deactivations.fmap(change =>
+              change match {
+                case StateChangeType(ContractChange.Unassigned, transferCounter) =>
+                  StateChangeType(ContractChange.Unassigned, transferCounter.map(_ - 1))
+                case _ => change
+              }
+            ),
+          )
+          lookupChangeMetadata(changeWithAdjustedTransferCountersForUnassignments).map(ch =>
+            (RecordTime.fromTimeOfChange(toc), ch)
+          )
         }
       } yield {
         logger.info(
           s"Replaying ${changes.size} ACS changes between $fromExclusive (exclusive) and $toInclusive to the commitment processor"
+        )
+        logger.debug(
+          s"Retrieved contract ID changes from changesBetween " +
+            s"${contractIdChanges.force
+                .map { case (toc, activeContractsChange) =>
+                  s"at time ${toc} activations ${activeContractsChange.activations} deactivations ${activeContractsChange.deactivations} "
+                }
+                .toString()}"
         )
         changes
       })
@@ -534,8 +558,9 @@ class SyncDomain(
     } yield ()
   }
 
-  protected def startAsync(): Future[Either[SyncDomainInitializationError, Unit]] = {
-    implicit val initializationTraceContext: TraceContext = TraceContext.empty
+  protected def startAsync()(implicit
+      initializationTraceContext: TraceContext
+  ): Future[Either[SyncDomainInitializationError, Unit]] = {
 
     val delayLogger =
       new DelayLogger(
@@ -607,8 +632,7 @@ class SyncDomain(
           ): HandlerResult = {
             tracedEvents.withTraceContext { traceContext => closedEvents =>
               val openEvents = closedEvents.map { event =>
-                event.trafficState.foreach(trafficStateController.updateState(_, event.timestamp))
-
+                trafficStateController.updateState(event)
                 val openedEvent = PossiblyIgnoredSequencedEvent.openEnvelopes(event)(
                   staticDomainParameters.protocolVersion,
                   domainCrypto.crypto.pureCrypto,

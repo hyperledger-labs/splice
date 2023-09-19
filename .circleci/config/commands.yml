@@ -607,8 +607,29 @@ commands:
                 esac
 
                 # GOOGLE_CREDENTIALS variable is used by pulumi
-                echo ${CN_ACTIVE_ENVIRONMENT_KEY} | gcloud auth activate-service-account --key-file=-
                 export GOOGLE_CREDENTIALS=${CN_ACTIVE_ENVIRONMENT_KEY}
+
+                # TODO(#7702) Extract retry logic for CI tasks into command/script
+                # gcloud auth with a limited number of retries
+                MAX_AUTH_RETRIES=5
+                AUTH_TRY_COUNT=0
+                AUTH_RETRY_WAIT=30
+                until [ $AUTH_TRY_COUNT -gt $MAX_AUTH_RETRIES ]
+                do
+                    echo "Trying gcloud auth. Attempt #$[AUTH_TRY_COUNT+1]"
+
+                    # Try to authenticate and break retry loop in case of success
+                    echo ${CN_ACTIVE_ENVIRONMENT_KEY} | gcloud auth activate-service-account --key-file=- && break
+
+                    AUTH_TRY_COUNT=$[$AUTH_TRY_COUNT+1]
+                    sleep $AUTH_RETRY_WAIT
+                done
+
+                if [ $AUTH_TRY_COUNT -gt $MAX_AUTH_RETRIES ]; then
+                    echo "Exceeded maximum retries, no more attempts: gcloud auth activate-service-account" >&2
+                    exit 1
+                fi
+
               fi
 
               MAX_RETRY=<< parameters.cmd_retry_count >>

@@ -4,6 +4,8 @@
 # This works around issues in simtime where in-flight requests
 # end up timing out when we concurrently advance time.
 The sequencer time.*has exceeded the max-sequencing-time.*of the send request
+# variant of the above for aggregate submissions
+Max sequencing time.*for submission.*is already past the sequencer clock timestamp
 Submission timed out at
 Rejected transaction due to a participant determined timeout
 Response message for request.*timed out at

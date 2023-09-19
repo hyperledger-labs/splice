@@ -242,7 +242,7 @@ final class ValidatorAppBackendReference(
     s"http://127.0.0.1:${config.clientAdminApi.port}"
   )
 
-  protected val nodes = consoleEnvironment.environment.validators
+  val nodes = consoleEnvironment.environment.validators
 
   @Help.Summary(
     "Returns the state of this app. May only be called while the app is running."

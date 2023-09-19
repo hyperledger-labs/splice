@@ -8,6 +8,7 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.daml.fs.TemporaryDirectory
 import com.daml.jwt.JwtVerifierConfigurationCliSpec.*
 import com.daml.testing.SimpleHttpServer
+import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.ledger.api.auth.ClaimSet.Claims
 import com.digitalasset.canton.ledger.api.auth.{
   AuthService,
@@ -16,12 +17,12 @@ import com.digitalasset.canton.ledger.api.auth.{
   ClaimPublic,
 }
 import com.digitalasset.canton.logging.SuppressingLogger
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Metadata
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.cert.jcajce.{JcaX509CertificateConverter, JcaX509v3CertificateBuilder}
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
-import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
 import org.scalatest.{Assertion, OptionValues}
 import scopt.OptionParser
@@ -35,10 +36,8 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.FutureConverters.*
 
-class JwtVerifierConfigurationCliSpec extends AsyncWordSpec with OptionValues with Matchers {
+class JwtVerifierConfigurationCliSpec extends AsyncWordSpec with OptionValues with BaseTest {
   Security.addProvider(new BouncyCastleProvider)
-
-  val loggerFactory = SuppressingLogger(getClass)
 
   "auth command-line parsers" should {
     "parse and configure the authorisation mechanism correctly when `--auth-jwt-hs256-unsafe <secret>` is passed" in {
@@ -114,7 +113,9 @@ object JwtVerifierConfigurationCliSpec {
   private def parseConfig(args: Array[String]): Option[AuthService] = {
     val parser = new OptionParser[AtomicReference[AuthService]]("test") {}
     JwtVerifierConfigurationCli.parse(parser) { (verifier, config) =>
-      config.set(AuthServiceJWT(verifier, targetAudience = None))
+      config.set(
+        AuthServiceJWT(verifier, targetAudience = None, loggerFactory = SuppressingLogger(getClass))
+      )
       config
     }
     parser.parse(args, new AtomicReference[AuthService](AuthServiceWildcard)).map(_.get())
@@ -129,7 +130,7 @@ object JwtVerifierConfigurationCliSpec {
   private def decodeAndCheckMetadata(
       authService: AuthService,
       metadata: Metadata,
-  )(implicit executionContext: ExecutionContext): Future[Assertion] = {
+  )(implicit executionContext: ExecutionContext, traceContext: TraceContext): Future[Assertion] = {
     import org.scalatest.Inside.*
     import org.scalatest.matchers.should.Matchers.*
 

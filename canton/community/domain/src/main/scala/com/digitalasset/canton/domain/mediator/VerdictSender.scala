@@ -14,7 +14,6 @@ import com.digitalasset.canton.data.{CantonTimestamp, ViewType}
 import com.digitalasset.canton.domain.mediator.MediatorMessageId.VerdictMessageId
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.protocol.messages.Verdict.MediatorReject
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.{RequestId, SourceDomainId, TargetDomainId}
 import com.digitalasset.canton.sequencing.client.{
@@ -26,13 +25,13 @@ import com.digitalasset.canton.sequencing.client.{
 import com.digitalasset.canton.sequencing.protocol.{
   AggregationRule,
   Batch,
-  DeliverErrorReason,
   MediatorsOfDomain,
   MemberRecipient,
   OpenEnvelope,
   ParticipantsOfParty,
   Recipient,
   Recipients,
+  SequencerErrors,
 }
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{MediatorId, MediatorRef, ParticipantId, PartyId}
@@ -68,7 +67,7 @@ private[mediator] trait VerdictSender {
       requestId: RequestId,
       requestO: Option[MediatorRequest],
       rootHashMessages: Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
-      rejectionReason: MediatorReject,
+      rejectionReason: Verdict.MediatorReject,
       decisionTime: CantonTimestamp,
   )(implicit traceContext: TraceContext): Future[Unit]
 }
@@ -140,17 +139,14 @@ private[mediator] class DefaultVerdictSender(
       case UnlessShutdown.Outcome(SendResult.Error(error)) =>
         val reason = error.reason
         reason match {
-          case _: DeliverErrorReason.BatchRefused =>
-            // TODO(i13155):
-            if (reason.message.contains("was previously delivered at")) {
-              logger.info(
-                s"Result message was refused for $requestId: $reason"
-              )
-            } else {
-              logger.warn(
-                s"Result message was refused for $requestId: $reason"
-              )
-            }
+          case SequencerErrors.AggregateSubmissionAlreadySent(_) =>
+            logger.info(
+              s"Result message was already sent for $requestId: $reason"
+            )
+          case SequencerErrors.SubmissionRequestRefused(_) =>
+            logger.warn(
+              s"Result message was refused for $requestId: $reason"
+            )
           case _ =>
             logger.error(
               s"Failed to send result message for $requestId: $reason"
@@ -323,7 +319,7 @@ private[mediator] class DefaultVerdictSender(
       requestId: RequestId,
       requestO: Option[MediatorRequest],
       rootHashMessages: Seq[OpenEnvelope[RootHashMessage[SerializedRootHashMessagePayload]]],
-      rejectionReason: MediatorReject,
+      rejectionReason: Verdict.MediatorReject,
       decisionTime: CantonTimestamp,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     // For each view type among the root hash messages,
@@ -360,7 +356,7 @@ private[mediator] class DefaultVerdictSender(
                     )
                   // For other kinds of request, or if the request is unknown, we send a generic result
                   case _ =>
-                    MalformedMediatorRequestResult(
+                    MalformedMediatorRequestResult.tryCreate(
                       requestId,
                       crypto.domainId,
                       viewType,
@@ -386,7 +382,7 @@ private[mediator] class DefaultVerdictSender(
                   protocolVersion,
                 )
               case _: ViewType =>
-                MalformedMediatorRequestResult(
+                MalformedMediatorRequestResult.tryCreate(
                   requestId,
                   crypto.domainId,
                   viewType,

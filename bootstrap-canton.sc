@@ -35,7 +35,7 @@ def bootstrapOtherDomain(
     sequencer: LocalSequencerNodeReferenceX,
     mediator: LocalMediatorReferenceX,
 ) =
-  sequencer.domain.bootstrap(
+  bootstrap.domain(
     name,
     staticParameters(sequencer),
     domainOwners = Seq(sequencer, mediator),

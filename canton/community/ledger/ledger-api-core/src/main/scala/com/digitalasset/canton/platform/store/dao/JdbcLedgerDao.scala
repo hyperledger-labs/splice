@@ -37,7 +37,7 @@ import com.digitalasset.canton.logging.{
 }
 import com.digitalasset.canton.platform.*
 import com.digitalasset.canton.platform.config.{
-  AcsStreamsConfig,
+  ActiveContractsServiceStreamsConfig,
   TransactionFlatStreamsConfig,
   TransactionTreeStreamsConfig,
 }
@@ -70,7 +70,7 @@ private class JdbcLedgerDao(
     parameterStorageBackend: ParameterStorageBackend,
     ledgerEndCache: LedgerEndCache,
     completionsPageSize: Int,
-    acsStreamsConfig: AcsStreamsConfig,
+    activeContractsServiceStreamsConfig: ActiveContractsServiceStreamsConfig,
     transactionFlatStreamsConfig: TransactionFlatStreamsConfig,
     transactionTreeStreamsConfig: TransactionTreeStreamsConfig,
     globalMaxEventIdQueries: Int,
@@ -87,14 +87,6 @@ private class JdbcLedgerDao(
   import JdbcLedgerDao.*
 
   override def currentHealth(): HealthStatus = dbDispatcher.currentHealth()
-
-  override def lookupLedgerId()(implicit
-      loggingContext: LoggingContextWithTrace
-  ): Future[Option[LedgerId]] =
-    dbDispatcher
-      .executeSql(metrics.daml.index.db.getLedgerId)(
-        parameterStorageBackend.ledgerIdentity(_).map(_.ledgerId)
-      )
 
   override def lookupParticipantId()(implicit
       loggingContext: LoggingContextWithTrace
@@ -122,8 +114,7 @@ private class JdbcLedgerDao(
       .executeSql(metrics.daml.index.db.initializeLedgerParameters)(
         parameterStorageBackend.initializeParameters(
           ParameterStorageBackend.IdentityParams(
-            ledgerId = ledgerId,
-            participantId = participantId,
+            participantId = participantId
           ),
           loggerFactory,
         )
@@ -533,7 +524,7 @@ private class JdbcLedgerDao(
   )
 
   private val acsReader = new ACSReader(
-    config = acsStreamsConfig,
+    config = activeContractsServiceStreamsConfig,
     globalIdQueriesLimiter = globalIdQueriesLimiter,
     globalPayloadQueriesLimiter = globalPayloadQueriesLimiter,
     dispatcher = dbDispatcher,
@@ -732,7 +723,7 @@ private[platform] object JdbcLedgerDao {
       ledgerEndCache: LedgerEndCache,
       stringInterning: StringInterning,
       completionsPageSize: Int,
-      acsStreamsConfig: AcsStreamsConfig,
+      activeContractsServiceStreamsConfig: ActiveContractsServiceStreamsConfig,
       transactionFlatStreamsConfig: TransactionFlatStreamsConfig,
       transactionTreeStreamsConfig: TransactionTreeStreamsConfig,
       globalMaxEventIdQueries: Int,
@@ -754,7 +745,7 @@ private[platform] object JdbcLedgerDao {
       parameterStorageBackend = dbSupport.storageBackendFactory.createParameterStorageBackend,
       ledgerEndCache = ledgerEndCache,
       completionsPageSize = completionsPageSize,
-      acsStreamsConfig = acsStreamsConfig,
+      activeContractsServiceStreamsConfig = activeContractsServiceStreamsConfig,
       transactionFlatStreamsConfig = transactionFlatStreamsConfig,
       transactionTreeStreamsConfig = transactionTreeStreamsConfig,
       globalMaxEventIdQueries = globalMaxEventIdQueries,
@@ -775,7 +766,7 @@ private[platform] object JdbcLedgerDao {
       ledgerEndCache: LedgerEndCache,
       stringInterning: StringInterning,
       completionsPageSize: Int,
-      acsStreamsConfig: AcsStreamsConfig,
+      activeContractsServiceStreamsConfig: ActiveContractsServiceStreamsConfig,
       transactionFlatStreamsConfig: TransactionFlatStreamsConfig,
       transactionTreeStreamsConfig: TransactionTreeStreamsConfig,
       globalMaxEventIdQueries: Int,
@@ -796,7 +787,7 @@ private[platform] object JdbcLedgerDao {
       parameterStorageBackend = dbSupport.storageBackendFactory.createParameterStorageBackend,
       ledgerEndCache = ledgerEndCache,
       completionsPageSize = completionsPageSize,
-      acsStreamsConfig = acsStreamsConfig,
+      activeContractsServiceStreamsConfig = activeContractsServiceStreamsConfig,
       transactionFlatStreamsConfig = transactionFlatStreamsConfig,
       transactionTreeStreamsConfig = transactionTreeStreamsConfig,
       globalMaxEventIdQueries = globalMaxEventIdQueries,

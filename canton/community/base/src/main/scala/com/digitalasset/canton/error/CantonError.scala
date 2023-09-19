@@ -7,7 +7,7 @@ import com.daml.error.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.google.rpc.error_details.ErrorInfo
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.StatusRuntimeException
 
 import scala.util.Try
 import scala.util.matching.Regex
@@ -72,23 +72,7 @@ trait BaseCantonError extends BaseError {
   // so anything using def, lay val and constructor arguments works. just not val. but best, just use
   // [[CantonUserError]] or [[CantonInternalError]]
 
-  /** The error code, usually passed in as implicit where the error class is defined */
-  def code: ErrorCode
-
-  def rpcStatus(
-      overrideCode: Option[Status.Code] = None
-  )(implicit loggingContext: ErrorLoggingContext): com.google.rpc.status.Status = {
-    import scala.jdk.CollectionConverters.*
-    val status0: com.google.rpc.Status = code.asGrpcStatus(this)
-    val details: Seq[com.google.protobuf.Any] = status0.getDetailsList.asScala.toSeq
-    val detailsScalapb = details.map(com.google.protobuf.any.Any.fromJavaProto)
-
-    com.google.rpc.status.Status(
-      overrideCode.map(_.value()).getOrElse(status0.getCode),
-      status0.getMessage,
-      detailsScalapb,
-    )
-  }
+  def rpcStatusWithoutLoggingContext(): com.google.rpc.status.Status = rpcStatus()(NoLogging)
 
   def log()(implicit loggingContext: ErrorLoggingContext): Unit = logWithContext()(loggingContext)
 
@@ -169,17 +153,30 @@ object BaseCantonError {
   )(implicit override val code: ErrorCode)
       extends BaseCantonError {}
 
-  def isStatusErrorCode(errorCode: ErrorCode, status: com.google.rpc.status.Status): Boolean = {
+  /** Custom matcher to extract [[com.google.rpc.error_details.ErrorInfo]] from [[com.google.protobuf.any.Any]] */
+  object AnyToErrorInfo {
+    def unapply(any: com.google.protobuf.any.Any): Option[ErrorInfo] =
+      if (any.is(ErrorInfo)) {
+        Try(any.unpack(ErrorInfo)).toOption
+      } else None
+  }
+
+  def statusErrorCodes(status: com.google.rpc.status.Status): Seq[String] =
+    status.details.collect { case AnyToErrorInfo(errorInfo) => errorInfo.reason }
+
+  def isStatusErrorCode(errorCode: ErrorCode, status: com.google.rpc.status.Status): Boolean =
+    extractStatusErrorCodeMessage(errorCode, status).isDefined
+
+  def extractStatusErrorCodeMessage(
+      errorCode: ErrorCode,
+      status: com.google.rpc.status.Status,
+  ): Option[String] = {
     val code = errorCode.category.grpcCode.getOrElse(
       throw new IllegalArgumentException(s"Error code $errorCode does not have a gRPC code")
     )
-    if (status.code == code.value()) {
-      status.details.exists { any =>
-        if (any.is(ErrorInfo.messageCompanion)) {
-          Try(any.unpack(ErrorInfo.messageCompanion)).toOption.exists(_.reason == errorCode.id)
-        } else false
-      }
-    } else false
+    Option.when(status.code == code.value() && statusErrorCodes(status).contains(errorCode.id))(
+      status.message
+    )
   }
 }
 

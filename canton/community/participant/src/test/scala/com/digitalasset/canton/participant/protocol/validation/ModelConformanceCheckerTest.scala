@@ -6,20 +6,26 @@ package com.digitalasset.canton.participant.protocol.validation
 import cats.data.EitherT
 import cats.syntax.parallel.*
 import com.daml.lf.data.ImmArray
+import com.daml.lf.data.Ref.PackageId
 import com.daml.lf.engine
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
-import com.digitalasset.canton.data.{CantonTimestamp, TransactionViewTree}
+import com.digitalasset.canton.data.{CantonTimestamp, TransactionView, TransactionViewTree}
+import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.participant.protocol.TransactionProcessingSteps
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactoryImpl
 import com.digitalasset.canton.participant.protocol.validation.ModelConformanceChecker.*
 import com.digitalasset.canton.participant.store.ContractLookup
-import com.digitalasset.canton.protocol.ExampleTransactionFactory.lfHash
+import com.digitalasset.canton.protocol.ExampleTransactionFactory.{lfHash, submitterParticipant}
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
+import com.digitalasset.canton.topology.transaction.VettedPackages
+import com.digitalasset.canton.topology.{TestingIdentityFactory, TestingTopology}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.{BaseTest, LfCommand, LfKeyResolver, LfPartyId, RequestCounter}
+import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
+import pprint.Tree
 
 import java.time.Duration
 import scala.concurrent.{ExecutionContext, Future}
@@ -65,10 +71,30 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
     EitherT.rightT[Future, DAMLeError]((reinterpretedTx, metadata, keyResolver))
   }
 
+  def failOnReinterpret(
+      _contracts: ContractLookup,
+      _submitters: Set[LfPartyId],
+      cmd: LfCommand,
+      ledgerTime: CantonTimestamp,
+      submissionTime: CantonTimestamp,
+      rootSeed: Option[LfHash],
+      _inRollback: Boolean,
+      _viewHash: ViewHash,
+      _traceContext: TraceContext,
+  ): EitherT[Future, DAMLeError, (LfVersionedTransaction, TransactionMetadata, LfKeyResolver)] =
+    fail("Reinterpret should not be called by this test case.")
+
   def viewsWithNoInputKeys(
       rootViews: Seq[TransactionViewTree]
-  ): NonEmpty[Seq[(TransactionViewTree, LfKeyResolver)]] =
-    NonEmptyUtil.fromUnsafe(rootViews.map(_ -> Map.empty))
+  ): NonEmpty[Seq[(TransactionViewTree, Seq[(TransactionView, LfKeyResolver)])]] =
+    NonEmptyUtil.fromUnsafe(rootViews.map { viewTree =>
+      // Include resolvers for all the subviews
+      val resolvers =
+        viewTree.view.allSubviewsWithPosition(viewTree.viewPosition).map { case (view, _viewPos) =>
+          view -> (Map.empty: LfKeyResolver)
+        }
+      (viewTree, resolvers)
+    })
 
   val transactionTreeFactory: TransactionTreeFactoryImpl = {
     TransactionTreeFactoryImpl(
@@ -83,12 +109,12 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
 
   def check(
       mcc: ModelConformanceChecker,
-      views: NonEmpty[Seq[(TransactionViewTree, LfKeyResolver)]],
+      views: NonEmpty[Seq[(TransactionViewTree, Seq[(TransactionView, LfKeyResolver)])]],
       ips: TopologySnapshot = factory.topologySnapshot,
-  ): EitherT[Future, ErrorWithSubviewsCheck, Result] = {
+  ): EitherT[Future, ErrorWithSubTransaction, Result] = {
     val rootViewTrees = views.map(_._1)
     val commonData = TransactionProcessingSteps.tryCommonData(rootViewTrees)
-    val keyResolvers = views.forgetNE.toMap
+    val keyResolvers = views.forgetNE.flatMap { case (_vt, resolvers) => resolvers }.toMap
     mcc.check(rootViewTrees, keyResolvers, RequestCounter(0), ips, commonData)
   }
 
@@ -107,6 +133,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
             reinterpret(example),
             validateContractOk,
             transactionTreeFactory,
+            submitterParticipant,
             enableContractUpgrading = false,
             loggerFactory,
           )
@@ -152,9 +179,10 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
 
     "transaction id is inconsistent" must {
       val sut = new ModelConformanceChecker(
-        (_, _, _, _, _, _, _, _, _) => throw new UnsupportedOperationException(),
+        failOnReinterpret,
         validateContractOk,
         transactionTreeFactory,
+        submitterParticipant,
         enableContractUpgrading = false,
         loggerFactory,
       )
@@ -173,7 +201,16 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
     }
 
     "reinterpretation fails" must {
-      val error = DAMLeError(mock[engine.Error], mock[ViewHash])
+      import pprint.Tree.Apply
+
+      // Without this, if the test fails, a NullPointerException shows up related to viewHash.pretty()
+      val mockViewHash = mock[ViewHash]
+      when(mockViewHash.pretty).thenAnswer(new Pretty[ViewHash] {
+        override def treeOf(t: ViewHash): Tree = Apply("[ViewHash]", Seq.empty.iterator)
+      })
+
+      val error = DAMLeError(mock[engine.Error], mockViewHash)
+
       val sut = new ModelConformanceChecker(
         (_, _, _, _, _, _, _, _, _) =>
           EitherT.leftT[Future, (LfVersionedTransaction, TransactionMetadata, LfKeyResolver)](
@@ -181,10 +218,20 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
           ),
         validateContractOk,
         transactionTreeFactory,
+        submitterParticipant,
         enableContractUpgrading = false,
         loggerFactory,
       )
       val example = factory.MultipleRootsAndViewNestings
+
+      def countLeaves(views: NonEmpty[Seq[TransactionView]]): Int =
+        views.foldLeft(0)((count, view) => {
+          NonEmpty.from(view.subviews.unblindedElements) match {
+            case Some(subviewsNE) => count + countLeaves(subviewsNE)
+            case None => count + 1
+          }
+        })
+      val nbLeafViews = countLeaves(NonEmptyUtil.fromUnsafe(example.rootViews))
 
       "yield an error" in {
         for {
@@ -194,7 +241,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
               viewsWithNoInputKeys(example.rootTransactionViewTrees),
             )
           )("reinterpretation fails")
-        } yield failure.error shouldBe error
+        } yield failure.errors shouldBe Seq.fill(nbLeafViews)(error) // One error per leaf
       }
     }
 
@@ -209,6 +256,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
             reinterpret(example, enableContractUpgrading = true),
             validateContractOk,
             transactionTreeFactory,
+            submitterParticipant,
             enableContractUpgrading = true,
             loggerFactory,
           )
@@ -241,6 +289,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
             ),
           validateContractOk,
           transactionTreeFactory,
+          submitterParticipant,
           enableContractUpgrading = false,
           loggerFactory,
         )
@@ -248,7 +297,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
           result <- leftOrFail(
             check(sut, viewsWithNoInputKeys(subviewMissing.rootTransactionViewTrees))
           )("detect missing subview")
-        } yield result.error shouldBe a[TransactionTreeError]
+        } yield result.errors.forgetNE.loneElement shouldBe a[TransactionTreeError]
       }
 
       /* TODO(#3202) further error cases to test:
@@ -262,6 +311,73 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
        * - wrong unicum of created contract
        * - wrong data for created contract
        */
+    }
+
+    "a package is not vetted by some participant" must {
+      "yield an error" in {
+        import ExampleTransactionFactory.*
+        testVettingError(
+          // The package is not vetted for signatoryParticipant
+          vettings = Seq(VettedPackages(submitterParticipant, Seq(packageId))),
+          packageDependenciesLookup = _ => EitherT.rightT(Set()),
+          expectedError = UnvettedPackages(Map(signatoryParticipant -> Set(packageId))),
+        )
+      }
+    }
+
+    def testVettingError(
+        vettings: Seq[VettedPackages],
+        packageDependenciesLookup: PackageId => EitherT[Future, PackageId, Set[PackageId]],
+        expectedError: UnvettedPackages,
+    ): Future[Assertion] = {
+      import ExampleTransactionFactory.*
+
+      val sut = new ModelConformanceChecker(
+        failOnReinterpret,
+        validateContractOk,
+        transactionTreeFactory,
+        submitterParticipant,
+        enableContractUpgrading = false,
+        loggerFactory,
+      )
+
+      val rootViewTrees =
+        NonEmpty.from(factory.SingleCreate(lfHash(0)).rootTransactionViewTrees).value
+
+      val snapshot = TestingIdentityFactory(
+        TestingTopology(
+        ).withTopology(Map(submitter -> submitterParticipant, observer -> signatoryParticipant))
+          .withPackages(vettings),
+        loggerFactory,
+        TestDomainParameters.defaultDynamic,
+      ).topologySnapshot(packageDependencies = packageDependenciesLookup)
+
+      for {
+        error <- check(sut, viewsWithNoInputKeys(rootViewTrees), snapshot).value
+      } yield error shouldBe Left(
+        ErrorWithSubTransaction(
+          NonEmpty(Seq, expectedError),
+          None,
+          Seq.empty,
+        )
+      )
+    }
+
+    "a package is not found in the package store" must {
+      "yield an error" in {
+        import ExampleTransactionFactory.*
+        testVettingError(
+          vettings = Seq(
+            VettedPackages(submitterParticipant, Seq(packageId)),
+            VettedPackages(signatoryParticipant, Seq(packageId)),
+          ),
+          // Submitter participant is unable to lookup dependencies.
+          // Therefore, the validation concludes that the package is not in the store
+          // and thus that the package is not vetted.
+          packageDependenciesLookup = EitherT.leftT(_),
+          expectedError = UnvettedPackages(Map(submitterParticipant -> Set(packageId))),
+        )
+      }
     }
   }
 }

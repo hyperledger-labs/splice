@@ -64,6 +64,10 @@ object RequireTypes {
       override def description: String =
         s"Unable to create Port as value $n was given, but only values between ${Port.minValidPort} and ${Port.maxValidPort} are allowed"
     }
+
+    /** This instructs the server to automatically choose a free port.
+      */
+    lazy val Dynamic = Port.tryCreate(0)
   }
 
   sealed trait RefinedNumeric[T] extends Ordered[RefinedNumeric[T]] {
@@ -175,6 +179,10 @@ object RequireTypes {
 
     def +(other: PositiveNumeric[T]): PositiveNumeric[T] =
       PositiveNumeric.tryCreate(value + other.value)
+
+    def +(other: NonNegativeNumeric[T]): PositiveNumeric[T] =
+      PositiveNumeric.tryCreate(value + other.value)
+
     def *(other: PositiveNumeric[T]): PositiveNumeric[T] =
       PositiveNumeric.tryCreate(value * other.value)
 

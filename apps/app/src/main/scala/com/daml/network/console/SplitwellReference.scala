@@ -474,7 +474,7 @@ final class SplitwellAppBackendReference(
     s"http://127.0.0.1:${config.clientAdminApi.port}"
   )
 
-  override protected val nodes = consoleEnvironment.environment.splitwells
+  override val nodes = consoleEnvironment.environment.splitwells
 
   @Help.Summary(
     "Returns the state of this app. May only be called while the app is running."

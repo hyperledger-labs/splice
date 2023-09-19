@@ -197,19 +197,6 @@ trait CNNodeEnvironment extends Environment {
     loggerFactory,
   )
 
-  /** Start all instances described in the configuration
-    */
-  override def startAll(): Either[Seq[StartupError], Unit] = {
-    val errors =
-      // Ordering here matches CNNodeConsoleEnvironment.startupOrderPrecedence
-      svs.startAll.left.getOrElse(Seq.empty) ++
-        scans.startAll.left.getOrElse(Seq.empty) ++
-        validators.startAll.left.getOrElse(Seq.empty) ++
-        directories.startAll.left.getOrElse(Seq.empty) ++
-        splitwells.startAll.left.getOrElse(Seq.empty)
-    Either.cond(errors.isEmpty, (), errors)
-  }
-
   // Ordering here matches CNNodeConsoleEnvironment.startupOrderPrecedence
   def allCNNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
     List(svs, scans, validators, directories, splitwells)

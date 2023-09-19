@@ -36,7 +36,8 @@ import com.digitalasset.canton.platform.store.dao.{EventProjectionProperties, Jd
 import com.digitalasset.canton.platform.{ContractId, Create, Exercise}
 import com.digitalasset.canton.protocol.{SourceDomainId, TargetDomainId}
 import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.tracing.TraceContext.Implicits.Empty.emptyTraceContext
+import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext, Traced}
 import com.google.protobuf.ByteString
 import com.google.rpc.status.Status as StatusProto
 import io.grpc.Status
@@ -267,6 +268,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           deduplication_duration_seconds = None,
           deduplication_duration_nanos = None,
           deduplication_start = None,
+          trace_context = serializedEmptyTraceContext,
         )
       )
     }
@@ -299,6 +301,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           deduplication_duration_nanos = None,
           deduplication_start = None,
           domain_id = Some(someDomainId1.toProtoPrimitive),
+          trace_context = serializedEmptyTraceContext,
         )
       )
     }
@@ -370,6 +373,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         create_key_value_compression = compressionAlgorithmId,
         event_sequential_id = 0,
         driver_metadata = Some(someContractDriverMetadata.toByteArray),
+        trace_context = serializedEmptyTraceContext,
       )
       dtos(5) shouldEqual DbDto.CommandCompletion(
         completion_offset = someOffset.toHexString,
@@ -386,6 +390,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         deduplication_duration_nanos = None,
         deduplication_duration_seconds = None,
         deduplication_start = None,
+        trace_context = serializedEmptyTraceContext,
       )
       dtos(6) shouldEqual DbDto.TransactionMeta(
         transaction_id = transactionId,
@@ -468,6 +473,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         event_sequential_id = 0,
         driver_metadata = Some(someContractDriverMetadata.toByteArray),
         domain_id = Some(someDomainId1.toProtoPrimitive),
+        trace_context = serializedEmptyTraceContext,
       )
       dtos(5) shouldEqual DbDto.CommandCompletion(
         completion_offset = someOffset.toHexString,
@@ -485,6 +491,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         deduplication_duration_seconds = None,
         deduplication_start = None,
         domain_id = Some(someDomainId1.toProtoPrimitive),
+        trace_context = serializedEmptyTraceContext,
       )
       dtos(6) shouldEqual DbDto.TransactionMeta(
         transaction_id = transactionId,
@@ -565,6 +572,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_argument_compression = compressionAlgorithmId,
           exercise_result_compression = compressionAlgorithmId,
           event_sequential_id = 0,
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.IdFilterConsumingStakeholder(
           event_sequential_id = 0,
@@ -591,6 +599,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           deduplication_duration_nanos = None,
           deduplication_duration_seconds = None,
           deduplication_start = None,
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.TransactionMeta(
           transaction_id = transactionId,
@@ -666,6 +675,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_result_compression = compressionAlgorithmId,
           event_sequential_id = 0,
           domain_id = Some(someDomainId1.toProtoPrimitive),
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.IdFilterConsumingStakeholder(
           event_sequential_id = 0,
@@ -693,6 +703,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           deduplication_duration_seconds = None,
           deduplication_start = None,
           domain_id = Some(someDomainId1.toProtoPrimitive),
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.TransactionMeta(
           transaction_id = transactionId,
@@ -767,6 +778,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_argument_compression = compressionAlgorithmId,
           exercise_result_compression = compressionAlgorithmId,
           event_sequential_id = 0,
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.IdFilterNonConsumingInformee(
           event_sequential_id = 0,
@@ -787,6 +799,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           deduplication_duration_nanos = None,
           deduplication_duration_seconds = None,
           deduplication_start = None,
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.TransactionMeta(
           transaction_id = transactionId,
@@ -862,6 +875,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_result_compression = compressionAlgorithmId,
           event_sequential_id = 0,
           domain_id = Some(someDomainId1.toProtoPrimitive),
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.IdFilterNonConsumingInformee(
           event_sequential_id = 0,
@@ -883,6 +897,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           deduplication_duration_seconds = None,
           deduplication_start = None,
           domain_id = Some(someDomainId1.toProtoPrimitive),
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.TransactionMeta(
           transaction_id = transactionId,
@@ -988,6 +1003,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_argument_compression = compressionAlgorithmId,
           exercise_result_compression = compressionAlgorithmId,
           event_sequential_id = 0,
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.IdFilterNonConsumingInformee(
           event_sequential_id = 0,
@@ -1018,6 +1034,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_argument_compression = compressionAlgorithmId,
           exercise_result_compression = compressionAlgorithmId,
           event_sequential_id = 0,
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.IdFilterNonConsumingInformee(
           event_sequential_id = 0,
@@ -1048,6 +1065,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_argument_compression = compressionAlgorithmId,
           exercise_result_compression = compressionAlgorithmId,
           event_sequential_id = 0,
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.IdFilterNonConsumingInformee(
           event_sequential_id = 0,
@@ -1068,6 +1086,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           deduplication_duration_nanos = None,
           deduplication_duration_seconds = None,
           deduplication_start = None,
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.TransactionMeta(
           transaction_id = transactionId,
@@ -1459,6 +1478,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_result_compression = compressionAlgorithmId,
           event_sequential_id = 0,
           domain_id = Some(someDomainId1.toProtoPrimitive),
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.IdFilterNonConsumingInformee(
           event_sequential_id = 0,
@@ -1490,6 +1510,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_result_compression = compressionAlgorithmId,
           event_sequential_id = 0,
           domain_id = Some(someDomainId1.toProtoPrimitive),
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.IdFilterNonConsumingInformee(
           event_sequential_id = 0,
@@ -1521,6 +1542,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_result_compression = compressionAlgorithmId,
           event_sequential_id = 0,
           domain_id = Some(someDomainId1.toProtoPrimitive),
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.IdFilterNonConsumingInformee(
           event_sequential_id = 0,
@@ -1542,6 +1564,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           deduplication_duration_seconds = None,
           deduplication_start = None,
           domain_id = Some(someDomainId1.toProtoPrimitive),
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.TransactionMeta(
           transaction_id = transactionId,
@@ -1615,6 +1638,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           deduplication_duration_nanos = None,
           deduplication_duration_seconds = None,
           deduplication_start = None,
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.TransactionMeta(
           transaction_id = transactionId,
@@ -1691,6 +1715,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           exercise_argument_compression = compressionAlgorithmId,
           exercise_result_compression = compressionAlgorithmId,
           event_sequential_id = 0,
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.IdFilterConsumingStakeholder(
           event_sequential_id = 0,
@@ -1736,6 +1761,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           deduplication_duration_nanos = None,
           deduplication_duration_seconds = None,
           deduplication_start = None,
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.TransactionMeta(
           transaction_id = transactionId,
@@ -1812,6 +1838,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         create_key_value_compression = None,
         event_sequential_id = 0,
         driver_metadata = Some(someContractDriverMetadata.toByteArray),
+        trace_context = serializedEmptyTraceContext,
       )
       Set(dtos(1), dtos(2)) should contain theSameElementsAs Set(
         DbDto.IdFilterCreateStakeholder(0L, createNode.templateId.toString, "signatory"),
@@ -1842,6 +1869,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         exercise_argument_compression = compressionAlgorithmId,
         exercise_result_compression = compressionAlgorithmId,
         event_sequential_id = 0,
+        trace_context = serializedEmptyTraceContext,
       )
       dtos(4) shouldEqual DbDto.IdFilterConsumingStakeholder(
         event_sequential_id = 0,
@@ -1887,6 +1915,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         deduplication_duration_nanos = None,
         deduplication_duration_seconds = None,
         deduplication_start = None,
+        trace_context = serializedEmptyTraceContext,
       )
       dtos(9) shouldEqual DbDto.TransactionMeta(
         transaction_id = transactionId,
@@ -1964,6 +1993,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         exercise_argument_compression = compressionAlgorithmId,
         exercise_result_compression = compressionAlgorithmId,
         event_sequential_id = 0,
+        trace_context = serializedEmptyTraceContext,
       )
       dtos(1) shouldEqual DbDto.IdFilterConsumingStakeholder(
         event_sequential_id = 0,
@@ -2007,6 +2037,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         deduplication_duration_nanos = None,
         deduplication_duration_seconds = None,
         deduplication_start = None,
+        trace_context = serializedEmptyTraceContext,
       )
       dtos(6) shouldEqual DbDto.TransactionMeta(
         transaction_id = transactionId,
@@ -2094,6 +2125,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
           deduplication_duration_nanos = None,
           deduplication_duration_seconds = None,
           deduplication_start = None,
+          trace_context = serializedEmptyTraceContext,
         ),
         DbDto.TransactionMeta(
           transaction_id = transactionId,
@@ -2157,6 +2189,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         create_key_value_compression = None,
         event_sequential_id = 0,
         driver_metadata = Some(someContractDriverMetadata.toByteArray),
+        trace_context = serializedEmptyTraceContext,
       )
       Set(dtos(1), dtos(2)) should contain theSameElementsAs Set(
         DbDto.IdFilterCreateStakeholder(0L, createNode.templateId.toString, "signatory"),
@@ -2219,6 +2252,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         create_key_value_compression = None,
         event_sequential_id = 0,
         driver_metadata = None,
+        trace_context = serializedEmptyTraceContext,
       )
       dtos(3) shouldEqual DbDto.TransactionMeta(
         transaction_id = transactionId,
@@ -2289,6 +2323,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
               deduplication_duration_seconds = expectedDeduplicationDurationSeconds,
               deduplication_duration_nanos = expectedDeduplicationDurationNanos,
               deduplication_start = None,
+              trace_context = serializedEmptyTraceContext,
             )
           )
       }
@@ -2354,6 +2389,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
             create_key_value_compression = None,
             event_sequential_id = 0,
             driver_metadata = Some(someContractDriverMetadata.toByteArray),
+            trace_context = serializedEmptyTraceContext,
           )
           Set(dtos(1), dtos(2)) should contain theSameElementsAs Set(
             DbDto.IdFilterCreateStakeholder(0L, createNode.templateId.toString, "signatory"),
@@ -2374,6 +2410,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
             deduplication_duration_seconds = expectedDeduplicationDurationSeconds,
             deduplication_duration_nanos = expectedDeduplicationDurationNanos,
             deduplication_start = None,
+            trace_context = serializedEmptyTraceContext,
           )
           dtos(4) shouldEqual DbDto.TransactionMeta(
             transaction_id = transactionId,
@@ -2407,7 +2444,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         reassignmentInfo = ReassignmentInfo(
           sourceDomain = SourceDomainId(DomainId.tryFromString("x::domain1")),
           targetDomain = TargetDomainId(DomainId.tryFromString("x::domain2")),
-          submitter = someParty,
+          submitter = Option(someParty),
           reassignmentCounter = 1500L,
           hostedStakeholders = Nil,
           unassignId = CantonTimestamp.assertFromLong(1000000000),
@@ -2428,7 +2465,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         update_id = update.updateId,
         command_id = Some(completionInfo.commandId),
         workflow_id = Some(someWorkflowId),
-        submitter = someParty,
+        submitter = Option(someParty),
         contract_id = createNode.coid.coid,
         template_id = createNode.templateId.toString,
         flat_event_witnesses = Set("signatory", "observer", "observer2"),
@@ -2448,6 +2485,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         target_domain_id = "x::domain2",
         unassign_id = "1000000000",
         reassignment_counter = 1500L,
+        trace_context = serializedEmptyTraceContext,
       )
       dtos(4) shouldEqual DbDto.CommandCompletion(
         completion_offset = someOffset.toHexString,
@@ -2465,6 +2503,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         deduplication_duration_seconds = None,
         deduplication_start = None,
         domain_id = Some("x::domain2"),
+        trace_context = serializedEmptyTraceContext,
       )
       dtos(5) shouldEqual DbDto.TransactionMeta(
         transaction_id = transactionId,
@@ -2502,7 +2541,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         reassignmentInfo = ReassignmentInfo(
           sourceDomain = SourceDomainId(DomainId.tryFromString("x::domain1")),
           targetDomain = TargetDomainId(DomainId.tryFromString("x::domain2")),
-          submitter = someParty,
+          submitter = Option(someParty),
           reassignmentCounter = 1500L,
           hostedStakeholders = Nil,
           unassignId = CantonTimestamp.assertFromLong(1000000000),
@@ -2535,6 +2574,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         unassign_id = "1000000000",
         reassignment_counter = 1500L,
         assignment_exclusivity = Some(123456L),
+        trace_context = serializedEmptyTraceContext,
       )
       dtos(4) shouldEqual DbDto.CommandCompletion(
         completion_offset = someOffset.toHexString,
@@ -2552,6 +2592,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         deduplication_duration_seconds = None,
         deduplication_start = None,
         domain_id = Some("x::domain1"),
+        trace_context = serializedEmptyTraceContext,
       )
       dtos(5) shouldEqual DbDto.TransactionMeta(
         transaction_id = transactionId,
@@ -2684,4 +2725,7 @@ object UpdateToDbDtoSpec {
   private val someContractDriverMetadata = Bytes.assertFromString("00abcd")
 
   implicit private val DbDtoEqual: org.scalactic.Equality[DbDto] = DbDtoEq.DbDtoEq
+
+  private val serializedEmptyTraceContext =
+    SerializableTraceContext(emptyTraceContext).toDamlProto.toByteArray
 }

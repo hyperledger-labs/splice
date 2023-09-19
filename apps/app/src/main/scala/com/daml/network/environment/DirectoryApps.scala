@@ -25,4 +25,12 @@ class DirectoryApps(
       DirectoryAppBackendConfig,
       SharedCNNodeAppParameters,
       DirectoryAppBootstrap,
-    ](create, migrationsFactory, _timeouts, configs, parametersFor, _loggerFactory) {}
+    ](
+      create,
+      migrationsFactory,
+      _timeouts,
+      configs,
+      parametersFor,
+      startUpGroup = 0,
+      _loggerFactory,
+    ) {}

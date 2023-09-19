@@ -17,11 +17,9 @@ import com.digitalasset.canton.ledger.runner.common.OptConfigValue.{
 }
 import com.digitalasset.canton.platform.apiserver.SeedService.Seeding
 import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
-import com.digitalasset.canton.platform.apiserver.{ApiServerConfig, AuthServiceConfig}
 import com.digitalasset.canton.platform.config.{
   CommandServiceConfig,
   IndexServiceConfig,
-  MetricsConfig,
   UserManagementServiceConfig,
 }
 import com.digitalasset.canton.platform.indexer.ha.HaConfig
@@ -84,10 +82,7 @@ class PureConfigReaderWriterSpec
     testReaderWriterIsomorphism(secure, ArbitraryConfig.versionRange)
     testReaderWriterIsomorphism(secure, ArbitraryConfig.limits)
     testReaderWriterIsomorphism(secure, ArbitraryConfig.contractKeyUniquenessMode)
-    testReaderWriterIsomorphism(secure, ArbitraryConfig.engineConfig)
     testReaderWriterIsomorphism(secure, ArbitraryConfig.metricsReporter)
-    testReaderWriterIsomorphism(secure, ArbitraryConfig.metricRegistryType)
-    testReaderWriterIsomorphism(secure, ArbitraryConfig.metricConfig)
     testReaderWriterIsomorphism(secure, Gen.oneOf(TlsVersion.allVersions))
     testReaderWriterIsomorphism(secure, ArbitraryConfig.tlsConfiguration)
     testReaderWriterIsomorphism(secure, ArbitraryConfig.port)
@@ -103,14 +98,9 @@ class PureConfigReaderWriterSpec
       Some("RateLimitingConfig"),
     )
     testReaderWriterIsomorphism(secure, ArbitraryConfig.indexerConfig)
-    testReaderWriterIsomorphism(secure, ArbitraryConfig.indexerStartupMode)
     testReaderWriterIsomorphism(secure, ArbitraryConfig.packageMetadataViewConfig)
     testReaderWriterIsomorphism(secure, ArbitraryConfig.commandServiceConfig)
-    testReaderWriterIsomorphism(secure, ArbitraryConfig.apiServerConfig)
-    testReaderWriterIsomorphism(secure, ArbitraryConfig.haConfig)
     testReaderWriterIsomorphism(secure, ArbitraryConfig.indexServiceConfig)
-    testReaderWriterIsomorphism(secure, ArbitraryConfig.participantConfig)
-    testReaderWriterIsomorphism(secure, ArbitraryConfig.config)
   }
 
   testReaderWriterIsomorphism(secure = true)
@@ -283,39 +273,6 @@ class PureConfigReaderWriterSpec
     compare(ContractKeyUniquenessMode.Strict, "strict")
   }
 
-  behavior of "EngineConfig"
-
-  val validEngineConfigValue =
-    """
-      |allowed-language-versions = stable
-      |contract-key-uniqueness = strict
-      |limits {
-      |  choice-controllers = 2147483647
-      |  choice-observers = 2147483647
-      |  contract-observers = 2147483647
-      |  contract-signatories = 2147483647
-      |  choice-authorizers = 2147483647
-      |  transaction-input-contracts = 2147483647
-      |}
-      |package-validation = true
-      |require-suffixed-global-contract-id = false
-      |stack-trace-mode = false
-      |""".stripMargin
-
-  it should "support current defaults" in {
-    convert(engineConvert, validEngineConfigValue).value shouldBe Config.DefaultEngineConfig
-  }
-
-  it should "not support additional invalid keys" in {
-    val value =
-      s"""
-        |unknown-key = yes
-        |$validLimits
-        |""".stripMargin
-    convert(engineConvert, value).left.value
-      .prettyPrint(0) should include("Unknown key")
-  }
-
   behavior of "TlsConfiguration"
 
   val validTlsConfigurationValue =
@@ -366,30 +323,6 @@ class PureConfigReaderWriterSpec
       "csv://" + path.toString,
     )
     compare(MetricsReporter.Console, "console")
-  }
-
-  behavior of "MetricsConfig"
-
-  val validMetricsConfigValue =
-    """
-      |    enabled = false
-      |    reporter = console
-      |    registry-type = jvm-shared
-      |    reporting-interval = "10s"
-      |""".stripMargin
-
-  it should "support current defaults" in {
-    convert(metricsConvert, validMetricsConfigValue).value shouldBe MetricsConfig()
-  }
-
-  it should "not support additional invalid keys" in {
-    val value =
-      s"""
-        |    unknown-key = yes
-        |    $validMetricsConfigValue
-        |""".stripMargin
-    convert(metricsConvert, value).left.value
-      .prettyPrint(0) should include("Unknown key")
   }
 
   behavior of "SecretsUrl"
@@ -445,61 +378,6 @@ class PureConfigReaderWriterSpec
       cacheExpiryAfterWriteInSeconds = 1,
       maxCacheSize = 99,
       maxUsersPageSize = 999,
-    )
-  }
-
-  behavior of "AuthServiceConfig"
-
-  it should "be isomorphic and support redaction" in forAll(ArbitraryConfig.authServiceConfig) {
-    generatedValue =>
-      val redacted = generatedValue match {
-        case AuthServiceConfig.UnsafeJwtHmac256(_, targetAudience) =>
-          AuthServiceConfig.UnsafeJwtHmac256("<REDACTED>", targetAudience)
-        case _ => generatedValue
-      }
-      val insecureWriter = new PureConfigReaderWriter(false)
-      authServiceConfigConvert
-        .from(authServiceConfigConvert.to(generatedValue))
-        .value shouldBe redacted
-      insecureWriter.authServiceConfigConvert
-        .from(insecureWriter.authServiceConfigConvert.to(generatedValue))
-        .value shouldBe generatedValue
-  }
-
-  it should "read/write against predefined values" in {
-    def compare(configString: String, expectedValue: AuthServiceConfig) = {
-      val source =
-        ConfigSource.fromConfig(ConfigFactory.parseString(configString)).cursor().value
-      authServiceConfigConvert.from(source).value shouldBe expectedValue
-    }
-
-    compare("type = wildcard", AuthServiceConfig.Wildcard)
-    compare(
-      "type = unsafe-jwt-hmac-256\nsecret=mysecret",
-      AuthServiceConfig.UnsafeJwtHmac256("mysecret", None),
-    )
-    compare(
-      "type = unsafe-jwt-hmac-256\nsecret=mysecret2",
-      AuthServiceConfig.UnsafeJwtHmac256("mysecret2", None),
-    )
-    compare(
-      "type = jwt-rs-256\ncertificate=certfile",
-      AuthServiceConfig.JwtRs256("certfile", None),
-    )
-    compare(
-      "type = jwt-es-256\ncertificate=certfile3",
-      AuthServiceConfig.JwtEs256("certfile3", None),
-    )
-    compare(
-      "type = jwt-es-512\ncertificate=certfile4",
-      AuthServiceConfig.JwtEs512("certfile4", None),
-    )
-    compare(
-      """
-        |type = jwt-rs-256-jwks
-        |url="https://daml.com/jwks.json"
-        |""".stripMargin,
-      AuthServiceConfig.JwtRs256Jwks("https://daml.com/jwks.json", None),
     )
   }
 
@@ -574,55 +452,17 @@ class PureConfigReaderWriterSpec
     )
   }
 
-  behavior of "ApiServerConfig"
-
-  val validApiServerConfigValue =
-    """
-      |api-stream-shutdown-timeout = "5s"
-      |command {
-      |  default-tracking-timeout = "300 seconds"
-      |  max-commands-in-flight = 256
-      |}
-      |configuration-load-timeout = "10s"
-      |management-service-timeout = "2m"
-      |max-inbound-message-size = 67108864
-      |port = 6865
-      |rate-limit {
-      |  enabled = true
-      |  max-api-services-index-db-queue-size = 1000
-      |  max-api-services-queue-size = 10000
-      |  max-used-heap-space-percentage = 100
-      |  min-free-heap-space-bytes = 0
-      |}
-      |seeding = strong
-      |time-provider-type = wall-clock
-      |user-management {
-      |  cache-expiry-after-write-in-seconds = 5
-      |  enabled = false
-      |  max-cache-size = 100
-      |  max-users-page-size = 1000
-      |}""".stripMargin
-
-  it should "support current defaults" in {
-    val value = validApiServerConfigValue
-    convert(apiServerConfigConvert, value).value shouldBe ApiServerConfig()
-  }
-
-  it should "not support unknown keys" in {
-    val value = "unknown-key=yes\n" + validApiServerConfigValue
-    convert(apiServerConfigConvert, value).left.value.prettyPrint(0) should include("Unknown key")
-  }
-
   behavior of "HaConfig"
 
   val validHaConfigValue =
     """
       |  indexer-lock-id = 105305792
       |  indexer-worker-lock-id = 105305793
-      |  main-lock-acquire-retry-millis = 500
-      |  main-lock-checker-period-millis = 1000
-      |  worker-lock-acquire-max-retry = 1000
-      |  worker-lock-acquire-retry-millis = 500
+      |  main-lock-acquire-retry-timeout= 500 milliseconds
+      |  main-lock-checker-period = 1000 milliseconds
+      |  worker-lock-acquire-max-retries = 1000
+      |  worker-lock-acquire-retry-timeout = 500 milliseconds
+      |  main-lock-checker-jdbc-network-timeout = 10000 milliseconds
       |  """.stripMargin
 
   it should "support current defaults" in {
@@ -663,21 +503,10 @@ class PureConfigReaderWriterSpec
     """
       |  batching-parallelism = 4
       |  enable-compression = false
-      |  high-availability {
-      |    indexer-lock-id = 105305792
-      |    indexer-worker-lock-id = 105305793
-      |    main-lock-acquire-retry-millis = 500
-      |    main-lock-checker-period-millis = 1000
-      |    worker-lock-acquire-max-retry = 1000
-      |    worker-lock-acquire-retry-millis = 500
-      |  }
       |  ingestion-parallelism = 16
       |  input-mapping-parallelism = 16
       |  max-input-buffer-size = 50
       |  restart-delay = "10s"
-      |  startup-mode {
-      |    type = migrate-and-start
-      |  }
       |  submission-batch-size = 50""".stripMargin
 
   it should "support current defaults" in {
@@ -696,7 +525,7 @@ class PureConfigReaderWriterSpec
 
   val validIndexServiceConfigValue =
     """|
-      |acs-streams {
+      |active-contracts-service-streams {
       |    contract-processing-parallelism=8
       |    max-ids-per-id-page=20000
       |    max-pages-per-id-pages-buffer=1
@@ -711,7 +540,6 @@ class PureConfigReaderWriterSpec
       |buffered-events-processing-parallelism=8
       |global-max-event-id-queries=20
       |global-max-event-payload-queries=10
-      |in-memory-fan-out-thread-pool-size=16
       |in-memory-state-updater-parallelism=2
       |max-contract-key-state-cache-size=100000
       |max-contract-state-cache-size=100000

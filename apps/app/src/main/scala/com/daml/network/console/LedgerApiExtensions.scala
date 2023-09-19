@@ -60,7 +60,7 @@ trait LedgerApiExtensions {
             submissionId: String = "",
             minLedgerTimeAbs: Option[Instant] = None,
             readAs: Seq[PartyId] = Seq.empty,
-            applicationId: String = LedgerApiCommands.applicationId,
+            applicationId: String = LedgerApiCommands.defaultApplicationId,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
         ): JavaTransactionTree = {
           val tx = ledgerApi.consoleEnvironment.run {

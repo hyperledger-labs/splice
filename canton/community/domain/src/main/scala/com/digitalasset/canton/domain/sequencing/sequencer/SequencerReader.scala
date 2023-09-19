@@ -340,16 +340,14 @@ class SequencerReader(
                 // we deliver an empty batch to the member if it is not the sender.
                 // This way, we can avoid revalidating the skipped events after the checkpoint we resubscribe from.
                 val event = if (registeredMember.memberId == sender) {
-                  val reason = Sequencer.signingTimestampTooEarlyError(
-                    signingTimestamp,
-                    sequencingTimestamp,
-                  )
+                  val error =
+                    SequencerErrors.SigningTimestampTooEarly(signingTimestamp, sequencingTimestamp)
                   DeliverError.create(
                     counter,
                     sequencingTimestamp,
                     domainId,
                     messageId,
-                    reason,
+                    error,
                     protocolVersion,
                   )
                 } else
@@ -403,7 +401,12 @@ class SequencerReader(
           // Neither do we have evidence that parallel processing helps, as a single sequencer reader
           // will typically serve many subscriptions in parallel.
           parallelism = 1
-        )(signValidatedEvent(_))
+        )(
+          signValidatedEvent(_).map(
+            // The database sequencer does not generate tombstones that would have to be turned into errors, hence always Right.
+            Right(_)
+          )
+        )
     }
 
     /** Attempt to save the counter checkpoint and fail horribly if we find this is an inconsistent checkpoint update. */
@@ -502,12 +505,15 @@ class SequencerReader(
             protocolVersion,
           )
         case DeliverErrorStoreEvent(_, messageId, message, traceContext) =>
-          DeliverError.create(
+          val error = DeliverErrorStoreEvent
+            .deserializeError(message, protocolVersion)
+            .fold(err => throw new DbDeserializationException(err.toString), identity)
+          DeliverError.tryCreate(
             counter,
             timestamp,
             domainId,
             messageId,
-            reason = DeliverErrorReason.BatchRefused(message.unwrap),
+            error,
             protocolVersion,
           )
       }

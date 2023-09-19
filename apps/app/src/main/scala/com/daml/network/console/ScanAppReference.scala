@@ -234,7 +234,7 @@ final class ScanAppBackendReference(
   override def httpClientConfig =
     NetworkAppClientConfig(s"http://127.0.0.1:${config.clientAdminApi.port}")
 
-  protected val nodes = cnNodeConsoleEnvironment.environment.scans
+  val nodes = cnNodeConsoleEnvironment.environment.scans
 
   @Help.Summary("Return local scan app config")
   override def config: ScanAppBackendConfig =

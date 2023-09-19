@@ -58,7 +58,7 @@ import org.scalatest.EitherValues
 
 import java.time.Duration as JDuration
 import java.util.UUID
-import scala.collection.immutable.{HashMap, StringOps}
+import scala.collection.immutable.HashMap
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Random
@@ -255,10 +255,6 @@ object ExampleTransactionFactory {
   )
 
   def unicum(index: Int) = Unicum(TestHash.digest(s"unicum$index"))
-
-  private val lfHashFormatString: StringOps = new StringOps(
-    s"%0${LfHash.underlyingHashLength * 2}x"
-  )
 
   def lfHash(index: Int): LfHash =
     LfHash.assertFromBytes(
@@ -667,14 +663,15 @@ class ExampleTransactionFactory(
     )
 
   val commonMetadata: CommonMetadata =
-    CommonMetadata(cryptoOps)(
-      confirmationPolicy,
-      domainId,
-      mediatorRef,
-      Salt.tryDeriveSalt(transactionSeed, 1, cryptoOps),
-      transactionUuid,
-      protocolVersion,
-    )
+    CommonMetadata
+      .create(cryptoOps, protocolVersion)(
+        confirmationPolicy,
+        domainId,
+        mediatorRef,
+        Salt.tryDeriveSalt(transactionSeed, 1, cryptoOps),
+        transactionUuid,
+      )
+      .value
 
   val participantMetadata: ParticipantMetadata =
     ParticipantMetadata(cryptoOps)(

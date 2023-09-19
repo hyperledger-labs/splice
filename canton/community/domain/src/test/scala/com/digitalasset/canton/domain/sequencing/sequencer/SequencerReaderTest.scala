@@ -32,6 +32,7 @@ import com.digitalasset.canton.sequencing.protocol.{
   DeliverError,
   MessageId,
   Recipients,
+  SequencerErrors,
 }
 import com.digitalasset.canton.topology.{
   DefaultTestIdentities,
@@ -141,6 +142,13 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
         valueOrFail(reader.read(member, sc))(s"Events source for $member") flatMap {
           _.take(take.toLong)
             .idleTimeout(defaultTimeout)
+            .map {
+              case Right(event) => event
+              case Left(err) =>
+                fail(
+                  s"The DatabaseSequencer's SequencerReader does not produce tombstone-errors: $err"
+                )
+            }
             .runWith(Sink.seq)
         },
         ignoreWarningsFromLackOfTopologyUpdates,
@@ -153,6 +161,11 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
       Source
         .future(valueOrFail(reader.read(member, counter))(s"Events source for $member"))
         .flatMapConcat(identity)
+        .map {
+          case Right(event) => event
+          case Left(err) =>
+            fail(s"The DatabaseSequencer's SequencerReader does not produce tombstone-errors: $err")
+        }
         .idleTimeout(defaultTimeout)
         .runWith(Sink.queue())
 
@@ -698,8 +711,11 @@ class SequencerReaderTest extends FixtureAsyncWordSpec with BaseTest {
                       sequencingTimestamp,
                       domainId,
                       messageId,
-                      Sequencer
-                        .signingTimestampTooEarlyError(signingTimestamp, sequencingTimestamp),
+                      SequencerErrors
+                        .SigningTimestampTooEarly(
+                          signingTimestamp,
+                          sequencingTimestamp,
+                        ),
                       testedProtocolVersion,
                     )
                 delivered.signedEvent.content shouldBe expectedSequencedEvent

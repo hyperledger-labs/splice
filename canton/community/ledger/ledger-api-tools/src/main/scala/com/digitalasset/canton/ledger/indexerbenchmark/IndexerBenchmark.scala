@@ -9,7 +9,6 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import com.codahale.metrics.MetricRegistry
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
-import com.daml.lf.data.Time
 import com.daml.metrics.api.dropwizard.DropwizardMetricsFactory
 import com.daml.metrics.api.opentelemetry.OpenTelemetryMetricsFactory
 import com.daml.metrics.api.testing.{InMemoryMetricsFactory, ProxyMetricsFactory}
@@ -19,16 +18,13 @@ import com.daml.telemetry.OpenTelemetryOwner
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.ledger.api.health.{HealthStatus, Healthy}
-import com.digitalasset.canton.ledger.configuration.{
-  Configuration,
-  LedgerInitialConditions,
-  LedgerTimeModel,
-}
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.ledger.participant.state.v2.{ReadService, Update}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.LedgerApiServer
+import com.digitalasset.canton.platform.indexer.ha.HaConfig
 import com.digitalasset.canton.platform.indexer.{Indexer, IndexerServiceOwner, JdbcIndexer}
+import com.digitalasset.canton.platform.store.DbSupport.DataSourceProperties
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, Traced}
 import io.opentelemetry.api.trace.Tracer
@@ -48,6 +44,8 @@ class IndexerBenchmark extends NamedLogging {
   def run(
       createUpdates: () => Future[Source[(Offset, Traced[Update]), NotUsed]],
       config: Config,
+      dataSourceProperties: Option[DataSourceProperties],
+      highAvailability: HaConfig,
   ): Future[Unit] = {
     withNewTraceContext { implicit traceContext =>
       val system = ActorSystem("IndexerBenchmark")
@@ -94,6 +92,8 @@ class IndexerBenchmark extends NamedLogging {
           tracer,
           loggerFactory,
           multiDomainEnabled = false,
+          dataSourceProperties,
+          highAvailability,
         )
         _ = println("Setting up the index database...")
         indexer <- indexer(config, indexerExecutionContext, indexerFactory)
@@ -178,21 +178,7 @@ class IndexerBenchmark extends NamedLogging {
   private[this] def createReadService(
       updates: Source[(Offset, Traced[Update]), NotUsed]
   ): ReadService = {
-    val initialConditions = LedgerInitialConditions(
-      IndexerBenchmark.LedgerId,
-      Configuration(
-        generation = 0,
-        timeModel = LedgerTimeModel.reasonableDefault,
-        maxDeduplicationDuration = java.time.Duration.ofDays(1),
-      ),
-      Time.Timestamp.Epoch,
-    )
-
     new ReadService {
-      override def ledgerInitialConditions(): Source[LedgerInitialConditions, NotUsed] = {
-        Source.single(initialConditions)
-      }
-
       override def stateUpdates(
           beginAfter: Option[Offset]
       )(implicit traceContext: TraceContext): Source[(Offset, Traced[Update]), NotUsed] = {
@@ -206,10 +192,12 @@ class IndexerBenchmark extends NamedLogging {
 
   def runAndExit(
       config: Config,
+      dataSourceProperties: Option[DataSourceProperties],
+      highAvailability: HaConfig,
       updates: () => Future[Source[(Offset, Traced[Update]), NotUsed]],
   ): Unit = {
     val result: Future[Unit] = new IndexerBenchmark()
-      .run(updates, config)
+      .run(updates, config, dataSourceProperties, highAvailability)
       .recover { case ex =>
         logger.error("Error running benchmark", ex)(TraceContext.empty)
         sys.exit(1)
