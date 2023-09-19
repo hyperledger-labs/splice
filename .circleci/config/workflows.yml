@@ -315,7 +315,6 @@ workflows:
            - wait_for_previous_pipeline
     - preflight_check:
         cluster: "cilr"
-        <<: *non_devnet_preflight_params
         context:
           - artifactory
           - canton-network-vpn
