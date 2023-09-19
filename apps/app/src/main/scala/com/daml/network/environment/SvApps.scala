@@ -25,4 +25,12 @@ class SvApps(
       SvAppBackendConfig,
       SharedCNNodeAppParameters,
       SvAppBootstrap,
-    ](create, migrationsFactory, _timeouts, configs, parametersFor, _loggerFactory) {}
+    ](
+      create,
+      migrationsFactory,
+      _timeouts,
+      configs,
+      parametersFor,
+      startUpGroup = 0,
+      _loggerFactory,
+    ) {}

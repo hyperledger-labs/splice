@@ -7,6 +7,7 @@ import akka.stream.Materializer
 import cats.Eval
 import cats.data.EitherT
 import cats.instances.future.*
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.lf.data.Ref.PackageId
 import com.digitalasset.canton.*
 import com.digitalasset.canton.common.domain.grpc.SequencerInfoLoader
@@ -65,8 +66,9 @@ class GrpcDomainRegistry(
     sequencerInfoLoader: SequencerInfoLoader,
     override protected val futureSupervisor: FutureSupervisor,
     protected val loggerFactory: NamedLoggerFactory,
-)(implicit
-    val ec: ExecutionContextExecutor,
+)(
+    implicit val ec: ExecutionContextExecutor,
+    override implicit val executionSequencerFactory: ExecutionSequencerFactory,
     val materializer: Materializer,
     val tracer: Tracer,
 ) extends DomainRegistry
@@ -123,7 +125,10 @@ class GrpcDomainRegistry(
 
     val runE = for {
       info <- sequencerInfoLoader
-        .loadSequencerEndpoints(config.domain, sequencerConnections)
+        .loadSequencerEndpoints(config.domain, sequencerConnections)(
+          traceContext,
+          CloseContext(this),
+        )
         .leftMap(DomainRegistryError.fromSequencerInfoLoaderError)
         .mapK(
           FutureUnlessShutdown.outcomeK

@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.AssignedContract
-import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId}
+import com.digitalasset.canton.topology.{DomainId, Member}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -78,13 +78,6 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
         } else {
           Future(TaskSuccess("Skipping since traffic limit is already up to date"))
         }
-      // Do a ping to force a new event to be sequenced - without this, the validator's participant may not
-      // see the updated traffic limit because for that participant the latest sequenced event's timestamp
-      // may still be before the effective timestamp of the new traffic limit.
-      // TODO(#7599) - Remove this once we bump our Canton binary to incorporate the changes in https://github.com/DACH-NY/canton/pull/14481
-      _ <- participantAdminConnection.ping(
-        ParticipantId.tryFromProtoPrimitive(memberTraffic.payload.memberId)
-      )
     } yield taskOutcome
   }
 

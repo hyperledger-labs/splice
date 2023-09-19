@@ -21,7 +21,7 @@ import com.digitalasset.canton.ledger.participant.state.v2.{CompletionInfo, Reas
 import com.digitalasset.canton.platform.*
 import com.digitalasset.canton.platform.store.dao.JdbcLedgerDao
 import com.digitalasset.canton.platform.store.dao.events.*
-import com.digitalasset.canton.tracing.Traced
+import com.digitalasset.canton.tracing.{SerializableTraceContext, Traced}
 import io.grpc.Status
 
 import java.util.UUID
@@ -37,6 +37,8 @@ object UpdateToDbDto {
   )(implicit mc: MetricsContext): Offset => Traced[Update] => Iterator[DbDto] = {
     offset => tracedUpdate =>
       import Update.*
+      val serializedTraceContext =
+        SerializableTraceContext(tracedUpdate.traceContext).toDamlProto.toByteArray
       tracedUpdate.value match {
         case u: CommandRejected =>
           withExtraMetricLabels(
@@ -60,6 +62,7 @@ object UpdateToDbDto {
               transactionId = None,
               completionInfo = u.completionInfo,
               domainId = domainId,
+              serializedTraceContext = serializedTraceContext,
             ).copy(
               rejection_status_code = Some(u.reasonTemplate.code),
               rejection_status_message = Some(u.reasonTemplate.message),
@@ -262,6 +265,7 @@ object UpdateToDbDto {
                       // with a version predating the introduction of contract driver metadata
                       u.contractMetadata.get(create.coid).map(_.toByteArray),
                     domain_id = domainId,
+                    trace_context = serializedTraceContext,
                   )
                 ) ++ stakeholders.iterator.map(
                   DbDto.IdFilterCreateStakeholder(
@@ -320,6 +324,7 @@ object UpdateToDbDto {
                     exercise_result_compression = compressionStrategy.exerciseResultCompression.id,
                     event_sequential_id = 0, // this is filled later
                     domain_id = domainId,
+                    trace_context = serializedTraceContext,
                   )
                 ) ++ {
                   if (exercise.consuming) {
@@ -377,11 +382,12 @@ object UpdateToDbDto {
           val completions =
             u.completionInfoO.iterator.map(
               commandCompletion(
-                offset,
-                u.recordTime,
-                Some(u.transactionId),
+                offset = offset,
+                recordTime = u.recordTime,
+                transactionId = Some(u.transactionId),
                 _,
-                domainId,
+                domainId = domainId,
+                serializedTraceContext = serializedTraceContext,
               )
             )
 
@@ -412,6 +418,7 @@ object UpdateToDbDto {
                   unassign_id = u.reassignmentInfo.unassignId.toMicros.toString,
                   reassignment_counter = u.reassignmentInfo.reassignmentCounter,
                   assignment_exclusivity = unassign.assignmentExclusivity.map(_.micros),
+                  trace_context = serializedTraceContext,
                 )
               ) ++ flatEventWitnesses.map(
                 DbDto.IdFilterUnassignStakeholder(
@@ -459,6 +466,7 @@ object UpdateToDbDto {
                   target_domain_id = u.reassignmentInfo.targetDomain.unwrap.toProtoPrimitive,
                   unassign_id = u.reassignmentInfo.unassignId.toMicros.toString,
                   reassignment_counter = u.reassignmentInfo.reassignmentCounter,
+                  trace_context = serializedTraceContext,
                 )
               ) ++ flatEventWitnesses.map(
                 DbDto.IdFilterAssignStakeholder(
@@ -471,16 +479,17 @@ object UpdateToDbDto {
 
           val completions = u.optCompletionInfo.iterator.map(
             commandCompletion(
-              offset,
-              u.recordTime,
-              Some(u.updateId),
+              offset = offset,
+              recordTime = u.recordTime,
+              transactionId = Some(u.updateId),
               _,
-              u.reassignment match {
+              domainId = u.reassignment match {
                 case _: Reassignment.Unassign =>
                   Some(u.reassignmentInfo.sourceDomain.unwrap.toProtoPrimitive)
                 case _: Reassignment.Assign =>
                   Some(u.reassignmentInfo.targetDomain.unwrap.toProtoPrimitive)
               },
+              serializedTraceContext = serializedTraceContext,
             )
           )
 
@@ -521,6 +530,7 @@ object UpdateToDbDto {
       transactionId: Option[Ref.TransactionId],
       completionInfo: CompletionInfo,
       domainId: Option[String],
+      serializedTraceContext: Array[Byte],
   ): DbDto.CommandCompletion = {
     val (deduplicationOffset, deduplicationDurationSeconds, deduplicationDurationNanos) =
       completionInfo.optDeduplicationPeriod
@@ -548,6 +558,7 @@ object UpdateToDbDto {
       deduplication_duration_nanos = deduplicationDurationNanos,
       deduplication_start = None,
       domain_id = domainId,
+      trace_context = serializedTraceContext,
     )
   }
 }

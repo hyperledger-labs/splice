@@ -122,6 +122,7 @@ object ApiConversions {
         case CompletionV2.DeduplicationPeriod.DeduplicationDuration(duration) =>
           CompletionV1.DeduplicationPeriod.DeduplicationDuration(duration)
       },
+      traceContext = completion.traceContext,
     )
 
   def toV1(completionStreamResponse: CompletionStreamResponseV2): CompletionStreamResponseV1 =
@@ -138,6 +139,7 @@ object ApiConversions {
       effectiveAt = transaction.effectiveAt,
       events = transaction.events,
       offset = transaction.offset,
+      traceContext = transaction.traceContext,
     )
 
   def toV1(transactionTree: TransactionTreeV2): TransactionTreeV1 =
@@ -149,6 +151,7 @@ object ApiConversions {
       offset = transactionTree.offset,
       rootEventIds = transactionTree.rootEventIds,
       eventsById = transactionTree.eventsById,
+      traceContext = transactionTree.traceContext,
     )
 
   def toV1(getUpdatesResponse: GetUpdatesResponse): Seq[GetTransactionsResponseV1] =

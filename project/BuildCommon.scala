@@ -977,6 +977,8 @@ object BuildCommon {
           reflections,
           scalatest % Test,
           daml_ledger_api_scalapb,
+          scalacheck % Test,
+          scalatestScalacheck % Test,
         ),
       )
   }
@@ -1056,6 +1058,7 @@ object BuildCommon {
       .dependsOn(
         `canton-ledger-common` % "compile->compile;test->test",
         `canton-community-base`,
+        `canton-community-common`,
       )
       .disablePlugins(
         WartRemover,
@@ -1094,6 +1097,7 @@ object BuildCommon {
           scalapb_runtime_grpc,
           scalapb_json4s % Test,
           scalapb_runtime,
+          scalaz_scalacheck % Test,
           testcontainers % Test,
           testcontainers_postgresql % Test,
         ),

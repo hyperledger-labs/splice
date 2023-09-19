@@ -136,7 +136,7 @@ object StaticDomainParameters
     ),
   )
 
-  override lazy val defaultValues = Seq(
+  override lazy val invariants = Seq(
     defaultReconciliationIntervalFrom,
     defaultMaxRatePerParticipantFrom,
     defaultMaxRequestSizeFrom,
@@ -146,7 +146,7 @@ object StaticDomainParameters
     protocolVersionRepresentativeFor(ProtocolVersion.v4)
 
   lazy val defaultReconciliationInterval: PositiveSeconds = PositiveSeconds.tryOfSeconds(60)
-  lazy val defaultReconciliationIntervalFrom = DefaultValueFrom(
+  lazy val defaultReconciliationIntervalFrom = DefaultValueFromInclusive(
     _.reconciliationInterval,
     "reconciliationInterval",
     rpv4,
@@ -154,7 +154,7 @@ object StaticDomainParameters
   )
 
   lazy val defaultMaxRatePerParticipant: NonNegativeInt = NonNegativeInt.tryCreate(1000000)
-  lazy val defaultMaxRatePerParticipantFrom = DefaultValueFrom(
+  lazy val defaultMaxRatePerParticipantFrom = DefaultValueFromInclusive(
     _.maxRatePerParticipant,
     "maxRatePerParticipant",
     rpv4,
@@ -164,7 +164,7 @@ object StaticDomainParameters
   lazy val defaultMaxRequestSize: MaxRequestSize = MaxRequestSize(
     NonNegativeInt.tryCreate(10 * 1024 * 1024)
   )
-  lazy val defaultMaxRequestSizeFrom = DefaultValueFrom(
+  lazy val defaultMaxRequestSizeFrom = DefaultValueFromInclusive(
     _.maxRequestSize,
     "maxRequestSize",
     rpv4,
@@ -380,6 +380,9 @@ object StaticDomainParameters
   *                               Otherwise, ACS commitments will keep being exchanged continuously on an idle domain.
   * @param maxRatePerParticipant maximum number of messages sent per participant per second
   * @param maxRequestSize maximum size of messages (in bytes) that the domain can receive through the public API
+  * @param sequencerAggregateSubmissionTimeout the maximum time for how long an incomplete aggregate submission request is
+  *                                            allowed to stay pending in the sequencer's state before it's removed.
+  *                                            Must be at least `participantResponseTimeout` + `mediatorReactionTimeout` in a practical system.
   * @throws DynamicDomainParameters$.InvalidDynamicDomainParameters
   *   if `mediatorDeduplicationTimeout` is less than twice of `ledgerTimeRecordTimeTolerance`.
   */
@@ -393,6 +396,7 @@ final case class DynamicDomainParameters(
     reconciliationInterval: PositiveSeconds,
     maxRatePerParticipant: NonNegativeInt,
     maxRequestSize: MaxRequestSize,
+    sequencerAggregateSubmissionTimeout: NonNegativeFiniteDuration,
 )(
     override val representativeProtocolVersion: RepresentativeProtocolVersion[
       DynamicDomainParameters.type
@@ -444,6 +448,8 @@ final case class DynamicDomainParameters(
       mediatorDeduplicationTimeout: NonNegativeFiniteDuration = mediatorDeduplicationTimeout,
       reconciliationInterval: PositiveSeconds = reconciliationInterval,
       maxRatePerParticipant: NonNegativeInt = maxRatePerParticipant,
+      sequencerAggregateSubmissionTimeout: NonNegativeFiniteDuration =
+        sequencerAggregateSubmissionTimeout,
   ): DynamicDomainParameters = DynamicDomainParameters.tryCreate(
     participantResponseTimeout = participantResponseTimeout,
     mediatorReactionTimeout = mediatorReactionTimeout,
@@ -454,6 +460,7 @@ final case class DynamicDomainParameters(
     reconciliationInterval = reconciliationInterval,
     maxRatePerParticipant = maxRatePerParticipant,
     maxRequestSize = maxRequestSize,
+    sequencerAggregateSubmissionTimeout = sequencerAggregateSubmissionTimeout,
   )(representativeProtocolVersion)
 
   def toProtoV0: protoV0.DynamicDomainParameters =
@@ -496,6 +503,7 @@ final case class DynamicDomainParameters(
     defaultParticipantLimits = Some(v2DefaultParticipantLimits.toProto),
     // TODO(#14050) limit number of participants that can be allocated to a given party
     defaultMaxHostingParticipantsPerParty = 0,
+    sequencerAggregateSubmissionTimeout = Some(sequencerAggregateSubmissionTimeout.toProtoPrimitive),
   )
 
   // TODO(#14052) add topology limits
@@ -521,6 +529,7 @@ final case class DynamicDomainParameters(
         param("reconciliation interval", _.reconciliationInterval),
         param("max rate per participant", _.maxRatePerParticipant),
         param("max request size", _.maxRequestSize.value),
+        param("sequencer aggregate submission timeout", _.sequencerAggregateSubmissionTimeout),
       )
     } else if (
       representativeProtocolVersion >= companionObj.protocolVersionRepresentativeFor(
@@ -568,33 +577,43 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
 
   override def name: String = "dynamic domain parameters"
 
-  private lazy val rpv3 = protocolVersionRepresentativeFor(ProtocolVersion.v3)
+  private lazy val rpv4 = protocolVersionRepresentativeFor(ProtocolVersion.v4)
 
-  override lazy val defaultValues = Seq(
+  // TODO(#12373): Adjust when releasing BFT
+  private lazy val rpvDev = protocolVersionRepresentativeFor(ProtocolVersion.dev)
+
+  override lazy val invariants = Seq(
     defaultReconciliationIntervalUntil,
     defaultMaxRatePerParticipantUntil,
     defaultMaxRequestSizeUntil,
   )
 
-  lazy val defaultReconciliationIntervalUntil = DefaultValueUntil(
+  lazy val defaultReconciliationIntervalUntil = DefaultValueUntilExclusive(
     _.reconciliationInterval,
     "reconciliationInterval",
-    rpv3,
+    rpv4,
     StaticDomainParameters.defaultReconciliationInterval,
   )
 
-  lazy val defaultMaxRatePerParticipantUntil = DefaultValueUntil(
+  lazy val defaultMaxRatePerParticipantUntil = DefaultValueUntilExclusive(
     _.maxRatePerParticipant,
     "maxRatePerParticipant",
-    rpv3,
+    rpv4,
     StaticDomainParameters.defaultMaxRatePerParticipant,
   )
 
-  lazy val defaultMaxRequestSizeUntil = DefaultValueUntil(
+  lazy val defaultMaxRequestSizeUntil = DefaultValueUntilExclusive(
     _.maxRequestSize,
     "maxRequestSize",
-    rpv3,
+    rpv4,
     StaticDomainParameters.defaultMaxRequestSize,
+  )
+
+  lazy val defaultSequencerAggregateSubmissionTimeoutUntilExclusive = DefaultValueUntilExclusive(
+    _.sequencerAggregateSubmissionTimeout,
+    "sequencerAggregateSubmissionTimeout",
+    rpvDev,
+    defaultSequencerAggregateSubmissionTimeout,
   )
 
   private val defaultParticipantResponseTimeout: NonNegativeFiniteDuration =
@@ -616,6 +635,10 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
   private val defaultMediatorDeduplicationTimeout: NonNegativeFiniteDuration =
     defaultLedgerTimeRecordTimeTolerance * NonNegativeInt.tryCreate(2)
 
+  // Based on SequencerClientConfig.defaultMaxSequencingTimeOffset
+  private val defaultSequencerAggregateSubmissionTimeout: NonNegativeFiniteDuration =
+    NonNegativeFiniteDuration.tryOfMinutes(5)
+
   /** Safely creates DynamicDomainParameters.
     *
     * @return `Left(...)` if `mediatorDeduplicationTimeout` is less than twice of `ledgerTimeRecordTimeTolerance`.
@@ -630,6 +653,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       reconciliationInterval: PositiveSeconds,
       maxRatePerParticipant: NonNegativeInt,
       maxRequestSize: MaxRequestSize,
+      sequencerAggregateSubmissionTimeout: NonNegativeFiniteDuration,
   )(
       representativeProtocolVersion: RepresentativeProtocolVersion[DynamicDomainParameters.type]
   ): Either[InvalidDynamicDomainParameters, DynamicDomainParameters] =
@@ -644,6 +668,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
         reconciliationInterval,
         maxRatePerParticipant,
         maxRequestSize,
+        sequencerAggregateSubmissionTimeout,
       )(representativeProtocolVersion)
     )
 
@@ -661,6 +686,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       reconciliationInterval: PositiveSeconds,
       maxRatePerParticipant: NonNegativeInt,
       maxRequestSize: MaxRequestSize,
+      sequencerAggregateSubmissionTimeout: NonNegativeFiniteDuration,
   )(
       representativeProtocolVersion: RepresentativeProtocolVersion[DynamicDomainParameters.type]
   ): DynamicDomainParameters =
@@ -685,6 +711,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
         maxRequestSize,
         representativeProtocolVersion,
       ),
+      sequencerAggregateSubmissionTimeout,
     )(representativeProtocolVersion)
 
   /** Default dynamic domain parameters for non-static clocks */
@@ -717,6 +744,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       reconciliationInterval = StaticDomainParameters.defaultReconciliationInterval,
       maxRatePerParticipant = StaticDomainParameters.defaultMaxRatePerParticipant,
       maxRequestSize = StaticDomainParameters.defaultMaxRequestSize,
+      sequencerAggregateSubmissionTimeout = defaultSequencerAggregateSubmissionTimeout,
     )(
       protocolVersionRepresentativeFor(protocolVersion)
     )
@@ -728,7 +756,10 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       maxRatePerParticipant: NonNegativeInt = StaticDomainParameters.defaultMaxRatePerParticipant,
       maxRequestSize: MaxRequestSize = StaticDomainParameters.defaultMaxRequestSize,
       mediatorReactionTimeout: NonNegativeFiniteDuration = defaultMediatorReactionTimeout,
-      reconciliationInterval: PositiveSeconds = StaticDomainParameters.defaultReconciliationInterval,
+      reconciliationInterval: PositiveSeconds =
+        StaticDomainParameters.defaultReconciliationInterval,
+      sequencerAggregateSubmissionTimeout: NonNegativeFiniteDuration =
+        defaultSequencerAggregateSubmissionTimeout,
   ) =
     DynamicDomainParameters.tryCreate(
       participantResponseTimeout = defaultParticipantResponseTimeout,
@@ -740,6 +771,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       reconciliationInterval = reconciliationInterval,
       maxRatePerParticipant = maxRatePerParticipant,
       maxRequestSize = maxRequestSize,
+      sequencerAggregateSubmissionTimeout = sequencerAggregateSubmissionTimeout,
     )(
       protocolVersionRepresentativeFor(protocolVersion)
     )
@@ -848,6 +880,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
         mediatorDeduplicationTimeout = ledgerTimeRecordTimeTolerance * NonNegativeInt.tryCreate(2),
         maxRatePerParticipant = StaticDomainParameters.defaultMaxRatePerParticipant,
         maxRequestSize = StaticDomainParameters.defaultMaxRequestSize,
+        sequencerAggregateSubmissionTimeout = defaultSequencerAggregateSubmissionTimeout,
       )(protocolVersionRepresentativeFor(ProtoVersion(0)))
     )
   }
@@ -939,6 +972,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
           reconciliationInterval = reconciliationInterval,
           maxRatePerParticipant = maxRatePerParticipant,
           maxRequestSize = maxRequestSize,
+          sequencerAggregateSubmissionTimeout = defaultSequencerAggregateSubmissionTimeout,
         )(protocolVersionRepresentativeFor(ProtoVersion(1)))
           .leftMap(_.toProtoDeserializationError)
     } yield domainParameters
@@ -961,6 +995,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       _onlyRequiredPackagesPermitted,
       defaultLimitsP,
       _partyHostingLimits,
+      sequencerAggregateSubmissionTimeoutP,
     ) = domainParametersP
     for {
       decodedV0 <- fromProtoSharedV0(
@@ -994,7 +1029,11 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
         maxRatePerParticipant,
         maxRequestSize,
       ) = decodedV1
-
+      sequencerAggregateSubmissionTimeout <- NonNegativeFiniteDuration.fromProtoPrimitiveO(
+        "sequencerAggregateSubmissionTimeout"
+      )(
+        sequencerAggregateSubmissionTimeoutP
+      )
       domainParameters <-
         create(
           participantResponseTimeout = participantResponseTimeout,
@@ -1006,6 +1045,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
           reconciliationInterval = reconciliationInterval,
           maxRatePerParticipant = maxRatePerParticipant,
           maxRequestSize = maxRequestSize,
+          sequencerAggregateSubmissionTimeout = sequencerAggregateSubmissionTimeout,
         )(protocolVersionRepresentativeFor(ProtoVersion(1)))
           .leftMap(_.toProtoDeserializationError)
     } yield domainParameters

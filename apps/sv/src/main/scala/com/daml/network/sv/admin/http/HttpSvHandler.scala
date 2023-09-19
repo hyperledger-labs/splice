@@ -453,7 +453,7 @@ class HttpSvHandler(
               participantAdminConnection
                 .downloadAcsSnapshot(
                   Set(svcParty),
-                  filterDomainId = globalDomain.toProtoPrimitive,
+                  filterDomainId = Some(globalDomain),
                   timestamp = Some(acsOffset),
                 )
                 .recoverWith { case ex: StatusRuntimeException =>

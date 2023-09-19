@@ -25,4 +25,12 @@ class ScanApps(
       ScanAppBackendConfig,
       SharedCNNodeAppParameters,
       ScanAppBootstrap,
-    ](create, migrationsFactory, _timeouts, configs, parametersFor, _loggerFactory) {}
+    ](
+      create,
+      migrationsFactory,
+      _timeouts,
+      configs,
+      parametersFor,
+      startUpGroup = 0,
+      _loggerFactory,
+    ) {}

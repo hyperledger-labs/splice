@@ -11,11 +11,10 @@ import com.digitalasset.canton.admin.api.client.commands.{
   VaultAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.ListConnectedDomainsResult
-import com.digitalasset.canton.config.{ClientConfig, ConsoleCommandTimeout, NonNegativeDuration}
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.crypto.{Fingerprint, Hash, HashAlgorithm, HashOps, HashPurpose}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.admin.v0.AcsSnapshotChunk
+import com.digitalasset.canton.participant.admin.v0.ExportAcsResponse
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
@@ -31,8 +30,6 @@ import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 import com.digitalasset.canton.health.admin.data.{NodeStatus, ParticipantStatus}
-
-import scala.concurrent.duration.Duration
 
 /** Connection to the subset of the Canton admin API that we rely
   * on in our own applications.
@@ -66,26 +63,6 @@ class ParticipantAdminConnection(
 
   def getStatus()(implicit traceContext: TraceContext): Future[NodeStatus[ParticipantStatus]] =
     runCmd(participantStatusCommand)
-
-  // TODO(#7599) - Remove this once we bump our Canton binary to incorporate the changes in https://github.com/DACH-NY/canton/pull/1448
-  def ping(
-      participantId: ParticipantId,
-      timeout: NonNegativeDuration = ConsoleCommandTimeout.defaultPingTimeout,
-      workflowId: String = "",
-      id: String = "",
-  )(implicit traceContext: TraceContext): Future[Option[Duration]] = {
-    runCmd(
-      ParticipantAdminCommands.Ping.Ping(
-        Set[String](participantId.adminParty.toLf),
-        Set(),
-        timeout.asFiniteApproximation.toMillis,
-        0,
-        0,
-        workflowId,
-        id,
-      )
-    )
-  }
 
   def reconnectAllDomains()(implicit
       traceContext: TraceContext
@@ -151,22 +128,19 @@ class ParticipantAdminConnection(
 
   def downloadAcsSnapshot(
       parties: Set[PartyId],
-      filterDomainId: String = "",
+      filterDomainId: Option[DomainId] = None,
       timestamp: Option[Instant] = None,
-      chunkSize: Option[PositiveInt] = None,
   )(implicit traceContext: TraceContext): Future[ByteString] = {
     val requestComplete = Promise[ByteString]()
     // TODO(#3298) just concatenate the byteString here. Make it scale to 2M contracts.
-    val observer = new GrpcByteChunksToByteArrayObserver[AcsSnapshotChunk](requestComplete)
+    val observer = new GrpcByteChunksToByteArrayObserver[ExportAcsResponse](requestComplete)
     runCmd(
-      ParticipantAdminCommands.ParticipantRepairManagement.Download(
+      ParticipantAdminCommands.ParticipantRepairManagement.ExportAcs(
         parties,
         filterDomainId,
         timestamp,
         None,
-        chunkSize,
         observer,
-        gzipFormat = true,
         Map.empty,
       )
     ).discard
@@ -177,7 +151,7 @@ class ParticipantAdminConnection(
       traceContext: TraceContext
   ): Future[Unit] = {
     runCmd(
-      ParticipantAdminCommands.ParticipantRepairManagement.Upload(acsBytes, gzip = true)
+      ParticipantAdminCommands.ParticipantRepairManagement.ImportAcs(acsBytes)
     )
   }
 

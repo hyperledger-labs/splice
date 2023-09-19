@@ -45,6 +45,9 @@ import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.ledger.runner.common.PureConfigReaderWriter.Secure.{
   commandConfigurationConvert,
   dbConfigPostgresDataSourceConfigConvert,
+  identityProviderManagementConfigConvert,
+  indexServiceConfigConvert,
+  indexerConfigConvert,
   userManagementServiceConfigConvert,
 }
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -58,13 +61,23 @@ import com.digitalasset.canton.participant.config.ParticipantInitConfig.{
 import com.digitalasset.canton.participant.config.*
 import com.digitalasset.canton.platform.apiserver.SeedService.Seeding
 import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
+import com.digitalasset.canton.platform.config.ActiveContractsServiceStreamsConfig
 import com.digitalasset.canton.platform.indexer.PackageMetadataViewConfig
 import com.digitalasset.canton.protocol.DomainParameters.MaxRequestSize
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.tracing.TracingConfig
 import com.typesafe.config.ConfigException.UnresolvedSubstitution
-import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigRenderOptions}
+import com.typesafe.config.{
+  Config,
+  ConfigException,
+  ConfigFactory,
+  ConfigList,
+  ConfigObject,
+  ConfigRenderOptions,
+  ConfigValue,
+  ConfigValueFactory,
+}
 import com.typesafe.scalalogging.LazyLogging
 import monocle.macros.syntax.lens.*
 import pureconfig.*
@@ -76,6 +89,7 @@ import java.nio.file.{Path, Paths}
 import scala.annotation.nowarn
 import scala.concurrent.duration.*
 import scala.reflect.ClassTag
+import scala.util.Try
 
 /** Configuration for a check */
 sealed trait CheckConfig
@@ -267,6 +281,7 @@ final case class RetentionPeriodDefaults(
   *
   * @param enableAdditionalConsistencyChecks if true, run additional consistency checks. This will degrade performance.
   * @param manualStart  If set to true, the nodes have to be manually started via console (default false)
+  * @param startupParallelism Start up to N nodes in parallel (default is num-threads)
   * @param nonStandardConfig don't fail config validation on non-standard configuration settings
   * @param devVersionSupport If true, allow domain nodes to use unstable protocol versions and participant nodes to connect to such domains
   * @param timeouts Sets the timeouts used for processing and console
@@ -276,13 +291,17 @@ final case class CantonParameters(
     clock: ClockConfig = ClockConfig.WallClock(),
     enableAdditionalConsistencyChecks: Boolean = false,
     manualStart: Boolean = false,
+    startupParallelism: Option[PositiveInt] = None,
     nonStandardConfig: Boolean = false,
     devVersionSupport: Boolean = false,
     portsFile: Option[String] = None,
     timeouts: TimeoutSettings = TimeoutSettings(),
     retentionPeriodDefaults: RetentionPeriodDefaults = RetentionPeriodDefaults(),
     console: AmmoniteConsoleConfig = AmmoniteConsoleConfig(),
-)
+) {
+  def getStartupParallelism(numThreads: Int): Int =
+    startupParallelism.fold(numThreads)(_.value)
+}
 
 /** Control which features are turned on / off in Canton
   *
@@ -560,7 +579,7 @@ object CantonConfig {
     import ParticipantInitConfig.DeprecatedImplicits.*
     import com.digitalasset.canton.config.CheckConfig.IsActive.DeprecatedImplicits.*
     import com.digitalasset.canton.metrics.MetricsReporterConfig.DeprecatedImplicits.*
-    import com.digitalasset.canton.participant.config.ActiveContractsServiceConfig.DeprecatedImplicits.*
+    import com.digitalasset.canton.platform.config.ActiveContractsServiceStreamsConfig.DeprecatedImplicits.*
     import com.digitalasset.canton.participant.config.LedgerApiServerConfig.DeprecatedImplicits.*
 
     lazy implicit val lengthLimitedStringReader: ConfigReader[LengthLimitedString] = {
@@ -828,14 +847,8 @@ object CantonConfig {
     lazy implicit val httpApiServerConfigReader: ConfigReader[HttpApiConfig] =
       deriveReader[HttpApiConfig]
     lazy implicit val activeContractsServiceConfigReader
-        : ConfigReader[ActiveContractsServiceConfig] =
-      deriveReader[ActiveContractsServiceConfig].applyDeprecations
-    lazy implicit val flatTransactionStreamsConfigReader
-        : ConfigReader[FlatTransactionStreamsConfig] = deriveReader[FlatTransactionStreamsConfig]
-    lazy implicit val treeTransactionStreamsConfigReader
-        : ConfigReader[TreeTransactionStreamsConfig] = deriveReader[TreeTransactionStreamsConfig]
-    lazy implicit val indexerConfigReader: ConfigReader[IndexerConfig] =
-      deriveReader[IndexerConfig]
+        : ConfigReader[ActiveContractsServiceStreamsConfig] =
+      deriveReader[ActiveContractsServiceStreamsConfig].applyDeprecations
     lazy implicit val packageMetadataViewConfigReader: ConfigReader[PackageMetadataViewConfig] =
       deriveReader[PackageMetadataViewConfig]
     lazy implicit val identityConfigReader: ConfigReader[TopologyConfig] =
@@ -1203,15 +1216,10 @@ object CantonConfig {
     lazy implicit val httpApiServerConfigWriter: ConfigWriter[HttpApiConfig] =
       deriveWriter[HttpApiConfig]
     lazy implicit val activeContractsServiceConfigWriter
-        : ConfigWriter[ActiveContractsServiceConfig] = deriveWriter[ActiveContractsServiceConfig]
-    lazy implicit val flatTransactionStreamsConfigWriter
-        : ConfigWriter[FlatTransactionStreamsConfig] = deriveWriter[FlatTransactionStreamsConfig]
-    lazy implicit val treeTransactionStreamsConfigWriter
-        : ConfigWriter[TreeTransactionStreamsConfig] = deriveWriter[TreeTransactionStreamsConfig]
+        : ConfigWriter[ActiveContractsServiceStreamsConfig] =
+      deriveWriter[ActiveContractsServiceStreamsConfig]
     lazy implicit val packageMetadataViewConfigWriter: ConfigWriter[PackageMetadataViewConfig] =
       deriveWriter[PackageMetadataViewConfig]
-    lazy implicit val indexerConfigWriter: ConfigWriter[IndexerConfig] =
-      deriveWriter[IndexerConfig]
     lazy implicit val identityConfigWriter: ConfigWriter[TopologyConfig] =
       deriveWriter[TopologyConfig]
     lazy implicit val topologyXConfigWriter: ConfigWriter[TopologyXConfig] =
@@ -1388,6 +1396,54 @@ object CantonConfig {
       parsedFiles <- parseConfigs(verifiedFiles)
       combinedConfig = mergeConfigs(parsedFiles)
     } yield combinedConfig
+  }
+
+  /** Renders a configuration file such that we can write it to the log-file on startup */
+  def renderForLoggingOnStartup(config: Config): String = {
+    import scala.jdk.CollectionConverters.*
+    val replace = Set("secret", "pw", "password", "ledger-api-jdbc-url")
+    val blinded = ConfigValueFactory.fromAnyRef("****")
+    def goVal(key: String, c: ConfigValue): ConfigValue = {
+      c match {
+        case lst: ConfigList => goLst(lst)
+        case obj: ConfigObject =>
+          goObj(obj)
+        case other =>
+          if (replace.contains(key))
+            blinded
+          else other
+      }
+    }
+    def goObj(c: ConfigObject): ConfigObject = {
+      val resolved = Try(c.isEmpty).isSuccess
+      if (resolved) {
+        c.entrySet().asScala.map(x => (x.getKey, x.getValue)).foldLeft(c) {
+          case (acc, (key, value)) =>
+            acc.withValue(key, goVal(key, value))
+        }
+      } else c
+    }
+    def goLst(c: ConfigList): ConfigList = {
+      val mapped = (0 until c.size()) map { idx =>
+        goVal("idx", c.get(idx))
+      }
+      ConfigValueFactory.fromIterable(mapped.asJava)
+    }
+    def go(c: Config): Config = {
+      c
+        .root()
+        .entrySet()
+        .asScala
+        .map(x => (x.getKey, x.getValue))
+        .foldLeft(c) { case (subConfig, (key, obj)) =>
+          subConfig.withValue(key, goVal(key, obj))
+        }
+    }
+    go(config)
+      .resolve()
+      .root()
+      .get("canton")
+      .render(CantonConfig.defaultConfigRenderer)
   }
 
   private def verifyThatFilesCanBeRead(

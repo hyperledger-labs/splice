@@ -4,12 +4,13 @@
 package com.digitalasset.canton.participant.protocol.validation
 
 import cats.data.EitherT
+import cats.syntax.alternative.*
 import cats.syntax.bifunctor.*
+import cats.syntax.functor.*
 import cats.syntax.parallel.*
-import com.daml.lf.data.Ref.Identifier
+import com.daml.lf.data.Ref.{Identifier, PackageId}
 import com.daml.lf.engine
 import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.data.ViewParticipantData.RootAction
 import com.digitalasset.canton.data.{
   CantonTimestamp,
@@ -39,6 +40,7 @@ import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{MediatorRef, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{
@@ -49,11 +51,9 @@ import com.digitalasset.canton.{
   RequestCounter,
   checked,
 }
-import com.google.common.annotations.VisibleForTesting
 
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{ExecutionContext, Future}
 
 /** Allows for checking model conformance of a list of transaction view trees.
   * If successful, outputs the received transaction as LfVersionedTransaction along with TransactionMetadata.
@@ -82,6 +82,7 @@ class ModelConformanceChecker(
         TraceContext,
     ) => EitherT[Future, ContractValidationFailure, Unit],
     val transactionTreeFactory: TransactionTreeFactory,
+    participantId: ParticipantId,
     val enableContractUpgrading: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
@@ -89,73 +90,115 @@ class ModelConformanceChecker(
 
   /** Reinterprets the transaction resulting from the received transaction view trees.
     *
-    * @param rootViews all received transaction view trees contained in a confirmation request that
-    *                  have the same transaction id and represent a top-most view
+    * @param rootViewTrees all received transaction view trees contained in a confirmation request that
+    *                      have the same transaction id and represent a top-most view
     * @param keyResolverFor The key resolver to be used for re-interpreting root views
     * @param commonData the common data of all the (rootViewTree :  TransactionViewTree) trees in `rootViews`
     * @return the resulting LfTransaction with [[com.digitalasset.canton.protocol.LfContractId]]s only
     */
   def check(
-      rootViews: NonEmpty[Seq[TransactionViewTree]],
-      keyResolverFor: TransactionViewTree => LfKeyResolver,
+      rootViewTrees: NonEmpty[Seq[TransactionViewTree]],
+      keyResolverFor: TransactionView => LfKeyResolver,
       requestCounter: RequestCounter,
       topologySnapshot: TopologySnapshot,
       commonData: CommonData,
-  )(implicit traceContext: TraceContext): EitherT[Future, ErrorWithSubviewsCheck, Result] = {
+  )(implicit traceContext: TraceContext): EitherT[Future, ErrorWithSubTransaction, Result] = {
     val CommonData(transactionId, ledgerTime, submissionTime, confirmationPolicy) = commonData
 
-    val modelCheckET = for {
-      suffixedTxs <- rootViews.toNEF.parTraverse { viewTree =>
-        checkView(
-          viewTree.view,
-          viewTree.viewPosition,
-          viewTree.mediator,
-          viewTree.transactionUuid,
-          keyResolverFor(viewTree),
-          requestCounter,
-          ledgerTime,
-          submissionTime,
-          confirmationPolicy,
-          viewTree.submitterMetadataO.map(_.submitterParticipant),
-          topologySnapshot,
-        )
-      }
+    // Previous checks in Phase 3 ensure that all the root views are sent to the same
+    // mediator, and that they all have the same correct root hash, and therefore the
+    // same CommonMetadata (which contains the UUID).
+    val mediator = rootViewTrees.head1.mediator
+    val transactionUuid = rootViewTrees.head1.transactionUuid
 
-      joinedWfTx <- EitherT
-        .fromEither[Future](WellFormedTransaction.merge(suffixedTxs))
-        .leftMap[Error](JoinedTransactionNotWellFormed)
-    } yield {
-      Result(transactionId, joinedWfTx)
-    }
+    def findValidSubtransactions(
+        views: Seq[(TransactionView, ViewPosition, Option[ParticipantId])]
+    ): Future[
+      (
+          Seq[Error],
+          Seq[(TransactionView, WithRollbackScope[WellFormedTransaction[WithSuffixes]])],
+      )
+    ] = views
+      .parTraverse { case (view, viewPos, submittingParticipantO) =>
+        for {
+          wfTxE <- checkView(
+            view,
+            viewPos,
+            mediator,
+            transactionUuid,
+            keyResolverFor(view),
+            requestCounter,
+            ledgerTime,
+            submissionTime,
+            confirmationPolicy,
+            submittingParticipantO,
+            topologySnapshot,
+          ).value
 
-    lazy val aSubviewIsValidF =
-      rootViews.toNEF.parTraverse { viewTree =>
-        viewTree.view
-          .allSubviewsWithPosition(viewTree.viewPosition)
-          .drop(1) // The first entry is the root view itself
-          .parTraverse { case (view, viewPos) =>
-            checkView(
-              view,
-              viewPos,
-              viewTree.mediator,
-              viewTree.transactionUuid,
-              keyResolverFor(viewTree),
-              requestCounter,
-              ledgerTime,
-              submissionTime,
-              confirmationPolicy,
-              None,
-              topologySnapshot,
-            ).swap
+          errorsViewsTxs <- wfTxE match {
+            case Right(wfTx) => Future.successful((Seq.empty, Seq((view, wfTx))))
+
+            case Left(error) =>
+              val subviewsWithInfo = view.subviews.unblindedElementsWithIndex.map {
+                case (sv, svIndex) => (sv, svIndex +: viewPos, None)
+              }
+
+              findValidSubtransactions(subviewsWithInfo).map { case (subErrors, subViewsTxs) =>
+                // If a view is not model conformant, all its ancestors are not either.
+                // To avoid redundant errors, return this view's error only if the subviews are valid.
+                val errors = if (subErrors.isEmpty) Seq(error) else subErrors
+
+                (errors, subViewsTxs)
+              }
           }
-      }.isLeft
-
-    modelCheckET.leftFlatMap { error =>
-      val errorWithSubviewsCheck = aSubviewIsValidF.map { aSubviewIsValid =>
-        Left(ErrorWithSubviewsCheck(aSubviewIsValid, error))
+        } yield errorsViewsTxs
       }
-      EitherT[Future, ErrorWithSubviewsCheck, Result](errorWithSubviewsCheck)
+      .map { aggregate =>
+        val (errorsSeq, viewsTxsSeq) = aggregate.separate
+        (errorsSeq.flatten, viewsTxsSeq.flatten)
+      }
+
+    val rootViewsWithInfo = rootViewTrees.map { viewTree =>
+      val submitterParticipantO = viewTree.submitterMetadataO.map(_.submitterParticipant)
+      (viewTree.view, viewTree.viewPosition, submitterParticipantO)
     }
+
+    val resultFE = findValidSubtransactions(rootViewsWithInfo).map { case (errors, viewsTxs) =>
+      val (views, txs) = viewsTxs.separate
+
+      val wftxO = NonEmpty.from(txs) match {
+        case Some(txsNE) =>
+          WellFormedTransaction
+            .merge(txsNE)
+            .leftMap(mergeError =>
+              // TODO(i14473): Handle failures to merge a transaction while preserving transparency
+              ErrorUtil.internalError(
+                new IllegalStateException(
+                  s"Model conformance check failure when merging transaction $transactionId: $mergeError"
+                )
+              )
+            )
+            .toOption
+
+        case None => None
+      }
+
+      NonEmpty.from(errors) match {
+        case None =>
+          wftxO match {
+            case Some(wftx) => Right(Result(transactionId, wftx))
+            case _ =>
+              ErrorUtil.internalError(
+                new IllegalStateException(
+                  s"Model conformance check for transaction $transactionId completed successfully but without a valid transaction"
+                )
+              )
+          }
+        case Some(errorsNE) => Left(ErrorWithSubTransaction(errorsNE, wftxO, views))
+      }
+    }
+
+    EitherT(resultFE)
   }
 
   private def validateInputContracts(
@@ -201,6 +244,9 @@ class ModelConformanceChecker(
     val seed = viewParticipantData.actionDescription.seedOption
     for {
       viewInputContracts <- validateInputContracts(view, requestCounter)
+
+      _ <- validatePackageVettings(view, topologySnapshot)
+
       lookupWithKeys =
         new ExtendedContractLookup(
           ContractLookup.noContracts(logger), // all contracts and keys specified explicitly
@@ -257,44 +303,44 @@ class ModelConformanceChecker(
     } yield WithRollbackScope(rbContext.rollbackScope, suffixedTx)
   }
 
+  private def validatePackageVettings(view: TransactionView, snapshot: TopologySnapshot)(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, Error, Unit] = {
+    val referencedContracts =
+      (view.inputContracts.fmap(_.contract) ++ view.createdContracts.fmap(_.contract)).values.toSet
+    val packageIds = referencedContracts.map(_.contractInstance.unversioned.template.packageId)
+
+    val informees = view.viewCommonData.tryUnwrap.informees.map(_.party)
+
+    EitherT(for {
+      informeeParticipantsByParty <- snapshot.activeParticipantsOfParties(informees.toSeq)
+      informeeParticipants = informeeParticipantsByParty.values.flatten.toSet
+      unvettedResult <- informeeParticipants.toSeq
+        .parTraverse(p => snapshot.findUnvettedPackagesOrDependencies(p, packageIds).map(p -> _))
+        .value
+      unvettedPackages = unvettedResult match {
+        case Left(packageId) =>
+          // The package is not in the store and thus the package is not vetted.
+          // If the admin has tampered with the package store and the package is still vetted,
+          // we consider this participant as malicious;
+          // in that case, other participants may still commit the view.
+          Seq(participantId -> Set(packageId))
+        case Right(unvettedSeq) =>
+          unvettedSeq.filter { case (_, packageIds) => packageIds.nonEmpty }
+      }
+    } yield {
+      Either.cond(unvettedPackages.isEmpty, (), UnvettedPackages(unvettedPackages.toMap))
+    })
+  }
+
 }
 
 object ModelConformanceChecker {
-
-  private val subviewsCheckIsEnabled = new AtomicReference[Boolean](true)
-  private val testsAllowedToDisableConformanceCheck = Seq("LedgerAuthorizationIntegrationTest")
-
-  private[protocol] def isSubviewsCheckEnabled(loggerName: String): Boolean = {
-    val checkIsEnabled = subviewsCheckIsEnabled.get()
-
-    // Ensure check is enabled except for tests allowed to disable it
-    checkIsEnabled || !testsAllowedToDisableConformanceCheck.exists(loggerName.startsWith)
-  }
-
-  @VisibleForTesting
-  def withSubviewsCheckDisabled[A](loggerFactory: NamedLoggerFactory)(body: => A): A = {
-    // Limit disabling the checks to specific tests
-    require(
-      testsAllowedToDisableConformanceCheck.exists(loggerFactory.name.startsWith),
-      "The subviews check can only be disabled for some specific tests",
-    )
-
-    blocking {
-      synchronized {
-        subviewsCheckIsEnabled.set(false)
-        try {
-          body
-        } finally {
-          subviewsCheckIsEnabled.set(true)
-        }
-      }
-    }
-  }
-
   def apply(
       damle: DAMLe,
       transactionTreeFactory: TransactionTreeFactory,
       protocolVersion: ProtocolVersion,
+      participantId: ParticipantId,
       enableContractUpgrading: Boolean,
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext): ModelConformanceChecker = {
@@ -326,6 +372,7 @@ object ModelConformanceChecker {
       if (protocolVersion >= ProtocolVersion.v5) validateSerializedContract(damle)
       else noSerializedContractValidation,
       transactionTreeFactory,
+      participantId,
       enableContractUpgrading,
       loggerFactory,
     )
@@ -386,11 +433,20 @@ object ModelConformanceChecker {
 
   sealed trait Error extends PrettyPrinting
 
-  final case class ErrorWithSubviewsCheck(aSubviewIsValid: Boolean, error: Error)
-      extends PrettyPrinting {
-    override def pretty: Pretty[ErrorWithSubviewsCheck] = prettyOfClass(
-      param("a subview is valid", _.aSubviewIsValid),
-      unnamedParam(_.error),
+  /** Enriches a model conformance error with the valid subtransaction, if any.
+    * If there is a valid subtransaction, the list of valid subview trees will not be empty.
+    */
+  final case class ErrorWithSubTransaction(
+      errors: NonEmpty[Seq[Error]],
+      validSubTransactionO: Option[WellFormedTransaction[WithSuffixesAndMerged]],
+      validSubViews: Seq[TransactionView],
+  ) extends PrettyPrinting {
+    require(validSubTransactionO.isEmpty == validSubViews.isEmpty)
+
+    override def pretty: Pretty[ErrorWithSubTransaction] = prettyOfClass(
+      param("valid subtransaction", _.validSubTransactionO.toString.unquoted),
+      param("valid subviews", _.validSubViews),
+      param("errors", _.errors),
     )
   }
 
@@ -472,6 +528,20 @@ object ModelConformanceChecker {
       param("contractId", _.contractId),
       param("templateId", _.templateId),
       unnamedParam(_.viewHash),
+    )
+  }
+
+  final case class UnvettedPackages(
+      unvetted: Map[ParticipantId, Set[PackageId]]
+  ) extends Error {
+    override def pretty: Pretty[UnvettedPackages] = prettyOfClass(
+      unnamedParam(
+        _.unvetted
+          .map { case (participant, packageIds) =>
+            show"$participant has not vetted $packageIds".unquoted
+          }
+          .mkShow("\n")
+      )
     )
   }
 

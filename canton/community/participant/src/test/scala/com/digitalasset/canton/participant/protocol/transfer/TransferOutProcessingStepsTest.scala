@@ -31,6 +31,7 @@ import com.digitalasset.canton.participant.protocol.submission.{
 import com.digitalasset.canton.participant.protocol.transfer.TransferOutProcessingSteps.PendingTransferOut
 import com.digitalasset.canton.participant.protocol.transfer.TransferOutProcessorError.*
 import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.{
+  IncompatibleProtocolVersions,
   NoTransferSubmissionPermission,
   TransferProcessorError,
 }
@@ -51,8 +52,8 @@ import com.digitalasset.canton.topology.transaction.ParticipantPermission.{
 }
 import com.digitalasset.canton.topology.transaction.{ParticipantPermission, VettedPackages}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetProtocolVersion}
+import com.digitalasset.canton.version.{HasTestCloseContext, ProtocolVersion}
 import com.digitalasset.canton.{
   BaseTest,
   HasExecutorService,
@@ -78,7 +79,8 @@ import scala.concurrent.{ExecutionContext, Future}
 final class TransferOutProcessingStepsTest
     extends AsyncWordSpec
     with BaseTest
-    with HasExecutorService {
+    with HasExecutorService
+    with HasTestCloseContext {
 
   private implicit val ec: ExecutionContext = executorService
 
@@ -612,6 +614,65 @@ final class TransferOutProcessingStepsTest
         )("prepare submission succeeded unexpectedly")
       } yield {
         submissionResult shouldBe a[TargetDomainIsSourceDomain]
+      }
+    }
+
+    "forbid transfer if the target domain does not support transfer counters and the source domain supports them" in {
+      val targetProtocolVersion = TargetProtocolVersion(ProtocolVersion.v4)
+      val state = mkState
+      val contractId = ExampleTransactionFactory.suffixedId(10, 0)
+      val contract = ExampleTransactionFactory.asSerializable(
+        contractId,
+        contractInstance = ExampleTransactionFactory.contractInstance(templateId = templateId),
+        metadata = ContractMetadata.tryCreate(
+          signatories = Set(party1),
+          stakeholders = Set(party1),
+          maybeKeyWithMaintainers = None,
+        ),
+      )
+      val transactionId = ExampleTransactionFactory.transactionId(1)
+      val submissionParam = TransferOutProcessingSteps.SubmissionParam(
+        submitterMetadata = submitterMetadata(party1),
+        contractId,
+        TargetDomainId(targetDomain.id),
+        targetProtocolVersion,
+      )
+
+      for {
+        _ <- state.storedContractManager.addPendingContracts(
+          RequestCounter(1),
+          Seq(WithTransactionId(contract, transactionId)),
+        )
+        _ <- persistentState.activeContractStore
+          .createContracts(
+            Seq(contractId),
+            TimeOfChange(RequestCounter(1), timeEvent.timestamp),
+          )
+          .value
+        submissionResult <-
+          outProcessingSteps
+            .prepareSubmission(
+              submissionParam,
+              sourceMediator,
+              state,
+              cryptoSnapshot,
+            )
+            .value
+            .failOnShutdown
+      } yield {
+        // TODO(#12373) Adapt when releasing BFT
+        if (outProcessingSteps.sourceDomainProtocolVersion.v == ProtocolVersion.dev) {
+          submissionResult shouldBe Left(
+            IncompatibleProtocolVersions(
+              contractId,
+              outProcessingSteps.sourceDomainProtocolVersion,
+              targetProtocolVersion,
+            )
+          )
+        } else {
+          succeed
+        }
+
       }
     }
   }

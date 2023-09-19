@@ -4,6 +4,7 @@
 package com.digitalasset.canton.console
 
 import better.files.File
+import cats.syntax.either.*
 import cats.syntax.functor.*
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.classic.{Level, Logger}
@@ -20,6 +21,7 @@ import com.daml.ledger.api.v1.value.{
   RecordField,
   Value,
 }
+import com.daml.lf.value.Value.ContractId
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.ContractData
 import com.digitalasset.canton.admin.api.client.data.{ListPartiesResult, TemplateId}
@@ -27,14 +29,18 @@ import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
+import com.digitalasset.canton.crypto.{CryptoPureApi, Salt}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{LastErrorsAppender, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.admin.{RepairService, SyncStateInspection}
+import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
+import com.digitalasset.canton.participant.admin.repair.RepairService
 import com.digitalasset.canton.participant.config.{AuthServiceConfig, BaseParticipantConfig}
 import com.digitalasset.canton.participant.ledger.api.JwtTokenUtilities
-import com.digitalasset.canton.protocol.{LfContractId, SerializableContract}
+import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.BinaryFileUtil
+import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Encoder
@@ -44,6 +50,7 @@ import io.circe.syntax.*
 import java.io.File as JFile
 import java.time.Instant
 import scala.annotation.nowarn
+import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
@@ -278,17 +285,15 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         env: ConsoleEnvironment
     ): SerializableContract =
       TraceContext.withNewTraceContext { implicit traceContext =>
-        env.run(
-          ConsoleCommandResult.fromEither(
-            RepairService.ContractConverter.contractDataToInstance(
-              contractData.templateId.toIdentifier,
-              contractData.createArguments,
-              contractData.signatories,
-              contractData.observers,
-              contractData.inheritedContractId,
-              contractData.ledgerCreateTime.map(_.toInstant).getOrElse(ledgerTime),
-              contractData.contractSalt,
-            )
+        env.runE(
+          RepairService.ContractConverter.contractDataToInstance(
+            contractData.templateId.toIdentifier,
+            contractData.createArguments,
+            contractData.signatories,
+            contractData.observers,
+            contractData.inheritedContractId,
+            contractData.ledgerCreateTime.map(_.toInstant).getOrElse(ledgerTime),
+            contractData.contractSalt,
           )
         )
       }
@@ -304,30 +309,128 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     def contract_instance_to_data(
         contract: SerializableContract
     )(implicit env: ConsoleEnvironment): ContractData =
-      env.run(
-        ConsoleCommandResult.fromEither(
-          RepairService.ContractConverter.contractInstanceToData(contract).map {
-            case (
-                  templateId,
-                  createArguments,
-                  signatories,
-                  observers,
-                  contractId,
-                  contractSaltO,
-                  ledgerCreateTime,
-                ) =>
-              ContractData(
-                TemplateId.fromIdentifier(templateId),
+      env.runE(
+        RepairService.ContractConverter.contractInstanceToData(contract).map {
+          case (
+                templateId,
                 createArguments,
                 signatories,
                 observers,
                 contractId,
                 contractSaltO,
-                Some(ledgerCreateTime.underlying),
+                ledgerCreateTime,
+              ) =>
+            ContractData(
+              TemplateId.fromIdentifier(templateId),
+              createArguments,
+              signatories,
+              observers,
+              contractId,
+              contractSaltO,
+              Some(ledgerCreateTime.underlying),
+            )
+        }
+      )
+
+    @Help.Summary("Recompute authenticated contract ids.")
+    @Help.Description(
+      """The `utils.recompute_contract_ids` regenerates "contract ids" of multiple contracts after their contents have
+        |changed. Starting from protocol version 4, Canton uses the so called authenticated contract ids which depend
+        |on the details of the associated contracts. When aspects of a contract such as the parties involved change as
+        |part of repair or export/import procedure, the corresponding contract id must be recomputed."""
+    )
+    def recompute_contract_ids(
+        participant: LocalParticipantReference,
+        acs: Seq[SerializableContract],
+        protocolVersion: ProtocolVersion,
+    ): (Seq[SerializableContract], Map[LfContractId, LfContractId]) =
+      CantonContractIdVersion.fromProtocolVersion(protocolVersion) match {
+        case NonAuthenticatedContractIdVersion =>
+          // No need to remap contract ids if the tested protocol version
+          // does not enforce the usage of authenticated contract ids
+          acs -> acs.view.map(contract => contract.contractId -> contract.contractId).toMap
+        case AuthenticatedContractIdVersion | AuthenticatedContractIdVersionV2 =>
+          val contractIdMappings = mutable.Map.empty[LfContractId, LfContractId]
+          // We assume ACS events are in order
+          val remappedCIds = acs.map { contract =>
+            // Update the referenced contract ids
+            val contractInstanceWithUpdatedContractIdReferences =
+              SerializableRawContractInstance
+                .create(
+                  contract.rawContractInstance.contractInstance.map(_.mapCid(contractIdMappings)),
+                  AgreementText.empty, // Empty is fine, because the agreement text is not used when generating the raw serializable contract hash
+                )
+                .valueOr(err =>
+                  throw new RuntimeException(
+                    s"Could not create serializable raw contract instance: $err"
+                  )
+                )
+
+            val LfContractId.V1(discriminator, _) = contract.contractId
+            val contractSalt = contract.contractSalt.getOrElse(
+              throw new IllegalArgumentException("Missing contract salt")
+            )
+            val pureCrypto = participant.underlying
+              .map(_.cryptoPureApi)
+              .getOrElse(sys.error("where is my crypto?"))
+
+            // Compute the new contract id
+            val newContractId =
+              generate_contract_id(
+                cryptoPureApi = pureCrypto,
+                rawContract = contractInstanceWithUpdatedContractIdReferences,
+                createdAt = contract.ledgerCreateTime,
+                discriminator = discriminator,
+                contractSalt = contractSalt,
+                metadata = contract.metadata,
+                protocolVersion = protocolVersion,
+              )
+
+            // Update the contract id mappings with the current contract's id
+            contractIdMappings += contract.contractId -> newContractId
+
+            // Update the contract with the new contract id and recomputed instance
+            contract
+              .copy(
+                contractId = newContractId,
+                rawContractInstance = contractInstanceWithUpdatedContractIdReferences,
               )
           }
+
+          remappedCIds -> Map.from(contractIdMappings)
+      }
+
+    @Help.Summary("Generate authenticated contract id.")
+    @Help.Description(
+      """The `utils.generate_contract_id` generates "contract id" of a contract. Starting from protocol version 4,
+        |Canton uses the so called authenticated contract ids which depend on the details of the associated contracts.
+        |When aspects of a contract such as the parties involved change as part of repair or export/import procedure,
+        |the corresponding contract id must be recomputed. This function can be used as a tool to generate an id for
+        |an arbitrary contract content"""
+    )
+    def generate_contract_id(
+        cryptoPureApi: CryptoPureApi,
+        rawContract: SerializableRawContractInstance,
+        createdAt: CantonTimestamp,
+        discriminator: LfHash,
+        contractSalt: Salt,
+        metadata: ContractMetadata,
+        protocolVersion: ProtocolVersion,
+    ): ContractId.V1 = {
+      val unicumGenerator = new UnicumGenerator(cryptoPureApi)
+      val cantonContractIdVersion =
+        CantonContractIdVersion.fromProtocolVersion(protocolVersion)
+      val unicum = unicumGenerator
+        .recomputeUnicum(
+          contractSalt,
+          createdAt,
+          metadata,
+          rawContract,
+          cantonContractIdVersion,
         )
-      )
+        .valueOr(err => throw new RuntimeException(err))
+      cantonContractIdVersion.fromDiscriminator(discriminator, unicum)
+    }
 
     @Help.Summary("Writes several Protobuf messages to a file.")
     def write_to_file(data: Seq[scalapb.GeneratedMessage], fileName: String): Unit =
@@ -371,7 +474,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     @Help.Summary("Reads a ByteString from a file.")
     @Help.Description("Fails with an exception, if the file can't be read.")
     def read_byte_string_from_file(fileName: String)(implicit env: ConsoleEnvironment): ByteString =
-      env.run(ConsoleCommandResult.fromEither(BinaryFileUtil.readByteStringFromFile(fileName)))
+      env.runE(BinaryFileUtil.readByteStringFromFile(fileName))
 
   }
 

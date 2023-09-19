@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.store.db
 import cats.data.{EitherT, OptionT}
 import cats.syntax.option.*
 import cats.syntax.parallel.*
+import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonRequireTypes.String2066
@@ -13,6 +14,7 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{BatchAggregatorConfig, CacheConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.Salt
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.metrics.TimedLoadGauge
@@ -49,7 +51,7 @@ class DbContractStore(
     override protected val loggerFactory: NamedLoggerFactory,
 )(protected implicit val ec: ExecutionContext)
     extends ContractStore
-    with DbStore {
+    with DbStore { self =>
 
   import DbStorage.Implicits.*
   import storage.api.*
@@ -98,7 +100,8 @@ class DbContractStore(
         override def logger: TracedLogger = DbContractStore.this.logger
 
         override def executeBatch(ids: NonEmpty[Seq[Traced[LfContractId]]])(implicit
-            traceContext: TraceContext
+            traceContext: TraceContext,
+            callerCloseContext: CloseContext,
         ): Future[Iterable[Option[StoredContract]]] =
           lookupManyUncachedInternal(ids.map(_.value))
 
@@ -151,11 +154,15 @@ class DbContractStore(
 
   override def lookupManyUncached(
       ids: Seq[LfContractId]
-  )(implicit traceContext: TraceContext): Future[List[(LfContractId, Option[StoredContract])]] =
+  )(implicit traceContext: TraceContext): EitherT[Future, LfContractId, List[StoredContract]] =
     NonEmpty
       .from(ids)
-      .map(lookupManyUncachedInternal(_).map(ids.toList.zip(_)))
-      .getOrElse(Future.successful(List.empty))
+      .map(ids =>
+        EitherT(lookupManyUncachedInternal(ids).map(ids.toList.zip(_).traverse {
+          case (id, contract) => contract.toRight(id)
+        }))
+      )
+      .getOrElse(EitherT.rightT(List.empty))
 
   private def lookupManyUncachedInternal(
       ids: NonEmpty[Seq[LfContractId]]
@@ -247,8 +254,10 @@ class DbContractStore(
       override def logger: TracedLogger = DbContractStore.this.logger
 
       override def executeBatch(items: NonEmpty[Seq[Traced[StoredContract]]])(implicit
-          traceContext: TraceContext
-      ): Future[Iterable[Try[Unit]]] = bulkUpdateWithCheck(items, "DbContractStore.insert")
+          traceContext: TraceContext,
+          callerCloseContext: CloseContext,
+      ): Future[Iterable[Try[Unit]]] =
+        bulkUpdateWithCheck(items, "DbContractStore.insert")(traceContext, self.closeContext)
 
       override protected def bulkUpdateAction(items: NonEmpty[Seq[Traced[StoredContract]]])(implicit
           batchTraceContext: TraceContext

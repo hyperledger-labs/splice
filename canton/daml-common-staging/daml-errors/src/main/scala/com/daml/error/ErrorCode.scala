@@ -5,7 +5,6 @@ package com.daml.error
 
 import com.daml.error.ErrorCode.MaxCauseLogLength
 import com.daml.error.utils.ErrorDetails
-import com.google.rpc.Status
 import io.grpc.Status.Code
 import io.grpc.StatusRuntimeException
 import io.grpc.protobuf.StatusProto
@@ -55,7 +54,7 @@ abstract class ErrorCode(val id: String, val category: ErrorCategory)(implicit
     * e.g. NO_DOMAINS_CONNECTED(2,ABC234)
     */
   def codeStr(correlationId: Option[String]): String =
-    s"$id(${category.asInt},${correlationId.getOrElse("0").take(8)})"
+    ErrorCodeMsg.codeStr(code.id, category.asInt, correlationId)
 
   /** @return message including error category id, error code id, correlation id and cause
     */
@@ -65,10 +64,12 @@ abstract class ErrorCode(val id: String, val category: ErrorCategory)(implicit
         cause.take(MaxCauseLogLength) + "..."
       else
         cause
-    s"${codeStr(correlationId)}: $truncatedCause"
+    ErrorCodeMsg(id, category.asInt, correlationId, truncatedCause)
   }
 
-  def asGrpcStatus(err: BaseError)(implicit loggingContext: ContextualizedErrorLogger): Status = {
+  def asGrpcStatus(
+      err: BaseError
+  )(implicit loggingContext: ContextualizedErrorLogger): com.google.rpc.Status = {
     val statusInfo = getStatusInfo(err)(loggingContext)
     // Provide error id and context via ErrorInfo
     val errorInfo =
@@ -94,9 +95,7 @@ abstract class ErrorCode(val id: String, val category: ErrorCategory)(implicit
     )
     // Build request info
     val requestInfo = statusInfo.correlationId.orElse(statusInfo.traceId).map { correlationId =>
-      ErrorDetails.RequestInfoDetail(
-        correlationId = correlationId
-      )
+      ErrorDetails.RequestInfoDetail(correlationId = correlationId)
     }
     // Build resource infos
     val resourceInfos =
@@ -153,7 +152,7 @@ abstract class ErrorCode(val id: String, val category: ErrorCategory)(implicit
     val traceId = loggingContext.traceId
     val message =
       if (code.category.securitySensitive) {
-        BaseError.securitySensitiveMessage(correlationId, traceId)
+        BaseError.SecuritySensitiveMessage(correlationId, traceId)
       } else
         code.toMsg(err.cause, correlationId)
     val grpcStatusCode = category.grpcCode
@@ -185,6 +184,31 @@ abstract class ErrorCode(val id: String, val category: ErrorCategory)(implicit
     }
     Some(loggedAs ++ apiLevel)
   }
+}
+
+object ErrorCodeMsg {
+  private val ErrorCodeMsgRegex = """([A-Z_]+)\((\d+),(.+?)\): (.*)""".r
+
+  def apply(
+      errorCodeId: String,
+      errorCategoryInt: Int,
+      maybeCorrelationId: Option[String],
+      cause: String,
+  ): String =
+    s"${codeStr(errorCodeId, errorCategoryInt, maybeCorrelationId)}: $cause"
+
+  def codeStr(
+      errorCodeId: String,
+      errorCategoryInt: Int,
+      maybeCorrelationId: Option[String],
+  ): String = s"$errorCodeId($errorCategoryInt,${maybeCorrelationId.getOrElse("0").take(8)})"
+
+  def extract(errorCodeMsg: String): Either[String, (String, Int, String, String)] =
+    errorCodeMsg match {
+      case ErrorCodeMsgRegex(errorCodeId, errorCategoryIdIntAsString, corrId, cause) =>
+        Right((errorCodeId, errorCategoryIdIntAsString.toInt, corrId, cause))
+      case other => Left(s"Could not extract error code constituents from $other")
+    }
 }
 
 object ErrorCode {

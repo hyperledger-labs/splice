@@ -32,6 +32,7 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
 import com.digitalasset.canton.topology.store.{StoredTopologyTransactionsX, TimeQueryX}
+import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.topology.transaction.{
   DomainParametersStateX,
@@ -299,6 +300,7 @@ class TopologyAdminConnection(
       TopologyAdminCommandsX.Write.Propose(
         mapping = mapping,
         signedBy = Seq(signedBy),
+        store = AuthorizedStore.filterName,
         serial = Some(serial),
       )
     )
@@ -388,7 +390,7 @@ class TopologyAdminConnection(
       traceContext: TraceContext
   ): Future[Unit] =
     runCmd(
-      TopologyAdminCommandsX.Write.AddTransactions(txs)
+      TopologyAdminCommandsX.Write.AddTransactions(txs, AuthorizedStore.filterName)
     )
 
   def proposeInitialSequencerDomainState(
