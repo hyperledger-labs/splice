@@ -1,11 +1,11 @@
 {
-    "name" : "DevNet Preflight",
-    "description": "Once every two hours Preflight of DevNet",
-    "attribution-actor": "system",
-    "parameters" : {
-      "branch" : "main",
-      "run-job": "healthcheck-devnet"
-    },
+  "name": "CILR Preflight",
+  "description": "Once every two hours Preflight of CILR",
+  "attribution-actor": "system",
+  "parameters": {
+    "branch": "main",
+    "run-job": "healthcheck-cilr"
+  },
     "timetable" : {
       "per-hour": 1,
       "hours-of-day" : [ 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22 ],

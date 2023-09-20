@@ -1,0 +1,29 @@
+{
+  "name": "CILR Monthly Re-deployment",
+  "description": "Monthly Re-deployment of CILR",
+  "attribution-actor": "system",
+  "parameters": {
+    "branch": "main",
+    "run-job": "deploy-cilr"
+  },
+  "timetable": {
+    "per-hour": 1,
+    "hours-of-day": [6],
+    "days-of-week": [],
+    "days-of-month": [1],
+    "months": [
+      "JAN",
+      "FEB",
+      "MAR",
+      "APR",
+      "MAY",
+      "JUN",
+      "JUL",
+      "AUG",
+      "SEP",
+      "OCT",
+      "NOV",
+      "DEC"
+    ]
+  }
+}
