@@ -8,6 +8,11 @@ nodeName: ""
 # Is the helm chart deployed on devnet
 isDevNet: true
 
+# Turn on experimental state sync which can be considerably faster for large chains
+stateSync:
+  enable: false
+  rpcServers: ""
+
 founder:
   # The CometBFT node ID of the founding node
   nodeId: "5af57aa83abcec085c949323ed8538108757be9c"

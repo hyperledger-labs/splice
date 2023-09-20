@@ -1619,6 +1619,10 @@
             "cpu": 1,
             "memory": "1Gi"
           }
+        },
+        "stateSync": {
+          "enable": false,
+          "rpcServers": ""
         }
       }
     },
@@ -2531,6 +2535,10 @@
             "cpu": 1,
             "memory": "1Gi"
           }
+        },
+        "stateSync": {
+          "enable": false,
+          "rpcServers": ""
         }
       }
     },
@@ -3351,6 +3359,10 @@
             "cpu": 1,
             "memory": "1Gi"
           }
+        },
+        "stateSync": {
+          "enable": false,
+          "rpcServers": ""
         }
       }
     },
@@ -4098,6 +4110,10 @@
             "cpu": 1,
             "memory": "1Gi"
           }
+        },
+        "stateSync": {
+          "enable": false,
+          "rpcServers": ""
         }
       }
     },

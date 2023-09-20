@@ -20,6 +20,27 @@ spec:
       labels:
         app: {{ $fullName }}
     spec:
+      initContainers:
+        - name: "{{ $fullName }}-init"
+          image: "{{ $.Values.imageRepo }}/cometbft-init:{{ $.Values.cluster.imageTag }}"
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: /initial-config
+              name: initial-config
+            - mountPath: /config
+              name: config
+          command:
+            - /bin/sh
+            - -c
+            - -x
+            - |
+              cp -a /initial-config/. /config/
+              {{- if $.Values.stateSync.enable }}
+              /update-cometbft-config.sh /config/config.toml
+              {{- end }}
+          env:
+            - name: STATE_SYNC_RPC_SERVERS
+              value: {{ $.Values.stateSync.rpcServers }}
       containers:
         - name: {{ $fullName }}
           image: "{{ $.Values.imageRepo }}/{{ $.Values.imageName }}:{{ $.Values.cluster.imageTag }}"
@@ -63,7 +84,7 @@ spec:
           resources: {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
-        - name: config
+        - name: initial-config
           projected:
             sources:
               - configMap:
@@ -74,6 +95,8 @@ spec:
                   {{- else }}
                   name: {{ $.Values.node.keysSecret }}
                   {{- end }}
+        - name: config
+          emptyDir: {}
         - name: initial-data
           configMap:
             name: {{ include "prefix" (list $.Values "initial-data") }}
