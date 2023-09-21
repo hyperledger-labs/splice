@@ -185,7 +185,7 @@ In order to use their time effectively, create an GitHub issue for your problem 
       Have a look at `version` in `nix/canton-sources.json` - the `9d36b99f`
       in `2.7.0-snapshot.20230726.10871.0.v9d36b99f` is what the Canton team is typically interested in.
 
-Contact the Canton team via the `#team-canton` Slack channel.
+If the issue is critical, contact the Canton team via the `#team-canton` Slack channel.
 
 - Reference your GH issue.
 - Note the severity of the issue for us.
@@ -193,3 +193,5 @@ Contact the Canton team via the `#team-canton` Slack channel.
   Unless you already know who a good candidate might be (based on what is failing, Git blame, ...),
   you can tag the person that is currently on support rotation.
   The person is typically pinned at the top of the Slack channel.
+
+If the issue is not critical, send the above information directly to the Canton Protocol team lead (Rafael)
