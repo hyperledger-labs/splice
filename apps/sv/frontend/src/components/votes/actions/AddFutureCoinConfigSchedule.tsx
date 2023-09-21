@@ -1,5 +1,7 @@
 import { getUTCWithOffset, JsonEditor, JSONValue, Loading } from 'common-frontend';
 import { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import React, { useEffect, useState } from 'react';
 
 import { FormControl, Stack, Typography } from '@mui/material';
@@ -11,8 +13,6 @@ import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcR
 
 import { useSvcInfos } from '../../../contexts/SvContext';
 
-const dayjs = require('dayjs');
-const utc = require('dayjs/plugin/utc');
 dayjs.extend(utc);
 
 const AddFutureCoinConfigSchedule: React.FC<{

@@ -1,4 +1,6 @@
 import { Loading, SvClientProvider } from 'common-frontend';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import React, { useMemo, useState } from 'react';
 
 import { ClickAwayListener } from '@mui/base';
@@ -29,8 +31,6 @@ import VoteRequestModalContent from './VoteRequestModalContent';
 import { VoteResultModalContent } from './VoteResultModalContent';
 import { VoteResultsFilterTable } from './VoteResultsFilterTable';
 
-const dayjs = require('dayjs');
-const utc = require('dayjs/plugin/utc');
 dayjs.extend(utc);
 
 function tabProps(info: string) {
@@ -64,7 +64,7 @@ const TabPanel = (props: TabPanelProps) => {
 const ListVoteRequests: React.FC = () => {
   const [value, setValue] = React.useState(0);
 
-  const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
   };
 
@@ -123,7 +123,7 @@ const ListVoteRequests: React.FC = () => {
       return dic;
     }, {});
     return Object.entries(groupedVotes)
-      .filter(([requestCid, totalVotes]) => totalVotes >= votingThreshold)
+      .filter(([, totalVotes]) => totalVotes >= votingThreshold)
       .map(([Cid, _]) => Cid);
   }, [votesQuery.data, votingThreshold]);
 

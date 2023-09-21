@@ -1,6 +1,16 @@
 import { ConfigReader, authSchema, testAuthSchema, serviceSchema } from 'common-frontend';
 import { z } from 'zod';
 
+type SvServicesConfig = {
+  sv: z.infer<typeof serviceSchema>;
+};
+
+type SvConfig = {
+  auth: z.infer<typeof authSchema>;
+  testAuth?: z.infer<typeof testAuthSchema>;
+  services: SvServicesConfig;
+};
+
 const reader = new ConfigReader(
   z.object({
     auth: authSchema,
@@ -11,4 +21,4 @@ const reader = new ConfigReader(
   })
 );
 
-export const config = reader.loadConfig();
+export const config: SvConfig = reader.loadConfig();

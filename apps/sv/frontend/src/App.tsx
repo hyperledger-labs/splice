@@ -39,9 +39,9 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
       },
     },
     logger: {
-      log: args => {},
-      error: args => {},
-      warn: args => {},
+      log: () => {},
+      error: () => {},
+      warn: () => {},
     },
   });
   return (

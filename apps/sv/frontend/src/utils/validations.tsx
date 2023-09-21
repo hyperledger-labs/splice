@@ -1,10 +1,10 @@
 import { Contract } from 'common-frontend';
 import { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 
 import { VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
-const dayjs = require('dayjs');
-const utc = require('dayjs/plugin/utc');
 dayjs.extend(utc);
 
 export interface VoteRequestValidity {

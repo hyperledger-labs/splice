@@ -1,6 +1,22 @@
 import { ConfigReader, authSchema, serviceSchema, testAuthSchema } from 'common-frontend';
 import { z } from 'zod';
 
+const walletSchema = z.object({
+  uiUrl: z.string().url(),
+});
+
+type DirectoryServicesConfig = {
+  wallet: z.infer<typeof walletSchema>;
+  directory: z.infer<typeof serviceSchema>;
+  jsonApi: z.infer<typeof serviceSchema>;
+};
+
+type DirectoryConfig = {
+  auth: z.infer<typeof authSchema>;
+  testAuth?: z.infer<typeof testAuthSchema>;
+  services: DirectoryServicesConfig;
+};
+
 const reader = new ConfigReader(
   z.object({
     auth: authSchema,
@@ -15,4 +31,4 @@ const reader = new ConfigReader(
   })
 );
 
-export const config = reader.loadConfig();
+export const config: DirectoryConfig = reader.loadConfig();

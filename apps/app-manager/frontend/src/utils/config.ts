@@ -7,6 +7,18 @@ import {
 } from 'common-frontend';
 import { z } from 'zod';
 
+type AppManagerServicesConfig = {
+  wallet: z.infer<typeof walletSchema>;
+  directory: z.infer<typeof serviceSchema>;
+  validator: z.infer<typeof serviceSchema>;
+};
+
+type AppManagerConfig = {
+  auth: z.infer<typeof authSchema>;
+  testAuth?: z.infer<typeof testAuthSchema>;
+  services: AppManagerServicesConfig;
+};
+
 const reader = new ConfigReader(
   z.object({
     auth: authSchema,
@@ -19,4 +31,4 @@ const reader = new ConfigReader(
   })
 );
 
-export const config = reader.loadConfig();
+export const config: AppManagerConfig = reader.loadConfig();

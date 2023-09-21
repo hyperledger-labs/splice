@@ -3,10 +3,10 @@ import BigNumber from 'bignumber.js';
 import React, { useContext, useMemo } from 'react';
 import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi';
 
+import { CoinRules, FeaturedAppRight } from '@daml.js/canton-coin-0.1.0/lib/CC/Coin';
+import { OpenMiningRound } from '@daml.js/canton-coin-0.1.0/lib/CC/Round';
 import { Party } from '@daml/types';
 
-import { CoinRules, FeaturedAppRight } from '../../daml.js/canton-coin-0.1.0/lib/CC/Coin';
-import { OpenMiningRound } from '../../daml.js/canton-coin-0.1.0/lib/CC/Round';
 import { Contract, OpenAPILoggingMiddleware } from '../utils';
 
 const ScanContext = React.createContext<ScanClient | undefined>(undefined);

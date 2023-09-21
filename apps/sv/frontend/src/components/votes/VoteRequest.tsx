@@ -1,6 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
 import { getUTCWithOffset, SvClientProvider } from 'common-frontend';
 import { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import React, { useEffect, useState } from 'react';
 
 import {
@@ -39,8 +41,6 @@ import SetCoinRulesEnabledChoices from './actions/SetCoinRulesEnabledChoices';
 import SetSvcRulesConfig from './actions/SetSvcRulesConfig';
 import UpdateFutureCoinConfigSchedule from './actions/UpdateFutureCoinConfigSchedule';
 
-const dayjs = require('dayjs');
-const utc = require('dayjs/plugin/utc');
 dayjs.extend(utc);
 
 const VoteRequest: React.FC = () => {

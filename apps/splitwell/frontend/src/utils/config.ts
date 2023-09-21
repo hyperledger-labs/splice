@@ -23,7 +23,7 @@ const reader = new ConfigReader(
   })
 );
 
-export type SplitwellServicesConfig = {
+type SplitwellServicesConfig = {
   wallet: z.infer<typeof walletSchema>;
   scan: z.infer<typeof serviceSchema>;
   directory: z.infer<typeof serviceSchema>;
@@ -31,7 +31,7 @@ export type SplitwellServicesConfig = {
   jsonApi: z.infer<typeof serviceSchema>;
 };
 
-export type SplitwellConfig = {
+type SplitwellConfig = {
   auth: z.infer<typeof authSchema>;
   testAuth?: z.infer<typeof testAuthSchema>;
   services: SplitwellServicesConfig;

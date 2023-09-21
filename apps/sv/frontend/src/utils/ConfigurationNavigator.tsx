@@ -1,5 +1,7 @@
 import { JSONValue, JsonEditor, getUTCWithOffset } from 'common-frontend';
 import { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import React, { useState } from 'react';
 
 import { Box, Button, Card, CardContent, CardHeader, Stack, Typography } from '@mui/material';
@@ -9,8 +11,6 @@ import { Tuple2 } from '@daml.js/40f452260bef3f29dede136108fc08a88d5a52503102810
 import { CoinConfig, USD } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
 import { Schedule } from '@daml.js/canton-coin-0.1.0/lib/CC/Schedule';
 
-const dayjs = require('dayjs');
-const utc = require('dayjs/plugin/utc');
 dayjs.extend(utc);
 
 interface ComponentSwitcherProps {

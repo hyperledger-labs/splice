@@ -9,7 +9,7 @@ const externalConfig = window.canton_network_config;
 // where the value of the variable is the config object serialized as a JSON string.
 // The environment variable is evaluated at build time and takes precedence over
 // the external config.
-const envConfigString = process.env.REACT_APP_CANTON_NETWORK_CONFIG;
+const envConfigString = import.meta.env.VITE_CANTON_NETWORK_CONFIG;
 
 export class ConfigReader<
   A extends z.ZodRawShape,
@@ -27,7 +27,7 @@ export class ConfigReader<
       const envConfig = JSON.parse(envConfigString);
       // Printing whole config files to the log is usually a bad idea because it can leak secrets,
       // but frontend configs are inherently unsafe and must not contain any secrets.
-      console.info(`Config from REACT_APP_CANTON_NETWORK_CONFIG:`, envConfigString);
+      console.info(`Config from VITE_CANTON_NETWORK_CONFIG:`, envConfigString);
       return this.schema.parse(envConfig);
     } else if (externalConfig !== undefined) {
       return this.schema.parse(externalConfig);

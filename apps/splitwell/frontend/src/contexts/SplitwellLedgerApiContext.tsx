@@ -62,7 +62,7 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
 
   async createGroupInvite(
     user: string,
-    provider: string,
+    _provider: string,
     groupId: GroupId,
     groups: AssignedContract<Group>[],
     domainId: string,
@@ -85,7 +85,7 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
 
   async acceptInvite(
     user: string,
-    provider: string,
+    _provider: string,
     inviteContractId: ContractId<GroupInvite>,
     domainId: string,
     rules: Contract<SplitwellRules>,
@@ -109,7 +109,7 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
   }
   async joinGroup(
     user: string,
-    provider: string,
+    _provider: string,
     groupId: GroupId,
     groups: AssignedContract<Group>[],
     inviteContractId: ContractId<AcceptedGroupInvite>,
@@ -134,7 +134,7 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
 
   async enterPayment(
     user: string,
-    provider: string,
+    _provider: string,
     groupId: GroupId,
     groups: AssignedContract<Group>[],
     amount: string,
@@ -161,7 +161,7 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
 
   async initiateTransfer(
     sender: string,
-    provider: string,
+    _provider: string,
     groupId: GroupId,
     groups: AssignedContract<Group>[],
     receiverAmounts: ReceiverCCAmount[],

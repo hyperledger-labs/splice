@@ -19,7 +19,7 @@ const AuthCheck: React.FC<AuthCheckProps> = ({ authConfig, testAuthConfig }) => 
   useEffect(() => {
     svClient
       .isAuthorized()
-      .then(r => setIsAuthorized('ok'))
+      .then(() => setIsAuthorized('ok'))
       .catch(error => {
         if (error.code === 403) {
           setIsAuthorized('unauthorized');

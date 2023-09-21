@@ -40,7 +40,7 @@ local testAuth(enabled) =
 
 local validatorNodes(clusterProtocol, clusterAddress, port) = {
   alice: {
-    jsonApiBackend: { url: "http://localhost:6201" },
+    jsonApiBackend: { url: "http://127.0.0.1:6201" },
     jsonApi: { url: "http://localhost:" + port + "/api/json-api/" },
     participantAdmin: { url: "http://localhost:6202" },
     validator: { url: "http://localhost:5203" },
@@ -50,7 +50,7 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
     scan: { url: "http://localhost:5012" },
   },
   bob: {
-    jsonApiBackend: { url: "http://localhost:6301" },
+    jsonApiBackend: { url: "http://127.0.0.1:6301" },
     jsonApi: { url: "http://localhost:" + port + "/api/json-api/" },
     participantAdmin: { url: "http://localhost:6302" },
     validator: { url: "http://localhost:5303" },
@@ -69,7 +69,7 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
     scan: { url: "http://localhost:5012" },
   },
   preflight: {
-    jsonApiBackend: { url: "http://localhost:7575" },
+    jsonApiBackend: { url: "http://127.0.0.1:7575" },
     jsonApi: { url: "http://localhost:" + port + "/api/json-api/" },
     participantAdmin: { url: "http://localhost:8002" },
     validator: { url: "http://localhost:5003" },

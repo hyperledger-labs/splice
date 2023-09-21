@@ -1,8 +1,9 @@
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+
 import { CoinConfig } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
 import { Schedule } from '@daml.js/canton-coin-0.1.0/lib/CC/Schedule';
 
-const dayjs = require('dayjs');
-const utc = require('dayjs/plugin/utc');
 dayjs.extend(utc);
 
 export function getCoinConfigurationAsOfNow(

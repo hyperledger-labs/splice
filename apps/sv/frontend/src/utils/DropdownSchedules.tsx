@@ -1,4 +1,6 @@
 import { JSONValue, JsonEditor } from 'common-frontend';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import React, { useState } from 'react';
 
 import { NativeSelect, Stack } from '@mui/material';
@@ -6,8 +8,6 @@ import { NativeSelect, Stack } from '@mui/material';
 import { Tuple2 } from '@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7/lib/DA/Types';
 import { CoinConfig, USD } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
 
-const dayjs = require('dayjs');
-const utc = require('dayjs/plugin/utc');
 dayjs.extend(utc);
 
 const PrettyJsonPrint: React.FC<{

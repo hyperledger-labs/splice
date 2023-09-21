@@ -21,7 +21,7 @@ const ElectionRequest: React.FC = () => {
   const electionContextQuery = useElectionContext();
 
   const cs: User[] = [];
-  svcInfosQuery.data?.svcRules.payload.members.forEach((v, a) =>
+  svcInfosQuery.data?.svcRules.payload.members.forEach((_v, a) =>
     cs.push({ id: cs.length + 1, name: a })
   );
 

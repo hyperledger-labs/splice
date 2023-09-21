@@ -63,7 +63,7 @@ const Subscriptions: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {subscriptionQuery.data.map((subscription, index) => {
+              {subscriptionQuery.data.map(subscription => {
                 const onCancel = () => {
                   cancelSubscription(subscription.state.value.contractId).catch(err =>
                     console.error('Failed to cancel subscription.', err)

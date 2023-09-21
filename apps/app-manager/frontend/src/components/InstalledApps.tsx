@@ -112,7 +112,7 @@ const InstalledApp: React.FC<{ app: openapi.InstalledApp }> = ({ app }) => {
     app.latest_configuration.ui_uri
   );
   const client = useAppManagerClient();
-  const onLaunch = async (e: React.MouseEvent) => {
+  const onLaunch = async (_e: React.MouseEvent) => {
     await client.authorizeApp(app.provider);
     window.location.href = redirectUri;
   };

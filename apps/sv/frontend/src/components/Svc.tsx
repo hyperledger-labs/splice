@@ -126,32 +126,27 @@ function getCometBftDebugData(
     return <p>Error encountered in cometBFT node: {data.error?.error} </p>;
   }
 
-  var JSONPrettyMon = require('react-json-pretty/dist/monikai');
   return (
     <div>
       <JSONPretty
         id="comet-bft-debug-abci"
         style={{ fontSize: '10pt' }}
         data={data.response?.abci_info}
-        theme={JSONPrettyMon}
       />
       <JSONPretty
         id="comet-bft-debug-validators"
         style={{ fontSize: '10pt' }}
         data={data.response?.validators}
-        theme={JSONPrettyMon}
       />
       <JSONPretty
         id="comet-bft-debug-status"
         style={{ fontSize: '10pt' }}
         data={data.response?.status}
-        theme={JSONPrettyMon}
       />
       <JSONPretty
         id="comet-bft-debug-network"
         style={{ fontSize: '10pt' }}
         data={data.response?.network_info}
-        theme={JSONPrettyMon}
       />
     </div>
   );
@@ -226,7 +221,7 @@ function tabProps(info: string) {
 const SvcViewPrettyJSON = () => {
   const [value, setValue] = React.useState(0);
 
-  const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
   };
 
@@ -239,7 +234,6 @@ const SvcViewPrettyJSON = () => {
     return <Loading />;
   }
   const svcInfoData = svcInfoResp.data;
-  var JSONPrettyMon = require('react-json-pretty/dist/monikai');
 
   const cometBftDebugTab = getCometBftDebugData(cometBftNodeDebugQuery);
 
@@ -270,7 +264,6 @@ const SvcViewPrettyJSON = () => {
           id="svc-rules-information"
           style={{ fontSize: '10pt' }}
           data={SvcRules.encode(svcInfoData?.svcRules.payload!)}
-          theme={JSONPrettyMon}
         />
       </TabPanel>
       <TabPanel value={value} index={2}>
@@ -278,7 +271,6 @@ const SvcViewPrettyJSON = () => {
           id="coin-rules-information"
           style={{ fontSize: '10pt' }}
           data={CoinRules.encode(updatedCoinRules)}
-          theme={JSONPrettyMon}
         />
       </TabPanel>
       <TabPanel value={value} index={3}>

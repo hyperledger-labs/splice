@@ -7,7 +7,7 @@ import {
 } from 'directory-openapi';
 import React, { useContext, useMemo } from 'react';
 
-import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory/module';
+import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
 import { Contract, OpenAPILoggingMiddleware } from '../utils';
 
