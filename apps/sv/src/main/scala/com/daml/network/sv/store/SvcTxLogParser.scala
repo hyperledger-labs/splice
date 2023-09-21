@@ -127,6 +127,7 @@ object SvcTxLogParser {
         executed: Boolean,
         requester: String,
         effectiveAt: String,
+        votedAt: String,
     ) extends TxLogIndexRecord {
 
       override def optOffset = Some(offset)
@@ -186,6 +187,7 @@ object SvcTxLogParser {
               node.result.value.executed,
               node.result.value.requester,
               node.result.value.effectiveAt.toString,
+              node.result.value.votedAt.toString,
             ),
             action = node.result.value.action,
             rejectedBy = node.result.value.rejectedBy.asScala.toList,

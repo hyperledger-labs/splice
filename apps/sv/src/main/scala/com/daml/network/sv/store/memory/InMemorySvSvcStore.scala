@@ -66,7 +66,7 @@ class InMemorySvSvcStore(
       indexes <- txLog
         .collectTxLogIndicesType[SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord]
       ind = actionName match {
-        case Some(actionName) => indexes.filter(_.actionName == actionName)
+        case Some(actionName) => indexes.filter(_.actionName.contains(actionName))
         case None => indexes
       }
       ind2 = executed match {
@@ -74,7 +74,7 @@ class InMemorySvSvcStore(
         case None => ind
       }
       ind3 = requester match {
-        case Some(requester) => ind2.filter(_.requester == requester)
+        case Some(requester) => ind2.filter(_.requester.contains(requester))
         case None => ind2
       }
       records <- ind3

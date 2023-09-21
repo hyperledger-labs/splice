@@ -295,6 +295,7 @@ object SvcTables extends AcsTables with NamedLogging {
       executed: Option[Boolean],
       requester: Option[String],
       effectiveAt: Option[String],
+      votedAt: Option[String],
   )
 
   object SvcTxLogRowData {
@@ -311,6 +312,7 @@ object SvcTables extends AcsTables with NamedLogging {
             executed = None,
             requester = None,
             effectiveAt = None,
+            votedAt = None,
           )
         case dv @ SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord(
               offset,
@@ -320,6 +322,7 @@ object SvcTables extends AcsTables with NamedLogging {
               executed,
               requester,
               effectiveAt,
+              votedAt,
             ) =>
           SvcTxLogRowData(
             eventId = eventId,
@@ -330,6 +333,7 @@ object SvcTables extends AcsTables with NamedLogging {
             executed = Some(executed),
             requester = Some(requester),
             effectiveAt = Some(effectiveAt),
+            votedAt = Some(votedAt),
           )
       }
     }

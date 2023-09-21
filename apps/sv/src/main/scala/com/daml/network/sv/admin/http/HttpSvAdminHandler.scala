@@ -316,6 +316,9 @@ class HttpSvAdminHandler(
                     Instant.parse(
                       res.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].effectiveAt
                     ),
+                    Instant.parse(
+                      res.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].votedAt
+                    ),
                     res.acceptedBy.asJava,
                     res.rejectedBy.asJava,
                   ).toValue

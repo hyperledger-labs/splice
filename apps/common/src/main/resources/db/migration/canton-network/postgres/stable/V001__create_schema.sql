@@ -578,7 +578,10 @@ create table svc_txlog_store
     requester                                                text,
 
     -- effective_at is an index of DefiniteVoteIndexRecord
-    effective_at                                             text
+    effective_at                                             text,
+
+    -- voted_at is an index of DefiniteVoteIndexRecord
+    voted_at                                                 text
 );
 
 create index svc_txlog_store_sid_irt_r_en

@@ -817,7 +817,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           transactionTreeSource.addTree(definitiveVoteTx)
           store
             .listVoteResults(
-              Some("CRARC_SetEnabledChoices"),
+              Some("SetEnabledChoices"),
               Some(true),
               None,
               None,
@@ -835,6 +835,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
               true,
               result.requester,
               result.effectiveAt.toString,
+              result.votedAt.toString,
             ),
             result.rejectedBy.asScala.toList,
             result.acceptedBy.asScala.toList,
@@ -929,6 +930,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     voteRequestContract.payload.action,
     true,
     voteRequestContract.payload.requester,
+    Instant.now(),
     Instant.now(),
     (1 to 4).map(n => userParty(n).toProtoPrimitive).toList.asJava,
     List.empty.asJava,

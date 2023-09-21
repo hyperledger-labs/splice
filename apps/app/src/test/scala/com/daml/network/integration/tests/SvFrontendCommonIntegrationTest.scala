@@ -2,8 +2,9 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.api.v1.coin.EnabledChoices
 import com.daml.network.codegen.java.cn.svcrules.VoteRequest
+import com.daml.network.console.SvAppBackendReference
 import com.daml.network.util.FrontendLoginUtil
-import org.openqa.selenium.By
+import org.openqa.selenium.{By, Keys}
 import org.openqa.selenium.support.ui.Select
 
 abstract class SvFrontendCommonIntegrationTest
@@ -66,18 +67,15 @@ abstract class SvFrontendCommonIntegrationTest
       )(
         "sv1 can see the new vote request",
         _ => {
+          click on "tab-panel-in-progress"
+
           val tbody = find(id("sv-voting-in-progress-table-body"))
           val tb = tbody.value
-          val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+          val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
           rows should have size 1
-          rows.head
-            .childElement(className("vote-row-action"))
-            .text shouldBe "CRARC_SetEnabledChoices"
+          rows.head.text shouldBe "CRARC_SetEnabledChoices"
 
           val reviewButton = rows.head
-            .childElement(className("vote-row-review"))
-            .childElement(className("vote-row-review-button"))
-          reviewButton.text should matchText("REVIEW")
           reviewButton.underlying.click()
 
           val requestId =
@@ -90,8 +88,8 @@ abstract class SvFrontendCommonIntegrationTest
 
       actAndCheck(
         "sv2 and sv3 accept the request", {
-          sv2Backend.castVote(new VoteRequest.ContractId(requestId), true, "", "")
-          sv3Backend.castVote(new VoteRequest.ContractId(requestId), true, "", "")
+          vote(sv2Backend, requestId, true, "1", false)
+          vote(sv3Backend, requestId, true, "2", true)
         },
       )(
         "the request went through and all choices are disabled",
@@ -99,7 +97,42 @@ abstract class SvFrontendCommonIntegrationTest
           sv1Backend.getSvcInfo().coinRules.payload.enabledChoices should equal(newEnabledChoices)
         },
       )
+
+      clue("the vote request is marked as executed") {
+        eventually() {
+          click on "tab-panel-executed"
+          val tbody = find(id("sv-vote-results-executed-table-body"))
+          val tb = tbody.value
+          val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+          rows.size shouldBe 1
+        }
+      }
     }
+  }
+
+  def vote(
+      backend: SvAppBackendReference,
+      requestId: String,
+      isAccept: Boolean,
+      numberAccepts: String,
+      finalVote: Boolean,
+  )(implicit webDriver: WebDriverType) = {
+    actAndCheck(
+      s"${backend.config.ledgerApiUser} accepts the request",
+      backend.castVote(new VoteRequest.ContractId(requestId), isAccept, "", ""),
+    )(
+      s"the number of accept votes increased to ${numberAccepts}",
+      _ => {
+        inside(find(id("vote-request-modal-accepted-count"))) {
+          case Some(element) => element.text should matchText(numberAccepts)
+          case None =>
+            finalVote shouldBe true // the vote request might already have been archived at this point
+        }
+        if (finalVote) {
+          webDriver.findElement(By.tagName("body")).sendKeys(Keys.ESCAPE)
+        }
+      },
+    )
   }
 
   def getParameterNamesFromClass(clazz: Class[_]): List[String] = {

@@ -54,7 +54,7 @@
   "main": "lib/index.js",
   "peerDependencies": {
     "@mui/icons-material": "5.11.9",
-    "@mui/material": "^5.11.9",
+    "@mui/material": "^5.14.10",
     "react": "18.2.0",
     "react-dom": "18.2.0"
   },

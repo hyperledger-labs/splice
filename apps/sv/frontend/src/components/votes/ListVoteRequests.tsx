@@ -1,83 +1,74 @@
-import {
-  Contract,
-  CopyableTypography,
-  DateDisplay,
-  Loading,
-  SvClientProvider,
-} from 'common-frontend';
+import { Loading, SvClientProvider } from 'common-frontend';
 import React, { useMemo, useState } from 'react';
 
 import { ClickAwayListener } from '@mui/base';
-import CheckIcon from '@mui/icons-material/Check';
-import ClearIcon from '@mui/icons-material/Clear';
 import CloseIcon from '@mui/icons-material/Close';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import {
   Box,
-  Button,
   Card,
   CardHeader,
-  Collapse,
   IconButton,
   Modal,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
+  Tab,
+  Tabs,
   Typography,
 } from '@mui/material';
 import Container from '@mui/material/Container';
-import Link from '@mui/material/Link';
 
-import {
-  ActionRequiringConfirmation,
-  SvcRules,
-  VoteResult,
-} from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules';
 import { ContractId } from '@daml/types';
 
 import { VoteRequest } from '../../../../../common/frontend/daml.js/svc-governance-0.1.0/lib/CN/SvcRules';
 import { useSvcInfos } from '../../contexts/SvContext';
-import {
-  useListSvcRulesVoteRequests,
-  useListSvcRulesVoteResults,
-} from '../../hooks/useListVoteRequests';
+import { useListSvcRulesVoteRequests } from '../../hooks/useListVoteRequests';
 import { useListVotes } from '../../hooks/useListVotes';
 import { config } from '../../utils';
+import { ListVoteRequestsFilterTable } from './VoteRequestFilterTable';
 import VoteRequestModalContent from './VoteRequestModalContent';
-import ActionView from './actions/views/ActionView';
+import { VoteResultModalContent } from './VoteResultModalContent';
+import { VoteResultsFilterTable } from './VoteResultsFilterTable';
 
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
 dayjs.extend(utc);
 
-const ListVoteRequests: React.FC = () => {
-  const listVoteRequestsQuery = useListSvcRulesVoteRequests();
+function tabProps(info: string) {
+  return {
+    id: `information-tab-${info}`,
+    'aria-controls': `information-panel-${info}`,
+  };
+}
 
-  const listVoteResultsExecuted = useListSvcRulesVoteResults(
-    {
-      executed: true,
-      effectiveTo: dayjs.utc().format('YYYY-MM-DDTHH:mm:ss[Z]'),
-    },
-    10
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+const TabPanel = (props: TabPanelProps) => {
+  const { children, value, index, ...other } = props;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
   );
-  const listVoteResultsPlanned = useListSvcRulesVoteResults(
-    {
-      executed: true,
-      effectiveFrom: dayjs.utc().format('YYYY-MM-DDTHH:mm:ss[Z]'),
-    },
-    10
-  );
-  const listVoteResultsRejected = useListSvcRulesVoteResults(
-    {
-      executed: false,
-    },
-    10
-  );
+};
+
+const ListVoteRequests: React.FC = () => {
+  const [value, setValue] = React.useState(0);
+
+  const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+    setValue(newValue);
+  };
+
+  const listVoteRequestsQuery = useListSvcRulesVoteRequests();
 
   const voteRequestIds = listVoteRequestsQuery.data
     ? listVoteRequestsQuery.data.map(v => v.contractId)
@@ -88,7 +79,9 @@ const ListVoteRequests: React.FC = () => {
   const [voteRequestContractId, setVoteRequestContractId] = useState<
     ContractId<VoteRequest> | undefined
   >(undefined);
+  const [action, setAction] = useState<ActionRequiringConfirmation | undefined>(undefined);
   const [isVoteRequestModalOpen, setVoteRequestModalOpen] = useState<boolean>(false);
+  const [isVoteResultModalOpen, setVoteResultModalOpen] = useState<boolean>(false);
   const [staledVoteRequestModal, setStaledVoteRequestModal] = useState<boolean>(false);
 
   const openModalWithVoteRequest = (
@@ -100,7 +93,15 @@ const ListVoteRequests: React.FC = () => {
     setVoteRequestModalOpen(true);
   };
 
-  const handleClose = () => setVoteRequestModalOpen(false);
+  const openModalWithVoteResult = (action: ActionRequiringConfirmation) => {
+    setAction(action);
+    setVoteResultModalOpen(true);
+  };
+
+  const handleClose = () => {
+    setVoteRequestModalOpen(false);
+    setVoteResultModalOpen(false);
+  };
 
   const svPartyId = svcInfosQuery.data?.svPartyId;
   const votingThreshold = svcInfosQuery.data?.votingThreshold;
@@ -126,25 +127,11 @@ const ListVoteRequests: React.FC = () => {
       .map(([Cid, _]) => Cid);
   }, [votesQuery.data, votingThreshold]);
 
-  if (
-    listVoteRequestsQuery.isLoading ||
-    svcInfosQuery.isLoading ||
-    votesQuery.isLoading ||
-    listVoteResultsExecuted.isLoading ||
-    listVoteResultsPlanned.isLoading ||
-    listVoteResultsRejected.isLoading
-  ) {
+  if (listVoteRequestsQuery.isLoading || svcInfosQuery.isLoading || votesQuery.isLoading) {
     return <Loading />;
   }
 
-  if (
-    listVoteRequestsQuery.isError ||
-    svcInfosQuery.isError ||
-    votesQuery.isError ||
-    listVoteResultsExecuted.isError ||
-    listVoteResultsPlanned.isError ||
-    listVoteResultsRejected.isError
-  ) {
+  if (listVoteRequestsQuery.isError || svcInfosQuery.isError || votesQuery.isError) {
     return <p>Error, something went wrong.</p>;
   }
 
@@ -175,15 +162,13 @@ const ListVoteRequests: React.FC = () => {
       const svcRulesAction = action.value.svcAction;
       switch (svcRulesAction.tag) {
         case 'SRARC_RemoveMember': {
-          return `${svcRulesAction.tag} : ${svcInfosQuery.data!.svcRules.payload.members.get(
-            svcRulesAction.value.member
-          )?.name!}`;
+          return `${svcRulesAction.tag}`;
         }
         case 'SRARC_GrantFeaturedAppRight': {
-          return `${svcRulesAction.tag} : ${svcRulesAction.value.provider}`;
+          return `${svcRulesAction.tag}`;
         }
         case 'SRARC_RevokeFeaturedAppRight': {
-          return `${svcRulesAction.tag} : ${svcRulesAction.value.rightCid}`;
+          return `${svcRulesAction.tag}`;
         }
         case 'SRARC_SetConfig': {
           return `${svcRulesAction.tag}`;
@@ -199,75 +184,88 @@ const ListVoteRequests: React.FC = () => {
     }
     return 'Action tag not defined.';
   }
-  // TODO(#7613): remove isDevNet flag and add feature in release_notes
+
   return (
-    <>
-      <Typography mt={6} variant="h4">
+    <Stack>
+      <Typography mt={4} variant="h4">
         Vote Requests
       </Typography>
-      <Typography mt={6} variant="h5">
-        Action Needed
-      </Typography>
-      <ListVoteRequestsTable
-        voteRequests={voteRequestsNotVoted}
-        getAction={getAction}
-        svcRules={svcInfosQuery.data!.svcRules}
-        openModalWithVoteRequest={openModalWithVoteRequest}
-        tableBodyId={'sv-voting-action-needed-table-body'}
-        staled={false}
-      />
-      <Typography mt={6} variant="h5">
-        In Progress
-      </Typography>
-      <ListVoteRequestsTable
-        voteRequests={voteRequestsVoted}
-        getAction={getAction}
-        svcRules={svcInfosQuery.data!.svcRules}
-        openModalWithVoteRequest={openModalWithVoteRequest}
-        tableBodyId={'sv-voting-in-progress-table-body'}
-        staled={false}
-      />
-      {svcInfosQuery.data?.svcRules.payload.isDevNet && (
-        <Stack>
-          <Typography mt={6} variant="h5">
-            Planned
-          </Typography>
-          <ListVoteResultsTable
-            voteResults={listVoteResultsPlanned.data! || []}
-            getAction={getAction}
-            tableBodyId={'sv-vote-results-planned-table-body'}
+      <Box mt={4} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={value} onChange={handleChange} aria-label="json tabs">
+          <Tab
+            label="Action Needed"
+            {...tabProps('action-needed')}
+            id={'tab-panel-action-needed'}
           />
-          <Typography mt={6} variant="h5">
-            Executed
-          </Typography>
-          <ListVoteResultsTable
-            voteResults={listVoteResultsExecuted.data! || []}
-            getAction={getAction}
-            tableBodyId={'sv-vote-results-executed-table-body'}
-          />
-          <Typography mt={6} variant="h5">
-            Rejected
-          </Typography>
-          <ListVoteResultsTable
-            voteResults={listVoteResultsRejected.data! || []}
-            getAction={getAction}
-            tableBodyId={'sv-vote-results-executed-table-body'}
-          />
-        </Stack>
-      )}
+          <Tab label="In Progress" {...tabProps('in-progress')} id={'tab-panel-in-progress'} />
+          <Tab label="Planned" {...tabProps('planned')} id={'tab-panel-planned'} />
+          <Tab label="Executed" {...tabProps('executed')} id={'tab-panel-executed'} />
+          <Tab label="Rejected" {...tabProps('rejected')} id={'tab-panel-rejected'} />
+          {voteRequestsStaled.length > 0 && (
+            <Tab label="Aborted" {...tabProps('aborted')} id={'tab-panel-aborted'} />
+          )}
+        </Tabs>
+      </Box>
+      <TabPanel value={value} index={0}>
+        <ListVoteRequestsFilterTable
+          voteRequests={voteRequestsNotVoted}
+          getAction={getAction}
+          svcRules={svcInfosQuery.data!.svcRules}
+          openModalWithVoteRequest={openModalWithVoteRequest}
+          tableBodyId={'sv-voting-action-needed-table-body'}
+          staled={false}
+        />
+      </TabPanel>
+      <TabPanel value={value} index={1}>
+        <ListVoteRequestsFilterTable
+          voteRequests={voteRequestsVoted}
+          getAction={getAction}
+          svcRules={svcInfosQuery.data!.svcRules}
+          openModalWithVoteRequest={openModalWithVoteRequest}
+          tableBodyId={'sv-voting-in-progress-table-body'}
+          staled={false}
+        />
+      </TabPanel>
+      <TabPanel value={value} index={2}>
+        <VoteResultsFilterTable
+          getAction={getAction}
+          tableBodyId={'sv-vote-results-planned-table-body'}
+          openModalWithVoteResult={openModalWithVoteResult}
+          validityColumnName={'Effective At'}
+          executed
+          effectiveFrom={dayjs.utc().format('YYYY-MM-DDTHH:mm:ss[Z]')}
+        />
+      </TabPanel>
+      <TabPanel value={value} index={3}>
+        <VoteResultsFilterTable
+          getAction={getAction}
+          tableBodyId={'sv-vote-results-executed-table-body'}
+          openModalWithVoteResult={openModalWithVoteResult}
+          executed
+          effectiveTo={dayjs.utc().format('YYYY-MM-DDTHH:mm:ss[Z]')}
+        />
+      </TabPanel>
+      <TabPanel value={value} index={4}>
+        <VoteResultsFilterTable
+          getAction={getAction}
+          tableBodyId={'sv-vote-results-rejected-table-body'}
+          openModalWithVoteResult={openModalWithVoteResult}
+          validityColumnName={'Not Executed At'}
+          executed={false}
+        />
+      </TabPanel>
       {voteRequestsStaled.length > 0 && (
         <Stack>
-          <Typography mt={6} variant="h5">
-            Rejected due to system conflict
-          </Typography>
-          <ListVoteRequestsTable
-            voteRequests={voteRequestsStaled}
-            getAction={getAction}
-            svcRules={svcInfosQuery.data!.svcRules}
-            openModalWithVoteRequest={openModalWithVoteRequest}
-            tableBodyId={'sv-voting-staled-table-body'}
-            staled
-          />
+          <TabPanel value={value} index={5}>
+            <ListVoteRequestsFilterTable
+              voteRequests={voteRequestsStaled}
+              getAction={getAction}
+              svcRules={svcInfosQuery.data!.svcRules}
+              openModalWithVoteRequest={openModalWithVoteRequest}
+              tableBodyId={'sv-voting-staled-table-body'}
+              staled
+            />
+          </TabPanel>
         </Stack>
       )}
       <Modal
@@ -298,292 +296,31 @@ const ListVoteRequests: React.FC = () => {
           </ClickAwayListener>
         </Box>
       </Modal>
-    </>
-  );
-};
-
-interface VoteRequestsRowProps {
-  contractId: ContractId<VoteRequest>;
-  action: string;
-  requester: string;
-  expires: Date;
-  idx: number;
-  description: string;
-  url: string;
-  openModalWithVoteRequest: (contractId: ContractId<VoteRequest>, staled: boolean) => void;
-  staled: boolean;
-}
-
-const VoteRequestRow: React.FC<VoteRequestsRowProps> = ({
-  contractId,
-  action,
-  requester,
-  expires,
-  idx,
-  description,
-  url,
-  openModalWithVoteRequest,
-  staled,
-}) => {
-  const [open, setOpen] = useState(-1);
-  const votesQuery = useListVotes(contractId ? [contractId] : []);
-
-  const allVotes = votesQuery.data
-    ? votesQuery.data.sort((a, b) => {
-        return b.expiresAt.valueOf() - a.expiresAt.valueOf();
-      })
-    : [];
-
-  const acceptedVotes = allVotes.filter(v => v.accept);
-  const rejectedVotes = allVotes.filter(v => !v.accept);
-
-  return (
-    <>
-      <TableRow key={idx} className="vote-request-row">
-        <TableCell>
-          <IconButton
-            aria-label="expand row"
-            size="small"
-            onClick={() => setOpen(open === idx ? -1 : idx)}
-          >
-            {open === idx ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-          </IconButton>
-        </TableCell>
-        <TableCell className="vote-row-action">
-          <CopyableTypography text={action} maxWidth={'300px'} />
-        </TableCell>
-        <TableCell className="vote-row-requester">{requester}</TableCell>
-        <TableCell className="vote-row-vote-status" color="default">
-          <Stack spacing={4} direction="row">
-            <Typography id={'vote-request-modal-rejected-count-' + idx} variant="h6">
-              <ClearIcon color="error" fontSize="inherit" /> {rejectedVotes.length}
-            </Typography>
-            <Typography id={'vote-request-modal-accepted-count-' + idx} variant="h6">
-              <CheckIcon color="success" fontSize="inherit" /> {acceptedVotes.length}
-            </Typography>
-          </Stack>
-        </TableCell>
-        <TableCell>
-          <DateDisplay datetime={expires.toISOString()} />
-        </TableCell>
-        <TableCell className="vote-row-review">
-          <Button
-            size="small"
-            variant="contained"
-            color="primary"
-            onClick={() => openModalWithVoteRequest(contractId, staled)}
-            className="vote-row-review-button"
-          >
-            Review
-          </Button>
-        </TableCell>
-      </TableRow>
-      <TableRow>
-        <TableCell colSpan={5} sx={{ paddingBottom: 0, paddingTop: 0, border: '0px' }}>
-          <Collapse in={open === idx} timeout="auto" unmountOnExit>
-            <Box
-              sx={{
-                width: '100%',
-                backgroundColor: 'rgba(50,50,50,0.4)',
-                minHeight: 36,
-                textAlign: 'center',
-                alignItems: 'center',
-                fontSize: 18,
-              }}
-            >
-              <TableContainer>
-                <Table
-                  style={{ tableLayout: 'fixed' }}
-                  size="small"
-                  className="sv-sub-voting-table"
-                >
-                  <TableBody>
-                    <TableCell>
-                      <span style={{ fontWeight: 'bold' }}>Summary:</span> {description}
-                    </TableCell>
-                    <TableCell>
-                      <span style={{ fontWeight: 'bold' }}>URL:</span> <Link href={url}>{url}</Link>
-                    </TableCell>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
-          </Collapse>
-        </TableCell>
-      </TableRow>
-    </>
-  );
-};
-
-interface ListVoteRequestsTableProps {
-  voteRequests: Contract<VoteRequest>[];
-  getAction: (action: ActionRequiringConfirmation, staled: boolean) => string;
-  svcRules: Contract<SvcRules>;
-  openModalWithVoteRequest: (
-    voteRequestContractId: ContractId<VoteRequest>,
-    staled: boolean
-  ) => void;
-  tableBodyId: string;
-  staled: boolean;
-}
-
-const ListVoteRequestsTable: React.FC<ListVoteRequestsTableProps> = ({
-  voteRequests,
-  getAction,
-  svcRules,
-  openModalWithVoteRequest,
-  tableBodyId,
-  staled,
-}) => {
-  return (
-    <TableContainer>
-      <Table style={{ tableLayout: 'auto' }} id="sv-voting-action-needed-table">
-        <TableHead>
-          <TableRow>
-            <TableCell></TableCell>
-            <TableCell>Action</TableCell>
-            <TableCell>Requester</TableCell>
-            <TableCell>Vote Status</TableCell>
-            <TableCell>Expires At</TableCell>
-            <TableCell></TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody id={tableBodyId}>
-          {voteRequests.map((request, index) => {
-            return (
-              <VoteRequestRow
-                key={request.contractId}
-                contractId={request.contractId}
-                action={getAction(request.payload.action, staled)}
-                requester={svcRules.payload.members.get(request.payload.requester)?.name!}
-                expires={new Date(request.payload.expiresAt)}
-                idx={index}
-                description={request.payload.reason.body}
-                url={request.payload.reason.url}
-                openModalWithVoteRequest={openModalWithVoteRequest}
-                staled={staled}
-              />
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
-};
-
-interface VoteResultRowProps {
-  action: string;
-  voteResult: VoteResult;
-  idx: number;
-}
-
-const VoteResultRow: React.FC<VoteResultRowProps> = ({ action, voteResult, idx }) => {
-  const [open, setOpen] = useState(-1);
-
-  return (
-    <>
-      <TableRow key={idx} className="vote-result-row">
-        <TableCell>
-          <IconButton
-            aria-label="expand row"
-            size="small"
-            onClick={() => setOpen(open === idx ? -1 : idx)}
-          >
-            {open === idx ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-          </IconButton>
-        </TableCell>
-        <TableCell className="vote-row-action">
-          <CopyableTypography text={action} maxWidth={'300px'} />
-        </TableCell>
-        <TableCell className="vote-row-requester">
-          <CopyableTypography text={voteResult.requester} maxWidth={'300px'} />
-        </TableCell>
-        <TableCell className="vote-row-vote-status" color="default">
-          <Stack spacing={4} direction="row">
-            <Typography id={'vote-result-rejected-count-' + idx} variant="h6">
-              <ClearIcon color="error" fontSize="inherit" /> {voteResult.rejectedBy.length}
-            </Typography>
-            <Typography id={'vote-result-accepted-count-' + idx} variant="h6">
-              <CheckIcon color="success" fontSize="inherit" /> {voteResult.acceptedBy.length}
-            </Typography>
-          </Stack>
-        </TableCell>
-        <TableCell>
-          <DateDisplay datetime={new Date(voteResult.effectiveAt).toLocaleString()} />
-        </TableCell>
-      </TableRow>
-      <TableRow>
-        <TableCell colSpan={5} sx={{ paddingBottom: 0, paddingTop: 0, border: '0px' }}>
-          <Collapse in={open === idx} timeout="auto" unmountOnExit>
-            <Box
-              sx={{
-                width: '100%',
-                backgroundColor: 'rgba(50,50,50,0.4)',
-                minHeight: 36,
-                textAlign: 'center',
-                alignItems: 'center',
-                fontSize: 18,
-              }}
-            >
-              <TableContainer>
-                <Table
-                  style={{ tableLayout: 'fixed' }}
-                  size="small"
-                  className="sv-sub-result-table"
-                >
-                  <TableBody>
-                    <TableRow>
-                      <ActionView action={voteResult.action} />
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
-          </Collapse>
-        </TableCell>
-      </TableRow>
-    </>
-  );
-};
-
-interface ListVoteResultsTableProps {
-  voteResults: VoteResult[];
-  getAction: (action: ActionRequiringConfirmation, staled: boolean) => string;
-  tableBodyId: string;
-}
-
-const ListVoteResultsTable: React.FC<ListVoteResultsTableProps> = ({
-  voteResults,
-  getAction,
-  tableBodyId,
-}) => {
-  return (
-    <TableContainer>
-      <Table style={{ tableLayout: 'auto' }} id="sv-voting-action-needed-table">
-        <TableHead>
-          <TableRow>
-            <TableCell></TableCell>
-            <TableCell>Action</TableCell>
-            <TableCell>Requester</TableCell>
-            <TableCell>Vote Status</TableCell>
-            <TableCell>Effective At</TableCell>
-            <TableCell></TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody id={tableBodyId}>
-          {voteResults.map((result, index) => {
-            return (
-              <VoteResultRow
-                key={index}
-                action={getAction(result.action, false)}
-                voteResult={result}
-                idx={index}
-              />
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
+      <Modal
+        open={isVoteResultModalOpen}
+        onClose={handleClose}
+        aria-labelledby="voteresult-modal-title"
+        aria-describedby="voteresult-modal-description"
+      >
+        <Box sx={{ flex: 1, overflowY: 'scroll', maxHeight: '100%' }}>
+          <ClickAwayListener onClickAway={handleClose}>
+            <Container maxWidth="md" sx={{ marginTop: '64px' }}>
+              <Card variant="elevation" sx={{ backgroundColor: '#2F2F2F' }}>
+                <CardHeader
+                  title="Vote Result"
+                  action={
+                    <IconButton onClick={handleClose}>
+                      <CloseIcon />
+                    </IconButton>
+                  }
+                />
+                <VoteResultModalContent action={action} />
+              </Card>
+            </Container>
+          </ClickAwayListener>
+        </Box>
+      </Modal>
+    </Stack>
   );
 };
 

@@ -238,7 +238,7 @@ const VoteRequest: React.FC = () => {
             <Typography variant="h6">Summary</Typography>
             <TextField
               id="create-reason-summary"
-              rows={4}
+              rows={2}
               multiline
               onChange={e => setSummary(e.target.value)}
               value={summary}

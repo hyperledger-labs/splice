@@ -163,17 +163,19 @@ class DbSvSvcStore(
       executed,
       requester,
       effectiveAt,
+      votedAt,
     ) = SvcTxLogRowData.fromTxLogIndexRecord(record)
     val safeEventId = lengthLimited(eventId)
     val safeOffset = offset.map(lengthLimited)
     val safeActionName = actionName.map(lengthLimited)
     val safeRequester = requester.map(lengthLimited)
     val safeEffectiveAt = effectiveAt.map(lengthLimited)
+    val safeVotedAt = votedAt.map(lengthLimited)
     Right(sqlu"""
           insert into svc_txlog_store(store_id, event_id, index_record_type, "offset", domain_id,
-          action_name, executed, requester, effective_at)
+          action_name, executed, requester, effective_at, voted_at)
           values ($storeId, $safeEventId, $indexRecordType, $safeOffset, $domainId,
-                  $safeActionName, $executed, $safeRequester, $safeEffectiveAt)
+                  $safeActionName, $executed, $safeRequester, $safeEffectiveAt, $safeVotedAt)
           on conflict do nothing
         """)
   }
@@ -1079,7 +1081,7 @@ class DbSvSvcStore(
   def listVoteResults(
       actionName: Option[String],
       executed: Option[Boolean],
-      requester: Option[String],
+      _requester: Option[String],
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: Int,
@@ -1088,7 +1090,8 @@ class DbSvSvcStore(
   ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]] = {
     val dbType = SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord.dbType
     val actionNameCondition = actionName match {
-      case Some(actionName) => sql"""and action_name = ${lengthLimited(actionName)}"""
+      case Some(actionName) =>
+        sql"""and action_name like ${lengthLimited(s"%${lengthLimited(actionName)}%")}"""
       case None => sql""""""
     }
     val executedCondition = executed match {
@@ -1105,8 +1108,9 @@ class DbSvSvcStore(
       case (None, Some(effectiveTo)) => sql"""and effective_at < ${lengthLimited(effectiveTo)}"""
       case (None, None) => sql""""""
     }
-    val requesterCondition = requester match {
-      case Some(requester) => sql"""and requester = ${lengthLimited(requester)}"""
+    val requesterCondition = _requester match {
+      case Some(_requester) =>
+        sql"""and requester like ${lengthLimited(s"%${lengthLimited(_requester)}%")}"""
       case None => sql""""""
     }
     for {

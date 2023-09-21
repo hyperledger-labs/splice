@@ -1,7 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.svcrules.VoteRequest
-import com.daml.network.console.SvAppBackendReference
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -362,13 +360,15 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request",
             _ => {
+              click on "tab-panel-in-progress"
+
               val tbody = find(id("sv-voting-in-progress-table-body"))
               inside(tbody) { case Some(tb) =>
-                val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
                 rows.size shouldBe previousVoteRequestsInProgress + 1
                 (
-                  rows.head.childElement(className("vote-row-action")).text,
-                  rows.head.childElement(className("vote-row-requester")).text,
+                  rows.head.text,
+                  tb.findAllChildElements(className("vote-row-requester")).toSeq.head.text,
                 )
               }
             },
@@ -387,21 +387,23 @@ class SvFrontendIntegrationTest
         )(
           "sv2 can see the new vote request",
           _ => {
+            click on "tab-panel-action-needed"
+
             val tbody = find(id("sv-voting-action-needed-table-body"))
             inside(tbody) { case Some(tb) =>
-              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
               rows.size shouldBe previousVoteRequestsActionNeeded + 1
 
-              rows.head.childElement(className("vote-row-action")).text should matchText(
+              rows.head.text should matchText(
                 createdVoteRequestAction
               )
-              rows.head.childElement(className("vote-row-requester")).text should matchText(
+              tb.findAllChildElements(className("vote-row-requester"))
+                .toSeq
+                .head
+                .text should matchText(
                 createdVoteRequestRequester
               )
               val reviewButton = rows.head
-                .childElement(className("vote-row-review"))
-                .childElement(className("vote-row-review-button"))
-              reviewButton.text should matchText("REVIEW")
               reviewButton.underlying
             }
           },
@@ -478,11 +480,8 @@ class SvFrontendIntegrationTest
           "sv1 operator can see the vote request detail by clicking review button", {
             val tbody = find(id("sv-voting-in-progress-table-body"))
             inside(tbody) { case Some(tb) =>
-              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
               val reviewButton = rows.head
-                .childElement(className("vote-row-review"))
-                .childElement(className("vote-row-review-button"))
-              reviewButton.text should matchText("REVIEW")
               reviewButton.underlying.click()
             }
           },
@@ -556,8 +555,6 @@ class SvFrontendIntegrationTest
         val requestReasonBody = "This is a request reason."
 
         withFrontEnd("sv1") { implicit webDriver =>
-          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
-
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
               go to s"http://localhost:$sv1UIPort/votes"
@@ -569,6 +566,9 @@ class SvFrontendIntegrationTest
               find(id("create-voterequest-submit-button")) should not be empty
             },
           )
+
+          click on "tab-panel-in-progress"
+          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
 
           actAndCheck(
             "sv1 operator can create a new vote request", {
@@ -590,13 +590,15 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request",
             _ => {
+              click on "tab-panel-in-progress"
+
               val tbody = find(id("sv-voting-in-progress-table-body"))
               inside(tbody) { case Some(tb) =>
-                val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
                 rows.size shouldBe previousVoteRequestsInProgress + 1
                 (
-                  rows.head.childElement(className("vote-row-action")).text,
-                  rows.head.childElement(className("vote-row-requester")).text,
+                  rows.head.text,
+                  tb.findAllChildElements(className("vote-row-requester")).toSeq.head.text,
                 )
               }
             },
@@ -606,11 +608,8 @@ class SvFrontendIntegrationTest
             "sv1 operator can see the vote request detail by clicking review button", {
               val tbody = find(id("sv-voting-in-progress-table-body"))
               inside(tbody) { case Some(tb) =>
-                val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
                 val reviewButton = rows.head
-                  .childElement(className("vote-row-review"))
-                  .childElement(className("vote-row-review-button"))
-                reviewButton.text should matchText("REVIEW")
                 reviewButton.underlying.click()
               }
             },
@@ -648,9 +647,11 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request",
             _ => {
+              click on "tab-panel-in-progress"
+
               val tbody = find(id("sv-voting-in-progress-table-body"))
               inside(tbody) { case Some(tb) =>
-                val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
                 rows.size shouldBe previousVoteRequestsInProgress + 2
               }
             },
@@ -699,14 +700,13 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request",
             _ => {
+              click on "tab-panel-in-progress"
+
               val tbody = find(id("sv-voting-in-progress-table-body"))
               inside(tbody) { case Some(tb) =>
-                val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
                 rows.size shouldBe previousVoteRequestsInProgress + 1
                 val reviewButton = rows.head
-                  .childElement(className("vote-row-review"))
-                  .childElement(className("vote-row-review-button"))
-                reviewButton.text should matchText("REVIEW")
                 reviewButton.underlying.click()
               }
               val requestId =
@@ -719,14 +719,25 @@ class SvFrontendIntegrationTest
 
           vote(sv2Backend, requestId, false, "1", false)
           vote(sv3Backend, requestId, false, "1", false)
-          vote(sv4Backend, requestId, false, "1", false)
+          vote(sv4Backend, requestId, false, "1", true)
 
           eventually() {
             val tbody = find(id("sv-voting-in-progress-table-body"))
             val tb = tbody.value
-            val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+            val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
             rows.size shouldBe previousVoteRequestsInProgress
           }
+
+          clue("the vote request is rejected") {
+            eventually() {
+              click on "tab-panel-rejected"
+              val tbody = find(id("sv-vote-results-rejected-table-body"))
+              val tb = tbody.value
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              rows.size shouldBe 1
+            }
+          }
+
         }
     }
 
@@ -734,6 +745,7 @@ class SvFrontendIntegrationTest
       " and remove it via a CRARC_RemoveFutureCoinConfigSchedule vote request." in { implicit env =>
         /* The following aspects are tested here:
          * - the creation of Add/Update/Remove FutureCoinConfigSchedule
+         * - that the accepted Add vote requests is well displayed in Planned section
          * - the alerting if such requests are touching the same schedule time
          * - the vote request expiresAt < effectiveAt
          * - tests if the modal closes when the last voter votes
@@ -743,8 +755,6 @@ class SvFrontendIntegrationTest
         val requestReasonBody = "This is a request reason."
 
         withFrontEnd("sv1") { implicit webDriver =>
-          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
-
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
               go to s"http://localhost:$sv1UIPort/votes"
@@ -756,6 +766,9 @@ class SvFrontendIntegrationTest
               find(id("create-voterequest-submit-button")) should not be empty
             },
           )
+
+          click on "tab-panel-in-progress"
+          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
 
           val (_, requestIdAdd) = actAndCheck(
             "sv1 operator can create a request to add a new coin config schedule", {
@@ -796,18 +809,15 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request",
             _ => {
+              click on "tab-panel-in-progress"
+
               val tbody = find(id("sv-voting-in-progress-table-body"))
               val tb = tbody.value
-              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
               rows.size shouldBe previousVoteRequestsInProgress + 1
-              rows.head
-                .childElement(className("vote-row-action"))
-                .text shouldBe "CRARC_AddFutureCoinConfigSchedule"
+              rows.head.text shouldBe "CRARC_AddFutureCoinConfigSchedule"
 
               val reviewButton = rows.head
-                .childElement(className("vote-row-review"))
-                .childElement(className("vote-row-review-button"))
-              reviewButton.text should matchText("REVIEW")
               reviewButton.underlying.click()
 
               val requestId =
@@ -858,6 +868,16 @@ class SvFrontendIntegrationTest
           )
 
           vote(sv3Backend, requestIdAdd, true, "3", true)
+
+          clue("the vote request is marked as planned") {
+            eventually() {
+              click on "tab-panel-planned"
+              val tbody = find(id("sv-vote-results-planned-table-body"))
+              val tb = tbody.value
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              rows.size shouldBe 1
+            }
+          }
 
           actAndCheck(
             "sv1 operator fails to create a vote request because the expiration date is after the effective date.", {
@@ -910,9 +930,11 @@ class SvFrontendIntegrationTest
           )
 
           eventually() {
+            click on "tab-panel-in-progress"
+
             val tbody = find(id("sv-voting-in-progress-table-body"))
             val tb = tbody.value
-            val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+            val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
             rows.size shouldBe previousVoteRequestsInProgress
             sv1ScanBackend
               .getCoinRules()
@@ -950,18 +972,15 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request",
             _ => {
+              click on "tab-panel-in-progress"
+
               val tbody = find(id("sv-voting-in-progress-table-body"))
               val tb = tbody.value
-              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
               rows.size shouldBe previousVoteRequestsInProgress + 1
-              rows.head
-                .childElement(className("vote-row-action"))
-                .text shouldBe "CRARC_UpdateFutureCoinConfigSchedule"
+              rows.head.text shouldBe "CRARC_UpdateFutureCoinConfigSchedule"
 
               val reviewButton = rows.head
-                .childElement(className("vote-row-review"))
-                .childElement(className("vote-row-review-button"))
-              reviewButton.text should matchText("REVIEW")
               reviewButton.underlying.click()
 
               val requestId =
@@ -1004,9 +1023,11 @@ class SvFrontendIntegrationTest
           vote(sv3Backend, requestIdUpdate, true, "3", true)
 
           eventually() {
+            click on "tab-panel-in-progress"
+
             val tbody = find(id("sv-voting-in-progress-table-body"))
             val tb = tbody.value
-            val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+            val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
             rows.size shouldBe previousVoteRequestsInProgress
             sv1ScanBackend
               .getCoinRules()
@@ -1040,18 +1061,15 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request",
             _ => {
+              click on "tab-panel-in-progress"
+
               val tbody = find(id("sv-voting-in-progress-table-body"))
               val tb = tbody.value
-              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
               rows.size shouldBe previousVoteRequestsInProgress + 1
-              rows.head
-                .childElement(className("vote-row-action"))
-                .text shouldBe "CRARC_RemoveFutureCoinConfigSchedule"
+              rows.head.text shouldBe "CRARC_RemoveFutureCoinConfigSchedule"
 
               val reviewButton = rows.head
-                .childElement(className("vote-row-review"))
-                .childElement(className("vote-row-review-button"))
-              reviewButton.text should matchText("REVIEW")
               reviewButton.underlying.click()
 
               val requestId =
@@ -1098,14 +1116,13 @@ class SvFrontendIntegrationTest
           )(
             "sv2 sees the new vote request",
             _ => {
+              click on "tab-panel-action-needed"
+
               val tbodyActionNeeded = find(id("sv-voting-action-needed-table-body"))
               inside(tbodyActionNeeded) { case Some(tb) =>
-                val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
 
                 val reviewButton = rows.head
-                  .childElement(className("vote-row-review"))
-                  .childElement(className("vote-row-review-button"))
-                reviewButton.text should matchText("REVIEW")
                 reviewButton.underlying.click()
               }
             },
@@ -1262,6 +1279,7 @@ class SvFrontendIntegrationTest
         }
 
         withFrontEnd("sv1") { implicit webDriver =>
+          click on "tab-panel-in-progress"
           val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
           val (_, requestIdAdd1) = actAndCheck(
             "sv1 creates the vote request",
@@ -1269,18 +1287,14 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request",
             _ => {
+              click on "tab-panel-in-progress"
               val tbody = find(id("sv-voting-in-progress-table-body"))
               val tb = tbody.value
-              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
               rows.size shouldBe previousVoteRequestsInProgress + 1
-              rows.head
-                .childElement(className("vote-row-action"))
-                .text shouldBe "CRARC_AddFutureCoinConfigSchedule"
+              rows.head.text shouldBe "CRARC_AddFutureCoinConfigSchedule"
 
               val reviewButton = rows.head
-                .childElement(className("vote-row-review"))
-                .childElement(className("vote-row-review-button"))
-              reviewButton.text should matchText("REVIEW")
               reviewButton.underlying.click()
 
               val requestId =
@@ -1295,6 +1309,7 @@ class SvFrontendIntegrationTest
         }
 
         withFrontEnd("sv2") { implicit webDriver =>
+          click on "tab-panel-in-progress"
           val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
           val (_, requestIdAdd2) = actAndCheck(
             "sv2 creates the vote request",
@@ -1302,18 +1317,15 @@ class SvFrontendIntegrationTest
           )(
             "sv2 can see the new vote request",
             _ => {
+              click on "tab-panel-in-progress"
+
               val tbody = find(id("sv-voting-in-progress-table-body"))
               val tb = tbody.value
-              val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
               rows.size shouldBe previousVoteRequestsInProgress + 1
-              rows.head
-                .childElement(className("vote-row-action"))
-                .text shouldBe "CRARC_AddFutureCoinConfigSchedule"
+              rows.head.text shouldBe "CRARC_AddFutureCoinConfigSchedule"
 
               val reviewButton = rows.head
-                .childElement(className("vote-row-review"))
-                .childElement(className("vote-row-review-button"))
-              reviewButton.text should matchText("REVIEW")
               reviewButton.underlying.click()
 
               val requestId =
@@ -1328,9 +1340,11 @@ class SvFrontendIntegrationTest
 
           clue("Of of the two request is marked as rejected/staled") {
             eventually() {
+              click on "tab-panel-aborted"
+
               val tbody = find(id("sv-voting-staled-table-body"))
               inside(tbody) { case Some(tb) =>
-                val rows = tb.findAllChildElements(className("vote-request-row")).toSeq
+                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
                 rows should have size 1
               }
             }
@@ -1339,42 +1353,17 @@ class SvFrontendIntegrationTest
     }
   }
 
-  def vote(
-      backend: SvAppBackendReference,
-      requestId: String,
-      isAccept: Boolean,
-      numberAccepts: String,
-      finalVote: Boolean,
-  )(implicit webDriver: WebDriverType) = {
-    actAndCheck(
-      s"${backend.config.ledgerApiUser} accepts the request",
-      backend.castVote(new VoteRequest.ContractId(requestId), isAccept, "", ""),
-    )(
-      s"the number of accept votes increased to ${numberAccepts}",
-      _ => {
-        inside(find(id("vote-request-modal-accepted-count"))) {
-          case Some(element) => element.text should matchText(numberAccepts)
-          case None =>
-            finalVote shouldBe true // the vote request might already have been archived at this point
-        }
-        if (finalVote) {
-          webDriver.findElement(By.tagName("body")).sendKeys(Keys.ESCAPE)
-        }
-      },
-    )
-  }
-
   def getVoteRequestsInProgressSize()(implicit webDriver: WebDriverType) = {
     val tbodyInProgress = find(id("sv-voting-in-progress-table-body"))
     tbodyInProgress
-      .map(_.findAllChildElements(className("vote-request-row")).toSeq.size)
+      .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
       .getOrElse(0)
   }
 
   def getVoteRequestsActionNeededSize()(implicit webDriver: WebDriverType) = {
     val tbodyInProgress = find(id("sv-voting-action-needed-table-body"))
     tbodyInProgress
-      .map(_.findAllChildElements(className("vote-request-row")).toSeq.size)
+      .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
       .getOrElse(0)
   }
 

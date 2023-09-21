@@ -236,6 +236,7 @@ data VoteResult = VoteResult with
     executed : Bool
     requester: Party
     effectiveAt: Time
+    votedAt: Time
     acceptedBy : [Party]
     rejectedBy : [Party]
   deriving (Eq, Show)
@@ -656,6 +657,7 @@ template SvcRules with
                       CRARC_SetEnabledChoices _ -> now
                   ARC_SvcRules with .. -> now
                   ARC_CnsEntryContext with .. -> now
+          votedAt = now
           acceptedBy = map (.voter) $ filter (.accept) votes
           rejectedBy = map (.voter) $ filter (\vote -> not vote.accept) votes
 

@@ -9,6 +9,8 @@ Release Notes
 * Frontend updates:
 
     * New history view of past SVC governance votes and actions, listing separately "Action Needed", "In Progress", "Planned", "Executed" and "Rejected" votes.
+        * Click on rows to review and vote on vote requests.
+        * Filter vote requests by action name, requester and dates.
 
 * Bugfixes:
 
