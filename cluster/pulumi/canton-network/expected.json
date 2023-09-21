@@ -1622,6 +1622,7 @@
         },
         "stateSync": {
           "enable": false,
+          "minCatchupBlocks": 100,
           "rpcServers": ""
         }
       }
@@ -2538,6 +2539,7 @@
         },
         "stateSync": {
           "enable": false,
+          "minCatchupBlocks": 100,
           "rpcServers": ""
         }
       }
@@ -3362,6 +3364,7 @@
         },
         "stateSync": {
           "enable": false,
+          "minCatchupBlocks": 100,
           "rpcServers": ""
         }
       }
@@ -4112,8 +4115,9 @@
           }
         },
         "stateSync": {
-          "enable": false,
-          "rpcServers": ""
+          "enable": true,
+          "minCatchupBlocks": 100,
+          "rpcServers": "cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657"
         }
       }
     },

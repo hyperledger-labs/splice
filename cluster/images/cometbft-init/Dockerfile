@@ -6,6 +6,5 @@ RUN apt-get update \
    && apt-get clean \
    && rm -rf /var/cache/apt/archives
 
-ENV STATE_SYNC_RPC_SERVERS=""
 COPY configure-state-sync.sh /
 RUN chmod +x /configure-state-sync.sh

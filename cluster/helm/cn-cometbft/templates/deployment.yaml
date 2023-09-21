@@ -35,12 +35,14 @@ spec:
             - -x
             - |
               cp -a /initial-config/. /config/
-              {{- if $.Values.stateSync.enable }}
-              /update-cometbft-config.sh /config/config.toml
-              {{- end }}
+              /configure-state-sync.sh /config/config.toml
           env:
+            - name: STATE_SYNC_ENABLE
+              value: "{{ $.Values.stateSync.enable }}"
             - name: STATE_SYNC_RPC_SERVERS
-              value: {{ $.Values.stateSync.rpcServers }}
+              value: "{{ $.Values.stateSync.rpcServers }}"
+            - name: STATE_SYNC_MIN_CATCHUP_BLOCKS
+              value: "{{ $.Values.stateSync.minCatchupBlocks }}"
       containers:
         - name: {{ $fullName }}
           image: "{{ $.Values.imageRepo }}/{{ $.Values.imageName }}:{{ $.Values.cluster.imageTag }}"

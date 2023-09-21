@@ -350,7 +350,7 @@ ttl-num-blocks = 0
 # the network to take and serve state machine snapshots. State sync is not attempted if the node
 # has any local state (LastBlockHeight > 0). The node will have a truncated block history,
 # starting from the height of the snapshot.
-enable = {{ .Values.stateSync.enable }}
+enable = STATE_SYNC_ENABLE
 
 # RPC servers (comma-separated) for light client verification of the synced state machine and
 # retrieval of state data for node bootstrapping. Also needs a trusted height and corresponding
@@ -358,9 +358,9 @@ enable = {{ .Values.stateSync.enable }}
 #
 # For Cosmos SDK-based chains, trust_period should usually be about 2/3 of the unbonding time (~2
 # weeks) during which they can be financially punished (slashed) for misbehavior.
-rpc_servers = ""
-trust_height = 0
-trust_hash = ""
+rpc_servers = STATE_SYNC_RPC_SERVERS
+trust_height = STATE_SYNC_TRUST_HEIGHT
+trust_hash = STATE_SYNC_TRUST_HASH
 trust_period = "168h0m0s"
 
 # Time to spend discovering snapshots before initiating a restore.

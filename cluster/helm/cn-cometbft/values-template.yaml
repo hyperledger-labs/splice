@@ -8,10 +8,15 @@ nodeName: ""
 # Is the helm chart deployed on devnet
 isDevNet: true
 
-# Turn on experimental state sync which can be considerably faster for large chains
 stateSync:
+  # turn on experimental state sync which could speed up initialization considerably for large chains.
   enable: false
+  # at least 2 not necessarily unique comma-separated entries must be provided for rpc_servers if enable is true
   rpcServers: ""
+  # number of blocks to catch up using regular block sync after state sync is complete.
+  # setting this to a higher value reduces the likelihood that we'll end up with an invalid config due to the
+  # target block becoming invalid in an unstable network at the cost of increasing initialization time.
+  minCatchupBlocks: 100
 
 founder:
   # The CometBFT node ID of the founding node
