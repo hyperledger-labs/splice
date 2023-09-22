@@ -3,6 +3,14 @@
 Release Notes
 =============
 
+2023-10-02
+----------
+
+* Deployment updates:
+
+    * The SV name for the node operated by Digital Asset on DevNet has been updated.
+      Note the updated SV name in ``approved-sv-id-values-dev.yaml``: `Digital-Asset`.
+
 2023-09-25
 ----------
 
