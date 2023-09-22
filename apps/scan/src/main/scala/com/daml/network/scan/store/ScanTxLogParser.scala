@@ -3,34 +3,31 @@ package com.daml.network.scan.store
 import cats.Monoid
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
-import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.api.v1.coin.{CoinCreateSummary, CoinExpireSummary}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.fees.ExpiringAmount
 import com.daml.network.history.*
 import com.daml.network.store.TxLogStore
+import com.daml.network.scan.store.TxLogEntry.*
+import com.daml.network.scan.store.TxLogIndexRecord
+import com.daml.network.scan.store.TxLogIndexRecord.*
 import com.daml.network.util.{Codec, ExerciseNode}
 import com.daml.network.util.CNNodeUtil.dollarsToCC
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
-import java.time.Instant
-import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
+import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.daml.network.environment.ledger.api.ActiveContract
 import com.daml.network.environment.ledger.api.IncompleteReassignmentEvent
-import com.daml.network.http.v0.definitions as httpDef
-import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.topology.DomainId
-import java.time.ZoneOffset
 
 class ScanTxLogParser(
     override val loggerFactory: NamedLoggerFactory
 ) extends TxLogStore.Parser[
-      ScanTxLogParser.TxLogIndexRecord,
-      ScanTxLogParser.TxLogEntry,
+      TxLogIndexRecord,
+      TxLogEntry,
     ]
     with NamedLogging {
 
@@ -45,21 +42,29 @@ class ScanTxLogParser(
         exercised match {
           case Transfer(node) =>
             State.fromTransfer(tree, root, domainId, node)
-          case Mint(node) =>
-            State.fromCoinCreateSummary(
-              tree,
-              exercised,
-              domainId,
-              node.result.value,
-              TxLogEntry.RecentActivityType.Mint,
-            )
           case Tap(node) =>
             State.fromCoinCreateSummary(
               tree,
               exercised,
               domainId,
               node.result.value,
-              TxLogEntry.RecentActivityType.Tap,
+              ActivityType.Tap,
+            )
+          case Mint(node) =>
+            State.fromCoinCreateSummary(
+              tree,
+              exercised,
+              domainId,
+              node.result.value,
+              ActivityType.Mint,
+            )
+          case SvcRules_CollectSvReward(node) =>
+            State.fromCoinCreateSummary(
+              tree,
+              exercised,
+              domainId,
+              node.result.value,
+              ActivityType.SvRewardCollected,
             )
           case ImportCrate_Receive(_) =>
             State.empty
@@ -116,7 +121,7 @@ class ScanTxLogParser(
       incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
   )(implicit
       tc: TraceContext
-  ): Seq[(DomainId, ScanTxLogParser.TxLogEntry)] = acs.collect(ac =>
+  ): Seq[(DomainId, TxLogEntry)] = acs.collect(ac =>
     ac.createdEvent match {
       case CoinCreate(c) =>
         (
@@ -135,15 +140,15 @@ class ScanTxLogParser(
 
   override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
       tc: TraceContext
-  ): Seq[ScanTxLogParser.TxLogEntry] = {
+  ): Seq[TxLogEntry] = {
     val ret = parseTrees(tx, domain, tx.getRootEventIds.asScala.toList).entries
     ret
   }
 
   override def error(offset: String, eventId: String, domainId: DomainId): Option[TxLogEntry] =
     Some(
-      TxLogEntry.ErrorTxLogEntry(
-        indexRecord = TxLogIndexRecord.ErrorIndexRecord(
+      ErrorTxLogEntry(
+        indexRecord = ErrorIndexRecord(
           offset,
           eventId,
           domainId,
@@ -178,246 +183,21 @@ class ScanTxLogParser(
 
 object ScanTxLogParser {
 
-  sealed trait TxLogIndexRecord extends TxLogStore.IndexRecord {
-    val companion: TxLogIndexRecordCompanion
-  }
-
-  sealed trait TxLogIndexRecordCompanion {
-    val shortType: String
-
-    def dbType: String3 = String3.tryCreate(shortType)
-  }
-
-  object TxLogIndexRecord {
-
-    final case class ErrorIndexRecord(
-        offset: String,
-        eventId: String,
-        domainId: DomainId,
-    ) extends TxLogIndexRecord {
-      override def optOffset = Some(offset)
-
-      override def acsContractId: Option[codegen.ContractId[_]] = None
-
-      override val companion: TxLogIndexRecordCompanion = ErrorIndexRecord
-    }
-
-    object ErrorIndexRecord extends TxLogIndexRecordCompanion {
-      override val shortType: String = "err"
-    }
-
-    final case class OpenMiningRoundIndexRecord(
-        offset: String,
-        eventId: String,
-        domainId: DomainId,
-        round: Long,
-    ) extends TxLogIndexRecord {
-      override def optOffset = Some(offset)
-
-      override def acsContractId: Option[codegen.ContractId[_]] = None
-
-      override val companion: TxLogIndexRecordCompanion = OpenMiningRoundIndexRecord
-    }
-
-    object OpenMiningRoundIndexRecord extends TxLogIndexRecordCompanion {
-      override val shortType: String = "omr"
-    }
-
-    final case class ClosedMiningRoundIndexRecord(
-        offset: String,
-        eventId: String,
-        domainId: DomainId,
-        round: Long,
-        effectiveAt: Instant,
-    ) extends TxLogIndexRecord {
-      override def optOffset = Some(offset)
-
-      override def acsContractId: Option[codegen.ContractId[_]] = None
-
-      override val companion: TxLogIndexRecordCompanion = ClosedMiningRoundIndexRecord
-    }
-
-    object ClosedMiningRoundIndexRecord extends TxLogIndexRecordCompanion {
-      override val shortType: String = "cmr"
-    }
-
-    sealed trait RewardIndexRecord extends TxLogIndexRecord {
-      def party: PartyId
-      def amount: BigDecimal
-      def round: Long
-    }
-
-    final case class AppRewardIndexRecord(
-        offset: String,
-        eventId: String,
-        domainId: DomainId,
-        round: Long,
-        party: PartyId,
-        amount: BigDecimal,
-    ) extends RewardIndexRecord {
-      override def optOffset = Some(offset)
-
-      override def acsContractId: Option[codegen.ContractId[_]] = None
-
-      override val companion: TxLogIndexRecordCompanion = AppRewardIndexRecord
-    }
-
-    object AppRewardIndexRecord extends TxLogIndexRecordCompanion {
-      override val shortType: String = "are"
-    }
-
-    final case class ValidatorRewardIndexRecord(
-        offset: String,
-        eventId: String,
-        domainId: DomainId,
-        round: Long,
-        party: PartyId,
-        amount: BigDecimal,
-    ) extends RewardIndexRecord {
-      override def optOffset = Some(offset)
-
-      override def acsContractId: Option[codegen.ContractId[_]] = None
-
-      override val companion: TxLogIndexRecordCompanion = ValidatorRewardIndexRecord
-    }
-
-    object ValidatorRewardIndexRecord extends TxLogIndexRecordCompanion {
-      override val shortType: String = "vre"
-    }
-
-    final case class ExtraTrafficPurchaseIndexRecord(
-        offset: String,
-        eventId: String,
-        domainId: DomainId,
-        round: Long,
-        validator: PartyId,
-        trafficPurchased: Long,
-        ccSpent: BigDecimal,
-    ) extends TxLogIndexRecord {
-      override def optOffset = Some(offset)
-
-      override def acsContractId: Option[codegen.ContractId[_]] = None
-
-      override val companion: TxLogIndexRecordCompanion = ExtraTrafficPurchaseIndexRecord
-    }
-
-    object ExtraTrafficPurchaseIndexRecord extends TxLogIndexRecordCompanion {
-      override val shortType: String = "etp"
-    }
-
-    final case class BalanceChangeIndexRecord(
-        optOffset: Option[String],
-        eventId: String,
-        domainId: DomainId,
-        round: Long,
-        changeToInitialAmountAsOfRoundZero: BigDecimal,
-        changeToHoldingFeesRate: BigDecimal,
-    ) extends TxLogIndexRecord {
-      override val companion: TxLogIndexRecordCompanion = BalanceChangeIndexRecord
-      override def acsContractId: Option[codegen.ContractId[_]] = None
-    }
-
-    object BalanceChangeIndexRecord extends TxLogIndexRecordCompanion {
-      override val shortType: String = "bac"
-    }
-
-    final case class RecentActivityIndexRecord(
-        offset: String,
-        eventId: String,
-        domainId: DomainId,
-    ) extends TxLogIndexRecord {
-      override def optOffset = Some(offset)
-
-      override def acsContractId: Option[codegen.ContractId[_]] = None
-
-      override val companion: TxLogIndexRecordCompanion = RecentActivityIndexRecord
-    }
-
-    object RecentActivityIndexRecord extends TxLogIndexRecordCompanion {
-      override val shortType: String = "rar"
-    }
-  }
-
-  sealed trait TxLogEntry extends TxLogStore.Entry[TxLogIndexRecord] {}
-
-  object TxLogEntry {
-
-    final case class ErrorTxLogEntry(indexRecord: TxLogIndexRecord.ErrorIndexRecord)
-        extends TxLogEntry {}
-
-    final case class EmptyTxLogEntry(indexRecord: TxLogIndexRecord) extends TxLogEntry {}
-
-    final case class OpenMiningRoundLogEntry(
-        indexRecord: TxLogIndexRecord,
-        coinCreateFee: BigDecimal,
-        holdingFee: BigDecimal,
-        lockHolderFee: BigDecimal,
-        initialTransferFee: BigDecimal,
-        transferFeeSteps: Seq[(BigDecimal, BigDecimal)],
-    ) extends TxLogEntry {}
-
-    object OpenMiningRoundLogEntry {
-      val transaction_type = "open_mining_round"
-    }
-    sealed trait RecentActivityType {
-      def name: String
-    }
-    object RecentActivityType {
-      case object Transfer extends RecentActivityType {
-        val name = "Transfer"
-      }
-      case object NetworkBurn extends RecentActivityType {
-        val name = "Network burn"
-      }
-      case object Mint extends RecentActivityType {
-        val name = "Mint"
-      }
-      case object Tap extends RecentActivityType {
-        val name = "Tap"
-      }
-    }
-
-    final case class RecentActivityLogEntry(
-        indexRecord: TxLogIndexRecord.RecentActivityIndexRecord,
-        activityType: RecentActivityType,
-        date: Instant,
-        provider: String,
-        sender: (String, BigDecimal),
-        receivers: Seq[(String, BigDecimal)],
-        senderHoldingFees: BigDecimal,
-        coinPrice: BigDecimal,
-        appRewardsUsed: BigDecimal,
-        validatorRewardsUsed: BigDecimal,
-    ) extends TxLogEntry {
-      def toResponseItem = httpDef.ListRecentActivityResponseItem(
-        activityType = activityType.name,
-        eventId = indexRecord.eventId,
-        offset = indexRecord.optOffset,
-        domainId = indexRecord.domainId.toProtoPrimitive,
-        date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
-        provider = provider,
-        sender = httpDef.PartyAndAmount(sender._1, Codec.encode(sender._2)),
-        receivers = receivers.map(r => httpDef.PartyAndAmount(r._1, Codec.encode(r._2))).toVector,
-        holdingFees = Some(Codec.encode(senderHoldingFees)),
-        coinPrice = Codec.encode(coinPrice),
-        appRewardsUsed = Some(Codec.encode(appRewardsUsed)),
-        validatorRewardsUsed = Some(Codec.encode(validatorRewardsUsed)),
-      )
-    }
-  }
-
   case class State(
       entries: immutable.Queue[TxLogEntry]
   ) {
     def appended(other: State): State = State(
       entries = entries.appendedAll(other.entries)
     )
+    def append(entry: TxLogEntry) = State(entries = entries :+ entry)
   }
 
   object State {
-    def empty: State = State(
-      entries = immutable.Queue.empty
-    )
+    def apply(entry: TxLogEntry): State = {
+      State(immutable.Queue(entry))
+    }
+
+    def empty: State = State(immutable.Queue.empty)
 
     implicit val stateMonoid: Monoid[State] = new Monoid[State] {
       override val empty = State(immutable.Queue.empty)
@@ -433,29 +213,24 @@ object ScanTxLogParser {
         coin: cc.coin.Coin,
     ): State =
       State(
-        immutable.Queue(
-          TxLogEntry.EmptyTxLogEntry(
-            indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
-              optOffset = Some(tx.getOffset()),
-              eventId = event.getEventId(),
-              domainId = domainId,
-              round = coin.amount.createdAt.number,
-              changeToInitialAmountAsOfRoundZero = amountAsOfRoundZero(coin.amount),
-              changeToHoldingFeesRate = coin.amount.ratePerRound.rate,
-            )
+        EmptyTxLogEntry(
+          indexRecord = BalanceChangeIndexRecord(
+            optOffset = Some(tx.getOffset()),
+            eventId = event.getEventId(),
+            domainId = domainId,
+            round = coin.amount.createdAt.number,
+            changeToInitialAmountAsOfRoundZero = amountAsOfRoundZero(coin.amount),
+            changeToHoldingFeesRate = coin.amount.ratePerRound.rate,
           )
         )
       )
 
-    def fromCoinCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
+    private def getCoinFromSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
         tx: TransactionTree,
-        event: TreeEvent,
-        domainId: DomainId,
         ccsum: CoinCreateSummary[T],
-        activityType: TxLogEntry.RecentActivityType,
-    ): State = {
+    ) = {
       val coinCid = ccsum.coin.contractId
-      val coin = tx.getEventsById.asScala
+      tx.getEventsById.asScala
         .collectFirst {
           case (_, c: CreatedEvent) if c.getContractId == coinCid => {
             CoinCreate.unapply(c).map(_.payload)
@@ -467,38 +242,55 @@ object ScanTxLogParser {
             s"The coin contract $coinCid referenced by CoinCreateSummary was not found in transaction ${tx.getTransactionId}"
           )
         }
+    }
 
-      val recentActivityEntry = State(
-        immutable.Queue(
-          TxLogEntry.RecentActivityLogEntry(
-            indexRecord = TxLogIndexRecord.RecentActivityIndexRecord(
-              offset = tx.getOffset(),
-              eventId = event.getEventId(),
-              domainId = domainId,
-            ),
-            activityType = activityType,
+    def fromCoinCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
+        tx: TransactionTree,
+        event: TreeEvent,
+        domainId: DomainId,
+        ccsum: CoinCreateSummary[T],
+        activityType: ActivityType,
+    ): State = {
+      val coin = getCoinFromSummary(tx, ccsum)
+      val activityEntry = activityType match {
+        case ActivityType.Tap =>
+          TapLogEntry(
+            indexRecord = ActivityIndexRecord(tx, event, domainId),
             date = tx.getEffectiveAt,
-            provider = coin.owner,
-            sender = (coin.owner, BigDecimal(0)),
-            receivers = Vector((coin.owner, coin.amount.initialAmount)),
-            senderHoldingFees = 0,
+            coinOwner = coin.owner,
+            coinAmount = coin.amount.initialAmount,
             coinPrice = ccsum.coinPrice,
-            appRewardsUsed = BigDecimal(0),
-            validatorRewardsUsed = BigDecimal(0),
           )
-        )
-      )
+        case ActivityType.Mint =>
+          MintLogEntry(
+            indexRecord = ActivityIndexRecord(tx, event, domainId),
+            date = tx.getEffectiveAt,
+            coinOwner = coin.owner,
+            coinAmount = coin.amount.initialAmount,
+            coinPrice = ccsum.coinPrice,
+          )
+        case ActivityType.SvRewardCollected =>
+          SvRewardCollectedLogEntry(
+            indexRecord = ActivityIndexRecord(tx, event, domainId),
+            date = tx.getEffectiveAt,
+            coinOwner = coin.owner,
+            coinAmount = coin.amount.initialAmount,
+            coinPrice = ccsum.coinPrice,
+          )
+        case unexpected =>
+          throw new Exception(
+            s"unexpected activityType: $unexpected in fromCoinCreateSummary"
+          )
+      }
 
       State(
-        immutable.Queue(
-          ScanTxLogParser.entryFromCoin(
-            Some(tx.getOffset()),
-            event.getEventId(),
-            domainId,
-            coin.amount,
-          )
+        ScanTxLogParser.entryFromCoin(
+          Some(tx.getOffset()),
+          event.getEventId(),
+          domainId,
+          coin.amount,
         )
-      ).appended(recentActivityEntry)
+      ).append(activityEntry)
     }
 
     def fromTransfer(
@@ -522,8 +314,8 @@ object ScanTxLogParser {
       val appRewardEntry =
         if (appRewards.compareTo(BigDecimal(0.0)) > 0) {
           val entry =
-            TxLogEntry.EmptyTxLogEntry(
-              indexRecord = TxLogIndexRecord.AppRewardIndexRecord(
+            EmptyTxLogEntry(
+              indexRecord = AppRewardIndexRecord(
                 offset = tx.getOffset(),
                 eventId = rootEventId.getOrElse(event.getEventId()),
                 domainId = domainId,
@@ -532,7 +324,7 @@ object ScanTxLogParser {
                 amount = appRewards,
               )
             )
-          State(immutable.Queue(entry))
+          State(entry)
         } else {
           State.empty
         }
@@ -540,8 +332,8 @@ object ScanTxLogParser {
       val validatorRewardEntry =
         if (validatorRewards.compareTo(BigDecimal(0.0)) > 0) {
           val entry =
-            TxLogEntry.EmptyTxLogEntry(
-              indexRecord = TxLogIndexRecord.ValidatorRewardIndexRecord(
+            EmptyTxLogEntry(
+              indexRecord = ValidatorRewardIndexRecord(
                 offset = tx.getOffset(),
                 eventId = rootEventId.getOrElse(event.getEventId()),
                 domainId = domainId,
@@ -550,55 +342,33 @@ object ScanTxLogParser {
                 amount = validatorRewards,
               )
             )
-          State(immutable.Queue(entry))
+          State(entry)
         } else {
           State.empty
         }
 
       val balanceChangeEntry = State(
-        immutable.Queue(
-          TxLogEntry.EmptyTxLogEntry(
-            indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
-              optOffset = Some(tx.getOffset()),
-              eventId = rootEventId.getOrElse(event.getEventId()),
-              domainId = domainId,
-              round = round.number,
-              changeToInitialAmountAsOfRoundZero =
-                node.result.value.summary.changeToInitialAmountAsOfRoundZero,
-              changeToHoldingFeesRate = node.result.value.summary.changeToHoldingFeesRate,
-            )
+        EmptyTxLogEntry(
+          indexRecord = BalanceChangeIndexRecord(
+            optOffset = Some(tx.getOffset()),
+            eventId = rootEventId.getOrElse(event.getEventId()),
+            domainId = domainId,
+            round = round.number,
+            changeToInitialAmountAsOfRoundZero =
+              node.result.value.summary.changeToInitialAmountAsOfRoundZero,
+            changeToHoldingFeesRate = node.result.value.summary.changeToHoldingFeesRate,
           )
         )
       )
-      val receivers = parseReceivers(node.argument.value, node.result.value)
-      val sender = parseSender(node.argument.value, node.result.value)
-      val recentActivityEntry = State(
-        immutable.Queue(
-          TxLogEntry.RecentActivityLogEntry(
-            indexRecord = TxLogIndexRecord.RecentActivityIndexRecord(
-              offset = tx.getOffset(),
-              eventId = rootEventId.getOrElse(event.getEventId()),
-              domainId = domainId,
-            ),
-            activityType =
-              if (receivers.isEmpty) TxLogEntry.RecentActivityType.NetworkBurn
-              else TxLogEntry.RecentActivityType.Transfer,
-            date = tx.getEffectiveAt,
-            provider = node.argument.value.transfer.provider,
-            sender = sender,
-            receivers = receivers,
-            senderHoldingFees = node.result.value.summary.holdingFees,
-            coinPrice = node.result.value.summary.coinPrice,
-            appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
-            validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
-          )
-        )
+
+      val activityEntry = State(
+        TransferLogEntry(tx, event, domainId, node)
       )
       State.empty
         .appended(appRewardEntry)
         .appended(validatorRewardEntry)
         .appended(balanceChangeEntry)
-        .appended(recentActivityEntry)
+        .appended(activityEntry)
     }
 
     def fromCoinExpireSummary(
@@ -608,16 +378,14 @@ object ScanTxLogParser {
         cxsum: CoinExpireSummary,
     ): State = {
       State(
-        immutable.Queue(
-          TxLogEntry.EmptyTxLogEntry(
-            indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
-              optOffset = Some(tx.getOffset()),
-              eventId = event.getEventId(),
-              domainId = domainId,
-              round = cxsum.round.number,
-              changeToInitialAmountAsOfRoundZero = cxsum.changeToInitialAmountAsOfRoundZero,
-              changeToHoldingFeesRate = cxsum.changeToHoldingFeesRate,
-            )
+        EmptyTxLogEntry(
+          indexRecord = BalanceChangeIndexRecord(
+            optOffset = Some(tx.getOffset()),
+            eventId = event.getEventId(),
+            domainId = domainId,
+            round = cxsum.round.number,
+            changeToInitialAmountAsOfRoundZero = cxsum.changeToInitialAmountAsOfRoundZero,
+            changeToHoldingFeesRate = cxsum.changeToHoldingFeesRate,
           )
         )
       )
@@ -652,8 +420,8 @@ object ScanTxLogParser {
       val round = transferNode.result.value.round
       val trafficPurchased = node.argument.value.trafficAmount
       val ccSpent = transferNode.argument.value.transfer.outputs.get(0).amount
-      val buyExtraTrafficEntry = TxLogEntry.EmptyTxLogEntry(
-        indexRecord = TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord(
+      val buyExtraTrafficEntry = EmptyTxLogEntry(
+        indexRecord = ExtraTrafficPurchaseIndexRecord(
           offset = tx.getOffset(),
           eventId = event.getEventId(),
           domainId = domainId,
@@ -667,7 +435,7 @@ object ScanTxLogParser {
       // third child event is the burning of transferred coin by the SVC
       val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(2))
 
-      State(immutable.Queue(buyExtraTrafficEntry))
+      State(buyExtraTrafficEntry)
         // append the entries for rewards
         .appended(
           State.fromTransfer(
@@ -687,7 +455,6 @@ object ScanTxLogParser {
             Some(event.getEventId()),
           )
         )
-
     }
 
     def fromCollectEntryPayment(
@@ -724,17 +491,15 @@ object ScanTxLogParser {
           )
         )
       State(
-        immutable.Queue(
-          TxLogEntry.EmptyTxLogEntry(
-            indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
-              optOffset = Some(tx.getOffset()),
-              eventId = rootEventId.getOrElse(event.getEventId()),
-              domainId = domainId,
-              round = burntCoin.amount.createdAt.number,
-              // negative value for both initial amount and holding fee so that the total balance can be calculated correctly
-              changeToInitialAmountAsOfRoundZero = -amountAsOfRoundZero(burntCoin.amount),
-              changeToHoldingFeesRate = -burntCoin.amount.ratePerRound.rate,
-            )
+        EmptyTxLogEntry(
+          indexRecord = BalanceChangeIndexRecord(
+            optOffset = Some(tx.getOffset()),
+            eventId = rootEventId.getOrElse(event.getEventId()),
+            domainId = domainId,
+            round = burntCoin.amount.createdAt.number,
+            // negative value for both initial amount and holding fee so that the total balance can be calculated correctly
+            changeToInitialAmountAsOfRoundZero = -amountAsOfRoundZero(burntCoin.amount),
+            changeToHoldingFeesRate = -burntCoin.amount.ratePerRound.rate,
           )
         )
       )
@@ -748,8 +513,8 @@ object ScanTxLogParser {
     ): State = {
       val config = round.payload.transferConfigUsd
       val coinPrice = round.payload.coinPrice
-      val newEntry = TxLogEntry.OpenMiningRoundLogEntry(
-        indexRecord = TxLogIndexRecord.OpenMiningRoundIndexRecord(
+      val newEntry = OpenMiningRoundLogEntry(
+        indexRecord = OpenMiningRoundIndexRecord(
           offset = tx.getOffset(),
           eventId = event.getEventId(),
           domainId = domainId,
@@ -764,9 +529,7 @@ object ScanTxLogParser {
         ),
       )
 
-      State(
-        entries = immutable.Queue(newEntry)
-      )
+      State(newEntry)
     }
 
     def fromClosedMiningRoundCreate(
@@ -775,8 +538,8 @@ object ScanTxLogParser {
         domainId: DomainId,
         round: ClosedMiningRoundCreate.ContractType,
     ): State = {
-      val newEntry = TxLogEntry.EmptyTxLogEntry(
-        indexRecord = TxLogIndexRecord.ClosedMiningRoundIndexRecord(
+      val newEntry = EmptyTxLogEntry(
+        indexRecord = ClosedMiningRoundIndexRecord(
           offset = tx.getOffset,
           eventId = event.getEventId(),
           domainId = domainId,
@@ -785,9 +548,7 @@ object ScanTxLogParser {
         )
       )
 
-      State(
-        entries = immutable.Queue(newEntry)
-      )
+      State(newEntry)
     }
   }
 
@@ -797,8 +558,8 @@ object ScanTxLogParser {
       domainId: DomainId,
       amount: ExpiringAmount,
   ): TxLogEntry = {
-    TxLogEntry.EmptyTxLogEntry(
-      indexRecord = TxLogIndexRecord.BalanceChangeIndexRecord(
+    EmptyTxLogEntry(
+      indexRecord = BalanceChangeIndexRecord(
         optOffset = optOffset,
         eventId = eventId,
         domainId = domainId,
@@ -811,87 +572,4 @@ object ScanTxLogParser {
 
   private def amountAsOfRoundZero(amount: ExpiringAmount) =
     amount.initialAmount + amount.ratePerRound.rate * BigDecimal(amount.createdAt.number)
-
-  // TODO(#7631) copied from UserWalletStore, this should be reused from a common lib.
-  private def parseSender(
-      arg: v1.coin.CoinRules_Transfer,
-      res: v1.coin.TransferResult,
-  ): (String, BigDecimal) = {
-    val sender = arg.transfer.sender
-
-    // Input coins, excluding holding fees
-    val netInput = res.summary.inputCoinAmount - res.summary.holdingFees
-
-    // Output coins going back to the sender, after deducting transfer fees
-    val netOutput = parseOutputAmounts(arg, res)
-      .filter(o => o.output.receiver == sender && o.output.lock.isEmpty)
-      .map(o => o.output.amount - o.senderFee)
-      .sum
-
-    // Leftover change
-    val netChange = BigDecimal(res.summary.senderChangeAmount)
-
-    // Net change in the balance of the senders
-    sender -> (netOutput + netChange - netInput)
-  }
-
-  /** Returns a list of receivers and their net balance changes */
-  private def parseReceivers(
-      arg: v1.coin.CoinRules_Transfer,
-      res: v1.coin.TransferResult,
-  ): Seq[(String, BigDecimal)] = {
-    def netBalanceChange(o: OutputWithFees) =
-      if (o.output.lock.isEmpty) {
-        o.output.amount - o.receiverFee
-      } else {
-        -o.receiverFee
-      }
-
-    // Note: the same receiver party can appear multiple times in the transfer result
-    // The code below merges balance changes for the same receiver, while preserving
-    // the order of receivers.
-    parseOutputAmounts(arg, res)
-      .filter(_.output.receiver != arg.transfer.sender)
-      .map(o => o.output.receiver -> netBalanceChange(o))
-      .foldLeft(immutable.ListMap.empty[String, BigDecimal])((acc, receiver) =>
-        acc.updatedWith(receiver._1)(prev => Some(prev.fold(receiver._2)(_ + receiver._2)))
-      )
-      .toList
-  }
-
-  /** A requested output of a transfer, together with the actual fees paid for the transfer.
-    *
-    * @param output Contains the receiver and the gross amount received (before deducting fees).
-    * @param senderFee Actual amount of fees paid by the sender.
-    * @param receiverFee Actual amount of fees paid by the receiver.
-    */
-  private final case class OutputWithFees(
-      output: v1.coin.TransferOutput,
-      senderFee: BigDecimal,
-      receiverFee: BigDecimal,
-  )
-
-  private def parseOutputAmounts(
-      arg: v1.coin.CoinRules_Transfer,
-      res: v1.coin.TransferResult,
-  ): Seq[OutputWithFees] = {
-    assert(
-      arg.transfer.outputs.size() == res.summary.outputFees.size(),
-      "Each output should have a corresponding fee",
-    )
-    val outputsWithFees = arg.transfer.outputs.asScala.toSeq.zip(res.summary.outputFees.asScala)
-
-    outputsWithFees
-      .map { case (out, fee) =>
-        OutputWithFees(
-          output = out,
-          senderFee = setDamlDecimalScale(BigDecimal(fee) * (BigDecimal(1) - out.receiverFeeRatio)),
-          receiverFee = setDamlDecimalScale(BigDecimal(fee) * out.receiverFeeRatio),
-        )
-      }
-  }
-
-  /** Returns the input number modified such that it has the same number of decimal places as a daml decimal */
-  private def setDamlDecimalScale(x: BigDecimal): BigDecimal =
-    x.setScale(10, RoundingMode.HALF_EVEN)
 }

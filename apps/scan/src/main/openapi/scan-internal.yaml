@@ -301,24 +301,26 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListImportCratesResponse"
-  /recent-activity:
+  /activities:
     post:
       tags: [scan]
       x-jvm-package: scan
-      operationId: "listRecentActivity"
+      operationId: "listActivity"
+      description: |
+        Lists activities in descending order, paged, optionally starting after a provided event id.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/ListRecentActivityRequest"
+              "$ref": "#/components/schemas/ListActivityRequest"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListRecentActivityResponse"
+                $ref: "#/components/schemas/ListActivityResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
@@ -537,17 +539,22 @@ components:
           items:
             # TODO(#6073): consider using a more precise type; i.e., no 'MaybeCached'
             $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
-    ListRecentActivityRequest:
+    ListActivityRequest:
       type: object
       required:
         - page_size
       properties:
         begin_after_id:
           type: string
+          description: |
+             Minimal event_id for returned activities.
+             Note that all activities carry some monotonically-increasing event_id. begin_after_id sets the minimum value for event_id's for the query.
         page_size:
+          description: |
+            The maximum number of activity items returned for this request.
           type: integer
           format: int64
-    ListRecentActivityResponse:
+    ListActivityResponse:
       type: object
       required:
         - activities
@@ -555,55 +562,160 @@ components:
         activities:
           type: array
           items:
-            $ref: "#/components/schemas/ListRecentActivityResponseItem"
-    ListRecentActivityResponseItem:
+            $ref: "#/components/schemas/ListActivityResponseItem"
+    ListActivityResponseItem:
       type: object
       required:
         - activity_type
         - event_id
         - date
         - domain_id
-        - provider
-        - sender
-        - receivers
-        - total_input
-        - total_output
         - coin_price
       properties:
         activity_type:
+          description: |
+            Describes the type of activity that occurred. 
+            Determines if the data for the activity should be read
+            from the `transfer`, `mint`, `tap` or `sv_reward_collected` property.
           type: string
+          enum:
+            - "transfer"
+            - "sv_reward_collected"
+            - "mint"
+            - "devnet_tap"
         event_id:
+          description: |
+            The event id.
           type: string
         offset:
-          type: string
-        domain_id:
+          description: |
+            The ledger offset of the event.
           type: string
         date:
+          description: |
+            The effective date of the event.
           type: string
           format: date-time
-        provider:
-          type: string
-        sender:
-          $ref: "#/components/schemas/PartyAndAmount"
-        receivers:
-          type: array
-          items:
-            $ref: "#/components/schemas/PartyAndAmount"
-        holding_fees:
+        domain_id:
+          description: |
+            The id of the domain through which this transaction was sequenced.
           type: string
         coin_price:
+          description: |
+            The coin price for the round at which this transfer was executed.
           type: string
-        app_rewards_used:
+        transfer:
+          description: |
+            A (batch) transfer from sender to receivers.
+          $ref: "#/components/schemas/Transfer"
+        mint:
+          description: |
+            The SVC mints coin for the cases where the collective rules allow for that.
+          $ref: "#/components/schemas/CoinAmount"
+        tap:
+          description: |
+            A tap creates a Coin, only used for development purposes, and enabled only on DevNet.
+          $ref: "#/components/schemas/CoinAmount"
+        sv_reward_collected:
+          description: |
+            An SV collected an SvReward.
+          $ref: "#/components/schemas/CoinAmount"
+    Transfer:
+      description: |
+        A transfer between one sender and possibly many receivers, provided by an application provider.
+      type: object
+      required:
+        - provider 
+        - sender
+        - receivers
+      properties:
+        provider:
+          description: |
+            The application provider.
           type: string
-        validator_rewards_used:
+        sender:
+          description: |
+            The sender amounts and fees.
+          $ref: "#/components/schemas/SenderAmount"
+        receivers:
+          description: |
+            The amounts and fees per receiver.
+          type: array
+          items:
+            $ref: "#/components/schemas/ReceiverAmount"
+    CoinAmount:
+      type: object
+      required:
+        - coin_owner
+        - coin_amount
+      properties:
+        coin_owner:
+          description: |
+            The party that owns the coin.
           type: string
-    PartyAndAmount:
+        coin_amount:
+          description: |
+            The coin amount.
+          type: string
+    SenderAmount:
+      type: object
+      required:
+        - party
+        - sender_change_fee
+        - sender_change_amount
+        - sender_fee
+        - holding_fees
+      properties:
+        party:
+          description: |
+            The sender who has transferred coin.
+          type: string
+        input_coin_amount:
+          description: |
+            Total amount of coin input into this transfer, before deducting holding fees.
+          type: string
+        input_app_reward_amount: 
+          description: |
+            Total amount of app rewards input into this transfer.
+          type: string
+        input_validator_reward_amount:
+          description: |
+            Total amount of validator rewards input into this transfer.
+          type: string
+        sender_change_fee:
+          description: |
+            Fee charged for returning change to the sender, 
+            which is the smaller of the left-over balance after paying for all outputs 
+            or one coin create fee.
+          type: string
+        sender_change_amount:
+          description: |
+            The final amount of coin returned to the sender after paying for all outputs and fees.
+          type: string
+        sender_fee:
+          description: |
+            Total fees paid by the sender, based on receiver's receiver_fee_ratio on outputs
+          type: string
+        holding_fees:
+          description: |
+            Holding fees paid by the sender on their input coins.
+          type: string
+    ReceiverAmount:
       type: object
       required:
         - party
         - amount
+        - receiver_fee
       properties:
         party:
+          description: |
+            The receiver who will own the created output coin.
           type: string
         amount:
+          description: |
+            The amount of coin to receive, before deducting receiver's part of the fees.
+          type: string
+        receiver_fee:
+          description: |
+            Total fees paid by the receiver, based on receiver_fee_ratio on outputs
           type: string

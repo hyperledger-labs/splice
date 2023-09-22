@@ -10,7 +10,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.db.ScanTables.{ScanAcsStoreRowData, ScanTxLogRowData}
-import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
+import com.daml.network.scan.store.{ScanStore, TxLogIndexRecord, TxLogEntry}
 import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
@@ -41,7 +41,7 @@ class DbScanStore(
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStoreWithHistory[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry](
+) extends DbCNNodeAppStoreWithHistory[TxLogIndexRecord, TxLogEntry](
       storage,
       DbScanStore.acsTableName,
       DbScanStore.txLogTableName,
@@ -95,7 +95,7 @@ class DbScanStore(
     }
   }
 
-  override def ingestionTxLogInsert(record: ScanTxLogParser.TxLogIndexRecord)(implicit
+  override def ingestionTxLogInsert(record: TxLogIndexRecord)(implicit
       tc: TraceContext
   ): Either[String, DBIO[_]] = {
     val ScanTxLogRowData(
@@ -187,7 +187,7 @@ class DbScanStore(
                      ($asOfEndOfRound + 1) * sum(balance_change_change_to_holding_fees_rate)
                from scan_txlog_store
                where store_id = $storeId
-                 and index_record_type = ${ScanTxLogParser.TxLogIndexRecord.BalanceChangeIndexRecord.dbType}
+                 and index_record_type = ${TxLogIndexRecord.BalanceChangeIndexRecord.dbType}
                  and round <= $asOfEndOfRound;
              """.as[Option[BigDecimal]].headOption,
           "getTotalCoinBalance",
@@ -204,8 +204,8 @@ class DbScanStore(
                   from scan_txlog_store
                   where store_id = $storeId
                     and index_record_type in (
-                      ${ScanTxLogParser.TxLogIndexRecord.ValidatorRewardIndexRecord.dbType},
-                      ${ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord.dbType}
+                      ${TxLogIndexRecord.ValidatorRewardIndexRecord.dbType},
+                      ${TxLogIndexRecord.AppRewardIndexRecord.dbType}
                     );
                """.as[BigDecimal].headOption,
           "getRewardsCollectedInRound",
@@ -213,14 +213,14 @@ class DbScanStore(
       } yield result.getOrElse(0)
     }
 
-  override def listRecentActivity(
+  override def listActivity(
       beginAfterEventId: Option[String],
       limit: Int,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[ScanTxLogParser.TxLogEntry.RecentActivityLogEntry]] =
+  ): Future[Seq[TxLogEntry.ActivityLogEntry]] =
     waitUntilAcsIngested {
-      val dbType = ScanTxLogParser.TxLogIndexRecord.RecentActivityIndexRecord.dbType
+      val dbType = TxLogIndexRecord.ActivityIndexRecord.dbType
       for {
         rows <- storage.query(
           beginAfterEventId.fold(
@@ -247,16 +247,15 @@ class DbScanStore(
                 order by entry_number desc
                 limit $limit;
            """.as[(String, String)]),
-          "listRecentActivity",
+          "listActivity",
         )
         entries <- rows.traverse { case (eventId, domainId) =>
           loadTxLogEntry(txLogReader, eventId, DomainId.tryFromString(domainId), None, dbType)
-        }: Future[Seq[ScanTxLogParser.TxLogEntry]]
-        recentActivityEntries = entries.collect {
-          case e: ScanTxLogParser.TxLogEntry.RecentActivityLogEntry =>
-            e
+        }: Future[Seq[TxLogEntry]]
+        activityEntries = entries.collect { case e: TxLogEntry.ActivityLogEntry =>
+          e
         }
-      } yield recentActivityEntries
+      } yield activityEntries
 
     }
 
@@ -270,8 +269,8 @@ class DbScanStore(
               from scan_txlog_store
               where store_id = $storeId
                 and index_record_type in (
-                  ${ScanTxLogParser.TxLogIndexRecord.ValidatorRewardIndexRecord.dbType},
-                  ${ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord.dbType}
+                  ${TxLogIndexRecord.ValidatorRewardIndexRecord.dbType},
+                  ${TxLogIndexRecord.AppRewardIndexRecord.dbType}
                 )
                 and round = $round;
            """.as[BigDecimal].headOption,
@@ -282,7 +281,7 @@ class DbScanStore(
 
   override def getCoinConfigForRound(round: Long)(implicit
       tc: TraceContext
-  ): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry] = waitUntilAcsIngested {
+  ): Future[TxLogEntry.OpenMiningRoundLogEntry] = waitUntilAcsIngested {
     for {
       row <- storage
         .querySingle(
@@ -290,7 +289,7 @@ class DbScanStore(
                 select event_id, domain_id, acs_contract_id
                 from scan_txlog_store
                 where store_id = $storeId
-                  and index_record_type = ${ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord.dbType}
+                  and index_record_type = ${TxLogIndexRecord.OpenMiningRoundIndexRecord.dbType}
                   and round = $round
                 order by entry_number desc
                 limit 1;
@@ -304,11 +303,11 @@ class DbScanStore(
           eventId,
           domainId,
           acsContractId,
-          ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord.dbType,
+          TxLogIndexRecord.OpenMiningRoundIndexRecord.dbType,
         )
       }
       result <- entry match {
-        case Some(omr: ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry) =>
+        case Some(omr: TxLogEntry.OpenMiningRoundLogEntry) =>
           Future.successful(omr)
         case Some(_) =>
           Future.failed(txLogIsOfWrongType())
@@ -327,7 +326,7 @@ class DbScanStore(
                select closed.event_id, closed.acs_contract_id, closed.domain_id, closed.round
                from scan_txlog_store closed
                where closed.store_id = $storeId
-                and closed.index_record_type = ${ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord.dbType}
+                and closed.index_record_type = ${TxLogIndexRecord.ClosedMiningRoundIndexRecord.dbType}
                order by closed.round desc
                limit 1;
              """.as[(String, Option[ContractId[Any]], DomainId, Long)].headOption,
@@ -340,7 +339,7 @@ class DbScanStore(
                select min(open.round)
                from scan_txlog_store open
                where open.store_id = $storeId
-                and open.index_record_type = ${ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord.dbType};
+                and open.index_record_type = ${TxLogIndexRecord.OpenMiningRoundIndexRecord.dbType};
              """.as[Long].headOption,
             "getRoundOfLatestData.earliestOpenRound",
           )
@@ -355,13 +354,13 @@ class DbScanStore(
               closedEventId,
               closedDomainId,
               closedAcsContractId,
-              ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord.dbType,
+              TxLogIndexRecord.ClosedMiningRoundIndexRecord.dbType,
             )
           case _ =>
             Future.failed(txLogNotFound())
         }
         result <- entry.indexRecord match {
-          case cmr: ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord =>
+          case cmr: TxLogIndexRecord.ClosedMiningRoundIndexRecord =>
             Future.successful(cmr)
           case _ =>
             Future.failed(txLogIsOfWrongType())
@@ -378,7 +377,7 @@ class DbScanStore(
               select rewarded_party, sum(reward_amount) as total_app_rewards
               from scan_txlog_store
               where store_id = $storeId
-                and index_record_type = ${ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord.dbType}
+                and index_record_type = ${TxLogIndexRecord.AppRewardIndexRecord.dbType}
                 and round <= $asOfEndOfRound
               group by rewarded_party
               order by total_app_rewards desc
@@ -398,7 +397,7 @@ class DbScanStore(
               select rewarded_party, sum(reward_amount) as total_app_rewards
               from scan_txlog_store
               where store_id = $storeId
-                and index_record_type = ${ScanTxLogParser.TxLogIndexRecord.ValidatorRewardIndexRecord.dbType}
+                and index_record_type = ${TxLogIndexRecord.ValidatorRewardIndexRecord.dbType}
                 and round <= $asOfEndOfRound
               group by rewarded_party
               order by total_app_rewards desc
@@ -422,7 +421,7 @@ class DbScanStore(
                      max(round)                                    as last_purchased_in_round
               from scan_txlog_store
               where store_id = $storeId
-                and index_record_type = ${ScanTxLogParser.TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord.dbType}
+                and index_record_type = ${TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord.dbType}
                 and round <= $asOfEndOfRound
               group by extra_traffic_validator
               order by total_traffic_purchased desc

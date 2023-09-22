@@ -10,12 +10,12 @@ import TotalRewards from '../components/TotalRewards';
 
 const Root: React.FC = () => {
   const navLinks = [
-    { name: 'Recent Activity', path: 'recent-activity' },
+    { name: 'Recent Activity', path: 'activity' },
     { name: 'App Leaderboard', path: 'app-leaderboard' },
     { name: 'Validator Leaderboard', path: 'validator-leaderboard' },
     { name: 'Domain Fees Leaderboard', path: 'domain-fees-leaderboard' },
   ];
-  // Unfortunately, NavLink from react-router-dom doesn't realize that 'recent-activity' is the index at '/',
+  // Unfortunately, NavLink from react-router-dom doesn't realize that 'activity' is the index at '/',
   // so we need to set it as active manually.
   const currentPath = useLocation().pathname;
   const selected = navLinks.find(({ path }) => currentPath.includes(path)) || navLinks[0];

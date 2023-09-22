@@ -483,9 +483,9 @@ object HttpScanAppClient {
           )
     }
   }
-  case class ListRecentActivity(beginAfterEventId: Option[String], pageSize: Int)
-      extends BaseCommand[http.ListRecentActivityResponse, Seq[
-        definitions.ListRecentActivityResponseItem
+  case class ListActivity(beginAfterEventId: Option[String], pageSize: Int)
+      extends BaseCommand[http.ListActivityResponse, Seq[
+        definitions.ListActivityResponseItem
       ]] {
     override def submitRequest(
         client: http.ScanClient,
@@ -493,14 +493,14 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.ListRecentActivityResponse] =
-      client.listRecentActivity(
-        definitions.ListRecentActivityRequest(beginAfterEventId, pageSize.toLong),
+    ], http.ListActivityResponse] =
+      client.listActivity(
+        definitions.ListActivityRequest(beginAfterEventId, pageSize.toLong),
         headers,
       )
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.ListRecentActivityResponse.OK(response) =>
+      case http.ListActivityResponse.OK(response) =>
         Right(response.activities)
     }
   }

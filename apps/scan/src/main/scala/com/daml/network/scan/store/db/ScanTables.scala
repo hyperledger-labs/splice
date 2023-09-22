@@ -8,8 +8,7 @@ import com.daml.network.codegen.java.cn
 import com.daml.network.store.db.AcsTables
 import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.daml.network.scan.store.ScanTxLogParser
-import com.daml.network.scan.store.ScanTxLogParser.TxLogIndexRecord
+import com.daml.network.scan.store.TxLogIndexRecord
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 
 object ScanTables extends AcsTables {
@@ -179,9 +178,9 @@ object ScanTables extends AcsTables {
 
   object ScanTxLogRowData {
 
-    def fromTxLogIndexRecord(record: ScanTxLogParser.TxLogIndexRecord): ScanTxLogRowData = {
+    def fromTxLogIndexRecord(record: TxLogIndexRecord): ScanTxLogRowData = {
       record match {
-        case err @ ScanTxLogParser.TxLogIndexRecord.ErrorIndexRecord(offset, eventId, domainId) =>
+        case err @ TxLogIndexRecord.ErrorIndexRecord(offset, eventId, domainId) =>
           ScanTxLogRowData(
             eventId = eventId,
             offset = Some(offset),
@@ -197,7 +196,7 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseTrafficPurchase = None,
             extraTrafficPurchaseCcSpent = None,
           )
-        case omr @ ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord(
+        case omr @ TxLogIndexRecord.OpenMiningRoundIndexRecord(
               offset,
               eventId,
               domainId,
@@ -218,7 +217,7 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseTrafficPurchase = None,
             extraTrafficPurchaseCcSpent = None,
           )
-        case cmr @ ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord(
+        case cmr @ TxLogIndexRecord.ClosedMiningRoundIndexRecord(
               offset,
               eventId,
               domainId,
@@ -286,7 +285,7 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseTrafficPurchase = None,
             extraTrafficPurchaseCcSpent = None,
           )
-        case etp @ ScanTxLogParser.TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord(
+        case etp @ TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord(
               offset,
               eventId,
               domainId,
@@ -310,7 +309,7 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseTrafficPurchase = Some(trafficPurchased),
             extraTrafficPurchaseCcSpent = Some(ccSpent),
           )
-        case bac @ ScanTxLogParser.TxLogIndexRecord.BalanceChangeIndexRecord(
+        case bac @ TxLogIndexRecord.BalanceChangeIndexRecord(
               offset,
               eventId,
               domainId,
@@ -333,7 +332,7 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseTrafficPurchase = None,
             extraTrafficPurchaseCcSpent = None,
           )
-        case rar @ ScanTxLogParser.TxLogIndexRecord.RecentActivityIndexRecord(
+        case rar @ TxLogIndexRecord.ActivityIndexRecord(
               offset,
               eventId,
               domainId,

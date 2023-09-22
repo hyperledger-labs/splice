@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.config.ScanAppBackendConfig
-import com.daml.network.scan.store.{ScanStore, ScanTxLogParser}
+import com.daml.network.scan.store.{ScanStore, TxLogIndexRecord, TxLogEntry}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.{HardLimit, InMemoryCNNodeAppStore}
 import com.daml.network.util.{Contract, ContractWithState}
@@ -29,7 +29,7 @@ class InMemoryScanStore(
     override protected val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext
-) extends InMemoryCNNodeAppStore[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry]
+) extends InMemoryCNNodeAppStore[TxLogIndexRecord, TxLogEntry]
     with ScanStore {
 
   override def lookupCoinRules()(implicit
@@ -54,14 +54,14 @@ class InMemoryScanStore(
     for {
       totalCoinBalance <- txLog
         .getTxLogIndicesByFilter(_ match {
-          case balanceChange: ScanTxLogParser.TxLogIndexRecord.BalanceChangeIndexRecord =>
+          case balanceChange: TxLogIndexRecord.BalanceChangeIndexRecord =>
             balanceChange.round <= asOfEndOfRound
           case _ => false
         })
         .map(txLogEntries =>
           txLogEntries.foldLeft(BigDecimal.valueOf(0.0))((sum, entry) =>
             entry match {
-              case e: ScanTxLogParser.TxLogIndexRecord.BalanceChangeIndexRecord =>
+              case e: TxLogIndexRecord.BalanceChangeIndexRecord =>
                 sum + e.changeToInitialAmountAsOfRoundZero - e.changeToHoldingFeesRate * (asOfEndOfRound + 1)
               case _ =>
                 throw Status.INTERNAL
@@ -75,10 +75,10 @@ class InMemoryScanStore(
 
   override def getCoinConfigForRound(
       round: Long
-  )(implicit tc: TraceContext): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry] = {
+  )(implicit tc: TraceContext): Future[TxLogEntry.OpenMiningRoundLogEntry] = {
     for {
       indexRecord <- txLog.getLatestTxLogIndex {
-        case roundConfig: ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord =>
+        case roundConfig: TxLogIndexRecord.OpenMiningRoundIndexRecord =>
           roundConfig.round == round
         case _ => false
       }
@@ -87,11 +87,11 @@ class InMemoryScanStore(
         indexRecord.eventId,
         indexRecord.domainId,
         indexRecord.acsContractId,
-        ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord.dbType,
+        TxLogIndexRecord.OpenMiningRoundIndexRecord.dbType,
       )
     } yield {
       roundConfig match {
-        case r: ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry => r
+        case r: TxLogEntry.OpenMiningRoundLogEntry => r
         case _ =>
           throw Status.INTERNAL.withDescription("Unexpected log entry type").asRuntimeException()
       }
@@ -103,8 +103,8 @@ class InMemoryScanStore(
     // Note that for all existing (and currently planned) queries, we could make this also the latest open mining round
     // that has been archived, but for now we're going for the later event of the round closing, to be a bit more future-proof.
 
-    type Closed = ScanTxLogParser.TxLogIndexRecord.ClosedMiningRoundIndexRecord
-    type Open = ScanTxLogParser.TxLogIndexRecord.OpenMiningRoundIndexRecord
+    type Closed = TxLogIndexRecord.ClosedMiningRoundIndexRecord
+    type Open = TxLogIndexRecord.OpenMiningRoundIndexRecord
 
     txLog
       .findLatestTxLogIndex[Closed, Map[Long, Closed]](Map.empty) {
@@ -130,14 +130,14 @@ class InMemoryScanStore(
     for {
       ret <- txLog
         .getTxLogIndicesByFilter(_ match {
-          case reward: ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord =>
+          case reward: TxLogIndexRecord.RewardIndexRecord =>
             round.fold(true)(_ == reward.round)
           case _ => false
         })
         .map(rewards =>
           rewards.foldLeft(BigDecimal.valueOf(0.0))((sum, reward) =>
             reward match {
-              case r: ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord =>
+              case r: TxLogIndexRecord.RewardIndexRecord =>
                 sum + r.amount
               case _ =>
                 throw Status.INTERNAL
@@ -151,12 +151,12 @@ class InMemoryScanStore(
 
   private def sumRewardsCollectedInRound(
       round: Long,
-      rewardTypeFilter: (ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord) => Boolean,
+      rewardTypeFilter: (TxLogIndexRecord.RewardIndexRecord) => Boolean,
   ) =
     for {
       ret <- txLog
         .getTxLogIndicesByFilter {
-          case reward: ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord
+          case reward: TxLogIndexRecord.RewardIndexRecord
               if reward.round == round && rewardTypeFilter(reward) =>
             true
           case _ => false
@@ -164,7 +164,7 @@ class InMemoryScanStore(
         .map(rewards =>
           rewards.foldLeft(Map[PartyId, BigDecimal]())((m, reward) =>
             reward match {
-              case r: ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord =>
+              case r: TxLogIndexRecord.RewardIndexRecord =>
                 m |+| Map((r.party -> r.amount))
               case _ =>
                 throw Status.INTERNAL
@@ -178,7 +178,7 @@ class InMemoryScanStore(
   private def getTopRewardRecipients(
       asOfEndOfRound: Long,
       limit: Int,
-      rewardTypeFilter: (ScanTxLogParser.TxLogIndexRecord.RewardIndexRecord) => Boolean,
+      rewardTypeFilter: (TxLogIndexRecord.RewardIndexRecord) => Boolean,
   )(implicit
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] =
@@ -200,7 +200,7 @@ class InMemoryScanStore(
       asOfEndOfRound,
       limit,
       (_ match {
-        case _: ScanTxLogParser.TxLogIndexRecord.AppRewardIndexRecord => true
+        case _: TxLogIndexRecord.AppRewardIndexRecord => true
         case _ => false
       }),
     )
@@ -212,19 +212,19 @@ class InMemoryScanStore(
       asOfEndOfRound,
       limit,
       (_ match {
-        case _: ScanTxLogParser.TxLogIndexRecord.ValidatorRewardIndexRecord => true
+        case _: TxLogIndexRecord.ValidatorRewardIndexRecord => true
         case _ => false
       }),
     )
 
-  override def listRecentActivity(
+  override def listActivity(
       beginAfterEventId: Option[String],
       limit: Int,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[ScanTxLogParser.TxLogEntry.RecentActivityLogEntry]] = {
-    def filter(txi: ScanTxLogParser.TxLogIndexRecord) = txi match {
-      case _: ScanTxLogParser.TxLogIndexRecord.RecentActivityIndexRecord => true
+  ): Future[Seq[TxLogEntry.ActivityLogEntry]] = {
+    def filter(txi: TxLogIndexRecord) = txi match {
+      case _: TxLogIndexRecord.ActivityIndexRecord => true
       case _ => false
     }
     val indices = beginAfterEventId.fold(
@@ -244,7 +244,7 @@ class InMemoryScanStore(
           )
         }
         .map {
-          _.collect { case entry: ScanTxLogParser.TxLogEntry.RecentActivityLogEntry =>
+          _.collect { case entry: TxLogEntry.ActivityLogEntry =>
             entry
           }.take(limit)
         }
@@ -256,7 +256,7 @@ class InMemoryScanStore(
   ): Future[Map[PartyId, ValidatorPurchasedTraffic]] =
     txLog
       .getTxLogIndicesByFilter {
-        case indexRecord: ScanTxLogParser.TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord
+        case indexRecord: TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord
             if indexRecord.round == round =>
           true
         case _ => false
@@ -264,7 +264,7 @@ class InMemoryScanStore(
       .map(
         _.foldLeft(Map.empty[PartyId, ValidatorPurchasedTraffic])((acc, entry) => {
           entry match {
-            case e: ScanTxLogParser.TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord =>
+            case e: TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord =>
               acc.updatedWith(e.validator) {
                 case None =>
                   Some(

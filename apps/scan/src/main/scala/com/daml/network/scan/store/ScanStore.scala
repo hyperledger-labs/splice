@@ -32,8 +32,8 @@ import java.time.Instant
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
 trait ScanStore
     extends CNNodeAppStoreWithHistory[
-      ScanTxLogParser.TxLogIndexRecord,
-      ScanTxLogParser.TxLogEntry,
+      TxLogIndexRecord,
+      TxLogEntry,
     ]
     with ConfiguredDefaultDomain {
 
@@ -64,7 +64,7 @@ trait ScanStore
 
   def getCoinConfigForRound(round: Long)(implicit
       tc: TraceContext
-  ): Future[ScanTxLogParser.TxLogEntry.OpenMiningRoundLogEntry]
+  ): Future[TxLogEntry.OpenMiningRoundLogEntry]
 
   def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)]
 
@@ -133,15 +133,15 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
-  def listRecentActivity(
+  def listActivity(
       beginAfterEventId: Option[String],
       limit: Int,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[ScanTxLogParser.TxLogEntry.RecentActivityLogEntry]]
+  ): Future[Seq[TxLogEntry.ActivityLogEntry]]
 
   protected def loadTxLogEntry(
-      txLogReader: TxLogStore.Reader[ScanTxLogParser.TxLogIndexRecord, ScanTxLogParser.TxLogEntry],
+      txLogReader: TxLogStore.Reader[TxLogIndexRecord, TxLogEntry],
       eventId: String,
       domainId: DomainId,
       acsContractId: Option[ContractId[?]],
@@ -149,13 +149,13 @@ trait ScanStore
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[ScanTxLogParser.TxLogEntry] =
+  ): Future[TxLogEntry] =
     txLogReader.loadTxLogEntry(eventId, domainId, acsContractId, filterUnique(dbType))
 
   protected def filterUnique(dbType: String3)(
-      entries: Seq[ScanTxLogParser.TxLogEntry],
+      entries: Seq[TxLogEntry],
       eventId: String,
-  ): ScanTxLogParser.TxLogEntry = {
+  ): TxLogEntry = {
     val res = entries.filter(e =>
       e.indexRecord.eventId == eventId && e.indexRecord.companion.dbType == dbType
     )

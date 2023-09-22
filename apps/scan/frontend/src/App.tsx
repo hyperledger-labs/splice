@@ -13,9 +13,9 @@ import {
 import { CssBaseline } from '@mui/material';
 import { ThemeProvider } from '@mui/material';
 
+import Activity from './routes/activity';
 import AppLeaderboard from './routes/appLeaderboard';
 import DomainFeesLeaderboard from './routes/domainFeesLeaderboard';
-import RecentActivity from './routes/recentActivity';
 import Root from './routes/root';
 import ValidatorLeaderboard from './routes/validatorLeaderboard';
 import { config } from './utils';
@@ -43,8 +43,8 @@ const router = createBrowserRouter(
   createRoutesFromElements(
     <Route>
       <Route path="/" element={<Root />}>
-        <Route index element={<RecentActivity />} />
-        <Route path="recent-activity" element={<RecentActivity />} />
+        <Route index element={<Activity />} />
+        <Route path="activity" element={<Activity />} />
         <Route path="app-leaderboard" element={<AppLeaderboard />} />
         <Route path="validator-leaderboard" element={<ValidatorLeaderboard />} />
         <Route path="domain-fees-leaderboard" element={<DomainFeesLeaderboard />} />

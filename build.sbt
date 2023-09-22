@@ -400,7 +400,10 @@ lazy val `apps-sv` =
 lazy val `apps-scan` =
   project
     .in(file("apps/scan"))
-    .dependsOn(`apps-common` % "compile->compile;test->test")
+    .dependsOn(
+      `apps-common` % "compile->compile;test->test",
+      `svc-governance-daml`,
+    )
     .settings(
       libraryDependencies ++= Seq(akka_http_cors, scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,

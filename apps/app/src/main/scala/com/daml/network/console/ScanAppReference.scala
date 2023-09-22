@@ -209,14 +209,14 @@ abstract class ScanAppReference(
       )
     }
 
-  import com.daml.network.http.v0.definitions.ListRecentActivityResponseItem
-  def listRecentActivity(
+  import com.daml.network.http.v0.definitions.ListActivityResponseItem
+  def listActivity(
       beginAfterEventId: Option[String],
       pageSize: Int,
-  ): Seq[ListRecentActivityResponseItem] =
+  ): Seq[ListActivityResponseItem] =
     consoleEnvironment.run {
       httpCommand(
-        HttpScanAppClient.ListRecentActivity(beginAfterEventId, pageSize)
+        HttpScanAppClient.ListActivity(beginAfterEventId, pageSize)
       )
     }
 }
