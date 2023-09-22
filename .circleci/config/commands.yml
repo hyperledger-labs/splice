@@ -803,6 +803,8 @@ commands:
             ./start-canton.sh << parameters.start_canton_options >> -b
           background: true
           additional_nix_args: "--keep CIRCLE_USERNAME --keep CIRCLE_BRANCH --keep CIRCLE_BUILD_NUM --keep CIRCLE_JOB --keep CIRCLE_NODE_INDEX"
+          # Retrying as sometimes it fails finding the images
+          cmd_retry_count: 3
 
   run_splitted_scala_tests:
     description: run splitted scala tests
