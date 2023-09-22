@@ -1251,7 +1251,7 @@ Network. Steps to do this are as follows:
 6. Create a new GCPKMS keyring for pulumi:
    `gcloud kms keyrings create "pulumi" --location "$CLOUDSDK_COMPUTE_REGION"`
 7. Give CircleCI account permissions to use keys in this keyring:
-   `gcloud projects add-iam-policy-binding da-cn-scratchnet \
+   `gcloud projects add-iam-policy-binding ${CLOUDSDK_CORE_PROJECT} \
       --member serviceAccount:circleci@${CLOUDSDK_CORE_PROJECT}.iam.gserviceaccount.com \
       --role "roles/cloudkms.cryptoKeyEncrypterDecrypter" \
       --condition=expression='resource.type == "cloudkms.googleapis.com/CryptoKey" &&
