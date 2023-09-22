@@ -102,8 +102,8 @@ spec:
             canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.target-throughput = {{ (.Values.topup).targetThroughput }}
             canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.min-topup-interval = {{ (.Values.topup).minTopupInterval }}
         {{- end }}
-        {{- with .Values.participantIdentitiesBackup }}
-        - name: ADDITIONAL_CONFIG_CN_APP_VALIDATOR_PARTICIPANT_IDENTITIES_BACKUP
+        {{- with .Values.participantIdentitiesDumpPeriodicBackup }}
+        - name: ADDITIONAL_CONFIG_CN_APP_VALIDATOR_PARTICIPANT_IDENTITIES_DUMP_PERIODIC_BACKUP
           value: |
             canton.validator-apps.validator_backend.participant-identities-backup = {
               type = gcp
@@ -124,8 +124,8 @@ spec:
               key: "json-credentials"
               name: {{ .bucket.secretName }}
         {{- end }}
-        {{- with .Values.participantBootstrappingDump }}
-        - name: ADDITIONAL_CONFIG_CN_APP_SV_PARTICIPANT_BOOTSTRAPPING_DUMP
+        {{- with .Values.participantIdentitiesDumpImport }}
+        - name: ADDITIONAL_CONFIG_CN_APP_SV_PARTICIPANT_IDENTITIES_DUMP_IMPORT
           value: |
             canton.validator-apps.validator_backend.participant-bootstrapping-dump {
               type = file
@@ -152,7 +152,7 @@ spec:
           periodSeconds: 5
           failureThreshold: 5
           timeoutSeconds: 3
-        {{- with .Values.participantBootstrappingDump }}
+        {{- with .Values.participantIdentitiesDumpImport }}
         volumeMounts:
           - name: participant-bootstrapping-dump-volume
             mountPath: /participant-bootstrapping-dump
@@ -161,7 +161,7 @@ spec:
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
-      {{- with .Values.participantBootstrappingDump }}
+      {{- with .Values.participantIdentitiesDumpImport }}
       volumes:
         - name: participant-bootstrapping-dump-volume
           secret:

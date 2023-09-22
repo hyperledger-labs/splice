@@ -18,6 +18,6 @@ domain:
 # PARTICIPANT_BOOTSTRAP_START
 # Uncomment the two lines below if you are bootstrapping from an existing participant
 # identities dump.
-# participantBootstrappingDump:
+# participantIdentitiesDumpImport:
 #  secretName: participant-identities-dump
 # PARTICIPANT_BOOTSTRAP_END

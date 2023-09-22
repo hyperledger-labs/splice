@@ -114,9 +114,9 @@ export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
           }
         : {},
       disableAllocateLedgerApiUserParty: config.disableAllocateLedgerApiUserParty,
-      participantIdentitiesBackup: backupConfig,
+      participantIdentitiesDumpPeriodicBackup: backupConfig,
       additionalConfig: config.additionalConfig,
-      participantBootstrappingDump: config.participantBootstrapDump
+      participantIdentitiesDumpImport: config.participantBootstrapDump
         ? { secretName: participantBootstrapDumpSecretName }
         : undefined,
     },

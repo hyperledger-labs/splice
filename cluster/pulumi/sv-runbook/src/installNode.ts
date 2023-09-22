@@ -233,7 +233,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       YOUR_SV_NAME: SV_NAME,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
     }),
-    participantBootstrappingDump: participantBootstrapDumpSecret
+    participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
     approvedSvIdentities,
@@ -291,7 +291,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
     }),
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),
-    participantIdentitiesBackup: backupConfig,
+    participantIdentitiesDumpPeriodicBackup: backupConfig,
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {

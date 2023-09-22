@@ -230,12 +230,12 @@ export function installSvNode(config: SvConfig): {
     })),
     isDevNet: config.isDevNet,
     approvedSvIdentities: config.approvedSvIdentities,
-    acsStoreDump: backupConfig,
-    acsBootstrappingDump:
+    acsDumpPeriodicExport: backupConfig,
+    acsDumpImport:
       config.bootstrappingDumpConfig && config.onboarding.type === 'found-collective'
         ? getAcsBootstrappingDump(xns, config.bootstrappingDumpConfig)
         : undefined,
-    participantBootstrappingDump: config.bootstrappingDumpConfig
+    participantIdentitiesDumpImport: config.bootstrappingDumpConfig
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
   } as ChartValues;

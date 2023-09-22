@@ -30,8 +30,8 @@ spec:
             {{- if eq .Values.onboardingType "found-collective" }}
             - name: CN_APP_SV_IS_DEV_NET
               value: {{ .Values.isDevNet | quote }}
-            {{- with .Values.acsBootstrappingDump }}
-            - name: ADDITIONAL_CONFIG_BOOTSTRAPPING_DUMP
+            {{- with .Values.acsDumpImport }}
+            - name: ADDITIONAL_CONFIG_ACS_DUMP_IMPORT
               value: |
                 canton.sv-apps.sv.onboarding.bootstrapping-dump {
                   type = gcp
@@ -144,8 +144,8 @@ spec:
                   public-key = {{ $sv.publicKey | quote }}
                 }
             {{- end }}
-            {{- with .Values.acsStoreDump }}
-            - name: ADDITIONAL_CONFIG_CN_APP_SV_ACS_STORE_DUMP
+            {{- with .Values.acsDumpPeriodicExport }}
+            - name: ADDITIONAL_CONFIG_CN_APP_SV_ACS_DUMP_PERIODIC_EXPORT
               value: |
                 canton.sv-apps.sv.acs-store-dump = {
                   type = gcp
@@ -166,8 +166,8 @@ spec:
                   key: "json-credentials"
                   name: {{ .bucket.secretName }}
             {{- end }}
-            {{- with .Values.participantBootstrappingDump }}
-            - name: ADDITIONAL_CONFIG_CN_APP_SV_PARTICIPANT_BOOTSTRAPPING_DUMP
+            {{- with .Values.participantIdentitiesDumpImport }}
+            - name: ADDITIONAL_CONFIG_CN_APP_SV_PARTICIPANT_IDENTITIES_DUMP_IMPORT
               value: |
                 canton.sv-apps.sv.participant-bootstrapping-dump {
                   type = file
@@ -194,7 +194,7 @@ spec:
             periodSeconds: 5
             failureThreshold: 5
             timeoutSeconds: 10
-          {{- with .Values.participantBootstrappingDump }}
+          {{- with .Values.participantIdentitiesDumpImport }}
           volumeMounts:
             - name: participant-bootstrapping-dump-volume
               mountPath: /participant-bootstrapping-dump
@@ -203,7 +203,7 @@ spec:
           {{- with .Values.resources }}
           resources: {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- with .Values.participantBootstrappingDump }}
+      {{- with .Values.participantIdentitiesDumpImport }}
       volumes:
         - name: participant-bootstrapping-dump-volume
           secret:
