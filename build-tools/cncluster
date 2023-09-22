@@ -119,7 +119,7 @@ function _cluster_apply() {
     _info "Applying Pulumi Stack"
 
     subcmd_install_data_export_bucket_key
-    _get_data_export_bucket_secret | subcmd_pulumi canton-network config set DATA_EXPORT_BUCKET_SA_KEY_JSON
+    _get_data_export_bucket_secret | subcmd_pulumi canton-network config set --secret DATA_EXPORT_BUCKET_SA_KEY_JSON
     subcmd_pulumi canton-network up --yes --skip-preview --show-sames "${args[@]}"
 }
 
@@ -543,7 +543,7 @@ function subcmd_get_dns01_key_id() {
     _get_service_account_key_id "${DNS01_SA_KEY_SECRET}"
 }
 
-subcommand_whitelist[get_data_export_bucket_key_id]='Get the gcloud service account key id used for dns challenges.'
+subcommand_whitelist[get_data_export_bucket_key_id]='Get the gcloud service account key id used for data exports.'
 
 function subcmd_get_data_export_bucket_key_id() {
     _get_service_account_key_id "${DATA_EXPORT_BUCKET_SA_KEY_SECRET}"
@@ -638,7 +638,7 @@ function subcmd_infra_up() {
 
     subcmd_install_dns01_key
 
-    _get_dns01_secret | subcmd_pulumi infra config set DNS01_SA_KEY_JSON
+    _get_dns01_secret | subcmd_pulumi infra config set --secret DNS01_SA_KEY_JSON
     subcmd_pulumi infra config set CLUSTER_BASENAME "${GCP_CLUSTER_BASENAME}"
 
     subcmd_pulumi infra up --yes --skip-preview
@@ -1227,7 +1227,7 @@ function subcmd_apply() {
     fi
 
     subcmd_install_data_export_bucket_key
-    _get_data_export_bucket_secret | subcmd_pulumi canton-network config set DATA_EXPORT_BUCKET_SA_KEY_JSON
+    _get_data_export_bucket_secret | subcmd_pulumi canton-network config set --secret DATA_EXPORT_BUCKET_SA_KEY_JSON
 
     if [ -n "${preview:-}" ]; then
         make -C "${REPO_ROOT}" cluster/helm/build -j
@@ -1309,7 +1309,7 @@ function subcmd_apply_sv(){
     local -x CHARTS_VERSION="${2-}"
 
     subcmd_install_data_export_bucket_key
-    _get_data_export_bucket_secret | subcmd_pulumi sv-runbook config set DATA_EXPORT_BUCKET_SA_KEY_JSON
+    _get_data_export_bucket_secret | subcmd_pulumi sv-runbook config set --secret DATA_EXPORT_BUCKET_SA_KEY_JSON
 
     subcmd_pulumi sv-runbook up --yes --skip-preview --show-sames "${args[@]}"
 }
@@ -1352,7 +1352,7 @@ function subcmd_ci_apply_sv() {
     local -x CHARTS_VERSION="${1-}"
 
     subcmd_install_data_export_bucket_key
-    _get_data_export_bucket_secret | subcmd_pulumi sv-runbook config set DATA_EXPORT_BUCKET_SA_KEY_JSON
+    _get_data_export_bucket_secret | subcmd_pulumi sv-runbook config set --secret DATA_EXPORT_BUCKET_SA_KEY_JSON
 
     subcmd_pulumi sv-runbook up --yes --skip-preview "${args[@]}"
 }
