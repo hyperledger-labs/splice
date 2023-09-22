@@ -88,8 +88,8 @@ abstract class SvFrontendCommonIntegrationTest
 
       actAndCheck(
         "sv2 and sv3 accept the request", {
-          vote(sv2Backend, requestId, true, "1", false)
-          vote(sv3Backend, requestId, true, "2", true)
+          vote(sv2Backend, requestId, true, "2", false)
+          vote(sv3Backend, requestId, true, "3", true)
         },
       )(
         "the request went through and all choices are disabled",
