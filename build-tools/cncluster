@@ -1310,6 +1310,8 @@ function subcmd_apply_sv(){
 
     local -x CHARTS_VERSION="${2-}"
 
+    _uses_pulumi_stack sv-runbook
+
     subcmd_install_data_export_bucket_key
     _get_data_export_bucket_secret | subcmd_pulumi sv-runbook config set --secret DATA_EXPORT_BUCKET_SA_KEY_JSON
 
@@ -1352,6 +1354,8 @@ function subcmd_ci_apply_sv() {
     local -x TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
 
     local -x CHARTS_VERSION="${1-}"
+
+    _uses_pulumi_stack sv-runbook
 
     subcmd_install_data_export_bucket_key
     _get_data_export_bucket_secret | subcmd_pulumi sv-runbook config set --secret DATA_EXPORT_BUCKET_SA_KEY_JSON
