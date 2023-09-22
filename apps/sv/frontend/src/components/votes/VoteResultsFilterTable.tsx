@@ -1,5 +1,6 @@
 import { CopyableTypography, DateDisplay, Loading } from 'common-frontend';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import React, { useEffect, useState } from 'react';
 
 import CheckIcon from '@mui/icons-material/Check';
@@ -20,6 +21,8 @@ import {
 } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { useListSvcRulesVoteResults } from '../../hooks/useListVoteRequests';
+
+dayjs.extend(utc);
 
 interface ListVoteResultsTableProps {
   getAction: (action: ActionRequiringConfirmation, staled: boolean) => string;
@@ -64,8 +67,8 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
 }) => {
   const [queryOptions, setQueryOptions] = useState<VoteResultQueryOptions>({
     executed: executed,
-    effectiveTo: effectiveTo ? effectiveTo : undefined,
-    effectiveFrom: effectiveFrom ? effectiveFrom : undefined,
+    effectiveTo: effectiveTo,
+    effectiveFrom: effectiveFrom,
   });
   const voteResultsQuery = useListSvcRulesVoteResults(queryOptions, QUERY_LIMIT);
 
@@ -74,23 +77,28 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
   useEffect(() => {
     const rows: VoteResultRow[] = getVoteResultRows(voteResultsQuery.data);
     setRows(rows);
+    setQueryOptions({
+      executed: executed,
+      effectiveTo: effectiveTo,
+      effectiveFrom: effectiveFrom,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [voteResultsQuery.data]);
+  }, [voteResultsQuery.data, effectiveTo, effectiveFrom, executed]);
 
   const onFilterChange = (filterModel: GridFilterModel) => {
     if (filterModel.items.length > 0) {
       if (filterModel.items[0].field === 'actionName') {
         setQueryOptions({
           executed: executed,
-          effectiveTo: effectiveTo ? effectiveTo : undefined,
-          effectiveFrom: effectiveFrom ? effectiveFrom : undefined,
+          effectiveTo: effectiveTo,
+          effectiveFrom: effectiveFrom,
           actionName: filterModel.items[0].value,
         });
       } else if (filterModel.items[0].field === 'requester') {
         setQueryOptions({
           executed: executed,
-          effectiveTo: effectiveTo ? effectiveTo : undefined,
-          effectiveFrom: effectiveFrom ? effectiveFrom : undefined,
+          effectiveTo: effectiveTo,
+          effectiveFrom: effectiveFrom,
           requester: filterModel.items[0].value,
         });
       } else if (filterModel.items[0].field === 'expiresAt') {

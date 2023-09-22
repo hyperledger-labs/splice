@@ -1,7 +1,7 @@
 import { Loading, SvClientProvider } from 'common-frontend';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { ClickAwayListener } from '@mui/base';
 import CloseIcon from '@mui/icons-material/Close';
@@ -63,6 +63,15 @@ const TabPanel = (props: TabPanelProps) => {
 
 const ListVoteRequests: React.FC = () => {
   const [value, setValue] = React.useState(0);
+  const [now, setNow] = useState<string>(dayjs().utc().format('YYYY-MM-DDTHH:mm:ss[Z]'));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(dayjs().utc().format('YYYY-MM-DDTHH:mm:ss[Z]'));
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -233,7 +242,7 @@ const ListVoteRequests: React.FC = () => {
           openModalWithVoteResult={openModalWithVoteResult}
           validityColumnName={'Effective At'}
           executed
-          effectiveFrom={dayjs.utc().format('YYYY-MM-DDTHH:mm:ss[Z]')}
+          effectiveFrom={now}
         />
       </TabPanel>
       <TabPanel value={value} index={3}>
@@ -242,7 +251,7 @@ const ListVoteRequests: React.FC = () => {
           tableBodyId={'sv-vote-results-executed-table-body'}
           openModalWithVoteResult={openModalWithVoteResult}
           executed
-          effectiveTo={dayjs.utc().format('YYYY-MM-DDTHH:mm:ss[Z]')}
+          effectiveTo={now}
         />
       </TabPanel>
       <TabPanel value={value} index={4}>
