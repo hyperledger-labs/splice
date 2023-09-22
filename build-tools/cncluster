@@ -733,22 +733,34 @@ function _down_stack() {
     _info "Uninstalling Pulumi ${STACK} stack"
     _uses_pulumi_stack "$STACK"
 
+    RETCODE=0
     ERRFILE="./tmp_ERRFILE"
     ERRMSG=""
 
-    subcmd_pulumi "$STACK" down --yes --skip-preview 2> >(tee ${ERRFILE} >&2) || ERRMSG=$(<${ERRFILE})
+    touch "$ERRFILE"
+
+    subcmd_pulumi "$STACK" down --yes --skip-preview 2> >(tee ${ERRFILE} >&2) || { RETCODE="$?"; ERRMSG=$(cat "$ERRFILE")
+    }
+
     rm -rf "$ERRFILE"
 
-    case "${ERRMSG}" in
-        *"the stack is currently locked"*)
-            echo "Retrying because of lock on stack $STACK"
-            subcmd_pulumi "$STACK" cancel --yes
-            subcmd_prefresh
-            _down_stack "$STACK"
+    if [ "$RETCODE" -ne 0 ]; then
+        case "${ERRMSG}" in
+            *"the stack is currently locked"*)
+                echo "Retrying because of lock on stack $STACK"
+                subcmd_pulumi "$STACK" cancel --yes
+                subcmd_prefresh
+                _down_stack "$STACK"
 
-            echo "Reset complete. In case a subsequent 'cncluster apply' fails, refer to the documentation on manual cleanup (https://github.com/DACH-NY/canton-network-node/tree/main/cluster#manually-deploying-via-ci)"
-            ;;
-    esac
+                echo "Reset complete. In case a subsequent 'cncluster apply' fails, refer to the documentation on manual cleanup (https://github.com/DACH-NY/canton-network-node/tree/main/cluster#manually-deploying-via-ci)"
+                ;;
+
+            *)
+                _error "Failed uninstalling stack $STACK, aborting"
+                exit 1
+                ;;
+        esac
+    fi
 }
 
 function subcmd_reset() {
