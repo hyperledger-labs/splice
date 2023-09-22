@@ -149,18 +149,31 @@ function _pulumi() {
     pulumi "$@"
 }
 
-# Create a pulumi stack for a given project (for the current cluster) if one does not yet exist
-# Use cases:
-# - unfortunately `pulumi up -y` still asks for confirmation of stack creation despite the `-y` flag
-# - to bring a stack down if it exists - call this before calling refresh&down
+# Create a pulumi stack for a given project (for the current cluster) if one does not yet exist.
+# While `pulumi up` can create a stack implicitly if one does not exist, we want to also configure
+# it to use gcpkms, so we explicitly initialize it first here.
+# We also call this before `pulumi down`, otherwise that command will fail if the stack happens not to exist yet,
+# which we typically don't want.
 function _uses_pulumi_stack() {
 
     pulumi_project=$1
 
-    RETRY_PULUMI="" _pulumi \
-                --stack "organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
-                --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
-            stack init 2> /dev/null || true
+    _pulumi --stack "organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
+            --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
+            stack init \
+            --secrets_provider="gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}" \
+            2> /dev/null || true
+
+    # Since the command above will take no effect if the stack already exists, we also explicitly change the secrets provider on the stack.
+    # This way, for stacks that already exist, and do not use gcpkms (because they were created before we starting using it),
+    # we will reconfigure them to use it here. Note that this also works if the stack is currently up.
+    # We also need to set the passphrase here for now, in order to be able to read from a stack that hasn't been migrated yet
+    # (where the secrets are encrypted with this passphrase)
+    # TODO(#7735): remove this once all stacks on all clusters use kms provider
+    local -x PULUMI_CONFIG_PASSPHRASE=''
+    _pulumi --stack "organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
+            --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
+            stack change-secrets-provider "gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}"
 }
 
 function _retry_until_value() {
@@ -625,8 +638,6 @@ function subcmd_infra_up() {
 
     subcmd_install_dns01_key
 
-    _uses_pulumi_stack infra
-
     _get_dns01_secret | subcmd_pulumi infra config set DNS01_SA_KEY_JSON
     subcmd_pulumi infra config set CLUSTER_BASENAME "${GCP_CLUSTER_BASENAME}"
 
@@ -643,7 +654,6 @@ function subcmd_infra_down() {
 
     _info "Deactivating infrastructure Pulumi stack"
 
-    _uses_pulumi_stack infra
     subcmd_pulumi infra down --yes --skip-preview
 }
 
@@ -709,6 +719,11 @@ function subcmd_create() {
         _error "Could not determine cluster IP address."
     fi
 
+    # Create a kms key for pulumi.
+    # TODO(#7752): for now we silently ignore errors in order to not fail if the key already exists.
+    # We should instead check for that case explicitly, and perhaps also rotate the key if it does exist
+    gcloud kms keys create "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --purpose "encryption" > /dev/null 2>&1 || true
+
     _log "Cluster at IP ${IPADDR} ready"
 }
 
@@ -718,8 +733,6 @@ subcommand_whitelist[reset]='Reset the state of the cluster to a fully blank sta
 
 function _cluster_reset() {
     _info "Uninstalling Pulumi canton-network-gateway stack"
-    # TODO(#4560): Use an empty passphrase until we manage secrets
-    local -x PULUMI_CONFIG_PASSPHRASE=''
 
     _down_stack canton-network
     _down_stack sv-runbook
@@ -731,7 +744,6 @@ function _down_stack() {
     STACK=$1
 
     _info "Uninstalling Pulumi ${STACK} stack"
-    _uses_pulumi_stack "$STACK"
 
     RETCODE=0
     ERRFILE="./tmp_ERRFILE"
@@ -1143,8 +1155,13 @@ function subcmd_pulumi() {
             ;;
     esac
 
-    # TODO(#4560): Use an empty passphrase until we manage secrets
-    local -x PULUMI_CONFIG_PASSPHRASE=''
+    case "${pulumi_cmd}" in
+        up|down)
+            _uses_pulumi_stack "${pulumi_project}"
+            ;;
+        *)
+            ;;
+    esac
 
     function run_pulumi() {
         if [[ -n "${GCP_CLUSTER_PROD_LIKE:-}" || "$pulumi_project" == "infra" ]]

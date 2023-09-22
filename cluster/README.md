@@ -1248,11 +1248,19 @@ Network. Steps to do this are as follows:
    activate` to authenticate to the project.
 5. Enable the required GCE services with the following command: `gcloud
    services enable container.googleapis.com`.
-6. Start creating a new cluster with `cncluster create`. Once this
+6. Create a new GCPKMS keyring for pulumi:
+   `gcloud kms keyrings create "pulumi" --location "$CLOUDSDK_COMPUTE_REGION"`
+7. Give CircleCI account permissions to use keys in this keyring:
+   `gcloud projects add-iam-policy-binding da-cn-scratchnet \
+      --member serviceAccount:circleci@${CLOUDSDK_CORE_PROJECT}.iam.gserviceaccount.com \
+      --role "roles/cloudkms.cryptoKeyEncrypterDecrypter" \
+      --condition=expression='resource.type == "cloudkms.googleapis.com/CryptoKey" &&
+         resource.name.startsWith("projects/'${CLOUDSDK_CORE_PROJECT}'/locations/'${CLOUDSDK_COMPUTE_REGION}'/keyRings/pulumi")',title="pulumi kms"`
+8. Start creating a new cluster with `cncluster create`. Once this
    command starts working, you'll see in the GCE web UI that a new
    default service account has been created. It'll have a principal of
    the following form: '816347582626-compute@developer.gserviceaccount.com'.
-7. Add a role binding to enable the new default service account to
+9. Add a role binding to enable the new default service account to
    have access to `da-cn-images. The command to do this will look like
    this:
 
@@ -1261,7 +1269,7 @@ Network. Steps to do this are as follows:
       --member='serviceAccount:816347582626-compute@developer.gserviceaccount.com' \
       --role='roles/artifactregistry.serviceAgent'
    ```
-8. Ensure the CCI Service account to be used for the project has the correct
+10. Ensure the CCI Service account to be used for the project has the correct
    IAM role bindings:
 
    ```
