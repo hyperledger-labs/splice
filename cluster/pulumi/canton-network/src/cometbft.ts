@@ -165,5 +165,5 @@ function p2pServiceAddress(nodename: string, namespace: string): string {
 }
 
 function rpcServiceAddress(nodename: string, namespace: string): string {
-  return `${nodename}-cometbft-rpc.${namespace}.svc.cluster.local:26657`;
+  return `http://${nodename}-cometbft-rpc.${namespace}.svc.cluster.local:26657`;
 }

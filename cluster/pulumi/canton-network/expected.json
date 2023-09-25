@@ -4117,7 +4117,7 @@
         "stateSync": {
           "enable": true,
           "minCatchupBlocks": 100,
-          "rpcServers": "cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657"
+          "rpcServers": "http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657"
         }
       }
     },

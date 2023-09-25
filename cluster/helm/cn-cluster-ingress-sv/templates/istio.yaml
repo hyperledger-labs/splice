@@ -52,6 +52,17 @@ spec:
         host: sv-app.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
   - match:
     - port: 443
+      uri:
+        prefix: "/cometbft-rpc/"
+    rewrite:
+      uri: "/"
+    route:
+      - destination:
+          port:
+            number: 26657
+          host: "cometbft-{{ (.Values.cluster).svNamespace }}-cometbft-rpc.{{ (.Values.cluster).svNamespace }}.svc.cluster.local"
+  - match:
+    - port: 443
     route:
     - destination:
         port:

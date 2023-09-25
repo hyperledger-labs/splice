@@ -20,7 +20,10 @@ spec:
       labels:
         app: {{ $fullName }}
     spec:
-      initContainers:
+      containers:
+        # Temporarily added container to allow configuring CometBFT state sync dynamically
+        # TODO(#7779): Move this logic into a pre-bootstrap script in the main container once the drivers team
+        #   publishes a new CometBFT image with the required tooling.
         - name: "{{ $fullName }}-init"
           image: "{{ $.Values.imageRepo }}/cometbft-init:{{ $.Values.cluster.imageTag }}"
           imagePullPolicy: Always
@@ -34,8 +37,14 @@ spec:
             - -c
             - -x
             - |
+              # Copy over root CA certs to make them available to the CometBFT container
+              # This is needed to enable state sync over HTTPS
+              cp -a /etc/ssl/certs /config/
+              # Configure state sync and signal when done
               cp -a /initial-config/. /config/
-              /configure-state-sync.sh /config/config.toml
+              /configure-state-sync.sh /config/config.toml \
+                && touch /config/config_done \
+                && sleep infinity
           env:
             - name: STATE_SYNC_ENABLE
               value: "{{ $.Values.stateSync.enable }}"
@@ -43,7 +52,6 @@ spec:
               value: "{{ $.Values.stateSync.rpcServers }}"
             - name: STATE_SYNC_MIN_CATCHUP_BLOCKS
               value: "{{ $.Values.stateSync.minCatchupBlocks }}"
-      containers:
         - name: {{ $fullName }}
           image: "{{ $.Values.imageRepo }}/{{ $.Values.imageName }}:{{ $.Values.cluster.imageTag }}"
           imagePullPolicy: Always
@@ -65,6 +73,7 @@ spec:
           volumeMounts:
             - mountPath: /cometbft/config
               name: config
+              readOnly: true
             - mountPath: /cometbft/initial-data
               name: initial-data
             - mountPath: /cometbft/data
@@ -74,12 +83,16 @@ spec:
           env:
             - name: HOME
               value: /cometbft
+            - name: SSL_CERT_DIR
+              value: /cometbft/config/certs
           command:
             - /bin/sh
             - -c
             - -x
             - |
               cp -n "${HOME}"/initial-data/* "${HOME}"/data
+              # Wait for configuration to be done
+              [ -f "$HOME"/config/config_done ] && \
               cometbft-canton-network start \
               {{ include "cliArgs" (list $ .) | indent 14 | trim }}
           {{- with $.Values.resources }}

@@ -59,6 +59,14 @@ export function installCometBftNode(
         port: 26696,
       },
       isDevNet: isDevNet,
+      stateSync: {
+        enable: true,
+        // Note that the port number and the ending slash are significant in the list of rpcServers
+        rpcServers:
+          `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global:443/cometbft-rpc/` +
+          ',' +
+          `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global:443/cometbft-rpc/`,
+      },
     }),
     localCharts,
     version,
