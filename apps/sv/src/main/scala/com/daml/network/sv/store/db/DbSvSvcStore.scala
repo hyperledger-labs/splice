@@ -22,7 +22,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
 }
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
+import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.store.{
   AcsStoreDump,
@@ -44,7 +44,6 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
-import slick.dbio.DBIO
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -88,7 +87,7 @@ class DbSvSvcStore(
 
   override def ingestionAcsInsert(createdEvent: javab.CreatedEvent)(implicit
       tc: TraceContext
-  ): Either[String, DBIO[_]] = {
+  ) = {
     SvcAcsStoreRowData.fromCreatedEvent(createdEvent).map {
       case SvcAcsStoreRowData(
             contract,
@@ -153,7 +152,7 @@ class DbSvSvcStore(
 
   override def ingestionTxLogInsert(record: SvcTxLogParser.TxLogIndexRecord)(implicit
       tc: TraceContext
-  ): Either[String, DBIO[_]] = {
+  ) = {
     val SvcTxLogRowData(
       eventId,
       offset,
@@ -217,7 +216,7 @@ class DbSvSvcStore(
                 and      idle.subscription_next_payment_due_at < $now
               order by idle.subscription_next_payment_due_at
               limit    $limit
-          """.as[(AcsStoreRowTemplate, AcsStoreRowTemplate)],
+          """.as[(SelectFromAcsTableResult, SelectFromAcsTableResult)],
           "listExpiredCnsSubscriptions",
         )
     } yield joinedRows.map { case (idleRow, ctxRow) =>
@@ -240,7 +239,7 @@ class DbSvSvcStore(
                   and template_id = ${SvOnboardingConfirmed.TEMPLATE_ID}
                   and sv_candidate_party = $svParty
                 limit 1
-              """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+              """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
             "lookupSvOnboardingConfirmedByParty",
           )
           .value
@@ -259,7 +258,7 @@ class DbSvSvcStore(
                    and template_id = ${Confirmation.TEMPLATE_ID}
                    and action_requiring_confirmation = ${payloadJsonFromValue(action.toValue)}
                  limit ${sqlLimit(limit)}
-               """).toActionBuilder.as[AcsStoreRowTemplate],
+               """).toActionBuilder.as[SelectFromAcsTableResult],
           "listConfirmations",
         )
       limited = applyLimit(limit, result)
@@ -280,7 +279,7 @@ class DbSvSvcStore(
                    and reward_round = $round
                    and reward_party is not null -- otherwise index is not used
                  limit ${sqlLimit(limit)}
-               """).toActionBuilder.as[AcsStoreRowTemplate],
+               """).toActionBuilder.as[SelectFromAcsTableResult],
           "listAppRewardCouponsOnDomain",
         )
       limited = applyLimit(limit, result)
@@ -302,7 +301,7 @@ class DbSvSvcStore(
                      and reward_round = $round
                      and reward_party is not null -- otherwise index is not used
                    limit ${sqlLimit(limit)}
-                 """).toActionBuilder.as[AcsStoreRowTemplate],
+                 """).toActionBuilder.as[SelectFromAcsTableResult],
             "listValidatorRewardCouponsOnDomain",
           )
         limited = applyLimit(limit, result)
@@ -377,7 +376,7 @@ class DbSvSvcStore(
               and mining_round is not null
             order by mining_round
             limit 1
-           """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+           """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
           "lookupOldestClosedMiningRound",
         )
       } yield AssignedContract(
@@ -404,7 +403,7 @@ class DbSvSvcStore(
                 and action_requiring_confirmation = ${payloadJsonFromValue(action.toValue)}
                   """,
             orderLimit = sql" limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupConfirmationByActionWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
@@ -438,7 +437,7 @@ class DbSvSvcStore(
               )}
                       """,
             orderLimit = sql"limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupCnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
@@ -472,7 +471,7 @@ class DbSvSvcStore(
               )}
                       """,
             orderLimit = sql"limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
@@ -503,7 +502,7 @@ class DbSvSvcStore(
                     and action_cns_entry_context_payment_id = $paymentId
                       """,
             orderLimit = sql"limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
@@ -532,7 +531,7 @@ class DbSvSvcStore(
                           and cns_entry_name = ${lengthLimited(name)}
                       )
                     limit ${sqlLimit(Limit.DefaultLimit)};
-                        """).toActionBuilder.as[AcsStoreRowTemplate],
+                        """).toActionBuilder.as[SelectFromAcsTableResult],
             "listInitialPaymentConfirmationByCnsName",
           )
         limited = applyLimit(Limit.DefaultLimit, result)
@@ -555,7 +554,7 @@ class DbSvSvcStore(
                   and sv_onboarding_token = ${lengthLimited(token)}
                     """,
             orderLimit = sql"limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupSvOnboardingRequestByTokenWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
@@ -585,7 +584,7 @@ class DbSvSvcStore(
                    and template_id = ${SvOnboardingRequest.TEMPLATE_ID}
                    and (sv_candidate_party, sv_candidate_name) in #$svCandidates
                  limit ${sqlLimit(Limit.DefaultLimit)}
-               """).toActionBuilder.as[AcsStoreRowTemplate],
+               """).toActionBuilder.as[SelectFromAcsTableResult],
             "listSvOnboardingRequestsBySvcMembers",
           )
         limited = applyLimit(Limit.DefaultLimit, result)
@@ -599,28 +598,25 @@ class DbSvSvcStore(
       waitUntilAcsIngested {
         for {
           rows <- storage.query(
-            (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
-              sql"""
-              where store_id = $storeId
-                and template_id = ${companion.TEMPLATE_ID}
-                and coin_round_of_expiry <= (
+            selectFromAcsTableWithState(
+              DbSvSvcStore.acsTableName,
+              storeId,
+              where = sql"""
+                template_id = ${companion.TEMPLATE_ID}
+                and assigned_domain is not null
+                and acs.coin_round_of_expiry <= (
                   select mining_round - 2
                   from svc_acs_store
                   where store_id = $storeId
                     and template_id = ${cc.round.OpenMiningRound.TEMPLATE_ID}
                     and mining_round is not null
-                  order by mining_round desc
-                  limit 1
-                )
-                order by mining_round desc
-                limit $limit
-               """).toActionBuilder.as[AcsStoreRowTemplate],
+                  order by mining_round desc limit 1)""",
+              orderLimit = sql"""order by mining_round desc limit $limit""",
+            ),
             "listExpiredRoundBased",
           )
-          contracts <- rows.traverse(multiDomainAcsStore.contractWithStateFromRow(companion)(_))
-        } yield contracts.flatMap(
-          _.toAssignedContract
-        ) // TODO (#5314) only those domain-matching SvcRules
+          assigned = rows.map(multiDomainAcsStore.assignedContractFromRow(companion)(_))
+        } yield assigned // TODO (#5314) only those domain-matching SvcRules
       }
 
   override def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Long)(
@@ -635,7 +631,7 @@ class DbSvSvcStore(
                    and template_id = ${MemberTraffic.TEMPLATE_ID}
                    and member_traffic_member = $memberId
                  limit $limit
-               """).toActionBuilder.as[AcsStoreRowTemplate],
+               """).toActionBuilder.as[SelectFromAcsTableResult],
           "listMemberTrafficContracts",
         )
     } yield result.map(contractFromRow(MemberTraffic.COMPANION)(_))
@@ -660,7 +656,7 @@ class DbSvSvcStore(
                  and template_id = ${CoinPriceVote.TEMPLATE_ID}
                  and voter in #$voterParties
                limit ${sqlLimit(Limit.DefaultLimit)}
-             """).toActionBuilder.as[AcsStoreRowTemplate],
+             """).toActionBuilder.as[SelectFromAcsTableResult],
           "listMemberCoinPriceVotes",
         )
       limited = applyLimit(Limit.DefaultLimit, result)
@@ -683,7 +679,7 @@ class DbSvSvcStore(
                     and sv_candidate_party = $candidateParty
                       """,
             orderLimit = sql"limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupSvOnboardingRequestByCandidatePartyWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
@@ -708,7 +704,7 @@ class DbSvSvcStore(
                       and validator = $validator
                     limit 1;
                         """,
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupSvOnboardingRequestByCandidatePartyWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
@@ -751,7 +747,7 @@ class DbSvSvcStore(
                    and template_id = ${CoinPriceVote.TEMPLATE_ID}
                    and vote_request_cid in #$voteRequestCidsSql
                  limit ${sqlLimit(Limit.DefaultLimit)}
-               """).toActionBuilder.as[AcsStoreRowTemplate],
+               """).toActionBuilder.as[SelectFromAcsTableResult],
           "listVotesByVoteRequests",
         )
       limited = applyLimit(Limit.DefaultLimit, result)
@@ -774,7 +770,7 @@ class DbSvSvcStore(
                         and voter = ${key.svParty}
                       limit 1;
                           """,
-            ).as[AcsStoreRowTemplateWithOffset].headOption,
+            ).headOption,
             "lookupVoteByThisSvAndVoteRequestWithOffset",
           )
       } yield MultiDomainAcsStore.QueryResult(
@@ -800,7 +796,7 @@ class DbSvSvcStore(
                       and requester = ${key.svParty}
                     limit 1;
                         """,
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupVoteRequestByThisSvAndActionWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
@@ -821,7 +817,7 @@ class DbSvSvcStore(
                      and template_id = ${Vote.TEMPLATE_ID}
                      and vote_request_cid = $voteRequestId
                    limit ${sqlLimit(Limit.DefaultLimit)}
-                 """).toActionBuilder.as[AcsStoreRowTemplate],
+                 """).toActionBuilder.as[SelectFromAcsTableResult],
           "listEligibleVotes",
         )
       limited = applyLimit(Limit.DefaultLimit, result)
@@ -840,7 +836,7 @@ class DbSvSvcStore(
                        and template_id = ${CoinPriceVote.TEMPLATE_ID}
                        and voter = ${key.svParty}
                      limit 1
-                   """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+                   """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
           "lookupCoinPriceVoteByThisSv",
         )
         .value
@@ -863,7 +859,7 @@ class DbSvSvcStore(
                         and sv_candidate_name = ${lengthLimited(candidateName)}
                           """,
             orderLimit = sql"limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupSvOnboardingRequestByCandidateNameWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
@@ -888,7 +884,7 @@ class DbSvSvcStore(
                           and sv_candidate_name = ${lengthLimited(svName)}
                             """,
             orderLimit = sql"limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupSvOnboardingConfirmedByNameWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
@@ -913,7 +909,7 @@ class DbSvSvcStore(
                        and requester IN #$requesters
                        and election_request_epoch = $electionRequestEpoch
                      limit ${sqlLimit(Limit.DefaultLimit)}
-                   """).toActionBuilder.as[AcsStoreRowTemplate],
+                   """).toActionBuilder.as[SelectFromAcsTableResult],
           "listElectionRequests",
         )
       limited = applyLimit(Limit.DefaultLimit, result)
@@ -937,7 +933,7 @@ class DbSvSvcStore(
                           and election_request_epoch = $epoch
                             """,
             orderLimit = sql"limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupElectionRequestByRequesterWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
@@ -961,7 +957,7 @@ class DbSvSvcStore(
                          and template_id = ${ElectionRequest.TEMPLATE_ID}
                          and election_request_epoch < $epoch
                        limit ${sqlLimit(Limit.DefaultLimit)}
-                     """).toActionBuilder.as[AcsStoreRowTemplate],
+                     """).toActionBuilder.as[SelectFromAcsTableResult],
           "listExpiredElectionRequests",
         )
       limited = applyLimit(Limit.DefaultLimit, result)
@@ -975,17 +971,17 @@ class DbSvSvcStore(
       openRound <- getLatestActiveOpenMiningRound()
       result <- storage
         .query(
-          (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
-            sql"""
-                         where store_id = $storeId
-                           and template_id = ${ImportCrate.TEMPLATE_ID}
-                           and import_crate_receiver = $receiver
-                         limit ${sqlLimit(Limit.DefaultLimit)}
-                       """).toActionBuilder.as[AcsStoreRowTemplate],
-          "listExpiredElectionRequests",
+          selectFromAcsTableWithState(
+            DbSvSvcStore.acsTableName,
+            storeId,
+            where = sql"""template_id = ${ImportCrate.TEMPLATE_ID}
+                           and import_crate_receiver = $receiver""",
+            orderLimit = sql"""limit ${sqlLimit(Limit.DefaultLimit)}""",
+          ),
+          "getImportShipmentFor",
         )
       limited = applyLimit(Limit.DefaultLimit, result)
-      withState <- Future.traverse(limited)(
+      withState = limited.map(
         multiDomainAcsStore.contractWithStateFromRow(ImportCrate.COMPANION)(_)
       )
     } yield AcsStoreDump.ImportShipment(openRound, withState)
@@ -999,24 +995,24 @@ class DbSvSvcStore(
     for {
       resultWithOffset <- storage
         .querySingle(
-          selectFromAcsTableWithOffset(
+          selectFromAcsTableWithStateAndOffset(
             DbSvSvcStore.acsTableName,
             storeId,
-            where = sql"""
-                        template_id = ${CnsEntry.TEMPLATE_ID}
+            acsWhere = sql"""template_id = ${CnsEntry.TEMPLATE_ID}
                     and cns_entry_name = ${lengthLimited(name)}
                       """,
+            stateWhere = sql"assigned_domain is not null",
             orderLimit = sql"limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupCnsEntryByNameWithOffset",
         )
         .getOrRaise(offsetExpectedError())
-      withState <- resultWithOffset.row.traverse(
-        multiDomainAcsStore.contractWithStateFromRow(CnsEntry.COMPANION)(_)
+      assigned = resultWithOffset.row.map(
+        multiDomainAcsStore.assignedContractFromRow(CnsEntry.COMPANION)(_)
       )
     } yield MultiDomainAcsStore.QueryResult(
       resultWithOffset.offset,
-      withState.flatMap(_.toAssignedContract),
+      assigned,
     )
   }
 
@@ -1028,24 +1024,24 @@ class DbSvSvcStore(
     for {
       resultWithOffset <- storage
         .querySingle(
-          selectFromAcsTableWithOffset(
+          selectFromAcsTableWithStateAndOffset(
             DbSvSvcStore.acsTableName,
             storeId,
-            where = sql"""
-                            template_id = ${SubscriptionInitialPayment.TEMPLATE_ID}
-                        and contract_id = $paymentCid
+            acsWhere = sql"""template_id = ${SubscriptionInitialPayment.TEMPLATE_ID}
+                        and acs.contract_id = $paymentCid
                           """,
+            stateWhere = sql"assigned_domain is not null",
             orderLimit = sql"limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupSubscriptionInitialPaymentWithOffset",
         )
         .getOrRaise(offsetExpectedError())
-      withState <- resultWithOffset.row.traverse(
-        multiDomainAcsStore.contractWithStateFromRow(SubscriptionInitialPayment.COMPANION)(_)
+      assigned = resultWithOffset.row.map(
+        multiDomainAcsStore.assignedContractFromRow(SubscriptionInitialPayment.COMPANION)(_)
       )
     } yield MultiDomainAcsStore.QueryResult(
       resultWithOffset.offset,
-      withState.flatMap(_.toAssignedContract),
+      assigned,
     )
   }
 
@@ -1057,24 +1053,24 @@ class DbSvSvcStore(
     for {
       resultWithOffset <- storage
         .querySingle(
-          selectFromAcsTableWithOffset(
+          selectFromAcsTableWithStateAndOffset(
             DbSvSvcStore.acsTableName,
             storeId,
-            where = sql"""
-                          template_id = ${FeaturedAppRight.TEMPLATE_ID}
+            acsWhere = sql"""template_id = ${FeaturedAppRight.TEMPLATE_ID}
                       and featured_app_right_provider = $providerPartyId
                         """,
+            stateWhere = sql"assigned_domain is not null",
             orderLimit = sql"limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupFeaturedAppRightWithOffset",
         )
         .getOrRaise(offsetExpectedError())
-      withState <- resultWithOffset.row.traverse(
-        multiDomainAcsStore.contractWithStateFromRow(FeaturedAppRight.COMPANION)(_)
+      assigned = resultWithOffset.row.map(
+        multiDomainAcsStore.assignedContractFromRow(FeaturedAppRight.COMPANION)(_)
       )
     } yield MultiDomainAcsStore.QueryResult(
       resultWithOffset.offset,
-      withState.flatMap(_.toAssignedContract),
+      assigned,
     )
   }
 

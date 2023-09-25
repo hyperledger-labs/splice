@@ -8,7 +8,7 @@ import com.daml.network.directory.config.DirectoryDomainConfig
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore
-import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
+import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -24,7 +24,6 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.store.db.DirectoryTables.DirectoryAcsStoreRowData
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import io.circe.Json
-import slick.dbio
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 class DbDirectoryStore(
@@ -61,7 +60,7 @@ class DbDirectoryStore(
 
   override def ingestionAcsInsert(
       createdEvent: CreatedEvent
-  )(implicit tc: TraceContext): Either[String, dbio.DBIO[_]] = {
+  )(implicit tc: TraceContext) = {
     DirectoryAcsStoreRowData.fromCreatedEvent(createdEvent).map {
       case DirectoryAcsStoreRowData(
             contract,
@@ -110,7 +109,7 @@ class DbDirectoryStore(
                 and directory_install_user = $user
             """,
             sql"limit 1",
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupInstallByUserWithOffset",
         )
         .getOrElse(throw offsetExpectedError())
@@ -126,7 +125,7 @@ class DbDirectoryStore(
     for {
       resultWithOffset <- storage
         .querySingle(
-          (selectFromAcsTableWithOffset(
+          selectFromAcsTableWithOffset(
             DbDirectoryStore.tableName,
             storeId,
             sql"""
@@ -134,7 +133,7 @@ class DbDirectoryStore(
               and directory_entry_name = ${lengthLimited(name)}
             """,
             sql"limit 1",
-          )).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupEntryByNameWithOffset",
         )
         .getOrElse(throw offsetExpectedError())
@@ -159,7 +158,7 @@ class DbDirectoryStore(
                 and directory_entry_name >= ''
               order by directory_entry_name
               limit 1
-          """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+          """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
             "lookupEntryByParty",
           )
           .value
@@ -180,7 +179,7 @@ class DbDirectoryStore(
                 and directory_entry_name ^@ $limitedPrefix
               order by directory_entry_name
               limit $pageSize
-          """).toActionBuilder.as[AcsStoreRowTemplate],
+          """).toActionBuilder.as[SelectFromAcsTableResult],
           "listEntries",
         )
     } yield rows.map(contractFromRow(directoryCodegen.DirectoryEntry.COMPANION)(_))
@@ -222,7 +221,7 @@ class DbDirectoryStore(
                 and      idle.subscription_next_payment_due_at < $now
               order by idle.subscription_next_payment_due_at
               limit    $limit
-          """.as[(AcsStoreRowTemplate, AcsStoreRowTemplate)],
+          """.as[(SelectFromAcsTableResult, SelectFromAcsTableResult)],
           "listExpiredDirectorySubscriptions",
         )
     } yield joinedRows.map { case (idleRow, ctxRow) =>

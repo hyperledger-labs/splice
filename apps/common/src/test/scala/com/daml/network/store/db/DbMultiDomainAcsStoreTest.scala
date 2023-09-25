@@ -1,22 +1,18 @@
 package com.daml.network.store.db
 
-import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
-import com.daml.network.store.db.AcsTables.*
 import com.daml.network.store.{MultiDomainAcsStoreTest, StoreTest}
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.HasActorSystem
-import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import slick.jdbc.JdbcProfile
-import slick.lifted.ProvenShape
 
 import scala.concurrent.Future
 
@@ -69,7 +65,6 @@ class DbMultiDomainAcsStoreTest
         "acs_store_template",
         "txlog_store_template",
         storeDescriptor(id),
-        _ => Future.successful(d1),
         loggerFactory,
         contractFilter,
         TestTxLogStoreParser,
@@ -80,49 +75,33 @@ class DbMultiDomainAcsStoreTest
     store
   }
 
-  private var eventNumber = 0L
   private def create(
       storeId: Int,
       evt: CreatedEvent,
-  ): DBIO[Unit] = {
+  ) = {
+    import storage.DbStorageConverters.setParameterByteArray
+
     val contract = Contract
       .fromCreatedEvent(coinCodegen.AppRewardCoupon.COMPANION)(evt)
       .valueOrFail("Failed to parse contract.")
     val contractId = new ContractId[Any](evt.getContractId)
-    val row = AcsStoreRowTemplate(
-      storeId = storeId,
-      eventNumber = eventNumber,
-      contractId = contractId,
-      templateId = TemplateId.fromIdentifier(
-        Identifier.of(
-          contract.identifier.getPackageId,
-          contract.identifier.getModuleName,
-          contract.identifier.getEntityName,
-        )
-      ),
-      createArguments = io.circe.parser
-        .parse(payloadJsonFromContract(contract.payload).compactPrint)
-        .valueOrFail("circe couldn't parse spray json"),
-      contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt),
-      contractMetadataContractKeyHash = Some(contract.metadata.contractKeyHash.toStringUtf8),
-      contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray,
-    )
-    insertRowIfNotExists(AcsStoreTemplateTable)(
-      row => row.contractId === contractId && row.storeId === storeId,
-      row,
-    ).map { result =>
-      eventNumber += 1
-      result
-    }
+    val templateId = contract.identifier
+    val createArguments = payloadJsonFromContract(contract.payload)
+    val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
+    val contractMetadataContractKeyHash =
+      lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)
+    val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
+    val contractExpiresAt = Some(contractMetadataCreatedAt.addMicros(1000000000L))
+    sqlu"""
+      insert into acs_store_template(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
+                                contract_metadata_contract_key_hash, contract_metadata_driver_internal,
+                                contract_expires_at)
+      values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
+              $contractMetadataContractKeyHash, $contractMetadataDriverInternal,
+              $contractExpiresAt)
+      on conflict do nothing
+    """
   }
-
-  // we can just use the template table for these
-  lazy val AcsStoreTemplateTable = new TableQuery(tag =>
-    new AcsStoreTemplate[AcsStoreRowTemplate](tag, "acs_store_template") {
-      override def * : ProvenShape[AcsStoreRowTemplate] =
-        templateColumns.tupled.<>((AcsStoreRowTemplate.apply _).tupled, AcsStoreRowTemplate.unapply)
-    }
-  )
 
   override protected def cleanDb(storage: DbStorage): Future[?] = {
     for {

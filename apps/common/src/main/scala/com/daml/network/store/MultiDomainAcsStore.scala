@@ -173,7 +173,7 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
 
   import language.existentials
 
-  def listAssignedContractsNotOnDomains(
+  def listAssignedContractsNotOnDomainN(
       excludedDomain: DomainId,
       companions: TemplateCompanion[_ <: ContractId[T], T] forSome { type T <: Template }*
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]]
@@ -221,8 +221,9 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
   def getJsonAcsSnapshot(ignoredContracts: Set[Identifier]): Future[JsonAcsSnapshot]
 
   /** Testing API: returns all contracts that have in-flight reassignments */
-  private[store] def listIncompleteReassignments()
-      : Future[Map[ContractId[_], NonEmpty[Set[ReassignmentId]]]]
+  private[store] def listIncompleteReassignments()(implicit
+      tc: TraceContext
+  ): Future[Map[ContractId[_], NonEmpty[Set[ReassignmentId]]]]
 }
 
 object MultiDomainAcsStore {

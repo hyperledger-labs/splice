@@ -181,7 +181,7 @@ trait ValidatorStore
   final def listCoinRulesTransferFollowers(
       coinRules: AssignedContract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
-    multiDomainAcsStore.listAssignedContractsNotOnDomains(
+    multiDomainAcsStore.listAssignedContractsNotOnDomainN(
       coinRules.domain,
       templatesMovedByMyAutomation: _*
     )

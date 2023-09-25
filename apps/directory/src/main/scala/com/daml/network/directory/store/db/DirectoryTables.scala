@@ -29,6 +29,7 @@ object DirectoryTables extends AcsTables {
       contractMetadataContractKeyHash: Option[String] = None,
       contractMetadataDriverInternal: Array[Byte],
       contractExpiresAt: Option[Timestamp] = None,
+      // Index columns
       directoryInstallUser: Option[PartyId] = None,
       directoryEntryName: Option[String] = None,
       directoryEntryOwner: Option[PartyId] = None,

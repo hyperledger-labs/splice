@@ -106,6 +106,11 @@ abstract class MultiDomainAcsStoreTest[
           .lookupContractById(AppRewardCoupon.COMPANION)(c.contract.contractId)
           .map(_ shouldBe Some(c))
       }
+      _ <- expected_.traverse_ { c =>
+        store
+          .lookupContractStateById(c.contract.contractId)
+          .map(_ shouldBe Some(c.state))
+      }
     } yield succeed
   }
 
@@ -319,6 +324,231 @@ abstract class MultiDomainAcsStoreTest[
         _ <- signal_012
         // We can still register signals for already ingested offsets
         _ <- store.signalWhenIngestedOrShutdown("010")
+      } yield succeed
+    }
+
+    "unassign before assign" in {
+      implicit val store = mkStore()
+      for {
+        _ <- acs()
+        _ <- assertList()
+        _ <- d1.create(c(1))
+        _ <- assertList(c(1) -> Some(d1))
+        tf0 = nextReassignmentId
+        _ <- d1.unassign(c(1) -> d2, tf0, 1)
+        _ <- assertList(c(1) -> None)
+        _ <- assertIncompleteReassignments(
+          Map(c(1).contractId -> NonEmpty(Set, ReassignmentId(d1, tf0)))
+        )
+        _ <- d2.assign(c(1) -> d1, tf0, 1)
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- d2.archive(c(1))
+        _ <- assertLookupNone(c(1))
+        _ <- assertList()
+        _ <- assertIncompleteReassignments()
+      } yield succeed
+    }
+    "assign before unassign" in {
+      implicit val store = mkStore()
+      for {
+        _ <- acs()
+        _ <- assertList()
+        _ <- d1.create(c(1))
+        _ <- assertList(c(1) -> Some(d1))
+        tf0 = nextReassignmentId
+        _ <- d2.assign(c(1) -> d1, tf0, 1)
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- assertIncompleteReassignments(
+          Map(c(1).contractId -> NonEmpty(Set, ReassignmentId(d1, tf0)))
+        )
+        _ <- d1.unassign(c(1) -> d2, tf0, 1)
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- d2.archive(c(1))
+        _ <- assertList()
+        _ <- assertLookupNone(c(1))
+        _ <- assertIncompleteReassignments()
+      } yield succeed
+    }
+    "assign and archive before unassign" in {
+      implicit val store = mkStore()
+      for {
+        _ <- acs()
+        _ <- assertList()
+        _ <- d1.create(c(1))
+        _ <- assertList(c(1) -> Some(d1))
+        tf0 = nextReassignmentId
+        _ <- d2.assign(c(1) -> d1, tf0, 1)
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- assertIncompleteReassignments(
+          Map(c(1).contractId -> NonEmpty(Set, ReassignmentId(d1, tf0)))
+        )
+        _ <- d2.archive(c(1))
+        _ <- assertList()
+        _ <- assertIncompleteReassignments(
+          Map(c(1).contractId -> NonEmpty(Set, ReassignmentId(d1, tf0)))
+        )
+        _ <- assertLookupNone(c(1))
+        _ <- d1.unassign(c(1) -> d2, tf0, 1)
+        _ <- assertList()
+        _ <- assertIncompleteReassignments()
+      } yield succeed
+    }
+    "assign before create" in {
+      implicit val store = mkStore()
+      for {
+        _ <- acs()
+        _ <- assertList()
+        tf0 = nextReassignmentId
+        _ <- d2.assign(c(1) -> d1, tf0, 1)
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- d1.create(c(1))
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- d1.unassign(c(1) -> d2, tf0, 1)
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- d2.archive(c(1))
+        _ <- assertList()
+        _ <- assertLookupNone(c(1))
+        _ <- assertIncompleteReassignments()
+      } yield succeed
+    }
+    "multiple early transfer ins" in {
+      implicit val store = mkStore()
+      for {
+        _ <- acs()
+        _ <- assertList()
+        tf0 = nextReassignmentId
+        tf1 = nextReassignmentId
+        tf2 = nextReassignmentId
+        _ <- d2.assign(c(1) -> d1, tf0, 1)
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- d3.assign(c(1) -> d1, tf2, 3)
+        _ <- assertList(c(1) -> Some(d3))
+        _ <- d2.unassign(c(1) -> d1, tf1, 2)
+        _ <- assertList(c(1) -> Some(d3))
+        _ <- d1.create(c(1))
+        _ <- assertList(c(1) -> Some(d3))
+        _ <- d1.unassign(c(1) -> d2, tf0, 1)
+        _ <- assertList(c(1) -> Some(d3))
+        _ <- d1.assign(c(1) -> d2, tf1, 2)
+        _ <- assertList(c(1) -> Some(d3))
+        _ <- d1.unassign(c(1) -> d3, tf2, 3)
+        _ <- assertList(c(1) -> Some(d3))
+        _ <- d3.archive(c(1))
+        _ <- assertList()
+        _ <- assertLookupNone(c(1))
+        _ <- assertIncompleteReassignments()
+      } yield succeed
+    }
+    "archive before create" in {
+      implicit val store = mkStore()
+      for {
+        _ <- acs()
+        _ <- assertList()
+        tf0 = nextReassignmentId
+        _ <- d2.assign(c(1) -> d1, tf0, 1)
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- d2.archive(c(1))
+        _ <- assertList()
+        _ <- assertLookupNone(c(1))
+        _ <- d1.create(c(1))
+        _ <- assertList()
+        _ <- d1.unassign(c(1) -> d2, tf0, 1)
+        _ <- assertList()
+        _ <- assertIncompleteReassignments()
+      } yield succeed
+    }
+    "XXX archive before assign" in {
+      implicit val store = mkStore()
+      for {
+        _ <- acs()
+        _ <- assertList()
+        tf0 = nextReassignmentId
+        tf1 = nextReassignmentId
+        _ <- d1.create(c(1))
+        _ <- assertList(c(1) -> Some(d1))
+        _ <- d1.unassign(c(1) -> d2, tf0, 1)
+        _ <- assertList(c(1) -> None)
+        _ <- d3.assign(c(1) -> d2, tf1, 2)
+        _ <- assertList(c(1) -> Some(d3))
+        _ <- d3.archive(c(1))
+        _ <- assertList()
+        _ <- d2.assign(c(1) -> d1, tf0, 1)
+        _ <- assertList()
+        _ <- d2.unassign(c(1) -> d3, tf1, 2)
+        _ <- assertList()
+        _ <- assertIncompleteReassignments()
+      } yield succeed
+    }
+    "incomplete unassign + assign" in {
+      implicit val store = mkStore()
+      val tf0 = nextReassignmentId
+      for {
+        _ <- acs(
+          incompleteOut = Seq(
+            (c(1), d1, d2, tf0, 1L)
+          )
+        )
+        _ <- assertList(c(1) -> None)
+        _ <- d2.assign(c(1) -> d1, tf0, 1)
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- d2.archive(c(1))
+        _ <- assertList()
+        _ <- assertIncompleteReassignments()
+      } yield succeed
+    }
+    "incomplete assign + unassign" in {
+      implicit val store = mkStore()
+      val tf0 = nextReassignmentId
+      for {
+        _ <- acs(
+          incompleteIn = Seq(
+            (c(1), d1, d2, tf0, 1L)
+          )
+        )
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- d1.create(c(1))
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- d1.unassign(c(1) -> d2, tf0, 1)
+        _ <- assertList(c(1) -> Some(d2))
+        _ <- d2.archive(c(1))
+        _ <- assertList()
+        _ <- assertIncompleteReassignments()
+      } yield succeed
+    }
+    "filtering of assign" in {
+      implicit val store = mkStore()
+      val tf0 = nextReassignmentId
+      val tf1 = nextReassignmentId
+      for {
+        _ <- acs()
+        _ <- d1.assign(c(1) -> d2, tf0, 1)
+        _ <- d1.assign(cFeatured(2) -> d2, tf1, 2)
+        _ <- assertList(c(1) -> Some(d1))
+        _ <- d1.archive(c(1))
+        _ <- assertIncompleteReassignments(
+          // We've not yet seen the unassign
+          Map(c(1).contractId -> NonEmpty(Set, ReassignmentId(d2, tf0)))
+        )
+      } yield succeed
+    }
+    "filtering of unassign" in {
+      implicit val store = mkStore()
+      val tf0 = nextReassignmentId
+      for {
+        _ <- acs()
+        _ <- d1.create(cFeatured(1))
+        _ <- d1.unassign(c(1) -> d2, tf0, 1)
+        _ <- assertIncompleteReassignments()
+      } yield succeed
+    }
+    "filtering of incomplete unassigns" in {
+      implicit val store = mkStore()
+      val tf0 = nextReassignmentId
+      for {
+        _ <- acs(
+          incompleteOut = Seq((cFeatured(1), d1, d2, tf0, 1L))
+        )
+        _ <- assertIncompleteReassignments()
       } yield succeed
     }
     "stream ready contracts on single domain" in {

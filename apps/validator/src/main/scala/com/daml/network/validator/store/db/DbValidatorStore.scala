@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topupCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
+import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.daml.network.validator.config.ValidatorDomainConfig
@@ -28,7 +28,6 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import io.circe.Json
-import slick.dbio
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -71,7 +70,7 @@ class DbValidatorStore(
 
   override def ingestionAcsInsert(createdEvent: CreatedEvent)(implicit
       tc: TraceContext
-  ): Either[String, dbio.DBIO[_]] = {
+  ) = {
     ValidatorAcsStoreRowData.fromCreatedEvent(createdEvent).map {
       case ValidatorAcsStoreRowData(
             contract,
@@ -124,7 +123,7 @@ class DbValidatorStore(
                 and template_id = ${walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID}
                 and user_party = $endUserParty
               limit 1
-          """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+          """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
         "lookupInstallByParty",
       )
       .value
@@ -144,7 +143,7 @@ class DbValidatorStore(
                 and template_id = ${walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID}
                 and user_name = ${lengthLimited(endUserName)}
               limit 1
-          """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+          """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
         "lookupInstallByName",
       )
       .value
@@ -164,7 +163,7 @@ class DbValidatorStore(
                 and template_id = ${coinCodegen.FeaturedAppRight.COMPANION.TEMPLATE_ID}
                 and provider_party = ${walletKey.validatorParty}
               limit 1
-          """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+          """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
         "lookupValidatorFeaturedAppRight",
       )
       .value
@@ -186,7 +185,7 @@ class DbValidatorStore(
               and user_name = ${lengthLimited(endUserName)}
             """,
             sql"limit 1",
-          ).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupWalletInstallByNameWithOffset",
         )
         .getOrElse(throw offsetExpectedError())
@@ -213,7 +212,7 @@ class DbValidatorStore(
               and validator_party = ${key.validatorParty}
             """,
             sql"limit 1",
-          ).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupValidatorLicenseWithOffset",
         )
         .getOrElse(throw offsetExpectedError())
@@ -241,7 +240,7 @@ class DbValidatorStore(
               and user_party = $party
             """,
             sql"limit 1",
-          ).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupValidatorRightByPartyWithOffset",
         )
         .getOrElse(throw offsetExpectedError())
@@ -260,23 +259,24 @@ class DbValidatorStore(
     for {
       row <- storage
         .querySingle(
-          (selectFromAcsTable(DbValidatorStore.acsTableName) ++
-            sql"""
-            where store_id = $storeId
-              and template_id = ${appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID}
+          selectFromAcsTableWithState(
+            DbValidatorStore.acsTableName,
+            storeId,
+            where = sql"""
+              template_id = ${appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID}
               and provider_party = $provider
-            order by app_configuration_version desc
-            limit 1
-        """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+              """,
+            orderLimit = sql"""order by app_configuration_version desc limit 1""",
+          ).headOption,
           "lookupLatestAppConfiguration",
         )
-        .semiflatMap(
-          multiDomainAcsStore.contractWithStateFromRow(
-            appManagerCodegen.AppConfiguration.COMPANION
-          )(_)
-        )
         .value
-    } yield row
+      result = row.map(
+        multiDomainAcsStore.contractWithStateFromRow(
+          appManagerCodegen.AppConfiguration.COMPANION
+        )(_)
+      )
+    } yield result
   }
 
   override def lookupAppConfiguration(
@@ -289,23 +289,24 @@ class DbValidatorStore(
     for {
       resultWithOffset <- storage
         .querySingle(
-          selectFromAcsTableWithOffset(
+          selectFromAcsTableWithStateAndOffset(
             DbValidatorStore.acsTableName,
             storeId,
-            sql"""
+            acsWhere = sql"""
             template_id = ${appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID}
               and provider_party = $provider
               and app_configuration_version = $version
             """,
-            sql"limit 1",
-          ).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
+            orderLimit = sql"limit 1",
+          ).headOption,
           "lookupAppConfiguration",
         )
         .getOrElse(throw offsetExpectedError())
-      contractWithState <-
-        multiDomainAcsStore.contractWithStateFromOptRow(
+      contractWithState = resultWithOffset.row.map(
+        multiDomainAcsStore.contractWithStateFromRow(
           appManagerCodegen.AppConfiguration.COMPANION
-        )(resultWithOffset.row)
+        )(_)
+      )
     } yield QueryResult(resultWithOffset.offset, contractWithState)
   }
 
@@ -318,23 +319,24 @@ class DbValidatorStore(
     for {
       resultWithOffset <- storage
         .querySingle(
-          selectFromAcsTableWithOffset(
+          selectFromAcsTableWithStateAndOffset(
             DbValidatorStore.acsTableName,
             storeId,
-            sql"""
+            acsWhere = sql"""
             template_id = ${appManagerCodegen.AppRelease.COMPANION.TEMPLATE_ID}
               and provider_party = $provider
               and app_release_version = ${lengthLimited(version)}
             """,
-            sql"limit 1",
-          ).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
+            orderLimit = sql"limit 1",
+          ).headOption,
           "lookupAppRelease",
         )
         .getOrElse(throw offsetExpectedError())
-      contractWithState <-
-        multiDomainAcsStore.contractWithStateFromOptRow(
+      contractWithState = resultWithOffset.row.map(
+        multiDomainAcsStore.contractWithStateFromRow(
           appManagerCodegen.AppRelease.COMPANION
-        )(resultWithOffset.row)
+        )(_)
+      )
     } yield QueryResult(resultWithOffset.offset, contractWithState)
   }
 
@@ -348,22 +350,23 @@ class DbValidatorStore(
     for {
       resultWithOffset <- storage
         .querySingle(
-          selectFromAcsTableWithOffset(
+          selectFromAcsTableWithStateAndOffset(
             DbValidatorStore.acsTableName,
             storeId,
-            sql"""
+            acsWhere = sql"""
             template_id = ${appManagerCodegen.RegisteredApp.COMPANION.TEMPLATE_ID}
               and provider_party = $provider
             """,
-            sql"limit 1",
-          ).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
+            orderLimit = sql"limit 1",
+          ).headOption,
           "lookupRegisteredApp",
         )
         .getOrElse(throw offsetExpectedError())
-      contractWithState <-
-        multiDomainAcsStore.contractWithStateFromOptRow(
+      contractWithState = resultWithOffset.row.map(
+        multiDomainAcsStore.contractWithStateFromRow(
           appManagerCodegen.RegisteredApp.COMPANION
-        )(resultWithOffset.row)
+        )(_)
+      )
     } yield QueryResult(resultWithOffset.offset, contractWithState)
   }
 
@@ -377,22 +380,23 @@ class DbValidatorStore(
     for {
       resultWithOffset <- storage
         .querySingle(
-          selectFromAcsTableWithOffset(
+          selectFromAcsTableWithStateAndOffset(
             DbValidatorStore.acsTableName,
             storeId,
-            sql"""
+            acsWhere = sql"""
             template_id = ${appManagerCodegen.InstalledApp.COMPANION.TEMPLATE_ID}
               and provider_party = $provider
             """,
-            sql"limit 1",
-          ).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
+            orderLimit = sql"limit 1",
+          ).headOption,
           "lookupInstalledApp",
         )
         .getOrElse(throw offsetExpectedError())
-      contractWithState <-
-        multiDomainAcsStore.contractWithStateFromOptRow(
+      contractWithState = resultWithOffset.row.map(
+        multiDomainAcsStore.contractWithStateFromRow(
           appManagerCodegen.InstalledApp.COMPANION
-        )(resultWithOffset.row)
+        )(_)
+      )
     } yield QueryResult(resultWithOffset.offset, contractWithState)
   }
 
@@ -407,15 +411,16 @@ class DbValidatorStore(
     for {
       rows <- storage
         .query(
-          (selectFromAcsTable(DbValidatorStore.acsTableName) ++
-            sql"""
-            where store_id = $storeId
-              and template_id = ${appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID}
-              and provider_party = $provider
-        """).toActionBuilder.as[AcsStoreRowTemplate],
+          selectFromAcsTableWithState(
+            DbValidatorStore.acsTableName,
+            storeId,
+            where = sql"""
+              template_id = ${appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID}
+              and provider_party = $provider""",
+          ),
           "listApprovedReleaseConfigurations",
         )
-      result <- rows.traverse(
+      result = rows.map(
         multiDomainAcsStore.contractWithStateFromRow(
           appManagerCodegen.ApprovedReleaseConfiguration.COMPANION
         )(_)
@@ -436,23 +441,24 @@ class DbValidatorStore(
     for {
       resultWithOffset <- storage
         .querySingle(
-          selectFromAcsTableWithOffset(
+          selectFromAcsTableWithStateAndOffset(
             DbValidatorStore.acsTableName,
             storeId,
-            sql"""
+            acsWhere = sql"""
             template_id = ${appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID}
               and provider_party = $provider
               and json_hash = $jsonHash
             """,
-            sql"limit 1",
-          ).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
+            orderLimit = sql"limit 1",
+          ).headOption,
           "lookupApprovedReleaseConfiguration",
         )
         .getOrElse(throw offsetExpectedError())
-      contractWithState <-
-        multiDomainAcsStore.contractWithStateFromOptRow(
+      contractWithState = resultWithOffset.row.map(
+        multiDomainAcsStore.contractWithStateFromRow(
           appManagerCodegen.ApprovedReleaseConfiguration.COMPANION
-        )(resultWithOffset.row)
+        )(_)
+      )
     } yield QueryResult(resultWithOffset.offset, contractWithState)
   }
 
@@ -474,7 +480,7 @@ class DbValidatorStore(
               and traffic_domain_id = $domainId
             """,
             sql"limit 1",
-          ).toActionBuilder.as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupValidatorTopUpStateWithOffset",
         )
         .getOrElse(throw offsetExpectedError())

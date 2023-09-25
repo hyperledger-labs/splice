@@ -679,7 +679,7 @@ trait SvSvcStore
     import com.daml.network.codegen.java.cn.svcrules as svcr
     for {
       coinRulesO <- lookupCoinRules()
-      otherContracts <- multiDomainAcsStore.listAssignedContractsNotOnDomains(
+      otherContracts <- multiDomainAcsStore.listAssignedContractsNotOnDomainN(
         targetDomain,
         svcr.Vote.COMPANION,
         svcr.VoteRequest.COMPANION,
@@ -708,7 +708,7 @@ trait SvSvcStore
   ): Future[Seq[FollowTask[cc.coin.CoinRules.ContractId, cc.coin.CoinRules, ?, ?]]] = {
     lookupCoinRules().flatMap(_.map { coinRules =>
       multiDomainAcsStore
-        .listAssignedContractsNotOnDomains(
+        .listAssignedContractsNotOnDomainN(
           coinRules.domain,
           cc.round.OpenMiningRound.COMPANION,
           cc.round.SummarizingMiningRound.COMPANION,

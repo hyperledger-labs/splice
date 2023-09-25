@@ -13,7 +13,6 @@ import com.daml.network.scan.store.db.ScanTables.{ScanAcsStoreRowData, ScanTxLog
 import com.daml.network.scan.store.{ScanStore, TxLogIndexRecord, TxLogEntry}
 import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.store.db.AcsTables.AcsStoreRowTemplate
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -23,7 +22,7 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import cats.implicits.*
-import slick.dbio.DBIO
+import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -64,7 +63,7 @@ class DbScanStore(
 
   override def ingestionAcsInsert(createdEvent: CreatedEvent)(implicit
       tc: TraceContext
-  ): Either[String, DBIO[_]] = {
+  ) = {
     ScanAcsStoreRowData.fromCreatedEvent(createdEvent).map {
       case ScanAcsStoreRowData(
             contract,
@@ -97,7 +96,7 @@ class DbScanStore(
 
   override def ingestionTxLogInsert(record: TxLogIndexRecord)(implicit
       tc: TraceContext
-  ): Either[String, DBIO[_]] = {
+  ) = {
     val ScanTxLogRowData(
       eventId,
       offset,
@@ -137,17 +136,16 @@ class DbScanStore(
       for {
         row <- storage
           .querySingle(
-            (selectFromAcsTable(DbScanStore.acsTableName) ++
-              sql"""
-              where store_id = $storeId
-                and template_id = ${CoinRules.TEMPLATE_ID}
-              order by event_number desc
-              limit 1;
-             """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+            selectFromAcsTableWithState(
+              DbScanStore.acsTableName,
+              storeId,
+              where = sql"""template_id = ${CoinRules.TEMPLATE_ID}""",
+              orderLimit = sql"""order by event_number desc limit 1""",
+            ).headOption,
             "lookupCoinRules",
           )
           .value
-        contractWithState <- row.traverse(
+        contractWithState = row.map(
           multiDomainAcsStore.contractWithStateFromRow(CoinRules.COMPANION)(_)
         )
       } yield contractWithState
@@ -160,17 +158,16 @@ class DbScanStore(
       for {
         row <- storage
           .querySingle(
-            (selectFromAcsTable(DbScanStore.acsTableName) ++
-              sql"""
-              where store_id = $storeId
-                and template_id = ${CnsRules.TEMPLATE_ID}
-              order by event_number desc
-              limit 1;
-             """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+            selectFromAcsTableWithState(
+              DbScanStore.acsTableName,
+              storeId,
+              where = sql"""template_id = ${CnsRules.TEMPLATE_ID}""",
+              orderLimit = sql"""order by event_number desc limit 1""",
+            ).headOption,
             "lookupCnsRules",
           )
           .value
-        contractWithState <- row.traverse(
+        contractWithState = row.map(
           multiDomainAcsStore.contractWithStateFromRow(CnsRules.COMPANION)(_)
         )
       } yield contractWithState
@@ -439,17 +436,17 @@ class DbScanStore(
       for {
         rows <- storage
           .query(
-            (selectFromAcsTable(DbScanStore.acsTableName) ++
-              sql"""
-                  where store_id = $storeId
-                    and template_id = ${ImportCrate.TEMPLATE_ID}
-                    and import_crate_receiver = $receiverParty
-                  limit ${sqlLimit(Limit.DefaultLimit)};
-                 """).toActionBuilder.as[AcsStoreRowTemplate],
+            selectFromAcsTableWithState(
+              DbScanStore.acsTableName,
+              storeId,
+              where =
+                sql"""template_id = ${ImportCrate.TEMPLATE_ID} and acs.import_crate_receiver = $receiverParty""",
+              orderLimit = sql"""limit ${sqlLimit(Limit.DefaultLimit)}""",
+            ),
             "listImportCrates",
           )
         limited = applyLimit(Limit.DefaultLimit, rows)
-        withState <- limited.traverse(
+        withState = limited.map(
           multiDomainAcsStore.contractWithStateFromRow(ImportCrate.COMPANION)(_)
         )
       } yield withState
@@ -471,7 +468,7 @@ class DbScanStore(
                     and template_id = ${FeaturedAppRight.TEMPLATE_ID}
                     and featured_app_right_provider = $providerPartyId
                   limit 1;
-                 """).toActionBuilder.as[AcsStoreRowTemplate].headOption,
+                 """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
             "findFeaturedAppRight",
           )
       } yield contractFromRow(FeaturedAppRight.COMPANION)(row)).value

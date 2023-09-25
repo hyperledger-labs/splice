@@ -56,6 +56,56 @@ create index acs_store_template_sid_tid_ce
     on acs_store_template (store_id, template_id, contract_expires_at)
     where contract_expires_at is not null;
 
+create table contract_state(
+    store_id int not null,
+    contract_id text not null,
+
+    -- The domain this contract is assigned to, as of the latest observed domain reassignment state.
+    -- If the latest observed domain reassignment event is an unassign, this is NULL.
+    assigned_domain text,
+
+    -- counter of the most recent observed domain reassignment
+    -- reassignment counters are monotonically increasing
+    reassignment_counter int not null,
+
+    -- Metadata for domain reassignments
+    -- Only contains data if the latest observed domain reassignment event is an unassign.
+    reassignment_target_domain text,
+    reassignment_source_domain text,
+    reassignment_submitter text,
+    reassignment_unassign_id text,
+
+    primary key (store_id, contract_id),
+    foreign key (store_id) references store_descriptors(id)
+);
+
+create index contract_state_sid_cid_ad
+    on contract_state (store_id, contract_id, assigned_domain)
+    where assigned_domain is not null;
+
+create table incomplete_reassignments(
+    -- The id of the store that this row belongs to
+    store_id int not null,
+
+    contract_id text not null,
+
+    source_domain text not null,
+
+    unassign_id text not null,
+
+    -- TRUE: this row represents an incomplete assign
+    -- FALSE: this row represents an incomplete unassign
+    is_assignment boolean not null,
+
+    primary key (store_id, contract_id, unassign_id),
+    foreign key (store_id) references store_descriptors(id)
+);
+
+create index incomplete_reassignments_sid_uid
+    on incomplete_reassignments (store_id, unassign_id);
+
+create index incomplete_reassignments_sid_cid
+    on incomplete_reassignments (store_id, contract_id);
 
 -- A template for a table containing a store's TxLog entries extended with custom indices.
 --

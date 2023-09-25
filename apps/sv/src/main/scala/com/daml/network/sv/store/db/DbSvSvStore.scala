@@ -12,7 +12,7 @@ import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithout
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.SvTables.SvAcsStoreRowData
 import com.daml.network.sv.store.{SvStore, SvSvStore}
-import com.daml.network.util.{Contract, AssignedContract, TemplateJsonDecoder}
+import com.daml.network.util.{AssignedContract, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -20,7 +20,6 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import slick.dbio.DBIO
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -60,7 +59,7 @@ class DbSvSvStore(
 
   override def ingestionAcsInsert(createdEvent: CreatedEvent)(implicit
       tc: TraceContext
-  ): Either[String, DBIO[_]] = {
+  ) = {
     SvAcsStoreRowData.fromCreatedEvent(createdEvent).map {
       case SvAcsStoreRowData(contract, contractExpiresAt, onboardingSecret, svCandidateName) =>
         val safeSecret = onboardingSecret.map(lengthLimited)
@@ -99,7 +98,7 @@ class DbSvSvStore(
             template_id = ${ValidatorOnboarding.TEMPLATE_ID}
               and onboarding_secret = ${lengthLimited(secret)}
           """,
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupValidatorOnboardingBySecretWithOffset",
         )
     } yield QueryResult(
@@ -122,7 +121,7 @@ class DbSvSvStore(
                   template_id = ${UsedSecret.TEMPLATE_ID}
                     and onboarding_secret = ${lengthLimited(secret)}
                 """,
-            ).as[AcsStoreRowTemplateWithOffset].headOption,
+            ).headOption,
             "lookupUsedSecretWithOffset",
           )
       } yield QueryResult(
@@ -146,7 +145,7 @@ class DbSvSvStore(
               template_id = ${ApprovedSvIdentity.TEMPLATE_ID}
                 and sv_candidate_name = ${lengthLimited(name)}
             """,
-          ).as[AcsStoreRowTemplateWithOffset].headOption,
+          ).headOption,
           "lookupApprovedSvIdentityByNameWithOffset",
         )
     } yield QueryResult(

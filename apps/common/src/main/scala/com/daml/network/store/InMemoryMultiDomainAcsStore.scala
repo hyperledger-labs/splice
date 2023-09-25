@@ -130,7 +130,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
           updateState(
             _.ingestTransfer(transfer, contractFilter.contains)
           ).map { case (summary, offsetChanged, offsetIngestionsToSignal) =>
-            logger.debug(show"Ingested transfer $summary")
+            logger.debug(show"Ingested reassignment $summary")
             offsetIngestionsToSignal.foreach(_.success(()))
             offsetChanged.success(())
           }
@@ -196,7 +196,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
   import language.existentials
 
-  override def listAssignedContractsNotOnDomains(
+  override def listAssignedContractsNotOnDomainN(
       excludedDomain: DomainId,
       companions: TemplateCompanion[_ <: ContractId[T], T] forSome { type T <: Template }*
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = Future
@@ -559,7 +559,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   /** Testing APIs
     */
 
-  override private[store] def listIncompleteReassignments() =
+  override private[store] def listIncompleteReassignments()(implicit tc: TraceContext) =
     Future.successful(stateVar.incompleteReassignmentsById)
 
   override def close(): Unit = ()
@@ -885,7 +885,7 @@ object InMemoryMultiDomainAcsStore {
           st.ingestCreatedEvent(
             ev,
             contract.domainId,
-            contract.transferCounter,
+            contract.reassignmentCounter,
             summary,
           )
         } else {
@@ -932,7 +932,7 @@ object InMemoryMultiDomainAcsStore {
           } else {
             (
               st,
-              summary.copy(numFilteredUnassignEvents = summary.numFilteredUnassignEvents + 1),
+              summary.copy(numFilteredAssignEvents = summary.numFilteredAssignEvents + 1),
             )
           }
         }

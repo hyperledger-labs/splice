@@ -25,8 +25,6 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.circe.Json
-import slick.dbio
-import slick.dbio.DBIO
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.*
@@ -69,7 +67,7 @@ class DbUserWalletStore(
 
   override def ingestionAcsInsert(
       createdEvent: CreatedEvent
-  )(implicit tc: TraceContext): Either[String, dbio.DBIO[_]] = {
+  )(implicit tc: TraceContext) = {
     UserWalletAcsStoreRowData
       .fromCreatedEvent(createdEvent, acsContractFilter)
       .map {
@@ -98,7 +96,7 @@ class DbUserWalletStore(
 
   override def ingestionTxLogInsert(record: TxLogIndexRecord)(implicit
       tc: TraceContext
-  ): Either[String, DBIO[_]] = UserWalletTxLogStoreRowData
+  ) = UserWalletTxLogStoreRowData
     .fromIndexRecord(record)
     .map {
       case UserWalletTxLogStoreRowData(

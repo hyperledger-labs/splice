@@ -1,12 +1,15 @@
 package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.lf.data.Time.Timestamp
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
-import com.daml.network.store.db.AcsTables.{AcsStoreRowTemplate, TxLogStoreRowTemplate}
+import com.daml.network.store.db.AcsTables.TxLogStoreRowTemplate
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.digitalasset.canton.admin.api.client.data.TemplateId
 import slick.jdbc.{GetResult, PositionedResult}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import io.circe.Json
 import slick.jdbc.canton.SQLActionBuilder
 
 trait AcsQueries extends AcsJdbcTypes {
@@ -28,6 +31,68 @@ trait AcsQueries extends AcsJdbcTypes {
        from #$tableName
        """.stripMargin
 
+  implicit val GetResultSelectFromAcsTable: GetResult[AcsQueries.SelectFromAcsTableResult] =
+    GetResult { prs =>
+      import prs.*
+      (AcsQueries.SelectFromAcsTableResult.apply _).tupled(
+        (
+          <<[Int],
+          <<[Long],
+          <<[ContractId[Any]],
+          <<[TemplateId],
+          <<[Json],
+          <<[Timestamp],
+          <<[Option[String]],
+          <<[Array[Byte]],
+          <<[Option[Timestamp]],
+        )
+      )
+    }
+
+  /** Similar to [[selectFromAcsTable]], but also returns the contract state (i.e., the domain to which a contract is currently assigned) */
+  protected def selectFromAcsTableWithState(
+      tableName: String,
+      storeId: Int,
+      where: SQLActionBuilder,
+      orderLimit: SQLActionBuilder = sql"",
+  ) =
+    (sql"""
+       select acs.store_id,
+         acs.event_number,
+         acs.contract_id,
+         acs.template_id,
+         acs.create_arguments,
+         acs.contract_metadata_created_at,
+         acs.contract_metadata_contract_key_hash,
+         acs.contract_metadata_driver_internal,
+         acs.contract_expires_at,
+         state.assigned_domain,
+         state.reassignment_counter,
+         state.reassignment_target_domain,
+         state.reassignment_source_domain,
+         state.reassignment_submitter,
+         state.reassignment_unassign_id
+       from #$tableName acs
+       inner join contract_state state on acs.store_id = state.store_id and acs.contract_id = state.contract_id
+       where acs.store_id = $storeId and """ ++ where ++ sql"""
+       """ ++ orderLimit).toActionBuilder.as[AcsQueries.SelectFromAcsTableWithStateResult]
+
+  implicit val GetResultSelectFromAcsTableWithState
+      : GetResult[AcsQueries.SelectFromAcsTableWithStateResult] =
+    GetResult { prs =>
+      import prs.*
+      val acsRow = prs.<<[AcsQueries.SelectFromAcsTableResult]
+      val stateRow = AcsQueries.SelectFromContractStateResult(
+        <<[Option[String]],
+        <<[Long],
+        <<[Option[String]],
+        <<[Option[String]],
+        <<[Option[String]],
+        <<[Option[String]],
+      )
+      AcsQueries.SelectFromAcsTableWithStateResult(acsRow, stateRow)
+    }
+
   /** Same as [[selectFromAcsTable]], but joins with the store_descriptors table to get the last_ingested_offset.
     * This guarantees that the fetched contracts exist in the given offset,
     * whereas two separate queries (one to fetch the contract and one to fetch the offset) don't guarantee that.
@@ -37,7 +102,7 @@ trait AcsQueries extends AcsJdbcTypes {
       storeId: Int,
       where: SQLActionBuilder,
       orderLimit: SQLActionBuilder = sql"",
-  ): SQLActionBuilder =
+  ) =
     (sql"""
        select
          store_id,
@@ -54,34 +119,99 @@ trait AcsQueries extends AcsJdbcTypes {
            left join #$tableName
                on sd.id = store_id
                and """ ++ where ++ sql"""
-       where sd.id = $storeId""" ++ orderLimit).toActionBuilder
+       where sd.id = $storeId
+       """ ++ orderLimit).toActionBuilder
+      .as[AcsQueries.SelectFromAcsTableResultWithOffset]
 
-  case class AcsStoreRowTemplateWithOffset(
-      offset: String,
-      row: Option[AcsStoreRowTemplate],
-  )
+  implicit val GetResultSelectFromAcsTableResultWithOffset
+      : GetResult[AcsQueries.SelectFromAcsTableResultWithOffset] = { (pp: PositionedResult) =>
+    val storeIdFromAcsRow = pp.<<[Option[Int]]
+    AcsQueries.SelectFromAcsTableResultWithOffset(
+      pp.<<,
+      storeIdFromAcsRow.map { storeId =>
+        AcsQueries.SelectFromAcsTableResult(
+          storeId,
+          pp.<<,
+          pp.<<,
+          pp.<<,
+          pp.<<,
+          pp.<<,
+          pp.<<,
+          pp.<<,
+          pp.<<,
+        )
+      },
+    )
+  }
 
-  object AcsStoreRowTemplateWithOffset {
-    implicit val GetResultAcsStoreRowTemplateWithOffset
-        : GetResult[AcsStoreRowTemplateWithOffset] = { (pp: PositionedResult) =>
+  /** Same as [[selectFromAcsTableWithOffset]], but also includes the contract state.
+    */
+  protected def selectFromAcsTableWithStateAndOffset(
+      tableName: String,
+      storeId: Int,
+      acsWhere: SQLActionBuilder = sql"true",
+      stateWhere: SQLActionBuilder = sql"true",
+      orderLimit: SQLActionBuilder = sql"",
+  ) =
+    (sql"""
+       select
+         acs.store_id,
+         sd.last_ingested_offset,
+         acs.event_number,
+         acs.contract_id,
+         acs.template_id,
+         acs.create_arguments,
+         acs.contract_metadata_created_at,
+         acs.contract_metadata_contract_key_hash,
+         acs.contract_metadata_driver_internal,
+         acs.contract_expires_at,
+         state.assigned_domain,
+         state.reassignment_counter,
+         state.reassignment_target_domain,
+         state.reassignment_source_domain,
+         state.reassignment_submitter,
+         state.reassignment_unassign_id
+       from store_descriptors sd
+           left join #$tableName acs
+               on sd.id = acs.store_id
+               and """ ++ acsWhere ++ sql"""
+           left join contract_state state
+               on sd.id = state.store_id and acs.contract_id = state.contract_id
+               and """ ++ stateWhere ++ sql"""
+       where sd.id = $storeId
+       """ ++ orderLimit).toActionBuilder
+      .as[AcsQueries.SelectFromAcsTableResultWithStateAndOffset]
+
+  implicit val GetResultSelectFromAcsTableResultWithStateOffset
+      : GetResult[AcsQueries.SelectFromAcsTableResultWithStateAndOffset] = {
+    (pp: PositionedResult) =>
       val storeIdFromAcsRow = pp.<<[Option[Int]]
-      AcsStoreRowTemplateWithOffset(
+      AcsQueries.SelectFromAcsTableResultWithStateAndOffset(
         pp.<<,
         storeIdFromAcsRow.map { storeId =>
-          AcsStoreRowTemplate(
-            storeId,
-            pp.<<,
-            pp.<<,
-            pp.<<,
-            pp.<<,
-            pp.<<,
-            pp.<<,
-            pp.<<,
-            pp.<<,
+          AcsQueries.SelectFromAcsTableWithStateResult(
+            AcsQueries.SelectFromAcsTableResult(
+              storeId,
+              pp.<<,
+              pp.<<,
+              pp.<<,
+              pp.<<,
+              pp.<<,
+              pp.<<,
+              pp.<<,
+              pp.<<,
+            ),
+            AcsQueries.SelectFromContractStateResult(
+              pp.<<,
+              pp.<<,
+              pp.<<,
+              pp.<<,
+              pp.<<,
+              pp.<<,
+            ),
           )
         },
       )
-    }
   }
 
   /** Same as [[selectFromAcsTableWithOffset]], but for tx log tables.
@@ -104,7 +234,8 @@ trait AcsQueries extends AcsJdbcTypes {
            left join #$tableName
                on sd.id = store_id
                and """ ++ where ++ sql"""
-       where sd.id = $storeId""" ++ orderLimit).toActionBuilder
+       where sd.id = $storeId
+       """ ++ orderLimit).toActionBuilder
 
   case class TxLogStoreRowTemplateWithOffset(
       offset: String,
@@ -131,7 +262,7 @@ trait AcsQueries extends AcsJdbcTypes {
   }
 
   protected def contractFromRow[C, TCId <: ContractId[_], T](companion: C)(
-      row: AcsTables.AcsStoreRowTemplate
+      row: AcsQueries.SelectFromAcsTableResult
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
       decoder: TemplateJsonDecoder,
@@ -151,4 +282,42 @@ trait AcsQueries extends AcsJdbcTypes {
       )
   }
 
+}
+
+object AcsQueries {
+  case class SelectFromAcsTableResult(
+      storeId: Int,
+      eventNumber: Long,
+      contractId: ContractId[Any],
+      templateId: TemplateId,
+      createArguments: Json,
+      contractMetadataCreatedAt: Timestamp,
+      contractMetadataContractKeyHash: Option[String] = None,
+      contractMetadataDriverInternal: Array[Byte],
+      contractExpiresAt: Option[Timestamp] = None,
+  )
+
+  case class SelectFromContractStateResult(
+      assignedDomain: Option[String],
+      reassignmentCounter: Long,
+      reassignmentTargetDomain: Option[String],
+      reassignmentSourceDomain: Option[String],
+      reassignmentSubmitter: Option[String],
+      reassignmentUnassignId: Option[String],
+  )
+
+  case class SelectFromAcsTableWithStateResult(
+      acsRow: SelectFromAcsTableResult,
+      stateRow: SelectFromContractStateResult,
+  )
+
+  case class SelectFromAcsTableResultWithOffset(
+      offset: String,
+      row: Option[SelectFromAcsTableResult],
+  )
+
+  case class SelectFromAcsTableResultWithStateAndOffset(
+      offset: String,
+      row: Option[SelectFromAcsTableWithStateResult],
+  )
 }

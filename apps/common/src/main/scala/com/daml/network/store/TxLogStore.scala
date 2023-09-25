@@ -243,7 +243,7 @@ object TxLogStore {
       val activeContract = ActiveContract(
         domainId = domainId,
         createdEvent = createdEvent,
-        transferCounter = 0L,
+        reassignmentCounter = 0L,
       )
 
       // Extract application-specific data from a simulated ACS containing the above contract

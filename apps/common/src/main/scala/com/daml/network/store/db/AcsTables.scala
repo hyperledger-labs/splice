@@ -38,36 +38,6 @@ trait AcsTables extends AcsJdbcTypes {
 }
 
 object AcsTables extends AcsTables {
-  case class AcsStoreRowTemplate(
-      storeId: Int,
-      eventNumber: Long,
-      contractId: ContractId[Any],
-      templateId: TemplateId,
-      createArguments: Json,
-      contractMetadataCreatedAt: Timestamp,
-      contractMetadataContractKeyHash: Option[String] = None,
-      contractMetadataDriverInternal: Array[Byte],
-      contractExpiresAt: Option[Timestamp] = None,
-  )
-
-  object AcsStoreRowTemplate {
-    implicit val GetResultAcsStoreTemplateRow: GetResult[AcsStoreRowTemplate] = GetResult { prs =>
-      import prs.*
-      (AcsStoreRowTemplate.apply _).tupled(
-        (
-          <<[Int],
-          <<[Long],
-          <<[ContractId[Any]],
-          <<[TemplateId],
-          <<[Json],
-          <<[Timestamp],
-          <<[Option[String]],
-          <<[Array[Byte]],
-          <<?[Timestamp],
-        )
-      )
-    }
-  }
 
   case class TxLogStoreRowTemplate(
       storeId: Int,
@@ -129,7 +99,8 @@ object AcsTables extends AcsTables {
         contractMetadataCreatedAt ::
         contractMetadataContractKeyHash ::
         contractMetadataDriverInternal ::
-        contractExpiresAt :: HNil
+        contractExpiresAt ::
+        HNil
 
   }
 

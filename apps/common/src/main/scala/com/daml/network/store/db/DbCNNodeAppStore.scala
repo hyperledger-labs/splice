@@ -8,7 +8,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
-import slick.dbio.DBIO
+import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 
 import scala.concurrent.ExecutionContext
 
@@ -24,7 +24,7 @@ abstract class DbCNNodeAppStore[
     protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends CNNodeAppStore[TXI, TXE] { this: ConfiguredDefaultDomain =>
+) extends CNNodeAppStore[TXI, TXE] {
 
   protected def retryProvider: RetryProvider
   final protected def futureSupervisor: FutureSupervisor = retryProvider.futureSupervisor
@@ -35,7 +35,6 @@ abstract class DbCNNodeAppStore[
       acsTableName,
       txLogTableName,
       storeDescriptor,
-      tc => defaultAcsDomainIdF(tc),
       loggerFactory,
       acsContractFilter,
       txLogParser,
@@ -61,11 +60,11 @@ abstract class DbCNNodeAppStore[
 
   def ingestionAcsInsert(createdEvent: CreatedEvent)(implicit
       tc: TraceContext
-  ): Either[String, DBIO[?]]
+  ): Either[String, DBIOAction[?, NoStream, Effect.Write]]
 
   def ingestionTxLogInsert(record: TXI)(implicit
       tc: TraceContext
-  ): Either[String, DBIO[?]]
+  ): Either[String, DBIOAction[?, NoStream, Effect.Write]]
 
   override def close(): Unit = ()
 }
@@ -87,7 +86,7 @@ abstract class DbCNNodeAppStoreWithoutHistory(
 
   override def ingestionTxLogInsert(record: TxLogStore.IndexRecord)(implicit
       tc: TraceContext
-  ): Either[String, DBIO[?]] = Right(DBIO.successful(()))
+  ): Either[String, DBIOAction[?, NoStream, Effect.Write]] = Right(DBIO.successful(()))
 
 }
 
@@ -109,4 +108,4 @@ abstract class DbCNNodeAppStoreWithHistory[
       txLogTableName,
       storeDescriptor,
     )
-    with CNNodeAppStoreWithHistory[TXI, TXE] { this: ConfiguredDefaultDomain => }
+    with CNNodeAppStoreWithHistory[TXI, TXE]
