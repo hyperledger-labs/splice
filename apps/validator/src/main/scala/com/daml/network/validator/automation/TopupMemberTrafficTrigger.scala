@@ -188,7 +188,7 @@ class TopupMemberTrafficTrigger(
         for {
           participantId <- participantAdminConnection.getParticipantId()
           topupState <- connection
-            .submitWithResult(
+            .submit(
               Seq(validator),
               Seq(validator),
               ValidatorTopUpState.create(
@@ -197,15 +197,18 @@ class TopupMemberTrafficTrigger(
                 activeDomainId.toProtoPrimitive,
                 Instant.ofEpochSecond(0),
               ),
+              priority = CommandPriority.High,
+            )
+            .withDedup(
               CNLedgerConnection.CommandId(
                 "com.daml.network.validator.automation.TopupMemberTrafficTrigger.getOrCreateValidatorTopupState",
                 Seq(validator),
                 activeDomainId.toProtoPrimitive,
               ),
               DedupOffset(dedupOffset),
-              activeDomainId,
-              priority = CommandPriority.High,
             )
+            .withDomainId(activeDomainId)
+            .yieldResult()
             .flatMap(ev =>
               store.multiDomainAcsStore.getContractByIdOnDomain(ValidatorTopUpState.COMPANION)(
                 activeDomainId,

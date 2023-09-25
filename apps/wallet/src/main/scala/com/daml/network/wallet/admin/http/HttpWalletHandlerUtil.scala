@@ -90,16 +90,15 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
           )
         case Some((commandId, dedupConfig)) =>
           userWallet.connection
-            .submitWithResult(
+            .submit(
               Seq(validatorParty),
               Seq(userParty),
               update,
-              commandId,
-              dedupConfig,
-              domainId,
-              dislosedContracts assertOnDomain domainId,
               priority = priority,
             )
+            .withDedup(commandId, dedupConfig)
+            .withDomainId(domainId, dislosedContracts)
+            .yieldResult()
       }
 
     } yield result
