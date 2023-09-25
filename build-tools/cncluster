@@ -763,7 +763,7 @@ function _down_stack() {
             *"the stack is currently locked"*)
                 echo "Retrying because of lock on stack $STACK"
                 subcmd_pulumi "$STACK" cancel --yes
-                subcmd_prefresh
+                subcmd_pulumi "$STACK" refresh --yes --skip-preview
                 _down_stack "$STACK"
 
                 echo "Reset complete. In case a subsequent 'cncluster apply' fails, refer to the documentation on manual cleanup (https://github.com/DACH-NY/canton-network-node/tree/main/cluster#manually-deploying-via-ci)"
