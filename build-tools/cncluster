@@ -161,7 +161,7 @@ function _uses_pulumi_stack() {
     _pulumi --stack "organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
             --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
             stack init \
-            --secrets_provider="gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}" \
+            --secrets-provider="gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}" \
             2> /dev/null || true
 
     # Since the command above will take no effect if the stack already exists, we also explicitly change the secrets provider on the stack.
