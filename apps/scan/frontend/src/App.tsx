@@ -44,7 +44,7 @@ const router = createBrowserRouter(
     <Route>
       <Route path="/" element={<Root />}>
         <Route index element={<Activity />} />
-        <Route path="activity" element={<Activity />} />
+        <Route path="recent-activity" element={<Activity />} />
         <Route path="app-leaderboard" element={<AppLeaderboard />} />
         <Route path="validator-leaderboard" element={<ValidatorLeaderboard />} />
         <Route path="domain-fees-leaderboard" element={<DomainFeesLeaderboard />} />
