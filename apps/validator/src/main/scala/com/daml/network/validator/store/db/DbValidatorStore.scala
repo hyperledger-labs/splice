@@ -12,6 +12,8 @@ import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topupCodegen
 import com.daml.network.environment.RetryProvider
+import com.daml.network.store.ConfiguredDefaultDomain
+import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
@@ -34,7 +36,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class DbValidatorStore(
     override val key: ValidatorStore.Key,
-    override protected[this] val domainConfig: ValidatorDomainConfig,
+    domainConfig: ValidatorDomainConfig,
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
@@ -53,8 +55,11 @@ class DbValidatorStore(
       ),
     )
     with ValidatorStore
+    with ConfiguredDefaultDomain
     with AcsTables
     with AcsQueries {
+
+  override final def defaultAcsDomain = domainConfig.global.alias
 
   override val walletKey = WalletStore.Key(
     key.validatorParty,
@@ -172,7 +177,9 @@ class DbValidatorStore(
   override def lookupWalletInstallByNameWithOffset(
       endUserName: String
   )(implicit tc: TraceContext): Future[QueryResult[
-    Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
+    Option[
+      ContractWithState[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]
+    ]
   ]] = waitUntilAcsIngested {
     for {
       resultWithOffset <- storage
@@ -189,9 +196,16 @@ class DbValidatorStore(
           "lookupWalletInstallByNameWithOffset",
         )
         .getOrElse(throw offsetExpectedError())
+      domain <- defaultAcsDomainIdF // TODO (#5314) use state from query
     } yield QueryResult(
       resultWithOffset.offset,
-      resultWithOffset.row.map(contractFromRow(walletCodegen.WalletAppInstall.COMPANION)(_)),
+      resultWithOffset.row.map { r =>
+        ContractWithState(
+          contractFromRow(walletCodegen.WalletAppInstall.COMPANION)(r),
+          Assigned(domain),
+        )
+
+      },
     )
   }
 
@@ -227,7 +241,9 @@ class DbValidatorStore(
   override def lookupValidatorRightByPartyWithOffset(
       party: PartyId
   )(implicit tc: TraceContext): Future[
-    QueryResult[Option[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]]
+    QueryResult[
+      Option[ContractWithState[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]
+    ]
   ] = waitUntilAcsIngested {
     for {
       resultWithOffset <- storage
@@ -244,9 +260,15 @@ class DbValidatorStore(
           "lookupValidatorRightByPartyWithOffset",
         )
         .getOrElse(throw offsetExpectedError())
+      domain <- defaultAcsDomainIdF // TODO (#5314) use state from query
     } yield QueryResult(
       resultWithOffset.offset,
-      resultWithOffset.row.map(contractFromRow(coinCodegen.ValidatorRight.COMPANION)(_)),
+      resultWithOffset.row.map { r =>
+        ContractWithState(
+          contractFromRow(coinCodegen.ValidatorRight.COMPANION)(r),
+          Assigned(domain),
+        )
+      },
     )
   }
 

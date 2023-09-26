@@ -51,6 +51,7 @@ import com.daml.network.validator.config.{
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorStore}
 import com.daml.network.validator.util.{OAuth2Manager, ValidatorUtil}
+import ValidatorUtil.getCoinRulesDomainFromScanConnection
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
 import com.digitalasset.canton.DomainAlias
@@ -196,7 +197,8 @@ class ValidatorApp(
           Some(party),
           storeWithIngestion,
           validatorUserName = config.ledgerApiUser,
-          domainId,
+          // we're initializing so CoinRules is guaranteed to be on domainId
+          getCoinRulesDomain = () => _ => Future successful domainId,
           participantAdminConnection,
           retryProvider,
           logger,
@@ -448,7 +450,8 @@ class ValidatorApp(
         knownParty = Some(validatorParty),
         automation,
         validatorUserName = config.ledgerApiUser,
-        domainId,
+        // we're initializing so CoinRules is guaranteed to be on domainId
+        getCoinRulesDomain = () => _ => Future successful domainId,
         participantAdminConnection,
         retryProvider,
         logger,
@@ -471,7 +474,7 @@ class ValidatorApp(
         new HttpValidatorHandler(
           automation,
           validatorUserName = config.ledgerApiUser,
-          domainId = domainId,
+          getCoinRulesDomain = getCoinRulesDomainFromScanConnection(scanConnection),
           participantAdminConnection,
           retryProvider,
           loggerFactory,
@@ -483,7 +486,7 @@ class ValidatorApp(
           participantIdentitiesStore,
           validatorUserName = config.ledgerApiUser,
           validatorWalletUserName = config.validatorWalletUser,
-          domainId = domainId,
+          getCoinRulesDomain = getCoinRulesDomainFromScanConnection(scanConnection),
           participantAdminConnection,
           retryProvider = retryProvider,
           loggerFactory,

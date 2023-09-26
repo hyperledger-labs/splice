@@ -11,11 +11,7 @@ import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{
-  CNNodeAppStoreWithoutHistory,
-  ConfiguredDefaultDomain,
-  MultiDomainAcsStore,
-}
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
 import com.daml.network.validator.config.ValidatorDomainConfig
@@ -32,23 +28,18 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait ValidatorStore
-    extends WalletStore
-    with CNNodeAppStoreWithoutHistory
-    with ConfiguredDefaultDomain {
+trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
   import ValidatorStore.templatesMovedByMyAutomation
 
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key
 
-  protected[this] def domainConfig: ValidatorDomainConfig
-
-  override final def defaultAcsDomain = domainConfig.global.alias
-
   def lookupWalletInstallByNameWithOffset(
       endUserName: String
   )(implicit tc: TraceContext): Future[QueryResult[
-    Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
+    Option[
+      ContractWithState[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]
+    ]
   ]]
 
   def lookupValidatorLicenseWithOffset()(implicit tc: TraceContext): Future[
@@ -61,7 +52,9 @@ trait ValidatorStore
   def lookupValidatorRightByPartyWithOffset(
       party: PartyId
   )(implicit tc: TraceContext): Future[
-    QueryResult[Option[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]]
+    QueryResult[
+      Option[ContractWithState[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]
+    ]
   ]
 
   def lookupValidatorTopUpStateWithOffset(
@@ -76,10 +69,8 @@ trait ValidatorStore
 
   def listUsers()(implicit tc: TraceContext): Future[Seq[String]] = {
     for {
-      domainId <- defaultAcsDomainIdF
-      installs <- multiDomainAcsStore.listContractsOnDomain(
-        walletCodegen.WalletAppInstall.COMPANION,
-        domainId,
+      installs <- multiDomainAcsStore.listContracts(
+        walletCodegen.WalletAppInstall.COMPANION
       )
     } yield installs.map(i => i.payload.endUserName)
   }
@@ -228,7 +219,7 @@ object ValidatorStore {
   ): ValidatorStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemoryValidatorStore(key, domains, loggerFactory, retryProvider)
+        new InMemoryValidatorStore(key, loggerFactory, retryProvider)
       case storage: DbStorage =>
         new DbValidatorStore(key, domains, storage, loggerFactory, retryProvider)
     }

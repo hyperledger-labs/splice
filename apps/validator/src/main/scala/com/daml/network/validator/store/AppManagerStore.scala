@@ -10,6 +10,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.ContractWithState
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.validator.store.ValidatorStore
+import com.daml.network.validator.util.ValidatorUtil.GetCoinRulesDomain
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
@@ -29,6 +30,7 @@ import scala.concurrent.{ExecutionContext, Future}
   * Note that contrary to our contract-based stores this also provides the write endpoints.
   */
 final class AppManagerStore(
+    getCoinRulesDomain: GetCoinRulesDomain,
     storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
     retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
@@ -138,38 +140,44 @@ final class AppManagerStore(
       commandId: CNLedgerConnection.CommandId,
       payload: T,
   )(implicit tc: TraceContext): Future[Unit] =
-    store.defaultAcsDomainIdF.flatMap { domain =>
-      retryProvider.retryForClientCalls(
-        show"Creating $name if it does not already exist",
-        lookup.flatMap {
-          case QueryResult(offset, None) =>
-            connection
-              .submit(
-                actAs = Seq(validator),
-                readAs = Seq(validator),
-                update = payload.create,
-              )
-              .withDomainId(domain)
-              .withDedup(
-                commandId,
-                offset,
-              )
-              .yieldUnit()
-          case QueryResult(_, Some(existing)) =>
-            if (existing.contract.payload == payload)
-              Future.unit
-            else
-              Future.failed(
-                Status.INVALID_ARGUMENT
-                  .withDescription(
-                    show"There is already an existing ${payload.getClass.toString} but payloads do not match: existing: ${existing.contract.payload}, submitted: $payload"
-                  )
-                  .asRuntimeException
-              )
-        },
+    retryProvider
+      .retryForClientCalls(
+        "Fetching global domain from CoinRules",
+        getCoinRulesDomain()(tc),
         logger,
       )
-    }
+      .flatMap { domain =>
+        retryProvider.retryForClientCalls(
+          show"Creating $name if it does not already exist",
+          lookup.flatMap {
+            case QueryResult(offset, None) =>
+              connection
+                .submit(
+                  actAs = Seq(validator),
+                  readAs = Seq(validator),
+                  update = payload.create,
+                )
+                .withDomainId(domain)
+                .withDedup(
+                  commandId,
+                  offset,
+                )
+                .yieldUnit()
+            case QueryResult(_, Some(existing)) =>
+              if (existing.contract.payload == payload)
+                Future.unit
+              else
+                Future.failed(
+                  Status.INVALID_ARGUMENT
+                    .withDescription(
+                      show"There is already an existing ${payload.getClass.toString} but payloads do not match: existing: ${existing.contract.payload}, submitted: $payload"
+                    )
+                    .asRuntimeException
+                )
+          },
+          logger,
+        )
+      }
 
   def getLatestAppConfiguration(
       provider: PartyId

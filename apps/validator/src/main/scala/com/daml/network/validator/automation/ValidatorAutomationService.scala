@@ -17,6 +17,7 @@ import com.daml.network.validator.store.{
   ParticipantIdentitiesStore,
   ValidatorStore,
 }
+import com.daml.network.validator.util.ValidatorUtil.getCoinRulesDomainFromScanConnection
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.automation.{OffboardUsersTrigger, WalletAppInstallTrigger}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -54,6 +55,7 @@ class ValidatorAutomationService(
 
   val appManagerStore =
     new AppManagerStore(
+      getCoinRulesDomainFromScanConnection(scanConnection),
       this,
       retryProvider,
       loggerFactory,

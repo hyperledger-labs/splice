@@ -6,8 +6,8 @@ import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, validator as v0}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
+import ValidatorUtil.GetCoinRulesDomain
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.circe.Json
 import io.opentelemetry.api.trace.Tracer
@@ -17,7 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class HttpValidatorHandler(
     storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
     validatorUserName: String,
-    domainId: DomainId,
+    getCoinRulesDomain: GetCoinRulesDomain,
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -47,7 +47,7 @@ class HttpValidatorHandler(
         None,
         storeWithIngestion,
         validatorUserName,
-        domainId,
+        getCoinRulesDomain,
         participantAdminConnection,
         retryProvider,
         logger,

@@ -444,7 +444,7 @@ object MultiDomainAcsStore {
   }
 
   /** A query result computed as-of a specific set of per-domain ledger API offset. */
-  final case class QueryResult[A](
+  final case class QueryResult[+A](
       offset: String,
       value: A,
   ) {

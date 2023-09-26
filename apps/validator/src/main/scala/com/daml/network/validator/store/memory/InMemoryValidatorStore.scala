@@ -12,7 +12,6 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{InMemoryCNNodeAppStoreWithoutHistory, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.util.{Contract, ContractWithState}
-import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.wallet.store.WalletStore
 import com.digitalasset.canton.crypto.Hash
@@ -24,12 +23,12 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class InMemoryValidatorStore(
     override val key: ValidatorStore.Key,
-    override protected[this] val domainConfig: ValidatorDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
 )(implicit override protected val ec: ExecutionContext)
     extends InMemoryCNNodeAppStoreWithoutHistory
     with ValidatorStore {
+  import InMemoryValidatorStore.*
 
   override val walletKey = WalletStore.Key(
     key.validatorParty,
@@ -68,13 +67,12 @@ class InMemoryValidatorStore(
   override def lookupWalletInstallByNameWithOffset(
       endUserName: String
   )(implicit tc: TraceContext): Future[QueryResult[
-    Option[Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]]
+    Option[
+      ContractWithState[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
+    ]
   ]] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(installCodegen.WalletAppInstall.COMPANION)(
-        _,
-        co => co.payload.endUserName == endUserName,
-      )
+    multiDomainAcsStore.findContractWithOffset(installCodegen.WalletAppInstall.COMPANION)(
+      (_: Contract[?, installCodegen.WalletAppInstall]).payload.endUserName == endUserName
     )
 
   override def lookupValidatorLicenseWithOffset()(implicit tc: TraceContext): Future[
@@ -83,22 +81,21 @@ class InMemoryValidatorStore(
       validatorLicenseCodegen.ValidatorLicense,
     ]]]
   ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(
-        validatorLicenseCodegen.ValidatorLicense.COMPANION
-      )(_, vl => vl.payload.validator == key.validatorParty.toProtoPrimitive)
-    )
+    multiDomainAcsStore.findContractWithOffset(
+      validatorLicenseCodegen.ValidatorLicense.COMPANION
+    ) { vl: Contract[?, validatorLicenseCodegen.ValidatorLicense] =>
+      vl.payload.validator == key.validatorParty.toProtoPrimitive
+    } map clearDomainFromLookup
 
   override def lookupValidatorRightByPartyWithOffset(
       party: PartyId
   )(implicit tc: TraceContext): Future[
-    QueryResult[Option[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]]
+    QueryResult[
+      Option[ContractWithState[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]
+    ]
   ] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.findContractOnDomainWithOffset(coinCodegen.ValidatorRight.COMPANION)(
-        _,
-        co => co.payload.user == party.toProtoPrimitive,
-      )
+    multiDomainAcsStore.findContractWithOffset(coinCodegen.ValidatorRight.COMPANION)(
+      (_: Contract[?, coinCodegen.ValidatorRight]).payload.user == party.toProtoPrimitive
     )
 
   override def lookupValidatorTopUpStateWithOffset(
@@ -231,4 +228,11 @@ class InMemoryValidatorStore(
         PageLimit(1),
       )
     } yield maybeContract.headOption map (_.contract)
+}
+
+private[memory] object InMemoryValidatorStore {
+  private def clearDomainFromLookup[I, A](
+      fa: QueryResult[Option[Contract.Has[I, A]]]
+  ): QueryResult[Option[Contract[I, A]]] =
+    fa map (_ map (_.contract))
 }

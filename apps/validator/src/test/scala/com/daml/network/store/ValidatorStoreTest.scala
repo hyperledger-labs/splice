@@ -602,7 +602,6 @@ class InMemoryValidatorStoreTest extends ValidatorStoreTest {
   override protected def mkStore(): Future[InMemoryValidatorStore] = {
     val store = new InMemoryValidatorStore(
       key = storeKey,
-      domainConfig = domainConfig,
       loggerFactory = loggerFactory,
       retryProvider =
         RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),

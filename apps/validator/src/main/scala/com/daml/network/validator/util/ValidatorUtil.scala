@@ -1,8 +1,11 @@
 package com.daml.network.validator.util
 
+import akka.stream.Materializer
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.CNNodeUtil
 import com.daml.network.validator.store.ValidatorStore
@@ -16,7 +19,7 @@ import scala.jdk.CollectionConverters.*
 
 private[validator] object ValidatorUtil {
 
-  def installWalletForUser(
+  private def installWalletForUser(
       validatorServiceParty: PartyId,
       endUserParty: PartyId,
       endUserName: String,
@@ -71,7 +74,7 @@ private[validator] object ValidatorUtil {
       knownParty: Option[PartyId],
       storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
-      domainId: DomainId,
+      getCoinRulesDomain: GetCoinRulesDomain,
       participantAdminConnection: ParticipantAdminConnection,
       retryProvider: RetryProvider,
       logger: TracedLogger,
@@ -97,6 +100,7 @@ private[validator] object ValidatorUtil {
         Seq(userPartyId),
         Seq.empty,
       )
+      domainId <- getCoinRulesDomain()(traceContext)
       _ <- installWalletForUser(
         endUserParty = userPartyId,
         endUserName = endUserName,
@@ -127,11 +131,9 @@ private[validator] object ValidatorUtil {
       storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
       validatorWalletUserName: Option[String],
-      domainId: DomainId,
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
-    import com.daml.network.codegen.java.da.internal.template.Archive as CodegenArchive
     val store = storeWithIngestion.store
     val validatorParty = store.key.validatorParty
     for {
@@ -151,35 +153,47 @@ private[validator] object ValidatorUtil {
       _ <- retryProvider.retryForClientCalls(
         "Remove install contract and validator right",
         Future
-          .sequence(
+          .traverse(
             Seq(
-              store
-                .lookupWalletInstallByNameWithOffset(endUserName)
-                .map(_.value.map(_.contractId.exerciseArchive(new CodegenArchive())).orElse {
-                  logger.debug(s"No install contract found for user $endUserName, skipping")
-                  None
-                }),
-              store
-                .lookupValidatorRightByPartyWithOffset(endUserParty)
-                .map(_.value.map(_.contractId.exerciseArchive(new CodegenArchive())).orElse {
-                  logger.debug(s"No validator right found for user $endUserName, skipping")
-                  None
-                }),
+              "install contract" ->
+                store.lookupWalletInstallByNameWithOffset(endUserName),
+              "validator right" ->
+                store.lookupValidatorRightByPartyWithOffset(endUserParty),
             )
-          )
+          ) { case (explanation, qocws) =>
+            qocws
+              .map(_.value.map(_.exercise(_.exerciseArchive())).orElse {
+                logger.debug(s"No $explanation found for user $endUserName, skipping")
+                None
+              })
+          }
           .flatMap(_.collect { case Some(archive) => archive } match {
-            case Seq() => Future.unit
-            case archives =>
+            case archives @ (headArchive +: tailArchives) =>
+              val domainId = headArchive.origin.state match {
+                case assigned @ Assigned(domainId)
+                    if tailArchives forall (_.origin.state == assigned) =>
+                  domainId
+                case _ =>
+                  throw Status.FAILED_PRECONDITION
+                    .withDescription(
+                      s"install and validator right for $endUserName not ready for archival, in states ${archives
+                          .map(_.origin.state)}"
+                    )
+                    .asRuntimeException()
+              }
               storeWithIngestion.connection
-                .submitCommandsNoDedup(
+                .submit(
                   actAs = Seq(
                     store.key.validatorParty,
                     endUserParty,
                   ),
                   readAs = Seq.empty,
-                  commands = archives,
-                  domainId = domainId,
+                  archives.map(_.update),
                 )
+                .withDomainId(domainId)
+                .noDedup
+                .yieldUnit()
+            case _ => Future.unit
           }),
         logger,
         // once the validator's actAs and readAs rights have been revoked,
@@ -190,5 +204,22 @@ private[validator] object ValidatorUtil {
       logger.debug(s"User $endUserParty offboarded")
       ()
     }
+  }
+
+  type GetCoinRulesDomain = () => TraceContext => Future[DomainId]
+
+  def getCoinRulesDomainFromScanConnection(
+      scanConnection: ScanConnection
+  )(implicit ec: ExecutionContext, mat: Materializer): GetCoinRulesDomain = { () => implicit tc =>
+    scanConnection
+      .getCoinRules()
+      .flatMap(
+        _.state.fold(
+          Future.successful,
+          Future failed Status.FAILED_PRECONDITION
+            .withDescription("CoinRules is in-flight, no current global domain")
+            .asRuntimeException(),
+        )
+      )
   }
 }

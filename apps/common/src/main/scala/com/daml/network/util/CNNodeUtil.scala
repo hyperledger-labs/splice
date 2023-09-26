@@ -1,6 +1,6 @@
 package com.daml.network.util
 
-import com.daml.ledger.javaapi.data.{Command, Unit as DamlUnit}
+import com.daml.ledger.javaapi.data.Unit as DamlUnit
 import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cc
@@ -68,12 +68,11 @@ object CNNodeUtil {
       svc: PartyId,
       validator: PartyId,
       user: PartyId,
-  ): Seq[Command] =
-    new cc.coin.ValidatorRight(
-      svc.toProtoPrimitive,
-      user.toProtoPrimitive,
-      validator.toProtoPrimitive,
-    ).create.commands.asScala.toSeq
+  ) = new cc.coin.ValidatorRight(
+    svc.toProtoPrimitive,
+    user.toProtoPrimitive,
+    validator.toProtoPrimitive,
+  ).create
 
   def createValidatorRight(
       svc: PartyId,
@@ -86,7 +85,9 @@ object CNNodeUtil {
       lookupValidatorRightByParty: (
           PartyId
       ) => Future[
-        QueryResult[Option[Contract[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]]
+        QueryResult[
+          Option[ContractWithState[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]
+        ]
       ],
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
     retryProvider.retryForClientCalls(
@@ -94,19 +95,21 @@ object CNNodeUtil {
       lookupValidatorRightByParty(user).flatMap {
         case QueryResult(offset, None) =>
           connection
-            .submitCommands(
+            .submit(
               actAs = Seq(validator, user),
               readAs = Seq.empty,
-              commands = createValidatorRightCommand(svc, validator, user),
+              createValidatorRightCommand(svc, validator, user),
+            )
+            .withDedup(
               commandId = CNLedgerConnection
                 .CommandId("com.daml.network.validator.createValidatorRight", Seq(user)),
               deduplicationOffset = offset,
-              domainId = domainId,
             )
-            .map(_ => ())
+            .withDomainId(domainId)
+            .yieldUnit()
         case QueryResult(_, Some(_)) =>
           logger.info(s"ValidatorRight for $user already exists, skipping")
-          Future.successful(())
+          Future.unit
       },
       logger,
     )

@@ -6,8 +6,8 @@ import com.daml.network.http.v0.{definitions, validator_admin as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorStore}
 import com.daml.network.validator.util.ValidatorUtil
+import ValidatorUtil.GetCoinRulesDomain
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
@@ -19,7 +19,7 @@ class HttpValidatorAdminHandler(
     identitiesStore: ParticipantIdentitiesStore,
     validatorUserName: String,
     validatorWalletUserName: Option[String],
-    domainId: DomainId,
+    getCoinRulesDomain: GetCoinRulesDomain,
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -95,7 +95,7 @@ class HttpValidatorAdminHandler(
         None,
         storeWithIngestion,
         validatorUserName,
-        domainId,
+        getCoinRulesDomain,
         participantAdminConnection,
         retryProvider,
         logger,
@@ -111,7 +111,6 @@ class HttpValidatorAdminHandler(
       storeWithIngestion,
       validatorUserName,
       validatorWalletUserName,
-      domainId,
       retryProvider,
       logger,
     )
