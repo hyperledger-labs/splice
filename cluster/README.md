@@ -1256,11 +1256,30 @@ Network. Steps to do this are as follows:
       --role "roles/cloudkms.cryptoKeyEncrypterDecrypter" \
       --condition=expression='resource.type == "cloudkms.googleapis.com/CryptoKey" &&
          resource.name.startsWith("projects/'${CLOUDSDK_CORE_PROJECT}'/locations/'${CLOUDSDK_COMPUTE_REGION}'/keyRings/pulumi")',title="pulumi kms"`
-8. Start creating a new cluster with `cncluster create`. Once this
+8. Copy relevant keys from another project:
+   - Change directory to a cluster that belongs to a working project.
+   - Fetch all relevant secrets into local json files:
+     `for secret in sv2-id sv3-id sv4-id sv-id; do gcloud secrets versions access 1 --secret $secret > $secret.json; done`
+   - Move the files to the new deployment directory, and cd into it
+   - Upload all relevant secrets to the new project:
+     `for secret in sv2-id sv3-id sv4-id sv-id; do gcloud secrets create $secret --data-file $secret.json; done`
+   - Delete the local json files holding the secrets.
+
+9. Grant CircleCI's account permissions to read these secrets:
+   `gcloud projects add-iam-policy-binding ${CLOUDSDK_CORE_PROJECT} \
+      --member serviceAccount:circleci@${CLOUDSDK_CORE_PROJECT}.iam.gserviceaccount.com \
+      --role "roles/secretmanager.secretAccessor" \
+      --condition=title="SV IDs",expression='
+        resource.name.endsWith("secrets/sv2-id/versions/latest") ||
+        resource.name.endsWith("secrets/sv3-id/versions/latest") ||
+        resource.name.endsWith("secrets/sv4-id/versions/latest") ||
+        resource.name.endsWith("secrets/sv-id/versions/latest")'`
+
+10. Start creating a new cluster with `cncluster create`. Once this
    command starts working, you'll see in the GCE web UI that a new
    default service account has been created. It'll have a principal of
    the following form: '816347582626-compute@developer.gserviceaccount.com'.
-9. Add a role binding to enable the new default service account to
+11. Add a role binding to enable the new default service account to
    have access to `da-cn-images. The command to do this will look like
    this:
 
@@ -1269,7 +1288,7 @@ Network. Steps to do this are as follows:
       --member='serviceAccount:816347582626-compute@developer.gserviceaccount.com' \
       --role='roles/artifactregistry.serviceAgent'
    ```
-10. Ensure the CCI Service account to be used for the project has the correct
+12. Ensure the CCI Service account to be used for the project has the correct
    IAM role bindings:
 
    ```

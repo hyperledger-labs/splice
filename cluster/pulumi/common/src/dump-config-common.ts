@@ -9,6 +9,7 @@ export enum PulumiFunction {
   // these are of the form "package:module:function"
   GCP_GET_PROJECT = 'gcp:organizations/getProject:getProject',
   GCP_GET_SUB_NETWORK = 'gcp:compute/getSubnetwork:getSubnetwork',
+  GCP_GET_SECRET_VERSION = 'gcp:secretmanager/getSecretVersion:getSecretVersion',
 }
 
 export class SecretsFixtureMap extends Map<string, Auth0ClientSecret> {
@@ -81,11 +82,25 @@ export function initDumpConfig(): void {
             if (args.inputs.name === `cn-${stackName}net-subnet`) {
               return { ...args.inputs, id: 'subnet-id' };
             } else {
-              console.error(`WARN unhandled sub-network: ${args.inputs.name}`);
+              console.error(
+                `WARN sub-network not supported for mocking in setMockOptions: ${args.inputs.name}`
+              );
+              break;
+            }
+          case PulumiFunction.GCP_GET_SECRET_VERSION:
+            if (args.inputs.secret.startsWith('sv') && args.inputs.secret.endsWith('-id')) {
+              return {
+                ...args.inputs,
+                secretData: `{"publicKey": "${args.inputs.secret}-public-key", "privateKey": "${args.inputs.secret}-private-key"}`,
+              };
+            } else {
+              console.error(
+                `WARN gcp secret not supported for mocking in setMockOptions: ${args.inputs.secret}`
+              );
               break;
             }
           default:
-            console.error('WARN unhandled call: ', args);
+            console.error('WARN unhandled call in setMockOptions: ', args);
         }
         return args.inputs;
       },

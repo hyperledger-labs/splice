@@ -4,3 +4,4 @@ export * from './infra';
 export * from './ingress';
 export * from './utils';
 export * from './backup';
+export * from './secrets';

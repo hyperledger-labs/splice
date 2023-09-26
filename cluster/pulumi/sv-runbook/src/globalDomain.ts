@@ -1,5 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
-import { Output, Resource } from '@pulumi/pulumi';
+import { Input, Output, Resource } from '@pulumi/pulumi';
 import { ChartValues, ExactNamespace, REPO_ROOT, loadYamlFromFile } from 'cn-pulumi-common';
 import { domainFeesConfig } from 'cn-pulumi-common/src/domainFeesCfg';
 import { globalDomainSequencerDriver } from 'cn-pulumi-common/src/global-domain';
@@ -13,7 +13,7 @@ export const includesCometBftGlobalDomainNode = globalDomainSequencerDriver == '
 export function installGlobalDomainNode(
   svNamespace: ExactNamespace,
   postgresPassword: Output<string>,
-  dependencies: Resource[]
+  dependencies: Input<Resource>[]
 ): k8s.helm.v3.Release {
   const cometbft = installCometBftNode(svNamespace, dependencies);
 

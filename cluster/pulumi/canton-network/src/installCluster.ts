@@ -11,6 +11,8 @@ import {
   installGcpBucket,
   isDevNet,
   loadYamlFromFile,
+  svKeyFromSecret,
+  SvIdKey,
 } from 'cn-pulumi-common';
 import { globalDomainSequencerDriver } from 'cn-pulumi-common/src/global-domain';
 import { exit } from 'process';
@@ -62,26 +64,9 @@ const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
   ? JSON.parse(process.env.BOOTSTRAPPING_CONFIG)
   : undefined;
 
-const SV2_KEY = {
-  publicKey:
-    'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==',
-  privateKey:
-    'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgOouqxvUir3C9+2apEdOUC40XrbLTdkbBIK78o2m3lOKhRANCAASxFGe02Q4sXZaHsnFXSsFA+BP5J6d0iMUtcpRcKsttUeqiaTKkdCJk/w6AUxKUHI6evzV+qJS3cbfotSmD9+aA',
-};
-
-const SV3_KEY = {
-  publicKey:
-    'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA==',
-  privateKey:
-    'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg+8jKTfry5rkitnvy9Dyh5uPVKTzcKu3rrPZyrVW9e/KhRANCAATR+dsFCIztSJI1pXq2M+rmUrZu4jHkvmfNS6FhbEGTfjWcUKFxsr2kMQ7g7qB3F7Fv85A/pGFCQM5MN1MKvvsI',
-};
-
-const SV4_KEY = {
-  publicKey:
-    'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ==',
-  privateKey:
-    'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgE5r1MpzeTmvYjtiVLDASw63VA2pfQm4psX7XlUJU8fGhRANCAARrvp3Y5aaSkJDZ1NaxbKGh9Xe04Z2WSGgKc+ljsFtCEJvSzeVpHW+nnsli793kJ/7ffY8XZeuCMLTIFZSozizJ',
-};
+const sv2Key = svKeyFromSecret('sv2');
+const sv3Key = svKeyFromSecret('sv3');
+const sv4Key = svKeyFromSecret('sv4');
 
 const svRunbookApprovedSvIdentities = [
   {
@@ -113,7 +98,7 @@ const approvedSvIdentities = singleSv
 
 function joinViaSv1(
   sv1: pulumi.Resource,
-  keys: { publicKey: string; privateKey: string },
+  keys: pulumi.Input<SvIdKey>,
   sequencerDatabase: Postgres
 ): SvOnboarding {
   return {
@@ -121,7 +106,7 @@ function joinViaSv1(
     sponsorApiUrl: 'http://sv-app.sv-1:5014',
     sponsorRelease: sv1,
     sequencerDatabase,
-    ...keys,
+    keys,
   };
 }
 
@@ -197,7 +182,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       nodename: 'sv-2',
       onboardingName: 'Canton-Foundation-2',
       validatorWalletUser: 'auth0|64afbc353bbc7ca776e27bf4',
-      onboarding: joinViaSv1(sv1, SV2_KEY, postgresDB1),
+      onboarding: joinViaSv1(sv1, sv2Key, postgresDB1),
       withDomainFees,
       approvedSvIdentities,
       withScan: true,
@@ -215,7 +200,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       nodename: 'sv-3',
       onboardingName: 'Canton-Foundation-3',
       validatorWalletUser: 'auth0|64afbc4431b562edb8995da6',
-      onboarding: joinViaSv1(sv1, SV3_KEY, postgresDB1),
+      onboarding: joinViaSv1(sv1, sv3Key, postgresDB1),
       withDomainFees,
       approvedSvIdentities,
       withScan: false,
@@ -228,13 +213,12 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       bootstrappingDumpConfig,
       sequencerDriver: globalDomainSequencerDriver,
     });
-
     installSvNode({
       auth0Client,
       nodename: 'sv-4',
       onboardingName: 'Canton-Foundation-4',
       validatorWalletUser: 'auth0|64afbc720e20777e46fff490',
-      onboarding: joinViaSv1(sv1, SV4_KEY, postgresDB1),
+      onboarding: joinViaSv1(sv1, sv4Key, postgresDB1),
       withDomainFees,
       approvedSvIdentities,
       withScan: false,

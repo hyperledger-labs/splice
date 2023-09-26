@@ -17,6 +17,7 @@ import {
   participantBootstrapDumpSecretName,
   readAndInstallParticipantBootstrapDump,
   REPO_ROOT,
+  svKeyFromSecret,
 } from 'cn-pulumi-common';
 import { exit } from 'process';
 
@@ -86,10 +87,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   console.error(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
   console.error(`Installing SV node in namespace: ${SV_NAMESPACE}`);
 
-  const SV_PUBLIC_KEY =
-    'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==';
-  const SV_PRIVATE_KEY =
-    'MEECAQAwEwYHKoZIzj0CAQYIKoZIzj0DAQcEJzAlAgEBBCBsFuFa7Eumkdg4dcf/vxIXgAje2ULVz+qTKP3s/tHqKw==';
+  const svKey = svKeyFromSecret('sv');
 
   const svNamespace = exactNamespace(SV_NAMESPACE, {
     'istio-injection': 'enabled',
@@ -203,7 +201,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     localCharts,
     version,
     svImagePullDeps
-      .concat([postgres, svAppSecret, svKeySecret(svNamespace, SV_PUBLIC_KEY, SV_PRIVATE_KEY)])
+      .concat([postgres, svAppSecret, svKeySecret(svNamespace, svKey)])
       .concat(loopback !== null ? loopback : [])
   );
 
@@ -261,6 +259,9 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     ...fixedTokensValue,
   };
 
+  const { appSecret: svValidatorAppSecret, uiSecret: svValidatorUISecret } =
+    await svValidatorSecrets(svNamespace, auth0Client);
+
   const sv = installCNSVHelmChart(
     svNamespace,
     'sv-app',
@@ -312,9 +313,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   if (!withDomainFees) {
     validatorValuesWithMaybeDomainFees['topup']['enabled'] = false;
   }
-
-  const { appSecret: svValidatorAppSecret, uiSecret: svValidatorUISecret } =
-    await svValidatorSecrets(svNamespace, auth0Client);
 
   const validator = installCNSVHelmChart(
     svNamespace,

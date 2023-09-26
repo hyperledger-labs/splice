@@ -16,7 +16,7 @@ import {
   installGcpBucketSecret,
   participantBootstrapDumpSecretName,
 } from 'cn-pulumi-common';
-import type { Auth0Client } from 'cn-pulumi-common';
+import type { Auth0Client, SvIdKey } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
 import { installCometBftNode } from './cometbft';
@@ -28,10 +28,17 @@ const btoa = (s: string) => Buffer.from(s).toString('base64');
 
 export function installSvKeySecret(
   xns: ExactNamespace,
-  publicKey: string,
-  privateKey: string
+  keys: pulumi.Input<SvIdKey>
 ): k8s.core.v1.Secret {
   const secretName = 'cn-app-sv-key';
+
+  const data = pulumi.output(keys).apply(ks => {
+    return {
+      public: btoa(ks.publicKey),
+      private: btoa(ks.privateKey),
+    };
+  });
+
   return new k8s.core.v1.Secret(
     `cn-app-${xns.logicalName}-key`,
     {
@@ -40,10 +47,7 @@ export function installSvKeySecret(
         namespace: xns.logicalName,
       },
       type: 'Opaque',
-      data: {
-        public: btoa(publicKey),
-        private: btoa(privateKey),
-      },
+      data: data,
     },
     {
       dependsOn: [xns.ns],
@@ -55,8 +59,7 @@ export type SvOnboarding =
   | { type: 'found-collective' }
   | {
       type: 'join-with-key';
-      publicKey: string;
-      privateKey: string;
+      keys: pulumi.Input<SvIdKey>;
       sequencerDatabase: postgres.Postgres;
       sponsorRelease?: pulumi.Resource;
       sponsorApiUrl: string;
@@ -125,7 +128,7 @@ export function installSvNode(config: SvConfig): {
 } {
   const xns = exactNamespace(config.nodename);
 
-  const auth0BackendSecrets: pulumi.Resource[] = [
+  const auth0BackendSecrets: pulumi.Input<pulumi.Resource>[] = [
     installAuth0Secret(config.auth0Client, xns, 'sv', config.nodename),
   ];
 
@@ -150,11 +153,11 @@ export function installSvNode(config: SvConfig): {
     ? fetchAndInstallParticipantBootstrapDump(xns, config.bootstrappingDumpConfig)
     : undefined;
 
-  const dependsOn: pulumi.Resource[] = auth0BackendSecrets
+  const dependsOn: pulumi.Input<pulumi.Resource>[] = auth0BackendSecrets
     .concat(auth0UISecrets)
     .concat(
       config.onboarding.type == 'join-with-key'
-        ? [installSvKeySecret(xns, config.onboarding.publicKey, config.onboarding.privateKey)]
+        ? [installSvKeySecret(xns, config.onboarding.keys)]
         : []
     )
     .concat(

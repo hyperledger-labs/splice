@@ -1,7 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as fs from 'fs';
 import * as _ from 'lodash';
-import { Resource } from '@pulumi/pulumi';
+import { Input, Resource } from '@pulumi/pulumi';
 import { ExactNamespace, isDevNet, loadYamlFromFile, REPO_ROOT } from 'cn-pulumi-common';
 
 import { installCNSVHelmChart } from './helm';
@@ -28,7 +28,7 @@ const privValidatorKeyContent = fs.readFileSync(
 
 export function installCometBftNode(
   xns: ExactNamespace,
-  dependencies: Resource[]
+  dependencies: Input<Resource>[]
 ): k8s.helm.v3.Release {
   new k8s.core.v1.Secret(
     'cometbft-keys',

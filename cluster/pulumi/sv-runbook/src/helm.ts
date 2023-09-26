@@ -11,7 +11,7 @@ export function installCNSVHelmChartByNamespaceName(
   values: ChartValues,
   local: boolean,
   version = '',
-  dependsOn: pulumi.Resource[] = []
+  dependsOn: pulumi.Input<pulumi.Resource>[] = []
 ): k8s.helm.v3.Release {
   const repo_root = requireEnv('REPO_ROOT', 'root directory of the repo');
   const username = local ? '' : requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
@@ -51,7 +51,7 @@ export function installCNSVHelmChart(
   values: ChartValues,
   local: boolean,
   version = '',
-  dependsOn: pulumi.Resource[] = []
+  dependsOn: pulumi.Input<pulumi.Resource>[] = []
 ): k8s.helm.v3.Release {
   return installCNSVHelmChartByNamespaceName(
     ns.ns.metadata.name,

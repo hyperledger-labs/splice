@@ -3,6 +3,7 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
   ExactNamespace,
+  SvIdKey,
   installAuth0Secret,
   installAuth0UiSecretWithClientId,
   requireEnv,
@@ -66,7 +67,7 @@ export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
   return [secret, patch];
 }
 
-export function imagePullSecret(ns: ExactNamespace): pulumi.Resource[] {
+export function imagePullSecret(ns: ExactNamespace): pulumi.Input<pulumi.Resource>[] {
   return imagePullSecretByNamespaceName(ns.logicalName);
 }
 
@@ -102,12 +103,14 @@ export async function svAppSecrets(
   };
 }
 
-export function svKeySecret(
-  ns: ExactNamespace,
-  publicKey: string,
-  privateKey: string
-): k8s.core.v1.Secret {
+export function svKeySecret(ns: ExactNamespace, keys: pulumi.Input<SvIdKey>): k8s.core.v1.Secret {
   const secretName = 'cn-app-sv-key';
+  const data = pulumi.output(keys).apply(ks => {
+    return {
+      public: btoa(ks.publicKey),
+      private: btoa(ks.privateKey),
+    };
+  });
   return new k8s.core.v1.Secret(
     secretName,
     {
@@ -116,10 +119,7 @@ export function svKeySecret(
         namespace: ns.logicalName,
       },
       type: 'Opaque',
-      data: {
-        public: btoa(publicKey),
-        private: btoa(privateKey),
-      },
+      data: data,
     },
     {
       dependsOn: [ns.ns],

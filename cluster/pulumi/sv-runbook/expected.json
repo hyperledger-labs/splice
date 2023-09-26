@@ -144,8 +144,8 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "private": "TUVFQ0FRQXdFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNFSnpBbEFnRUJCQ0JzRnVGYTdFdW1rZGc0ZGNmL3Z4SVhnQWplMlVMVnorcVRLUDNzL3RIcUt3PT0=",
-          "public": "TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFMWViK0prSDJRRlJDWmVkTy9QNWNxNWQyK3lmZHdQK2pFKzl3M2NUNkJxZkh4Q2QvUHlBMG1tV01lUG92U2htZjk3SGxVYWpGdU4wNWtaZ3h2amNQUXc9PQ=="
+          "private": "c3YtaWQtcHJpdmF0ZS1rZXk=",
+          "public": "c3YtaWQtcHVibGljLWtleQ=="
         }
       },
       "kind": "Secret",

@@ -711,8 +711,8 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "private": "TUlHSEFnRUFNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VIQkcwd2F3SUJBUVFnT291cXh2VWlyM0M5KzJhcEVkT1VDNDBYcmJMVGRrYkJJSzc4bzJtM2xPS2hSQU5DQUFTeEZHZTAyUTRzWFphSHNuRlhTc0ZBK0JQNUo2ZDBpTVV0Y3BSY0tzdHRVZXFpYVRLa2RDSmsvdzZBVXhLVUhJNmV2elYrcUpTM2NiZm90U21EOSthQQ==",
-          "public": "TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFc1JSbnROa09MRjJXaDdKeFYwckJRUGdUK1NlbmRJakZMWEtVWENyTGJWSHFvbWt5cEhRaVpQOE9nRk1TbEJ5T25yODFmcWlVdDNHMzZMVXBnL2ZtZ0E9PQ=="
+          "private": "c3YyLWlkLXByaXZhdGUta2V5",
+          "public": "c3YyLWlkLXB1YmxpYy1rZXk="
         }
       },
       "kind": "Secret",
@@ -734,8 +734,8 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "private": "TUlHSEFnRUFNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VIQkcwd2F3SUJBUVFnKzhqS1Rmcnk1cmtpdG52eTlEeWg1dVBWS1R6Y0t1M3JyUFp5clZXOWUvS2hSQU5DQUFUUitkc0ZDSXp0U0pJMXBYcTJNK3JtVXJadTRqSGt2bWZOUzZGaGJFR1RmaldjVUtGeHNyMmtNUTdnN3FCM0Y3RnY4NUEvcEdGQ1FNNU1OMU1LdnZzSQ==",
-          "public": "TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFMGZuYkJRaU03VWlTTmFWNnRqUHE1bEsyYnVJeDVMNW56VXVoWVd4QmszNDFuRkNoY2JLOXBERU80TzZnZHhleGIvT1FQNlJoUWtET1REZFRDcjc3Q0E9PQ=="
+          "private": "c3YzLWlkLXByaXZhdGUta2V5",
+          "public": "c3YzLWlkLXB1YmxpYy1rZXk="
         }
       },
       "kind": "Secret",
@@ -757,8 +757,8 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "private": "TUlHSEFnRUFNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VIQkcwd2F3SUJBUVFnRTVyMU1wemVUbXZZanRpVkxEQVN3NjNWQTJwZlFtNHBzWDdYbFVKVThmR2hSQU5DQUFScnZwM1k1YWFTa0pEWjFOYXhiS0doOVhlMDRaMldTR2dLYytsanNGdENFSnZTemVWcEhXK25uc2xpNzkza0ovN2ZmWThYWmV1Q01MVElGWlNveml6Sg==",
-          "public": "TUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFYTc2ZDJPV21rcENRMmRUV3NXeWhvZlYzdE9HZGxraG9DblBwWTdCYlFoQ2IwczNsYVIxdnA1N0pZdS9kNUNmKzMzMlBGMlhyZ2pDMHlCV1VxTTRzeVE9PQ=="
+          "private": "c3Y0LWlkLXByaXZhdGUta2V5",
+          "public": "c3Y0LWlkLXB1YmxpYy1rZXk="
         }
       },
       "kind": "Secret",
