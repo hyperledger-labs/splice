@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -11,6 +12,9 @@ import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.wallet.automation.CollectRewardsAndMergeCoinsTrigger
+import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
 
 class ScanIntegrationTest
     extends CNNodeIntegrationTest
@@ -30,6 +34,16 @@ class ScanIntegrationTest
       .addConfigTransforms((_, config) =>
         CNNodeConfigTransforms.updateAllAutomationConfigs(
           _.withPausedTrigger[CollectRewardsAndMergeCoinsTrigger]
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
+          _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
+          _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
         )(config)
       )
 
@@ -195,5 +209,123 @@ class ScanIntegrationTest
         // bob tapped
         BigDecimal(tap.coinAmount) shouldBe (BigDecimal(bobTapAmount))
       }
+  }
+
+  "list activity for collected app and validator and SV rewards" in { implicit env =>
+    val (alice, _) = onboardAliceAndBob()
+    waitForWalletUser(aliceValidatorWalletClient)
+    waitForWalletUser(bobValidatorWalletClient)
+    val bobValidatorUserName = bobValidatorWalletClient.config.ledgerApiUser
+    val bobValidatorParty = bobValidatorBackend.getValidatorPartyId().toProtoPrimitive
+
+    // The current round, as seen by the SV1 scan service (reflects the state of the scan app store)
+    def currentRoundInScan(): Long =
+      sv1ScanBackend.getLatestOpenMiningRound(CantonTimestamp.now()).contract.payload.round.number
+
+    // The current round, as seen by the SV1 participant
+    def currentRoundOnLedger(): Long =
+      sv1Backend.participantClient.ledger_api_extensions.acs
+        .filterJava(OpenMiningRound.COMPANION)(svcParty)
+        .map(_.data.round.number)
+        .max
+
+    clue("Ensuring Scan has ingested initial rounds") {
+      // There are exactly 2 initial rounds created when bootstrapping the network.
+      // This is performed synchronously, so we know for sure that the initial rounds
+      // exist on the ledger.
+      val round = currentRoundOnLedger()
+
+      // Although very unlikely, the scan app store might not have ingested the initial rounds
+      // at this point yet.
+      eventually() {
+        currentRoundInScan() should be(round)
+      }
+    }
+
+    def bobValidatorRewardsTrigger =
+      bobValidatorBackend
+        .userWalletAutomation(bobValidatorUserName)
+        .trigger[CollectRewardsAndMergeCoinsTrigger]
+    bobValidatorRewardsTrigger.resume()
+
+    // The trigger that advances rounds, running in the sv app
+    // Note: using `def`, as the trigger may be destroyed and recreated (when the sv leader changes)
+    def advanceTrigger = sv1Backend.leaderBasedAutomation
+      .trigger[AdvanceOpenMiningRoundTrigger]
+
+    clue("Bob grants featured app and taps, transfers to alice") {
+      grantFeaturedAppRight(bobValidatorWalletClient)
+
+      bobWalletClient.tap(50)
+      actAndCheck(
+        "Transfer from Bob to Alice",
+        p2pTransfer(bobValidatorBackend, bobWalletClient, aliceWalletClient, alice, 30.0),
+      )(
+        "Bob's validator will receive some rewards",
+        _ => {
+          bobValidatorWalletClient.listAppRewardCoupons() should have size 1
+          bobValidatorWalletClient.listValidatorRewardCoupons() should have size 1
+        },
+      )
+    }
+    val appRewardCoupons = bobValidatorWalletClient.listAppRewardCoupons()
+    val validatorRewardCoupons = bobValidatorWalletClient.listValidatorRewardCoupons()
+
+    clue("Advancing round and checking sv reward") {
+      eventually() {
+        advanceTrigger.runOnce().futureValue should be(true)
+      }
+
+      eventually() {
+        val svRewardsCollected = sv1ScanBackend
+          .listActivity(None, 10000)
+          .flatMap(_.svRewardCollected)
+        svRewardsCollected should have size (1)
+        val svRewardCollected = svRewardsCollected(0)
+        val balance = sv1WalletClient.balance().unlockedQty
+        BigDecimal(svRewardCollected.coinAmount) shouldBe balance
+        svRewardCollected.coinOwner shouldBe sv1Backend.getSvcInfo().svParty.toProtoPrimitive
+      }
+    }
+
+    clue("Trigger automation 2 more times to advance 3 rounds") {
+      (1 to 2).foreach { _ =>
+        eventually() {
+          advanceTrigger.runOnce().futureValue should be(true)
+        }
+      }
+    }
+
+    val (appRewardAmount, validatorRewardAmount) =
+      getRewardCouponsValue(appRewardCoupons, validatorRewardCoupons, true)
+
+    clue("Checking app and validator reward amounts") {
+      eventually() {
+        bobValidatorWalletClient.listAppRewardCoupons() should have size 0
+        bobValidatorWalletClient.listValidatorRewardCoupons() should have size 0
+
+        val zero = BigDecimal(0)
+        val bobTransfers = sv1ScanBackend
+          .listActivity(None, 10000)
+          .flatMap(_.transfer)
+          .filter(_.sender.party == bobValidatorParty)
+
+        val inputAppRewardAmounts = bobTransfers
+          .flatMap(_.sender.inputAppRewardAmount)
+          .map(BigDecimal(_))
+          .filter(_ != zero)
+        inputAppRewardAmounts should have size (1)
+        val inputAppRewardAmount = inputAppRewardAmounts(0)
+        inputAppRewardAmount shouldBe appRewardAmount
+
+        val inputValidatorAmounts = bobTransfers
+          .flatMap(_.sender.inputValidatorRewardAmount)
+          .map(BigDecimal(_))
+          .filter(_ != zero)
+        inputValidatorAmounts should have size (1)
+        val inputValidatorAmount = inputValidatorAmounts(0)
+        inputValidatorAmount shouldBe validatorRewardAmount
+      }
+    }
   }
 }
