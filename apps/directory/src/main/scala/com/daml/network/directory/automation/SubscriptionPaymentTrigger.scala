@@ -84,18 +84,19 @@ class SubscriptionPaymentTrigger(
             entry.contractId,
             transferContext,
           )
-          .commands
       for {
         _ <- connection
-          .submitCommands(
+          .submit(
             actAs = Seq(provider),
             readAs = Seq.empty,
-            commands = cmd.asScala.toSeq,
+            cmd,
+          )
+          .withDedup(
             commandId = DirectoryUtil.createDirectoryEntryCommandId(provider, entry.payload.name),
             deduplicationOffset = deduplicationOffset,
-            domainId = domainId,
-            disclosedContracts = disclosedContracts assertOnDomain domainId,
           )
+          .withDisclosedContracts(disclosedContracts assertOnDomain domainId)
+          .yieldUnit()
       } yield TaskSuccess("renewed directory entry.")
     }
     store.multiDomainAcsStore

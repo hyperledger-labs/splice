@@ -73,20 +73,22 @@ class DirectoryInstallRequestTrigger(
             renewalDuration,
             entryLifetime,
           )
-          val acceptCmd = req.contractId
-            .exerciseDirectoryInstallRequest_Accept(arg)
+          val acceptCmd = req.exercise(_.exerciseDirectoryInstallRequest_Accept(arg))
           connection
-            .submitCommands(
+            .submit(
               actAs = Seq(provider),
               readAs = Seq(),
-              commands = acceptCmd.commands.asScala.toSeq,
+              acceptCmd,
+            )
+            .withDedup(
               commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.directory.createDirectoryInstall",
                 Seq(provider, user),
               ),
               deduplicationOffset = offset,
-              domainId = domainId,
             )
+            .withDomainId(domainId)
+            .yieldUnit()
             .map(_ => TaskSuccess("accepted install request."))
       }
     } yield taskOutcome

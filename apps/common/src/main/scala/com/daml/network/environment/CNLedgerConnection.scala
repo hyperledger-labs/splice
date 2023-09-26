@@ -361,21 +361,6 @@ class CNLedgerConnection(
     }
   }
 
-  def submitCommands(
-      actAs: Seq[PartyId],
-      readAs: Seq[PartyId],
-      commands: Seq[Command],
-      commandId: CommandId,
-      deduplicationOffset: String,
-      domainId: DomainId,
-      disclosedContracts: DisclosedContracts = DisclosedContracts(),
-      priority: CommandPriority = CommandPriority.Low,
-  )(implicit tc: TraceContext): Future[Unit] =
-    submit(actAs, readAs, commands, priority)
-      .withDedup(commandId, deduplicationOffset)
-      .withDomainId(domainId, disclosedContracts)
-      .yieldUnit()
-
   def submitWithResultNoDedup[T](
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],

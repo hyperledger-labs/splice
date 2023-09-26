@@ -20,7 +20,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class SubscriptionInitialPaymentTrigger(
     override protected val context: TriggerContext,
@@ -78,18 +77,19 @@ class SubscriptionInitialPaymentTrigger(
             payment.contractId,
             transferContext,
           )
-          .commands
       for {
         _ <- connection
-          .submitCommands(
+          .submit(
             actAs = Seq(store.providerParty),
             readAs = Seq.empty,
-            commands = cmd.asScala.toSeq,
+            cmd,
+          )
+          .withDedup(
             commandId = DirectoryUtil.createDirectoryEntryCommandId(store.providerParty, entryName),
             deduplicationOffset = deduplicationOffset,
-            domainId = domainId,
-            disclosedContracts = disclosedContracts assertOnDomain domainId,
           )
+          .withDisclosedContracts(disclosedContracts assertOnDomain domainId)
+          .yieldUnit()
       } yield TaskSuccess("created directory entry.")
     }
 

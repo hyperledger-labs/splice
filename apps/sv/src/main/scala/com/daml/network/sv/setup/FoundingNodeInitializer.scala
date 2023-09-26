@@ -474,10 +474,10 @@ class FoundingNodeInitializer(
                   _ = logger
                     .info(s"Bootstrapping SVC as $svcParty with BFT nodes $founderDomainNodes")
                   _ <- svcStoreWithIngestion.connection
-                    .submitCommands(
+                    .submit(
                       actAs = Seq(svcParty),
                       readAs = Seq.empty,
-                      commands = new cn.svcbootstrap.SvcBootstrap(
+                      new cn.svcbootstrap.SvcBootstrap(
                         svcParty.toProtoPrimitive,
                         svParty.toProtoPrimitive,
                         foundingConfig.name,
@@ -506,12 +506,15 @@ class FoundingNodeInitializer(
                           .asJava,
                         defaultEnabledChoices,
                         foundingConfig.isDevNet,
-                      ).createAnd.exerciseSvcBootstrap_Bootstrap.commands.asScala.toSeq,
+                      ).createAnd.exerciseSvcBootstrap_Bootstrap,
+                    )
+                    .withDedup(
                       commandId = CNLedgerConnection
                         .CommandId("com.daml.network.svc.executeSvcBootstrap", Seq()),
                       deduplicationOffset = offset,
-                      domainId = domainId,
                     )
+                    .withDomainId(domainId)
+                    .yieldUnit()
                 } yield ()
             }
           }

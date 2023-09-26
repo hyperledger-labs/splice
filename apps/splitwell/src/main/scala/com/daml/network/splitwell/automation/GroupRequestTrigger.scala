@@ -17,7 +17,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class GroupRequestTrigger(
     override protected val context: TriggerContext,
@@ -57,21 +56,22 @@ class GroupRequestTrigger(
             .map(_ => TaskSuccess("rejected request for already existing group."))
 
         case QueryResult(offset, None) =>
-          val acceptCmd =
-            req.contractId.exerciseGroupRequest_Accept().commands.asScala.toSeq
+          val acceptCmd = req.exercise(_.exerciseGroupRequest_Accept())
           connection
-            .submitCommands(
+            .submit(
               actAs = Seq(provider),
               readAs = Seq(),
-              commands = acceptCmd,
+              acceptCmd,
+            )
+            .withDedup(
               commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.splitwell.createGroupRequest",
                 Seq(provider, user),
                 groupId.unpack,
               ),
               deduplicationOffset = offset,
-              domainId = req.domain,
             )
+            .yieldUnit()
             .map(_ => TaskSuccess("accepted group request."))
       }
     } yield taskOutcome

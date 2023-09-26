@@ -17,7 +17,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class SplitwellInstallRequestTrigger(
     override protected val context: TriggerContext,
@@ -55,20 +54,22 @@ class SplitwellInstallRequestTrigger(
 
         case QueryResult(offset, None) =>
           val acceptCmd =
-            req.contractId.exerciseSplitwellInstallRequest_Accept().commands.asScala.toSeq
+            req.exercise(_.exerciseSplitwellInstallRequest_Accept())
           connection
-            .submitCommands(
+            .submit(
               actAs = Seq(provider),
               readAs = Seq(),
-              commands = acceptCmd,
+              acceptCmd,
+            )
+            .withDedup(
               commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.splitwell.createSplitwellInstall",
                 Seq(provider, user),
                 req.domain.toProtoPrimitive,
               ),
               deduplicationOffset = offset,
-              domainId = req.domain,
             )
+            .yieldUnit()
             .map(_ => TaskSuccess("accepted install request."))
       }
     } yield taskOutcome

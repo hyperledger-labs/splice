@@ -15,7 +15,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 private[validator] object ValidatorUtil {
 
@@ -42,15 +41,17 @@ private[validator] object ValidatorUtil {
         store.lookupWalletInstallByNameWithOffset(endUserName).flatMap {
           case QueryResult(offset, None) =>
             storeWithIngestion.connection
-              .submitCommands(
+              .submit(
                 actAs = Seq(validatorServiceParty, endUserParty),
                 readAs = Seq.empty,
-                commands = new walletCodegen.WalletAppInstall(
+                new walletCodegen.WalletAppInstall(
                   svcParty.toProtoPrimitive,
                   validatorServiceParty.toProtoPrimitive,
                   endUserName,
                   endUserParty.toProtoPrimitive,
-                ).create.commands.asScala.toSeq,
+                ).create,
+              )
+              .withDedup(
                 commandId = CNLedgerConnection
                   .CommandId(
                     "com.daml.network.validator.installWalletForUser",
@@ -58,8 +59,9 @@ private[validator] object ValidatorUtil {
                     CNLedgerConnection.sanitizeUserIdToPartyString(endUserName),
                   ),
                 deduplicationOffset = offset,
-                domainId = domainId,
               )
+              .withDomainId(domainId)
+              .yieldUnit()
           case QueryResult(_, Some(_)) =>
             logger.info(s"WalletAppInstall for $endUserName already exists, skipping")
             Future.successful(())
