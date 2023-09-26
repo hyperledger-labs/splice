@@ -379,13 +379,6 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
 
     eventually() {
       val membersInfoFromSvcRules = sv1Backend.getSvcInfo().svcRules.payload.members
-      val sequencerInfoFromCoinRules =
-        sv1Backend
-          .getSvcInfo()
-          .coinRules
-          .payload
-          .domainSequencerInfo
-          .asScala
 
       forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { svBackend =>
         val svParty = svBackend.getSvcInfo().svParty
@@ -396,6 +389,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
           .sequencerConnections
           .connections
           .forgetNE
+
         val localSequencerUrl = inside(sequencerConnections) {
           case Seq(
                 GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _)
@@ -407,14 +401,11 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
               ) =>
             localSequencerEndpoint.forgetNE.map(_.toURI(false)).headOption.value
         }
+
         forAll(membersInfoFromSvcRules.get(svParty.toProtoPrimitive).domainNodes.values()) {
           domainNode =>
-            domainNode.sequencer.toScala should not be empty
+            domainNode.sequencer.toScala.value.url shouldBe localSequencerUrl.toString
         }
-        val sequencerInfo = sequencerInfoFromCoinRules.values.headOption.value.asScala
-          .get(svParty.toProtoPrimitive)
-          .value
-        sequencerInfo.url shouldBe localSequencerUrl.toString
       }
     }
   }

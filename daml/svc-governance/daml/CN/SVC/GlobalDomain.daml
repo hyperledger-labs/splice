@@ -57,6 +57,11 @@ data DomainState
 -- | Config for a sequencer.
 data SequencerConfig = SequencerConfig with
     sequencerId : Text
+    -- ^ The id of the sequencer.
+    url : Text
+    -- ^ The public accessible url of the sequencer.
+    availableAfter : Time
+    -- ^ Any participant should subscribe this sequencer after this time.
   deriving (Eq, Show)
 
 -- | A map from domain-numbers to the configuration of a member's node for this domain.

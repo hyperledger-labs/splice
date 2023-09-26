@@ -75,7 +75,7 @@ class PublishLocalCometBftNodeConfigTrigger(
     val cmd = task.svcRules.exercise(
       _.exerciseSvcRules_SetDomainNodeConfig(
         store.key.svParty.toProtoPrimitive,
-        SvUtil.defaultSvcDomainNumber, // TODO(#4901): do not use default, but reconcile all configured CometBFT networks
+        SvUtil.defaultSvcDomainNumber, // TODO(#4901): do not use default, but reconcile all domains
         task.damlSvNodeConfig,
       )
     )

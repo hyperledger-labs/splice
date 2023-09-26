@@ -364,7 +364,6 @@ class JoiningNodeInitializer(
           svcStoreWithIngestion.connection,
           retryProvider,
           logger,
-          domainId,
         )
       }
     }

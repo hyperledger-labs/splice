@@ -6,7 +6,7 @@ import qualified DA.Map as Map
 
 import CC.Coin
 import CC.CoinConfig
-import CC.GlobalDomain (initialMemberTraffic, SvSequencerInfoMap)
+import CC.GlobalDomain (initialMemberTraffic)
 import CC.Schedule
 import qualified CC.API.V1.Coin as API
 import qualified CC.API.V1.Round as API
@@ -25,7 +25,6 @@ template SvcBootstrap with
     founderName : Text -- ^ human-readable name of the founding SV
     founderParticipantId : Text -- ^ the id of the participant of the founding SV
     founderDomainNodes : DomainNodeConfigMap -- ^ Domain nodes on which this workflow runs
-    founderDomainSequencerInfo : Map.Map Text SvSequencerInfoMap  -- ^ Sequencer info of Domain nodes on which this workflow runs
     coinConfig : CoinConfig USD
     coinPrice : Decimal
     cnsRulesConfig: CnsRulesConfig
@@ -47,7 +46,6 @@ template SvcBootstrap with
           configSchedule = Schedule with
             initialValue = coinConfig
             futureValues = []
-          domainSequencerInfo = founderDomainSequencerInfo
           enabledChoices
           isDevNet
           lock = False

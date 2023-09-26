@@ -1,7 +1,6 @@
 package com.daml.network.sv.util
 
 import cats.syntax.traverse.*
-import com.daml.network.codegen.java.cc.globaldomain.SequencerInfo
 import com.daml.network.codegen.java.cn.cometbft.{
   CometBftConfig,
   CometBftConfigLimits,
@@ -29,7 +28,6 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
-import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.nio.file.{Path, Paths}
@@ -94,28 +92,6 @@ object SvUtil {
     }
   }.sequence
 
-  def getFounderDomainSequencerInfo(
-      domainId: DomainId,
-      svParty: PartyId,
-      localDomainNode: LocalDomainNode,
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[java.util.Map[String, java.util.Map[String, SequencerInfo]]] = {
-    getSequencerConfig(Some(localDomainNode)).map {
-      _.map { sequencerConf =>
-        Map(
-          domainId.toProtoPrimitive ->
-            Map(
-              svParty.toProtoPrimitive ->
-                new SequencerInfo(sequencerConf.url)
-            ).asJava
-        ).asJava
-      }
-        .getOrElse(Map.empty.asJava)
-    }
-  }
-
   def getFounderDomainNodeConfig(
       cometBftNode: Option[CometBftNode],
       localDomainNode: LocalDomainNode,
@@ -149,7 +125,15 @@ object SvUtil {
         }
         .getOrElse(SvUtil.emptyCometBftConfig)
       localSequencerConfig <- getSequencerConfig(Some(localDomainNode))
-      sequencerConfig = localSequencerConfig.map(c => new SequencerConfig(c.sequencerId))
+      sequencerConfig = localSequencerConfig.map(c =>
+        new SequencerConfig(
+          c.sequencerId,
+          c.url,
+          // TODO(#7717) Don't use now here, calculate the available time as described in
+          // https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
+          Instant.now,
+        )
+      )
     } yield {
       Map(
         long2Long(defaultSvcDomainNumber) -> new DomainNodeConfig(

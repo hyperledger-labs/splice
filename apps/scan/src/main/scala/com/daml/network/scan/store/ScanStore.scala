@@ -118,7 +118,9 @@ trait ScanStore
           .baseRateTrafficLimits
       )
         .getOrElse(
-          throw Status.NOT_FOUND.withDescription("No active SvcRules contract").asRuntimeException()
+          throw Status.NOT_FOUND
+            .withDescription("No active CoinRules contract")
+            .asRuntimeException()
         )
     )
 

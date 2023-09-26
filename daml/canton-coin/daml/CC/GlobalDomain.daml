@@ -1,7 +1,6 @@
 -- | Types and contracts for managing domain fees
 module CC.GlobalDomain where
 
-import qualified DA.Map as Map
 import qualified DA.Set as Set
 import DA.Time
 
@@ -74,12 +73,3 @@ initialMemberTraffic svc memberId domainId amount = MemberTraffic with
     numPurchases = 0
     ccSpent = 0.0
     usdSpent = 0.0
-
--- Sequencer information tracking
-------------------------------------------------
-
-data SequencerInfo = SequencerInfo with
-    url : Text
-  deriving (Eq, Show)
-
-type SvSequencerInfoMap = Map.Map Party SequencerInfo

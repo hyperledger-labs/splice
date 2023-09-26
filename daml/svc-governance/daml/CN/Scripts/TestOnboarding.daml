@@ -154,7 +154,7 @@ testSvOnboarding = do
     Some info ->
       -- the new member joined in the earliest open round
       info.joinedAsOfRound === earliestRound.round
-
+  now <- getTime
   -- now that svX is a member it can set its CometBFT config to become a CometBFT  validator
   -- TODO(M3-59): add negative tests for limits enforced on config values (manual testing showed they work)
   let cometBftConfig = CometBftConfig with
@@ -175,6 +175,9 @@ testSvOnboarding = do
 
   let sequencerConfig = Some SequencerConfig with
         sequencerId = "sequencer-id"
+        url = "sequencer.address:1234"
+        availableAfter = now
+
   let newNodeConfig = DomainNodeConfig with
         cometBft = cometBftConfig
         sequencer = sequencerConfig

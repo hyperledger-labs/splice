@@ -337,7 +337,6 @@ class FoundingNodeInitializer(
         svcStoreWithIngestion.connection,
         retryProvider,
         logger,
-        domainId,
       )
     }
 
@@ -472,11 +471,6 @@ class FoundingNodeInitializer(
                     cometBftNode,
                     localDomainNode,
                   )
-                  founderDomainSequencerInfo <- SvUtil.getFounderDomainSequencerInfo(
-                    domainId,
-                    svcParty,
-                    localDomainNode,
-                  )
                   _ = logger
                     .info(s"Bootstrapping SVC as $svcParty with BFT nodes $founderDomainNodes")
                   _ <- svcStoreWithIngestion.connection
@@ -489,7 +483,6 @@ class FoundingNodeInitializer(
                         foundingConfig.name,
                         participantId.toProtoPrimitive,
                         founderDomainNodes,
-                        founderDomainSequencerInfo,
                         defaultCoinConfig(
                           foundingConfig.initialTickDuration,
                           foundingConfig.initialMaxNumInputs,

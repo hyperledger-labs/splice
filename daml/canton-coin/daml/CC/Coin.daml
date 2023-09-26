@@ -257,7 +257,6 @@ template CoinRules
   with
     svc : Party
     configSchedule : Schedule Time (CoinConfig USD)
-    domainSequencerInfo : Map.Map Text SvSequencerInfoMap -- ^ mapping of domain-id to sequencer info of SVs
     enabledChoices : API.EnabledChoices
     isDevNet : Bool
     lock : Bool
@@ -686,37 +685,6 @@ template CoinRules
         require "The update is scheduled in the future" (now < scheduleItem._1)
         create this with configSchedule = prune now (update scheduleItem this.configSchedule)
 
-    choice CoinRules_SetSequencerInfo : ContractId CoinRules
-      with
-        domainId : Text
-        sv : Party
-        sequencerInfo : SequencerInfo
-      controller svc
-      do
-        require "it is currently not locked" (not lock)
-        let svSequencerInfoMap = Map.fromList [(sv, sequencerInfo)]
-        create CoinRules with
-          domainSequencerInfo = Map.insertWith Map.union domainId svSequencerInfoMap domainSequencerInfo
-          ..
-
-    choice CoinRules_RemoveSequencerInfo : ContractId CoinRules
-      with
-        domainId : Text
-        sv : Party
-      controller svc
-      do
-        require "it is currently not locked" (not lock)
-        case Map.lookup domainId domainSequencerInfo of
-              None -> error $ "The SequencerInfo for domain ID " <> domainId <> " not found"
-              Some sequencerInfoMap -> do
-                case Map.lookup sv sequencerInfoMap of
-                  None -> error $ "The SequencerInfo for SV " <> show sv <> " not found"
-                  Some _ -> do
-                    create CoinRules with
-                      domainSequencerInfo = case deleteNonEmpty sv sequencerInfoMap of
-                          None -> Map.delete domainId domainSequencerInfo
-                          Some newSequencerInfoMap -> Map.insert domainId newSequencerInfoMap domainSequencerInfo
-                      ..
 
     -- Lock or Unlock Choices that could be observed by SVC
     -------------------------------------------------------
@@ -1117,10 +1085,3 @@ computeDomainFees validator trafficAmount coinRules context = do
   contextMiningRound <- exercise context.context.openMiningRound (API.OpenMiningRound_Fetch validator)
   let trafficCostCc = trafficCostUsd / contextMiningRound.coinPrice
   pure (trafficCostCc, trafficCostUsd)
-
--- | Delete a key from a Map. Returns Some Map if the map is non-empty after deletion, None otherwise
-deleteNonEmpty : Ord k => k -> Map k v -> Optional (Map k v)
-deleteNonEmpty k m =
-  if Map.null deleted then None else Some deleted
-    where
-  deleted = Map.delete k m

@@ -17,7 +17,7 @@ import CC.API.V1.Coin (CoinCreateSummary(..), CoinExpireSummary(..))
 import CC.API.V1.Round (Round(..))
 import CC.ValidatorLicense
 import CN.Wallet.Subscriptions
-import CC.GlobalDomain (initialMemberTraffic, MemberTraffic, SequencerInfo(..))
+import CC.GlobalDomain (initialMemberTraffic, MemberTraffic)
 
 import qualified CN.CometBft as CometBft
 import CN.Cns
@@ -418,35 +418,6 @@ template SvcRules with
             -- update member info
             let newInfo = info with domainNodes = Map.insert domainNumber newNodeConfig info.domainNodes
             create this with members = Map.insert sv newInfo this.members
-
-    nonconsuming choice SvcRules_SetCoinRulesSequencerInfo : ContractId CoinRules
-      with
-        domainId : Text
-        sv : Party
-        coinRulesCid : ContractId CoinRules
-        sequencerInfo : SequencerInfo
-      controller sv
-      do
-        requireUnlocked lock
-        require "SV is a collective member" (sv `Map.member` members)
-        -- TODO(#7782) After #7308 is completed, we should add a check to make sure the specified domainId is already configured in SvcRulesConfig.globalDomain
-        exercise coinRulesCid CoinRules_SetSequencerInfo with
-          domainId
-          sv
-          sequencerInfo
-
-    nonconsuming choice SvcRules_RemoveCoinRulesSequencerInfo : ContractId CoinRules
-      with
-        domainId : Text
-        sv : Party
-        coinRulesCid : ContractId CoinRules
-      controller sv
-      do
-        requireUnlocked lock
-        require "Requester is a collective member" (sv `Map.member` members)
-        exercise coinRulesCid CoinRules_RemoveSequencerInfo with
-          domainId
-          sv
 
     -- Automation leader election
     ------------------------------

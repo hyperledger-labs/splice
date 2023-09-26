@@ -90,7 +90,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     val template = new coinCodegen.CoinRules(
       svcParty.toProtoPrimitive,
       schedule,
-      Map.empty.asJava,
       enabledChoices,
       false,
       false,
