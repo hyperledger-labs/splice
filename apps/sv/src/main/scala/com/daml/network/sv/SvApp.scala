@@ -12,10 +12,12 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
+import com.daml.ledger.javaapi.data.codegen.Exercised
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
-import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
+import com.daml.network.codegen.java.cc.globaldomain.SequencerInfo
+import com.daml.network.codegen.java.cn.svc.globaldomain.{DomainNodeConfig, SequencerConfig}
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.{cc, cn}
@@ -42,7 +44,13 @@ import com.daml.network.sv.metrics.SvAppMetrics
 import com.daml.network.sv.setup.{FoundingNodeInitializer, JoiningNodeInitializer}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
-import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.util.{
+  AssignedContract,
+  Contract,
+  HasHealth,
+  TemplateJsonDecoder,
+  UploadablePackage,
+}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{
@@ -1110,12 +1118,15 @@ object SvApp {
       svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
   ): Boolean = svcRules.payload.isDevNet
 
-  private[sv] def setSequencerConfigIfRequired(
+  private[sv] def reconcileSequencerConfigIfRequired(
       svcStore: SvSvcStore,
       localDomainNode: Option[LocalDomainNode],
       connection: CNLedgerConnection,
       retryProvider: RetryProvider,
       logger: TracedLogger,
+      domainId: DomainId,
+      domainNum: Long =
+        SvUtil.defaultSvcDomainNumber, // TODO(#4901): do not use default, but reconcile all configured CometBFT networks
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -1123,38 +1134,51 @@ object SvApp {
     logger.debug("Setting sequencer config")
     val svParty = svcStore.key.svParty
     val svcParty = svcStore.key.svcParty
-    val svcDomainNum = SvUtil.defaultSvcDomainNumber
 
     def setConfigIfRequired() = for {
       localSequencerConfig <- SvUtil.getSequencerConfig(localDomainNode).map(_.toJava)
+      sequencerConfig = localSequencerConfig.toScala.map(c => new SequencerConfig(c.sequencerId))
+      sequencerInfo = localSequencerConfig.toScala.map(c => new SequencerInfo(c.url))
       svcRules <- svcStore.getSvcRules()
-      // TODO(#4901): do not use default, but reconcile all configured CometBFT networks
+      coinRules <- svcStore.getCoinRules()
       memberInfo = Option(svcRules.payload.members.get(svParty.toProtoPrimitive))
         .getOrElse(throw new IllegalArgumentException(s"SV $svParty is not party of the SVC"))
-      existingConfig = java.util.Optional
-        .ofNullable(memberInfo.domainNodes.get(svcDomainNum))
-        .flatMap(_.sequencer)
       _ <-
-        if (existingConfig != localSequencerConfig) {
-          val nodeConfig = new DomainNodeConfig(
-            Option(memberInfo.domainNodes.get(svcDomainNum))
-              .map(_.cometBft)
-              .getOrElse(SvUtil.emptyCometBftConfig),
-            localSequencerConfig,
+        if (isDifferentSvcRulesSequencerConfig(domainNum, memberInfo, sequencerConfig)) {
+          setSvcRulesSequencerConfig(
+            svParty,
+            svcParty,
+            domainNum,
+            memberInfo,
+            svcRules,
+            sequencerConfig,
+            connection,
           )
-          val cmd = svcRules.exercise(
-            _.exerciseSvcRules_SetDomainNodeConfig(
-              svParty.toProtoPrimitive,
-              svcDomainNum,
-              nodeConfig,
-            )
-          )
-          connection
-            .submit(Seq(svParty), Seq(svcParty), cmd)
-            .noDedup
-            .yieldResult()
         } else {
-          logger.info(s"Not setting domain node config because it is the same as the existing one.")
+          logger.info(
+            s"Not setting domain node config because it is the same as the existing one in SvcRules contract."
+          )
+          Future.unit
+        }
+      _ <-
+        if (isDifferentCoinRulesSequencerInfo(domainId, svParty, sequencerInfo, coinRules)) {
+          sequencerInfo.fold {
+            Future.unit
+          } { sequencer =>
+            setCoinRulesSequencerInfo(
+              svParty,
+              svcParty,
+              domainId,
+              svcRules,
+              coinRules.contractId,
+              sequencer,
+              connection,
+            )
+          }
+        } else {
+          logger.info(
+            s"Not setting domain sequencer info because it is the same as the existing one in coinRules contract."
+          )
           Future.unit
         }
     } yield ()
@@ -1165,6 +1189,82 @@ object SvApp {
         setConfigIfRequired(),
         logger,
       )
+  }
+
+  private def isDifferentSvcRulesSequencerConfig(
+      domainNum: Long,
+      memberInfo: MemberInfo,
+      localSequencerConfig: Option[SequencerConfig],
+  ): Boolean = {
+    val existingSvcRulesConfig = Option(memberInfo.domainNodes.get(domainNum))
+      .flatMap(_.sequencer.toScala)
+    existingSvcRulesConfig != localSequencerConfig
+  }
+
+  private def setSvcRulesSequencerConfig(
+      svParty: PartyId,
+      svcParty: PartyId,
+      domainNum: Long,
+      memberInfo: MemberInfo,
+      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
+      localSequencerConfig: Option[SequencerConfig],
+      connection: CNLedgerConnection,
+  )(implicit tc: TraceContext): Future[Exercised[SvcRules.ContractId]] = {
+    val nodeConfig = new DomainNodeConfig(
+      Option(memberInfo.domainNodes.get(domainNum))
+        .map(_.cometBft)
+        .getOrElse(SvUtil.emptyCometBftConfig),
+      localSequencerConfig.toJava,
+    )
+    val cmd = svcRules.exercise(
+      _.exerciseSvcRules_SetDomainNodeConfig(
+        svParty.toProtoPrimitive,
+        domainNum,
+        nodeConfig,
+      )
+    )
+    connection
+      .submit(Seq(svParty), Seq(svcParty), cmd)
+      .noDedup
+      .yieldResult()
+  }
+
+  private def isDifferentCoinRulesSequencerInfo(
+      domainId: DomainId,
+      svParty: PartyId,
+      localSequencerInfo: Option[SequencerInfo],
+      coinRules: Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules],
+  ): Boolean = {
+    val existingCoinRulesSequencerInfo = for {
+      domainSequencerMap <- Option(
+        coinRules.payload.domainSequencerInfo.get(domainId.toProtoPrimitive)
+      )
+      sequencerInfo <- Option(domainSequencerMap.get(svParty.toProtoPrimitive))
+    } yield new SequencerInfo(sequencerInfo.url)
+    existingCoinRulesSequencerInfo != localSequencerInfo
+  }
+
+  private def setCoinRulesSequencerInfo(
+      svParty: PartyId,
+      svcParty: PartyId,
+      domainId: DomainId,
+      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
+      coinRulesCid: cc.coin.CoinRules.ContractId,
+      sequencerInfo: SequencerInfo,
+      connection: CNLedgerConnection,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    val cmd = svcRules.exercise(
+      _.exerciseSvcRules_SetCoinRulesSequencerInfo(
+        domainId.toProtoPrimitive,
+        svParty.toProtoPrimitive,
+        coinRulesCid,
+        sequencerInfo,
+      )
+    )
+    connection
+      .submit(Seq(svParty), Seq(svcParty), cmd)
+      .noDedup
+      .yieldUnit()
   }
 
   private def initializeValidator(

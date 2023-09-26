@@ -161,7 +161,7 @@ class FoundingNodeInitializer(
       // This is for the case that SvcRules is already bootstrapped but setting the domain node config is required,
       // for example if the founding SV node restarted after bootstrapping the SvcRules.
       // We only set the domain sequencer config if the existing one is different here.
-      _ <- withSvcStore.setSequencerConfigIfRequired(Some(localDomainNode))
+      _ <- withSvcStore.reconcileSequencerConfigIfRequired(Some(localDomainNode))
       svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
     } yield (
       globalDomain,
@@ -328,13 +328,16 @@ class FoundingNodeInitializer(
       } yield ()
     }
 
-    def setSequencerConfigIfRequired(localDomainNode: Option[LocalDomainNode]): Future[Unit] = {
-      SvApp.setSequencerConfigIfRequired(
+    def reconcileSequencerConfigIfRequired(
+        localDomainNode: Option[LocalDomainNode]
+    ): Future[Unit] = {
+      SvApp.reconcileSequencerConfigIfRequired(
         svcStore,
         localDomainNode,
         svcStoreWithIngestion.connection,
         retryProvider,
         logger,
+        domainId,
       )
     }
 
@@ -469,6 +472,11 @@ class FoundingNodeInitializer(
                     cometBftNode,
                     localDomainNode,
                   )
+                  founderDomainSequencerInfo <- SvUtil.getFounderDomainSequencerInfo(
+                    domainId,
+                    svcParty,
+                    localDomainNode,
+                  )
                   _ = logger
                     .info(s"Bootstrapping SVC as $svcParty with BFT nodes $founderDomainNodes")
                   _ <- svcStoreWithIngestion.connection
@@ -481,6 +489,7 @@ class FoundingNodeInitializer(
                         foundingConfig.name,
                         participantId.toProtoPrimitive,
                         founderDomainNodes,
+                        founderDomainSequencerInfo,
                         defaultCoinConfig(
                           foundingConfig.initialTickDuration,
                           foundingConfig.initialMaxNumInputs,

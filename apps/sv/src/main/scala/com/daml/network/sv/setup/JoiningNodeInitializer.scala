@@ -260,7 +260,7 @@ class JoiningNodeInitializer(
         svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
         localDomainNode: Option[LocalDomainNode],
     ): Future[Unit] = {
-      new WithSvcStore(svcStoreWithIngestion).setSequencerConfigIfRequired(localDomainNode)
+      new WithSvcStore(svcStoreWithIngestion).reconcileSequencerConfigIfRequired(localDomainNode)
     }
 
     /** A private class to share the svcStoreWithIngestion across utility methods. */
@@ -355,13 +355,16 @@ class JoiningNodeInitializer(
         } yield ()
       }
 
-      def setSequencerConfigIfRequired(localDomainNode: Option[LocalDomainNode]): Future[Unit] = {
-        SvApp.setSequencerConfigIfRequired(
+      def reconcileSequencerConfigIfRequired(
+          localDomainNode: Option[LocalDomainNode]
+      ): Future[Unit] = {
+        SvApp.reconcileSequencerConfigIfRequired(
           svcStore,
           localDomainNode,
           svcStoreWithIngestion.connection,
           retryProvider,
           logger,
+          domainId,
         )
       }
     }

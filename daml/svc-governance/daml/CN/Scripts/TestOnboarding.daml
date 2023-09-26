@@ -175,7 +175,6 @@ testSvOnboarding = do
 
   let sequencerConfig = Some SequencerConfig with
         sequencerId = "sequencer-id"
-        url = "sequencer.address:1234"
   let newNodeConfig = DomainNodeConfig with
         cometBft = cometBftConfig
         sequencer = sequencerConfig

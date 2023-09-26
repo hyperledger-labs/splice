@@ -1,0 +1,57 @@
+module CN.Scripts.TestDomainSequencerTracking where
+
+import DA.Assert
+import DA.Foldable (forA_)
+import qualified DA.Map as Map
+import Daml.Script
+
+import CC.Coin
+import CC.GlobalDomain (SequencerInfo(..))
+
+import CN.CometBft
+import CN.SvcRules
+import CN.SVC.GlobalDomain
+
+import CN.Scripts.SvcTestUtils
+
+testDomainMigration : Script ()
+testDomainMigration = do
+  (_, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
+  let svs = [sv1, sv2, sv3, sv4]
+      domainNum = 0
+      domainId = "domain-id"
+
+  -- SV's onboard their nodes
+  forA_ svs $ \sv -> do
+    [(svcRulesCid, _)] <- query @SvcRules svc
+    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_SetDomainNodeConfig with
+      sv
+      domainNumber = domainNum
+      newNodeConfig = DomainNodeConfig with
+        cometBft = CometBftConfig with
+          nodes = Map.fromList [("nodeId-1-" <> partyToText sv, CometBftNodeConfig ("pubKey-" <> partyToText sv) 1)]
+          sequencingKeys = []
+          governanceKeys = []
+        sequencer = Some SequencerConfig with sequencerId = "sequencer-id-" <> partyToText sv
+
+    [(svcRulesCid, _)] <- query @SvcRules svc
+    [(coinRulesCid, _)] <- query @CoinRules svc
+    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_SetCoinRulesSequencerInfo with
+      sv
+      domainId
+      coinRulesCid
+      sequencerInfo = SequencerInfo with url = "sequencer.address:1234"
+
+  -- sequencer info are published to svcRules and coinRules
+  [(_, svcRules)] <- query @SvcRules svc
+  [(_, coinRules)] <- query @CoinRules svc
+  forA_ svs $ \sv -> do
+    let Some(memberInfo) = Map.lookup sv svcRules.members
+        Some(domainConfig) = Map.lookup domainNum memberInfo.domainNodes
+    domainConfig.sequencer === Some SequencerConfig with
+      sequencerId = "sequencer-id-" <> partyToText sv
+
+    let Some(svSequencerInfo) = Map.lookup domainId coinRules.domainSequencerInfo
+        Some(sequencerInfo) = Map.lookup sv svSequencerInfo
+    sequencerInfo === SequencerInfo with
+      url = "sequencer.address:1234"

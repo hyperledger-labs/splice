@@ -17,7 +17,7 @@ import CC.API.V1.Coin (CoinCreateSummary(..), CoinExpireSummary(..))
 import CC.API.V1.Round (Round(..))
 import CC.ValidatorLicense
 import CN.Wallet.Subscriptions
-import CC.GlobalDomain (initialMemberTraffic, MemberTraffic)
+import CC.GlobalDomain (initialMemberTraffic, MemberTraffic, SequencerInfo(..))
 
 import qualified CN.CometBft as CometBft
 import CN.Cns
@@ -409,7 +409,7 @@ template SvcRules with
         requireUnlocked lock
         require "Domain with this number is configured" (domainNumber `Map.member` config.globalDomain.domains)
         case Map.lookup sv members of
-          None -> error "SV is no member"
+          None -> error "SV is not a collective member"
           Some info -> do
             -- check validity of config and constraint on voting power
             require "Valid configuration" (validDomainNodeConfig config.domainNodeConfigLimits newNodeConfig)
@@ -419,6 +419,34 @@ template SvcRules with
             let newInfo = info with domainNodes = Map.insert domainNumber newNodeConfig info.domainNodes
             create this with members = Map.insert sv newInfo this.members
 
+    nonconsuming choice SvcRules_SetCoinRulesSequencerInfo : ContractId CoinRules
+      with
+        domainId : Text
+        sv : Party
+        coinRulesCid : ContractId CoinRules
+        sequencerInfo : SequencerInfo
+      controller sv
+      do
+        requireUnlocked lock
+        require "SV is a collective member" (sv `Map.member` members)
+        -- TODO(#7782) After #7308 is completed, we should add a check to make sure the specified domainId is already configured in SvcRulesConfig.globalDomain
+        exercise coinRulesCid CoinRules_SetSequencerInfo with
+          domainId
+          sv
+          sequencerInfo
+
+    nonconsuming choice SvcRules_RemoveCoinRulesSequencerInfo : ContractId CoinRules
+      with
+        domainId : Text
+        sv : Party
+        coinRulesCid : ContractId CoinRules
+      controller sv
+      do
+        requireUnlocked lock
+        require "Requester is a collective member" (sv `Map.member` members)
+        exercise coinRulesCid CoinRules_RemoveSequencerInfo with
+          domainId
+          sv
 
     -- Automation leader election
     ------------------------------

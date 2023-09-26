@@ -14,6 +14,7 @@ import qualified CC.API.V1.Coin as API
 import CC.Coin
 import CC.Issuance
 import CC.API.V1.Round (Round(..))
+import CC.GlobalDomain (SequencerInfo(..))
 import CC.Round
 
 import CC.Scripts.Util
@@ -86,9 +87,9 @@ initCollective initialOpenRounds isDevNet = do
                   governanceKeys = map GovernanceKeyConfig ["initial-governance-key"]
                 sequencer = Some SequencerConfig with
                   sequencerId = "sequencer-id"
-                  url = "sequencer.address:1234"
 
         )]
+      founderDomainSequencerInfo = Map.fromList [(coinConfig.globalDomain.activeDomain, Map.fromList [(sv1, SequencerInfo with url = "sequencer.address:1234")])]
       coinConfig
       coinPrice = 1.0
       cnsRulesConfig

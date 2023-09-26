@@ -378,7 +378,15 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     sv4ValidatorBackend.waitForInitialization()
 
     eventually() {
-      val memberInfosFromSv1 = sv1Backend.getSvcInfo().svcRules.payload.members
+      val membersInfoFromSvcRules = sv1Backend.getSvcInfo().svcRules.payload.members
+      val sequencerInfoFromCoinRules =
+        sv1Backend
+          .getSvcInfo()
+          .coinRules
+          .payload
+          .domainSequencerInfo
+          .asScala
+
       forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { svBackend =>
         val svParty = svBackend.getSvcInfo().svParty
         val globalDomain = svBackend.config.domains.global.alias
@@ -399,10 +407,14 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
               ) =>
             localSequencerEndpoint.forgetNE.map(_.toURI(false)).headOption.value
         }
-        forAll(memberInfosFromSv1.get(svParty.toProtoPrimitive).domainNodes.values()) {
+        forAll(membersInfoFromSvcRules.get(svParty.toProtoPrimitive).domainNodes.values()) {
           domainNode =>
-            domainNode.sequencer.toScala.value.url shouldBe localSequencerUrl.toString
+            domainNode.sequencer.toScala should not be empty
         }
+        val sequencerInfo = sequencerInfoFromCoinRules.values.headOption.value.asScala
+          .get(svParty.toProtoPrimitive)
+          .value
+        sequencerInfo.url shouldBe localSequencerUrl.toString
       }
     }
   }

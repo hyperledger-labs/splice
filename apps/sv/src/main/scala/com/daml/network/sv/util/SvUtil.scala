@@ -1,6 +1,7 @@
 package com.daml.network.sv.util
 
 import cats.syntax.traverse.*
+import com.daml.network.codegen.java.cc.globaldomain.SequencerInfo
 import com.daml.network.codegen.java.cn.cometbft.{
   CometBftConfig,
   CometBftConfigLimits,
@@ -28,6 +29,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.nio.file.{Path, Paths}
@@ -78,17 +80,41 @@ object SvUtil {
 
   )
 
+  case class LocalSequencerConfig(sequencerId: String, url: String)
+
   def getSequencerConfig(localDomainNode: Option[LocalDomainNode])(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Option[SequencerConfig]] = localDomainNode.map { node =>
+  ): Future[Option[LocalSequencerConfig]] = localDomainNode.map { node =>
     node.sequencerAdminConnection.getSequencerId.map { sequencerId =>
-      new SequencerConfig(
+      LocalSequencerConfig(
         sequencerId.toProtoPrimitive,
         node.getSequencerPublicUri.toString,
       )
     }
   }.sequence
+
+  def getFounderDomainSequencerInfo(
+      domainId: DomainId,
+      svParty: PartyId,
+      localDomainNode: LocalDomainNode,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[java.util.Map[String, java.util.Map[String, SequencerInfo]]] = {
+    getSequencerConfig(Some(localDomainNode)).map {
+      _.map { sequencerConf =>
+        Map(
+          domainId.toProtoPrimitive ->
+            Map(
+              svParty.toProtoPrimitive ->
+                new SequencerInfo(sequencerConf.url)
+            ).asJava
+        ).asJava
+      }
+        .getOrElse(Map.empty.asJava)
+    }
+  }
 
   def getFounderDomainNodeConfig(
       cometBftNode: Option[CometBftNode],
@@ -122,7 +148,8 @@ object SvUtil {
           )
         }
         .getOrElse(SvUtil.emptyCometBftConfig)
-      sequencerConfig <- getSequencerConfig(Some(localDomainNode))
+      localSequencerConfig <- getSequencerConfig(Some(localDomainNode))
+      sequencerConfig = localSequencerConfig.map(c => new SequencerConfig(c.sequencerId))
     } yield {
       Map(
         long2Long(defaultSvcDomainNumber) -> new DomainNodeConfig(

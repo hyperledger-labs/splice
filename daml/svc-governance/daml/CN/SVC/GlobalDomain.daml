@@ -57,7 +57,6 @@ data DomainState
 -- | Config for a sequencer.
 data SequencerConfig = SequencerConfig with
     sequencerId : Text
-    url: Text
   deriving (Eq, Show)
 
 -- | A map from domain-numbers to the configuration of a member's node for this domain.
@@ -81,6 +80,13 @@ noDomainNodes = Map.empty
 data DomainNodeConfigLimits = DomainNodeConfigLimits with
     cometBft : CometBftConfigLimits
   deriving (Eq, Show)
+
+
+-- default values
+-----------------
+
+emptyDomainNodeConfig : DomainNodeConfig
+emptyDomainNodeConfig = DomainNodeConfig emptyCometBftConfig None
 
 
 -- helper functions
