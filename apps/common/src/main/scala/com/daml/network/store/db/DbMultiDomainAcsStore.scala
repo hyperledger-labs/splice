@@ -45,9 +45,7 @@ import scala.collection.immutable.{SortedMap, VectorMap}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.digitalasset.canton.admin.api.client.data.TemplateId
-import com.daml.ledger.javaapi.data as javab
 import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, ReassignmentId}
 import com.daml.network.store.db.AcsQueries.{
   SelectFromAcsTableWithStateResult,
@@ -267,11 +265,9 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     } yield contracts
   }
 
-  import language.existentials
-
   override def listAssignedContractsNotOnDomainN(
       excludedDomain: DomainId,
-      companions: TemplateCompanion[_ <: ContractId[T], T] forSome { type T <: javab.Template }*
+      companions: ConstrainedTemplate*
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = waitUntilAcsIngested {
     val templateIdMap = companions
       .map(c =>

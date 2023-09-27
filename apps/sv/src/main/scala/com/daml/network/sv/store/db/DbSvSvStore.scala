@@ -7,16 +7,15 @@ import com.daml.network.codegen.java.cn.svonboarding.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding.{UsedSecret, ValidatorOnboarding}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{ConfiguredDefaultDomain, MultiDomainAcsStore, StoreErrors}
-import MultiDomainAcsStore.{ContractCompanion, QueryResult}
+import MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.SvTables.SvAcsStoreRowData
 import com.daml.network.sv.store.{SvStore, SvSvStore}
-import com.daml.network.util.{AssignedContract, Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -153,16 +152,6 @@ class DbSvSvStore(
       resultWithOffset.row.map(contractFromRow(ApprovedSvIdentity.COMPANION)(_)),
     )).getOrRaise(offsetExpectedError())
   }
-
-  // TODO (#5314): this depends on contracts being in domains, which we don't currently track in the DB
-  // also: consider moving it to MultiDomainAcsStore (not SvSvStore), as this is generic
-  protected[this] override def listAssignedContractsNotOnDomain[C, I <: ContractId[?], P](
-      excludedDomain: DomainId,
-      c: C,
-  )(implicit
-      tc: TraceContext,
-      companion: ContractCompanion[C, I, P],
-  ): Future[Seq[AssignedContract[I, P]]] = ???
 }
 
 object DbSvSvStore {

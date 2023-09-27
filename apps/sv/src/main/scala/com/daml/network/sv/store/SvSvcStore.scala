@@ -26,7 +26,11 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.*
-import com.daml.network.store.MultiDomainAcsStore.{JsonAcsSnapshot, QueryResult}
+import com.daml.network.store.MultiDomainAcsStore.{
+  ConstrainedTemplate,
+  JsonAcsSnapshot,
+  QueryResult,
+}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.SvSvcStore.ignoredContractsForAcsDump
@@ -54,6 +58,7 @@ trait SvSvcStore
       SvcTxLogParser.TxLogIndexRecord,
       SvcTxLogParser.TxLogEntry,
     ] {
+  import SvSvcStore.{svcRulesFollowers, coinRulesFollowers}
 
   override protected def txLogParser = new SvcTxLogParser(loggerFactory)
 
@@ -675,24 +680,15 @@ trait SvSvcStore
 
   private[this] def listLaggingSvcRulesFollowers(targetDomain: DomainId)(implicit
       tc: TraceContext
-  ): Future[Seq[AssignedContract[?, ?]]] = {
-    import com.daml.network.codegen.java.cn.svcrules as svcr
-    for {
-      coinRulesO <- lookupCoinRules()
-      otherContracts <- multiDomainAcsStore.listAssignedContractsNotOnDomainN(
-        targetDomain,
-        svcr.Vote.COMPANION,
-        svcr.VoteRequest.COMPANION,
-        svcr.Confirmation.COMPANION,
-        svcr.SvReward.COMPANION,
-        svcr.ElectionRequest.COMPANION,
-        so.SvOnboardingRequest.COMPANION,
-        so.SvOnboardingConfirmed.COMPANION,
-      )
-    } yield otherContracts ++ coinRulesO
-      .filterNot(_.domain == targetDomain)
-      .toList
-  }
+  ): Future[Seq[AssignedContract[?, ?]]] = for {
+    coinRulesO <- lookupCoinRules()
+    otherContracts <- multiDomainAcsStore.listAssignedContractsNotOnDomainN(
+      targetDomain,
+      svcRulesFollowers: _*
+    )
+  } yield otherContracts ++ coinRulesO
+    .filterNot(_.domain == targetDomain)
+    .toList
 
   final def listSvcRulesTransferFollowers()(implicit
       tc: TraceContext
@@ -710,14 +706,7 @@ trait SvSvcStore
       multiDomainAcsStore
         .listAssignedContractsNotOnDomainN(
           coinRules.domain,
-          cc.round.OpenMiningRound.COMPANION,
-          cc.round.SummarizingMiningRound.COMPANION,
-          cc.round.IssuingMiningRound.COMPANION,
-          cc.round.ClosedMiningRound.COMPANION,
-          cc.coin.FeaturedAppRight.COMPANION,
-          cc.coin.SvcReward.COMPANION,
-          cc.coin.UnclaimedReward.COMPANION,
-          cc.validatorlicense.ValidatorLicense.COMPANION,
+          coinRulesFollowers: _*
         )
         .map(_.map(FollowTask(coinRules, _)).toSeq)
     }.getOrElse(Future successful Seq.empty))
@@ -851,6 +840,39 @@ object SvSvcStore {
     cc.coin.ValidatorRewardCoupon.COMPANION.TEMPLATE_ID,
     cc.round.ClosedMiningRound.COMPANION.TEMPLATE_ID,
   )
+
+  private val svcRulesFollowers: Seq[ConstrainedTemplate] = {
+    import com.daml.network.codegen.java.cn.svcrules as svcr
+    Seq[ConstrainedTemplate](
+      // CoinRules is specially handled so should *not* be listed here, even
+      // though it follows SvcRules
+      svcr.Vote.COMPANION,
+      svcr.VoteRequest.COMPANION,
+      svcr.Confirmation.COMPANION,
+      svcr.SvReward.COMPANION,
+      svcr.ElectionRequest.COMPANION,
+      so.SvOnboardingRequest.COMPANION,
+      so.SvOnboardingConfirmed.COMPANION,
+    )
+  }
+
+  private val coinRulesFollowers: Seq[ConstrainedTemplate] = Seq[ConstrainedTemplate](
+    cc.round.OpenMiningRound.COMPANION,
+    cc.round.SummarizingMiningRound.COMPANION,
+    cc.round.IssuingMiningRound.COMPANION,
+    cc.round.ClosedMiningRound.COMPANION,
+    cc.coin.FeaturedAppRight.COMPANION,
+    cc.coin.SvcReward.COMPANION,
+    cc.coin.UnclaimedReward.COMPANION,
+    cc.validatorlicense.ValidatorLicense.COMPANION,
+  )
+
+  private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
+    (svcRulesFollowers ++ coinRulesFollowers) ++ Seq[ConstrainedTemplate](
+      // CoinRules and SvcRules are specially handled, so not listed in followers
+      cn.svcrules.SvcRules.COMPANION,
+      cc.coin.CoinRules.COMPANION,
+    )
 
   /** Contract filter of an sv acs store for a specific acs party. */
   def contractFilter(

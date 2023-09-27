@@ -171,11 +171,9 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
       traceContext: TraceContext,
   ): Future[Seq[Contract[TCid, T]]]
 
-  import language.existentials
-
   def listAssignedContractsNotOnDomainN(
       excludedDomain: DomainId,
-      companions: TemplateCompanion[_ <: ContractId[T], T] forSome { type T <: Template }*
+      companions: ConstrainedTemplate*
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]]
 
   private[network] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[T], T <: Template](
@@ -584,6 +582,17 @@ object MultiDomainAcsStore {
           createArgumentsBlob,
         )
       }
+    }
+
+  import language.existentials
+
+  /** The domain of [[MultiDomainAcsStore#listAssignedContractsNotOnDomainN]].
+    * We'll have to take an implicit conversion approach instead to support
+    * interfaces, but this is good enough for the current callers.
+    */
+  private[network] type ConstrainedTemplate =
+    TemplateCompanion[_ <: ContractId[T], T] forSome {
+      type T <: Template
     }
 
   final case class ReassignmentId(source: DomainId, id: String)

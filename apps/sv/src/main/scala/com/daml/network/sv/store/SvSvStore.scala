@@ -1,13 +1,12 @@
 package com.daml.network.sv.store
 
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore, PageLimit}
-import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
+import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ConstrainedTemplate}
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.DbSvSvStore
 import com.daml.network.sv.store.memory.InMemorySvSvStore
@@ -22,6 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 /* Store used by the SV app for filtering contracts visible to the SV party. */
 trait SvSvStore extends CNNodeAppStoreWithoutHistory {
+  import SvSvStore.templatesMovedByMyAutomation
 
   protected val outerLoggerFactory: NamedLoggerFactory
 
@@ -90,18 +90,13 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
       )
       .map(_.headOption map (_.contract))
 
-  protected[this] def listAssignedContractsNotOnDomain[C, I <: ContractId[?], P](
-      excludedDomain: DomainId,
-      c: C,
-  )(implicit
-      tc: TraceContext,
-      companion: ContractCompanion[C, I, P],
-  ): Future[Seq[AssignedContract[I, P]]]
-
   private[this] def listLaggingSvcRulesFollowers(targetDomain: DomainId)(implicit
       tc: TraceContext
   ): Future[Seq[AssignedContract[?, ?]]] =
-    listAssignedContractsNotOnDomain(targetDomain, so.ApprovedSvIdentity.COMPANION)
+    multiDomainAcsStore.listAssignedContractsNotOnDomainN(
+      targetDomain,
+      templatesMovedByMyAutomation: _*
+    )
 
   final def listSvcRulesTransferFollowers[SrCid, Sr](svcRules: AssignedContract[SrCid, Sr])(implicit
       tc: TraceContext
@@ -130,6 +125,9 @@ object SvSvStore {
       case db: DbStorage =>
         new DbSvSvStore(key, db, domains, loggerFactory, retryProvider)
     }
+
+  private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
+    Seq[ConstrainedTemplate](so.ApprovedSvIdentity.COMPANION)
 
   /** Contract filter of an sv acs store for a specific acs party. */
   def contractFilter(key: SvStore.Key): MultiDomainAcsStore.ContractFilter = {

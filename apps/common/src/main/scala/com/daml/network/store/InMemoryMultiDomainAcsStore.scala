@@ -25,7 +25,6 @@ import java.time.Instant
 import scala.collection.immutable.{Queue, SortedMap}
 import scala.concurrent.*
 import scala.reflect.ClassTag
-import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 
 class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
     override protected val loggerFactory: NamedLoggerFactory,
@@ -194,11 +193,9 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   ): Future[Seq[Contract[TCid, T]]] =
     filterContractsOnDomain(companion, domainId, _ => true, limit)
 
-  import language.existentials
-
   override def listAssignedContractsNotOnDomainN(
       excludedDomain: DomainId,
-      companions: TemplateCompanion[_ <: ContractId[T], T] forSome { type T <: Template }*
+      companions: ConstrainedTemplate*
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = Future
     .traverse(companions)(listAssignedContractsNotOnDomain(excludedDomain, _))
     .map(_.flatten)
