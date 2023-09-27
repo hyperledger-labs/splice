@@ -209,6 +209,16 @@ abstract class ScanAppReference(
       )
     }
 
+  @Help.Summary(
+    "List the svc sequencers"
+  )
+  def listSvcSequencers(): Seq[HttpScanAppClient.DomainSequencers] =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.ListSvcSequencers()
+      )
+    }
+
   import com.daml.network.http.v0.definitions.ListActivityResponseItem
   def listActivity(
       beginAfterEventId: Option[String],

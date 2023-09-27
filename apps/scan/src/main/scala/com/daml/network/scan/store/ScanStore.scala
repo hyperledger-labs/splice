@@ -57,6 +57,10 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ContractWithState[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]]]
 
+  def lookupSvcRules()(implicit
+      tc: TraceContext
+  ): Future[Option[ContractWithState[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]]
+
   def getTotalCoinBalance(asOfEndOfRound: Long)(implicit tc: TraceContext): Future[BigDecimal]
 
   def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal]
@@ -215,6 +219,7 @@ object ScanStore {
       Map(
         mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),

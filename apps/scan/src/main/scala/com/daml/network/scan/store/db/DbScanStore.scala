@@ -10,7 +10,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.db.ScanTables.{ScanAcsStoreRowData, ScanTxLogRowData}
-import com.daml.network.scan.store.{ScanStore, TxLogIndexRecord, TxLogEntry}
+import com.daml.network.scan.store.{ScanStore, TxLogEntry, TxLogIndexRecord}
 import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
@@ -22,6 +22,7 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import cats.implicits.*
+import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 
 import java.time.Instant
@@ -169,6 +170,28 @@ class DbScanStore(
           .value
         contractWithState = row.map(
           multiDomainAcsStore.contractWithStateFromRow(CnsRules.COMPANION)(_)
+        )
+      } yield contractWithState
+    }
+
+  override def lookupSvcRules()(implicit
+      tc: TraceContext
+  ): Future[Option[ContractWithState[SvcRules.ContractId, SvcRules]]] =
+    waitUntilAcsIngested {
+      for {
+        row <- storage
+          .querySingle(
+            selectFromAcsTableWithState(
+              DbScanStore.acsTableName,
+              storeId,
+              where = sql"""template_id = ${SvcRules.TEMPLATE_ID}""",
+              orderLimit = sql"""order by event_number desc limit 1""",
+            ).headOption,
+            "lookupSvcRules",
+          )
+          .value
+        contractWithState = row.map(
+          multiDomainAcsStore.contractWithStateFromRow(SvcRules.COMPANION)(_)
         )
       } yield contractWithState
     }

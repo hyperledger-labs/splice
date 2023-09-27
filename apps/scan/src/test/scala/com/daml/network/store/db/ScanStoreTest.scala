@@ -9,6 +9,9 @@ import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_Coin
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, svcrules as svcrulesCodegen}
+import com.daml.network.codegen.java.cn.svc.globaldomain as globaldomainCodegen
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.{CNDbConfig, DomainConfig}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.history.{
@@ -22,8 +25,8 @@ import com.daml.network.scan.config.{ScanAppBackendConfig, ScanDomainConfig}
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.TxLogEntry.*
 import com.daml.network.scan.store.TxLogIndexRecord.{
-  OpenMiningRoundIndexRecord,
   ActivityIndexRecord,
+  OpenMiningRoundIndexRecord,
 }
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.scan.store.memory.InMemoryScanStore
@@ -38,7 +41,7 @@ import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext
 import com.google.protobuf
 
 import java.time.Instant
-import java.util.Optional
+import java.util.{Collections, Optional}
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
@@ -587,6 +590,23 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       }
     }
 
+    "lookupSvcRules" should {
+      "find the latest Svc rules" in {
+        val sr = svcRules()
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(sr)(store.multiDomainAcsStore)
+        } yield {
+          eventually() {
+            store
+              .lookupSvcRules()
+              .futureValue
+              .map(_.contract) should be(Some(sr))
+          }
+        }
+      }
+    }
+
     "listImportCrates" should {
 
       "return all import crates of a receiver" in {
@@ -1026,6 +1046,45 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     new cc.fees.RatePerRound(numeric(amount)),
   )
 
+  private def svcRules(
+      members: java.util.Map[String, svcrulesCodegen.MemberInfo] = Collections.emptyMap(),
+      epoch: Long = 123,
+  ) = {
+    val templateId = svcrulesCodegen.SvcRules.TEMPLATE_ID
+    val newDomainId = "new-domain-id"
+    val template = new svcrulesCodegen.SvcRules(
+      svcParty.toProtoPrimitive,
+      epoch,
+      members,
+      user1.toProtoPrimitive,
+      new svcrulesCodegen.SvcRulesConfig(
+        1,
+        1,
+        new RelTime(1),
+        new RelTime(1),
+        new RelTime(1),
+        new RelTime(1),
+        new RelTime(1),
+        new globaldomainCodegen.DomainNodeConfigLimits(
+          new cometbftCodegen.CometBftConfigLimits(1, 1, 1, 1, 1)
+        ),
+        1,
+        1,
+        new globaldomainCodegen.GlobalDomainConfig(Collections.emptyMap(), newDomainId, newDomainId),
+      ),
+      Collections.emptyMap(),
+      true,
+      false,
+    )
+    Contract(
+      identifier = templateId,
+      contractId = new svcrulesCodegen.SvcRules.ContractId(nextCid()),
+      payload = template,
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
+    )
+  }
+
   lazy val offset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
   lazy val domain = dummyDomain.toProtoPrimitive
 }
@@ -1068,6 +1127,7 @@ class DbScanStoreTest
         Seq(
           "dar/canton-coin-0.1.0.dar",
           "dar/canton-name-service-0.1.0.dar",
+          "dar/svc-governance-0.1.0.dar",
         )
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =

@@ -63,7 +63,8 @@ class ScanApp(
       nodeMetrics,
     ) {
 
-  override def packages = super.packages ++ Seq("dar/canton-name-service-0.1.0.dar")
+  override def packages =
+    super.packages ++ Seq("dar/canton-name-service-0.1.0.dar", "dar/svc-governance-0.1.0.dar")
 
   override def initialize(
       ledgerClient: CNLedgerClient,

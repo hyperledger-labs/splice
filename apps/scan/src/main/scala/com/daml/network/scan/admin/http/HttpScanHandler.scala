@@ -22,7 +22,9 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import java.time.ZoneOffset
+import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
+import java.time.{OffsetDateTime, ZoneOffset}
 
 class HttpScanHandler(
     store: ScanStore,
@@ -434,6 +436,35 @@ class HttpScanHandler(
             .toVector
         )
       }
+    }
+  }
+
+  // TODO: (#7809) Add caching for sequencers per domain
+  override def listSvcSequencers(
+      respond: v0.ScanResource.ListSvcSequencersResponse.type
+  )()(extracted: TraceContext): Future[v0.ScanResource.ListSvcSequencersResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getTopValidatorsByPurchasedTraffic") { _ => _ =>
+      for {
+        svcRulesO <- store.lookupSvcRules()
+        svcRules = svcRulesO getOrElse {
+          throw new NoSuchElementException("found no svcRules instance")
+        }
+        sequencers = for {
+          memberInfo <- svcRules.payload.members.asScala.values
+          (domainId, domainConfig) <- memberInfo.domainNodes.asScala
+          sequencer <- domainConfig.sequencer.toScala
+        } yield domainId -> definitions.SvcSequencer(
+          sequencer.sequencerId,
+          sequencer.url,
+          memberInfo.name,
+          OffsetDateTime.ofInstant(sequencer.availableAfter, ZoneOffset.UTC),
+        )
+        sequencersByDomain = sequencers.groupBy(_._1).view.mapValues(_.map(_._2))
+        domainSequencers = sequencersByDomain.map { case (domainId, svcSequencers) =>
+          definitions.DomainSequencers(domainId, svcSequencers.toVector)
+        }.toVector
+      } yield definitions.ListSvcSequencersResponse(domainSequencers)
     }
   }
 

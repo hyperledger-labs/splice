@@ -18,7 +18,7 @@ import com.daml.network.http.v0.definitions.GetCnsRulesRequest
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.codegen.java.cc
 import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
@@ -483,6 +483,43 @@ object HttpScanAppClient {
           )
     }
   }
+  case class ListSvcSequencers()
+      extends BaseCommand[
+        http.ListSvcSequencersResponse,
+        Seq[DomainSequencers],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListSvcSequencersResponse] =
+      client.listSvcSequencers(headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListSvcSequencersResponse.OK(response) =>
+        response.domainSequencers.traverse { domain =>
+          Codec.decode(Codec.DomainId)(domain.domainId).flatMap { domainId =>
+            domain.sequencers
+              .traverse { s =>
+                Codec.decode(Codec.Sequencer)(s.id).map { sequencerId =>
+                  SvcSequencer(sequencerId, s.url, s.svName)
+                }
+              }
+              .map { sequencers =>
+                DomainSequencers(domainId, sequencers)
+              }
+          }
+        }
+    }
+  }
+
+  final case class DomainSequencers(domainId: DomainId, sequencers: Seq[SvcSequencer])
+
+  final case class SvcSequencer(id: SequencerId, url: String, svName: String)
+
   case class ListActivity(beginAfterEventId: Option[String], pageSize: Int)
       extends BaseCommand[http.ListActivityResponse, Seq[
         definitions.ListActivityResponseItem

@@ -53,6 +53,18 @@ object ScanTables extends AcsTables {
               featuredAppRightProvider = None,
             )
           }
+        case cn.svcrules.SvcRules.TEMPLATE_ID =>
+          tryToDecode(cn.svcrules.SvcRules.COMPANION, createdEvent) { contract =>
+            ScanAcsStoreRowData(
+              contract = contract,
+              contractExpiresAt = None,
+              round = None,
+              validator = None,
+              amount = None,
+              importCrateReceiver = None,
+              featuredAppRightProvider = None,
+            )
+          }
         case cc.round.OpenMiningRound.TEMPLATE_ID =>
           tryToDecode(cc.round.OpenMiningRound.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(

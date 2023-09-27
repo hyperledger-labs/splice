@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import better.files.File
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cn
 import com.daml.network.config.CNNodeConfigTransforms.{
   updateAllAutomationConfigs,
   updateAllSvAppFoundCollectiveConfigs_,
@@ -89,6 +90,11 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
             },
           )
         )
+        val svcRules = sv1LocalBackend.participantClient.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.SvcRules.COMPANION)(
+            svcParty
+          )
+        println(svcRules)
 
         clue("Check that there are no duplicate validator licenses") {
           val licenses = sv1LocalBackend.participantClient.ledger_api_extensions.acs

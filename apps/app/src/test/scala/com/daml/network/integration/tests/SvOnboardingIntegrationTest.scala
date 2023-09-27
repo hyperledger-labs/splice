@@ -402,9 +402,18 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
             localSequencerEndpoint.forgetNE.map(_.toURI(false)).headOption.value
         }
 
-        forAll(membersInfoFromSvcRules.get(svParty.toProtoPrimitive).domainNodes.values()) {
-          domainNode =>
-            domainNode.sequencer.toScala.value.url shouldBe localSequencerUrl.toString
+        val memberInfo = membersInfoFromSvcRules.get(svParty.toProtoPrimitive)
+        forAll(memberInfo.domainNodes.values()) { domainNode =>
+          domainNode.sequencer.toScala.value.url shouldBe localSequencerUrl.toString
+        }
+
+        clue("published sequencer information can be seen via scan") {
+          inside(sv1ScanBackend.listSvcSequencers()) { case Seq(domainSequencers) =>
+            domainSequencers.sequencers should have size 4
+            domainSequencers.sequencers.find(s =>
+              s.svName == memberInfo.name && s.url == localSequencerUrl.toString
+            ) should not be empty
+          }
         }
       }
     }

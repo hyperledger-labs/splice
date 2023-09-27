@@ -301,6 +301,18 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListImportCratesResponse"
+  /svc-sequencers:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listSvcSequencers"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListSvcSequencersResponse"
   /activities:
     post:
       tags: [scan]
@@ -539,6 +551,37 @@ components:
           items:
             # TODO(#6073): consider using a more precise type; i.e., no 'MaybeCached'
             $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
+    ListSvcSequencersResponse:
+      type: object
+      required: ["domainSequencers"]
+      properties:
+        domainSequencers:
+          type: array
+          items:
+            $ref: "#/components/schemas/DomainSequencers"
+    DomainSequencers:
+      type: object
+      required: [ "domainId", "sequencers" ]
+      properties:
+        domainId:
+          type: string
+        sequencers:
+          type: array
+          items:
+            $ref: "#/components/schemas/SvcSequencer"
+    SvcSequencer:
+      type: object
+      required: ["id", "url", "svName", availableAfter]
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+        svName:
+          type: string
+        availableAfter:
+          type: string
+          format: date-time
     ListActivityRequest:
       type: object
       required:
@@ -574,7 +617,7 @@ components:
       properties:
         activity_type:
           description: |
-            Describes the type of activity that occurred. 
+            Describes the type of activity that occurred.
             Determines if the data for the activity should be read
             from the `transfer`, `mint`, `tap` or `sv_reward_collected` property.
           type: string
@@ -625,7 +668,7 @@ components:
         A transfer between one sender and possibly many receivers, provided by an application provider.
       type: object
       required:
-        - provider 
+        - provider
         - sender
         - receivers
       properties:
@@ -674,7 +717,7 @@ components:
           description: |
             Total amount of coin input into this transfer, before deducting holding fees.
           type: string
-        input_app_reward_amount: 
+        input_app_reward_amount:
           description: |
             Total amount of app rewards input into this transfer.
           type: string
@@ -684,8 +727,8 @@ components:
           type: string
         sender_change_fee:
           description: |
-            Fee charged for returning change to the sender, 
-            which is the smaller of the left-over balance after paying for all outputs 
+            Fee charged for returning change to the sender,
+            which is the smaller of the left-over balance after paying for all outputs
             or one coin create fee.
           type: string
         sender_change_amount:

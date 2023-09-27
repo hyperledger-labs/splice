@@ -6,10 +6,11 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.codegen.java.cn.cns.CnsRules
+import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.config.ScanAppBackendConfig
-import com.daml.network.scan.store.{ScanStore, TxLogIndexRecord, TxLogEntry}
+import com.daml.network.scan.store.{ScanStore, TxLogEntry, TxLogIndexRecord}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.{HardLimit, InMemoryCNNodeAppStore}
 import com.daml.network.util.{Contract, ContractWithState}
@@ -46,6 +47,14 @@ class InMemoryScanStore(
     for {
       contracts <- multiDomainAcsStore
         .listContracts(CnsRules.COMPANION, HardLimit(1))
+    } yield contracts.headOption
+
+  override def lookupSvcRules()(implicit
+      tc: TraceContext
+  ): Future[Option[ContractWithState[SvcRules.ContractId, SvcRules]]] =
+    for {
+      contracts <- multiDomainAcsStore
+        .listContracts(SvcRules.COMPANION, HardLimit(1))
     } yield contracts.headOption
 
   override def getTotalCoinBalance(asOfEndOfRound: Long)(implicit
