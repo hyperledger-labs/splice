@@ -7,6 +7,7 @@ import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.DomainId
 import org.openqa.selenium.WebDriver
 import org.slf4j.event.Level
 
@@ -17,6 +18,8 @@ class SvFrontendTimeBasedIntegrationTest
     with FrontendLoginUtil
     with WalletTestUtil
     with TimeTestUtil {
+
+  private val dummySvcDomainId = DomainId.tryFromString("domain1::domain")
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -77,7 +80,7 @@ class SvFrontendTimeBasedIntegrationTest
       clue("stop the leader sv1 long enough for an election to occur") {
         val automationConfig = sv2Backend.config.automation
         val effectiveTimeoutPlusBuffer = SvUtil
-          .fromRelTime(SvUtil.defaultSvcRulesConfig().leaderInactiveTimeout)
+          .fromRelTime(SvUtil.defaultSvcRulesConfig(dummySvcDomainId).leaderInactiveTimeout)
           .plus(automationConfig.pollingInterval.asJava)
           .plus(JavaDuration.ofSeconds(5))
         sv1Backend.stop()

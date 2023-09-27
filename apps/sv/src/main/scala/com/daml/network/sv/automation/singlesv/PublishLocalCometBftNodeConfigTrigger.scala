@@ -13,10 +13,10 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.SequencerConfig
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.drivers as proto
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -34,6 +34,8 @@ class PublishLocalCometBftNodeConfigTrigger(
     store: SvSvcStore,
     connection: CNLedgerConnection,
     cometBftNode: CometBftNode,
+    // TODO (#4901) reconcile cometBft networks for multiple domains instead using one default domain id here.
+    domainId: DomainId,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -50,8 +52,7 @@ class PublishLocalCometBftNodeConfigTrigger(
         CometBftNode.extractSvNodeMemberInfo(svcRules.payload, store.key.svParty)
       )
       localSvNodeConfig <- OptionT.liftF(cometBftNode.getLocalNodeConfig())
-      domainNodeConfig = svNodeMemberInfo.domainNodes.asScala
-        .get(SvUtil.defaultSvcDomainNumber)
+      domainNodeConfig = svNodeMemberInfo.domainNodes.asScala.get(domainId.toProtoPrimitive)
       // create a task if the local config is different than the one we have published to the SVC
       // or if no domain bft is configured
       if
@@ -64,6 +65,7 @@ class PublishLocalCometBftNodeConfigTrigger(
       svcRules,
       domainNodeConfig.flatMap(_.sequencer.toScala).toJava,
       localSvNodeConfig,
+      domainId,
     )).value
       .map(_.toList)
 
@@ -75,7 +77,7 @@ class PublishLocalCometBftNodeConfigTrigger(
     val cmd = task.svcRules.exercise(
       _.exerciseSvcRules_SetDomainNodeConfig(
         store.key.svParty.toProtoPrimitive,
-        SvUtil.defaultSvcDomainNumber, // TODO(#4901): do not use default, but reconcile all domains
+        task.domainId.toProtoPrimitive,
         task.damlSvNodeConfig,
       )
     )
@@ -106,6 +108,7 @@ object PublishLocalCometBftNodeConfigTrigger {
       svcRules: AssignedContract[daml.svcrules.SvcRules.ContractId, daml.svcrules.SvcRules],
       sequencerConfig: Optional[SequencerConfig],
       localSvNodeConfig: proto.cometbft.SvNodeConfig,
+      domainId: DomainId,
   ) extends PrettyPrinting {
 
     import com.daml.network.util.PrettyInstances.*

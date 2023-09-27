@@ -20,6 +20,7 @@ import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.DomainId
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -33,6 +34,7 @@ class SvSvcAutomationService(
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
+    domainId: DomainId,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -68,13 +70,20 @@ class SvSvcAutomationService(
   cometBft.foreach { node =>
     if (triggerContext.config.enableCometbftReconciliation) {
       registerTrigger(
-        new PublishLocalCometBftNodeConfigTrigger(triggerContext, svcStore, connection, node)
+        new PublishLocalCometBftNodeConfigTrigger(
+          triggerContext,
+          svcStore,
+          connection,
+          node,
+          domainId,
+        )
       )
       registerTrigger(
         new ReconcileCometBftNetworkConfigWithSvcRulesTrigger(
           triggerContext,
           svcStore,
           node,
+          domainId,
         )
       )
     }

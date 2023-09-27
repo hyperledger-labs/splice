@@ -27,13 +27,13 @@ testDomainMigration = do
   --
   -- Every member generates their new validator keys and assemble these off-ledger into a valid[sv1, sv2, sv3, sv4]
   -- genesis.json for bootstrapping the CometBft network, likely via the https://github.com/canton-network/foundation repo
-  let newDomainNumber = 1
+  let newDomainId = "new-domain-id"
   executeSvcRulesConfigChange app $ \config ->
     let globalDomainConfig = config.globalDomain
         newDomainConfig = DomainConfig with state = DS_Bootstrapping; cometBftGenesisJson = "<genesis-json-from-off-ledger-for-network-1"
         newGlobalDomainConfig = globalDomainConfig with
-          domains = Map.insert newDomainNumber newDomainConfig globalDomainConfig.domains
-          lastDomainNumber = newDomainNumber
+          domains = Map.insert newDomainId newDomainConfig globalDomainConfig.domains
+          lastDomainId = newDomainId
     in  config with
           globalDomain = newGlobalDomainConfig
   now <- getTime
@@ -42,7 +42,7 @@ testDomainMigration = do
     [(svcRulesCid, _)] <- query @SvcRules svc
     submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_SetDomainNodeConfig with
       sv
-      domainNumber = newDomainNumber
+      domainId = newDomainId
       newNodeConfig = DomainNodeConfig with
         cometBft = CometBftConfig with
           nodes = Map.fromList [("nodeId-1-" <> partyToText sv, CometBftNodeConfig ("pubKey-" <> partyToText sv) 1)]
@@ -58,8 +58,8 @@ testDomainMigration = do
     let globalDomainConfig = config.globalDomain
         newDomainConfig = DomainConfig with state = DS_Operational; cometBftGenesisJson = "<genesis-json-from-off-ledger-for-network-1"
         newGlobalDomainConfig = globalDomainConfig with
-          domains = Map.insert newDomainNumber newDomainConfig globalDomainConfig.domains
-          lastDomainNumber = newDomainNumber
+          domains = Map.insert newDomainId newDomainConfig globalDomainConfig.domains
+          lastDomainId = newDomainId
     in  config with
           globalDomain = newGlobalDomainConfig
 

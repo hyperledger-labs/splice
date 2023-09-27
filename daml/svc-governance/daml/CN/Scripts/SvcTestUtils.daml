@@ -49,9 +49,9 @@ initCollective initialOpenRounds isDevNet = do
         state = DS_Operational
         cometBftGenesisJson = "<genesis-json-injected-by-founding-member>"
   let initialGlobalDomainConfig =  GlobalDomainConfig with
-        domains = Map.fromList [(0, initialDomainConfig)]
-        lastDomainNumber = 0
-        activeDomain = 0
+        domains = Map.fromList [("domain-id", initialDomainConfig)]
+        lastDomainId = "domain-id"
+        activeDomainId = "domain-id"
 
   let config = SvcRulesConfig with
         numUnclaimedRewardsThreshold = 5
@@ -79,7 +79,7 @@ initCollective initialOpenRounds isDevNet = do
       founderDomainNodes = Map.fromList
         -- NOTE: the Canton domain and CometBft keys and config need to be allocated before bootstrapping the SvcRules
         -- as we need a working domain to create and exercise Daml contracts.
-        [(0,  DomainNodeConfig with
+        [("domain-id",  DomainNodeConfig with
                 cometBft = CometBftConfig with
                   nodes = Map.fromList
                     [("node-id-1", CometBftNodeConfig "validatorPubKey" 1)]

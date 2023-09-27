@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.cn.cometbft.{
   SequencingKeyConfig,
 }
 import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
-import com.daml.network.sv.util.SvUtil
+import com.digitalasset.canton.topology.DomainId
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.Optional
@@ -22,6 +22,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
   private val owningSvNodeNr = 1
   private val owningSvNodeId = mkSvNodeId(owningSvNodeNr)
   private val chainId = "dummy-chain-id"
+  private val dummySvcDomainId = DomainId.tryFromString("domain1::domain")
 
   private def mkCometBftNodeName(svNodeNr: Int) = "cometBftNode" + svNodeNr.toString
 
@@ -95,7 +96,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
             mkSvNodeId(svNodeNr),
             new Round(0L),
             Map(
-              long2Long(SvUtil.defaultSvcDomainNumber) -> new DomainNodeConfig(
+              dummySvcDomainId.toProtoPrimitive -> new DomainNodeConfig(
                 new CometBftConfig(
                   Map(
                     mkCometBftNodeName(svNodeNr) -> new CometBftNodeConfig(
@@ -146,6 +147,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
         owningSvNodeId,
         mkMemberInfos(targetConfig.map((nodeNr, _)).toList ++ Seq(10 -> "key-10", 11 -> "key-11")),
         networkConfig,
+        dummySvcDomainId,
         logger,
       )
       .requests

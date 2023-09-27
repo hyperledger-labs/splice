@@ -1115,6 +1115,7 @@ object SvApp {
   private[sv] def reconcileSequencerConfigIfRequired(
       svcStore: SvSvcStore,
       localDomainNode: Option[LocalDomainNode],
+      domainId: DomainId,
       connection: CNLedgerConnection,
       retryProvider: RetryProvider,
       logger: TracedLogger,
@@ -1125,7 +1126,6 @@ object SvApp {
     logger.debug("Setting sequencer config")
     val svParty = svcStore.key.svParty
     val svcParty = svcStore.key.svcParty
-    val svcDomainNum = SvUtil.defaultSvcDomainNumber
 
     def setConfigIfRequired() = for {
       localSequencerConfig <- SvUtil.getSequencerConfig(localDomainNode).map(_.toJava)
@@ -1134,12 +1134,12 @@ object SvApp {
       memberInfo = Option(svcRules.payload.members.get(svParty.toProtoPrimitive))
         .getOrElse(throw new IllegalArgumentException(s"SV $svParty is not party of the SVC"))
       existingConfig = java.util.Optional
-        .ofNullable(memberInfo.domainNodes.get(svcDomainNum))
+        .ofNullable(memberInfo.domainNodes.get(domainId.toProtoPrimitive))
         .flatMap(_.sequencer.map(c => LocalSequencerConfig(c.sequencerId, c.url)))
       _ <-
         if (existingConfig != localSequencerConfig) {
           val nodeConfig = new DomainNodeConfig(
-            Option(memberInfo.domainNodes.get(svcDomainNum))
+            Option(memberInfo.domainNodes.get(domainId.toProtoPrimitive))
               .map(_.cometBft)
               .getOrElse(SvUtil.emptyCometBftConfig),
             localSequencerConfig.map(c =>
@@ -1155,7 +1155,7 @@ object SvApp {
           val cmd = svcRules.exercise(
             _.exerciseSvcRules_SetDomainNodeConfig(
               svParty.toProtoPrimitive,
-              svcDomainNum,
+              domainId.toProtoPrimitive,
               nodeConfig,
             )
           )

@@ -147,6 +147,7 @@ class FoundingNodeInitializer(
         svcStore,
         ledgerClient,
         cometBftNode,
+        globalDomain,
       )
       _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
       withSvcStore = new WithSvcStore(svcAutomation, globalDomain)
@@ -334,6 +335,7 @@ class FoundingNodeInitializer(
       SvApp.reconcileSequencerConfigIfRequired(
         svcStore,
         localDomainNode,
+        domainId,
         svcStoreWithIngestion.connection,
         retryProvider,
         logger,
@@ -425,7 +427,7 @@ class FoundingNodeInitializer(
 
     // Import AcsSnapshot and Create SvcRules and CoinRules and open the first mining round
     private def bootstrapSvc(): Future[Unit] = {
-      val svcRulesConfig = SvUtil.defaultSvcRulesConfig()
+      val svcRulesConfig = SvUtil.defaultSvcRulesConfig(domainId)
       for {
         (participantId, mediatorId, trafficStateForAllMembers, coinRules, svcRules) <- (
           participantAdminConnection.getParticipantId(),
@@ -470,6 +472,7 @@ class FoundingNodeInitializer(
                   founderDomainNodes <- SvUtil.getFounderDomainNodeConfig(
                     cometBftNode,
                     localDomainNode,
+                    domainId,
                   )
                   _ = logger
                     .info(s"Bootstrapping SVC as $svcParty with BFT nodes $founderDomainNodes")
@@ -586,6 +589,7 @@ class FoundingNodeInitializer(
       svcStore: SvSvcStore,
       ledgerClient: CNLedgerClient,
       cometBftNode: Option[CometBftNode],
+      domainId: DomainId,
   ) =
     new SvSvcAutomationService(
       clock,
@@ -596,6 +600,7 @@ class FoundingNodeInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
+      domainId,
       loggerFactory,
     )
 

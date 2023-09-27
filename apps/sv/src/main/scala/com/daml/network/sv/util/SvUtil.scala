@@ -28,6 +28,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.nio.file.{Path, Paths}
@@ -55,7 +56,6 @@ object SvUtil {
     defaultCometBftNetworkLimits // cometBft
   )
 
-  val defaultSvcDomainNumber = 0L;
   val emptyCometBftConfig = new CometBftConfig(
     Map.empty[String, CometBftNodeConfig].asJava,
     List.empty.asJava,
@@ -64,17 +64,17 @@ object SvUtil {
 
   private val defaultInitialTrafficGrant = 1000_000L
 
-  private def defaultSvcGlobalDomainConfig = new GlobalDomainConfig(
+  private def defaultSvcGlobalDomainConfig(domainId: DomainId) = new GlobalDomainConfig(
     // domains
     Map(
-      long2Long(defaultSvcDomainNumber) -> new DomainConfig(
+      domainId.toProtoPrimitive -> new DomainConfig(
         svc.globaldomain.DomainState.DS_OPERATIONAL,
         "TODO(#4900): share CometBFT genesis.json of founding SV node via SvcRules config.",
         // TODO(M3-47): also share the Canton DomainId of the decentralized domain here
       )
     ).asJava,
-    defaultSvcDomainNumber, // lastDomainNumber
-    defaultSvcDomainNumber, // activeDomain
+    domainId.toProtoPrimitive, // lastDomainId
+    domainId.toProtoPrimitive, // activeDomain
 
   )
 
@@ -95,10 +95,11 @@ object SvUtil {
   def getFounderDomainNodeConfig(
       cometBftNode: Option[CometBftNode],
       localDomainNode: LocalDomainNode,
+      domainId: DomainId,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[java.util.Map[java.lang.Long, DomainNodeConfig]] = {
+  ): Future[java.util.Map[String, DomainNodeConfig]] = {
     for {
       nodeConfigOpt <- cometBftNode
         .map(_.getLocalNodeConfig())
@@ -136,7 +137,7 @@ object SvUtil {
       )
     } yield {
       Map(
-        long2Long(defaultSvcDomainNumber) -> new DomainNodeConfig(
+        domainId.toProtoPrimitive -> new DomainNodeConfig(
           cometBftConfig,
           sequencerConfig.toJava,
         )
@@ -144,7 +145,7 @@ object SvUtil {
     }
   }
 
-  def defaultSvcRulesConfig(): SvcRulesConfig = new SvcRulesConfig(
+  def defaultSvcRulesConfig(domainId: DomainId): SvcRulesConfig = new SvcRulesConfig(
     10, // numUnclaimedRewardsThreshold
     5, // numMemberTrafficContractsThreshold, arbitrarily set as 5 for now.
     new RelTime(TimeUnit.MINUTES.toMicros(5)), // actionConfirmationTimeout
@@ -155,7 +156,7 @@ object SvUtil {
     defaultDomainNodeConfigLimits,
     1024, // maxTextLength
     defaultInitialTrafficGrant,
-    defaultSvcGlobalDomainConfig, // globalDomainConfig
+    defaultSvcGlobalDomainConfig(domainId), // globalDomainConfig
   )
 
   def keyPairMatches(

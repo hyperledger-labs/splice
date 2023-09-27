@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cc.round.*
 import com.daml.network.codegen.java.cn
 import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import org.slf4j.event.Level
 import CNNodeTests.BracketSynchronous.*
 import com.daml.network.codegen.java.cn.svcrules.ElectionRequest
@@ -15,6 +15,8 @@ import scala.jdk.CollectionConverters.*
 
 class SvcElectionTimeBasedIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElections {
+
+  private val dummySvcDomainId = DomainId.tryFromString("domain1::domain")
 
   def createElectionRequestUpdate(
       svc: PartyId,
@@ -91,7 +93,7 @@ class SvcElectionTimeBasedIntegrationTest
         "A new leader is elected and leader-based triggers resume operating normally"
       ) {
         val effectiveTimeout = SvUtil
-          .fromRelTime(SvUtil.defaultSvcRulesConfig().leaderInactiveTimeout)
+          .fromRelTime(SvUtil.defaultSvcRulesConfig(dummySvcDomainId).leaderInactiveTimeout)
           .plus(pollingIntervalDuration)
 
         val bufferDuration = JavaDuration.ofSeconds(5)

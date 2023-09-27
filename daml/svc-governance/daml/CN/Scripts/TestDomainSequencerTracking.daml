@@ -15,7 +15,7 @@ testDomainMigration : Script ()
 testDomainMigration = do
   (_, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
   let svs = [sv1, sv2, sv3, sv4]
-      domainNum = 0
+      domainId = "domain-id"
 
   -- SV's onboard their nodes
   now <- getTime
@@ -23,7 +23,7 @@ testDomainMigration = do
     [(svcRulesCid, _)] <- query @SvcRules svc
     submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_SetDomainNodeConfig with
       sv
-      domainNumber = domainNum
+      domainId = domainId
       newNodeConfig = DomainNodeConfig with
         cometBft = CometBftConfig with
           nodes = Map.fromList [("nodeId-1-" <> partyToText sv, CometBftNodeConfig ("pubKey-" <> partyToText sv) 1)]
@@ -38,7 +38,7 @@ testDomainMigration = do
   [(_, svcRules)] <- query @SvcRules svc
   forA_ svs $ \sv -> do
     let Some(memberInfo) = Map.lookup sv svcRules.members
-        Some(domainConfig) = Map.lookup domainNum memberInfo.domainNodes
+        Some(domainConfig) = Map.lookup domainId memberInfo.domainNodes
     domainConfig.sequencer === Some SequencerConfig with
       sequencerId = "sequencer-id-" <> partyToText sv
       url = "sequencer-" <> partyToText sv <> ".address:1234"

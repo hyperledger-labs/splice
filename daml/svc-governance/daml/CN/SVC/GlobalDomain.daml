@@ -16,11 +16,11 @@ import CN.CometBft
 -- As can be seen form `DomainNodeConfig` each member runs multiple different kinds of
 -- physical nodes.
 data GlobalDomainConfig = GlobalDomainConfig with
-    domains : Map.Map Int DomainConfig
+    domains : Map.Map Text DomainConfig
     -- ^ The actual domains, numbered sequentially.
-    lastDomainNumber : Int
-    -- ^ The last allocated domain number.
-    activeDomain : Int
+    lastDomainId : Text
+    -- ^ The last allocated domain Id.
+    activeDomainId: Text
     -- ^ The domain to be used for managing all SVC and CC workflows.
   deriving (Eq, Show)
 
@@ -64,8 +64,8 @@ data SequencerConfig = SequencerConfig with
     -- ^ Any participant should subscribe this sequencer after this time.
   deriving (Eq, Show)
 
--- | A map from domain-numbers to the configuration of a member's node for this domain.
-type DomainNodeConfigMap = Map.Map Int DomainNodeConfig
+-- | A map from domain-ids to the configuration of a member's node for this domain.
+type DomainNodeConfigMap = Map.Map Text DomainNodeConfig
 
 -- | The configuration of a member's node for a particular domain.
 data DomainNodeConfig = DomainNodeConfig with

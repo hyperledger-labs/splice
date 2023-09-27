@@ -402,12 +402,12 @@ template SvcRules with
     choice SvcRules_SetDomainNodeConfig : ContractId SvcRules
       with
         sv : Party
-        domainNumber : Int
+        domainId : Text
         newNodeConfig : DomainNodeConfig
       controller sv
       do
         requireUnlocked lock
-        require "Domain with this number is configured" (domainNumber `Map.member` config.globalDomain.domains)
+        require "Domain with this id is configured" (domainId `Map.member` config.globalDomain.domains)
         case Map.lookup sv members of
           None -> error "SV is not a collective member"
           Some info -> do
@@ -416,7 +416,7 @@ template SvcRules with
             unless isDevNet $
               require "CometBft voting power <= 1" (CometBft.totalVotingPower newNodeConfig.cometBft <= 1)
             -- update member info
-            let newInfo = info with domainNodes = Map.insert domainNumber newNodeConfig info.domainNodes
+            let newInfo = info with domainNodes = Map.insert domainId newNodeConfig info.domainNodes
             create this with members = Map.insert sv newInfo this.members
 
     -- Automation leader election

@@ -183,14 +183,14 @@ testSvOnboarding = do
         sequencer = sequencerConfig
   submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_SetDomainNodeConfig with
     sv = svX
-    domainNumber = svcRules.config.globalDomain.lastDomainNumber
+    domainId = svcRules.config.globalDomain.lastDomainId
     newNodeConfig
 
   -- check that the config was actually set
   [(_, svcRules)] <- query @SvcRules svc
   let actualConfig = do
         info <- Map.lookup svX svcRules.members
-        config <- Map.lookup svcRules.config.globalDomain.lastDomainNumber info.domainNodes
+        config <- Map.lookup svcRules.config.globalDomain.lastDomainId info.domainNodes
         pure config
   actualConfig === Some newNodeConfig
 

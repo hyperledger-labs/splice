@@ -1055,6 +1055,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       members: java.util.Map[String, MemberInfo] = Collections.emptyMap(),
       epoch: Long = 123,
   ) = {
+    val newDomainId = "new-domain-id"
     val template = new SvcRules(
       svcParty.toProtoPrimitive,
       epoch,
@@ -1071,7 +1072,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         new DomainNodeConfigLimits(new CometBftConfigLimits(1, 1, 1, 1, 1)),
         1,
         1,
-        new GlobalDomainConfig(Collections.emptyMap(), 1, 1),
+        new GlobalDomainConfig(Collections.emptyMap(), newDomainId, newDomainId),
       ),
       Collections.emptyMap(),
       true,
