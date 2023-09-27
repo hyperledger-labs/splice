@@ -18,7 +18,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class DirectoryInstallRequestTrigger(
     override protected val context: TriggerContext,
