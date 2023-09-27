@@ -15,7 +15,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class ExpiredDirectoryEntryTrigger(
     override protected val context: TriggerContext,
@@ -40,17 +39,11 @@ class ExpiredDirectoryEntryTrigger(
       ]]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val cmd =
-      co.work.contractId
-        .exerciseDirectoryEntry_Expire(store.providerParty.toProtoPrimitive)
-    store.domains.waitForDomainConnection(store.defaultAcsDomain).flatMap { domainId =>
-      connection
-        .submitCommandsNoDedup(
-          actAs = Seq(store.providerParty),
-          readAs = Seq(),
-          commands = cmd.commands.asScala.toSeq,
-          domainId,
-        )
-        .map(_ => TaskSuccess(s"archived expired entry"))
-    }
+      co.work.exercise(_.exerciseDirectoryEntry_Expire(store.providerParty.toProtoPrimitive))
+    connection
+      .submit(actAs = Seq(store.providerParty), readAs = Seq(), cmd)
+      .noDedup
+      .yieldUnit()
+      .map(_ => TaskSuccess(s"archived expired entry"))
   }
 }

@@ -7,7 +7,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class ExpiredSvOnboardingRequestTrigger(
     override protected val context: TriggerContext,
@@ -39,14 +38,14 @@ class ExpiredSvOnboardingRequestTrigger(
   override def completeTaskAsLeader(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       svcRules <- store.getSvcRules()
-      cmd = svcRules.contractId.exerciseSvcRules_ExpireSvOnboardingRequest(
-        co.work.contractId
+      cmd = svcRules.exercise(
+        _.exerciseSvcRules_ExpireSvOnboardingRequest(
+          co.work.contractId
+        )
       )
-      _ <- svTaskContext.connection.submitCommandsNoDedup(
-        Seq(store.key.svParty),
-        Seq(store.key.svcParty),
-        commands = cmd.commands.asScala.toSeq,
-        domainId = co.work.domain,
-      )
+      _ <- svTaskContext.connection
+        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .noDedup
+        .yieldUnit()
     } yield TaskSuccess("archived expired SV onboarding contract")
 }

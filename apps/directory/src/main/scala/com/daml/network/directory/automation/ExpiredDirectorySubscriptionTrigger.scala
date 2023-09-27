@@ -12,7 +12,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class ExpiredDirectorySubscriptionTrigger(
     override protected val context: TriggerContext,
@@ -31,17 +30,17 @@ class ExpiredDirectorySubscriptionTrigger(
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[DirectoryStore.IdleDirectorySubscription]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val cmd = task.work.state.contractId.exerciseSubscriptionIdleState_ExpireSubscription(
-      store.providerParty.toProtoPrimitive
+    val cmd = task.work.state.exercise(
+      _.exerciseSubscriptionIdleState_ExpireSubscription(
+        store.providerParty.toProtoPrimitive
+      )
     )
     store.domains.waitForDomainConnection(store.defaultAcsDomain).flatMap { domainId =>
       connection
-        .submitCommandsNoDedup(
-          actAs = Seq(store.providerParty),
-          readAs = Seq(),
-          commands = cmd.commands.asScala.toSeq,
-          domainId = domainId,
-        )
+        .submit(actAs = Seq(store.providerParty), readAs = Seq(), cmd)
+        .withDomainId(domainId)
+        .noDedup
+        .yieldUnit()
         .map(_ => TaskSuccess(s"archived expired directory subscription"))
     }
   }

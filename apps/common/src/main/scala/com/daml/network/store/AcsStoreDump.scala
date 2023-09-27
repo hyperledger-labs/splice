@@ -23,7 +23,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 object AcsStoreDump {
 
@@ -61,7 +60,9 @@ object AcsStoreDump {
 
   def extractImportCommands(svcParty: PartyId)(
       contracts: Seq[http.Contract]
-  )(implicit templateDecoder: TemplateJsonDecoder): Seq[data.Command] = {
+  )(implicit
+      templateDecoder: TemplateJsonDecoder
+  ): Seq[data.codegen.Update[data.codegen.Created[cc.coinimport.ImportCrate.ContractId]]] = {
 
     def extractCoin(co: http.Contract): Seq[cc.coin.Coin] =
       // attempt to decode as a: Coin
@@ -71,45 +72,36 @@ object AcsStoreDump {
         .orElse(fromJsonIgnoringPackageId(cc.coin.LockedCoin.COMPANION)(co).map(_.payload.coin))
         .toSeq
 
-    val coinCommands =
-      for {
-        httpCo <- contracts
-        coin <- extractCoin(httpCo)
-        cmd <- new cc.coinimport.ImportCrate(
-          svcParty.toProtoPrimitive,
-          coin.owner,
-          new cc.coinimport.importpayload.IP_Coin(
-            coin
-          ),
-        ).create().commands().asScala.toSeq
-      } yield cmd
+    val coinCommands = for {
+      httpCo <- contracts
+      coin <- extractCoin(httpCo)
+    } yield new cc.coinimport.ImportCrate(
+      svcParty.toProtoPrimitive,
+      coin.owner,
+      new cc.coinimport.importpayload.IP_Coin(
+        coin
+      ),
+    ).create()
 
-    val validatorLicenseCommands =
-      for {
-        httpCo <- contracts
-        license <- fromJsonIgnoringPackageId(cc.validatorlicense.ValidatorLicense.COMPANION)(
-          httpCo
-        ).toSeq
-        cmd <- new cc.coinimport.ImportCrate(
-          svcParty.toProtoPrimitive,
-          license.payload.validator,
-          new IP_ValidatorLicense(license.payload),
-        ).create().commands().asScala.toSeq
-      } yield cmd
+    val validatorLicenseCommands = for {
+      httpCo <- contracts
+      license <- fromJsonIgnoringPackageId(cc.validatorlicense.ValidatorLicense.COMPANION)(
+        httpCo
+      ).toSeq
+    } yield new cc.coinimport.ImportCrate(
+      svcParty.toProtoPrimitive,
+      license.payload.validator,
+      new IP_ValidatorLicense(license.payload),
+    ).create()
 
-    val importCrateCommands: Seq[data.Command] = {
-      for {
-        httpCo <- contracts
-        crate <- fromJsonIgnoringPackageId(cc.coinimport.ImportCrate.COMPANION)(httpCo).toSeq
-        cmd <- {
-          new cc.coinimport.ImportCrate(
-            svcParty.toProtoPrimitive, // override the svc party to the current one
-            crate.payload.receiver, // keep as-is
-            crate.payload.payload, // keep as-is
-          ).create().commands().asScala.toSeq
-        }
-      } yield cmd
-    }
+    val importCrateCommands = for {
+      httpCo <- contracts
+      crate <- fromJsonIgnoringPackageId(cc.coinimport.ImportCrate.COMPANION)(httpCo).toSeq
+    } yield new cc.coinimport.ImportCrate(
+      svcParty.toProtoPrimitive, // override the svc party to the current one
+      crate.payload.receiver, // keep as-is
+      crate.payload.payload, // keep as-is
+    ).create()
 
     Seq(coinCommands, validatorLicenseCommands, importCrateCommands).flatten
   }

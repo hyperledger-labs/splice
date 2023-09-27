@@ -416,18 +416,18 @@ class HttpSvHandler(
     logger.info(s"Sponsor SV authorizing svc party to participant $participantId")
 
     def submitDummyTransaction(): Future[Unit] =
-      svStoreWithIngestion.connection.submitCommandsNoDedup(
-        Seq(svParty),
-        Seq.empty,
-        // The transaction here is arbitrary with the restriction that it should not have the SVC as a stakeholder.
-        // FeaturedAppRight just happens to be one of the simplest templates we have.
-        new FeaturedAppRight(svParty.toProtoPrimitive, svParty.toProtoPrimitive).createAnd
-          .exerciseArchive(new com.daml.network.codegen.java.da.internal.template.Archive())
-          .commands
-          .asScala
-          .toSeq,
-        globalDomain,
-      )
+      svStoreWithIngestion.connection
+        .submit(
+          Seq(svParty),
+          Seq.empty,
+          // The transaction here is arbitrary with the restriction that it should not have the SVC as a stakeholder.
+          // FeaturedAppRight just happens to be one of the simplest templates we have.
+          new FeaturedAppRight(svParty.toProtoPrimitive, svParty.toProtoPrimitive).createAnd
+            .exerciseArchive(),
+        )
+        .withDomainId(globalDomain)
+        .noDedup
+        .yieldUnit()
     for {
       // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
       // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933

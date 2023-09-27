@@ -395,12 +395,10 @@ class FoundingNodeInitializer(
                 )
                 // Note: we assume that the Acs dump is small enough to be imported in a single transaction.
                 svcStoreWithIngestion.connection
-                  .submitCommandsNoDedup(
-                    actAs = Seq(svcParty),
-                    readAs = Seq.empty,
-                    commands = cmds,
-                    domainId = domainId,
-                  )
+                  .submit(actAs = Seq(svcParty), readAs = Seq.empty, cmds)
+                  .withDomainId(domainId)
+                  .noDedup
+                  .yieldUnit()
               }
           } yield {
             if (cmds.isEmpty) {

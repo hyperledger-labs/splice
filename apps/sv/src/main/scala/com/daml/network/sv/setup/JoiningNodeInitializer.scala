@@ -333,21 +333,21 @@ class JoiningNodeInitializer(
                     )
                     Future.unit
                   } else {
-                    val cmd = svcRules.contractId.exerciseSvcRules_AddConfirmedMember(
-                      svcStore.key.svParty.toProtoPrimitive,
-                      confirmed.contractId,
-                      openMiningRounds.oldest.contractId,
-                      openMiningRounds.middle.contractId,
-                      openMiningRounds.newest.contractId,
-                      coinRules.contractId,
-                      participantId.toProtoPrimitive,
+                    val cmd = svcRules.exercise(
+                      _.exerciseSvcRules_AddConfirmedMember(
+                        svcStore.key.svParty.toProtoPrimitive,
+                        confirmed.contractId,
+                        openMiningRounds.oldest.contractId,
+                        openMiningRounds.middle.contractId,
+                        openMiningRounds.newest.contractId,
+                        coinRules.contractId,
+                        participantId.toProtoPrimitive,
+                      )
                     )
-                    svcStoreWithIngestion.connection.submitCommandsNoDedup(
-                      Seq(svcStore.key.svParty),
-                      Seq(svcStore.key.svcParty),
-                      commands = cmd.commands.asScala.toSeq,
-                      domainId = domainId,
-                    )
+                    svcStoreWithIngestion.connection
+                      .submit(Seq(svcStore.key.svParty), Seq(svcStore.key.svcParty), cmd)
+                      .noDedup
+                      .yieldUnit()
                   }
               }
             } yield (),

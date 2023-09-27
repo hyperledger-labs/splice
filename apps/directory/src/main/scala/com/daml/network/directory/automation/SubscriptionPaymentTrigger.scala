@@ -57,15 +57,12 @@ class SubscriptionPaymentTrigger(
         log: String => Unit = logger.warn(_),
     ) = {
       log(s"rejecting subscription payment: $reason")
-      val cmd = payment.contractId.exerciseSubscriptionPayment_Reject(transferContext).commands
+      val cmd = payment.exercise(_.exerciseSubscriptionPayment_Reject(transferContext))
       connection
-        .submitCommandsNoDedup(
-          Seq(provider),
-          Seq(),
-          cmd.asScala.toSeq,
-          domainId,
-          disclosedContracts assertOnDomain domainId,
-        )
+        .submit(Seq(provider), Seq(), cmd)
+        .withDisclosedContracts(disclosedContracts assertOnDomain domainId)
+        .noDedup
+        .yieldUnit()
         .map(_ => TaskSuccess(s"rejected subscription payment: $reason"))
     }
     def collectPayment(

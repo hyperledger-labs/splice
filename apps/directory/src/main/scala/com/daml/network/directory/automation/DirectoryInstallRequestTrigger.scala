@@ -60,10 +60,12 @@ class DirectoryInstallRequestTrigger(
       taskOutcome <- queryResult match {
         case QueryResult(_, Some(_)) =>
           logger.info(s"Rejecting duplicate install request from user party $user")
-          val cmd = req.contractId
-            .exerciseDirectoryInstallRequest_Reject()
+          val cmd = req.exercise(_.exerciseDirectoryInstallRequest_Reject())
           connection
-            .submitCommandsNoDedup(Seq(provider), Seq(), cmd.commands.asScala.toSeq, domainId)
+            .submit(Seq(provider), Seq(), cmd)
+            .withDomainId(domainId)
+            .noDedup
+            .yieldUnit()
             .map(_ => TaskSuccess("rejected request for already existing installation."))
 
         case QueryResult(offset, None) =>

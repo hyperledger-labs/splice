@@ -7,7 +7,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
+
+import ExpiredSvOnboardingConfirmedTrigger.*
 
 class ExpiredSvOnboardingConfirmedTrigger(
     override protected val context: TriggerContext,
@@ -23,30 +24,30 @@ class ExpiredSvOnboardingConfirmedTrigger(
       svTaskContext.svcStore.listExpiredSvOnboardingConfirmed,
       cn.svonboarding.SvOnboardingConfirmed.COMPANION,
     )
-    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
-      cn.svonboarding.SvOnboardingConfirmed.ContractId,
-      cn.svonboarding.SvOnboardingConfirmed,
-    ]]] {
-  type Task = ScheduledTaskTrigger.ReadyTask[
-    AssignedContract[
-      cn.svonboarding.SvOnboardingConfirmed.ContractId,
-      cn.svonboarding.SvOnboardingConfirmed,
-    ]
-  ]
+    with SvTaskBasedTrigger[Task] {
 
   private val store = svTaskContext.svcStore
 
   override def completeTaskAsLeader(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       svcRules <- store.getSvcRules()
-      cmd = svcRules.contractId.exerciseSvcRules_ExpireSvOnboardingConfirmed(
-        co.work.contractId
+      cmd = svcRules.exercise(
+        _.exerciseSvcRules_ExpireSvOnboardingConfirmed(
+          co.work.contractId
+        )
       )
-      _ <- svTaskContext.connection.submitCommandsNoDedup(
-        Seq(store.key.svParty),
-        Seq(store.key.svcParty),
-        commands = cmd.commands.asScala.toSeq,
-        domainId = co.work.domain,
-      )
+      _ <- svTaskContext.connection
+        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .noDedup
+        .yieldUnit()
     } yield TaskSuccess("archived expired SV confirmed contract")
+}
+
+private[leaderbased] object ExpiredSvOnboardingConfirmedTrigger {
+  type Task = ScheduledTaskTrigger.ReadyTask[
+    AssignedContract[
+      cn.svonboarding.SvOnboardingConfirmed.ContractId,
+      cn.svonboarding.SvOnboardingConfirmed,
+    ]
+  ]
 }

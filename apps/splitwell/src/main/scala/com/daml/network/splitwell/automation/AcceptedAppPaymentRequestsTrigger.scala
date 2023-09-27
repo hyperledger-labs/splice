@@ -19,7 +19,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class AcceptedAppPaymentRequestsTrigger(
     override protected val context: TriggerContext,
@@ -79,17 +78,17 @@ class AcceptedAppPaymentRequestsTrigger(
                   )
                 )
               )
-            cmd = transferInProgress.contractId.exerciseTransferInProgress_CompleteTransfer(
-              payment.contractId,
-              transferContext,
+            cmd = transferInProgress.exercise(
+              _.exerciseTransferInProgress_CompleteTransfer(
+                payment.contractId,
+                transferContext,
+              )
             )
-            _ <- connection.submitCommandsNoDedup(
-              actAs = Seq(provider),
-              readAs = Seq(),
-              commands = cmd.commands.asScala.toSeq,
-              domainId = payment.domain,
-              disclosedContracts = disclosedContracts,
-            )
+            _ <- connection
+              .submit(actAs = Seq(provider), readAs = Seq(), cmd)
+              .withDisclosedContracts(disclosedContracts assertOnDomain payment.domain)
+              .noDedup
+              .yieldUnit()
           } yield TaskSuccess("accepted payment and completed transfer")
         case Left(err) =>
           scanConnection

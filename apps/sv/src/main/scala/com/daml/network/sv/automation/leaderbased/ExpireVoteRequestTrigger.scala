@@ -31,17 +31,19 @@ class ExpireVoteRequestTrigger(
   override def completeTaskAsLeader(task: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       svcRules <- svTaskContext.svcStore.getSvcRules()
-      _ <- svTaskContext.connection.submitCommandsNoDedup(
-        Seq(svTaskContext.svcStore.key.svParty),
-        Seq(svTaskContext.svcStore.key.svcParty),
-        Seq(
-          svcRules.contractId.exerciseSvcRules_VoteRequest_Expire(
-            task.work.contract.contractId,
-            new VoteRequest_Expire(),
-          )
-        ),
-        task.work.domain,
-      )
+      _ <- svTaskContext.connection
+        .submit(
+          Seq(svTaskContext.svcStore.key.svParty),
+          Seq(svTaskContext.svcStore.key.svcParty),
+          svcRules.exercise(
+            _.exerciseSvcRules_VoteRequest_Expire(
+              task.work.contractId,
+              new VoteRequest_Expire(),
+            )
+          ),
+        )
+        .noDedup
+        .yieldUnit()
     } yield TaskSuccess(
       s"Archived expired VoteRequest ${task.work.contract.payload.action.toValue}"
     )

@@ -159,19 +159,6 @@ class CNLedgerConnection(
   def ledgerEnd(): Future[Value.Absolute] =
     client.ledgerEnd()
 
-  def submitCommandsNoDedup(
-      actAs: Seq[PartyId],
-      readAs: Seq[PartyId],
-      commands: Seq[HasCommands],
-      domainId: DomainId,
-      disclosedContracts: DisclosedContracts = DisclosedContracts(),
-      priority: CommandPriority = CommandPriority.Low,
-  )(implicit tc: TraceContext): Future[Unit] =
-    submit(actAs, readAs, commands, priority)
-      .withDomainId(domainId, disclosedContracts)
-      .noDedup
-      .yieldUnit()
-
   // When using submitAndWaitForTransaction with a command whose resulting transaction is
   // not visible to the submitting parties, one receives `TRANSACTION_NOT_FOUND`. In case, you run into this consider using
   // one of the other methods in this class that rely on submitAndWaitForTransactionTree instead.

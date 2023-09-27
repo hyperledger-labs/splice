@@ -8,7 +8,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class ExpiredCnsEntryTrigger(
     override protected val context: TriggerContext,
@@ -40,15 +39,15 @@ class ExpiredCnsEntryTrigger(
   override def completeTaskAsLeader(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       svcRules <- store.getSvcRules()
-      cmd = svcRules.contractId.exerciseSvcRules_ExpireCnsEntry(
-        co.work.contractId,
-        new CnsEntry_Expire(store.key.svcParty.toProtoPrimitive),
+      cmd = svcRules.exercise(
+        _.exerciseSvcRules_ExpireCnsEntry(
+          co.work.contractId,
+          new CnsEntry_Expire(store.key.svcParty.toProtoPrimitive),
+        )
       )
-      _ <- svTaskContext.connection.submitCommandsNoDedup(
-        Seq(store.key.svParty),
-        Seq(store.key.svcParty),
-        commands = cmd.commands.asScala.toSeq,
-        domainId = co.work.domain,
-      )
+      _ <- svTaskContext.connection
+        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .noDedup
+        .yieldUnit()
     } yield TaskSuccess("archived expired CNS entry")
 }
