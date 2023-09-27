@@ -163,7 +163,7 @@ class FoundingNodeInitializer(
       // for example if the founding SV node restarted after bootstrapping the SvcRules.
       // We only set the domain sequencer config if the existing one is different here.
       _ <- withSvcStore.reconcileSequencerConfigIfRequired(Some(localDomainNode))
-      svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
+      svcRulesLock = new SvcRulesLock(svcAutomation, retryProvider, loggerFactory)
     } yield (
       globalDomain,
       svcPartyHosting,

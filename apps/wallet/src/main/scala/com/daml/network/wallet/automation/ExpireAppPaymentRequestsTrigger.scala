@@ -42,16 +42,16 @@ class ExpireAppPaymentRequestsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       install <- store.getInstall()
-      cmd = install.contractId.exerciseWalletAppInstall_AppPaymentRequest_Expire(
-        task.work.contractId
+      cmd = install.exercise(
+        _.exerciseWalletAppInstall_AppPaymentRequest_Expire(
+          task.work.contractId
+        )
       )
       _ <- connection
-        .submitWithResultNoDedup(
-          Seq(store.key.validatorParty),
-          Seq(store.key.endUserParty),
-          cmd,
-          task.work.domain,
-        )
+        .submit(Seq(store.key.validatorParty), Seq(store.key.endUserParty), cmd)
+        .withDomainId(task.work.domain)
+        .noDedup
+        .yieldResult()
     } yield TaskSuccess("expired app payment request")
   }
 }

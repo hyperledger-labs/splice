@@ -43,7 +43,7 @@ class MergeMemberTrafficContractsTrigger(
       memberTraffics <- store.listMemberTrafficContracts(memberId, domainId, 2 * threshold)
       outcome <-
         if (memberTraffics.length > threshold)
-          mergeMemberTrafficContracts(memberId, domainId, memberTraffics)
+          mergeMemberTrafficContracts(memberId, memberTraffics)
         else
           Future.successful(
             TaskSuccess(
@@ -56,7 +56,6 @@ class MergeMemberTrafficContractsTrigger(
 
   def mergeMemberTrafficContracts(
       memberId: Member,
-      domainId: DomainId,
       memberTraffics: Seq[Contract[MemberTraffic.ContractId, MemberTraffic]],
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
@@ -66,16 +65,13 @@ class MergeMemberTrafficContractsTrigger(
         coinRules.contractId,
         memberTraffics.map(_.contractId).asJava,
       )
-      cmd = svcRules.contractId.exerciseSvcRules_MergeMemberTrafficContracts(arg)
+      cmd = svcRules.exercise(_.exerciseSvcRules_MergeMemberTrafficContracts(arg))
       outcome <- svTaskContext.connection
-        .submitWithResultNoDedup(
-          Seq(store.key.svParty),
-          Seq(store.key.svcParty),
-          cmd,
-          domainId,
-        )
+        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .noDedup
+        .yieldResult()
     } yield TaskSuccess(
-      s"Merged ${memberTraffics.length} member traffic contracts for member $memberId on domain $domainId " +
+      s"Merged ${memberTraffics.length} member traffic contracts for member $memberId on domain ${svcRules.domain} " +
         s"into contract ${outcome.exerciseResult.contractId}"
     )
   }

@@ -162,7 +162,7 @@ class JoiningNodeInitializer(
         }
       _ <- waitForSvcMembership(svcStore)
       _ <- SetupUtil.ensureSvcPartyMetadataAnnotation(svAutomation.connection, config, svcPartyId)
-      svcRulesLock = new SvcRulesLock(globalDomain, svcAutomation, retryProvider, loggerFactory)
+      svcRulesLock = new SvcRulesLock(svcAutomation, retryProvider, loggerFactory)
       _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
         for {
           _ <- waitUntilCometBftNodeHasCaughtUp

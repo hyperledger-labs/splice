@@ -14,7 +14,6 @@ import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.util.{DisclosedContracts, AssignedContract}
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -51,13 +50,15 @@ class AcceptedAppPaymentRequestsTrigger(
     def rejectPayment(
         reason: String,
         transferContext: v1.coin.AppTransferContext,
-        domainId: DomainId,
         disclosedContracts: DisclosedContracts.NE,
     ) = {
       logger.warn(s"rejecting accepted app payment: $reason")
-      val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject(transferContext)
+      val cmd = payment.exercise(_.exerciseAcceptedAppPayment_Reject(transferContext))
       connection
-        .submitWithResultNoDedup(Seq(store.providerParty), Seq(), cmd, domainId, disclosedContracts)
+        .submit(Seq(store.providerParty), Seq(), cmd)
+        .withDisclosedContracts(disclosedContracts)
+        .noDedup
+        .yieldResult()
         .map(_ => TaskSuccess(s"rejected accepted app payment: $reason"))
     }
     for {
@@ -97,7 +98,6 @@ class AcceptedAppPaymentRequestsTrigger(
               rejectPayment(
                 s"Round ${payment.payload.round} is no longer active: $err",
                 transferContext,
-                payment.domain,
                 disclosedContracts,
               )
             }

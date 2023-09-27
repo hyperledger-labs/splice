@@ -46,15 +46,16 @@ class ExpireAcceptedTransferOfferTrigger(
       user = store.key.endUserParty.toProtoPrimitive
       _ <- user match {
         case task.work.contract.payload.sender | task.work.contract.payload.receiver =>
-          val cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Expire(
-            task.work.contractId
+          val cmd = install.exercise(
+            _.exerciseWalletAppInstall_AcceptedTransferOffer_Expire(
+              task.work.contractId
+            )
           )
-          connection.submitWithResultNoDedup(
-            Seq(store.key.validatorParty),
-            Seq(store.key.endUserParty),
-            cmd,
-            task.work.domain,
-          )
+          connection
+            .submit(Seq(store.key.validatorParty), Seq(store.key.endUserParty), cmd)
+            .withDomainId(task.work.domain)
+            .noDedup
+            .yieldResult()
         case _ =>
           Future.failed(
             Status.INTERNAL

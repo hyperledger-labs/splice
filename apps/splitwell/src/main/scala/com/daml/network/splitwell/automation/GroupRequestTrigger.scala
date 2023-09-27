@@ -50,9 +50,11 @@ class GroupRequestTrigger(
           logger.info(
             s"Rejecting duplicate group request from user party $user for group id ${groupId.unpack}"
           )
-          val cmd = req.contractId.exerciseGroupRequest_Reject()
+          val cmd = req.exercise(_.exerciseGroupRequest_Reject())
           connection
-            .submitWithResultNoDedup(Seq(provider), Seq(), cmd, req.domain)
+            .submit(Seq(provider), Seq(), cmd)
+            .noDedup
+            .yieldResult()
             .map(_ => TaskSuccess("rejected request for already existing group."))
 
         case QueryResult(offset, None) =>

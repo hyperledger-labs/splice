@@ -4,13 +4,11 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class SvcRulesLock(
-    globalDomain: DomainId,
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -26,12 +24,16 @@ class SvcRulesLock(
       for {
         svcRules <- svcStore.getSvcRules()
         coinRules <- svcStore.getCoinRules()
-        res <- svcStoreWithIngestion.connection.submitWithResultNoDedup(
-          Seq(svParty),
-          Seq(svcParty),
-          svcRules.contractId.exerciseSvcRules_Lock(svParty.toProtoPrimitive, coinRules.contractId),
-          globalDomain,
-        )
+        res <- svcStoreWithIngestion.connection
+          .submit(
+            Seq(svParty),
+            Seq(svcParty),
+            svcRules.exercise(
+              _.exerciseSvcRules_Lock(svParty.toProtoPrimitive, coinRules.contractId)
+            ),
+          )
+          .noDedup
+          .yieldResult()
       } yield res,
       logger,
     )
@@ -42,13 +44,16 @@ class SvcRulesLock(
       for {
         svcRules <- svcStore.getSvcRules()
         coinRules <- svcStore.getCoinRules()
-        res <- svcStoreWithIngestion.connection.submitWithResultNoDedup(
-          Seq(svParty),
-          Seq(svcParty),
-          svcRules.contractId
-            .exerciseSvcRules_Unlock(svParty.toProtoPrimitive, coinRules.contractId),
-          globalDomain,
-        ),
+        res <- svcStoreWithIngestion.connection
+          .submit(
+            Seq(svParty),
+            Seq(svcParty),
+            svcRules.exercise(
+              _.exerciseSvcRules_Unlock(svParty.toProtoPrimitive, coinRules.contractId)
+            ),
+          )
+          .noDedup
+          .yieldResult(),
       } yield res,
       logger,
     )

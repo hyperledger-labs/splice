@@ -62,7 +62,11 @@ class HttpExternalDirectoryHandler(
               )
             }
         }
-        res <- connection.submitWithResultNoDedup(Seq(partyId), Seq(partyId), update, domainId)
+        res <- connection
+          .submit(Seq(partyId), Seq(partyId), update)
+          .withDomainId(domainId)
+          .noDedup
+          .yieldResult()
       } yield res
     }
   }

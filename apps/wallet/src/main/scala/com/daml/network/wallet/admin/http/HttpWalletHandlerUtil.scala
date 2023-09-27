@@ -72,7 +72,8 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
     for {
       // TODO (#4906) pick install based on disclosed contracts' domain IDs
       install <- userStore.getInstall()
-      update <- getUpdate(install.contractId, userStore)
+      unadornedUpdate <- getUpdate(install.contractId, userStore)
+      update = install.exercise(_ => unadornedUpdate)
       domainId <- dislosedContracts
         .inferDomain(None)
         .fold {
@@ -80,14 +81,11 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
         }(Future.successful)
       result <- dedup match {
         case None =>
-          getUserWallet(user).connection.submitWithResultNoDedup(
-            Seq(validatorParty),
-            Seq(userParty),
-            update,
-            domainId,
-            dislosedContracts assertOnDomain domainId,
-            priority = priority,
-          )
+          getUserWallet(user).connection
+            .submit(Seq(validatorParty), Seq(userParty), update, priority = priority)
+            .withDomainId(domainId, dislosedContracts)
+            .noDedup
+            .yieldResult()
         case Some((commandId, dedupConfig)) =>
           userWallet.connection
             .submit(

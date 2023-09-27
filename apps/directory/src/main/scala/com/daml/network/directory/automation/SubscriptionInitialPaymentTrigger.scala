@@ -39,12 +39,11 @@ class SubscriptionInitialPaymentTrigger(
     ) {
 
   override def completeTask(
-      readyPayment: AssignedContract[
+      payment: AssignedContract[
         subsCodegen.SubscriptionInitialPayment.ContractId,
         subsCodegen.SubscriptionInitialPayment,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val AssignedContract(payment, domainId) = readyPayment
     val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
       payment.payload.subscriptionData.context
     )
@@ -54,15 +53,12 @@ class SubscriptionInitialPaymentTrigger(
         disclosedContracts: DisclosedContracts.NE,
     ) = {
       logger.warn(s"rejecting initial subscription payment: $reason")
-      val cmd = payment.contractId.exerciseSubscriptionInitialPayment_Reject(transferContext)
+      val cmd = payment.exercise(_.exerciseSubscriptionInitialPayment_Reject(transferContext))
       connection
-        .submitWithResultNoDedup(
-          Seq(store.providerParty),
-          Seq(),
-          cmd,
-          domainId,
-          disclosedContracts = disclosedContracts assertOnDomain domainId,
-        )
+        .submit(Seq(store.providerParty), Seq(), cmd)
+        .withDisclosedContracts(disclosedContracts)
+        .noDedup
+        .yieldResult()
         .map(_ => TaskSuccess(s"rejected initial subscription payment: $reason"))
     }
     def collectPaymentAndCreateEntry(
@@ -88,14 +84,14 @@ class SubscriptionInitialPaymentTrigger(
             commandId = DirectoryUtil.createDirectoryEntryCommandId(store.providerParty, entryName),
             deduplicationOffset = deduplicationOffset,
           )
-          .withDisclosedContracts(disclosedContracts assertOnDomain domainId)
+          .withDisclosedContracts(disclosedContracts assertOnDomain payment.domain)
           .yieldUnit()
       } yield TaskSuccess("created directory entry.")
     }
 
     store.multiDomainAcsStore
       .lookupContractByIdOnDomain(directoryCodegen.DirectoryEntryContext.COMPANION)(
-        domainId,
+        payment.domain,
         contextId,
       )
       .flatMap {

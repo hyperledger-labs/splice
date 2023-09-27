@@ -93,17 +93,17 @@ class AcceptedTransferOfferTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       install <- store.getInstall()
-      cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Abort(
-        acceptedOffer.contractId,
-        reason,
+      cmd = install.exercise(
+        _.exerciseWalletAppInstall_AcceptedTransferOffer_Abort(
+          acceptedOffer.contractId,
+          reason,
+        )
       )
       _ <- connection
-        .submitWithResultNoDedup(
-          Seq(store.key.validatorParty),
-          Seq(store.key.endUserParty),
-          cmd,
-          acceptedOffer.domain,
-        )
+        .submit(Seq(store.key.validatorParty), Seq(store.key.endUserParty), cmd)
+        .withDomainId(acceptedOffer.domain)
+        .noDedup
+        .yieldResult()
     } yield TaskSuccess(s"aborted accepted transfer offer, $reason")
   }
 

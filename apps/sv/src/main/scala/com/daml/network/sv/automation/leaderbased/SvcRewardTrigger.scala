@@ -14,6 +14,8 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
+import SvcRewardTrigger.*
+
 class SvcRewardTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
@@ -28,15 +30,7 @@ class SvcRewardTrigger(
       svTaskContext.svcStore,
       cc.coin.SvcReward.COMPANION,
     )
-    with SvTaskBasedTrigger[AssignedContract[
-      cc.coin.SvcReward.ContractId,
-      cc.coin.SvcReward,
-    ]] {
-  type SvcRewardContract = AssignedContract[
-    cc.coin.SvcReward.ContractId,
-    cc.coin.SvcReward,
-  ]
-
+    with SvTaskBasedTrigger[SvcRewardContract] {
   private val store = svTaskContext.svcStore
 
   override def completeTaskAsLeader(
@@ -44,19 +38,24 @@ class SvcRewardTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       svcRules <- store.getSvcRules()
-      cmd = svcRules.contractId
-        .exerciseSvcRules_CollectSvcReward(
+      cmd = svcRules.exercise(
+        _.exerciseSvcRules_CollectSvcReward(
           svcReward.contractId
         )
-      _ <-
-        svTaskContext.connection.submitWithResultNoDedup(
-          Seq(store.key.svParty),
-          Seq(store.key.svcParty),
-          cmd,
-          svcReward.domain,
-        )
+      )
+      _ <- svTaskContext.connection
+        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .noDedup
+        .yieldResult()
     } yield TaskSuccess(
       s"collected `SvcReward` of round ${svcReward.payload.round.number} and created `SvReward` for each SV"
     )
   }
+}
+
+private[leaderbased] object SvcRewardTrigger {
+  type SvcRewardContract = AssignedContract[
+    cc.coin.SvcReward.ContractId,
+    cc.coin.SvcReward,
+  ]
 }

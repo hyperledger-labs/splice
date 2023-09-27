@@ -47,9 +47,11 @@ class SplitwellInstallRequestTrigger(
       taskOutcome <- queryResult match {
         case QueryResult(_, Some(_)) =>
           logger.info(s"Rejecting duplicate install request from user party $user")
-          val cmd = req.contractId.exerciseSplitwellInstallRequest_Reject()
+          val cmd = req.exercise(_.exerciseSplitwellInstallRequest_Reject())
           connection
-            .submitWithResultNoDedup(Seq(provider), Seq(), cmd, req.domain)
+            .submit(Seq(provider), Seq(), cmd)
+            .noDedup
+            .yieldResult()
             .map(_ => TaskSuccess("rejected request for already existing installation."))
 
         case QueryResult(offset, None) =>

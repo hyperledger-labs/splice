@@ -348,32 +348,6 @@ class CNLedgerConnection(
     }
   }
 
-  def submitWithResultNoDedup[T](
-      actAs: Seq[PartyId],
-      readAs: Seq[PartyId],
-      update: Update[T],
-      domainId: DomainId,
-      disclosedContracts: DisclosedContracts = DisclosedContracts(),
-      priority: CommandPriority = CommandPriority.Low,
-  )(implicit tc: TraceContext): Future[T] =
-    submit(actAs, readAs, update, priority)
-      .withDomainId(domainId, disclosedContracts)
-      .noDedup
-      .yieldResult()
-
-  def submitWithResultAndOffsetNoDedup[T](
-      actAs: Seq[PartyId],
-      readAs: Seq[PartyId],
-      update: Update[T],
-      domainId: DomainId,
-      disclosedContracts: DisclosedContracts = DisclosedContracts(),
-      priority: CommandPriority = CommandPriority.Low,
-  )(implicit tc: TraceContext): Future[(String, T)] =
-    submit(actAs, readAs, update, priority)
-      .withDomainId(domainId, disclosedContracts)
-      .noDedup
-      .yieldResultAndOffset()
-
   def activeContracts(
       filter: IngestionFilter,
       offset: ParticipantOffset.Value.Absolute,

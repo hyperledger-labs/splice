@@ -58,20 +58,18 @@ class SvRewardTrigger(
     for {
       svcRules <- store.getSvcRules()
       coinRules <- store.getCoinRules()
-      cmd = svcRules.contractId
-        .exerciseSvcRules_CollectSvReward(
+      cmd = svcRules.exercise(
+        _.exerciseSvcRules_CollectSvReward(
           store.key.svParty.toProtoPrimitive,
           svReward.contractId,
           coinRules.contractId,
           openMiningRound.contractId,
         )
-      _ <-
-        connection.submitWithResultNoDedup(
-          Seq(store.key.svParty),
-          Seq(store.key.svcParty),
-          cmd,
-          svReward.domain,
-        )
+      )
+      _ <- connection
+        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .noDedup
+        .yieldResult()
     } yield TaskSuccess(
       s"collected `SvReward` of round ${svReward.payload.round.number} and create Coin for SV ${svReward.payload.sv}"
     )

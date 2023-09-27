@@ -41,12 +41,13 @@ class ExpireValidatorOnboardingTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     connection
-      .submitWithResultNoDedup(
+      .submit(
         Seq(store.key.svParty),
         Seq.empty,
-        task.work.contractId.exerciseValidatorOnboarding_Expire(),
-        task.work.domain,
+        task.work.exercise(_.exerciseValidatorOnboarding_Expire()),
       )
+      .noDedup
+      .yieldResult()
       .map(_ =>
         TaskSuccess(
           s"Archived expired ValidatorOnboarding ${task.work.payload.candidateSecret}"

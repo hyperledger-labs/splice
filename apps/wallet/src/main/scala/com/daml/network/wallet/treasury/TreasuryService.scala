@@ -378,15 +378,17 @@ class TreasuryService(
     logger.debug(s"executing batch $batch with inputs $inputs")
     for {
       (offset, result) <- connection
-        // The only operation that is not self-conflicting is Tap, therefore batch execution w/o command dedup is safe.
-        .submitWithResultAndOffsetNoDedup(
+        .submit(
           Seq(walletManager.store.walletKey.validatorParty),
           userStore.key.endUserParty +: readAs.toSeq,
           cmd,
-          disclosedContracts.assignedDomain,
-          disclosedContracts,
           priority = batch.priority,
         )
+        .withDisclosedContracts(disclosedContracts)
+        // The only operation that is not self-conflicting is Tap, therefore
+        // batch execution w/o command dedup is safe.
+        .noDedup
+        .yieldResultAndOffset()
 
       // wait for store to ingest the new coin holdings, then return all outcomes to the callers
       _ <- waitForIngestion(offset, result).map(_ =>
@@ -727,13 +729,14 @@ object TreasuryService {
         install: Contract[WalletAppInstall.ContractId, WalletAppInstall],
         transferContext: PaymentTransferContext,
         inputs: Seq[TransferInput],
-    ) = {
-      install.contractId.exerciseWalletAppInstall_ExecuteBatch(
-        transferContext,
-        inputs.asJava,
-        operationsToRun.map(_.operation).asJava,
+    ) =
+      install.exercise(
+        _.exerciseWalletAppInstall_ExecuteBatch(
+          transferContext,
+          inputs.asJava,
+          operationsToRun.map(_.operation).asJava,
+        )
       )
-    }
 
     def completeBatchOperations(
         outcomes: Exercised[ExecuteBatchResult]
