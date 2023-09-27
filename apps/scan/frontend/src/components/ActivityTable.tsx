@@ -9,14 +9,7 @@ import {
   TitledTable,
 } from 'common-frontend';
 import { useGetSvcPartyId, useActivity } from 'common-frontend/scan-api';
-import {
-  ListActivityResponseItem,
-  SenderAmount,
-  Transfer,
-  Mint,
-  SvRewardCollected,
-  Tap,
-} from 'scan-openapi';
+import { ListActivityResponseItem, SenderAmount, Transfer, CoinAmount } from 'scan-openapi';
 
 import { Button, Stack, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import Typography from '@mui/material/Typography';
@@ -200,40 +193,40 @@ function toActivities(item: ListActivityResponseItem, svcPartyId: string): Activ
     };
   }
 
-  function getActivityFromMint(mint: Mint): ActivityView {
+  function getActivityFromMint(mint: CoinAmount): ActivityView {
     return {
       activityType: 'Mint',
       provider: mint.coin_owner,
       sender: mint.coin_owner,
       receiver: mint.coin_owner,
       feesBurnt: BigNumber(0),
-      transferAmount: mint.coin_amount,
+      transferAmount: BigNumber(mint.coin_amount),
       coinPrice: BigNumber(item.coin_price),
       eventId: item.event_id,
     };
   }
 
-  function getActivityFromTap(tap: Tap): ActivityView {
+  function getActivityFromTap(tap: CoinAmount): ActivityView {
     return {
       activityType: 'Tap',
       provider: tap.coin_owner,
       sender: tap.coin_owner,
       receiver: tap.coin_owner,
       feesBurnt: BigNumber(0),
-      transferAmount: tap.coin_amount,
+      transferAmount: BigNumber(tap.coin_amount),
       coinPrice: BigNumber(item.coin_price),
       eventId: item.event_id,
     };
   }
 
-  function getActivityFromSvRewardCollected(svr: SvRewardCollected): ActivityView {
+  function getActivityFromSvRewardCollected(svr: CoinAmount): ActivityView {
     return {
       activityType: 'SV Reward Collected',
       provider: svcPartyId,
       sender: svcPartyId,
       receiver: svr.coin_owner,
       feesBurnt: BigNumber(0),
-      transferAmount: svr.coin_amount,
+      transferAmount: BigNumber(svr.coin_amount),
       coinPrice: BigNumber(item.coin_price),
       eventId: item.event_id,
     };

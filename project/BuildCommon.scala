@@ -1238,14 +1238,22 @@ object BuildCommon {
         // We use hashes to detect changes in input files, thus avoid having to deal with file timestamps,
         // and also support cases where we don't cache the entire build pipeline
         FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
-          runBuildCommand(workingDir, workspace, log)
+          runWorkspaceCommand(workingDir, "build", workspace, log)
+
+          // TODO(#7667) - we have to run the type check here because it depends on other things to be built first (e.g. common-frontend, openapi-ts-client, etc). Ideally we run this as part of our static checks instead (npmLint)
+          runWorkspaceCommand(workingDir, "type:check", workspace, log)
           val buildFiles = (baseDir / "build" ** "*").get.toSet
           buildFiles
         }
       (baseDir / "build", cache(sourceFiles union commonFrontendFiles))
     }
-    def runBuildCommand(workingDir: File, workspace: String, log: ManagedLogger) = runCommand(
-      Seq("npm", "run", "build", "--workspace", workspace),
+    def runWorkspaceCommand(
+        workingDir: File,
+        script: String,
+        workspace: String,
+        log: ManagedLogger,
+    ) = runCommand(
+      Seq("npm", "run", script, "--workspace", workspace),
       log,
       None,
       Some(workingDir),

@@ -497,48 +497,57 @@ lazy val `apps-common-frontend` = {
             // compile to get .d.ts and .js files. We cannot run this as part of
             // apps-common-frontend-openapi/compile because that does not yet run
             // npm install.
-            BuildCommon.TS.runBuildCommand(
+            BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
+              "build",
               "scan/openapi-ts-client",
               log,
             )
-            BuildCommon.TS.runBuildCommand(
+            BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
+              "build",
               "directory/openapi-ts-client",
               log,
             )
-            BuildCommon.TS.runBuildCommand(
+            BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
+              "build",
               "sv/openapi-ts-client",
               log,
             )
-            BuildCommon.TS.runBuildCommand(
+            BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
+              "build",
               "validator/openapi-ts-client",
               log,
             )
-            BuildCommon.TS.runBuildCommand(
+            BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
+              "build",
               "wallet/openapi-ts-client",
               log,
             )
-            BuildCommon.TS.runBuildCommand(
+            BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
+              "build",
               "wallet/external-openapi-ts-client",
               log,
             )
-            BuildCommon.TS.runBuildCommand(
+            BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
+              "build",
               "splitwell/openapi-ts-client",
               log,
             )
-            BuildCommon.TS.runBuildCommand(
+            BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
+              "build",
               "common-frontend",
               log,
             )
-            BuildCommon.TS.runBuildCommand(
+            BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
+              "build",
               "common-test-utils",
               log,
             )
@@ -572,8 +581,8 @@ lazy val `apps-common-frontend` = {
         val log = streams.value.log
         (Test / compile).value
         npmInstall.value
-        BuildCommon.TS.runBuildCommand(npmRootDir.value, "common-frontend", log)
-        BuildCommon.TS.runBuildCommand(npmRootDir.value, "common-test-utils", log)
+        BuildCommon.TS.runWorkspaceCommand(npmRootDir.value, "build", "common-frontend", log)
+        BuildCommon.TS.runWorkspaceCommand(npmRootDir.value, "build", "common-test-utils", log)
         runCommand(
           Seq("npm", "run", "test:sbt", "--workspaces", "--if-present"),
           log,
