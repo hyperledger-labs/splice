@@ -29,7 +29,7 @@ parameters:
     default: "20"
   run-job:
     type: enum
-    enum: [build, deploy-cidaily, deploy-cilr, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-cidaily, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
+    enum: [build, deploy-cidaily, deploy-cidaily-testnet, deploy-cilr, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-cidaily, healthcheck-cidaily-testnet, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
     default: build
   # Tag the current commit for the next TestNet release, overwriting the existing tag if it exists.
   mark-for-testnet:
@@ -72,7 +72,7 @@ notify-fail: &notify-fail
 cluster-parameter: &cluster-parameter
   cluster:
     type: enum
-    enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "cilr", "devnet", "testnet", "testnet-preview", "observability"]
+    enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "cidaily-testnet", "cilr", "devnet", "testnet", "testnet-preview", "observability"]
 commands:
   setup_nix:
     description: Set up Nix
@@ -482,7 +482,7 @@ commands:
         default: ""
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "cilr", "devnet", "testnet", "testnet-preview", "none", "observability"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "cidaily-testnet", "cilr", "devnet", "testnet", "testnet-preview", "none", "observability"]
         default: "none"
     steps:
       - run_bash_command_in_nix:
@@ -607,7 +607,7 @@ commands:
         default: false
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "cilr", "devnet", "testnet", "testnet-preview", "none", "observability"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "cidaily-testnet", "cilr", "devnet", "testnet", "testnet-preview", "none", "observability"]
         default: "none"
       additional_nix_args:
         type: string
@@ -2516,6 +2516,58 @@ workflows:
           requires:
             - deploy_cluster
 
+  deploy_cidaily_testnet:
+    when:
+      equal: [ deploy-cidaily-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+    - docker_images_push:
+        <<: *notify-fail
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+    - wait_for_previous_pipeline:
+        <<: *notify-fail
+        # <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        workflow_names: "deploy_cidaily_testnet cidaily_testnet_health_check"
+    - deploy_cluster:
+        # <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "cidaily-testnet"
+        restore_cluster: true
+        requires:
+           - docker_images_push
+           - wait_for_previous_pipeline
+    - preflight_check:
+        cluster: "cidaily-testnet"
+        <<: *non_devnet_preflight_params
+        # <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        requires:
+          - docker_images_push
+          - deploy_cluster
+    - deploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "cidaily-testnet"
+          restore_cluster: true
+          requires:
+            - deploy_cluster
+
   testnet_health_check:
     when:
       equal: [ healthcheck-testnet, << pipeline.parameters.run-job >> ]
@@ -2624,6 +2676,30 @@ workflows:
       - preflight_check:
           <<: *main-branch-only
           cluster: "testnet-preview"
+          <<: *non_devnet_preflight_params
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          requires:
+             - wait_for_previous_pipeline
+
+  cidaily_testnet_health_check:
+    when:
+      equal: [ healthcheck-cidaily-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          # <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for deployments, concurrent preflight checks are fine.
+          workflow_names: "deploy_cidaily_testnet"
+      - preflight_check:
+          # <<: *main-branch-only
+          cluster: "cidaily-testnet"
           <<: *non_devnet_preflight_params
           context:
             - artifactory

@@ -23,7 +23,7 @@ parameters:
     default: "20"
   run-job:
     type: enum
-    enum: [build, deploy-cidaily, deploy-cilr, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-cidaily, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
+    enum: [build, deploy-cidaily, deploy-cidaily-testnet, deploy-cilr, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-cidaily, healthcheck-cidaily-testnet, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
     default: build
   # Tag the current commit for the next TestNet release, overwriting the existing tag if it exists.
   mark-for-testnet:
@@ -66,4 +66,4 @@ notify-fail: &notify-fail
 cluster-parameter: &cluster-parameter
   cluster:
     type: enum
-    enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "cilr", "devnet", "testnet", "testnet-preview", "observability"]
+    enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "scratchnetf", "scratchnetg", "cimain", "cidaily", "cidaily-testnet", "cilr", "devnet", "testnet", "testnet-preview", "observability"]
