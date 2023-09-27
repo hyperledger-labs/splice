@@ -82,7 +82,7 @@ abstract class DbCNNodeAppStoreWithoutHistory(
       tableName,
       "THIS_STORE_DOES_NOT_HAVE_A_TXLOG",
       storeDescriptor,
-    ) { this: ConfiguredDefaultDomain =>
+    ) {
 
   override def ingestionTxLogInsert(record: TxLogStore.IndexRecord)(implicit
       tc: TraceContext
