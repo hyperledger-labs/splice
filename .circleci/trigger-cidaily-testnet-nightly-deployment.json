@@ -1,6 +1,6 @@
 {
     "name": "CIDaily TestNet Nightly Re-deployment",
-    "description": "Nightly Re-deployment of CIDailt TestNet",
+    "description": "Nightly Re-deployment of CIDaily TestNet",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
