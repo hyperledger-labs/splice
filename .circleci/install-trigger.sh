@@ -39,7 +39,7 @@ endpoint="https://circleci.com/api/v2/project/github/DACH-NY/canton-network-node
 
 existing_schedule=$(curl -s "$endpoint" \
     -H "Content-Type: application/json" \
-    -H "circle-token: $CIRCLECI_TOKEN" | jq -c '.items[] | select(.name | contains($ARGS.positional[0]))' --jsonargs "${TRIGGER_NAME}")
+    -H "circle-token: $CIRCLECI_TOKEN" | jq -c '.items[] | select(.name == $ARGS.positional[0])' --jsonargs "${TRIGGER_NAME}")
 
 if [[ -n $existing_schedule ]]; then
     echo "Trigger ${TRIGGER_NAME} already exists... patching"
