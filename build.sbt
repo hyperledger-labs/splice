@@ -340,6 +340,7 @@ lazy val `apps-validator` =
     .settings(
       libraryDependencies ++= Seq(akka_http_cors, commons_compress, jaxb_abi),
       BuildCommon.sharedAppSettings,
+      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
         npmName = "validator-openapi",
         openApiSpec = "validator-internal.yaml",
@@ -377,6 +378,7 @@ lazy val `apps-sv` =
         comet_bft_proto,
       ),
       BuildCommon.sharedAppSettings,
+      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
         npmName = "sv-openapi",
         openApiSpec = "sv-internal.yaml",
@@ -407,6 +409,7 @@ lazy val `apps-scan` =
     .settings(
       libraryDependencies ++= Seq(akka_http_cors, scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
+      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
         npmName = "scan-openapi",
         openApiSpec = "scan-internal.yaml",
@@ -684,6 +687,7 @@ lazy val `apps-wallet` =
     )
     .settings(
       BuildCommon.sharedAppSettings,
+      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
         npmName = "wallet-external-openapi",
         openApiSpec = "wallet-external.yaml",
@@ -722,6 +726,7 @@ lazy val `apps-directory` =
     )
     .settings(
       libraryDependencies ++= Seq(akka_http_cors),
+      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
         npmName = "directory-openapi",
         openApiSpec = "directory-internal.yaml",
@@ -760,6 +765,7 @@ lazy val `apps-splitwell` =
     )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
         npmName = "splitwell-openapi",
         openApiSpec = "splitwell-internal.yaml",
@@ -847,6 +853,38 @@ lazy val pulumi =
         }
         cache(Set(npmRootDir.value / "package.json")).toSeq
       },
+    )
+
+lazy val patchTemplate = taskKey[File]("patch an openapi codegen template")
+
+lazy val `openapi-typescript-template` =
+  project
+    .in(file("openapi-templates"))
+    .settings(
+      patchTemplate := {
+        val log = streams.value.log
+        val template = baseDirectory.value / "typescript"
+        val patch = baseDirectory.value / "typescript.patch"
+        // ensure directory exists
+        runCommand(Seq("mkdir", "-p", s"$template"), log)
+        // copy the typescript template out to the directory
+        runCommand(
+          Seq(
+            "openapi-generator-cli",
+            "author",
+            "template",
+            "-g",
+            "typescript",
+            "-o",
+            s"$template",
+          ),
+          log,
+        )
+        // apply a patch file
+        runCommand(Seq("patch", "-p0", "-i", s"$patch"), log, optCwd = Some(baseDirectory.value))
+        template
+      },
+      cleanFiles += baseDirectory.value / "typescript",
     )
 
 // Copied from Canton. Can probably be removed once we use Canton as a library.

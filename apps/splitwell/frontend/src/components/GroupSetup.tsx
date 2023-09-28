@@ -51,9 +51,11 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
   const setGroupInviteInput = useCallback(
     (rawValue: string) => {
       try {
-        const decodedInvite = JSON.parse(rawValue);
-        const inviteContract = Contract.fromJsonString<GroupInvite>(rawValue);
-        const inviteDomainId = (decodedInvite as { domainId: string }).domainId;
+        const { domainId: inviteDomainId, ...rest } = JSON.parse(rawValue);
+        if (!inviteDomainId) {
+          throw new Error('expected domain id, none found');
+        }
+        const inviteContract = Contract.fromUnknown(rest, GroupInvite);
         const inviteRules = rulesMap.get(inviteDomainId);
         setGroupInvite({
           originalText: rawValue,

@@ -3,6 +3,7 @@ import {
   Contract as OpenAPIContract,
   ContractWithState as OpenAPIContractWithState,
 } from 'splitwell-openapi';
+import { z } from 'zod';
 
 import { DisclosedContract } from '@daml/ledger';
 import { ContractId, ContractTypeCompanion, Template } from '@daml/types';
@@ -28,7 +29,6 @@ export interface AssignedContract<T> {
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const Contract = {
-  // TODO(#7670) - try to improve type safety of openAPI contract decoding
   decodeOpenAPI: <T extends object, K, I extends string>(
     c: OpenAPIContract,
     tmpl: ContractTypeCompanion<T, K, I>
@@ -50,8 +50,27 @@ export const Contract = {
     payload: tmpl.encode(c.payload),
     metadata: c.metadata,
   }),
-  // TODO(#7670) -- trust that our json string is valid, perhaps eventually use zod to validate
-  fromJsonString: <T extends object>(j: string): Contract<T> => JSON.parse(j),
+  fromUnknown: <T extends object, K, I extends string>(
+    data: unknown,
+    tmpl: ContractTypeCompanion<T, K, I>
+  ): Contract<T> => {
+    const payloadSchema = z.custom<T>(val => tmpl.decoder.run(val).ok);
+    const contractSchema = z.object({
+      contractId: z.custom<ContractId<T>>(val => typeof val === 'string'),
+      // for some reason, TS cant infer types correctly if we in-line the generic custom payload schema here,
+      // so we'll just validate it separately
+      payload: z.any(),
+      metadata: z.object({
+        createdAt: z.string(),
+        keyHash: z.string(),
+        driverMetadata: z.string(),
+      }),
+    });
+
+    const contract = contractSchema.parse(data);
+
+    return { ...contract, payload: payloadSchema.parse(contract.payload) };
+  },
 };
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare

@@ -1,0 +1,39 @@
+diff -ru typescript/model/ObjectSerializer.mustache new/model/ObjectSerializer.mustache
+--- typescript/model/ObjectSerializer.mustache	2023-09-27 19:49:54.759457078 +0000
++++ new/model/ObjectSerializer.mustache	2023-09-27 19:51:13.848778963 +0000
+@@ -19,6 +19,7 @@
+                     "long",
+                     "float",
+                     "number",
++                    "unknown",
+                     "any"
+                  ];
+
+diff -ru typescript/model/model.mustache new/model/model.mustache
+--- typescript/model/model.mustache	2023-09-27 19:49:54.759037540 +0000
++++ new/model/model.mustache	2023-09-27 19:50:50.384325401 +0000
+@@ -19,7 +19,7 @@
+     * {{{.}}}
+     */
+ {{/description}}
+-    '{{name}}'{{^required}}?{{/required}}: {{#isEnum}}{{{datatypeWithEnum}}}{{/isEnum}}{{^isEnum}}{{{dataType}}}{{/isEnum}}{{#isNullable}} | null{{/isNullable}};
++    '{{name}}'{{^required}}?{{/required}}: {{#isEnum}}{{{datatypeWithEnum}}}{{/isEnum}}{{^isEnum}}{{#isFreeFormObject}}unknown{{/isFreeFormObject}}{{^isFreeFormObject}}{{{dataType}}}{{/isFreeFormObject}}{{/isEnum}}{{#isNullable}} | null{{/isNullable}};
+ {{/vars}}
+
+     {{#discriminator}}
+@@ -35,7 +35,7 @@
+         {
+             "name": "{{name}}",
+             "baseName": "{{baseName}}",
+-            "type": "{{#isEnum}}{{{datatypeWithEnum}}}{{/isEnum}}{{^isEnum}}{{{dataType}}}{{/isEnum}}",
++            "type": "{{#isEnum}}{{{datatypeWithEnum}}}{{/isEnum}}{{^isEnum}}{{#isFreeFormObject}}unknown{{/isFreeFormObject}}{{^isFreeFormObject}}{{{dataType}}}{{/isFreeFormObject}}{{/isEnum}}",
+             "format": "{{dataFormat}}"
+         }{{^-last}},
+         {{/-last}}
+@@ -81,4 +81,4 @@
+ export type {{classname}} ={{#allowableValues}}{{#values}} "{{.}}" {{^-last}}|{{/-last}}{{/values}}{{/allowableValues}};
+ {{/isEnum}}
+ {{/model}}
+-{{/models}}
+\ No newline at end of file
++{{/models}}

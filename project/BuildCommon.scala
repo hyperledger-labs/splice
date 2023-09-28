@@ -37,6 +37,7 @@ object BuildCommon {
     lazy val npmTest = taskKey[Unit]("run all frontend unit tests")
 
     lazy val compileOpenApi = taskKey[Seq[File]]("build typescript code")
+    lazy val templateDirectory = taskKey[File]("directory to openapi template")
     lazy val frontendWorkspace = settingKey[String]("npm workspace to bundle")
     lazy val commonFrontendBundle =
       taskKey[Set[File]]("common frontend bundle task to run before the app frontend bundle")
@@ -1295,6 +1296,7 @@ object BuildCommon {
       val cacheDir = streams.value.cacheDirectory / directory
 
       val openApiSpecFile = baseDirectory.value / "src/main/openapi/" / openApiSpec
+      val template = templateDirectory.value
       val cache = FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
         runCommand(
           Seq(
@@ -1302,12 +1304,14 @@ object BuildCommon {
             "generate",
             "-g",
             "typescript",
+            "-t",
+            s"$template",
             "-p",
-            s"npmName=${npmName}",
+            s"npmName=$npmName",
             "-p",
-            s"moduleName=${npmModuleName}",
+            s"moduleName=$npmModuleName",
             "-p",
-            s"projectName=${npmProjectName}",
+            s"projectName=$npmProjectName",
             "-p",
             "enumPropertyNaming=original",
             "-p",
