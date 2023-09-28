@@ -137,14 +137,13 @@ object GlobalDomainMigrationCoverageTest {
       subsCodegen.SubscriptionPayment.COMPANION -> todoCnsDirectory,
       globaldomain.MemberTraffic.COMPANION -> "tied to a specific domainId, never migrated",
       topUpCodegen.ValidatorTopUpState.COMPANION -> "tied to a specific domainId, never migrated",
-      vo.UsedSecret.COMPANION -> "TODO (#7821) validator onboarding migration needed?",
-      vo.ValidatorOnboarding.COMPANION -> "TODO (#7821) validator onboarding migration needed?",
-      coinimport.ImportCrate.COMPANION ->
-        "import only occurs during svc bootstrapping, before a global domain migration is possible",
-      coin.AppRewardCoupon.COMPANION -> "TODO (#7822) reward coupon migration?",
-      coin.LockedCoin.COMPANION -> "TODO (#7822) locked coin migration?",
-      coin.ValidatorRewardCoupon.COMPANION -> "TODO (#7822) reward coupon migration?",
-      svc.coinprice.CoinPriceVote.COMPANION -> "TODO (#7822) CoinPriceVote migration?",
+      vo.UsedSecret.COMPANION -> "TODO (#7821) follow SvcRules in SvSv",
+      vo.ValidatorOnboarding.COMPANION -> "TODO (#7821) follow SvcRules in SvSv",
+      coinimport.ImportCrate.COMPANION -> "TODO (#7822) follow CoinRules in SvSvc",
+      coin.AppRewardCoupon.COMPANION -> "TODO (#7822) follow CoinRules in UserWallet",
+      coin.LockedCoin.COMPANION -> "TODO (#7822) follow CoinRules in UserWallet",
+      coin.ValidatorRewardCoupon.COMPANION -> "TODO (#7822) follow CoinRules in UserWallet",
+      svc.coinprice.CoinPriceVote.COMPANION -> "TODO (#7822) follow CoinRules in SvSvc",
     ).view.map { case (c, reason) => (c.TEMPLATE_ID, reason) }.toMap
   }
 }

@@ -237,7 +237,7 @@ object ValidatorStore {
   private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
     Seq[ConstrainedTemplate](
       walletCodegen.WalletAppInstall.COMPANION,
-      coinCodegen.Coin.COMPANION,
+      coinCodegen.Coin.COMPANION, // TODO (#7822) move to UserWallet
       coinCodegen.ValidatorRight.COMPANION,
       appManagerCodegen.AppConfiguration.COMPANION,
       appManagerCodegen.AppRelease.COMPANION,
