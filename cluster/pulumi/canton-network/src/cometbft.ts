@@ -100,7 +100,7 @@ export function installCometBftNode(
   };
   // Enabling state sync only for sv-4 during testing
   if (nodename === 'sv-4') {
-    stateSync.enable = true;
+    stateSync.enable = false;
     stateSync.rpcServers =
       rpcServiceAddress('cometbft-sv-1', 'sv-1') + ',' + rpcServiceAddress('cometbft-sv-1', 'sv-1');
   }
