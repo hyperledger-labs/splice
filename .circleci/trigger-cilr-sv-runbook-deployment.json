@@ -1,10 +1,10 @@
 {
-    "name": "CILR SV Runbook Deployment",
-    "description": "Daily CILR SV Runbook Deployment",
+    "name": "CILR SV Runbook Redeployment",
+    "description": "Daily CILR SV Runbook Redeployment",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
-      "run-job": "deploy-sv-runbook-cilr"
+      "run-job": "redeploy-sv-runbook-cilr"
     },
     "timetable" : {
       "per-hour" : 1,

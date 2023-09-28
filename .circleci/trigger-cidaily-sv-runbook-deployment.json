@@ -1,10 +1,10 @@
 {
-    "name": "CIDaily SV Runbook Deployment",
-    "description": "CIDaily SV Runbook Deployment every 4 hours",
+    "name": "CIDaily SV Runbook Redeployment",
+    "description": "CIDaily SV Runbook Redeployment every 4 hours",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
-      "run-job": "deploy-sv-runbook-cidaily",
+      "run-job": "redeploy-sv-runbook-cidaily"
     },
     "timetable" : {
       "per-hour" : 1,

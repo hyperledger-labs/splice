@@ -622,7 +622,7 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "deploy_cidaily deploy_sv_runbook_cidaily"
+          workflow_names: "deploy_cidaily redeploy_sv_runbook_cidaily"
       - preflight_check:
           <<: *main-branch-only
           cluster: "cidaily"
@@ -645,7 +645,7 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "deploy_cilr deploy_sv_runbook_cilr"
+          workflow_names: "deploy_cilr redeploy_sv_runbook_cilr"
       - preflight_check:
           <<: *main-branch-only
           cluster: "cilr"
@@ -715,7 +715,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cidaily deploy_sv_runbook_cidaily cidaily_health_check"
+          workflow_names: "deploy_cidaily redeploy_sv_runbook_cidaily cidaily_health_check"
       - redeploy_sv_runbook:
           <<: *main-branch-only
           context:
@@ -749,7 +749,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cilr deploy_sv_runbook_cilr cilr_health_check"
+          workflow_names: "deploy_cilr redeploy_sv_runbook_cilr cilr_health_check"
       - redeploy_sv_runbook:
           <<: *main-branch-only
           context:
