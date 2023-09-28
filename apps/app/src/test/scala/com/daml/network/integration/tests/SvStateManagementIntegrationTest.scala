@@ -360,7 +360,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
     clue("We should be able to query vote requests that have been executed") {
       eventually() {
-        val voteResult = sv1Backend.listVoteResults(None, Some(true), None, None, None, 1).head
+        val voteResult =
+          sv1Backend.listVoteResults(None, Some(true), None, None, None, 1).headOption.value
 
         voteResult.executed shouldBe true
         voteResult.acceptedBy should contain(
