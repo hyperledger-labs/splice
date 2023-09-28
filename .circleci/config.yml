@@ -29,7 +29,9 @@ parameters:
     default: "20"
   run-job:
     type: enum
-    enum: [build, deploy-cidaily, deploy-cidaily-testnet, deploy-cilr, deploy-devnet, deploy-testnet, deploy-testnet-preview, healthcheck-cidaily, healthcheck-cidaily-testnet, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
+    enum: [build, deploy-cidaily, deploy-cidaily-testnet, deploy-cilr, deploy-devnet, deploy-testnet, deploy-testnet-preview,
+           healthcheck-cidaily, healthcheck-cidaily-testnet, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview,
+           redeploy-sv-runbook-cidaily, redeploy-sv-runbook-cilr, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
     default: build
   # Tag the current commit for the next TestNet release, overwriting the existing tag if it exists.
   mark-for-testnet:
@@ -1432,6 +1434,51 @@ jobs:
           cluster: << parameters.cluster >>
       - collect_test_timings_and_send_to_datadog
 
+  # TODO(#7554): Once we no longer need a VPN connection to do this, combine the deploy_sv_runbook and redeploy_sv_runbook jobs into 1.
+  redeploy_sv_runbook:
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parameters:
+      <<: *cluster-parameter
+      use_published_artifacts:
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - record_job_start_time
+      # Needs to occur before setup_vpn_routes
+      - setup_nix
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - checkout_cluster_version:
+          cluster: <<parameters.cluster>>
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+      - run_bash_command_in_nix:
+          cmd_name: Apply SV-runbook Kubernetes manifest to cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            VERSION=""
+            if [[ << parameters.use_published_artifacts >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+            fi
+            cncluster ci_pdown_sv
+            cncluster ci_apply_sv $VERSION
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+      - collect_test_timings_and_send_to_datadog
+
   deploy_cluster:
     circleci_ip_ranges: true
     docker:
@@ -2626,7 +2673,7 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "deploy_cidaily"
+          workflow_names: "deploy_cidaily deploy_sv_runbook_cidaily"
       - preflight_check:
           <<: *main-branch-only
           cluster: "cidaily"
@@ -2649,7 +2696,7 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "deploy_cilr"
+          workflow_names: "deploy_cilr deploy_sv_runbook_cilr"
       - preflight_check:
           <<: *main-branch-only
           cluster: "cilr"
@@ -2708,6 +2755,74 @@ workflows:
             - slack-context
           requires:
              - wait_for_previous_pipeline
+
+  redeploy_sv_runbook_cidaily:
+    when:
+      equal: [ redeploy-sv-runbook-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily deploy_sv_runbook_cidaily cidaily_health_check"
+      - redeploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "cidaily"
+          use_published_artifacts: false
+          requires:
+            - wait_for_previous_pipeline
+      - preflight_sv_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "cidaily"
+          sync_with_cluster_version: true
+          requires:
+            - redeploy_sv_runbook
+
+  redeploy_sv_runbook_cilr:
+    when:
+      equal: [ redeploy-sv-runbook-cilr, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cilr deploy_sv_runbook_cilr cilr_health_check"
+      - redeploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "cilr"
+          use_published_artifacts: false
+          requires:
+            - wait_for_previous_pipeline
+      - preflight_sv_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "cilr"
+          sync_with_cluster_version: true
+          requires:
+            - redeploy_sv_runbook
 
   auth0_user_cleanup:
     when:

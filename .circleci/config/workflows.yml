@@ -622,7 +622,7 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "deploy_cidaily"
+          workflow_names: "deploy_cidaily deploy_sv_runbook_cidaily"
       - preflight_check:
           <<: *main-branch-only
           cluster: "cidaily"
@@ -645,7 +645,7 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "deploy_cilr"
+          workflow_names: "deploy_cilr deploy_sv_runbook_cilr"
       - preflight_check:
           <<: *main-branch-only
           cluster: "cilr"
@@ -704,6 +704,74 @@ workflows:
             - slack-context
           requires:
              - wait_for_previous_pipeline
+
+  redeploy_sv_runbook_cidaily:
+    when:
+      equal: [ redeploy-sv-runbook-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily deploy_sv_runbook_cidaily cidaily_health_check"
+      - redeploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "cidaily"
+          use_published_artifacts: false
+          requires:
+            - wait_for_previous_pipeline
+      - preflight_sv_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "cidaily"
+          sync_with_cluster_version: true
+          requires:
+            - redeploy_sv_runbook
+
+  redeploy_sv_runbook_cilr:
+    when:
+      equal: [ redeploy-sv-runbook-cilr, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cilr deploy_sv_runbook_cilr cilr_health_check"
+      - redeploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "cilr"
+          use_published_artifacts: false
+          requires:
+            - wait_for_previous_pipeline
+      - preflight_sv_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "cilr"
+          sync_with_cluster_version: true
+          requires:
+            - redeploy_sv_runbook
 
   auth0_user_cleanup:
     when:
