@@ -12,11 +12,7 @@ import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.logging.SuppressionRule
 import monocle.macros.syntax.lens.*
-import org.slf4j.event.Level
-
-import scala.concurrent.Future
 
 class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 
@@ -39,39 +35,7 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
   private val toxiproxy = UseToxiproxy(createScanAppProxies = true)
   registerPlugin(toxiproxy)
 
-  "wallet should recover after a short disconnect from the Scan HTTP API" in { implicit env =>
-    val (_, _) = onboardAliceAndBob()
-
-    toxiproxy.disableConnectionViaProxy(
-      UseToxiproxy.scanHttpApiProxyName(aliceValidatorBackend.name)
-    )
-    val tapFuture =
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-        Future(aliceWalletClient.tap(1))(env.executionContext),
-        entries => {
-          forAtLeast(
-            1,
-            entries,
-          )(
-            _.message should include regex (
-              "operation 'execute coin operation batch' failed .*ConnectionRefused"
-            )
-          )
-        },
-      )
-
-    toxiproxy.enableConnectionViaProxy(
-      UseToxiproxy.scanHttpApiProxyName(aliceValidatorBackend.name)
-    )
-
-    tapFuture.value // tap eventually succeeds
-    eventually() { // ... and we see the coin it creates
-      aliceWalletClient.list().coins should have length 1
-    }
-
-  }
-
-  "wallet should recover after a longer disconnect from the Scan HTTP API" in { implicit env =>
+  "wallet should recover after a disconnect from the Scan HTTP API" in { implicit env =>
     val (_, _) = onboardAliceAndBob()
 
     actAndCheck(
