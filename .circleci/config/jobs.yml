@@ -421,7 +421,7 @@ jobs:
                   cncluster wait validator1 validator-app
                   cncluster wait splitwell validator-app
                   cncluster wait sv-1 validator-app
-                  if [[ "$IS_DEVNET" != false ]]; then
+                  if [[ "${IS_DEVNET-}" != false ]]; then
                     cncluster wait sv-2 validator-app
                     cncluster wait sv-3 validator-app
                     cncluster wait sv-4 validator-app
@@ -459,7 +459,7 @@ jobs:
                   cncluster wait validator1 validator-app
                   cncluster wait splitwell validator-app
                   cncluster wait sv-1 validator-app
-                  if [[ "$IS_DEVNET" != false ]]; then
+                  if [[ "${IS_DEVNET-}" != false ]]; then
                     cncluster wait sv-2 validator-app
                     cncluster wait sv-3 validator-app
                     cncluster wait sv-4 validator-app
