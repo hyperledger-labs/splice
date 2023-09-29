@@ -36,8 +36,8 @@ spec:
                 canton.sv-apps.sv.onboarding.bootstrapping-dump {
                   type = gcp
                   bucket {
-                    project-id = {{ .bucket.config.projectId }}
-                    bucket-name = {{ .bucket.config.bucketName }}
+                    project-id = {{ .bucket.projectId }}
+                    bucket-name = {{ .bucket.bucketName }}
                     credentials {
                       type = service-account
                       json-credentials = ${CN_APP_SV_BOOTSTRAPPING_DUMP_SERVICE_ACCOUNT_CREDENTIALS}
@@ -150,8 +150,8 @@ spec:
                 canton.sv-apps.sv.acs-store-dump = {
                   type = gcp
                   bucket {
-                    project-id = {{ .bucket.config.projectId }}
-                    bucket-name = {{ .bucket.config.bucketName }}
+                    project-id = {{ .bucket.projectId }}
+                    bucket-name = {{ .bucket.bucketName }}
                     credentials {
                       type = service-account
                       json-credentials = ${CN_APP_SV_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}

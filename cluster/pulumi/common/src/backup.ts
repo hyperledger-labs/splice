@@ -5,21 +5,18 @@ import { Bucket, File, Storage } from '@google-cloud/storage';
 import { ExactNamespace, config } from 'cn-pulumi-common';
 import { exit } from 'process';
 
-export type GcpBucketConfig = {
+export type GcpBucket = {
   projectId: string;
   bucketName: string;
-};
-
-export type GcpBucket = {
-  config: GcpBucketConfig;
   secretName: string;
   jsonCredentials: string;
 };
 
-export function installGcpBucket(bucketConfig: GcpBucketConfig): GcpBucket {
+export function bootstrapDataBucketSpec(projectId: string, bucketName: string): GcpBucket {
   return {
-    config: bucketConfig,
-    secretName: `cn-gcp-bucket-${bucketConfig.projectId}-${bucketConfig.bucketName}`,
+    projectId,
+    bucketName,
+    secretName: `cn-gcp-bucket-${projectId}-${bucketName}`,
     jsonCredentials: config.require('DATA_EXPORT_BUCKET_SA_KEY_JSON'),
   };
 }
@@ -31,7 +28,10 @@ export type BackupConfig = {
 };
 
 // Install the bucket's secret into a namespace so apps in there can access the GCP bucket
-export function installGcpBucketSecret(xns: ExactNamespace, bucket: GcpBucket): k8s.core.v1.Secret {
+export function installBootstrapDataBucketSecret(
+  xns: ExactNamespace,
+  bucket: GcpBucket
+): k8s.core.v1.Secret {
   return new k8s.core.v1.Secret(
     `cn-app-${xns.logicalName}-${bucket.secretName}`,
     {
@@ -50,12 +50,12 @@ export function installGcpBucketSecret(xns: ExactNamespace, bucket: GcpBucket): 
   );
 }
 
-function getGcpBucket(bucketConfig: GcpBucketConfig, credentials: string): Bucket {
+function openGcpBucket(bucket: GcpBucket): Bucket {
   const storage: Storage = new Storage({
-    projectId: bucketConfig.projectId,
-    credentials: JSON.parse(credentials),
+    projectId: bucket.projectId,
+    credentials: JSON.parse(bucket.jsonCredentials),
   });
-  return storage.bucket(bucketConfig.bucketName);
+  return storage.bucket(bucket.bucketName);
 }
 
 async function fetchBucketFile(bucket: Bucket, file: File): Promise<string> {
@@ -114,7 +114,7 @@ export function getLatestSvcAcsDumpFile(
   xns: ExactNamespace,
   config: BootstrappingDumpConfig
 ): Promise<File> {
-  const bucket = getGcpBucket(config.bucket.config, config.bucket.jsonCredentials);
+  const bucket = openGcpBucket(config.bucket);
   return getLatestObjectInDateRange(
     bucket,
     `${bucketPath(config.cluster, xns)}/svc_acs_dump_`,
@@ -154,7 +154,7 @@ export function fetchAndInstallParticipantBootstrapDump(
   xns: ExactNamespace,
   config: BootstrappingDumpConfig
 ): k8s.core.v1.Secret {
-  const bucket = getGcpBucket(config.bucket.config, config.bucket.jsonCredentials);
+  const bucket = openGcpBucket(config.bucket);
   const content = getLatestParticipantIdentitiesDump(
     bucket,
     xns,

@@ -108,8 +108,8 @@ spec:
             canton.validator-apps.validator_backend.participant-identities-backup = {
               type = gcp
               bucket {
-                project-id = {{ .bucket.config.projectId }}
-                bucket-name = {{ .bucket.config.bucketName }}
+                project-id = {{ .bucket.projectId }}
+                bucket-name = {{ .bucket.bucketName }}
                 credentials {
                   type = service-account
                   json-credentials = ${CN_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}

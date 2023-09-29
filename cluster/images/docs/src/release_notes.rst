@@ -10,6 +10,9 @@ Release Notes
 
     * The SV name for the node operated by Digital Asset on DevNet has been updated.
       Note the updated SV name in ``approved-sv-id-values-dev.yaml``: `Digital-Asset`.
+    * The bucket configuration structure for the SV app and validator
+      is now flattened. `projectId` and `bucketName` are now specified
+      at the top level rather than in a `config` structure.
 
 * Frontend updates
 

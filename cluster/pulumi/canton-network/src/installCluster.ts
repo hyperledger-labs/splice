@@ -4,11 +4,10 @@ import {
   BackupConfig,
   BootstrappingDumpConfig,
   envFlag,
-  GcpBucketConfig,
   InfrastructureOutputs,
   REPO_ROOT,
   infraStack,
-  installGcpBucket,
+  bootstrapDataBucketSpec,
   isDevNet,
   loadYamlFromFile,
   svKeyFromSecret,
@@ -122,32 +121,27 @@ const validator1Onboarding = {
   expiresIn: '1h',
 };
 
-const backupBucketConfig: GcpBucketConfig = {
-  projectId: 'da-cn-devnet',
-  bucketName: 'da-cn-data-dumps',
-};
-
 let backupConfig: BackupConfig | undefined;
 let bootstrappingDumpConfig: BootstrappingDumpConfig | undefined;
 
-if (!isDevNet || bootstrappingConfig) {
-  const backupBucket = installGcpBucket(backupBucketConfig);
-  if (!isDevNet) {
-    backupConfig = { backupInterval: '10m', bucket: backupBucket };
-  }
-  if (bootstrappingConfig) {
-    const end = new Date(Date.parse(bootstrappingConfig.date));
-    // We search within an interval of 2 hours. Given that we usually backups every 10min, this gives us
-    // more than enough of a threshold to make sure each node has one backup in that interval
-    // while also having sufficiently few backups that the bucket query is fast.
-    const start = new Date(end.valueOf() - 2 * 60 * 60 * 1000);
-    bootstrappingDumpConfig = {
-      bucket: backupBucket,
-      cluster: bootstrappingConfig.cluster,
-      start,
-      end,
-    };
-  }
+const bootstrapBucketSpec = bootstrapDataBucketSpec('da-cn-devnet', 'da-cn-data-dumps');
+
+if (!isDevNet) {
+  backupConfig = { backupInterval: '10m', bucket: bootstrapBucketSpec };
+}
+
+if (bootstrappingConfig) {
+  const end = new Date(Date.parse(bootstrappingConfig.date));
+  // We search within an interval of 2 hours. Given that we usually backups every 10min, this gives us
+  // more than enough of a threshold to make sure each node has one backup in that interval
+  // while also having sufficiently few backups that the bucket query is fast.
+  const start = new Date(end.valueOf() - 2 * 60 * 60 * 1000);
+  bootstrappingDumpConfig = {
+    bucket: bootstrapBucketSpec,
+    cluster: bootstrappingConfig.cluster,
+    start,
+    end,
+  };
 }
 
 export async function installCluster(auth0Client: Auth0Client): Promise<void> {

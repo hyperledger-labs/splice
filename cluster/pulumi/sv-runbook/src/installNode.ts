@@ -8,10 +8,9 @@ import {
   exactNamespace,
   fetchAndInstallParticipantBootstrapDump,
   fixedTokens,
-  GcpBucketConfig,
   infraStack,
-  installGcpBucket,
-  installGcpBucketSecret,
+  bootstrapDataBucketSpec,
+  installBootstrapDataBucketSecret,
   isDevNet,
   loadYamlFromFile,
   participantBootstrapDumpSecretName,
@@ -68,11 +67,6 @@ const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
 
 const participantIdentitiesFile = process.env.PARTICIPANT_IDENTITIES_FILE;
 
-const backupBucketConfig: GcpBucketConfig = {
-  projectId: 'da-cn-devnet',
-  bucketName: 'da-cn-data-dumps',
-};
-
 const SV_WALLET_USER_ID =
   process.env.SV_WALLET_USER_ID ||
   (isDevNet ? 'auth0|64b16b9ff7a0dfd00ea3704e' : 'auth0|64553aa683015a9687d9cc2e'); // Default to admin@sv-dev.com (devnet) or admin@sv.com (non devnet) at the sv-test tenant by default
@@ -124,25 +118,30 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   let backupConfigSecret: pulumi.Resource | undefined;
   let backupConfig: BackupConfig | undefined;
 
+  const bootstrapBucketSpec = bootstrapDataBucketSpec('da-cn-devnet', 'da-cn-data-dumps');
+
+  if (bootstrappingConfig || !isDevNet) {
+    backupConfig = {
+      prefix: `${CLUSTER_BASENAME}/${SV_NAMESPACE}`,
+      backupInterval: '10m',
+      bucket: bootstrapBucketSpec,
+    };
+    backupConfigSecret = installBootstrapDataBucketSecret(svNamespace, backupConfig.bucket);
+  }
+
   if (participantIdentitiesFile) {
     participantBootstrapDumpSecret = await readAndInstallParticipantBootstrapDump(
       svNamespace,
       participantIdentitiesFile
     );
   } else if (bootstrappingConfig) {
-    const backupBucket = installGcpBucket(backupBucketConfig);
-    backupConfig = {
-      prefix: `${CLUSTER_BASENAME}/${SV_NAMESPACE}`,
-      backupInterval: '10m',
-      bucket: backupBucket,
-    };
     const end = new Date(Date.parse(bootstrappingConfig.date));
     // We search within an interval of 2 hours. Given that we usually backups every 10min, this gives us
     // more than enough of a threshold to make sure each node has one backup in that interval
     // while also having sufficiently few backups that the bucket query is fast.
     const start = new Date(end.valueOf() - 2 * 60 * 60 * 1000);
     const bootstrappingDumpConfig = {
-      bucket: backupBucket,
+      bucket: bootstrapBucketSpec,
       cluster: bootstrappingConfig.cluster,
       start,
       end,
@@ -151,7 +150,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       svNamespace,
       bootstrappingDumpConfig
     );
-    backupConfigSecret = installGcpBucketSecret(svNamespace, backupConfig.bucket);
   }
 
   const postgres = installCNSVHelmChart(

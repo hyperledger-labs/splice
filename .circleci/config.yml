@@ -2592,14 +2592,14 @@ workflows:
           - slack-context
     - wait_for_previous_pipeline:
         <<: *notify-fail
-        # <<: *main-branch-only
+        <<: *main-branch-only
         context:
           - artifactory
           - datadog
           - slack-context
         workflow_names: "deploy_cidaily_testnet cidaily_testnet_health_check"
     - deploy_cluster:
-        # <<: *main-branch-only
+        <<: *main-branch-only
         context:
           - artifactory
           - datadog
@@ -2612,7 +2612,7 @@ workflows:
     - preflight_check:
         cluster: "cidaily-testnet"
         <<: *non_devnet_preflight_params
-        # <<: *main-branch-only
+        <<: *main-branch-only
         context:
           - artifactory
           - canton-network-vpn

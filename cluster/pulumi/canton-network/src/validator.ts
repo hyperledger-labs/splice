@@ -8,7 +8,7 @@ import {
   CLUSTER_BASENAME,
   ExactNamespace,
   fetchAndInstallParticipantBootstrapDump,
-  installGcpBucketSecret,
+  installBootstrapDataBucketSecret,
   participantBootstrapDumpSecretName,
 } from 'cn-pulumi-common';
 import { domainFeesConfig } from 'cn-pulumi-common/src/domainFeesCfg';
@@ -68,7 +68,7 @@ export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
   const backupConfigSecret: pulumi.Resource | undefined = config.backupConfig
     ? config.backupConfig.secret
       ? config.backupConfig.secret
-      : installGcpBucketSecret(config.xns, config.backupConfig.config.bucket)
+      : installBootstrapDataBucketSecret(config.xns, config.backupConfig.config.bucket)
     : undefined;
 
   const dependsOn: pulumi.Resource[] = [

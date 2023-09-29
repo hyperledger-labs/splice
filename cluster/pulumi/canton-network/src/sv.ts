@@ -13,7 +13,7 @@ import {
   installAuth0Secret,
   installAuth0UISecret,
   installCNHelmChart,
-  installGcpBucketSecret,
+  installBootstrapDataBucketSecret,
   participantBootstrapDumpSecretName,
 } from 'cn-pulumi-common';
 import type { Auth0Client, SvIdKey } from 'cn-pulumi-common';
@@ -146,7 +146,7 @@ export function installSvNode(config: SvConfig): {
     : undefined;
 
   const backupConfigSecret: pulumi.Resource | undefined = config.backupConfig
-    ? installGcpBucketSecret(xns, config.backupConfig.bucket)
+    ? installBootstrapDataBucketSecret(xns, config.backupConfig.bucket)
     : undefined;
 
   const participantBootstrapDumpSecret: pulumi.Resource | undefined = config.bootstrappingDumpConfig
