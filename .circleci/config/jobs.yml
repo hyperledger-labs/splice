@@ -421,9 +421,11 @@ jobs:
                   cncluster wait validator1 validator-app
                   cncluster wait splitwell validator-app
                   cncluster wait sv-1 validator-app
-                  cncluster wait sv-2 validator-app
-                  cncluster wait sv-3 validator-app
-                  cncluster wait sv-4 validator-app
+                  if [[ << parameters.cluster >> != *"testnet"* ]]; then
+                    cncluster wait sv-2 validator-app
+                    cncluster wait sv-3 validator-app
+                    cncluster wait sv-4 validator-app
+                  fi
                   echo "Done waiting. All pods in the cluster are:"
                   kubectl get pods -A
                 cmd_retry_count: 5
@@ -457,9 +459,11 @@ jobs:
                   cncluster wait validator1 validator-app
                   cncluster wait splitwell validator-app
                   cncluster wait sv-1 validator-app
-                  cncluster wait sv-2 validator-app
-                  cncluster wait sv-3 validator-app
-                  cncluster wait sv-4 validator-app
+                  if [[ << parameters.cluster >> != *"testnet"* ]]; then
+                    cncluster wait sv-2 validator-app
+                    cncluster wait sv-3 validator-app
+                    cncluster wait sv-4 validator-app
+                  fi
                   echo "Done waiting. All pods in the cluster are:"
                   kubectl get pods -A
       - execute_sbt_command:
