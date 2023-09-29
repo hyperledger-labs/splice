@@ -1,13 +1,10 @@
 package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.lf.data.Time.Timestamp
-import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json
-import shapeless.HNil
 import slick.jdbc.{GetResult, PostgresProfile}
 
 trait AcsTables extends AcsJdbcTypes {
@@ -71,72 +68,5 @@ object AcsTables extends AcsTables {
           )
         )
     }
-  }
-
-  import profile.api.*
-
-  abstract class AcsStoreTemplate[Row](_tableTag: Tag, tableName: String)
-      extends profile.api.Table[Row](_tableTag, tableName) {
-
-    val storeId: Rep[Int] = column[Int]("store_id")
-
-    val eventNumber: Rep[Long] = column[Long]("event_number", O.AutoInc, O.PrimaryKey)
-
-    val contractId: Rep[ContractId[Any]] = column[ContractId[Any]]("contract_id")
-
-    val templateIdPackageId: Rep[String] = column[String]("template_id_package_id")
-
-    val templateIdQualifiedName: Rep[QualifiedName] =
-      column[QualifiedName]("template_id_qualified_name")
-
-    val createArguments: Rep[Json] = column[Json]("create_arguments")
-
-    val contractMetadataCreatedAt: Rep[Timestamp] =
-      column[Timestamp]("contract_metadata_created_at")
-
-    val contractMetadataContractKeyHash: Rep[Option[String]] =
-      column[Option[String]]("contract_metadata_contract_key_hash", O.Default(None))
-
-    val contractMetadataDriverInternal: Rep[Array[Byte]] =
-      column[Array[Byte]]("contract_metadata_driver_internal")
-
-    val contractExpiresAt: Rep[Option[Timestamp]] =
-      column[Option[Timestamp]]("contract_expires_at", O.Default(None))
-
-    protected def templateColumns =
-      storeId ::
-        eventNumber ::
-        contractId ::
-        templateIdPackageId ::
-        templateIdQualifiedName ::
-        createArguments ::
-        contractMetadataCreatedAt ::
-        contractMetadataContractKeyHash ::
-        contractMetadataDriverInternal ::
-        contractExpiresAt ::
-        HNil
-
-  }
-
-  abstract class TxLogStoreTemplate[Row](_tableTag: Tag, tableName: String)
-      extends profile.api.Table[Row](_tableTag, tableName) {
-
-    val storeId: Rep[Int] = column[Int]("store_id")
-
-    val entryNumber: Rep[Long] = column[Long]("entry_number", O.AutoInc, O.PrimaryKey)
-
-    val eventId: Rep[String] = column[String]("event_id")
-
-    val offset: Rep[Option[String]] = column[Option[String]]("offset")
-
-    val domainId: Rep[DomainId] = column[DomainId]("domain_id")
-
-    protected def templateColumns =
-      storeId ::
-        entryNumber ::
-        eventId ::
-        offset ::
-        domainId ::
-        HNil
   }
 }
