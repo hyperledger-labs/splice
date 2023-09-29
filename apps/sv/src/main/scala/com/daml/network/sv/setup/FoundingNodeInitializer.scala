@@ -21,7 +21,7 @@ import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, SvOnboardingConfig}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvUtil, SvcRulesLock}
-import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig, defaultEnabledChoices}
+import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
 import com.daml.network.util.{AssignedContract, GcpBucket, TemplateJsonDecoder, UploadablePackage}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
@@ -505,7 +505,6 @@ class FoundingNodeInitializer(
                           )
                           .toMap
                           .asJava,
-                        defaultEnabledChoices,
                         foundingConfig.isDevNet,
                       ).createAnd.exerciseSvcBootstrap_Bootstrap,
                     )

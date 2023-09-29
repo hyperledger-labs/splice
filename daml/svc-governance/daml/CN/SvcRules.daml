@@ -74,8 +74,6 @@ data CoinRules_ActionRequiringConfirmation
     -- ^ Automated action to start an issuing round once the summary of the reward coupons have been computed.
   | CRARC_MiningRound_Archive CoinRules_MiningRound_Archive
     -- ^ Automated action to archive a closed mining round once no expired reward coupons are left.
-  | CRARC_SetEnabledChoices CoinRules_SetEnabledChoices
-    -- ^ Voted action to change the choices that are enabled in the CC contracts.
   | CRARC_AddFutureCoinConfigSchedule CoinRules_AddFutureCoinConfigSchedule
     -- ^ Voted action to add a config schedule to the `CoinRules`.
   | CRARC_RemoveFutureCoinConfigSchedule CoinRules_RemoveFutureCoinConfigSchedule
@@ -653,7 +651,6 @@ template SvcRules with
                       CRARC_UpdateFutureCoinConfigSchedule choiceArg -> choiceArg.scheduleItem._1
                       CRARC_MiningRound_Archive _ -> now
                       CRARC_MiningRound_StartIssuing _ -> now
-                      CRARC_SetEnabledChoices _ -> now
                   ARC_SvcRules with .. -> now
                   ARC_CnsEntryContext with .. -> now
           votedAt = now
@@ -1105,7 +1102,6 @@ executeActionRequiringConfirmation svcRulesCid coinRulesCid act = case act of
         case coinRulesAction of
           CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise coinRulesCid choiceArg
           CRARC_MiningRound_Archive choiceArg -> void $ exercise coinRulesCid choiceArg
-          CRARC_SetEnabledChoices choiceArg -> void $ exercise coinRulesCid choiceArg
           CRARC_AddFutureCoinConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
           CRARC_RemoveFutureCoinConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
           CRARC_UpdateFutureCoinConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg

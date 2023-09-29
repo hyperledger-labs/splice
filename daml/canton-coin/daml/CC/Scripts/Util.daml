@@ -62,7 +62,6 @@ genericSetupApp svcPrefix = do
 
   _ <- submit svc $ createCmd CoinRules with
     configSchedule = defaultCoinConfigSchedule
-    enabledChoices = API.enableAllChoices
     isDevNet = True
     lock = False
     ..

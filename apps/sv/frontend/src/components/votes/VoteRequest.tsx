@@ -37,7 +37,6 @@ import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import RemoveFutureCoinConfigSchedule from './actions/RemoveFutureCoinConfigSchedule';
 import RemoveMember from './actions/RemoveMember';
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
-import SetCoinRulesEnabledChoices from './actions/SetCoinRulesEnabledChoices';
 import SetSvcRulesConfig from './actions/SetSvcRulesConfig';
 import UpdateFutureCoinConfigSchedule from './actions/UpdateFutureCoinConfigSchedule';
 
@@ -83,7 +82,6 @@ const VoteRequest: React.FC = () => {
     { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
     { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
     { name: 'Set SvcRules Configuration', value: 'SRARC_SetConfig' },
-    { name: 'Set CoinRules Enabled Choices', value: 'CRARC_SetEnabledChoices' },
     { name: 'Add Coin Configuration Schedule', value: 'CRARC_AddFutureCoinConfigSchedule' },
     { name: 'Remove Coin Configuration Schedule', value: 'CRARC_RemoveFutureCoinConfigSchedule' },
     { name: 'Update Coin Configuration Schedule', value: 'CRARC_UpdateFutureCoinConfigSchedule' },
@@ -220,9 +218,6 @@ const VoteRequest: React.FC = () => {
             <RevokeFeaturedAppRight chooseAction={chooseAction} />
           )}
           {actionName === 'SRARC_SetConfig' && <SetSvcRulesConfig chooseAction={chooseAction} />}
-          {actionName === 'CRARC_SetEnabledChoices' && (
-            <SetCoinRulesEnabledChoices chooseAction={chooseAction} />
-          )}
           {actionName === 'CRARC_AddFutureCoinConfigSchedule' && (
             <AddFutureCoinConfigSchedule chooseAction={chooseAction} />
           )}

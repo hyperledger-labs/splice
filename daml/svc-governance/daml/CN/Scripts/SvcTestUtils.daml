@@ -10,7 +10,6 @@ import qualified DA.Text as T
 import Daml.Script
 import DA.Time
 
-import qualified CC.API.V1.Coin as API
 import CC.Coin
 import CC.Issuance
 import CC.API.V1.Round (Round(..))
@@ -95,7 +94,6 @@ initCollective initialOpenRounds isDevNet = do
       cnsRulesConfig
       config
       initialTrafficState = Map.empty
-      enabledChoices = API.enableAllChoices
       initialOpenRounds
       isDevNet
     SvcBootstrap_Bootstrap

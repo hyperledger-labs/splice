@@ -53,7 +53,6 @@ template Coin
       do coinRules <- view <$> fetch coinRulesCid
          -- This is not necessary as there is already a checking in SvcRules but still add it here to be consistent with other choices.
          requireUnlocked coinRules.lock
-         requireChoiceIsEnabled "Coin_Expire" (\c -> c.enable_Coin_Expire) coinRules
          requireCoinExpiredForAllOpenRounds roundCid this
          return API.CoinExpireSummary with
            owner = owner
@@ -78,7 +77,6 @@ template LockedCoin
         coinRules <- view <$> fetch coinRulesCid
         requireUnlocked coinRules.lock
         openMiningRound <- exercise openRoundCid (API.OpenMiningRound_Fetch coin.owner)
-        requireChoiceIsEnabled "LockedCoin_OwnerExpireLock" (\c -> c.enable_LockedCoin_OwnerExpireLock) coinRules
         t <- getTime
         require "Lock is expired" (lock.expiresAt < t)
         coinCid <- toInterfaceContractId <$> create coin
@@ -90,7 +88,6 @@ template LockedCoin
         coinRules <- view <$> fetch coinRulesCid
         requireUnlocked coinRules.lock
         openMiningRound <- exercise openRoundCid (API.OpenMiningRound_Fetch coin.owner)
-        requireChoiceIsEnabled "LockedCoin_Unlock" (\c -> c.enable_LockedCoin_Unlock) coinRules
         coinCid <- toInterfaceContractId <$> create coin
         return API.CoinCreateSummary with
           coin = coinCid
@@ -105,8 +102,6 @@ template LockedCoin
       do coinRules <- view <$> fetch coinRulesCid
          -- This is not necessary as there is already a checking in SvcRules but still add it here to be consistent with other choices.
          requireUnlocked coinRules.lock
-         requireChoiceIsEnabled "LockedCoin_ExpireCoin" (\c -> c.enable_LockedCoin_ExpireCoin) coinRules
-         requireChoiceIsEnabled "Coin_Expire" (\c -> c.enable_Coin_Expire) coinRules
          t <- getTime
          require "Lock is expired" (lock.expiresAt < t)
          requireCoinExpiredForAllOpenRounds roundCid coin
@@ -221,8 +216,6 @@ template ValidatorRewardCoupon
         coinRulesCid : ContractId API.CoinRules
       controller svc, validator
       do
-        coinRules <- view <$> fetch coinRulesCid
-        requireChoiceIsEnabled "ValidatorRewardCoupon_ArchiveAsValidator" (\c -> c.enable_ValidatorRewardCoupon_ArchiveAsValidator) coinRules
         right <- fetch rightCid
         require "Right must match" (right == ValidatorRight with svc; validator, user)
 
@@ -247,17 +240,12 @@ template UnclaimedReward with
 -- Configuration of CoinRules behavior
 --------------------------------------
 
-requireChoiceIsEnabled : CanAssert m => Text -> (API.EnabledChoices -> Bool) -> API.CoinRulesView -> m ()
-requireChoiceIsEnabled desc getField rules =
-  require ("Choice " <> desc <> " is enabled") (getField rules.enabledChoices)
-
 -- | The rules governing how CC users can modify the CC state
 -- managed by the SVC.
 template CoinRules
   with
     svc : Party
     configSchedule : Schedule Time (CoinConfig USD)
-    enabledChoices : API.EnabledChoices
     isDevNet : Bool
     lock : Bool
   where
@@ -269,10 +257,8 @@ template CoinRules
       view = API.CoinRulesView with ..
       coinrules_Transfer_Controllers = Set.toList . transferControllers
       coinrules_ComputeFees context sender outputs = do
-        requireChoiceIsEnabled "CoinRules_ComputeFees" (\c -> c.enable_CoinRules_ComputeFees) (view $ toInterface @API.CoinRules this)
         computeFees svc context sender outputs
       coinrules_Transfer coinRulesCid transfer context = do
-        requireChoiceIsEnabled "CoinRules_Transfer" (\c -> c.enable_CoinRules_Transfer) (view $ toInterface @API.CoinRules this)
         executeTransfer coinRulesCid context svc transfer
 
     -- Global domain usage
@@ -394,7 +380,6 @@ template CoinRules
       do
         requireUnlocked lock
         require "isDevNet flag is true" isDevNet
-        requireChoiceIsEnabled "CoinRules_DevNet_Tap" (\c -> c.enable_CoinRules_DevNet_Tap) (view $ toInterface @API.CoinRules this)
         exercise self CoinRules_Mint with ..
 
     nonconsuming choice CoinRules_DevNet_FeatureApp : ContractId FeaturedAppRight
@@ -643,14 +628,6 @@ template CoinRules
       do
         requireUnlocked lock
         pure (self, this)
-
-    choice CoinRules_SetEnabledChoices : ContractId CoinRules
-      with
-        newEnabledChoices : API.EnabledChoices
-      controller svc
-      do
-        requireUnlocked lock
-        create this with enabledChoices = newEnabledChoices
 
     -- This inserts a new CoinConfig Schedule into the future Schedules
     choice CoinRules_AddFutureCoinConfigSchedule: ContractId CoinRules

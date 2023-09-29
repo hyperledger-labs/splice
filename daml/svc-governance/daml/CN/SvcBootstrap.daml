@@ -8,7 +8,6 @@ import CC.Coin
 import CC.CoinConfig
 import CC.GlobalDomain (initialMemberTraffic)
 import CC.Schedule
-import qualified CC.API.V1.Coin as API
 import qualified CC.API.V1.Round as API
 import CC.Round
 
@@ -31,7 +30,6 @@ template SvcBootstrap with
     config : SvcRulesConfig
     initialOpenRounds : Optional [OpenMiningRound]
     initialTrafficState: Map.Map Text TrafficState
-    enabledChoices : API.EnabledChoices
     isDevNet : Bool
   where
     signatory svc
@@ -46,7 +44,6 @@ template SvcBootstrap with
           configSchedule = Schedule with
             initialValue = coinConfig
             futureValues = []
-          enabledChoices
           isDevNet
           lock = False
         _ <- create CnsRules with

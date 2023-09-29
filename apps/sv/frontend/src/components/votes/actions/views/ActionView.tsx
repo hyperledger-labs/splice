@@ -1,6 +1,6 @@
 import { Loading, PartyId } from 'common-frontend';
 import dayjs from 'dayjs';
-import React, { ReactElement } from 'react';
+import React from 'react';
 
 import {
   Chip,
@@ -13,7 +13,6 @@ import {
 } from '@mui/material';
 
 import { CoinConfig, USD } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
-import { EnabledChoices } from '@daml.js/canton-coin-api-0.1.0/lib/CC/API/V1/Coin';
 import {
   ActionRequiringConfirmation,
   SvcRulesConfig,
@@ -37,19 +36,6 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
   }
 
   const actionType = action.tag;
-
-  const trueElement = <Typography>True</Typography>;
-  const falseElement = <Typography>False</Typography>;
-
-  function convertEnabledChoices(booleanObject: EnabledChoices): {
-    [key: string]: ReactElement<JSX.Element>;
-  } {
-    return Object.keys(booleanObject).reduce((result, key) => {
-      // @ts-ignore
-      result[key] = booleanObject[key] ? trueElement : falseElement;
-      return result;
-    }, {});
-  }
 
   if (action.tag === 'ARC_SvcRules') {
     const svcAction = action.value.svcAction;
@@ -102,15 +88,6 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
   } else if (action.tag === 'ARC_CoinRules') {
     const coinRulesAction = action.value.coinRulesAction;
     switch (coinRulesAction.tag) {
-      case 'CRARC_SetEnabledChoices': {
-        return (
-          <ActionValueTable
-            actionType={actionType}
-            actionName={coinRulesAction.tag}
-            valuesMap={convertEnabledChoices(coinRulesAction.value.newEnabledChoices)}
-          />
-        );
-      }
       case 'CRARC_AddFutureCoinConfigSchedule': {
         return (
           <ActionValueTable

@@ -3,12 +3,9 @@ package com.daml.network.store.db
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{ContractMetadata, DamlRecord}
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.api.v1.coin.{AppTransferContext, EnabledChoices}
+import com.daml.network.codegen.java.cc.api.v1.coin.AppTransferContext
 import com.daml.network.codegen.java.cc.api.v1.round.Round
-import com.daml.network.codegen.java.cc.coin.{
-  CoinRules_MiningRound_Archive,
-  CoinRules_SetEnabledChoices,
-}
+import com.daml.network.codegen.java.cc.coin.{CoinRules_MiningRound_Archive}
 import com.daml.network.codegen.java.cc.coinimport.importpayload.{IP_Coin, IP_ValidatorLicense}
 import com.daml.network.codegen.java.cc.coinimport.{ImportCrate, ImportPayload}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
@@ -32,11 +29,13 @@ import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiring
   CNSRARC_RejectEntryInitialPayment,
 }
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.{
-  CRARC_MiningRound_Archive,
-  CRARC_SetEnabledChoices,
+  CRARC_MiningRound_Archive
 }
 import com.daml.network.codegen.java.cn.svcrules.electionrequestreason.ERR_OtherReason
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_RemoveMember
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
+  SRARC_AddMember,
+  SRARC_RemoveMember,
+}
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.codegen.java.cn.wallet.subscriptions.{
@@ -123,12 +122,12 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       _.lookupCnsRulesWithOffset()
     )
     lookupTests("lookupConfirmationByActionWithOffset")(
-      create = confirmation(1, enabledChoicesTrueAction),
+      create = confirmation(1, addUser666Action),
       noise = Seq(
-        confirmation(2, enabledChoicesFalseAction),
+        confirmation(2, addUser667Action),
         confirmation(3, removeUserAction),
       ),
-    )(_.lookupConfirmationByActionWithOffset(storeSvParty, enabledChoicesTrueAction))
+    )(_.lookupConfirmationByActionWithOffset(storeSvParty, addUser666Action))
     lookupTests("lookupSvOnboardingRequestByTokenWithOffset")(
       create = svOnboardingRequest("good", userParty(1), "good"),
       noise = Seq(
@@ -292,8 +291,8 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     "listConfirmations" should {
 
       "list all confirmations with a matching action" in {
-        val goodAction = enabledChoicesTrueAction
-        val badActionSameType = enabledChoicesFalseAction
+        val goodAction = addUser666Action
+        val badActionSameType = addUser667Action
         val badActionDifferentType = removeUserAction
         val goodConfirmations = (1 to 3).map(n => confirmation(n, goodAction))
         val badConfirmation1 = confirmation(4, badActionSameType)
@@ -484,7 +483,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
               ),
             )
           )
-        val unrelatedConfirmation = confirmation(10, enabledChoicesTrueAction)
+        val unrelatedConfirmation = confirmation(10, addUser666Action)
 
         def lookupConfirmations(
             lookup: SubscriptionInitialPayment.ContractId => Future[
@@ -747,7 +746,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val badCnsName = cnsEntryContext(2, "bad")
         val badConfirmations =
           (4 to 6).map(n => confirmation(n, cnsEntryContextPaymentAction(badCnsName.contractId)))
-        val unrelatedConfirmations = (7 to 9).map(n => confirmation(n, enabledChoicesTrueAction))
+        val unrelatedConfirmations = (7 to 9).map(n => confirmation(n, addUser666Action))
 
         for {
           store <- mkStore()
@@ -817,7 +816,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           transactionTreeSource.addTree(definitiveVoteTx)
           store
             .listVoteResults(
-              Some("SetEnabledChoices"),
+              Some("AddMember"),
               Some(true),
               None,
               None,
@@ -831,7 +830,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
               definitiveVoteTx.getOffset,
               definitiveVoteTx.getRootEventIds.get(0),
               dummyDomain,
-              "CRARC_SetEnabledChoices",
+              "SRARC_AddMember",
               true,
               result.requester,
               result.effectiveAt.toString,
@@ -843,7 +842,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           )
           store
             .listVoteResults(
-              Some("CRARC_SetEnabledChoices"),
+              Some("SRARC_AddMember"),
               Some(false),
               None,
               None,
@@ -895,20 +894,30 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
   }
 
-  lazy val enabledChoicesTrueAction = new ARC_CoinRules(
-    new CRARC_SetEnabledChoices(
-      new CoinRules_SetEnabledChoices(
-        enabledChoices(true)
+  lazy val addUser666Action = new ARC_SvcRules(
+    new SRARC_AddMember(
+      new SvcRules_AddMember(
+        userParty(666).toProtoPrimitive,
+        "user666",
+        "user666ParticipantId",
+        new Round(1L),
+        dummyDomain.toProtoPrimitive,
       )
     )
   )
-  lazy val enabledChoicesFalseAction = new ARC_CoinRules(
-    new CRARC_SetEnabledChoices(
-      new CoinRules_SetEnabledChoices(
-        enabledChoices(false)
+
+  lazy val addUser667Action = new ARC_SvcRules(
+    new SRARC_AddMember(
+      new SvcRules_AddMember(
+        userParty(667).toProtoPrimitive,
+        "user667",
+        "user667ParticipantId",
+        new Round(1L),
+        dummyDomain.toProtoPrimitive,
       )
     )
   )
+
   lazy val removeUserAction = new ARC_SvcRules(
     new SRARC_RemoveMember(new SvcRules_RemoveMember(userParty(666).toProtoPrimitive))
   )
@@ -988,7 +997,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     val template = new VoteRequest(
       svcParty.toProtoPrimitive,
       userParty(n).toProtoPrimitive,
-      enabledChoicesTrueAction,
+      addUser666Action,
       new Reason("https://www.example.com", ""),
       expiry,
     )
@@ -1039,17 +1048,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       protobuf.Any.getDefaultInstance,
     )
   }
-
-  private def enabledChoices(enableLockedCoinUnlock: Boolean) = new EnabledChoices(
-    enableLockedCoinUnlock,
-    false,
-    false,
-    false,
-    false,
-    true,
-    false,
-    false,
-  )
 
   private def svcRules(
       members: java.util.Map[String, MemberInfo] = Collections.emptyMap(),

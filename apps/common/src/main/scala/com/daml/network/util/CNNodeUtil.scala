@@ -310,11 +310,6 @@ object CNNodeUtil {
     )
   }
 
-  def defaultEnabledChoices: cc.api.v1.coin.EnabledChoices =
-    new cc.api.v1.coin.EnabledChoices(
-      true, true, true, true, true, true, true, true,
-    )
-
   def holdingFee(
       coin: Coin,
       currentRound: Long,

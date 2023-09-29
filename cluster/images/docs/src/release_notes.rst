@@ -11,6 +11,11 @@ Release Notes
     * The SV name for the node operated by Digital Asset on DevNet has been updated.
       Note the updated SV name in ``approved-sv-id-values-dev.yaml``: `Digital-Asset`.
 
+* Frontend updates
+
+  * The option to vote on enabled choices has been removed.
+    This will be superseded by support for full Daml model upgrades.
+
 2023-09-25
 ----------
 

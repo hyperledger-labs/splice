@@ -77,7 +77,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     LfContractId.assertFromString("00" + f"$cIdCounter%064x").coid
   }
 
-  private val enabledChoices = CNNodeUtil.defaultEnabledChoices
   private val schedule: scheduleCodegen.Schedule[Instant, CoinConfig[USD]] =
     CNNodeUtil.defaultCoinConfigSchedule(
       NonNegativeFiniteDuration(Duration.ofMinutes(10)),
@@ -90,7 +89,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     val template = new coinCodegen.CoinRules(
       svcParty.toProtoPrimitive,
       schedule,
-      enabledChoices,
       false,
       false,
     )

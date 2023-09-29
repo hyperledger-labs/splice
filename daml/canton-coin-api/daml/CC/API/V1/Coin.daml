@@ -77,38 +77,7 @@ data TimeLock = TimeLock with
 
 data CoinRulesView = CoinRulesView with
   svc : Party
-  enabledChoices : EnabledChoices
   lock : Bool
-
--- | Configuration that allows us to disable certain choices if we encounter a bug.
-data EnabledChoices = EnabledChoices
-  with
-    enable_LockedCoin_Unlock : Bool
-    enable_LockedCoin_OwnerExpireLock : Bool
-    enable_LockedCoin_ExpireCoin : Bool
-
-    enable_Coin_Expire : Bool
-
-    enable_ValidatorRewardCoupon_ArchiveAsValidator : Bool
-
-    enable_CoinRules_DevNet_Tap : Bool
-    enable_CoinRules_Transfer : Bool
-    enable_CoinRules_ComputeFees : Bool
-  deriving (Eq, Ord, Show)
-
-enableAllChoices : EnabledChoices
-enableAllChoices = EnabledChoices with
-  enable_LockedCoin_Unlock = True
-  enable_LockedCoin_OwnerExpireLock = True
-  enable_LockedCoin_ExpireCoin = True
-
-  enable_Coin_Expire = True
-
-  enable_ValidatorRewardCoupon_ArchiveAsValidator = True
-
-  enable_CoinRules_DevNet_Tap = True
-  enable_CoinRules_Transfer = True
-  enable_CoinRules_ComputeFees = True
 
 interface CoinRules where
   viewtype CoinRulesView
