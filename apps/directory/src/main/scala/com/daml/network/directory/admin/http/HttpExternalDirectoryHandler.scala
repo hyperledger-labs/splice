@@ -9,6 +9,7 @@ import com.daml.network.http.v0.external
 import com.daml.network.http.v0.external.directory.DirectoryResource as r0
 import com.daml.network.http.v0.{definitions as d0}
 import com.daml.network.store.MultiDomainAcsStore
+import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.NamedLogging
@@ -89,8 +90,8 @@ class HttpExternalDirectoryHandler(
     val offset = ParticipantOffset.Value.Absolute(participantBegin.getAbsolute)
     val filter = MultiDomainAcsStore.IngestionFilter(
       partyId,
-      Set(DirectoryInstall.TEMPLATE_ID),
-      Set(DirectoryInstall.TEMPLATE_ID),
+      Set(QualifiedName(DirectoryInstall.TEMPLATE_ID)),
+      Set(QualifiedName(DirectoryInstall.TEMPLATE_ID)),
     )
 
     retryProvider.retryForClientCalls(

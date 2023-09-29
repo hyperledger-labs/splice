@@ -4,8 +4,8 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Bytes
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.store.db.{AcsJdbcTypes, CNPostgresTest}
+import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -32,8 +32,8 @@ class AcsJdbcTypesTest extends AsyncWordSpec with AcsJdbcTypes with BaseTest wit
           "003daad4665efc696dfb505d8ca794034a18f264cda4ebd3f0549f03c0f1f4ef42ca011220df05a9d3d5a4180cec940aeed16e1f080e6f81ee3867ff433e4a37ce2a9769c1"
         ),
         Offset(Bytes.assertFromString("ff00aa")),
-        TemplateId(
-          "bf196cb0db2637fd30850500c50984c3b2dc23c2f89b42d9a673c5dcad3649a2",
+        "bf196cb0db2637fd30850500c50984c3b2dc23c2f89b42d9a673c5dcad3649a2",
+        QualifiedName(
           "CN.Directory",
           "DirectoryEntry",
         ),
@@ -67,7 +67,8 @@ class AcsJdbcTypesTest extends AsyncWordSpec with AcsJdbcTypes with BaseTest wit
       timestamp: Timestamp,
       contractId: ContractId[Any],
       offset: Offset,
-      templateId: TemplateId,
+      templateIdPackageId: String,
+      templateIdQualifiedName: QualifiedName,
       domainId: DomainId,
       partyId: PartyId,
       json: Json,
@@ -78,11 +79,22 @@ class AcsJdbcTypesTest extends AsyncWordSpec with AcsJdbcTypes with BaseTest wit
     val timestamp: Rep[Timestamp] = column[Timestamp]("timestamp")
     val contractId: Rep[ContractId[Any]] = column[ContractId[Any]]("contract_id")
     val offset: Rep[Offset] = column[Offset]("offset")
-    val templateId: Rep[TemplateId] = column[TemplateId]("template_id")
+    val templateIdPackageId: Rep[String] = column[String]("template_id_package_id")
+    val templateIdQualifiedName: Rep[QualifiedName] =
+      column[QualifiedName]("template_id_qualified_name")
     val domainId: Rep[DomainId] = column[DomainId]("domain_id")
     val partyId: Rep[PartyId] = column[PartyId]("party_id")
     val json: Rep[Json] = column[Json]("jayson")
-    def * = (timestamp, contractId, offset, templateId, domainId, partyId, json).<>(
+    def * = (
+      timestamp,
+      contractId,
+      offset,
+      templateIdPackageId,
+      templateIdQualifiedName,
+      domainId,
+      partyId,
+      json,
+    ).<>(
       TestRow.tupled,
       TestRow.unapply,
     )

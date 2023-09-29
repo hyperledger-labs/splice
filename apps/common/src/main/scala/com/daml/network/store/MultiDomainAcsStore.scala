@@ -5,16 +5,7 @@ import akka.stream.scaladsl.Source
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.transaction_filter.TransactionFilter as LapiTransactionFilter
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.ledger.javaapi.data.{
-  ContractMetadata,
-  CreatedEvent,
-  Filter,
-  FiltersByParty,
-  Identifier,
-  InclusiveFilter,
-  Template,
-  TransactionFilter,
-}
+import com.daml.ledger.javaapi.data.{ContractMetadata, CreatedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{
   ContractId,
   DamlRecord,
@@ -30,11 +21,16 @@ import com.daml.network.environment.ledger.api.{
 }
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.Contract.Companion.Interface
-import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.util.{
+  AssignedContract,
+  Contract,
+  ContractWithState,
+  QualifiedName,
+  TemplateJsonDecoder,
+}
 import com.daml.network.util.PrettyInstances.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -308,10 +304,10 @@ object MultiDomainAcsStore {
   case class SimpleContractFilter(
       primaryParty: PartyId,
       templateFilters: Map[
-        Identifier,
+        QualifiedName,
         (CreatedEvent => Boolean, CreatedEvent => Option[Contract[?, ?]]),
       ],
-      interfaceFilters: Map[Identifier, (CreatedEvent => Boolean, InterfaceDecoder)] = Map.empty,
+      interfaceFilters: Map[QualifiedName, (CreatedEvent => Boolean, InterfaceDecoder)] = Map.empty,
   ) extends ContractFilter {
 
     override val ingestionFilter =
@@ -322,34 +318,39 @@ object MultiDomainAcsStore {
       )
 
     override def contains(ev: CreatedEvent): Boolean =
-      templateFilters.get(ev.getTemplateId).exists { case (evPredicate, _) => evPredicate(ev) } ||
+      templateFilters.get(QualifiedName(ev.getTemplateId)).exists { case (evPredicate, _) =>
+        evPredicate(ev)
+      } ||
         // TODO (#2676) Avoid linear search once we have proper interface support in multi-domain.
         interfaceFilters.exists { case (_, (evPredicate, _)) => evPredicate(ev) }
 
     override def mightContain[TC, TCid, T](
         templateCompanion: JavaContractCompanion[TC, TCid, T]
     ): Boolean =
-      templateFilters.contains(templateCompanion.TEMPLATE_ID)
+      templateFilters.contains(QualifiedName(templateCompanion.TEMPLATE_ID))
 
     override def mightContain[I, Id, View](
         interfaceCompanion: JavaInterfaceCompanion[I, Id, View]
     ): Boolean =
-      interfaceFilters.contains(interfaceCompanion.TEMPLATE_ID)
+      interfaceFilters.contains(QualifiedName(interfaceCompanion.TEMPLATE_ID))
 
     override def mightContain(identifier: Identifier): Boolean = {
-      templateFilters.contains(identifier) || interfaceFilters.contains(identifier)
+      templateFilters.contains(QualifiedName(identifier)) || interfaceFilters
+        .contains(QualifiedName(identifier))
     }
 
     override def decodeInterface[I, Id <: ContractId[I], View <: DamlRecord[?]](
         interfaceCompanion: JavaInterfaceCompanion[I, Id, View]
     )(ev: CreatedEvent): Option[Contract[Id, View]] =
-      interfaceFilters.get(interfaceCompanion.TEMPLATE_ID).flatMap { case (_, decoder) =>
-        decoder.fromCreatedEvent(interfaceCompanion)(ev)
-      }
+      interfaceFilters
+        .get(QualifiedName(interfaceCompanion.TEMPLATE_ID))
+        .flatMap { case (_, decoder) =>
+          decoder.fromCreatedEvent(interfaceCompanion)(ev)
+        }
 
     override def decodeMatchingContract(ev: CreatedEvent): Option[Contract[?, ?]] =
       for {
-        (_, decoder) <- templateFilters.get(ev.getTemplateId)
+        (_, decoder) <- templateFilters.get(QualifiedName(ev.getTemplateId))
         contract <- decoder(ev)
       } yield contract
 
@@ -364,11 +365,14 @@ object MultiDomainAcsStore {
       templateCompanion: Contract.Companion.Template[TCid, T]
   )(
       p: Contract[TCid, T] => Boolean
-  ): (Identifier, (CreatedEvent => Boolean, CreatedEvent => Option[Contract[?, ?]])) =
+  ): (QualifiedName, (CreatedEvent => Boolean, CreatedEvent => Option[Contract[?, ?]])) =
     (
-      templateCompanion.TEMPLATE_ID,
+      QualifiedName(templateCompanion.TEMPLATE_ID),
       (
-        ev => Contract.fromCreatedEvent(templateCompanion)(ev).exists(p),
+        ev => {
+          val c = Contract.fromCreatedEvent(templateCompanion)(ev)
+          c.exists(p)
+        },
         ev => Contract.fromCreatedEvent(templateCompanion)(ev),
       ),
     )
@@ -379,7 +383,7 @@ object MultiDomainAcsStore {
   )(
       p: Contract[Id, View] => Boolean,
       implementations: Seq[InterfaceImplementation[I, Id, View, _, _]],
-  ): (Identifier, (CreatedEvent => Boolean, InterfaceDecoder)) = {
+  ): (QualifiedName, (CreatedEvent => Boolean, InterfaceDecoder)) = {
     val decoder: InterfaceDecoder = new InterfaceDecoder {
 
       val implementationViews: Map[Identifier, CreatedEvent => Option[Contract[Id, View]]] =
@@ -405,7 +409,7 @@ object MultiDomainAcsStore {
       }
     }
     (
-      interfaceCompanion.TEMPLATE_ID,
+      QualifiedName(interfaceCompanion.TEMPLATE_ID),
       (
         (ev: CreatedEvent) =>
           decoder.fromCreatedEvent(interfaceCompanion)(ev).map(p).getOrElse(false),
@@ -419,21 +423,11 @@ object MultiDomainAcsStore {
     */
   final case class IngestionFilter(
       primaryParty: PartyId,
-      templateIds: Set[Identifier],
-      interfaceIds: Set[Identifier],
+      templateIds: Set[QualifiedName],
+      interfaceIds: Set[QualifiedName],
   ) {
-    def toTransactionFilter: TransactionFilter = {
-      val interfaceIdsJava =
-        interfaceIds.view.map(i => i -> Filter.Interface.INCLUDE_VIEW).toMap.asJava
-      val partyString: String = primaryParty.toProtoPrimitive
-      new FiltersByParty(
-        Map[String, Filter](
-          partyString -> new InclusiveFilter(templateIds.asJava, interfaceIdsJava)
-        ).asJava
-      )
-    }
 
-    // TODO (#3956) callers should use `toTransactionFilter` instead when
+    // TODO (#7855) callers should use `toTransactionFilter` instead when
     // state service supports real filters
     def toTransactionFilterAllContractsScala: LapiTransactionFilter =
       LapiTransactionFilter(
@@ -465,7 +459,7 @@ object MultiDomainAcsStore {
     )(filter: MultiDomainAcsStore.ContractFilter, event: CreatedEvent): Option[Contract[TCid, T]]
 
     def fromJson(companion: C)(
-        templateId: TemplateId,
+        templateId: Identifier,
         contractId: String,
         payload: Json,
         createdAt: Instant,
@@ -475,8 +469,6 @@ object MultiDomainAcsStore {
         decoder: TemplateJsonDecoder
     ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
       val cId = toContractId(companion, contractId)
-      val javaTemplateId =
-        new Identifier(templateId.packageId, templateId.moduleName, templateId.entityName)
       val metadata = new ContractMetadata(
         createdAt,
         ByteString.copyFromUtf8(contractKeyHash.getOrElse("")),
@@ -485,7 +477,7 @@ object MultiDomainAcsStore {
       fromJson(
         companion,
         cId,
-        javaTemplateId,
+        templateId,
         payload,
         metadata,
         createArgumentsBlob =

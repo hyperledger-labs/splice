@@ -27,6 +27,7 @@ import com.daml.network.util.{
   AssignedContract,
   Contract,
   ContractWithState,
+  QualifiedName,
   TemplateJsonDecoder,
   Trees,
 }
@@ -45,7 +46,6 @@ import scala.collection.immutable.{SortedMap, VectorMap}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, ReassignmentId}
 import com.daml.network.store.db.AcsQueries.{
   SelectFromAcsTableWithStateResult,
@@ -134,7 +134,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
           selectFromAcsTableWithStateAndOffset(
             acsTableName,
             storeId,
-            where = sql"""template_id = $templateId""",
+            where = sql"""template_id_qualified_name = ${QualifiedName(templateId)}""",
             orderLimit = sql"limit 1",
           ).headOption,
           "findAnyContractWithOffset",
@@ -184,7 +184,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         selectFromAcsTableWithState(
           acsTableName,
           storeId,
-          where = sql"""template_id = $templateId""",
+          where = sql"""template_id_qualified_name = ${QualifiedName(templateId)}""",
           orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
         ),
         "listContracts",
@@ -207,7 +207,9 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         selectFromAcsTableWithState(
           acsTableName,
           storeId,
-          where = sql"""template_id = $templateId and assigned_domain is not null""",
+          where = sql"""template_id_qualified_name = ${QualifiedName(
+              templateId
+            )} and assigned_domain is not null""",
           orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
         ),
         "listAssignedContracts",
@@ -233,7 +235,9 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
           selectFromAcsTableWithState(
             acsTableName,
             storeId,
-            where = sql"""template_id = $templateId and acs.contract_expires_at < $now""",
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                templateId
+              )} and acs.contract_expires_at < $now""",
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
           "listExpiredFromPayloadExpiry",
@@ -257,7 +261,9 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         selectFromAcsTableWithState(
           acsTableName,
           storeId,
-          where = sql"""template_id = $templateId and assigned_domain = $domain""",
+          where = sql"""template_id_qualified_name = ${QualifiedName(
+              templateId
+            )} and assigned_domain = $domain""",
           orderLimit = sql"""limit ${sqlLimit(limit)}""",
         ),
         "listContractsOnDomain",
@@ -272,13 +278,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       companions: ConstrainedTemplate*
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = waitUntilAcsIngested {
     val templateIdMap = companions
-      .map(c =>
-        TemplateId(
-          c.TEMPLATE_ID.getPackageId,
-          c.TEMPLATE_ID.getModuleName,
-          c.TEMPLATE_ID.getEntityName,
-        ) -> c
-      )
+      .map(c => QualifiedName(c.TEMPLATE_ID) -> c)
       .toMap
     val templateIds = templateIdMap.keys.mkString("(',", "','", "')")
     for {
@@ -287,13 +287,13 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
           acsTableName,
           storeId,
           where =
-            sql"""template_id IN #$templateIds and assigned_domain is not null and assigned_domain != $excludedDomain""",
+            sql"""template_id_qualified_name IN #${templateIds} and assigned_domain is not null and assigned_domain != $excludedDomain""",
         ),
         "listAssignedContractsNotOnDomains",
       )
       assigned = result.map(row =>
         assignedContractFromRow(
-          templateIdMap(row.acsRow.templateId)
+          templateIdMap(row.acsRow.templateIdQualifiedName)
         )(row)
       )
     } yield assigned
@@ -330,7 +330,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                 selectFromAcsTableWithState(
                   acsTableName,
                   storeId,
-                  where = sql"""template_id = $templateId
+                  where = sql"""template_id_qualified_name = ${QualifiedName(templateId)}
                     and event_number >= $fromEventNumber""",
                   orderLimit = sql"""order by event_number
                     limit ${sqlLimit(pageSize)}""",

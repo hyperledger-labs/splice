@@ -1,7 +1,7 @@
 package com.daml.network.store
 
 import cats.syntax.foldable.*
-import com.daml.ledger.javaapi.data.ContractMetadata
+import com.daml.ledger.javaapi.data.{ContractMetadata, Identifier}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
 import com.daml.network.codegen.java.cn.scripts.testwallet.TestDeliveryOffer
@@ -27,6 +27,8 @@ abstract class MultiDomainAcsStoreTest[
 ] extends StoreTest { this: HasActorSystem =>
 
   import MultiDomainAcsStore.*
+
+  private val upgradedPackageId = "upgradedpackageid"
 
   private var transferCounter = 0
   protected def nextReassignmentId: String = {
@@ -129,6 +131,16 @@ abstract class MultiDomainAcsStoreTest[
     }
 
   protected def c(i: Int): C = appRewardCoupon(i, svcParty, contractId = validContractId(i))
+  protected def cUpgraded(i: Int): C = {
+    val coupon = appRewardCoupon(i, svcParty, contractId = validContractId(i))
+    coupon.copy(
+      identifier = new Identifier(
+        upgradedPackageId,
+        coupon.identifier.getModuleName,
+        coupon.identifier.getEntityName,
+      )
+    )
+  }
   protected def cFeatured(i: Int): C =
     appRewardCoupon(i, svcParty, true, contractId = validContractId(i))
 
@@ -591,6 +603,23 @@ abstract class MultiDomainAcsStoreTest[
         _ <- d1.create(c(3))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1), r(2), r(3)))
         _ <- streamF
+      } yield succeed
+    }
+
+    "reads return contracts from all package versions" in {
+      implicit val store = mkStore()
+      for {
+        _ <- acs(Seq((c(1), d1, 0L), (cUpgraded(2), d1, 0L)))
+        _ <- d1.create(c(3))
+        _ <- d1.create(cUpgraded(4))
+        results <- store.listContracts(AppRewardCoupon.COMPANION)
+        _ = results should have size 4
+        _ = forExactly(2, results) { c =>
+          c.contract.identifier.getPackageId shouldBe AppRewardCoupon.TEMPLATE_ID.getPackageId
+        }
+        _ = forExactly(2, results) { c =>
+          c.contract.identifier.getPackageId shouldBe upgradedPackageId
+        }
       } yield succeed
     }
   }

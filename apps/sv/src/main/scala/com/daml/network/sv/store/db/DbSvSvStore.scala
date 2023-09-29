@@ -13,7 +13,7 @@ import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithout
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.SvTables.SvAcsStoreRowData
 import com.daml.network.sv.store.{SvStore, SvSvStore}
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -66,18 +66,21 @@ class DbSvSvStore(
         val safeCandidateName = svCandidateName.map(lengthLimited)
         val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
         val templateId = contract.identifier
+        val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
         val createArguments = payloadJsonFromContract(contract.payload)
         val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
         val contractMetadataContractKeyHash =
           lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)
         val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
         sqlu"""
-              insert into sv_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
+              insert into sv_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, contract_metadata_created_at,
                                        contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
                                        assigned_domain, reassignment_counter, reassignment_target_domain,
                                        reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
                                        onboarding_secret, sv_candidate_name)
-              values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
+              values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
+            templateId
+          )}, $createArguments, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
@@ -99,7 +102,7 @@ class DbSvSvStore(
             DbSvSvStore.tableName,
             storeId,
             sql"""
-            template_id = ${ValidatorOnboarding.TEMPLATE_ID}
+            template_id_qualified_name = ${QualifiedName(ValidatorOnboarding.TEMPLATE_ID)}
               and onboarding_secret = ${lengthLimited(secret)}
           """,
           ).headOption,
@@ -122,7 +125,7 @@ class DbSvSvStore(
               DbSvSvStore.tableName,
               storeId,
               sql"""
-                  template_id = ${UsedSecret.TEMPLATE_ID}
+                  template_id_qualified_name = ${QualifiedName(UsedSecret.TEMPLATE_ID)}
                     and onboarding_secret = ${lengthLimited(secret)}
                 """,
             ).headOption,
@@ -146,7 +149,7 @@ class DbSvSvStore(
             DbSvSvStore.tableName,
             storeId,
             sql"""
-              template_id = ${ApprovedSvIdentity.TEMPLATE_ID}
+              template_id_qualified_name = ${QualifiedName(ApprovedSvIdentity.TEMPLATE_ID)}
                 and sv_candidate_name = ${lengthLimited(name)}
             """,
           ).headOption,

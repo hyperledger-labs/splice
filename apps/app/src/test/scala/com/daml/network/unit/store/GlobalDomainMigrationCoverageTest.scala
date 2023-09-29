@@ -4,6 +4,7 @@ package unit.store
 import store.MultiDomainAcsStore.ContractFilter
 
 import com.daml.ledger.javaapi.data.codegen.ContractTypeCompanion
+import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.topology.PartyId
 
 import org.scalatest.AppendedClues
@@ -25,7 +26,7 @@ class GlobalDomainMigrationCoverageTest
 
   filtersAndMoveLists.foreach { case (label, filtered, rawHandled) =>
     s"${label.getClass.getSimpleName}" should {
-      val handled = rawHandled.view.map(_.TEMPLATE_ID).toSet
+      val handled = rawHandled.view.map(t => QualifiedName(t.TEMPLATE_ID)).toSet
 
       "handle every listened-to contract type not handled elsewhere" in {
         filtered.ingestionFilter.templateIds should contain allElementsOf handled
@@ -54,7 +55,9 @@ class GlobalDomainMigrationCoverageTest
   }
 
   "knownNotHandled" should {
-    val allHandled = filtersAndMoveLists.view.flatMap(_._3.map(_.TEMPLATE_ID)).toSet
+    val allHandled = filtersAndMoveLists.view
+      .flatMap(_._3.map(i => QualifiedName(i.TEMPLATE_ID)))
+      .toSet
 
     "not list any handled contracts" in {
       knownNotHandled.keySet intersect allHandled shouldBe empty
@@ -144,6 +147,8 @@ object GlobalDomainMigrationCoverageTest {
       coin.LockedCoin.COMPANION -> "TODO (#7822) follow CoinRules in UserWallet",
       coin.ValidatorRewardCoupon.COMPANION -> "TODO (#7822) follow CoinRules in UserWallet",
       svc.coinprice.CoinPriceVote.COMPANION -> "TODO (#7822) follow CoinRules in SvSvc",
-    ).view.map { case (c, reason) => (c.TEMPLATE_ID, reason) }.toMap
+    ).view.map { case (c, reason) =>
+      (QualifiedName(c.TEMPLATE_ID), reason)
+    }.toMap
   }
 }

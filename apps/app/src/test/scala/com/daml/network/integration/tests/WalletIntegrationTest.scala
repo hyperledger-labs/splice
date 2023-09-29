@@ -12,10 +12,9 @@ import com.daml.network.http.v0.definitions.TapRequest
 import com.daml.network.http.v0.wallet.WalletClient
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.util.WalletTestUtil
+import com.daml.network.util.{JavaDecodeUtil as DecodeUtil, WalletTestUtil}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
 import com.typesafe.config.ConfigFactory
 import org.slf4j.event.Level

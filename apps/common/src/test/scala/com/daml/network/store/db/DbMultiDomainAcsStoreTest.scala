@@ -8,7 +8,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
 import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.store.{MultiDomainAcsStoreTest, StoreTest}
-import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, QualifiedName, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
@@ -88,6 +88,7 @@ class DbMultiDomainAcsStoreTest
       .valueOrFail("Failed to parse contract.")
     val contractId = new ContractId[Any](evt.getContractId)
     val templateId = contract.identifier
+    val templateIdPackageId = lengthLimited(templateId.getPackageId)
     val createArguments = payloadJsonFromContract(contract.payload)
     val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
     val contractMetadataContractKeyHash =
@@ -95,11 +96,13 @@ class DbMultiDomainAcsStoreTest
     val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
     val contractExpiresAt = Some(contractMetadataCreatedAt.addMicros(1000000000L))
     sqlu"""
-      insert into acs_store_template(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
+      insert into acs_store_template(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, contract_metadata_created_at,
                                 contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
                                 assigned_domain, reassignment_counter, reassignment_target_domain,
                                 reassignment_source_domain, reassignment_submitter, reassignment_unassign_id)
-      values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
+      values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
+        templateId
+      )}, $createArguments, $contractMetadataCreatedAt,
               $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
               ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
               ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId})

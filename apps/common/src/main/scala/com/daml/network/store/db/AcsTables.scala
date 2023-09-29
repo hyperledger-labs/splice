@@ -2,7 +2,7 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
-import com.digitalasset.canton.admin.api.client.data.TemplateId
+import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -84,7 +84,10 @@ object AcsTables extends AcsTables {
 
     val contractId: Rep[ContractId[Any]] = column[ContractId[Any]]("contract_id")
 
-    val templateId: Rep[TemplateId] = column[TemplateId]("template_id")
+    val templateIdPackageId: Rep[String] = column[String]("template_id_package_id")
+
+    val templateIdQualifiedName: Rep[QualifiedName] =
+      column[QualifiedName]("template_id_qualified_name")
 
     val createArguments: Rep[Json] = column[Json]("create_arguments")
 
@@ -104,7 +107,8 @@ object AcsTables extends AcsTables {
       storeId ::
         eventNumber ::
         contractId ::
-        templateId ::
+        templateIdPackageId ::
+        templateIdQualifiedName ::
         createArguments ::
         contractMetadataCreatedAt ::
         contractMetadataContractKeyHash ::

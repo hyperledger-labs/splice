@@ -1,16 +1,15 @@
 package com.daml.network.store.db
 
-import com.daml.ledger.javaapi.data
 import com.daml.ledger.javaapi.data.{CreatedEvent, Value}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
-import com.daml.lf.data.Ref.*
+import com.daml.lf.data.Ref.HexString
 import com.daml.lf.data.Time.Timestamp
 import com.daml.lf.value.Value as LfValue
 import com.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.store.MultiDomainAcsStore.ContractFilter
 import com.daml.network.util.Contract
 import com.daml.network.util.Contract.Companion
-import com.digitalasset.canton.admin.api.client.data.TemplateId
+import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String300}
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -91,54 +90,19 @@ trait AcsJdbcTypes {
       s => Offset.fromHexString(HexString.assertFromString(s)),
     )
 
-  protected implicit lazy val identifierSetParameter: SetParameter[Identifier] =
-    (v1: Identifier, v2: PositionedParameters) =>
+  protected implicit lazy val qualifiedNameSetParameter: SetParameter[QualifiedName] =
+    (v1: QualifiedName, v2: PositionedParameters) =>
       implicitly[SetParameter[String2066]].apply(lengthLimited(v1.toString()), v2)
 
-  protected implicit lazy val javaIdentifierSetParameter
-      : SetParameter[com.daml.ledger.javaapi.data.Identifier] =
-    (v1: data.Identifier, v2: PositionedParameters) =>
-      identifierSetParameter.apply(
-        Identifier(
-          PackageId.assertFromString(v1.getPackageId),
-          QualifiedName(
-            ModuleName.assertFromString(v1.getModuleName),
-            DottedName.assertFromString(v1.getEntityName),
-          ),
-        ),
-        v2,
-      )
+  protected implicit val qualifiedNameGetResult: GetResult[QualifiedName] =
+    GetResult.GetString.andThen { s => QualifiedName.assertFromString(s) }
 
-  protected implicit lazy val templateIdJdbcType: JdbcType[TemplateId] =
-    MappedColumnType.base[TemplateId, String](
-      { case TemplateId(packageId, moduleName, entityName) =>
-        Identifier(
-          PackageId.assertFromString(packageId),
-          QualifiedName(
-            ModuleName.assertFromString(moduleName),
-            DottedName.assertFromString(entityName),
-          ),
-        ).toString()
-      },
-      s => {
-        val identifier = Identifier.assertFromString(s)
-        TemplateId(
-          identifier.packageId,
-          identifier.qualifiedName.module.dottedName,
-          identifier.qualifiedName.name.dottedName,
-        )
+  protected implicit lazy val qualifiedNameJdbcType: JdbcType[QualifiedName] =
+    MappedColumnType.base[QualifiedName, String](
+      { _.toString }, {
+        QualifiedName.assertFromString(_)
       },
     )
-
-  protected implicit val templateIdGetResult: GetResult[TemplateId] =
-    GetResult.GetString.andThen { s =>
-      val identifier = Identifier.assertFromString(s)
-      TemplateId(
-        identifier.packageId,
-        identifier.qualifiedName.module.dottedName,
-        identifier.qualifiedName.name.dottedName,
-      )
-    }
 
   protected implicit lazy val domainIdJdbcType: JdbcType[DomainId] =
     MappedColumnType.base[DomainId, String](_.toProtoPrimitive, DomainId.tryFromString)

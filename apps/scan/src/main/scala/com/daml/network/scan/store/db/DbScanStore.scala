@@ -14,7 +14,7 @@ import com.daml.network.scan.store.{ScanStore, TxLogEntry, TxLogIndexRecord}
 import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
-import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -78,6 +78,7 @@ class DbScanStore(
           ) =>
         val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
         val templateId = contract.identifier
+        val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
         val createArguments = payloadJsonFromContract(contract.payload)
         val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
         val contractMetadataContractKeyHash =
@@ -85,12 +86,14 @@ class DbScanStore(
         val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
         val safeImportCrateReceiverName = importCrateReceiverName.map(lengthLimited)
         sqlu"""
-              insert into scan_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
+              insert into scan_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, contract_metadata_created_at,
               contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
               assigned_domain, reassignment_counter, reassignment_target_domain,
               reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
               round, validator, amount, import_crate_receiver, featured_app_right_provider)
-              values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
+              values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
+            templateId
+          )}, $createArguments, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
@@ -145,7 +148,7 @@ class DbScanStore(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
               storeId,
-              where = sql"""template_id = ${CoinRules.TEMPLATE_ID}""",
+              where = sql"""template_id_qualified_name = ${QualifiedName(CoinRules.TEMPLATE_ID)}""",
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
             "lookupCoinRules",
@@ -167,7 +170,7 @@ class DbScanStore(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
               storeId,
-              where = sql"""template_id = ${CnsRules.TEMPLATE_ID}""",
+              where = sql"""template_id_qualified_name = ${QualifiedName(CnsRules.TEMPLATE_ID)}""",
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
             "lookupCnsRules",
@@ -189,7 +192,7 @@ class DbScanStore(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
               storeId,
-              where = sql"""template_id = ${SvcRules.TEMPLATE_ID}""",
+              where = sql"""template_id_qualified_name = ${QualifiedName(SvcRules.TEMPLATE_ID)}""",
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
             "lookupSvcRules",
@@ -467,8 +470,9 @@ class DbScanStore(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
               storeId,
-              where =
-                sql"""template_id = ${ImportCrate.TEMPLATE_ID} and acs.import_crate_receiver = $receiverParty""",
+              where = sql"""template_id_qualified_name = ${QualifiedName(
+                  ImportCrate.TEMPLATE_ID
+                )} and acs.import_crate_receiver = $receiverParty""",
               orderLimit = sql"""limit ${sqlLimit(Limit.DefaultLimit)}""",
             ),
             "listImportCrates",
@@ -493,7 +497,7 @@ class DbScanStore(
             (selectFromAcsTable(ScanTables.acsTableName) ++
               sql"""
                   where store_id = $storeId
-                    and template_id = ${FeaturedAppRight.TEMPLATE_ID}
+                    and template_id_qualified_name = ${QualifiedName(FeaturedAppRight.TEMPLATE_ID)}
                     and featured_app_right_provider = $providerPartyId
                   limit 1;
                  """).toActionBuilder.as[SelectFromAcsTableResult].headOption,

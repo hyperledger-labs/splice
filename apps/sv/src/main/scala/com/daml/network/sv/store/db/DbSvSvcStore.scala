@@ -36,7 +36,7 @@ import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.SvcTables.{SvcAcsStoreRowData, SvcTxLogRowData}
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
 import com.daml.network.util.Contract.Companion.Template
-import com.daml.network.util.{AssignedContract, Contract, TemplateJsonDecoder}
+import com.daml.network.util.{AssignedContract, Contract, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -123,6 +123,7 @@ class DbSvSvcStore(
           ) =>
         val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
         val templateId = contract.identifier
+        val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
         val createArguments = payloadJsonFromContract(contract.payload)
         val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
         val contractMetadataContractKeyHash =
@@ -133,7 +134,7 @@ class DbSvSvcStore(
         val safeCnsEntryName = cnsEntryName.map(lengthLimited)
         val safeActionCnsEntryContextArcType = actionCnsEntryContextArcType.map(lengthLimited)
         sqlu"""
-              insert into svc_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
+              insert into svc_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, contract_metadata_created_at,
                                         contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
                                         assigned_domain, reassignment_counter, reassignment_target_domain,
                                         reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
@@ -143,7 +144,9 @@ class DbSvSvcStore(
                                         import_crate_receiver, member_traffic_member, cns_entry_name, action_cns_entry_context_cid,
                                         action_cns_entry_context_payment_id, action_cns_entry_context_arc_type, subscription_context_contract_id,
                                         subscription_next_payment_due_at, featured_app_right_provider)
-              values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
+              values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
+            templateId
+          )}, $createArguments, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
@@ -199,7 +202,8 @@ class DbSvSvcStore(
                        idle.store_id,
                        idle.event_number,
                        idle.contract_id,
-                       idle.template_id,
+                       idle.template_id_package_id,
+                       idle.template_id_qualified_name,
                        idle.create_arguments,
                        idle.contract_metadata_created_at,
                        idle.contract_metadata_contract_key_hash,
@@ -208,7 +212,8 @@ class DbSvSvcStore(
                        ctx.store_id,
                        ctx.event_number,
                        ctx.contract_id,
-                       ctx.template_id,
+                       ctx.template_id_package_id,
+                       ctx.template_id_qualified_name,
                        ctx.create_arguments,
                        ctx.contract_metadata_created_at,
                        ctx.contract_metadata_contract_key_hash,
@@ -219,8 +224,12 @@ class DbSvSvcStore(
               on       idle.subscription_context_contract_id = ctx.contract_id
                 and      ctx.store_id = idle.store_id
               where    idle.store_id = $storeId
-                and      idle.template_id = ${SubscriptionIdleState.COMPANION.TEMPLATE_ID}
-                and      ctx.template_id = ${CnsEntryContext.COMPANION.TEMPLATE_ID}
+                and      idle.template_id_qualified_name = ${QualifiedName(
+              SubscriptionIdleState.COMPANION.TEMPLATE_ID
+            )}
+                and      ctx.template_id_qualified_name = ${QualifiedName(
+              CnsEntryContext.COMPANION.TEMPLATE_ID
+            )}
                 and      idle.subscription_next_payment_due_at < $now
               order by idle.subscription_next_payment_due_at
               limit    $limit
@@ -244,7 +253,9 @@ class DbSvSvcStore(
             (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
               sql"""
                 where store_id = $storeId
-                  and template_id = ${SvOnboardingConfirmed.TEMPLATE_ID}
+                  and template_id_qualified_name = ${QualifiedName(
+                  SvOnboardingConfirmed.TEMPLATE_ID
+                )}
                   and sv_candidate_party = $svParty
                 limit 1
               """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
@@ -263,7 +274,7 @@ class DbSvSvcStore(
           (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                  where store_id = $storeId
-                   and template_id = ${Confirmation.TEMPLATE_ID}
+                   and template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                    and action_requiring_confirmation = ${payloadJsonFromValue(action.toValue)}
                  limit ${sqlLimit(limit)}
                """).toActionBuilder.as[SelectFromAcsTableResult],
@@ -283,7 +294,7 @@ class DbSvSvcStore(
           (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                  where store_id = $storeId
-                   and template_id = ${AppRewardCoupon.TEMPLATE_ID}
+                   and template_id_qualified_name = ${QualifiedName(AppRewardCoupon.TEMPLATE_ID)}
                    and reward_round = $round
                    and reward_party is not null -- otherwise index is not used
                  limit ${sqlLimit(limit)}
@@ -305,7 +316,9 @@ class DbSvSvcStore(
             (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
               sql"""
                    where store_id = $storeId
-                     and template_id = ${ValidatorRewardCoupon.TEMPLATE_ID}
+                     and template_id_qualified_name = ${QualifiedName(
+                  ValidatorRewardCoupon.TEMPLATE_ID
+                )}
                      and reward_round = $round
                      and reward_party is not null -- otherwise index is not used
                    limit ${sqlLimit(limit)}
@@ -331,7 +344,7 @@ class DbSvSvcStore(
               select reward_party, array_agg(contract_id)
               from svc_acs_store
               where store_id = $storeId
-                and template_id = ${AppRewardCoupon.TEMPLATE_ID}
+                and template_id_qualified_name = ${QualifiedName(AppRewardCoupon.TEMPLATE_ID)}
                 and reward_round = $roundNumber
                 and reward_party is not null -- otherwise index is not used
               group by reward_party
@@ -356,7 +369,9 @@ class DbSvSvcStore(
                 select reward_party, array_agg(contract_id)
                 from svc_acs_store
                 where store_id = $storeId
-                  and template_id = ${ValidatorRewardCoupon.TEMPLATE_ID}
+                  and template_id_qualified_name = ${QualifiedName(
+                ValidatorRewardCoupon.TEMPLATE_ID
+              )}
                   and reward_round = $roundNumber
                   and reward_party is not null -- otherwise index is not used
                 group by reward_party
@@ -380,7 +395,7 @@ class DbSvSvcStore(
           (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
             where store_id = $storeId
-              and template_id = ${ClosedMiningRound.TEMPLATE_ID}
+              and template_id_qualified_name = ${QualifiedName(ClosedMiningRound.TEMPLATE_ID)}
               and mining_round is not null
             order by mining_round
             limit 1
@@ -406,7 +421,7 @@ class DbSvSvcStore(
             DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
-                    template_id = ${Confirmation.TEMPLATE_ID}
+                    template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                 and confirmer = $confirmer
                 and action_requiring_confirmation = ${payloadJsonFromValue(action.toValue)}
                   """,
@@ -437,7 +452,7 @@ class DbSvSvcStore(
             DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
-                        template_id = ${Confirmation.TEMPLATE_ID}
+                        template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                     and confirmer = $confirmer
                     and action_cns_entry_context_payment_id = $paymentId
                     and action_cns_entry_context_arc_type = ${lengthLimited(
@@ -471,7 +486,7 @@ class DbSvSvcStore(
             DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
-                        template_id = ${Confirmation.TEMPLATE_ID}
+                        template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                     and confirmer = $confirmer
                     and action_cns_entry_context_payment_id = $paymentId
                     and action_cns_entry_context_arc_type = ${lengthLimited(
@@ -505,7 +520,7 @@ class DbSvSvcStore(
             DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
-                        template_id = ${Confirmation.TEMPLATE_ID}
+                        template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                     and confirmer = $confirmer
                     and action_cns_entry_context_payment_id = $paymentId
                       """,
@@ -529,13 +544,15 @@ class DbSvSvcStore(
           .query(
             (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
               sql"""
-                    where template_id = ${Confirmation.TEMPLATE_ID}
+                    where template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                       and confirmer = $confirmer
                       and action_cns_entry_context_cid IN (
                         select contract_id
                         from #${DbSvSvcStore.acsTableName}
                         where store_id = $storeId
-                          and template_id = ${CnsEntryContext.TEMPLATE_ID}
+                          and template_id_qualified_name = ${QualifiedName(
+                  CnsEntryContext.TEMPLATE_ID
+                )}
                           and cns_entry_name = ${lengthLimited(name)}
                       )
                     limit ${sqlLimit(Limit.DefaultLimit)};
@@ -558,7 +575,7 @@ class DbSvSvcStore(
             DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
-                      template_id = ${SvOnboardingRequest.TEMPLATE_ID}
+                      template_id_qualified_name = ${QualifiedName(SvOnboardingRequest.TEMPLATE_ID)}
                   and sv_onboarding_token = ${lengthLimited(token)}
                     """,
             orderLimit = sql"limit 1",
@@ -589,7 +606,9 @@ class DbSvSvcStore(
             (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
               sql"""
                  where store_id = $storeId
-                   and template_id = ${SvOnboardingRequest.TEMPLATE_ID}
+                   and template_id_qualified_name = ${QualifiedName(
+                  SvOnboardingRequest.TEMPLATE_ID
+                )}
                    and (sv_candidate_party, sv_candidate_name) in #$svCandidates
                  limit ${sqlLimit(Limit.DefaultLimit)}
                """).toActionBuilder.as[SelectFromAcsTableResult],
@@ -610,13 +629,15 @@ class DbSvSvcStore(
               DbSvSvcStore.acsTableName,
               storeId,
               where = sql"""
-                template_id = ${companion.TEMPLATE_ID}
+                template_id_qualified_name = ${QualifiedName(companion.TEMPLATE_ID)}
                 and assigned_domain is not null
                 and acs.coin_round_of_expiry <= (
                   select mining_round - 2
                   from svc_acs_store
                   where store_id = $storeId
-                    and template_id = ${cc.round.OpenMiningRound.TEMPLATE_ID}
+                    and template_id_qualified_name = ${QualifiedName(
+                  cc.round.OpenMiningRound.TEMPLATE_ID
+                )}
                     and mining_round is not null
                   order by mining_round desc limit 1)""",
               orderLimit = sql"""order by mining_round desc limit $limit""",
@@ -636,7 +657,7 @@ class DbSvSvcStore(
           (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                  where store_id = $storeId
-                   and template_id = ${MemberTraffic.TEMPLATE_ID}
+                   and template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID)}
                    and member_traffic_member = $memberId
                  limit $limit
                """).toActionBuilder.as[SelectFromAcsTableResult],
@@ -661,7 +682,7 @@ class DbSvSvcStore(
           (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                where store_id = $storeId
-                 and template_id = ${CoinPriceVote.TEMPLATE_ID}
+                 and template_id_qualified_name = ${QualifiedName(CoinPriceVote.TEMPLATE_ID)}
                  and voter in #$voterParties
                limit ${sqlLimit(Limit.DefaultLimit)}
              """).toActionBuilder.as[SelectFromAcsTableResult],
@@ -683,7 +704,9 @@ class DbSvSvcStore(
             DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
-                        template_id = ${SvOnboardingRequest.TEMPLATE_ID}
+                        template_id_qualified_name = ${QualifiedName(
+                SvOnboardingRequest.TEMPLATE_ID
+              )}
                     and sv_candidate_party = $candidateParty
                       """,
             orderLimit = sql"limit 1",
@@ -708,7 +731,9 @@ class DbSvSvcStore(
             DbSvSvcStore.acsTableName,
             storeId,
             sql"""
-                          template_id = ${ValidatorLicense.TEMPLATE_ID}
+                          template_id_qualified_name = ${QualifiedName(
+                ValidatorLicense.TEMPLATE_ID
+              )}
                       and validator = $validator
                     limit 1;
                         """,
@@ -731,7 +756,7 @@ class DbSvSvcStore(
                select sum(total_traffic_purchased)
                from #${DbSvSvcStore.acsTableName}
                where store_id = $storeId
-                and template_id = ${MemberTraffic.TEMPLATE_ID}
+                and template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID)}
                 and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
              """.as[Long].headOption,
           "getTotalPurchasedMemberTraffic",
@@ -752,7 +777,7 @@ class DbSvSvcStore(
           (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                  where store_id = $storeId
-                   and template_id = ${CoinPriceVote.TEMPLATE_ID}
+                   and template_id_qualified_name = ${QualifiedName(CoinPriceVote.TEMPLATE_ID)}
                    and vote_request_cid in #$voteRequestCidsSql
                  limit ${sqlLimit(Limit.DefaultLimit)}
                """).toActionBuilder.as[SelectFromAcsTableResult],
@@ -773,7 +798,7 @@ class DbSvSvcStore(
               DbSvSvcStore.acsTableName,
               storeId,
               sql"""
-                            template_id = ${Vote.TEMPLATE_ID}
+                            template_id_qualified_name = ${QualifiedName(Vote.TEMPLATE_ID)}
                             vote_request_cid = $voteRequestCid
                         and voter = ${key.svParty}
                       limit 1;
@@ -799,7 +824,7 @@ class DbSvSvcStore(
             DbSvSvcStore.acsTableName,
             storeId,
             sql"""
-                          template_id = ${VoteRequest.TEMPLATE_ID}
+                          template_id_qualified_name = ${QualifiedName(VoteRequest.TEMPLATE_ID)}
                           action_requiring_confirmation = ${payloadJsonFromValue(action.toValue)}
                       and requester = ${key.svParty}
                     limit 1;
@@ -822,7 +847,7 @@ class DbSvSvcStore(
           (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                    where store_id = $storeId
-                     and template_id = ${Vote.TEMPLATE_ID}
+                     and template_id_qualified_name = ${QualifiedName(Vote.TEMPLATE_ID)}
                      and vote_request_cid = $voteRequestId
                    limit ${sqlLimit(Limit.DefaultLimit)}
                  """).toActionBuilder.as[SelectFromAcsTableResult],
@@ -841,7 +866,7 @@ class DbSvSvcStore(
           (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                      where store_id = $storeId
-                       and template_id = ${CoinPriceVote.TEMPLATE_ID}
+                       and template_id_qualified_name = ${QualifiedName(CoinPriceVote.TEMPLATE_ID)}
                        and voter = ${key.svParty}
                      limit 1
                    """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
@@ -863,7 +888,9 @@ class DbSvSvcStore(
             DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
-                            template_id = ${SvOnboardingRequest.TEMPLATE_ID}
+                            template_id_qualified_name = ${QualifiedName(
+                SvOnboardingRequest.TEMPLATE_ID
+              )}
                         and sv_candidate_name = ${lengthLimited(candidateName)}
                           """,
             orderLimit = sql"limit 1",
@@ -888,7 +915,9 @@ class DbSvSvcStore(
             DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
-                              template_id = ${SvOnboardingConfirmed.TEMPLATE_ID}
+                              template_id_qualified_name = ${QualifiedName(
+                SvOnboardingConfirmed.TEMPLATE_ID
+              )}
                           and sv_candidate_name = ${lengthLimited(svName)}
                             """,
             orderLimit = sql"limit 1",
@@ -913,7 +942,9 @@ class DbSvSvcStore(
           (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                      where store_id = $storeId
-                       and template_id = ${ElectionRequest.TEMPLATE_ID}
+                       and template_id_qualified_name = ${QualifiedName(
+                ElectionRequest.TEMPLATE_ID
+              )}
                        and requester IN #$requesters
                        and election_request_epoch = $electionRequestEpoch
                      limit ${sqlLimit(Limit.DefaultLimit)}
@@ -936,7 +967,9 @@ class DbSvSvcStore(
             DbSvSvcStore.acsTableName,
             storeId,
             where = sql"""
-                              template_id = ${ElectionRequest.TEMPLATE_ID}
+                              template_id_qualified_name = ${QualifiedName(
+                ElectionRequest.TEMPLATE_ID
+              )}
                           and requester = $requester
                           and election_request_epoch = $epoch
                             """,
@@ -962,7 +995,9 @@ class DbSvSvcStore(
           (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                        where store_id = $storeId
-                         and template_id = ${ElectionRequest.TEMPLATE_ID}
+                         and template_id_qualified_name = ${QualifiedName(
+                ElectionRequest.TEMPLATE_ID
+              )}
                          and election_request_epoch < $epoch
                        limit ${sqlLimit(Limit.DefaultLimit)}
                      """).toActionBuilder.as[SelectFromAcsTableResult],
@@ -982,7 +1017,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithState(
             DbSvSvcStore.acsTableName,
             storeId,
-            where = sql"""template_id = ${ImportCrate.TEMPLATE_ID}
+            where = sql"""template_id_qualified_name = ${QualifiedName(ImportCrate.TEMPLATE_ID)}
                            and import_crate_receiver = $receiver""",
             orderLimit = sql"""limit ${sqlLimit(Limit.DefaultLimit)}""",
           ),
@@ -1006,7 +1041,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithStateAndOffset(
             DbSvSvcStore.acsTableName,
             storeId,
-            where = sql"""template_id = ${CnsEntry.TEMPLATE_ID}
+            where = sql"""template_id_qualified_name = ${QualifiedName(CnsEntry.TEMPLATE_ID)}
                     and cns_entry_name = ${lengthLimited(name)}
                     and assigned_domain is not null""",
             orderLimit = sql"limit 1",
@@ -1034,7 +1069,9 @@ class DbSvSvcStore(
           selectFromAcsTableWithStateAndOffset(
             DbSvSvcStore.acsTableName,
             storeId,
-            where = sql"""template_id = ${SubscriptionInitialPayment.TEMPLATE_ID}
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                SubscriptionInitialPayment.TEMPLATE_ID
+              )}
                         and contract_id = $paymentCid
                         and assigned_domain is not null""",
             orderLimit = sql"limit 1",
@@ -1062,7 +1099,8 @@ class DbSvSvcStore(
           selectFromAcsTableWithStateAndOffset(
             DbSvSvcStore.acsTableName,
             storeId,
-            where = sql"""template_id = ${FeaturedAppRight.TEMPLATE_ID}
+            where =
+              sql"""template_id_qualified_name = ${QualifiedName(FeaturedAppRight.TEMPLATE_ID)}
                       and featured_app_right_provider = $providerPartyId
                       and assigned_domain is not null""",
             orderLimit = sql"limit 1",

@@ -4,9 +4,8 @@ import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.ConfigScheduleUtil
+import com.daml.network.util.{ConfigScheduleUtil, JavaDecodeUtil as DecodeUtil}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.digitalasset.canton.time.EnrichedDurations.*
 
 import java.time.Duration as JavaDuration

@@ -10,7 +10,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -76,20 +76,23 @@ class DbDirectoryStore(
         val safeDirectoryName = directoryEntryName.map(lengthLimited)
         val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
         val templateId = contract.identifier
+        val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
         val createArguments = payloadJsonFromContract(contract.payload)
         val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
         val contractMetadataContractKeyHash =
           lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)
         val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
         sqlu"""
-              insert into directory_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
+              insert into directory_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, contract_metadata_created_at,
                                         contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
                                         assigned_domain, reassignment_counter, reassignment_target_domain,
                                         reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
                                         directory_install_user, directory_entry_name,
                                         directory_entry_owner, subscription_context_contract_id,
                                         subscription_next_payment_due_at)
-              values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
+              values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
+            templateId
+          )}, $createArguments, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
@@ -111,7 +114,9 @@ class DbDirectoryStore(
             DirectoryTables.acsTableName,
             storeId,
             sql"""
-              template_id = ${directoryCodegen.DirectoryInstall.COMPANION.TEMPLATE_ID}
+              template_id_qualified_name = ${QualifiedName(
+                directoryCodegen.DirectoryInstall.COMPANION.TEMPLATE_ID
+              )}
                 and directory_install_user = $user
             """,
             sql"limit 1",
@@ -135,7 +140,9 @@ class DbDirectoryStore(
             DirectoryTables.acsTableName,
             storeId,
             sql"""
-            template_id = ${directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID}
+            template_id_qualified_name = ${QualifiedName(
+                directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID
+              )}
               and directory_entry_name = ${lengthLimited(name)}
             """,
             sql"limit 1",
@@ -159,7 +166,9 @@ class DbDirectoryStore(
             (selectFromAcsTable(DirectoryTables.acsTableName) ++
               sql"""
               where store_id = $storeId
-                and template_id = ${directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID}
+                and template_id_qualified_name = ${QualifiedName(
+                  directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID
+                )}
                 and directory_entry_owner = $partyId
                 and directory_entry_name >= ''
               order by directory_entry_name
@@ -181,7 +190,9 @@ class DbDirectoryStore(
           (selectFromAcsTable(DirectoryTables.acsTableName) ++
             sql"""
               where store_id = $storeId
-                and template_id = ${directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID}
+                and template_id_qualified_name = ${QualifiedName(
+                directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID
+              )}
                 and directory_entry_name ^@ $limitedPrefix
               order by directory_entry_name
               limit $pageSize
@@ -202,7 +213,8 @@ class DbDirectoryStore(
                        idle.store_id,
                        idle.event_number,
                        idle.contract_id,
-                       idle.template_id,
+                       idle.template_id_package_id,
+                       idle.template_id_qualified_name,
                        idle.create_arguments,
                        idle.contract_metadata_created_at,
                        idle.contract_metadata_contract_key_hash,
@@ -211,7 +223,8 @@ class DbDirectoryStore(
                        ctx.store_id,
                        ctx.event_number,
                        ctx.contract_id,
-                       ctx.template_id,
+                       ctx.template_id_package_id,
+                       ctx.template_id_qualified_name,
                        ctx.create_arguments,
                        ctx.contract_metadata_created_at,
                        ctx.contract_metadata_contract_key_hash,
@@ -222,8 +235,12 @@ class DbDirectoryStore(
               on       idle.subscription_context_contract_id = ctx.contract_id
                 and      ctx.store_id = idle.store_id
               where    idle.store_id = $storeId
-                and      idle.template_id = ${subsCodegen.SubscriptionIdleState.COMPANION.TEMPLATE_ID}
-                and      ctx.template_id = ${directoryCodegen.DirectoryEntryContext.COMPANION.TEMPLATE_ID}
+                and      idle.template_id_qualified_name = ${QualifiedName(
+              subsCodegen.SubscriptionIdleState.COMPANION.TEMPLATE_ID
+            )}
+                and      ctx.template_id_qualified_name = ${QualifiedName(
+              directoryCodegen.DirectoryEntryContext.COMPANION.TEMPLATE_ID
+            )}
                 and      idle.subscription_next_payment_due_at < $now
               order by idle.subscription_next_payment_due_at
               limit    $limit

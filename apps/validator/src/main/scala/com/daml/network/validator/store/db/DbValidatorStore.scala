@@ -18,7 +18,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
-import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
@@ -95,6 +95,7 @@ class DbValidatorStore(
           ) =>
         val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
         val templateId = contract.identifier
+        val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
         val createArguments = payloadJsonFromContract(contract.payload)
         val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
         val contractMetadataContractKeyHash =
@@ -104,13 +105,15 @@ class DbValidatorStore(
         val safeAppReleaseVersion = appReleaseVersion.map(lengthLimited)
         val safeJsonHash = jsonHash.map(lengthLimited)
         sqlu"""
-              insert into validator_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
+              insert into validator_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, contract_metadata_created_at,
                                         contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
                                         assigned_domain, reassignment_counter, reassignment_target_domain,
                                         reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
                                         user_party, user_name, provider_party, validator_party,
                                         traffic_domain_id, app_configuration_version, app_release_version, json_hash)
-              values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
+              values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
+            templateId
+          )}, $createArguments, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
@@ -132,7 +135,9 @@ class DbValidatorStore(
         (selectFromAcsTable(ValidatorTables.acsTableName) ++
           sql"""
               where store_id = $storeId
-                and template_id = ${walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID}
+                and template_id_qualified_name = ${QualifiedName(
+              walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID
+            )}
                 and user_party = $endUserParty
               limit 1
           """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
@@ -152,7 +157,9 @@ class DbValidatorStore(
         (selectFromAcsTable(ValidatorTables.acsTableName) ++
           sql"""
               where store_id = $storeId
-                and template_id = ${walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID}
+                and template_id_qualified_name = ${QualifiedName(
+              walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID
+            )}
                 and user_name = ${lengthLimited(endUserName)}
               limit 1
           """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
@@ -172,7 +179,9 @@ class DbValidatorStore(
         (selectFromAcsTable(ValidatorTables.acsTableName) ++
           sql"""
               where store_id = $storeId
-                and template_id = ${coinCodegen.FeaturedAppRight.COMPANION.TEMPLATE_ID}
+                and template_id_qualified_name = ${QualifiedName(
+              coinCodegen.FeaturedAppRight.COMPANION.TEMPLATE_ID
+            )}
                 and provider_party = ${walletKey.validatorParty}
               limit 1
           """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
@@ -195,7 +204,9 @@ class DbValidatorStore(
             ValidatorTables.acsTableName,
             storeId,
             sql"""
-            template_id = ${walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID}
+            template_id_qualified_name = ${QualifiedName(
+                walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID
+              )}
               and user_name = ${lengthLimited(endUserName)}
             """,
             sql"limit 1",
@@ -229,7 +240,9 @@ class DbValidatorStore(
             ValidatorTables.acsTableName,
             storeId,
             sql"""
-            template_id = ${validatorLicenseCodegen.ValidatorLicense.COMPANION.TEMPLATE_ID}
+            template_id_qualified_name = ${QualifiedName(
+                validatorLicenseCodegen.ValidatorLicense.COMPANION.TEMPLATE_ID
+              )}
               and validator_party = ${key.validatorParty}
             """,
             sql"limit 1",
@@ -259,7 +272,9 @@ class DbValidatorStore(
             ValidatorTables.acsTableName,
             storeId,
             sql"""
-            template_id = ${coinCodegen.ValidatorRight.COMPANION.TEMPLATE_ID}
+            template_id_qualified_name = ${QualifiedName(
+                coinCodegen.ValidatorRight.COMPANION.TEMPLATE_ID
+              )}
               and user_party = $party
             """,
             sql"limit 1",
@@ -292,7 +307,9 @@ class DbValidatorStore(
             ValidatorTables.acsTableName,
             storeId,
             where = sql"""
-              template_id = ${appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID}
+              template_id_qualified_name = ${QualifiedName(
+                appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID
+              )}
               and provider_party = $provider
               """,
             orderLimit = sql"""order by app_configuration_version desc limit 1""",
@@ -321,7 +338,9 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
-            where = sql"""template_id = ${appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID}
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID
+              )}
               and provider_party = $provider
               and app_configuration_version = $version
             """,
@@ -350,7 +369,9 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
-            where = sql"""template_id = ${appManagerCodegen.AppRelease.COMPANION.TEMPLATE_ID}
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                appManagerCodegen.AppRelease.COMPANION.TEMPLATE_ID
+              )}
               and provider_party = $provider
               and app_release_version = ${lengthLimited(version)}
             """,
@@ -380,7 +401,9 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
-            where = sql"""template_id = ${appManagerCodegen.RegisteredApp.COMPANION.TEMPLATE_ID}
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                appManagerCodegen.RegisteredApp.COMPANION.TEMPLATE_ID
+              )}
               and provider_party = $provider
             """,
             orderLimit = sql"limit 1",
@@ -409,7 +432,9 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
-            where = sql"""template_id = ${appManagerCodegen.InstalledApp.COMPANION.TEMPLATE_ID}
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                appManagerCodegen.InstalledApp.COMPANION.TEMPLATE_ID
+              )}
               and provider_party = $provider
             """,
             orderLimit = sql"limit 1",
@@ -440,7 +465,9 @@ class DbValidatorStore(
             ValidatorTables.acsTableName,
             storeId,
             where = sql"""
-              template_id = ${appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID}
+              template_id_qualified_name = ${QualifiedName(
+                appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID
+              )}
               and provider_party = $provider""",
           ),
           "listApprovedReleaseConfigurations",
@@ -469,8 +496,9 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
-            where =
-              sql"""template_id = ${appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID}
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID
+              )}
               and provider_party = $provider
               and json_hash = $jsonHash
             """,
@@ -501,7 +529,9 @@ class DbValidatorStore(
             ValidatorTables.acsTableName,
             storeId,
             sql"""
-            template_id = ${topupCodegen.ValidatorTopUpState.COMPANION.TEMPLATE_ID}
+            template_id_qualified_name = ${QualifiedName(
+                topupCodegen.ValidatorTopUpState.COMPANION.TEMPLATE_ID
+              )}
               and traffic_domain_id = $domainId
             """,
             sql"limit 1",

@@ -1,11 +1,11 @@
 package com.daml.network.store.db
 
+import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.store.db.AcsTables.TxLogStoreRowTemplate
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
-import com.digitalasset.canton.admin.api.client.data.TemplateId
+import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
 import slick.jdbc.{GetResult, PositionedResult}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
@@ -22,7 +22,8 @@ trait AcsQueries extends AcsJdbcTypes {
        select store_id,
          event_number,
          contract_id,
-         template_id,
+         template_id_package_id,
+         template_id_qualified_name,
          create_arguments,
          contract_metadata_created_at,
          contract_metadata_contract_key_hash,
@@ -39,7 +40,8 @@ trait AcsQueries extends AcsJdbcTypes {
           <<[Int],
           <<[Long],
           <<[ContractId[Any]],
-          <<[TemplateId],
+          <<[String],
+          <<[QualifiedName],
           <<[Json],
           <<[Timestamp],
           <<[Option[String]],
@@ -60,7 +62,8 @@ trait AcsQueries extends AcsJdbcTypes {
        select store_id,
          event_number,
          contract_id,
-         template_id,
+         template_id_package_id,
+         template_id_qualified_name,
          create_arguments,
          contract_metadata_created_at,
          contract_metadata_contract_key_hash,
@@ -113,7 +116,8 @@ trait AcsQueries extends AcsJdbcTypes {
          last_ingested_offset,
          event_number,
          contract_id,
-         template_id,
+         template_id_package_id,
+         template_id_qualified_name,
          create_arguments,
          contract_metadata_created_at,
          contract_metadata_contract_key_hash,
@@ -162,7 +166,8 @@ trait AcsQueries extends AcsJdbcTypes {
          sd.last_ingested_offset,
          acs.event_number,
          acs.contract_id,
-         acs.template_id,
+         acs.template_id_package_id,
+         acs.template_id_qualified_name,
          acs.create_arguments,
          acs.contract_metadata_created_at,
          acs.contract_metadata_contract_key_hash,
@@ -192,6 +197,7 @@ trait AcsQueries extends AcsJdbcTypes {
           AcsQueries.SelectFromAcsTableWithStateResult(
             AcsQueries.SelectFromAcsTableResult(
               storeId,
+              pp.<<,
               pp.<<,
               pp.<<,
               pp.<<,
@@ -269,7 +275,11 @@ trait AcsQueries extends AcsJdbcTypes {
   ): Contract[TCId, T] = {
     companionClass
       .fromJson(companion)(
-        row.templateId,
+        new Identifier(
+          row.templateIdPackageId,
+          row.templateIdQualifiedName.moduleName,
+          row.templateIdQualifiedName.entityName,
+        ),
         row.contractId.contractId,
         row.createArguments,
         row.contractMetadataCreatedAt.toInstant,
@@ -289,7 +299,8 @@ object AcsQueries {
       storeId: Int,
       eventNumber: Long,
       contractId: ContractId[Any],
-      templateId: TemplateId,
+      templateIdPackageId: String,
+      templateIdQualifiedName: QualifiedName,
       createArguments: Json,
       contractMetadataCreatedAt: Timestamp,
       contractMetadataContractKeyHash: Option[String] = None,

@@ -11,7 +11,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletStore.TxLogIndexRecord
 import com.daml.network.wallet.store.db.WalletTables.{
   UserWalletAcsStoreRowData,
@@ -79,17 +79,20 @@ class DbUserWalletStore(
             ) =>
           val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
           val templateId = contract.identifier
+          val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
           val createArguments = contract.toHttp.payload
           val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
           val contractMetadataContractKeyHash =
             lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)
           val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
           sqlu"""
-              insert into user_wallet_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
+              insert into user_wallet_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, contract_metadata_created_at,
                                         contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
                                         assigned_domain, reassignment_counter, reassignment_target_domain,
                                         reassignment_source_domain, reassignment_submitter, reassignment_unassign_id)
-              values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
+              values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
+              templateId
+            )}, $createArguments, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId})

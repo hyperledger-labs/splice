@@ -1,8 +1,9 @@
 // Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package com.digitalasset.canton.participant.ledger.api.client
+package com.daml.network.util
 
+import com.daml.network.util.QualifiedName
 import com.daml.ledger.javaapi.data.codegen.{
   Contract,
   ContractCompanion,
@@ -22,7 +23,7 @@ object JavaDecodeUtil {
   def decodeCreated[TC](
       companion: ContractCompanion[TC, ?, ?]
   )(event: JavaCreatedEvent): Option[TC] =
-    if (event.getTemplateId == companion.TEMPLATE_ID) {
+    if (QualifiedName(event.getTemplateId) == QualifiedName(companion.TEMPLATE_ID)) {
       Some(companion.fromCreatedEvent(event))
     } else None
 

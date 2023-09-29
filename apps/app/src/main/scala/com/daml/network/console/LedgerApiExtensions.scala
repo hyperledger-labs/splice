@@ -22,7 +22,7 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.ledger.api.DeduplicationPeriod
-import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
+import com.daml.network.util.JavaDecodeUtil
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import java.time.Instant

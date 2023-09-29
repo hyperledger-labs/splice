@@ -19,11 +19,11 @@ import com.daml.lf.data.Ref.Identifier as LfIdentifier
 import com.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.http.v0.definitions.MaybeCachedContract
+import com.daml.network.util.JavaDecodeUtil
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ledger.api.validation.NoLoggingValueValidator
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf
 import io.circe.{Json, parser as circe}
@@ -183,7 +183,9 @@ object Contract {
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
     for {
       _ <- Either.cond(
-        javaTemplateId == companionTemplateId,
+        QualifiedName(javaTemplateId) == QualifiedName(
+          companionTemplateId
+        ),
         (),
         ProtoDeserializationError.ValueConversionError(
           "templateId",
@@ -231,7 +233,7 @@ object Contract {
       ev: CreatedEvent,
   ): Contract[TCid, T] = {
     Contract(
-      identifier = contract.getContractTypeId,
+      identifier = ev.getTemplateId,
       contractId = contract.id,
       payload = contract.data,
       metadata = ev.getContractMetadata,
