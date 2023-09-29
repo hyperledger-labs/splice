@@ -195,12 +195,16 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
     * The only guarantee provided is that a unassign that does not get transferred in
     * will eventually appear on the stream.
     */
-  def streamReadyForAssign(): Source[ReassignmentEvent.Unassign, NotUsed]
+  def streamReadyForAssign()(implicit
+      tc: TraceContext
+  ): Source[ReassignmentEvent.Unassign, NotUsed]
 
   /** Returns true if the unassign event can still potentially be transferred in.
     * Intended to be used as a staleness check for the results of `streamReadyForAssign`.
     */
-  def isReadyForAssign(contractId: ContractId[_], out: ReassignmentId): Future[Boolean]
+  def isReadyForAssign(contractId: ContractId[_], out: ReassignmentId)(implicit
+      tc: TraceContext
+  ): Future[Boolean]
 
   /** Signal when the store has finished ingesting ledger data from the given offset
     * or a larger one or node-level shutdown was initiated

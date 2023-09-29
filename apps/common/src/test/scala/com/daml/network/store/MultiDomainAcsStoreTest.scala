@@ -8,8 +8,9 @@ import com.daml.network.codegen.java.cn.scripts.testwallet.TestDeliveryOffer
 import com.daml.network.codegen.java.cn.splitwell.*
 import com.daml.network.codegen.java.cn.wallet.payment.{DeliveryOffer, DeliveryOfferView}
 import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.environment.ledger.api.ReassignmentEvent
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord}
-import com.daml.network.util.{Contract, ContractWithState, AssignedContract}
+import com.daml.network.util.{AssignedContract, Contract, ContractWithState}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.topology.DomainId
@@ -469,7 +470,7 @@ abstract class MultiDomainAcsStoreTest[
         _ <- assertIncompleteReassignments()
       } yield succeed
     }
-    "XXX archive before assign" in {
+    "archive before assign" in {
       implicit val store = mkStore()
       for {
         _ <- acs()
@@ -604,6 +605,95 @@ abstract class MultiDomainAcsStoreTest[
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1), r(2), r(3)))
         _ <- streamF
       } yield succeed
+    }
+    "stream transfers and report stale transfers" in {
+      implicit val store = mkStore()
+      val transfers = new AtomicReference(Seq.empty[ReassignmentEvent.Unassign])
+      val streamF = store
+        .streamReadyForAssign()
+        .take(2)
+        .runForeach { transfer => transfers.updateAndGet(_.appended(transfer)) }
+      val tf0 = nextReassignmentId
+      val tf0Id = ReassignmentId(d1, tf0)
+      val tf1 = nextReassignmentId
+      val tf1Id = ReassignmentId(d2, tf1)
+      val tf2 = nextReassignmentId
+      val tf2Id = ReassignmentId(d1, tf2)
+      val cid = c(1).contractId
+      for {
+        // incomplete unassign
+        _ <- acs(
+          incompleteOut = Seq(
+            (c(1), d1, d2, tf0, 1L)
+          )
+        )
+        _ = eventually()(transfers.get should have length 1)
+        _ <- assertReadyForAssign(cid, tf0Id, true)
+        _ <- d2.assign(c(1) -> d1, tf0, 1)
+        _ <- assertReadyForAssign(cid, tf0Id, false)
+        // unassign before assign
+        _ <- d2.unassign(c(1) -> d1, tf1, 2)
+        _ <- assertReadyForAssign(cid, tf1Id, true)
+        _ = eventually()(transfers.get should have length 2)
+        _ <- d1.assign(c(1) -> d2, tf1, 2)
+        _ <- assertReadyForAssign(cid, tf1Id, false)
+        // assign before unassign
+        _ <- d3.assign(c(1) -> d1, tf2, 3)
+        _ <- assertReadyForAssign(cid, tf2Id, false)
+        _ <- d1.unassign(c(1) -> d3, tf2, 3)
+        _ <- assertReadyForAssign(cid, tf2Id, false)
+        _ <- streamF
+      } yield {
+        transfers.get().map(ReassignmentId.fromUnassign(_)) shouldBe Seq(tf0Id, tf1Id)
+      }
+    }
+    "stream assigned contracts" in {
+      implicit val store = mkStore()
+      val assignedContracts = new AtomicReference(Seq.empty[CReady])
+      val streamF = store
+        .streamAssignedContracts(AppRewardCoupon.COMPANION)
+        .take(5)
+        .runForeach { assignedContract =>
+          assignedContracts.updateAndGet(_.appended(assignedContract))
+        }
+      val tf0 = nextReassignmentId
+      val tf1 = nextReassignmentId
+      val tf2 = nextReassignmentId
+      def assertSize(label: String, expected: Long) = {
+        clue(label) {
+          eventually()(assignedContracts.get() should have size expected)
+        }
+      }
+      for {
+        _ <- acs(
+          acs = Seq((c(1), d1, 0L)),
+          incompleteOut = Seq((c(2), d1, d2, tf2, 3L)),
+        )
+        _ = assertSize("Initial", 1)
+        // unassign before assign
+        _ <- d1.unassign(c(1) -> d2, tf0, 1)
+        _ <- d2.assign(c(1) -> d1, tf0, 1)
+        _ = assertSize("unassign before assign", 2)
+        // assign before unassign
+        _ <- d1.assign(c(1) -> d2, tf1, 2)
+        _ <- d2.unassign(c(1) -> d1, tf1, 2)
+        _ = assertSize("assign before unassign", 3)
+        // complete assign of incomplete unassign.
+        _ <- d2.assign(c(2) -> d1, tf2, 3)
+        _ = assertSize("complete assign of incomplete unassign", 4)
+        // create
+        _ <- d2.create(c(3))
+        _ = assertSize("create", 5)
+        _ <- streamF
+      } yield {
+        assignedContracts.get() shouldBe Seq(
+          AssignedContract(c(1), d1),
+          AssignedContract(c(1), d2),
+          AssignedContract(c(1), d1),
+          AssignedContract(c(2), d2),
+          AssignedContract(c(3), d2),
+        )
+      }
     }
 
     "reads return contracts from all package versions" in {

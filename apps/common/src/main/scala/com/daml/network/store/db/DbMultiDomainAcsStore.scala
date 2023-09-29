@@ -46,6 +46,8 @@ import scala.collection.immutable.{SortedMap, VectorMap}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import slick.jdbc.canton.SQLActionBuilder
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, ReassignmentId}
 import com.daml.network.store.db.AcsQueries.{
   SelectFromAcsTableWithStateResult,
@@ -303,17 +305,27 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Source[AssignedContract[TCid, T], NotUsed] = {
-    streamAssignedContracts(companion, PageLimit(100L))
+    val templateId = companionClass.typeId(companion)
+    streamContractsWithState(
+      pageSize = defaultPageSizeForContractStream,
+      where = sql"""assigned_domain is not null and template_id_qualified_name = ${QualifiedName(
+          templateId
+        )}""",
+    )
+      .map(assignedContractFromRow(companion)(_))
   }
 
-  def streamAssignedContracts[C, TCid <: ContractId[_], T](
-      companion: C,
+  private val defaultPageSizeForContractStream = PageLimit(100L)
+
+  /** Returns a stream of contracts with their current state.
+    * The same contract may appear multiple times in the stream if the contract state changes.
+    */
+  private def streamContractsWithState(
       pageSize: PageLimit,
+      where: SQLActionBuilder,
   )(implicit
-      companionClass: ContractCompanion[C, TCid, T],
-      traceContext: TraceContext,
-  ): Source[AssignedContract[TCid, T], NotUsed] = {
-    val templateId = companionClass.typeId(companion)
+      traceContext: TraceContext
+  ): Source[SelectFromAcsTableWithStateResult, NotUsed] = {
     Source
       .future(
         // TODO(#5534): this is currently waiting until the whole ACS has been ingested.
@@ -323,32 +335,31 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       )
       .flatMapConcat { _ =>
         Source
-          .unfoldAsync(0L) { fromEventNumber =>
+          .unfoldAsync(0L) { fromNumber =>
             val offsetPromise = state.get().offsetChanged
             storage
-              .query( // index: acs_store_template_sid_tid_en
+              .query(
                 selectFromAcsTableWithState(
                   acsTableName,
                   storeId,
-                  where = sql"""template_id_qualified_name = ${QualifiedName(templateId)}
-                    and event_number >= $fromEventNumber""",
-                  orderLimit = sql"""order by event_number
-                    limit ${sqlLimit(pageSize)}""",
+                  where = (where ++ sql" and state_number >= $fromNumber").toActionBuilder,
+                  orderLimit =
+                    (sql"order by state_number limit ${sqlLimit(pageSize)}").toActionBuilder,
                 ),
-                "streamAssignedContracts",
+                "streamContractsWithState",
               )
               .flatMap { rows =>
-                rows.lastOption.map(_.acsRow.eventNumber) match {
-                  case Some(lastEventNumber) =>
+                rows.lastOption.map(_.stateRow.stateNumber) match {
+                  case Some(lastNumber) =>
                     Future.successful(
                       (
-                        lastEventNumber + 1,
-                        rows.map(assignedContractFromRow(companion)(_)),
+                        lastNumber + 1,
+                        rows,
                       )
                     )
                   case None =>
                     // to avoid polling the DB, we wait for a new offset to have been ingested
-                    offsetPromise.future.map(_ => fromEventNumber -> Vector.empty)
+                    offsetPromise.future.map(_ => fromNumber -> Vector.empty)
                 }
               }
               .map(Some(_))
@@ -357,11 +368,39 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       .mapConcat(identity)
   }
 
-  // TODO(#5314): Implement domain reassignments
-  override def streamReadyForAssign(): Source[ReassignmentEvent.Unassign, NotUsed] = Source.never
+  override def streamReadyForAssign()(implicit
+      tc: TraceContext
+  ): Source[ReassignmentEvent.Unassign, NotUsed] = {
+    streamContractsWithState(
+      pageSize = defaultPageSizeForContractStream,
+      where = sql"""assigned_domain is null""",
+    )
+      .map(reassignmentEventUnassignFromRow)
+  }
 
-  override def isReadyForAssign(contractId: ContractId[_], out: ReassignmentId): Future[Boolean] =
-    ???
+  override def isReadyForAssign(contractId: ContractId[_], out: ReassignmentId)(implicit
+      tc: TraceContext
+  ): Future[Boolean] = {
+    waitUntilAcsIngested {
+      storage
+        .querySingle(
+          selectFromAcsTableWithState(
+            acsTableName,
+            storeId,
+            where = sql"""acs.contract_id = ${contractId}""",
+          ).headOption,
+          "isReadyForAssign",
+        )
+        .value
+        .map {
+          case Some(SelectFromAcsTableWithStateResult(_, state)) =>
+            state.assignedDomain.isEmpty &&
+            state.reassignmentSourceDomain.contains(out.source) &&
+            state.reassignmentUnassignId.contains(out.id)
+          case _ => false
+        }
+    }
+  }
 
   override private[store] def listIncompleteReassignments()(implicit
       tc: TraceContext
@@ -513,8 +552,10 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
           case Some(`offset`) =>
             logger.info(s"Update at offset $offset already ingested, skipping database actions")
             DBIO.successful(())
-          case None => action.andThen(updateOffset(offset))
-          case Some(_) => action.andThen(updateOffset(offset))
+          case None =>
+            action.andThen(updateOffset(offset))
+          case Some(_) =>
+            action.andThen(updateOffset(offset))
         })
         .transactionally
     }
@@ -979,6 +1020,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       sqlu"""
         update #$acsTableName
             set
+                state_number = default, -- generates a new identity value
                 assigned_domain = NULL,
                 reassignment_counter = ${event.counter},
                 reassignment_target_domain = ${event.target},
@@ -1012,6 +1054,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       sqlu"""
         update #$acsTableName
             set
+                state_number = default, -- generates a new identity value
                 assigned_domain = $domainId,
                 reassignment_counter = $reassignmentCounter,
                 reassignment_target_domain = NULL,
@@ -1083,7 +1126,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   )(implicit companionClass: ContractCompanion[C, TCid, T]): AssignedContract[TCid, T] = {
     val contract = contractFromRow(companion)(row.acsRow)
     row.stateRow.assignedDomain match {
-      case Some(domain) => AssignedContract(contract, DomainId.tryFromString(domain))
+      case Some(domain) => AssignedContract(contract, domain)
       case None =>
         throw new RuntimeException(
           s"Cannot read contract ${contract.contractId} as AssignedContract, it is in flight with ${row.stateRow}"
@@ -1102,8 +1145,21 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   private def contractStateFromRow(
       row: SelectFromContractStateResult
   ): ContractState = {
-    row.assignedDomain.fold[ContractState](ContractState.InFlight)(id =>
-      ContractState.Assigned(DomainId.tryFromString(id))
+    row.assignedDomain.fold[ContractState](ContractState.InFlight)(id => ContractState.Assigned(id))
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
+  private def reassignmentEventUnassignFromRow(
+      row: SelectFromAcsTableWithStateResult
+  ): ReassignmentEvent.Unassign = {
+    assert(row.stateRow.assignedDomain.isEmpty)
+    ReassignmentEvent.Unassign(
+      submitter = row.stateRow.reassignmentSubmitter.get,
+      source = row.stateRow.reassignmentSourceDomain.get,
+      target = row.stateRow.reassignmentTargetDomain.get,
+      unassignId = row.stateRow.reassignmentUnassignId.get,
+      contractId = row.acsRow.contractId,
+      counter = row.stateRow.reassignmentCounter,
     )
   }
 

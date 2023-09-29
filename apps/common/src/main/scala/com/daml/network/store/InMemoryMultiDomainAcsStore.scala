@@ -381,6 +381,8 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     findContractOnDomainWithOffset(companion)(domain, p).map(_.value)
 
   override def streamReadyForAssign(
+  )(implicit
+      tc: TraceContext
   ): Source[ReassignmentEvent.Unassign, NotUsed] =
     Source
       .unfoldAsync(0: Long)(eventNumber => nextReadyForAssign(eventNumber).map(Some(_)))
@@ -409,7 +411,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   override def isReadyForAssign(
       contractId: ContractId[_],
       transfer: ReassignmentId,
-  ): Future[Boolean] =
+  )(implicit tc: TraceContext): Future[Boolean] =
     offsetAndStateAfterIngestingAcs().map { case (_, st) =>
       st.contractStateEventsById.get(contractId).fold(false) { num =>
         val contractState = st.contractStateEvents(num).state

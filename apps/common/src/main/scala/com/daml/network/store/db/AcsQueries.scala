@@ -9,6 +9,7 @@ import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
 import slick.jdbc.{GetResult, PositionedResult}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json
 import slick.jdbc.canton.SQLActionBuilder
 
@@ -51,6 +52,24 @@ trait AcsQueries extends AcsJdbcTypes {
       )
     }
 
+  protected def selectFromContractState(
+      storeId: Int,
+      where: SQLActionBuilder,
+      orderLimit: SQLActionBuilder = sql"",
+  ) =
+    (sql"""
+       select
+         state_number,
+         assigned_domain,
+         reassignment_counter,
+         reassignment_target_domain,
+         reassignment_source_domain,
+         reassignment_submitter,
+         reassignment_unassign_id
+       from contract_state
+       where acs.store_id = $storeId and """ ++ where ++ sql"""
+       """ ++ orderLimit).toActionBuilder.as[AcsQueries.SelectFromContractStateResult]
+
   /** Similar to [[selectFromAcsTable]], but also returns the contract state (i.e., the domain to which a contract is currently assigned) */
   protected def selectFromAcsTableWithState(
       tableName: String,
@@ -69,6 +88,7 @@ trait AcsQueries extends AcsJdbcTypes {
          contract_metadata_contract_key_hash,
          contract_metadata_driver_internal,
          contract_expires_at,
+         state_number,
          assigned_domain,
          reassignment_counter,
          reassignment_target_domain,
@@ -83,11 +103,12 @@ trait AcsQueries extends AcsJdbcTypes {
       : GetResult[AcsQueries.SelectFromContractStateResult] =
     GetResult { prs =>
       AcsQueries.SelectFromContractStateResult(
-        prs.<<[Option[String]],
         prs.<<[Long],
-        prs.<<[Option[String]],
-        prs.<<[Option[String]],
-        prs.<<[Option[String]],
+        prs.<<[Option[DomainId]],
+        prs.<<[Long],
+        prs.<<[Option[DomainId]],
+        prs.<<[Option[DomainId]],
+        prs.<<[Option[PartyId]],
         prs.<<[Option[String]],
       )
     }
@@ -173,6 +194,7 @@ trait AcsQueries extends AcsJdbcTypes {
          acs.contract_metadata_contract_key_hash,
          acs.contract_metadata_driver_internal,
          acs.contract_expires_at,
+         acs.state_number,
          acs.assigned_domain,
          acs.reassignment_counter,
          acs.reassignment_target_domain,
@@ -208,6 +230,7 @@ trait AcsQueries extends AcsJdbcTypes {
               pp.<<,
             ),
             AcsQueries.SelectFromContractStateResult(
+              pp.<<,
               pp.<<,
               pp.<<,
               pp.<<,
@@ -309,11 +332,12 @@ object AcsQueries {
   )
 
   case class SelectFromContractStateResult(
-      assignedDomain: Option[String],
+      stateNumber: Long,
+      assignedDomain: Option[DomainId],
       reassignmentCounter: Long,
-      reassignmentTargetDomain: Option[String],
-      reassignmentSourceDomain: Option[String],
-      reassignmentSubmitter: Option[String],
+      reassignmentTargetDomain: Option[DomainId],
+      reassignmentSourceDomain: Option[DomainId],
+      reassignmentSubmitter: Option[PartyId],
       reassignmentUnassignId: Option[String],
   )
 
