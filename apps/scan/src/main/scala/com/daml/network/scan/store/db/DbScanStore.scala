@@ -43,8 +43,8 @@ class DbScanStore(
     closeContext: CloseContext,
 ) extends DbCNNodeAppStoreWithHistory[TxLogIndexRecord, TxLogEntry](
       storage,
-      DbScanStore.acsTableName,
-      DbScanStore.txLogTableName,
+      ScanTables.acsTableName,
+      ScanTables.txLogTableName,
       // TODO (#5544): change this to something better
       storeDescriptor = Json.obj(
         "version" -> Json.fromInt(1),
@@ -138,7 +138,7 @@ class DbScanStore(
         row <- storage
           .querySingle(
             selectFromAcsTableWithState(
-              DbScanStore.acsTableName,
+              ScanTables.acsTableName,
               storeId,
               where = sql"""template_id = ${CoinRules.TEMPLATE_ID}""",
               orderLimit = sql"""order by event_number desc limit 1""",
@@ -160,7 +160,7 @@ class DbScanStore(
         row <- storage
           .querySingle(
             selectFromAcsTableWithState(
-              DbScanStore.acsTableName,
+              ScanTables.acsTableName,
               storeId,
               where = sql"""template_id = ${CnsRules.TEMPLATE_ID}""",
               orderLimit = sql"""order by event_number desc limit 1""",
@@ -182,7 +182,7 @@ class DbScanStore(
         row <- storage
           .querySingle(
             selectFromAcsTableWithState(
-              DbScanStore.acsTableName,
+              ScanTables.acsTableName,
               storeId,
               where = sql"""template_id = ${SvcRules.TEMPLATE_ID}""",
               orderLimit = sql"""order by event_number desc limit 1""",
@@ -460,7 +460,7 @@ class DbScanStore(
         rows <- storage
           .query(
             selectFromAcsTableWithState(
-              DbScanStore.acsTableName,
+              ScanTables.acsTableName,
               storeId,
               where =
                 sql"""template_id = ${ImportCrate.TEMPLATE_ID} and acs.import_crate_receiver = $receiverParty""",
@@ -485,7 +485,7 @@ class DbScanStore(
       (for {
         row <- storage
           .querySingle(
-            (selectFromAcsTable(DbScanStore.acsTableName) ++
+            (selectFromAcsTable(ScanTables.acsTableName) ++
               sql"""
                   where store_id = $storeId
                     and template_id = ${FeaturedAppRight.TEMPLATE_ID}
@@ -496,11 +496,4 @@ class DbScanStore(
           )
       } yield contractFromRow(FeaturedAppRight.COMPANION)(row)).value
     }
-}
-
-object DbScanStore {
-
-  val acsTableName = "scan_acs_store"
-  val txLogTableName = "scan_txlog_store"
-
 }

@@ -45,8 +45,8 @@ class DbUserWalletStore(
       UserWalletStore.TxLogEntry,
     ](
       storage = storage,
-      acsTableName = DbUserWalletStore.acsTableName,
-      txLogTableName = DbUserWalletStore.txLogTableName,
+      acsTableName = WalletTables.acsTableName,
+      txLogTableName = WalletTables.txLogTableName,
       // TODO (#5544): change this to something better
       storeDescriptor = Json.obj(
         "version" -> Json.fromInt(1),
@@ -201,7 +201,7 @@ class DbUserWalletStore(
             beginAfterEventIdO.fold(
               sql"""
                     select event_id, domain_id, acs_contract_id
-                    from #${DbUserWalletStore.txLogTableName}
+                    from #${WalletTables.txLogTableName}
                     where store_id = $storeId
                       and tx_log_id = ${UserWalletTxLogParser.TransactionHistoryTxLogIndexRecord.txLogId}
                     order by entry_number desc
@@ -209,12 +209,12 @@ class DbUserWalletStore(
                   """.as[(String, DomainId, Option[ContractId[Any]])]
             )(beginAfterEventId => sql"""
                     select event_id, domain_id, acs_contract_id
-                    from #${DbUserWalletStore.txLogTableName}
+                    from #${WalletTables.txLogTableName}
                     where store_id = $storeId
                       and tx_log_id = ${UserWalletTxLogParser.TransactionHistoryTxLogIndexRecord.txLogId}
                       and entry_number < (
                           select entry_number
-                          from #${DbUserWalletStore.txLogTableName}
+                          from #${WalletTables.txLogTableName}
                           where store_id = $storeId
                           and event_id = ${lengthLimited(beginAfterEventId)}
                       )
@@ -242,7 +242,7 @@ class DbUserWalletStore(
         resultWithOffset <- storage
           .querySingle(
             selectFromTxLogTableWithOffset(
-              DbUserWalletStore.txLogTableName,
+              WalletTables.txLogTableName,
               storeId,
               sql"transfer_offer_tracking_id = ${lengthLimited(trackingId)}",
               sql"order by entry_number desc limit 1",
@@ -275,9 +275,4 @@ class DbUserWalletStore(
         }
       } yield result
     }
-}
-
-object DbUserWalletStore {
-  val acsTableName: String = WalletTables.UserWalletAcsStore.baseTableRow.tableName
-  val txLogTableName: String = WalletTables.UserWalletTxLogStore.baseTableRow.tableName
 }

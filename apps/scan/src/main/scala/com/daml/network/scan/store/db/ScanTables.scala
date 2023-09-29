@@ -369,4 +369,6 @@ object ScanTables extends AcsTables {
 
   }
 
+  val acsTableName = "scan_acs_store"
+  val txLogTableName = "scan_txlog_store"
 }

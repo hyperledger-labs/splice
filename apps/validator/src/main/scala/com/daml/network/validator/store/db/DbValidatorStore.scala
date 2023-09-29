@@ -46,7 +46,7 @@ class DbValidatorStore(
     closeContext: CloseContext,
 ) extends DbCNNodeAppStoreWithoutHistory(
       storage = storage,
-      tableName = DbValidatorStore.acsTableName,
+      tableName = ValidatorTables.acsTableName,
       storeDescriptor = Json.obj(
         "version" -> Json.fromInt(1),
         "store" -> Json.fromString("DbValidatorStore"),
@@ -122,7 +122,7 @@ class DbValidatorStore(
     _ <- defaultAcsDomainIdF
     row <- storage
       .querySingle(
-        (selectFromAcsTable(DbValidatorStore.acsTableName) ++
+        (selectFromAcsTable(ValidatorTables.acsTableName) ++
           sql"""
               where store_id = $storeId
                 and template_id = ${walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID}
@@ -142,7 +142,7 @@ class DbValidatorStore(
     _ <- defaultAcsDomainIdF
     row <- storage
       .querySingle(
-        (selectFromAcsTable(DbValidatorStore.acsTableName) ++
+        (selectFromAcsTable(ValidatorTables.acsTableName) ++
           sql"""
               where store_id = $storeId
                 and template_id = ${walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID}
@@ -162,7 +162,7 @@ class DbValidatorStore(
     _ <- defaultAcsDomainIdF
     row <- storage
       .querySingle(
-        (selectFromAcsTable(DbValidatorStore.acsTableName) ++
+        (selectFromAcsTable(ValidatorTables.acsTableName) ++
           sql"""
               where store_id = $storeId
                 and template_id = ${coinCodegen.FeaturedAppRight.COMPANION.TEMPLATE_ID}
@@ -185,7 +185,7 @@ class DbValidatorStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbValidatorStore.acsTableName,
+            ValidatorTables.acsTableName,
             storeId,
             sql"""
             template_id = ${walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID}
@@ -219,7 +219,7 @@ class DbValidatorStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbValidatorStore.acsTableName,
+            ValidatorTables.acsTableName,
             storeId,
             sql"""
             template_id = ${validatorLicenseCodegen.ValidatorLicense.COMPANION.TEMPLATE_ID}
@@ -249,7 +249,7 @@ class DbValidatorStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbValidatorStore.acsTableName,
+            ValidatorTables.acsTableName,
             storeId,
             sql"""
             template_id = ${coinCodegen.ValidatorRight.COMPANION.TEMPLATE_ID}
@@ -282,7 +282,7 @@ class DbValidatorStore(
       row <- storage
         .querySingle(
           selectFromAcsTableWithState(
-            DbValidatorStore.acsTableName,
+            ValidatorTables.acsTableName,
             storeId,
             where = sql"""
               template_id = ${appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID}
@@ -312,7 +312,7 @@ class DbValidatorStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithStateAndOffset(
-            DbValidatorStore.acsTableName,
+            ValidatorTables.acsTableName,
             storeId,
             acsWhere = sql"""
             template_id = ${appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID}
@@ -342,7 +342,7 @@ class DbValidatorStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithStateAndOffset(
-            DbValidatorStore.acsTableName,
+            ValidatorTables.acsTableName,
             storeId,
             acsWhere = sql"""
             template_id = ${appManagerCodegen.AppRelease.COMPANION.TEMPLATE_ID}
@@ -373,7 +373,7 @@ class DbValidatorStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithStateAndOffset(
-            DbValidatorStore.acsTableName,
+            ValidatorTables.acsTableName,
             storeId,
             acsWhere = sql"""
             template_id = ${appManagerCodegen.RegisteredApp.COMPANION.TEMPLATE_ID}
@@ -403,7 +403,7 @@ class DbValidatorStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithStateAndOffset(
-            DbValidatorStore.acsTableName,
+            ValidatorTables.acsTableName,
             storeId,
             acsWhere = sql"""
             template_id = ${appManagerCodegen.InstalledApp.COMPANION.TEMPLATE_ID}
@@ -434,7 +434,7 @@ class DbValidatorStore(
       rows <- storage
         .query(
           selectFromAcsTableWithState(
-            DbValidatorStore.acsTableName,
+            ValidatorTables.acsTableName,
             storeId,
             where = sql"""
               template_id = ${appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID}
@@ -464,7 +464,7 @@ class DbValidatorStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithStateAndOffset(
-            DbValidatorStore.acsTableName,
+            ValidatorTables.acsTableName,
             storeId,
             acsWhere = sql"""
             template_id = ${appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID}
@@ -495,7 +495,7 @@ class DbValidatorStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbValidatorStore.acsTableName,
+            ValidatorTables.acsTableName,
             storeId,
             sql"""
             template_id = ${topupCodegen.ValidatorTopUpState.COMPANION.TEMPLATE_ID}
@@ -515,8 +515,4 @@ class DbValidatorStore(
       ),
     )
   }
-}
-
-object DbValidatorStore {
-  val acsTableName: String = ValidatorTables.ValidatorAcsStore.baseTableRow.tableName
 }

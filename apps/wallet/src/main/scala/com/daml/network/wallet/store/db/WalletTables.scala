@@ -12,31 +12,12 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.store.MultiDomainAcsStore.ContractFilter
 import com.daml.network.store.db.AcsTables
-import com.daml.network.store.db.AcsTables.{AcsStoreTemplate, TxLogStoreTemplate}
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.UserWalletTxLogParser
-import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.topology.DomainId
-import io.circe.Json
-import shapeless.HNil
 
 object WalletTables extends AcsTables {
-  import profile.api.*
-
-  lazy val schema: profile.SchemaDescription = acsBaseSchema ++ UserWalletAcsStore.schema
-
-  case class UserWalletAcsStoreRow(
-      storeId: Int,
-      eventNumber: Long,
-      contractId: ContractId[Any],
-      templateId: TemplateId,
-      createArguments: Json,
-      contractMetadataCreatedAt: Timestamp,
-      contractMetadataContractKeyHash: Option[String] = None,
-      contractMetadataDriverInternal: Array[Byte],
-      contractExpiresAt: Option[Timestamp] = None,
-  )
 
   case class UserWalletAcsStoreRowData(
       contract: Contract[?, ?],
@@ -154,24 +135,6 @@ object WalletTables extends AcsTables {
     }
   }
 
-  class UserWalletAcsStore(_tableTag: Tag)
-      extends AcsStoreTemplate[UserWalletAcsStoreRow](_tableTag, "user_wallet_acs_store") {
-    def * =
-      (templateColumns ::: HNil).tupled
-        .<>(UserWalletAcsStoreRow.tupled, UserWalletAcsStoreRow.unapply)
-  }
-
-  lazy val UserWalletAcsStore = new TableQuery(tag => new UserWalletAcsStore(tag))
-
-  case class UserWalletTxLogStoreRow(
-      storeId: Int,
-      entryNumber: Long,
-      eventId: String,
-      offset: Option[String],
-      domainId: DomainId,
-      txLogId: String,
-  )
-
   // Note: currently the index record is empty, but this is likely to change once we want to support more advanced
   // filtering/sorting of the transaction history.
   case class UserWalletTxLogStoreRowData(
@@ -204,13 +167,6 @@ object WalletTables extends AcsTables {
       )
   }
 
-  class UserWalletTxLogStore(_tableTag: Tag)
-      extends TxLogStoreTemplate[UserWalletTxLogStoreRow](_tableTag, "user_wallet_txlog_store") {
-    val txLogId: Rep[String] = column[String]("tx_log_id")
-    def * =
-      (templateColumns ::: txLogId :: HNil).tupled
-        .<>(UserWalletTxLogStoreRow.tupled, UserWalletTxLogStoreRow.unapply)
-  }
-
-  lazy val UserWalletTxLogStore = new TableQuery(tag => new UserWalletTxLogStore(tag))
+  val acsTableName: String = "user_wallet_acs_store"
+  val txLogTableName: String = "user_wallet_txlog_store"
 }

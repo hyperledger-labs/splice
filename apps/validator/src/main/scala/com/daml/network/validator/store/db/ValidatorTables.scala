@@ -1,7 +1,6 @@
 package com.daml.network.validator.store.db
 
 import com.daml.ledger.javaapi.data.CreatedEvent
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
@@ -11,38 +10,10 @@ import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.store.db.AcsTables
-import com.daml.network.store.db.AcsTables.AcsStoreTemplate
 import com.daml.network.util.Contract
-import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import io.circe.Json
-import shapeless.HNil
 
 object ValidatorTables extends AcsTables {
-  import profile.api.*
-
-  lazy val schema: profile.SchemaDescription = acsBaseSchema ++ ValidatorAcsStore.schema
-
-  case class ValidatorAcsStoreRow(
-      storeId: Int,
-      eventNumber: Long,
-      contractId: ContractId[Any],
-      templateId: TemplateId,
-      createArguments: Json,
-      contractMetadataCreatedAt: Timestamp,
-      contractMetadataContractKeyHash: Option[String] = None,
-      contractMetadataDriverInternal: Array[Byte],
-      contractExpiresAt: Option[Timestamp] = None,
-      // Index columns
-      userParty: Option[PartyId] = None,
-      userName: Option[String] = None,
-      providerParty: Option[PartyId] = None,
-      validatorParty: Option[PartyId] = None,
-      trafficDomainId: Option[DomainId] = None,
-      appConfigurationVersion: Option[Long] = None,
-      appReleaseVersion: Option[String] = None,
-      jsonHash: Option[String] = None,
-  )
 
   case class ValidatorAcsStoreRowData(
       contract: Contract[?, ?],
@@ -164,45 +135,5 @@ object ValidatorTables extends AcsTables {
     }
   }
 
-  class ValidatorAcsStore(_tableTag: Tag)
-      extends AcsStoreTemplate[ValidatorAcsStoreRow](_tableTag, "validator_acs_store") {
-    def * =
-      (templateColumns :::
-        userParty ::
-        userName ::
-        providerParty ::
-        validatorParty ::
-        trafficDomainId ::
-        appConfigurationVersion ::
-        appReleaseVersion ::
-        jsonHash ::
-        HNil).tupled
-        .<>(ValidatorAcsStoreRow.tupled, ValidatorAcsStoreRow.unapply)
-
-    val userParty: Rep[Option[PartyId]] =
-      column[Option[PartyId]]("user_party", O.Default(None))
-
-    val userName: Rep[Option[String]] =
-      column[Option[String]]("user_name", O.Default(None))
-
-    val providerParty: Rep[Option[PartyId]] =
-      column[Option[PartyId]]("provider_party", O.Default(None))
-
-    val validatorParty: Rep[Option[PartyId]] =
-      column[Option[PartyId]]("validator_party", O.Default(None))
-
-    val trafficDomainId: Rep[Option[DomainId]] =
-      column[Option[DomainId]]("traffic_domain_id", O.Default(None))
-
-    val appConfigurationVersion: Rep[Option[Long]] =
-      column[Option[Long]]("app_configuration_version", O.Default(None))
-
-    val appReleaseVersion: Rep[Option[String]] =
-      column[Option[String]]("app_release_version", O.Default(None))
-
-    val jsonHash: Rep[Option[String]] =
-      column[Option[String]]("json_hash", O.Default(None))
-  }
-
-  lazy val ValidatorAcsStore = new TableQuery(tag => new ValidatorAcsStore(tag))
+  val acsTableName = "validator_acs_store"
 }

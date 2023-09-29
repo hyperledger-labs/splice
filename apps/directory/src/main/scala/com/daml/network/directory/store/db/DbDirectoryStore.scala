@@ -39,7 +39,7 @@ class DbDirectoryStore(
     closeContext: CloseContext,
 ) extends DbCNNodeAppStoreWithoutHistory(
       storage,
-      DbDirectoryStore.tableName,
+      DirectoryTables.acsTableName,
       // TODO (#5544): change this to something better
       storeDescriptor = Json.obj(
         "version" -> Json.fromInt(1),
@@ -102,7 +102,7 @@ class DbDirectoryStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbDirectoryStore.tableName,
+            DirectoryTables.acsTableName,
             storeId,
             sql"""
               template_id = ${directoryCodegen.DirectoryInstall.COMPANION.TEMPLATE_ID}
@@ -126,7 +126,7 @@ class DbDirectoryStore(
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(
-            DbDirectoryStore.tableName,
+            DirectoryTables.acsTableName,
             storeId,
             sql"""
             template_id = ${directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID}
@@ -150,7 +150,7 @@ class DbDirectoryStore(
       for {
         row <- storage
           .querySingle(
-            (selectFromAcsTable(DbDirectoryStore.tableName) ++
+            (selectFromAcsTable(DirectoryTables.acsTableName) ++
               sql"""
               where store_id = $storeId
                 and template_id = ${directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID}
@@ -172,7 +172,7 @@ class DbDirectoryStore(
     for {
       rows <- storage
         .query(
-          (selectFromAcsTable(DbDirectoryStore.tableName) ++
+          (selectFromAcsTable(DirectoryTables.acsTableName) ++
             sql"""
               where store_id = $storeId
                 and template_id = ${directoryCodegen.DirectoryEntry.COMPANION.TEMPLATE_ID}
@@ -231,8 +231,4 @@ class DbDirectoryStore(
     }
   }
 
-}
-
-object DbDirectoryStore {
-  val tableName: String = DirectoryTables.DirectoryAcsStore.baseTableRow.tableName
 }
