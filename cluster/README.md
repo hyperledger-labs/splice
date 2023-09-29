@@ -812,13 +812,13 @@ configuration that have a longer lifecycle than any one deployment of
 the Canton Network software. This configuration includes the cluster
 ingress IP address, DNS records, and the certificate used for incoming
 traffic. From within a deployment directory for a cluster, this stack
-can be managed with `cncluster pulumi infra`. The following commands
-cover the typical lifecycle of a Canton Network cluster.
+can be managed with the `cncluster infra_*` commands or with `cncluster pulumi infra`.
+The following commands cover the typical lifecycle of a Canton Network cluster.
 
-* `cncluster pulumi infra up` - Apply the infrastructure configuration
-  to the cluster..
-* `cncluster pulumi infra down` - Remove the configured infrastructure
-  for the cluster.
+* `cncluster infra_up` / `cncluster pulumi infra up` - Apply the infrastructure
+  configuration to the cluster.
+* `cncluster infra_down` / `cncluster pulumi infra down` - Remove the configured
+  infrastructure for the cluster.
 * `cncluster pulumi infra refresh` - Refresh Pulumi's infrastructure
   state database based on the current cluster infrastructure. This
   is useful when a cluster configuration is updated externally.
