@@ -57,39 +57,43 @@ trait AcsQueries extends AcsJdbcTypes {
       orderLimit: SQLActionBuilder = sql"",
   ) =
     (sql"""
-       select acs.store_id,
-         acs.event_number,
-         acs.contract_id,
-         acs.template_id,
-         acs.create_arguments,
-         acs.contract_metadata_created_at,
-         acs.contract_metadata_contract_key_hash,
-         acs.contract_metadata_driver_internal,
-         acs.contract_expires_at,
-         state.assigned_domain,
-         state.reassignment_counter,
-         state.reassignment_target_domain,
-         state.reassignment_source_domain,
-         state.reassignment_submitter,
-         state.reassignment_unassign_id
+       select store_id,
+         event_number,
+         contract_id,
+         template_id,
+         create_arguments,
+         contract_metadata_created_at,
+         contract_metadata_contract_key_hash,
+         contract_metadata_driver_internal,
+         contract_expires_at,
+         assigned_domain,
+         reassignment_counter,
+         reassignment_target_domain,
+         reassignment_source_domain,
+         reassignment_submitter,
+         reassignment_unassign_id
        from #$tableName acs
-       inner join contract_state state on acs.store_id = state.store_id and acs.contract_id = state.contract_id
        where acs.store_id = $storeId and """ ++ where ++ sql"""
        """ ++ orderLimit).toActionBuilder.as[AcsQueries.SelectFromAcsTableWithStateResult]
+
+  implicit val GetResultSelectFromContractStateResult
+      : GetResult[AcsQueries.SelectFromContractStateResult] =
+    GetResult { prs =>
+      AcsQueries.SelectFromContractStateResult(
+        prs.<<[Option[String]],
+        prs.<<[Long],
+        prs.<<[Option[String]],
+        prs.<<[Option[String]],
+        prs.<<[Option[String]],
+        prs.<<[Option[String]],
+      )
+    }
 
   implicit val GetResultSelectFromAcsTableWithState
       : GetResult[AcsQueries.SelectFromAcsTableWithStateResult] =
     GetResult { prs =>
-      import prs.*
       val acsRow = prs.<<[AcsQueries.SelectFromAcsTableResult]
-      val stateRow = AcsQueries.SelectFromContractStateResult(
-        <<[Option[String]],
-        <<[Long],
-        <<[Option[String]],
-        <<[Option[String]],
-        <<[Option[String]],
-        <<[Option[String]],
-      )
+      val stateRow = prs.<<[AcsQueries.SelectFromContractStateResult]
       AcsQueries.SelectFromAcsTableWithStateResult(acsRow, stateRow)
     }
 
@@ -149,8 +153,7 @@ trait AcsQueries extends AcsJdbcTypes {
   protected def selectFromAcsTableWithStateAndOffset(
       tableName: String,
       storeId: Int,
-      acsWhere: SQLActionBuilder = sql"true",
-      stateWhere: SQLActionBuilder = sql"true",
+      where: SQLActionBuilder = sql"true",
       orderLimit: SQLActionBuilder = sql"",
   ) =
     (sql"""
@@ -165,19 +168,16 @@ trait AcsQueries extends AcsJdbcTypes {
          acs.contract_metadata_contract_key_hash,
          acs.contract_metadata_driver_internal,
          acs.contract_expires_at,
-         state.assigned_domain,
-         state.reassignment_counter,
-         state.reassignment_target_domain,
-         state.reassignment_source_domain,
-         state.reassignment_submitter,
-         state.reassignment_unassign_id
+         acs.assigned_domain,
+         acs.reassignment_counter,
+         acs.reassignment_target_domain,
+         acs.reassignment_source_domain,
+         acs.reassignment_submitter,
+         acs.reassignment_unassign_id
        from store_descriptors sd
            left join #$tableName acs
                on sd.id = acs.store_id
-               and """ ++ acsWhere ++ sql"""
-           left join contract_state state
-               on sd.id = state.store_id and acs.contract_id = state.contract_id
-               and """ ++ stateWhere ++ sql"""
+               and """ ++ where ++ sql"""
        where sd.id = $storeId
        """ ++ orderLimit).toActionBuilder
       .as[AcsQueries.SelectFromAcsTableResultWithStateAndOffset]

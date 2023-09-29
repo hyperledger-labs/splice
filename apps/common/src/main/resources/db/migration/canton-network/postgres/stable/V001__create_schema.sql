@@ -43,22 +43,7 @@ create table acs_store_template(
     -- expiry time of expiring contracts in micros since unix epoch
     -- part of the template as we expect all stores to support expiry
     -- TODO(#3822): wire this up with the generic expiry interface on contracts
-    contract_expires_at bigint
-);
-
-create unique index acs_store_template_sid_cid
-    on acs_store_template (store_id, contract_id);
-
-create index acs_store_template_sid_tid_en
-    on acs_store_template (store_id, template_id, event_number);
-
-create index acs_store_template_sid_tid_ce
-    on acs_store_template (store_id, template_id, contract_expires_at)
-    where contract_expires_at is not null;
-
-create table contract_state(
-    store_id int not null,
-    contract_id text not null,
+    contract_expires_at bigint,
 
     -- The domain this contract is assigned to, as of the latest observed domain reassignment state.
     -- If the latest observed domain reassignment event is an unassign, this is NULL.
@@ -73,15 +58,18 @@ create table contract_state(
     reassignment_target_domain text,
     reassignment_source_domain text,
     reassignment_submitter text,
-    reassignment_unassign_id text,
-
-    primary key (store_id, contract_id),
-    foreign key (store_id) references store_descriptors(id)
+    reassignment_unassign_id text
 );
 
-create index contract_state_sid_cid_ad
-    on contract_state (store_id, contract_id, assigned_domain)
-    where assigned_domain is not null;
+create unique index acs_store_template_sid_cid
+    on acs_store_template (store_id, contract_id);
+
+create index acs_store_template_sid_tid_en
+    on acs_store_template (store_id, template_id, event_number);
+
+create index acs_store_template_sid_tid_ce
+    on acs_store_template (store_id, template_id, contract_expires_at)
+    where contract_expires_at is not null;
 
 create table incomplete_reassignments(
     -- The id of the store that this row belongs to

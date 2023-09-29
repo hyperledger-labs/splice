@@ -9,6 +9,7 @@ import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
+import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletStore.TxLogIndexRecord
@@ -66,7 +67,8 @@ class DbUserWalletStore(
   def storeId: Int = multiDomainAcsStore.storeId
 
   override def ingestionAcsInsert(
-      createdEvent: CreatedEvent
+      createdEvent: CreatedEvent,
+      contractState: ContractStateRowData,
   )(implicit tc: TraceContext) = {
     UserWalletAcsStoreRowData
       .fromCreatedEvent(createdEvent, acsContractFilter)
@@ -84,11 +86,13 @@ class DbUserWalletStore(
           val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
           sqlu"""
               insert into user_wallet_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
-                                        contract_metadata_contract_key_hash, contract_metadata_driver_internal,
-                                        contract_expires_at)
+                                        contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
+                                        assigned_domain, reassignment_counter, reassignment_target_domain,
+                                        reassignment_source_domain, reassignment_submitter, reassignment_unassign_id)
               values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
-                      $contractMetadataContractKeyHash, $contractMetadataDriverInternal,
-                      $contractExpiresAt)
+                      $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
+                      ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
+                      ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId})
               on conflict do nothing
             """
       }

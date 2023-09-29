@@ -3,8 +3,9 @@ package com.daml.network.store.db
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.digitalasset.canton.admin.api.client.data.TemplateId
+import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json
 import shapeless.HNil
 import slick.jdbc.{GetResult, PostgresProfile}
@@ -38,6 +39,15 @@ trait AcsTables extends AcsJdbcTypes {
 }
 
 object AcsTables extends AcsTables {
+
+  case class ContractStateRowData(
+      assignedDomain: Option[DomainId],
+      reassignmentCounter: Long,
+      reassignmentTargetDomain: Option[DomainId],
+      reassignmentSourceDomain: Option[DomainId],
+      reassignmentSubmitter: Option[PartyId],
+      reassignmentUnassignId: Option[String255],
+  )
 
   case class TxLogStoreRowTemplate(
       storeId: Int,

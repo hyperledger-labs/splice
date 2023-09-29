@@ -8,6 +8,7 @@ import com.daml.network.codegen.java.cn.validatoronboarding.{UsedSecret, Validat
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{ConfiguredDefaultDomain, MultiDomainAcsStore, StoreErrors}
 import MultiDomainAcsStore.QueryResult
+import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.SvTables.SvAcsStoreRowData
@@ -56,8 +57,8 @@ class DbSvSvStore(
 
   def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionAcsInsert(createdEvent: CreatedEvent)(implicit
-      tc: TraceContext
+  override def ingestionAcsInsert(createdEvent: CreatedEvent, contractState: ContractStateRowData)(
+      implicit tc: TraceContext
   ) = {
     SvAcsStoreRowData.fromCreatedEvent(createdEvent).map {
       case SvAcsStoreRowData(contract, contractExpiresAt, onboardingSecret, svCandidateName) =>
@@ -72,11 +73,15 @@ class DbSvSvStore(
         val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
         sqlu"""
               insert into sv_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
-                                       contract_metadata_contract_key_hash, contract_metadata_driver_internal,
-                                       contract_expires_at, onboarding_secret, sv_candidate_name)
+                                       contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
+                                       assigned_domain, reassignment_counter, reassignment_target_domain,
+                                       reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
+                                       onboarding_secret, sv_candidate_name)
               values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
-                      $contractMetadataContractKeyHash, $contractMetadataDriverInternal,
-                      $contractExpiresAt, $safeSecret, $safeCandidateName)
+                      $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
+                      ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
+                      ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
+                      $safeSecret, $safeCandidateName)
               on conflict do nothing
             """
     }

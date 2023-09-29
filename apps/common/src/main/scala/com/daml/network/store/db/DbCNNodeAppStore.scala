@@ -3,6 +3,7 @@ package com.daml.network.store.db
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
+import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -39,7 +40,7 @@ abstract class DbCNNodeAppStore[
       acsContractFilter,
       txLogParser,
       retryProvider,
-      (evt, tc) => ingestionAcsInsert(evt)(tc),
+      (evt, csr, tc) => ingestionAcsInsert(evt, csr)(tc),
       (evt, tc) => ingestionTxLogInsert(evt)(tc),
     )
 
@@ -58,7 +59,7 @@ abstract class DbCNNodeAppStore[
       retryProvider,
     )
 
-  def ingestionAcsInsert(createdEvent: CreatedEvent)(implicit
+  def ingestionAcsInsert(createdEvent: CreatedEvent, contractState: ContractStateRowData)(implicit
       tc: TraceContext
   ): Either[String, DBIOAction[?, NoStream, Effect.Write]]
 

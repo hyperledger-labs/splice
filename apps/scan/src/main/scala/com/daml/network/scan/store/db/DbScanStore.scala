@@ -24,6 +24,7 @@ import io.circe.Json
 import cats.implicits.*
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
+import com.daml.network.store.db.AcsTables.ContractStateRowData
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -62,8 +63,8 @@ class DbScanStore(
 
   def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionAcsInsert(createdEvent: CreatedEvent)(implicit
-      tc: TraceContext
+  override def ingestionAcsInsert(createdEvent: CreatedEvent, contractState: ContractStateRowData)(
+      implicit tc: TraceContext
   ) = {
     ScanAcsStoreRowData.fromCreatedEvent(createdEvent).map {
       case ScanAcsStoreRowData(
@@ -86,9 +87,13 @@ class DbScanStore(
         sqlu"""
               insert into scan_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
               contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
+              assigned_domain, reassignment_counter, reassignment_target_domain,
+              reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
               round, validator, amount, import_crate_receiver, featured_app_right_provider)
               values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
+                      ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
+                      ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
                       $round, $validator, $amount, $safeImportCrateReceiverName, $featuredAppRightProvider)
               on conflict do nothing
               """

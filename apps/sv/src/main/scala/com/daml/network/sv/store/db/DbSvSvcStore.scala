@@ -23,6 +23,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
+import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.store.{
   AcsStoreDump,
@@ -85,7 +86,10 @@ class DbSvSvcStore(
 
   def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionAcsInsert(createdEvent: javab.CreatedEvent)(implicit
+  override def ingestionAcsInsert(
+      createdEvent: javab.CreatedEvent,
+      contractState: ContractStateRowData,
+  )(implicit
       tc: TraceContext
   ) = {
     SvcAcsStoreRowData.fromCreatedEvent(createdEvent).map {
@@ -131,6 +135,8 @@ class DbSvSvcStore(
         sqlu"""
               insert into svc_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
                                         contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
+                                        assigned_domain, reassignment_counter, reassignment_target_domain,
+                                        reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
                                         coin_round_of_expiry, reward_round, reward_party, mining_round, action_requiring_confirmation,
                                         confirmer, sv_onboarding_token, sv_candidate_party, sv_candidate_name, validator,
                                         total_traffic_purchased, voter, vote_request_cid, requester, election_request_epoch,
@@ -139,6 +145,8 @@ class DbSvSvcStore(
                                         subscription_next_payment_due_at, featured_app_right_provider)
               values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
+                      ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
+                      ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
                       $coinRoundOfExpiry, $rewardRound, $rewardParty, $miningRound, $actionRequiringConfirmation,
                       $confirmer, $safeSvOnboardingToken, $svCandidateParty, $safeSvCandidateName, $validator,
                       $totalTrafficPurchased, $voter, $voteRequestCid, $requester, $electionRequestEpoch,
@@ -998,10 +1006,9 @@ class DbSvSvcStore(
           selectFromAcsTableWithStateAndOffset(
             DbSvSvcStore.acsTableName,
             storeId,
-            acsWhere = sql"""template_id = ${CnsEntry.TEMPLATE_ID}
+            where = sql"""template_id = ${CnsEntry.TEMPLATE_ID}
                     and cns_entry_name = ${lengthLimited(name)}
-                      """,
-            stateWhere = sql"assigned_domain is not null",
+                    and assigned_domain is not null""",
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupCnsEntryByNameWithOffset",
@@ -1027,10 +1034,9 @@ class DbSvSvcStore(
           selectFromAcsTableWithStateAndOffset(
             DbSvSvcStore.acsTableName,
             storeId,
-            acsWhere = sql"""template_id = ${SubscriptionInitialPayment.TEMPLATE_ID}
-                        and acs.contract_id = $paymentCid
-                          """,
-            stateWhere = sql"assigned_domain is not null",
+            where = sql"""template_id = ${SubscriptionInitialPayment.TEMPLATE_ID}
+                        and contract_id = $paymentCid
+                        and assigned_domain is not null""",
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupSubscriptionInitialPaymentWithOffset",
@@ -1056,10 +1062,9 @@ class DbSvSvcStore(
           selectFromAcsTableWithStateAndOffset(
             DbSvSvcStore.acsTableName,
             storeId,
-            acsWhere = sql"""template_id = ${FeaturedAppRight.TEMPLATE_ID}
+            where = sql"""template_id = ${FeaturedAppRight.TEMPLATE_ID}
                       and featured_app_right_provider = $providerPartyId
-                        """,
-            stateWhere = sql"assigned_domain is not null",
+                      and assigned_domain is not null""",
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupFeaturedAppRightWithOffset",

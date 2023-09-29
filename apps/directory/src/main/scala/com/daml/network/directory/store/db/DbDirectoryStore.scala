@@ -22,6 +22,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.store.db.DirectoryTables.DirectoryAcsStoreRowData
+import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -59,7 +60,8 @@ class DbDirectoryStore(
   private def storeId: Int = multiDomainAcsStore.storeId
 
   override def ingestionAcsInsert(
-      createdEvent: CreatedEvent
+      createdEvent: CreatedEvent,
+      contractState: ContractStateRowData,
   )(implicit tc: TraceContext) = {
     DirectoryAcsStoreRowData.fromCreatedEvent(createdEvent).map {
       case DirectoryAcsStoreRowData(
@@ -81,13 +83,17 @@ class DbDirectoryStore(
         val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
         sqlu"""
               insert into directory_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
-                                        contract_metadata_contract_key_hash, contract_metadata_driver_internal,
-                                        contract_expires_at, directory_install_user, directory_entry_name,
+                                        contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
+                                        assigned_domain, reassignment_counter, reassignment_target_domain,
+                                        reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
+                                        directory_install_user, directory_entry_name,
                                         directory_entry_owner, subscription_context_contract_id,
                                         subscription_next_payment_due_at)
               values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
-                      $contractMetadataContractKeyHash, $contractMetadataDriverInternal,
-                      $contractExpiresAt, $directoryInstallUser, $safeDirectoryName,
+                      $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
+                      ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
+                      ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
+                      $directoryInstallUser, $safeDirectoryName,
                       $directoryEntryOwner, $subscriptionContextContractId,
                       $subscriptionNextPaymentDueAt)
               on conflict do nothing

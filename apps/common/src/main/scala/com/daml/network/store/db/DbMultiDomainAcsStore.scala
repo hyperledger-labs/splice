@@ -30,7 +30,7 @@ import com.daml.network.util.{
   TemplateJsonDecoder,
   Trees,
 }
-import com.digitalasset.canton.config.CantonRequireTypes.String256M
+import com.digitalasset.canton.config.CantonRequireTypes.{String255, String256M}
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -51,6 +51,7 @@ import com.daml.network.store.db.AcsQueries.{
   SelectFromAcsTableWithStateResult,
   SelectFromContractStateResult,
 }
+import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.nonempty.NonEmpty
 
 import scala.collection.mutable
@@ -66,6 +67,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     @unused retryProvider: RetryProvider,
     ingestAcsInsert: (
         CreatedEvent,
+        ContractStateRowData,
         TraceContext,
     ) => Either[String, DBIOAction[?, NoStream, Effect.Write]],
     ingestTxLogInsert: (TXI, TraceContext) => Either[String, DBIOAction[?, NoStream, Effect.Write]],
@@ -132,7 +134,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
           selectFromAcsTableWithStateAndOffset(
             acsTableName,
             storeId,
-            acsWhere = sql"""template_id = $templateId""",
+            where = sql"""template_id = $templateId""",
             orderLimit = sql"limit 1",
           ).headOption,
           "findAnyContractWithOffset",
@@ -557,20 +559,20 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                   // TODO (#5643): batch inserts
                   todoAcs.map { ac =>
                     for {
-                      _ <- doIngestAcsInsert(offset, ac.createdEvent, summaryState)
-                      _ <- doSetContractStateActive(
-                        ac.createdEvent.getContractId,
-                        ac.domainId,
-                        ac.reassignmentCounter,
+                      _ <- doIngestAcsInsert(
+                        offset,
+                        ac.createdEvent,
+                        stateRowDataFromActiveContract(ac.domainId, ac.reassignmentCounter),
                         summaryState,
                       )
                     } yield ()
                   }
                     ++ todoIncompleteOut.map { evt =>
                       for {
-                        _ <- doIngestAcsInsert(offset, evt.createdEvent, summaryState)
-                        _ <- doSetContractStateInFlight(
-                          evt.reassignmentEvent,
+                        _ <- doIngestAcsInsert(
+                          offset,
+                          evt.createdEvent,
+                          stateRowDataFromUnassign(evt.reassignmentEvent),
                           summaryState,
                         )
                         _ <- doRegisterIncompleteReassignment(
@@ -587,12 +589,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                         _ <- doIngestAcsInsert(
                           offset,
                           evt.reassignmentEvent.createdEvent,
-                          summaryState,
-                        )
-                        _ <- doSetContractStateActive(
-                          evt.reassignmentEvent.createdEvent.getContractId,
-                          evt.reassignmentEvent.target,
-                          evt.reassignmentEvent.counter,
+                          stateRowDataFromAssign(evt.reassignmentEvent),
                           summaryState,
                         )
                         _ <- doRegisterIncompleteReassignment(
@@ -710,17 +707,28 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                               true,
                               summary,
                             )
+                          } else if (_hasAcsEntry) {
+                            DBIO.seq(
+                              doSetContractStateActive(
+                                assign.createdEvent.getContractId,
+                                assign.target,
+                                assign.counter,
+                                summary,
+                              ),
+                              doRegisterIncompleteReassignment(
+                                assign.createdEvent.getContractId,
+                                assign.source,
+                                assign.unassignId,
+                                true,
+                                summary,
+                              ),
+                            )
                           } else {
                             DBIO.seq(
                               doIngestAcsInsert(
                                 reassignment.offset.getOffset,
                                 assign.createdEvent,
-                                summary,
-                              ),
-                              doSetContractStateActive(
-                                assign.createdEvent.getContractId,
-                                assign.target,
-                                assign.counter,
+                                stateRowDataFromAssign(assign),
                                 summary,
                               ),
                               doRegisterIncompleteReassignment(
@@ -833,13 +841,12 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                             DBIO.successful(())
                           } else {
                             DBIO.seq(
-                              doIngestAcsInsert(tree.getOffset, createdEvent, summary),
-                              doSetContractStateActive(
-                                createdEvent.getContractId,
-                                domainId,
-                                0,
+                              doIngestAcsInsert(
+                                tree.getOffset,
+                                createdEvent,
+                                stateRowDataFromActiveContract(domainId, 0L),
                                 summary,
-                              ),
+                              )
                             )
                           }
                       } yield ()
@@ -855,7 +862,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     }
 
     private def hasAcsEntry(contractId: String) = (sql"""
-           select count(*) from contract_state
+           select count(*) from #$acsTableName
            where store_id = $storeId and contract_id = ${lengthLimited(contractId)}
           """).as[Int].head.map(_ > 0)
 
@@ -864,14 +871,49 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
            where store_id = $storeId and contract_id = ${lengthLimited(contractId)}
           """).as[Int].head.map(_ > 0)
 
+    private def stateRowDataFromActiveContract(
+        domainId: DomainId,
+        reassignmentCounter: Long,
+    ) = ContractStateRowData(
+      assignedDomain = Some(domainId),
+      reassignmentCounter = reassignmentCounter,
+      reassignmentTargetDomain = None,
+      reassignmentSourceDomain = None,
+      reassignmentSubmitter = None,
+      reassignmentUnassignId = None,
+    )
+
+    private def stateRowDataFromAssign(
+        event: ReassignmentEvent.Assign
+    ) = ContractStateRowData(
+      assignedDomain = Some(event.target),
+      reassignmentCounter = event.counter,
+      reassignmentTargetDomain = None,
+      reassignmentSourceDomain = None,
+      reassignmentSubmitter = None,
+      reassignmentUnassignId = None,
+    )
+
+    private def stateRowDataFromUnassign(
+        event: ReassignmentEvent.Unassign
+    ) = ContractStateRowData(
+      assignedDomain = None,
+      reassignmentCounter = event.counter,
+      reassignmentTargetDomain = Some(event.target),
+      reassignmentSourceDomain = Some(event.source),
+      reassignmentSubmitter = Some(event.submitter),
+      reassignmentUnassignId = Some(String255.tryCreate(event.unassignId)),
+    )
+
     private def doIngestAcsInsert(
         offset: String,
         createdEvent: CreatedEvent,
+        stateData: ContractStateRowData,
         summary: MutableIngestionSummary[TXE],
     )(implicit
         tc: TraceContext
     ) = {
-      ingestAcsInsert(createdEvent, tc) match {
+      ingestAcsInsert(createdEvent, stateData, tc) match {
         case Left(err) =>
           val errMsg =
             s"Item at offset ${offset} with contract id ${createdEvent.getContractId} cannot be ingested: $err"
@@ -904,24 +946,18 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
 
     private def doDeleteContract(event: ExercisedEvent, summary: MutableIngestionSummary[TXE]) = {
       sqlu"""
-        delete from contract_state
-        where store_id = $storeId
-          and contract_id = ${lengthLimited(event.getContractId)}
-      """.andThen(
-        sqlu"""
         delete from #$acsTableName
         where store_id = $storeId
           and contract_id = ${lengthLimited(event.getContractId)}
       """.map {
-          case 1 =>
-            summary.ingestedArchivedEvents.addOne(event)
-          case _ =>
-            // there was actually no contract with that id. This can happen because:
-            // `contractFilter.mightContain` in `getIngestionWork` can return true for a template,
-            // but that might still satisfy some other filter, so the contract was never inserted
-            summary.numFilteredArchivedEvents += 1
-        }
-      )
+        case 1 =>
+          summary.ingestedArchivedEvents.addOne(event)
+        case _ =>
+          // there was actually no contract with that id. This can happen because:
+          // `contractFilter.mightContain` in `getIngestionWork` can return true for a template,
+          // but that might still satisfy some other filter, so the contract was never inserted
+          summary.numFilteredArchivedEvents += 1
+      }
     }
 
     private def doSetContractStateInFlight(
@@ -929,23 +965,19 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         summary: MutableIngestionSummary[TXE],
     ) = {
       val safeUnassignId = lengthLimited(event.unassignId)
+      summary.updatedContractStates.addOne(
+        ContractStateEvent(
+          event.contractId,
+          event.counter,
+          StoreContractState.InFlight(event),
+        )
+      )
       // Only overwrite the current contract state if existing row is "older", i.e., it has
       // a reassignment counter smaller than the state we are trying to insert.
       // Note: reassignment counters increase with Unassign events. Corresponding Assign and Unassign events
       // have the same reassignment counter.
       sqlu"""
-        insert into contract_state(
-            store_id,
-            contract_id,
-            assigned_domain,
-            reassignment_counter,
-            reassignment_target_domain,
-            reassignment_source_domain,
-            reassignment_submitter,
-            reassignment_unassign_id
-        )
-        values($storeId, ${event.contractId}, NULL, ${event.counter}, ${event.target}, ${event.source}, ${event.submitter}, $safeUnassignId)
-        on conflict(store_id, contract_id) do update
+        update #$acsTableName
             set
                 assigned_domain = NULL,
                 reassignment_counter = ${event.counter},
@@ -954,19 +986,9 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                 reassignment_submitter = ${event.submitter},
                 reassignment_unassign_id = $safeUnassignId
             where
-                contract_state.reassignment_counter < ${event.counter}
-      """.map {
-        case 1 =>
-          summary.updatedContractStates.addOne(
-            ContractStateEvent(
-              event.contractId,
-              event.counter,
-              StoreContractState.InFlight(event),
-            )
-          )
-        case _ =>
-          ()
-      }
+                store_id = $storeId and contract_id = ${event.contractId} and
+                #$acsTableName.reassignment_counter < ${event.counter}
+      """
     }
 
     private def doSetContractStateActive(
@@ -976,23 +998,19 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         summary: MutableIngestionSummary[TXE],
     ) = {
       val safeContractId = lengthLimited(contractId)
+      summary.updatedContractStates.addOne(
+        ContractStateEvent(
+          new ContractId(contractId),
+          reassignmentCounter,
+          StoreContractState.Assigned(domainId),
+        )
+      )
       // Only overwrite the current contract state if existing row is "older", i.e., it has
       // a reassignment counter smaller or equal to the state we are trying to insert.
       // Note: reassignment counters increase with Unassign events. Corresponding Assign and Unassign events
       // have the same reassignment counter.
       sqlu"""
-        insert into contract_state(
-            store_id,
-            contract_id,
-            assigned_domain,
-            reassignment_counter,
-            reassignment_target_domain,
-            reassignment_source_domain,
-            reassignment_submitter,
-            reassignment_unassign_id
-        )
-        values($storeId, $safeContractId, $domainId, $reassignmentCounter, NULL, NULL, NULL, NULL)
-        on conflict(store_id, contract_id) do update
+        update #$acsTableName
             set
                 assigned_domain = $domainId,
                 reassignment_counter = $reassignmentCounter,
@@ -1001,19 +1019,9 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                 reassignment_submitter = NULL,
                 reassignment_unassign_id = NULL
             where
-                contract_state.reassignment_counter <= $reassignmentCounter
-      """.map {
-        case 1 =>
-          summary.updatedContractStates.addOne(
-            ContractStateEvent(
-              new ContractId(contractId),
-              reassignmentCounter,
-              StoreContractState.Assigned(domainId),
-            )
-          )
-        case _ =>
-          ()
-      }
+                store_id = $storeId and contract_id = $safeContractId and
+                #$acsTableName.reassignment_counter <= $reassignmentCounter
+      """
     }
 
     private def doRegisterIncompleteReassignment(

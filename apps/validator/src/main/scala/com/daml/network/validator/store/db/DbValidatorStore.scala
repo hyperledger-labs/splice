@@ -16,6 +16,7 @@ import com.daml.network.store.ConfiguredDefaultDomain
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
+import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.daml.network.validator.config.ValidatorDomainConfig
@@ -73,7 +74,10 @@ class DbValidatorStore(
 
   private def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionAcsInsert(createdEvent: CreatedEvent)(implicit
+  override def ingestionAcsInsert(
+      createdEvent: CreatedEvent,
+      contractState: ContractStateRowData,
+  )(implicit
       tc: TraceContext
   ) = {
     ValidatorAcsStoreRowData.fromCreatedEvent(createdEvent).map {
@@ -101,13 +105,16 @@ class DbValidatorStore(
         val safeJsonHash = jsonHash.map(lengthLimited)
         sqlu"""
               insert into validator_acs_store(store_id, contract_id, template_id, create_arguments, contract_metadata_created_at,
-                                        contract_metadata_contract_key_hash, contract_metadata_driver_internal,
-                                        contract_expires_at, user_party, user_name, provider_party, validator_party,
+                                        contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
+                                        assigned_domain, reassignment_counter, reassignment_target_domain,
+                                        reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
+                                        user_party, user_name, provider_party, validator_party,
                                         traffic_domain_id, app_configuration_version, app_release_version, json_hash)
               values ($storeId, $contractId, $templateId, $createArguments, $contractMetadataCreatedAt,
-                      $contractMetadataContractKeyHash, $contractMetadataDriverInternal,
-                      $contractExpiresAt, $userParty, $safeUserName,
-                      $providerParty, $validatorParty, $trafficDomainId,
+                      $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
+                      ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
+                      ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
+                      $userParty, $safeUserName, $providerParty, $validatorParty, $trafficDomainId,
                       $appConfigurationVersion, $safeAppReleaseVersion, $safeJsonHash)
               on conflict do nothing
             """
@@ -314,8 +321,7 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
-            acsWhere = sql"""
-            template_id = ${appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID}
+            where = sql"""template_id = ${appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID}
               and provider_party = $provider
               and app_configuration_version = $version
             """,
@@ -344,8 +350,7 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
-            acsWhere = sql"""
-            template_id = ${appManagerCodegen.AppRelease.COMPANION.TEMPLATE_ID}
+            where = sql"""template_id = ${appManagerCodegen.AppRelease.COMPANION.TEMPLATE_ID}
               and provider_party = $provider
               and app_release_version = ${lengthLimited(version)}
             """,
@@ -375,8 +380,7 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
-            acsWhere = sql"""
-            template_id = ${appManagerCodegen.RegisteredApp.COMPANION.TEMPLATE_ID}
+            where = sql"""template_id = ${appManagerCodegen.RegisteredApp.COMPANION.TEMPLATE_ID}
               and provider_party = $provider
             """,
             orderLimit = sql"limit 1",
@@ -405,8 +409,7 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
-            acsWhere = sql"""
-            template_id = ${appManagerCodegen.InstalledApp.COMPANION.TEMPLATE_ID}
+            where = sql"""template_id = ${appManagerCodegen.InstalledApp.COMPANION.TEMPLATE_ID}
               and provider_party = $provider
             """,
             orderLimit = sql"limit 1",
@@ -466,8 +469,8 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
-            acsWhere = sql"""
-            template_id = ${appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID}
+            where =
+              sql"""template_id = ${appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID}
               and provider_party = $provider
               and json_hash = $jsonHash
             """,
