@@ -25,14 +25,7 @@ import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
-import com.daml.network.store.{
-  AcsStoreDump,
-  ConfiguredDefaultDomain,
-  Limit,
-  LimitHelpers,
-  MultiDomainAcsStore,
-}
-import com.daml.network.sv.config.SvDomainConfig
+import com.daml.network.store.{AcsStoreDump, Limit, LimitHelpers, MultiDomainAcsStore}
 import com.daml.network.sv.store.db.SvcTables.{SvcAcsStoreRowData, SvcTxLogRowData}
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
 import com.daml.network.util.Contract.Companion.Template
@@ -52,7 +45,6 @@ import scala.concurrent.{ExecutionContext, Future}
 class DbSvSvcStore(
     override val key: SvStore.Key,
     storage: DbStorage,
-    domainConfig: SvDomainConfig,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     override protected val transactionTreeSource: TransactionTreeSource,
@@ -73,7 +65,6 @@ class DbSvSvcStore(
       ),
     )
     with SvSvcStore
-    with ConfiguredDefaultDomain
     with AcsTables
     with AcsQueries
     with LimitHelpers
@@ -81,8 +72,6 @@ class DbSvSvcStore(
 
   import storage.DbStorageConverters.setParameterByteArray
   import multiDomainAcsStore.waitUntilAcsIngested
-
-  override final def defaultAcsDomain = domainConfig.global.alias
 
   def storeId: Int = multiDomainAcsStore.storeId
 

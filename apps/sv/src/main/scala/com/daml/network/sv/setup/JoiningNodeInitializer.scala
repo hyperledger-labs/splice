@@ -493,7 +493,6 @@ class JoiningNodeInitializer(
   private def newSvStore(key: SvStore.Key) = SvSvStore(
     key,
     storage,
-    config.domains,
     loggerFactory,
     retryProvider,
   )
@@ -516,7 +515,6 @@ class JoiningNodeInitializer(
     SvSvcStore(
       key,
       storage,
-      config,
       loggerFactory,
       connection,
       retryProvider,

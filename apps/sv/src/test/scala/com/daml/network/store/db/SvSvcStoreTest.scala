@@ -1313,7 +1313,6 @@ class DbSvSvcStoreTest
     val store = new DbSvSvcStore(
       SvStore.Key(storeSvParty, svcParty),
       storage,
-      svDomainConfig,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       transactionTreeSource,

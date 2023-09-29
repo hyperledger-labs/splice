@@ -552,7 +552,6 @@ class FoundingNodeInitializer(
   private def newSvStore(key: SvStore.Key) = SvSvStore(
     key,
     storage,
-    config.domains,
     loggerFactory,
     retryProvider,
   )
@@ -575,7 +574,6 @@ class FoundingNodeInitializer(
     SvSvcStore(
       key,
       storage,
-      config,
       loggerFactory,
       connection,
       retryProvider,

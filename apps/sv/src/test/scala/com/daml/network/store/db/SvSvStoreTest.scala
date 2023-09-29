@@ -214,7 +214,6 @@ class DbSvSvStoreTest
     val store = new DbSvSvStore(
       SvStore.Key(storeSvParty, svcParty),
       storage,
-      svDomainConfig,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )(parallelExecutionContext, implicitly, implicitly)

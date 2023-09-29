@@ -32,7 +32,6 @@ import com.daml.network.store.MultiDomainAcsStore.{
   QueryResult,
 }
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.SvSvcStore.ignoredContractsForAcsDump
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
@@ -803,7 +802,6 @@ object SvSvcStore {
   def apply(
       key: SvStore.Key,
       storage: Storage,
-      config: SvAppBackendConfig,
       loggerFactory: NamedLoggerFactory,
       connection: CNLedgerConnection,
       retryProvider: RetryProvider,
@@ -825,7 +823,6 @@ object SvSvcStore {
         new DbSvSvcStore(
           key,
           db,
-          config.domains,
           loggerFactory,
           retryProvider,
           treeSource,

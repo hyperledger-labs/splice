@@ -7,7 +7,6 @@ import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ConstrainedTemplate}
-import com.daml.network.sv.config.SvDomainConfig
 import com.daml.network.sv.store.db.DbSvSvStore
 import com.daml.network.sv.store.memory.InMemorySvSvStore
 import com.daml.network.util.{Contract, AssignedContract, TemplateJsonDecoder}
@@ -111,7 +110,6 @@ object SvSvStore {
   def apply(
       key: SvStore.Key,
       storage: Storage,
-      domains: SvDomainConfig,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
   )(implicit
@@ -123,7 +121,7 @@ object SvSvStore {
       case _: MemoryStorage =>
         new InMemorySvSvStore(key, loggerFactory, retryProvider)
       case db: DbStorage =>
-        new DbSvSvStore(key, db, domains, loggerFactory, retryProvider)
+        new DbSvSvStore(key, db, loggerFactory, retryProvider)
     }
 
   private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
