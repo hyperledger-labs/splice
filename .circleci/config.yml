@@ -1624,7 +1624,16 @@ jobs:
                 cmd_name: wait for cluster to be ready
                 cluster: << parameters.cluster >>
                 gce_authenticate: true
-                cmd: cncluster wait
+                cmd: |
+                  # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
+                  cncluster wait validator1 validator-app
+                  cncluster wait splitwell validator-app
+                  cncluster wait sv-1 validator-app
+                  cncluster wait sv-2 validator-app
+                  cncluster wait sv-3 validator-app
+                  cncluster wait sv-4 validator-app
+                  echo "Done waiting. All pods in the cluster are:"
+                  kubectl get pods -A
                 cmd_retry_count: 5
             - checkout_cluster_version:
                 cluster: <<parameters.cluster>>
@@ -1748,7 +1757,11 @@ jobs:
               cmd_name: wait for cluster to be ready
               cluster: << parameters.cluster >>
               gce_authenticate: true
-              cmd: cncluster wait
+              cmd: |
+                # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
+                cncluster wait sv validator-app
+                echo "Done waiting. All pods in the cluster are:"
+                kubectl get pods -A
               cmd_retry_count: 5
           - checkout_cluster_version:
               cluster: <<parameters.cluster>>
