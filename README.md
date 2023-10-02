@@ -23,6 +23,7 @@
     1. [Editing Daml](#editing-daml)
     1. [Bumping External Dependencies](#bumping-external-dependencies)
        1. [Bumping CometBFT](#bumping-cometbft)
+       1. [Bumping Canton](#bumping-canton)
        1. [Bumping Our Canton fork](#bumping-our-canton-fork)
             1. [Message Definitions](#message-definitions)
     1. [Code Layout](#code-layout)
@@ -509,6 +510,17 @@ file along with your dar changes.
 
 1. Update the version in the `nix/cometbft-driver-sources.json` file
 2. Update the version used for the CometBFT docker image in the `.circleci/config.yml` file
+
+#### Bumping Canton
+
+1. Update the Canton Enterprise `version` in `nix/canton-sources.json`. The currently published versions on
+   Artifactory can be found [here](https://digitalasset.jfrog.io/ui/repos/tree/General/canton-enterprise).
+2. Update the `sha256` hash in the same file by first running `direnv reload` to make the hash validation fail
+   and using the 'got' hash printed by nix. This is usually easier and more accurate than copying the sha256 hash
+   displayed for the release version in Artifactory.
+3. In case you have also made configuration changes to Canton in `simple-topology-canton.conf`, remember
+   to also make the corresponding changes for our cluster deployments. It is recommended to test any configuration
+   changes on scratchnet first.
 
 #### Bumping Our Canton fork
 
