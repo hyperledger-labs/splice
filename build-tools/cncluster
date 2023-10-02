@@ -972,11 +972,17 @@ function subcmd_sbt_for_preflight() {
 subcommand_whitelist[preflight_sv]='Run the SV runbook preflight test against the cluster'
 
 function subcmd_preflight_sv() {
+  if [ "${IS_DEVNET}" != false ]; then
     _log "Starting SV preflight"
-
     cd "${REPO_ROOT}" && \
-        NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
-        sbt "apps-app/testOnly *PreflightSvIntegrationTest"
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+            sbt "apps-app/testOnly *PreflightSvIntegrationTest"
+  else
+    _log "Starting SV preflight on non-DevNet"
+    cd "${REPO_ROOT}" && \
+                NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+                sbt "apps-app/testOnly *NonDevNet*PreflightSvIntegrationTest"
+  fi
 }
 
 ###

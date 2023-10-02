@@ -511,6 +511,17 @@ workflows:
           restore_cluster: true
           requires:
             - deploy_cluster
+    - preflight_sv_check:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        cluster: "cidaily-testnet"
+        requires:
+          - deploy_sv_runbook
+
 
   testnet_health_check:
     when:

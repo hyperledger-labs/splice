@@ -1,16 +1,16 @@
 package com.daml.network.integration.tests.runbook
 
-import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{DirectoryFrontendTestUtil, FrontendLoginUtil, WalletFrontendTestUtil}
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.duration.*
 import scala.util.Random
 
-class SvNodePreflightSvIntegrationTest
+abstract class SvNodePreflightSvIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
     with PreflightIntegrationTestUtil
     with SvUiIntegrationTestUtil
@@ -24,18 +24,20 @@ class SvNodePreflightSvIntegrationTest
       this.getClass.getSimpleName()
     )
 
+  protected def svUsername: String
+  protected def isDevNet: Boolean
+  protected val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
+
   "The SV UI of the node is working as expected" in { _ =>
     val svUiUrl = s"https://sv.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    val svUsername = s"admin@sv-dev.com";
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
     withFrontEnd("sv") { implicit webDriver =>
-      testSvUi(svUiUrl, svUsername, svPassword, None, Seq())
+      testSvUi(svUiUrl, svUsername, svPassword, None, Seq(), isDevNet)
     }
   }
 
   "CometBFT is working" in { _ =>
     val svUiUrl = s"https://sv.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    val svUsername = s"admin@sv-dev.com";
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
 
     withFrontEnd("sv") { implicit webDriver =>
@@ -54,8 +56,14 @@ class SvNodePreflightSvIntegrationTest
         s"We see all other SVs as peers",
         _ => {
           inside(find(id("comet-bft-debug-network"))) { case Some(e) =>
-            forAll(Range(1, 5)) { sv =>
-              e.text should include(s"\"moniker\": \"Canton-Foundation-$sv\"")
+            if (isDevNet) {
+              forAll(Range(1, 5)) { _ =>
+                e.text should include(s"\"moniker\": \"Canton-Foundation-1\"")
+              }
+            } else {
+              forAll(Range(1, 2)) { _ =>
+                e.text should include(s"\"moniker\": \"Canton-Foundation\"")
+              }
             }
           }
         },
@@ -65,8 +73,6 @@ class SvNodePreflightSvIntegrationTest
 
   "The SV can log in to their wallet" in { _ =>
     val walletUrl = s"https://wallet.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
-    val svUsername = s"admin@sv-dev.com";
-    val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
 
     withFrontEnd("sv") { implicit webDriver =>
       actAndCheck(
@@ -84,7 +90,9 @@ class SvNodePreflightSvIntegrationTest
           userIsLoggedIn()
         },
       )
-      tapCoins(100)
+      if (isDevNet) { // can't tap in NonDevNet
+        tapCoins(100)
+      }
     }
   }
 
@@ -103,7 +111,6 @@ class SvNodePreflightSvIntegrationTest
 
   "The Directory UI is working" in { _ =>
     val directoryUrl = s"https://directory.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
-    val svUsername = s"admin@sv-dev.com";
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
     val cnsName = s"da-test-${Random.alphanumeric.take(10).mkString.toLowerCase}.unverified.cns"
 
@@ -126,13 +133,16 @@ class SvNodePreflightSvIntegrationTest
         )
 
       }
-      reserveDirectoryNameFor(
-        () => login(),
-        cnsName,
-        "1.0",
-        "USD",
-        "90 days",
-      )
+      if (isDevNet) { // SV missing CC in NonDevNet
+        reserveDirectoryNameFor(
+          () => login(),
+          cnsName,
+          "1.0",
+          "USD",
+          "90 days",
+        )
+      }
+
     }
   }
 
@@ -147,5 +157,39 @@ class SvNodePreflightSvIntegrationTest
 
     val svValidatorClient = vc("svTestValidator").copy(token = Some(token))
     svValidatorClient.dumpParticipantIdentities()
+  }
+}
+
+final class SvNodePreflightSvIntegrationTest extends SvNodePreflightSvIntegrationTestBase {
+  override protected def svUsername = s"admin@sv-dev.com";
+  override protected def isDevNet = true
+}
+
+final class SvNodeNonDevNetPreflightSvIntegrationTest extends SvNodePreflightSvIntegrationTestBase {
+  override protected def svUsername = s"admin@sv.com";
+  override protected def isDevNet = false
+
+  "ParticipantId matches the expected one" in { _ =>
+    val svUiUrl = s"https://sv.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
+    val participantId = "1220a07b1a67efd1e0421230a109b57e519223574f8e2d7bcb7c348c8d011e1461b9"
+
+    withFrontEnd("sv") { implicit webDriver =>
+      clue(s"Logging in to sv ui at ${svUiUrl}") {
+        completeAuth0LoginWithAuthorization(
+          svUiUrl,
+          svUsername,
+          svPassword,
+          () => find(id("logout-button")) should not be empty,
+        )
+      }
+
+      clue("The suffix matches the participantID") {
+        eventually() {
+          val valueCells = findAll(className("general-svc-value-name")).toSeq
+          println(valueCells)
+          forAtLeast(1, valueCells)(cell => seleniumText(cell) should include(participantId))
+        }
+      }
+    }
   }
 }

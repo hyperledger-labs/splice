@@ -1115,6 +1115,8 @@ printTests := {
     name.contains("PreflightIntegrationTest") && !isNonDevNetTest(name)
   def isNonDevNetPreflightIntegrationTest(name: String): Boolean =
     name.contains("PreflightIntegrationTest") && isNonDevNetTest(name)
+  def isNonDevNetPreflightSvIntegrationTest(name: String): Boolean =
+    name.contains("PreflightSvIntegrationTest") && isNonDevNetTest(name)
   def isPreflightSvIntegrationTest(name: String): Boolean =
     name.contains("PreflightSvIntegrationTest")
   def isGlobalUpgradeTest(name: String): Boolean = name contains "GlobalDomainUpgrade"

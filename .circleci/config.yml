@@ -1801,8 +1801,7 @@ jobs:
             --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET \
             --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cluster: << parameters.cluster >>
-          cmd: |
-            cncluster preflight_sv
+          cmd: cncluster preflight_sv
           cmd_retry_count: 3
           # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
           # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
@@ -2579,6 +2578,17 @@ workflows:
           restore_cluster: true
           requires:
             - deploy_cluster
+    - preflight_sv_check:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        cluster: "cidaily-testnet"
+        requires:
+          - deploy_sv_runbook
+
 
   testnet_health_check:
     when:

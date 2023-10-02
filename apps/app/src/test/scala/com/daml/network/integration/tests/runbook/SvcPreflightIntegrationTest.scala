@@ -49,6 +49,7 @@ class SvcPreflightIntegrationTest
           svPassword,
           Some(svInfo),
           votedSvParties,
+          true,
         )
       }
     }

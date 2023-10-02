@@ -3,8 +3,7 @@ package com.daml.network.util
 import io.fabric8.kubernetes.client.{KubernetesClient, KubernetesClientBuilder}
 import java.nio.charset.StandardCharsets
 import scala.jdk.CollectionConverters.*
-import io.fabric8.kubernetes.api.model.SecretBuilder
-import io.fabric8.kubernetes.api.model.Secret
+import io.fabric8.kubernetes.api.model.{Secret, SecretBuilder}
 import com.daml.network.auth.AuthToken
 import com.digitalasset.canton.data.CantonTimestamp
 

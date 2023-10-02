@@ -61,6 +61,8 @@
     - [Test and CircleCI setup](#test-and-circleci-setup)
     - [Pruning Data Dumps](#pruning-data-dumps)
     - [Bootstrapping from a Cluster Data Dump](#bootstrapping-from-a-cluster-data-dump)
+  - [Testing](#testing)
+    - [Writing Tests against different Clusters](#writing-tests-against-different-clusters)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -1377,6 +1379,20 @@ so if no backup exists on [Google Cloud Storage](https://console.cloud.google.co
 that is timestamped (as per its file name) at at most 2 hours before the specified date, your deployment attempt will fail.
 
 When [deploying via CI](#manually-deploying-via-ci), you can use the `bootstrapping-config` parameter (in addition to `run-job`) to set the bootstrapping config (same format as above).
+
+## Testing
+
+### Writing Tests against different Clusters
+
+1. Look for the right filename.
+   - NonDevNet clusters (e.g. testnet, testnet-preview) include `NonDevNet` in the test class name,
+   - Tests running preflight checks include `PreflightIntegrationTest`
+   - Tests running the sv runbook preflight  checks include `PreflightSvIntegrationTest`
+   - ... to see all the different pattern, good starting point is [build.sbt](https://github.com/DACH-NY/canton-network-node/blob/6a24a83724ad666d8095ff59cfcb00be879ad289/build.sbt#L1060)
+2. Check that your test will be run by the right circle-ci job in the right workflow
+   - see the different steps in `.circleci/config/workflows.yml` and `.circleci/config/prelude.yml`
+   - run [`build-config.sh`](/.circleci/build-config.sh) to update the main config file
+
 
 ## Appendix: Kubernetes and Other Deployment Resources
 

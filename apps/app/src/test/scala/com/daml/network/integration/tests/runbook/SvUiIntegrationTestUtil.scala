@@ -15,6 +15,7 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
       svPassword: String,
       svInfo: Option[SvcInfo],
       votedSvParties: Seq[PartyId],
+      isDevNet: Boolean,
       extraChecks: => Unit = (),
   )(implicit webDriver: WebDriverType) = {
 
@@ -46,17 +47,20 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
         _ => find(id("information-tab-canton-domain-status")) should not be empty,
       )
 
-      actAndCheck(
-        "Click on domain status tab",
-        click on "information-tab-canton-domain-status",
-      )(
-        "Observe sequencer and mediator as active",
-        _ => {
-          val activeCells = findAll(className("active-value")).toSeq
-          activeCells should have length 2
-          forAll(activeCells)(_.text shouldBe "true")
-        },
-      )
+      // TODO(#5185): enable check for NonDevNet once we have a BFT domain on NonDevNet
+      if (isDevNet) {
+        actAndCheck(
+          "Click on domain status tab",
+          click on "information-tab-canton-domain-status",
+        )(
+          "Observe sequencer and mediator as active",
+          _ => {
+            val activeCells = findAll(className("active-value")).toSeq
+            activeCells should have length 2
+            forAll(activeCells)(_.text shouldBe "true")
+          },
+        )
+      }
 
       clue("SVs 1-4 have placed a coin price vote") {
         actAndCheck(
