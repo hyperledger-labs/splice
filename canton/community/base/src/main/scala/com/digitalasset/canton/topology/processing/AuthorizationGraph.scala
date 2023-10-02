@@ -242,8 +242,8 @@ class AuthorizationGraph(
   protected def recompute()(implicit traceContext: TraceContext): Unit = {
     cache.clear()
     // recompute authorization graph starting from the root certificate
-    // this is a graph potentially with cycles, as stupid (or malicious) users might create useless
-    // certificates chain cycles.
+    // this is a graph potentially with cycles, as users might accidentally (or maliciously)
+    // create useless certificates chain cycles.
     // however, the actual computation is simple: we start at the root certificate
     // and we let the "trust" (auth-level) flow from there downwards.
     // as a result, every key that doesn't end up in the cache is not connected

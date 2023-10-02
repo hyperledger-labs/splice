@@ -24,6 +24,7 @@ import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.{
   PositiveStoredTopologyTransactionsX,
 }
 import com.digitalasset.canton.topology.store.TopologyStore.Change.{Other, TopologyDelay}
+import com.digitalasset.canton.topology.store.TopologyTransactionRejection.Duplicate
 import com.digitalasset.canton.topology.store.ValidatedTopologyTransactionX.GenericValidatedTopologyTransactionX
 import com.digitalasset.canton.topology.store.db.DbTopologyStoreX
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStoreX
@@ -55,6 +56,7 @@ final case class StoredTopologyTransactionX[+Op <: TopologyChangeOpX, +M <: Topo
       param("op", _.transaction.transaction.op),
       param("serial", _.transaction.transaction.serial),
       param("mapping", _.transaction.transaction.mapping),
+      param("signatures", _.transaction.signatures),
     )
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -78,6 +80,11 @@ final case class ValidatedTopologyTransactionX[+Op <: TopologyChangeOpX, +M <: T
     rejectionReason: Option[TopologyTransactionRejection] = None,
     expireImmediately: Boolean = false,
 ) {
+  def nonDuplicateRejectionReason: Option[TopologyTransactionRejection] = rejectionReason match {
+    case Some(Duplicate(_)) => None
+    case otherwise => otherwise
+  }
+
   def collectOfMapping[TargetM <: TopologyMappingX: ClassTag]
       : Option[ValidatedTopologyTransactionX[Op, TargetM]] =
     transaction.selectMapping[TargetM].map(tx => copy[Op, TargetM](transaction = tx))
@@ -204,8 +211,9 @@ abstract class TopologyStoreX[+StoreID <: TopologyStoreId](implicit
     findStored(transaction).map(_.forall { inStore =>
       // check whether source still could provide an additional signature
       transaction.signatures.diff(inStore.transaction.signatures.forgetNE).nonEmpty &&
-      // but only if the transaction in the target store is a proposal
-      inStore.transaction.isProposal
+      // but only if the transaction in the target store is a valid proposal
+      inStore.transaction.isProposal &&
+      inStore.validUntil.isEmpty
     })
   }
 

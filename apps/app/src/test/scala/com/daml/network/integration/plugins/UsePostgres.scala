@@ -66,7 +66,7 @@ class UsePostgres(
   private lazy val dbSetupExecutorService: ExecutionContextIdlenessExecutorService =
     Threading.newExecutionContext(
       loggerFactory.threadName + "-db-execution-context",
-      logger,
+      noTracingLogger,
       executorServiceMetrics,
     )
 

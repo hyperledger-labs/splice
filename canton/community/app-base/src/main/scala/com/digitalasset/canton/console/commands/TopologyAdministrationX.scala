@@ -84,7 +84,10 @@ class TopologyAdministrationGroupX(
   @Help.Group("All Transactions")
   object transactions {
 
-    // TODO(#12390): add doc annotations
+    @Help.Summary("Downloads the node's topology identity transactions")
+    @Help.Description(
+      "The node's identity is defined by topology transactions of type NamespaceDelegationX and OwnerToKeyMappingX."
+    )
     def identity_transactions()
         : Seq[SignedTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]] = {
       val txs = instance.topology.transactions.list()
@@ -321,7 +324,6 @@ class TopologyAdministrationGroupX(
                   signedBy = signedBy.toList,
                   serial = serial,
                   change = TopologyChangeOpX.Replace,
-                  // TODO(#12390): change to false when activating topology transaction validation
                   mustFullyAuthorize = true,
                   store = store,
                 )
@@ -518,7 +520,6 @@ class TopologyAdministrationGroupX(
         domainId: Option[DomainId] = None,
         serial: Option[PositiveInt] = None,
         groupAddressing: Boolean = false,
-        // TODO(#12390): change to false when activating topology transaction validation
         mustFullyAuthorize: Boolean = true,
         store: String = AuthorizedStore.filterName,
     ): SignedTopologyTransactionX[TopologyChangeOpX, PartyToParticipantX] = {
@@ -905,7 +906,6 @@ class TopologyAdministrationGroupX(
             signedBy = signedBy.toList,
             serial = serial,
             change = TopologyChangeOpX.Replace,
-            // TODO(#12390): change to false when activating topology transaction validation
             mustFullyAuthorize = true,
             store = store.getOrElse(domainId.filterString),
           )
@@ -958,7 +958,6 @@ class TopologyAdministrationGroupX(
             signedBy = signedBy.toList,
             serial = serial,
             change = TopologyChangeOpX.Replace,
-            // TODO(#12390): change to false when activating topology transaction validation
             mustFullyAuthorize = true,
             store = store.getOrElse(domainId.filterString),
           )
@@ -1012,7 +1011,6 @@ class TopologyAdministrationGroupX(
             ),
             signedBy.toList,
             serial = serial,
-            // TODO(#12390): change to false when activating topology transaction validation
             mustFullyAuthorize = true,
             store = store.getOrElse(domain.filterString),
           )
