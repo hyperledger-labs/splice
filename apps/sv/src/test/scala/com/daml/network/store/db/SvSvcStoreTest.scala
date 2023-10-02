@@ -1070,6 +1070,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         new DomainNodeConfigLimits(new CometBftConfigLimits(1, 1, 1, 1, 1)),
         1,
         1,
+        new RelTime(1),
         new GlobalDomainConfig(Collections.emptyMap(), newDomainId, newDomainId),
       ),
       Collections.emptyMap(),

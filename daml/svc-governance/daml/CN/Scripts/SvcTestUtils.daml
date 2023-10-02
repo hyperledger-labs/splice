@@ -63,6 +63,7 @@ initCollective initialOpenRounds isDevNet = do
         domainNodeConfigLimits = defaultDomainNodeConfigLimits
         maxTextLength = 1024
         initialTrafficGrant = 1_000_000
+        svChallengeDeadline = minutes 30
         globalDomain = initialGlobalDomainConfig
   let coinConfig = defaultCoinConfig
   let cnsRulesConfig = defaultCnsRulesConfig

@@ -5,7 +5,7 @@ daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar 321d0c6e2ac892
 daml/cn-util/.daml/dist/cn-util-0.1.0.dar e43fba5e5c294a4727855b7065cb1daa6e09b5fd66f7fe55ba353ed711bd4417
 daml/directory-service/.daml/dist/directory-service-0.1.0.dar 234fed55c5654e5c29643b4c2962a36f2a29863453b2988cfb3882752724eb23
 daml/splitwell/.daml/dist/splitwell-0.1.0.dar 51f794e6e72c59e212fe8a8207443fab1905c053ef458dab989332a5e16a1334
-daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar 08683feda3202f708ea61210c851ef9816eba30f50095e605fcaabe361f6395b
+daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar 31372bd8d95aae5c7277a309adaffa2b22ccc07d03e8c14bf138432ba85248b6
 daml/validator-lifecycle/.daml/dist/validator-lifecycle-0.1.0.dar 60ef650de6a0f32b3876cd7ee439fee34228a5957b99c1357951309230f538a6
 daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar fbe2b51fa3cb59fda0d7e3f367bf43a5c7fceb8986e8fc7839cf26e37628c956
 daml/wallet/.daml/dist/wallet-0.1.0.dar 718bcd74690e3f831e62db90f3d287cf5221bd6fc0f4ffdebd4b7c0742a42222
