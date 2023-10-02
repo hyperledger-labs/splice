@@ -1,9 +1,10 @@
 package com.daml.network.util
 
-import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.api.v1.coin.{TimeLock, TransferOutput}
-import com.daml.network.codegen.java.cc.coin.SvcReward
+import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.coin.{SvcReward, TransferOutput}
+import com.daml.network.codegen.java.cc.expiry.TimeLock
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cn.svcrules.SvReward
 import com.daml.network.console.*
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -113,7 +114,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
       receiver: PartyId,
       receiverFeeRatio: BigDecimal,
       amount: BigDecimal,
-  ): v1.coin.TransferOutput = {
+  ): cc.coin.TransferOutput = {
     new TransferOutput(
       receiver.toProtoPrimitive,
       receiverFeeRatio.bigDecimal,
@@ -128,7 +129,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
       receiverFeeRatio: BigDecimal,
       amount: BigDecimal,
       expiredDuration: Duration,
-  )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment): v1.coin.TransferOutput = {
+  )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment): cc.coin.TransferOutput = {
     val expiredAt = cnNodeEnv.environment.clock.now.add(expiredDuration)
     val expiration = Codec.decode(Codec.Timestamp)(expiredAt.underlying.micros).value
 
@@ -165,15 +166,15 @@ trait TimeTestUtil extends CNNodeTestCommon {
         optTimeout = None,
         commands = transferContext.coinRules
           .exerciseCoinRules_Transfer(
-            new v1.coin.Transfer(
+            new cc.coin.Transfer(
               userParty.toProtoPrimitive,
               userParty.toProtoPrimitive,
-              Seq[v1.coin.TransferInput](
-                new v1.coin.transferinput.InputCoin(
-                  coin.contract.contractId.toInterface(v1.coin.Coin.INTERFACE)
+              Seq[cc.coin.TransferInput](
+                new cc.coin.transferinput.InputCoin(
+                  coin.contract.contractId
                 )
               ).asJava,
-              Seq[v1.coin.TransferOutput](
+              Seq[cc.coin.TransferOutput](
                 transferOutputLockedCoin(
                   userParty,
                   Seq(userParty),
@@ -183,10 +184,10 @@ trait TimeTestUtil extends CNNodeTestCommon {
                 )
               ).asJava,
             ),
-            new v1.coin.TransferContext(
+            new cc.coin.TransferContext(
               transferContext.openMiningRound,
-              Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
-              Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,
+              Map.empty[Round, IssuingMiningRound.ContractId].asJava,
+              Map.empty[String, cc.coin.ValidatorRight.ContractId].asJava,
               // note: we don't provide a featured app right as sender == provider
               None.toJava,
             ),
@@ -207,7 +208,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
       userParty: PartyId,
       validatorParty: PartyId,
       coin: HttpWalletAppClient.CoinPosition,
-      outputs: Seq[v1.coin.TransferOutput],
+      outputs: Seq[cc.coin.TransferOutput],
   )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment) = {
     val coinRules = sv1ScanBackend.getCoinRules()
     val transferContext = sv1ScanBackend.getUnfeaturedAppTransferContext(getLedgerTime)
@@ -224,20 +225,20 @@ trait TimeTestUtil extends CNNodeTestCommon {
       readAs = Seq.empty,
       update = transferContext.coinRules
         .exerciseCoinRules_Transfer(
-          new v1.coin.Transfer(
+          new cc.coin.Transfer(
             userParty.toProtoPrimitive,
             userParty.toProtoPrimitive,
-            Seq[v1.coin.TransferInput](
-              new v1.coin.transferinput.InputCoin(
-                coin.contract.contractId.toInterface(v1.coin.Coin.INTERFACE)
+            Seq[cc.coin.TransferInput](
+              new cc.coin.transferinput.InputCoin(
+                coin.contract.contractId
               )
             ).asJava,
             outputs.asJava,
           ),
-          new v1.coin.TransferContext(
+          new cc.coin.TransferContext(
             transferContext.openMiningRound,
-            Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
-            Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,
+            Map.empty[Round, IssuingMiningRound.ContractId].asJava,
+            Map.empty[String, cc.coin.ValidatorRight.ContractId].asJava,
             // note: we don't provide a featured app right as sender == provider
             None.toJava,
           ),

@@ -2,8 +2,8 @@ module CN.Directory where
 
 import DA.Time
 
+import CC.Coin
 import CN.Util.Assert
-import CC.API.V1.Coin
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 

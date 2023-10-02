@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.DirectoryUtil
@@ -49,7 +49,7 @@ class SubscriptionInitialPaymentTrigger(
     )
     def rejectPayment(
         reason: String,
-        transferContext: v1.coin.AppTransferContext,
+        transferContext: cc.coin.AppTransferContext,
         disclosedContracts: DisclosedContracts.NE,
     ) = {
       logger.warn(s"rejecting initial subscription payment: $reason")
@@ -64,7 +64,7 @@ class SubscriptionInitialPaymentTrigger(
     def collectPaymentAndCreateEntry(
         entryName: String,
         deduplicationOffset: String,
-        transferContext: v1.coin.AppTransferContext,
+        transferContext: cc.coin.AppTransferContext,
         disclosedContracts: DisclosedContracts.NE,
     ) = {
       val cmd =

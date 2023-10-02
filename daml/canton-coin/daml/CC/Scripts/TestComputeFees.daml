@@ -4,10 +4,10 @@ import DA.Assert
 import DA.Time
 import Daml.Script
 
-import qualified CC.API.V1.Coin as API
 import CC.Scripts.Util
 
 import CC.Coin
+import CC.Expiry
 import CC.Fees
 
 
@@ -18,10 +18,10 @@ template Test
     signatory sender
     choice Test_ComputeFees : [Decimal]
       with
-        context : API.PaymentTransferContext
-        outputs : [API.TransferOutput]
+        context : PaymentTransferContext
+        outputs : [TransferOutput]
       controller sender
-      do API.exerciseComputeFees context sender outputs
+      do exerciseComputeFees context sender outputs
 
 
 test = script do
@@ -31,36 +31,36 @@ test = script do
     test <- submitUser alice.userId $ createCmd Test with
       sender = alice.primaryParty
     let outputs =
-          [ API.TransferOutput with
+          [ TransferOutput with
               receiver = alice.primaryParty
               receiverFeeRatio = 0.4
               amount = 20.0
               lock = None
-          , API.TransferOutput with
+          , TransferOutput with
               receiver = alice.primaryParty
               receiverFeeRatio = 0.0
               amount = 20.0
-              lock = Some API.TimeLock with
+              lock = Some TimeLock with
                 expiresAt = addRelTime now (days 1)
                 holders = [bob.primaryParty, provider1.primaryParty]
-          , API.TransferOutput with
+          , TransferOutput with
               receiver = bob.primaryParty
               receiverFeeRatio = 0.0
               amount = 20.0
               lock = None
-          , API.TransferOutput with
+          , TransferOutput with
               receiver = bob.primaryParty
               receiverFeeRatio = 0.6
               amount = 20.0
               lock = None
-          , API.TransferOutput with
+          , TransferOutput with
               receiver = bob.primaryParty
               receiverFeeRatio = 0.0
               amount = 20.0
-              lock = Some API.TimeLock with
+              lock = Some TimeLock with
                 expiresAt = addRelTime now (days 1)
                 holders = [bob.primaryParty, provider1.primaryParty]
-          , API.TransferOutput with
+          , TransferOutput with
               receiver = bob.primaryParty
               receiverFeeRatio = 0.0
               amount = 101.0
@@ -113,12 +113,12 @@ testScaledHoldingFees = do
   -- Make a transfer, so that holding fees will be charged
   context <- getPaymentTransferContext app alice
   transferResult <- submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $
-    exerciseCmd context.coinRules API.CoinRules_Transfer with
-      transfer = API.Transfer with
+    exerciseCmd context.coinRules CoinRules_Transfer with
+      transfer = Transfer with
         sender = alice.primaryParty
         provider = alice.primaryParty
-        inputs = [API.InputCoin $ toInterfaceContractId curCoinCid]
-        outputs = [ API.TransferOutput with
+        inputs = [InputCoin curCoinCid]
+        outputs = [ TransferOutput with
                       receiver = bob.primaryParty
                       amount = 10.0
                       lock = None

@@ -9,9 +9,8 @@ import qualified DA.Set as Set
 import Daml.Script
 import DA.Time
 
-import CC.API.V1.Round (Round(..))
-import CC.API.V1.Coin(TransferInput(InputCoin))
 import CC.Round
+import CC.Round.Types
 import CC.Coin
 
 import CN.SvcRules
@@ -23,9 +22,6 @@ import CN.Scripts.SvcTestUtils
 import CN.Cns
 import CN.Scripts.CnsRulesParameters
 import CN.Wallet.Subscriptions
-
-import qualified CC.API.V1.Coin as API
-import qualified CC.API.V1.Round as API
 
 
 -- Automation leader election
@@ -254,15 +250,15 @@ testActivityLockOnLockedCoinChoices = do
   bob <- setupUser app "bob" app.svc
 
   cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
-  roundCid <- toInterfaceContractId @API.OpenMiningRound <$> fst <$> getLatestOpenRound app
+  roundCid <- fst <$> getLatestOpenRound app
   ensureHonorsActivityLock app sv1 [bob.primaryParty, alice.primaryParty] [app.svc] $ \coinRules ->
-    exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_Unlock coinRules roundCid)
+    exerciseCmd cid (LockedCoin_Unlock coinRules roundCid)
 
   cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
   passTime (minutes 6)
-  roundCid <- toInterfaceContractId @API.OpenMiningRound <$> fst <$> getLatestOpenRound app
+  roundCid <- fst <$> getLatestOpenRound app
   ensureHonorsActivityLock app sv1 [alice.primaryParty] [app.svc] $ \coinRules ->
-    exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_OwnerExpireLock coinRules roundCid)
+    exerciseCmd cid (LockedCoin_OwnerExpireLock coinRules roundCid)
 
   cid <- getLockedCoin app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (minutes 1)
   replicateA_ 4 $ runNextIssuance app
@@ -295,15 +291,15 @@ testLockControllers = script do
   submitMulti [sv1] [app.svc] $ exerciseCmd svcRulesCid (SvcRules_Lock sv1 coinRulesCid)
   pure ()
 
-ensureHonorsActivityLock : CCApp -> Party -> [Party] -> [Party] -> (ContractId API.CoinRules -> Commands a) -> Script ()
+ensureHonorsActivityLock : CCApp -> Party -> [Party] -> [Party] -> (ContractId CoinRules -> Commands a) -> Script ()
 ensureHonorsActivityLock app sv actAs readAs buildCommand = do
   lockSvcRules app sv
   Some (coinRules, _) <- queryCoinRulesByKey app.svc
-  submitMultiMustFail actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
+  submitMultiMustFail actAs readAs (buildCommand coinRules)
 
   unlockSvcRules app sv
   Some (coinRules, _) <- queryCoinRulesByKey app.svc
-  submitMulti actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
+  submitMulti actAs readAs (buildCommand coinRules)
   pure ()
 
 lockSvcRules : CCApp -> Party -> Script ()
@@ -355,7 +351,7 @@ testDecentralizedCns = do
 
   paymentContext <- getPaymentTransferContext app alice
   (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
-    inputs = [InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     context = paymentContext
     walletProvider = app.svc
 
@@ -395,7 +391,7 @@ testDecentralizedCns = do
 
   coin <- tap app alice 1.5
   (paymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
-    inputs = [InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     context = paymentContext
     walletProvider = app.svc
 
@@ -426,7 +422,7 @@ testDecentralizedCns = do
 
   paymentContext <- getPaymentTransferContext app alice
   (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequestToReject SubscriptionRequest_AcceptAndMakePayment with
-    inputs = [InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     context = paymentContext
     walletProvider = app.svc
 

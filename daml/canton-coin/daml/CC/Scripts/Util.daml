@@ -12,13 +12,13 @@ import qualified DA.Map as Map
 import DA.List.Total
 import DA.Time
 
-import qualified CC.API.V1.Coin as API
-import CC.API.V1.Round (Round(..))
 import CC.Coin
 import CC.CoinConfig
+import CC.Expiry
 import CC.Issuance
-import CC.Fees
 import CC.Round
+import CC.Fees
+import CC.Round.Types
 import CC.RelRound
 import CC.Schedule
 
@@ -270,18 +270,6 @@ submitExerciseCoinRulesByKey' app user arg = do
   (rules, _) <- fetchCoinRulesByKey app.svc
   submitUser user.userId $ exerciseCmd rules arg
 
-submitExerciseCoinRulesAPIByKey : Choice API.CoinRules c r => CCApp -> [Party] -> [Party] -> c -> Script r
-submitExerciseCoinRulesAPIByKey app actors readers arg = do
-  (rules, _) <- fetchCoinRulesByKey app.svc
-  -- TODO(#2957): remove read-as SVC.
-  let adjustedReaders = (app.svc :: readers)
-  submitMulti actors adjustedReaders $ exerciseCmd (toInterfaceContractId @API.CoinRules rules) arg
-
-submitExerciseCoinRulesAPIByKey' : Choice API.CoinRules c r => CCApp -> CCUser -> c -> Script r
-submitExerciseCoinRulesAPIByKey' app user arg = do
-  (rules, _) <- fetchCoinRulesByKey app.svc
-  submitUser user.userId $ exerciseCmd (toInterfaceContractId @API.CoinRules rules) arg
-
 fetchCoinRulesByKey : Party -> Script (ContractId CoinRules, CoinRules)
 fetchCoinRulesByKey svc =
   queryCoinRulesByKey svc >>= \case
@@ -314,12 +302,12 @@ payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio = do
   -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
   readAs <- getUserReadAs sender.userId
   coins <- getCoinInputs sender.primaryParty
-  let transfer = API.Transfer with
+  let transfer = Transfer with
         sender = sender.primaryParty
         provider = sender.primaryParty
         inputs = coins
         outputs =
-          [  API.TransferOutput with
+          [  TransferOutput with
               receiver = recipient
               amount = coinAmount
               receiverFeeRatio = transferFeeRatio
@@ -327,9 +315,9 @@ payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio = do
           ]
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
-  void $ submitExerciseCoinRulesAPIByKey app [sender.primaryParty, recipient] readAs
-    API.CoinRules_Transfer with
-      transfer, context = API.coinTransferContext (toInterfaceContractId openRound) featuredAppRight
+  void $ submitExerciseCoinRulesByKey app [sender.primaryParty, recipient] readAs
+    CoinRules_Transfer with
+      transfer, context = coinTransferContext openRound featuredAppRight
 
 -- | Locks a coin of the given amount to the given lock holder
 -- for the given time starting at the current time
@@ -340,24 +328,24 @@ lockTo1 app sender lockHolder coinAmount lockDuration = do
   readAs <- getUserReadAs sender.userId
   -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
   coins <- getCoinInputs sender.primaryParty
-  let transfer = API.Transfer with
+  let transfer = Transfer with
         sender = sender.primaryParty
         provider = sender.primaryParty
         inputs = coins
         outputs =
-          [ API.TransferOutput with
+          [ TransferOutput with
               receiver = sender.primaryParty
               amount = coinAmount
-              lock = Some API.TimeLock with
+              lock = Some TimeLock with
                 holders = [lockHolder]
                 expiresAt = now `addRelTime` lockDuration
               receiverFeeRatio = 0.0
           ]
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
-  void $ submitExerciseCoinRulesAPIByKey app [sender.primaryParty, lockHolder] readAs
-    API.CoinRules_Transfer with
-      transfer, context = API.coinTransferContext (toInterfaceContractId openRound) featuredAppRight
+  void $ submitExerciseCoinRulesByKey app [sender.primaryParty, lockHolder] readAs
+    CoinRules_Transfer with
+      transfer, context = coinTransferContext openRound featuredAppRight
 
 -- | Deposit all coins together with new issuances into a single coin.
 runCoinDepositBots : CCApp -> Script ()
@@ -365,9 +353,9 @@ runCoinDepositBots app = do
   (openRound, _) <- getLatestOpenRound app
   issuingRounds <- getOpenIssuingRounds app
   let issuingRoundNumbers = map (._2.round) issuingRounds
-  let mkContext validatorRights = API.TransferContext with
-        openMiningRound = toInterfaceContractId openRound
-        issuingMiningRounds = Map.fromList [ (round.round, toInterfaceContractId roundCid) | (roundCid, round) <- issuingRounds ]
+  let mkContext validatorRights = TransferContext with
+        openMiningRound = openRound
+        issuingMiningRounds = Map.fromList [ (round.round, roundCid) | (roundCid, round) <- issuingRounds ]
         validatorRights
         featuredAppRight = None
   -- iterate over all validator rights to use the right readAs values
@@ -390,16 +378,16 @@ runCoinDepositBots app = do
     -- TODO(M4-82): remove the need for reading as the validator
     let readAs = Map.keys validatorRights ++ [validatorRight.validator]
     -- merge multiple of them into a single coin to minimize the holding fees
-    let transfer = API.Transfer with
+    let transfer = Transfer with
           sender = user
           provider = user
           inputs =
-              map (API.InputAppRewardCoupon . toInterfaceContractId . fst) appRewardCoupons ++
-              map (API.InputValidatorRewardCoupon . toInterfaceContractId . fst) validatorRewardCoupons ++
+              map (InputAppRewardCoupon . fst) appRewardCoupons ++
+              map (InputValidatorRewardCoupon . fst) validatorRewardCoupons ++
               coins
           outputs = []
     when (not (null appRewardCoupons) || not (null validatorRewardCoupons) || length coins > 1) $ void $
-      submitExerciseCoinRulesAPIByKey app [user] readAs API.CoinRules_Transfer with
+      submitExerciseCoinRulesByKey app [user] readAs CoinRules_Transfer with
         transfer
         context = mkContext validatorRights
 
@@ -410,10 +398,10 @@ runCoinDepositBots app = do
   pure ()
 
 -- | Retrieve the list of all coins that the given party can use as transfer inputs.
-getCoinInputs : Party -> Script [API.TransferInput]
+getCoinInputs : Party -> Script [TransferInput]
 getCoinInputs sender = do
   coins <- queryFilter @Coin sender (\coin -> coin.owner == sender)
-  pure [ API.InputCoin (toInterfaceContractId coinCid) | (coinCid, _) <- coins]
+  pure [ InputCoin coinCid | (coinCid, _) <- coins]
 
 -- | Retrieve a list of all issuing mining rounds that are currently open.
 getOpenIssuingRounds : CCApp -> Script [(ContractId IssuingMiningRound, IssuingMiningRound)]
@@ -423,10 +411,10 @@ getOpenIssuingRounds app = do
   return [ (cid, r) | (cid, r) <- miningRounds, r.opensAt <= now ]
 
 -- | All validator rights for the given user.
-getValidatorRights : Party -> Script (Map.Map Party (ContractId API.ValidatorRight))
+getValidatorRights : Party -> Script (Map.Map Party (ContractId ValidatorRight))
 getValidatorRights validator = do
   rights <- queryFilter @ValidatorRight validator (\right -> right.validator == validator)
-  return $ Map.fromList [ (right.user, toInterfaceContractId rightCid) | (rightCid, right) <- rights ]
+  return $ Map.fromList [ (right.user, rightCid) | (rightCid, right) <- rights ]
 
 -- Primarily used by submitters to decide against which round they should try to transact.
 getLatestOpenRound : CCApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
@@ -458,58 +446,58 @@ getActiveOpenRoundsSorted app = do
   rounds <- query @OpenMiningRound app.svc
   return $ sortOn (\(_, openRound) -> openRound.round) rounds
 
-getFeaturedAppRight : CCApp -> Party -> Script (Optional (ContractId API.FeaturedAppRight))
+getFeaturedAppRight : CCApp -> Party -> Script (Optional (ContractId FeaturedAppRight))
 getFeaturedAppRight app provider = do
   rounds <- query @FeaturedAppRight provider
-  return $ DA.List.Total.head [ toInterfaceContractId cid | (cid, round) <- rounds, round.svc == app.svc ]
+  return $ DA.List.Total.head [ cid | (cid, round) <- rounds, round.svc == app.svc ]
 
-getAppTransferContext : CCApp -> CCUser -> Script API.AppTransferContext
+getAppTransferContext : CCApp -> CCUser -> Script AppTransferContext
 getAppTransferContext app provider = do
-  openMiningRound <- toInterfaceContractId . fst <$> getLatestOpenRound app
-  coinRules <- toInterfaceContractId . fst <$> fetchCoinRulesByKey app.svc
+  openMiningRound <- fst <$> getLatestOpenRound app
+  coinRules <- fst <$> fetchCoinRulesByKey app.svc
   featuredAppRight <- getFeaturedAppRight app provider.primaryParty
-  pure API.AppTransferContext with
+  pure AppTransferContext with
     coinRules
     openMiningRound
     featuredAppRight
 
-getAppTransferContextForRound : CCApp -> CCUser -> Round -> Script API.AppTransferContext
+getAppTransferContextForRound : CCApp -> CCUser -> Round -> Script AppTransferContext
 getAppTransferContextForRound app provider round = do
   openMiningRounds <- getOpenRoundsSorted app
   openMiningRound <- case find (\(_, payload) -> payload.round == round) openMiningRounds of
         None -> abort ("No open mining round for round " <> show round)
-        Some (cid, _) -> pure (toInterfaceContractId cid )
-  coinRules <- toInterfaceContractId . fst <$> fetchCoinRulesByKey app.svc
+        Some (cid, _) -> pure cid
+  coinRules <- fst <$> fetchCoinRulesByKey app.svc
   featuredAppRight <- getFeaturedAppRight app provider.primaryParty
-  pure API.AppTransferContext with
+  pure AppTransferContext with
     coinRules
     openMiningRound
     featuredAppRight
 
-getPaymentTransferContext : CCApp -> CCUser -> Script API.PaymentTransferContext
+getPaymentTransferContext : CCApp -> CCUser -> Script PaymentTransferContext
 getPaymentTransferContext app user = do
   getPaymentTransferContextFeaturedApp app user None
 
-getPaymentTransferContextFeaturedApp : CCApp -> CCUser -> Optional(ContractId FeaturedAppRight) -> Script API.PaymentTransferContext
+getPaymentTransferContextFeaturedApp : CCApp -> CCUser -> Optional(ContractId FeaturedAppRight) -> Script PaymentTransferContext
 getPaymentTransferContextFeaturedApp app user featuredAppRight = do
   context <- getTransferContext app user featuredAppRight
-  coinRules <- toInterfaceContractId . fst <$> fetchCoinRulesByKey app.svc
-  pure API.PaymentTransferContext with ..
+  coinRules <- fst <$> fetchCoinRulesByKey app.svc
+  pure PaymentTransferContext with ..
 
 
-getTransferContext : CCApp -> CCUser -> Optional(ContractId FeaturedAppRight) -> Script API.TransferContext
+getTransferContext : CCApp -> CCUser -> Optional(ContractId FeaturedAppRight) -> Script TransferContext
 getTransferContext app user featuredAppRight = do
-  openMiningRound <- toInterfaceContractId . fst <$> getLatestOpenRound app
+  openMiningRound <- fst <$> getLatestOpenRound app
   now <- getTime
   issuingRounds <- query @IssuingMiningRound app.svc
   validatorRights <- query @ValidatorRight user.primaryParty
-  pure API.TransferContext with
+  pure TransferContext with
     issuingMiningRounds = Map.fromList
-      [ (round.round, toInterfaceContractId roundCid) | (roundCid, round) <- issuingRounds, round.opensAt <= now ]
+      [ (round.round, roundCid) | (roundCid, round) <- issuingRounds, round.opensAt <= now ]
     validatorRights = Map.fromList
-      [ (right.user, toInterfaceContractId rightCid) | (rightCid, right) <- validatorRights, right.validator == user.primaryParty]
+      [ (right.user, rightCid) | (rightCid, right) <- validatorRights, right.validator == user.primaryParty]
     openMiningRound
-    featuredAppRight = fmap (\cid -> toInterfaceContractId cid) featuredAppRight
+    featuredAppRight = fmap (\cid -> cid) featuredAppRight
 
 tap : CCApp -> CCUser -> Decimal -> Script (ContractId Coin)
 tap app user amount = do

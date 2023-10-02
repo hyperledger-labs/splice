@@ -1,12 +1,14 @@
 package com.daml.network.console
 
 import akka.actor.ActorSystem
-import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.api.v1.round.Round
+import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
-import com.daml.network.codegen.java.cc.round as roundCodegen
-import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.codegen.java.cc.round.{
+  ClosedMiningRound,
+  IssuingMiningRound,
+  OpenMiningRound,
+}
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
@@ -90,15 +92,14 @@ abstract class ScanAppReference(
   @Help.Summary(
     "Returns the transfer context required for third-party apps."
   )
-  def getUnfeaturedAppTransferContext(now: CantonTimestamp): v1.coin.AppTransferContext = {
+  def getUnfeaturedAppTransferContext(now: CantonTimestamp): cc.coin.AppTransferContext = {
     getTransferContextWithInstances(now).toUnfeaturedAppTransferContext()
   }
 
   @Help.Summary(
     "Lists all closed rounds with their collected statistics"
   )
-  def getClosedRounds()
-      : Seq[Contract[roundCodegen.ClosedMiningRound.ContractId, roundCodegen.ClosedMiningRound]] =
+  def getClosedRounds(): Seq[Contract[ClosedMiningRound.ContractId, ClosedMiningRound]] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetClosedRounds)
     }

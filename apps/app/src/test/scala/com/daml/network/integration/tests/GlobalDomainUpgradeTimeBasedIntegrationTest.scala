@@ -114,7 +114,6 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         )
 
     clue("create governance contracts of various kinds") {
-      import com.daml.network.codegen.java.cc.api.v1.round
       actAndCheck(
         "create VoteRequest",
         sv1Backend.createVoteRequest(
@@ -125,7 +124,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
                 "alice",
                 "Alice",
                 "alice-participant-id",
-                new round.Round(42),
+                new cc.round.types.Round(42),
                 previousGlobalId.toProtoPrimitive,
               )
             )
@@ -193,7 +192,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           new svcr.SvReward(
             svcParty.toProtoPrimitive,
             sv1Party.toProtoPrimitive,
-            new cc.api.v1.round.Round(42),
+            new cc.round.types.Round(42),
             new java.math.BigDecimal("42"),
           ).create()
         ),
@@ -227,7 +226,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         exerciseSvc(
           new cc.round.IssuingMiningRound(
             svcParty.toProtoPrimitive,
-            new cc.api.v1.round.Round(42),
+            new cc.round.types.Round(42),
             new java.math.BigDecimal(42),
             new java.math.BigDecimal(42),
             new java.math.BigDecimal(42),
@@ -245,7 +244,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         exerciseSvc(
           new cc.round.ClosedMiningRound(
             svcParty.toProtoPrimitive,
-            new cc.api.v1.round.Round(42),
+            new cc.round.types.Round(42),
             new java.math.BigDecimal(42),
             new java.math.BigDecimal(42),
             new java.math.BigDecimal(42),

@@ -5,7 +5,8 @@ import DA.Foldable (forA_)
 import DA.Optional
 
 import CC.Coin
-import CC.API.V1.Round as API
+import CC.Round
+import CC.Round.Types
 import CN.Util.Assert
 
 -- | A faucet for reward coupons that can be created by the SVC and grants
@@ -48,7 +49,7 @@ template RewardFaucet with
         now <- getTime
         require "Open" (opensAt <= now)
         require "Not expired" (now < expiresAt)
-        openRound <- exercise openRoundCid (API.OpenMiningRound_Fetch owner)
+        openRound <- exercise openRoundCid (OpenMiningRound_Fetch owner)
         require "SVC of open round matches" (openRound.svc == svc)
         require "OpenRound is open" (openRound.opensAt <= now)
         state <- fetchAndArchiveRewardFaucetState self this stateCid
@@ -109,7 +110,7 @@ template RewardFaucetState with
     svc : Party
     owner : Party
     faucetCid : ContractId RewardFaucet -- ^ The faucet whose state this contract tracks. The SVC should ensure that there is a 1-1 relationship between states and faucets.
-    lastReceivedFor : Optional API.Round -- ^ The last round for which the coupons were received for.
+    lastReceivedFor : Optional Round -- ^ The last round for which the coupons were received for.
   where
     signatory svc
     observer owner

@@ -50,7 +50,7 @@ testAddFutureCoinConfigSchedule = do
 
   -- a scheduled item in 1 year gets properly appended to empty futureValues and the old futureValue got pruned
   submitMulti [app.svc] [app.svc] $
-    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_AddFutureCoinConfigSchedule with
+    exerciseCmd context.coinRules CoinRules_AddFutureCoinConfigSchedule with
       newScheduleItem = (oneYearLater, coinConfig2)
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   coinRules.configSchedule === newSchedule1
@@ -58,7 +58,7 @@ testAddFutureCoinConfigSchedule = do
   -- a scheduled item in 10 year gets properly appended to the current futureValues
   context <- getPaymentTransferContext app alice
   submitMulti [app.svc] [app.svc] $
-    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_AddFutureCoinConfigSchedule with
+    exerciseCmd context.coinRules CoinRules_AddFutureCoinConfigSchedule with
       newScheduleItem = (hundredYearsLater, coinConfig3)
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   coinRules.configSchedule === newSchedule2
@@ -66,14 +66,14 @@ testAddFutureCoinConfigSchedule = do
   -- a scheduled item 13 hours ago fails to be added to the current futureValues
   context <- getPaymentTransferContext app alice
   submitMultiMustFail [app.svc] [app.svc] $
-    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_AddFutureCoinConfigSchedule with
+    exerciseCmd context.coinRules CoinRules_AddFutureCoinConfigSchedule with
       newScheduleItem = (tenHoursBefore, coinConfig1)
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   coinRules.configSchedule === newSchedule2
 
   -- a scheduled item planned at an already defined time fails to be added to the current futureValues
   submitMultiMustFail [app.svc] [app.svc] $
-    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_AddFutureCoinConfigSchedule with
+    exerciseCmd context.coinRules CoinRules_AddFutureCoinConfigSchedule with
       newScheduleItem = (hundredYearsLater, coinConfig3)
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   coinRules.configSchedule === newSchedule2
@@ -81,7 +81,7 @@ testAddFutureCoinConfigSchedule = do
   -- a scheduled item in 13 hours gets properly prepended to the current futureValues
   context <- getPaymentTransferContext app alice
   submitMulti [app.svc] [app.svc] $
-    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_AddFutureCoinConfigSchedule with
+    exerciseCmd context.coinRules CoinRules_AddFutureCoinConfigSchedule with
       newScheduleItem = (thirteenHoursLater, coinConfig1)
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   coinRules.configSchedule === newSchedule3
@@ -91,7 +91,7 @@ testAddFutureCoinConfigSchedule = do
   -- 20 hours later: as a new schedule is inserted the whole schedule gets pruned properly
   context <- getPaymentTransferContext app alice
   submitMulti [app.svc] [app.svc] $
-    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_AddFutureCoinConfigSchedule with
+    exerciseCmd context.coinRules CoinRules_AddFutureCoinConfigSchedule with
       newScheduleItem = (elevenDaysLater, coinConfig3)
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   coinRules.configSchedule === newSchedule4
@@ -124,7 +124,7 @@ testRemoveFutureCoinConfigSchedule = do
 
   -- a scheduled item in 1 year gets properly appended to empty futureValues and the old futureValue got pruned
   submitMulti [app.svc] [app.svc] $
-    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_AddFutureCoinConfigSchedule with
+    exerciseCmd context.coinRules CoinRules_AddFutureCoinConfigSchedule with
       newScheduleItem = (oneYearLater, coinConfig1)
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   coinRules.configSchedule === newSchedule1
@@ -132,14 +132,14 @@ testRemoveFutureCoinConfigSchedule = do
   -- a removal on an unmatched time does not succeed
   context <- getPaymentTransferContext app alice
   submitMultiMustFail [app.svc] [app.svc] $
-    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_RemoveFutureCoinConfigSchedule with
+    exerciseCmd context.coinRules CoinRules_RemoveFutureCoinConfigSchedule with
       scheduleTime = thirteenHoursLater
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   coinRules.configSchedule === newSchedule1
 
   -- a removal on a matched time succeeds
   submitMulti [app.svc] [app.svc] $
-    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_RemoveFutureCoinConfigSchedule with
+    exerciseCmd context.coinRules CoinRules_RemoveFutureCoinConfigSchedule with
       scheduleTime = oneYearLater
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   coinRules.configSchedule === newSchedule2
@@ -173,7 +173,7 @@ testUpdateFutureCoinConfigSchedule = do
 
   -- a scheduled item in 1 year gets properly appended to empty futureValues and the old futureValue got pruned
   submitMulti [app.svc] [app.svc] $
-    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_AddFutureCoinConfigSchedule with
+    exerciseCmd context.coinRules CoinRules_AddFutureCoinConfigSchedule with
       newScheduleItem = (oneYearLater, coinConfig1)
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   coinRules.configSchedule === newSchedule1
@@ -181,14 +181,14 @@ testUpdateFutureCoinConfigSchedule = do
   -- an update on an unmatched time does not succeed
   context <- getPaymentTransferContext app alice
   submitMultiMustFail [app.svc] [app.svc] $
-    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_UpdateFutureCoinConfigSchedule with
+    exerciseCmd context.coinRules CoinRules_UpdateFutureCoinConfigSchedule with
       scheduleItem = (thirteenHoursLater, coinConfig1)
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   coinRules.configSchedule === newSchedule1
 
   -- an update on a matched time succeeds
   submitMulti [app.svc] [app.svc] $
-    exerciseCmd (fromInterfaceContractId @CoinRules context.coinRules) CoinRules_UpdateFutureCoinConfigSchedule with
+    exerciseCmd context.coinRules CoinRules_UpdateFutureCoinConfigSchedule with
       scheduleItem = (oneYearLater, coinConfig2)
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   coinRules.configSchedule === newSchedule2

@@ -7,9 +7,9 @@ import qualified DA.Map as Map
 import CC.Coin
 import CC.CoinConfig
 import CC.GlobalDomain (initialMemberTraffic)
-import CC.Schedule
-import qualified CC.API.V1.Round as API
 import CC.Round
+import CC.Schedule
+import CC.Round.Types
 
 import CN.Cns
 import CN.Util.Assert
@@ -54,7 +54,7 @@ template SvcBootstrap with
           None -> do
             exercise coinRulesCid CoinRules_Bootstrap_Rounds with
               coinPrice
-            pure (API.Round 0)
+            pure (Round 0)
           Some openRoundsUnsorted -> do
             let openRounds = sortOn (.round) openRoundsUnsorted
             require "There are exactly three open rounds" (length openRounds == 3)

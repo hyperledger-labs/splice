@@ -1,6 +1,6 @@
 package com.daml.network.util
 
-import com.daml.network.codegen.java.cc.api.v1.round.Round
+import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cn
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,

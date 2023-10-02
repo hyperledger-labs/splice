@@ -4,7 +4,6 @@ import DA.Assert
 import DA.Time
 import Daml.Script
 
-import CC.API.V1.Coin(TransferInput(InputCoin))
 import CC.Coin
 import CC.Scripts.Util
 import CN.Cns
@@ -36,7 +35,7 @@ testWithSubscription = script do
 
   paymentContext <- getPaymentTransferContext app alice
   (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
-    inputs = [InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     context = paymentContext
     walletProvider = app.svc
 
@@ -82,7 +81,7 @@ testWithSubscription = script do
 
   coin <- tap app alice 1.5
   (paymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
-    inputs = [InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     context = paymentContext
     walletProvider = app.svc
 
@@ -102,7 +101,7 @@ testWithSubscription = script do
   -- user can't pay earlier than `renewalDuration` from the next due date
   coin <- tap app alice 1.5
   submitMultiMustFail [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
-    inputs = [InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     context = paymentContext
     walletProvider = app.svc
 
@@ -114,7 +113,7 @@ testWithSubscription = script do
 
   -- cc wallet and svc can repeat the "payment and collect" cycle indefinitely
   (paymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
-    inputs = [InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     context = paymentContext
     walletProvider = app.svc
   (entryCid, subscriptionStateCid) <- submit app.svc $ exerciseCmd entryContext CnsEntryContext_CollectEntryRenewalPayment with

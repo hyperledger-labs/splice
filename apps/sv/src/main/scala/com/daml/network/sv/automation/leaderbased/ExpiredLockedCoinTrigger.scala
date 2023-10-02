@@ -38,7 +38,7 @@ class ExpiredLockedCoinTrigger(
         co.work.contractId,
         new cc.coin.LockedCoin_ExpireCoin(
           latestOpenMiningRound.contractId,
-          coinRules.contractId.toInterface(cc.api.v1.coin.CoinRules.INTERFACE),
+          coinRules.contractId,
         ),
       )
     )

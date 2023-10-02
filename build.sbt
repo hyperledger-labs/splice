@@ -55,7 +55,6 @@ lazy val root = (project in file("."))
     `apps-directory`,
     `apps-frontends`,
     `cn-util-daml`,
-    `canton-coin-api-daml`,
     `canton-coin-daml`,
     `canton-name-service-daml`,
     `wallet-payments-daml`,
@@ -164,16 +163,6 @@ lazy val `cn-util-daml` =
       BuildCommon.damlSettings
     )
 
-lazy val `canton-coin-api-daml` =
-  project
-    .in(file("daml/canton-coin-api"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`cn-util-daml` / Compile / damlBuild).value,
-    )
-
 lazy val `canton-coin-daml` =
   project
     .in(file("daml/canton-coin"))
@@ -181,8 +170,7 @@ lazy val `canton-coin-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`cn-util-daml` / Compile / damlBuild).value ++
-          (`canton-coin-api-daml` / Compile / damlBuild).value,
+        (`cn-util-daml` / Compile / damlBuild).value,
     )
 
 lazy val `svc-governance-daml` =
@@ -194,7 +182,6 @@ lazy val `svc-governance-daml` =
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value ++
           (`canton-coin-daml` / Compile / damlBuild).value ++
-          (`canton-coin-api-daml` / Compile / damlBuild).value ++
           (`canton-name-service-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value,
     )
@@ -218,7 +205,7 @@ lazy val `wallet-payments-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value ++
-          (`canton-coin-api-daml` / Compile / damlBuild).value,
+          (`canton-coin-daml` / Compile / damlBuild).value,
     )
 
 // This defines the Daml model that we do not expose to app devs
@@ -443,8 +430,7 @@ lazy val `apps-common-frontend` = {
     .settings(
       // daml typescript code generation settings:
       damlTsCodegenSources :=
-        (`canton-coin-api-daml` / Compile / damlBuild).value ++
-          (`canton-coin-daml` / Compile / damlBuild).value ++
+        (`canton-coin-daml` / Compile / damlBuild).value ++
           (`wallet-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value ++
           (`directory-daml` / Compile / damlBuild).value ++
@@ -1060,7 +1046,6 @@ lazy val `apps-app` =
       `apps-sv` % "compile->compile;test->test",
       `apps-scan`,
       `apps-wallet`,
-      `canton-coin-api-daml`,
       `canton-community-app` % "compile->compile;test->test",
       `canton-community-base`,
       `canton-community-integration-testing` % "test",

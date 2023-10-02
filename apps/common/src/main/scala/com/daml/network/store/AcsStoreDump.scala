@@ -28,7 +28,10 @@ object AcsStoreDump {
 
   /** A shipment of crates ready for import -- sorry for the bad pun :D */
   case class ImportShipment(
-      openRound: AssignedContract[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound],
+      openRound: AssignedContract[
+        cc.round.OpenMiningRound.ContractId,
+        cc.round.OpenMiningRound,
+      ],
       crates: Seq[
         ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]
       ],
@@ -54,7 +57,8 @@ object AcsStoreDump {
   )(implicit templateDecoder: TemplateJsonDecoder): Seq[cc.round.OpenMiningRound] =
     contracts.collect(
       Function.unlift(co =>
-        fromJsonIgnoringPackageId(cc.round.OpenMiningRound.COMPANION)(co).toOption.map(_.payload)
+        fromJsonIgnoringPackageId(cc.round.OpenMiningRound.COMPANION)(co).toOption
+          .map(_.payload)
       )
     )
 

@@ -1,8 +1,9 @@
 package com.daml.network.scan.admin.http
 
 import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.{coin as coinCodegen}
 import com.daml.network.codegen.java.cc.round.{
+  ClosedMiningRound,
   IssuingMiningRound,
   OpenMiningRound,
   SummarizingMiningRound,
@@ -207,7 +208,7 @@ class HttpScanHandler(
       for {
         domainId <- store.defaultAcsDomainIdF
         rounds <- store.multiDomainAcsStore.listContractsOnDomain(
-          roundCodegen.ClosedMiningRound.COMPANION,
+          ClosedMiningRound.COMPANION,
           domainId,
         )
       } yield {

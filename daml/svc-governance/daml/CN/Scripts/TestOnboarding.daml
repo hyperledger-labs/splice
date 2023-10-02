@@ -8,7 +8,6 @@ import qualified DA.Map as Map
 import Daml.Script
 import DA.Time
 
-import CC.API.V1.Round as API (Round(..))
 import CC.ValidatorLicense
 
 import CN.CometBft
@@ -22,6 +21,7 @@ import CN.Scripts.SvcTestUtils
 import CC.GlobalDomain (MemberTraffic, initialMemberTraffic)
 import CC.Coin (CoinRules, Coin)
 import CC.Round
+import CC.Round.Types
 import CC.Schedule
 
 
@@ -359,12 +359,12 @@ testTapAfterRestoringOpenRounds = do
   let initialOpenRounds =
         [ OpenMiningRound with
             -- rounds shifted by 10 to check that the new numbers get picked up
-            svc; round = API.Round 10; coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
+            svc; round = Round 10; coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
         , OpenMiningRound with
-            svc; round = API.Round 12; coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
+            svc; round = Round 12; coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
         -- moved after Round 12 on purpose to see that init works with sorting rounds
         , OpenMiningRound with
-            svc; round = API.Round 11; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
+            svc; round = Round 11; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
         ]
 
 
@@ -374,18 +374,18 @@ testTapAfterRestoringOpenRounds = do
   -- NOTE: members that join later after a data import will though miss some SvRewards. We're OK with this.
   [(_, svcRules)] <- query @SvcRules app.svc
   sort (map (.joinedAsOfRound) $ Map.values (svcRules.members)) ===
-    replicate 4 (API.Round 10)
+    replicate 4 (Round 10)
 
 
   (alice, _) <- setupSelfHostedUser app "alice"
 
   -- the user setup taps 1.0 coin, which gets tapped at the most recent open round, which is round 11
   [(_, coin)] <- query @Coin alice.primaryParty
-  (coin.amount.createdAt, coin.amount.initialAmount) === (API.Round 11, 1.0)
+  (coin.amount.createdAt, coin.amount.initialAmount) === (Round 11, 1.0)
 
   -- next issuance runs successfully and creates IssuingRound 10
   runNextIssuanceD app 3.0
   [(_, issuingRound)] <- query @IssuingMiningRound app.svc
-  issuingRound.round === API.Round 10
+  issuingRound.round === Round 10
 
   pure ()

@@ -6,7 +6,12 @@ import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
-import com.daml.network.codegen.java.cc.coin.{CoinRules_MiningRound_Archive, UnclaimedReward}
+import com.daml.network.codegen.java.cc.coin.{
+  AppTransferContext,
+  CoinRules_MiningRound_Archive,
+  UnclaimedReward,
+}
+import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.validatorlicense as vl
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
@@ -299,7 +304,10 @@ trait SvSvcStore
   protected[this] def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
   ): Future[
-    Option[AssignedContract[cc.round.ClosedMiningRound.ContractId, cc.round.ClosedMiningRound]]
+    Option[AssignedContract[
+      cc.round.ClosedMiningRound.ContractId,
+      cc.round.ClosedMiningRound,
+    ]]
   ]
 
   final def getExpiredRewardsForOldestClosedMiningRound(totalCouponsLimit: Long = 100L)(implicit
@@ -340,7 +348,10 @@ trait SvSvcStore
     */
   def listArchivableClosedMiningRounds()(implicit tc: TraceContext): Future[
     Seq[QueryResult[
-      AssignedContract[cc.round.ClosedMiningRound.ContractId, cc.round.ClosedMiningRound]
+      AssignedContract[
+        cc.round.ClosedMiningRound.ContractId,
+        cc.round.ClosedMiningRound,
+      ]
     ]]
   ] = {
     for {
@@ -523,8 +534,10 @@ trait SvSvcStore
   ]
 
   /** List issuing mining rounds past their targetClosesAt */
-  def listExpiredIssuingMiningRounds
-      : ListExpiredContracts[cc.round.IssuingMiningRound.ContractId, cc.round.IssuingMiningRound] =
+  def listExpiredIssuingMiningRounds: ListExpiredContracts[
+    cc.round.IssuingMiningRound.ContractId,
+    cc.round.IssuingMiningRound,
+  ] =
     multiDomainAcsStore.listExpiredFromPayloadExpiry(cc.round.IssuingMiningRound.COMPANION)(
       _.targetClosesAt
     )
@@ -767,32 +780,29 @@ trait SvSvcStore
   ] =
     lookupFeaturedAppRightWithOffset(providerPartyId).map(_.value)
 
-  def getSvcTransferContextForRound(round: cc.api.v1.round.Round)(implicit
+  def getSvcTransferContextForRound(round: Round)(implicit
       tc: TraceContext
-  ): Future[Option[cc.api.v1.coin.AppTransferContext]] =
+  ): Future[Option[AppTransferContext]] =
     getOpenMiningRoundTriple().map(_.toSeq).flatMap { openRounds =>
       openRounds.find(_.payload.round == round).traverse(getTransferContext)
     }
 
   def getSvcTransferContext()(implicit
       tc: TraceContext
-  ): Future[cc.api.v1.coin.AppTransferContext] =
+  ): Future[AppTransferContext] =
     getLatestActiveOpenMiningRound().flatMap(getTransferContext)
 
   private def getTransferContext(
       openMiningRound: SvSvcStore.OpenMiningRound[Contract.Has]
-  )(implicit tc: TraceContext): Future[cc.api.v1.coin.AppTransferContext] = {
+  )(implicit tc: TraceContext): Future[AppTransferContext] = {
     for {
       featured <- lookupFeaturedAppRight(key.svcParty)
       coinRules <- getCoinRules()
     } yield {
-      new cc.api.v1.coin.AppTransferContext(
-        coinRules.contractId.toInterface(cc.api.v1.coin.CoinRules.INTERFACE),
-        openMiningRound.contractId
-          .toInterface(cc.api.v1.round.OpenMiningRound.INTERFACE),
-        featured
-          .map(_.contractId.toInterface(cc.api.v1.coin.FeaturedAppRight.INTERFACE))
-          .toJava,
+      new AppTransferContext(
+        coinRules.contractId,
+        openMiningRound.contractId,
+        featured.map(_.contractId).toJava,
       )
     }
   }
@@ -926,7 +936,8 @@ object SvSvcStore {
     )
   }
 
-  type OpenMiningRound[Ct[_, _]] = Ct[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound]
+  type OpenMiningRound[Ct[_, _]] =
+    Ct[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound]
   type OpenMiningRoundContract =
     OpenMiningRound[Contract]
 

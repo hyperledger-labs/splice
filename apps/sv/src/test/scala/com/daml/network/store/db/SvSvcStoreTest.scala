@@ -2,9 +2,9 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{ContractMetadata, DamlRecord}
-import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.api.v1.coin.AppTransferContext
-import com.daml.network.codegen.java.cc.api.v1.round.Round
+import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.coin.AppTransferContext
+import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin.{CoinRules_MiningRound_Archive}
 import com.daml.network.codegen.java.cc.coinimport.importpayload.{IP_Coin, IP_ValidatorLicense}
 import com.daml.network.codegen.java.cc.coinimport.{ImportCrate, ImportPayload}
@@ -952,8 +952,8 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         new SubscriptionInitialPayment.ContractId(validContractId(1)),
   ): ActionRequiringConfirmation = {
     val appTransferContext = new AppTransferContext(
-      new v1.coin.CoinRules.ContractId(validContractId(1)),
-      new v1.round.OpenMiningRound.ContractId(validContractId(1)),
+      new cc.coin.CoinRules.ContractId(validContractId(1)),
+      new cc.round.OpenMiningRound.ContractId(validContractId(1)),
       Optional.empty(),
     )
     new ARC_CnsEntryContext(

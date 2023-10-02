@@ -3,7 +3,7 @@ package com.daml.network.scan.store
 import cats.Monoid
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
-import com.daml.network.codegen.java.cc.api.v1.coin.{CoinCreateSummary, CoinExpireSummary}
+import com.daml.network.codegen.java.cc.coin.{CoinCreateSummary, CoinExpireSummary}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.fees.ExpiringAmount
 import com.daml.network.history.*

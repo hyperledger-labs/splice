@@ -64,24 +64,24 @@ test_RewardFaucet = do
 
     -- round0 cannot yet be received as the faucet is not yet open
     submitMultiMustFail [alice.primaryParty] [app.svc] $ exerciseCmd faucetCid RewardFaucet_Receive with
-      openRoundCid = toInterfaceContractId round0._1
+      openRoundCid = round0._1
       stateCid
 
     -- round0 can be received once the faucet is open
     passTime (hours 1)
     stateCid <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd faucetCid RewardFaucet_Receive with
-      openRoundCid = toInterfaceContractId round0._1
+      openRoundCid = round0._1
       stateCid
     checkRewardCouponsExist (round0._2.round)
 
     -- but not twice
     submitMultiMustFail [alice.primaryParty] [app.svc] $ exerciseCmd faucetCid RewardFaucet_Receive with
-      openRoundCid = toInterfaceContractId round0._1
+      openRoundCid = round0._1
       stateCid
 
     -- round1 can be received
     stateCid <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd faucetCid RewardFaucet_Receive with
-      openRoundCid = toInterfaceContractId round1._1
+      openRoundCid = round1._1
       stateCid
     checkRewardCouponsExist (round1._2.round)
 
@@ -108,7 +108,7 @@ test_RewardFaucet = do
 
     -- round2 cannot be received as the faucet expired
     submitMultiMustFail [alice.primaryParty] [app.svc] $ exerciseCmd faucetCid RewardFaucet_Receive with
-      openRoundCid = toInterfaceContractId round2._1
+      openRoundCid = round2._1
       stateCid
 
     -- let's turn back the time
@@ -116,7 +116,7 @@ test_RewardFaucet = do
 
     -- round3 can be received despite round 2 not yet being recieved, i.e., we can skip rounds
     stateCid <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd faucetCid RewardFaucet_Receive with
-      openRoundCid = toInterfaceContractId round3._1
+      openRoundCid = round3._1
       stateCid
 
     checkRewardCouponsDoNotExist round2._2.round
@@ -124,7 +124,7 @@ test_RewardFaucet = do
 
     -- round2 can no longer be received
     submitMultiMustFail [alice.primaryParty] [app.svc] $ exerciseCmd faucetCid RewardFaucet_Receive with
-      openRoundCid = toInterfaceContractId round2._1
+      openRoundCid = round2._1
       stateCid
 
     -- pass enough time to receive round4
@@ -139,7 +139,7 @@ test_RewardFaucet = do
 
     -- submission fails as the faucet is inactive
     submitMultiMustFail [alice.primaryParty] [app.svc] $ exerciseCmd faucetCid RewardFaucet_Receive with
-      openRoundCid = toInterfaceContractId round4._1
+      openRoundCid = round4._1
       stateCid
 
     -- faucet can be retired

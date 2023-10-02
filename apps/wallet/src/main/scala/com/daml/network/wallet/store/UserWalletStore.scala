@@ -1,7 +1,7 @@
 package com.daml.network.wallet.store
 
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.{
   cns as cnsCongen,
@@ -268,7 +268,7 @@ trait UserWalletStore
       submittingRound: Long,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[(BigDecimal, ccApiCodegen.coin.transferinput.InputCoin)]] = for {
+  ): Future[Seq[(BigDecimal, coinCodegen.transferinput.InputCoin)]] = for {
     domainId <- defaultAcsDomainIdF
     coins <- multiDomainAcsStore.listContractsOnDomain(
       coinCodegen.Coin.COMPANION,
@@ -291,8 +291,8 @@ trait UserWalletStore
     .map(quantityAndCoin =>
       (
         quantityAndCoin._1,
-        new ccApiCodegen.coin.transferinput.InputCoin(
-          quantityAndCoin._2.contractId.toInterface(ccApiCodegen.coin.Coin.INTERFACE)
+        new coinCodegen.transferinput.InputCoin(
+          quantityAndCoin._2.contractId
         ),
       )
     )
@@ -312,7 +312,7 @@ trait UserWalletStore
     */
   def listSortedAppRewards(
       maxNumInputs: Int,
-      issuingRoundsMap: Map[ccApiCodegen.round.Round, roundCodegen.IssuingMiningRound],
+      issuingRoundsMap: Map[cc.round.types.Round, roundCodegen.IssuingMiningRound],
   )(implicit tc: TraceContext): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
   ]]

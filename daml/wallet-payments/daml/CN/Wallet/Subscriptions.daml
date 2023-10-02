@@ -6,10 +6,12 @@ import DA.Time
 import DA.List (dedupSort)
 import DA.Optional
 
+import CC.Coin
+import CC.Expiry
+import CC.Round.Types
+import CC.Round
 import CN.Wallet.Payment
 import CN.Util.Assert
-import CC.API.V1.Coin
-import CC.API.V1.Round
 
 -- Subscriptions flow (happy path) for reference;
 -- solid arrows represent state transitions via exercising a choice,

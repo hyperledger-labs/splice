@@ -5,7 +5,6 @@ import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coinimport
-import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
@@ -19,24 +18,24 @@ import scala.jdk.OptionConverters.*
 
 case class Transfer(
     node: ExerciseNode[
-      v1.coin.CoinRules_Transfer,
-      v1.coin.TransferResult,
+      cc.coin.CoinRules_Transfer,
+      cc.coin.TransferResult,
     ]
 )
 
 object Transfer extends ExerciseNodeCompanion {
-  override type Tpl = v1.coin.CoinRules
-  override type Arg = v1.coin.CoinRules_Transfer
-  override type Res = v1.coin.TransferResult
+  override type Tpl = cc.coin.CoinRules
+  override type Arg = cc.coin.CoinRules_Transfer
+  override type Res = cc.coin.TransferResult
 
-  override val templateOrInterface = Right(v1.coin.CoinRules.INTERFACE)
-  override val choice = v1.coin.CoinRules.CHOICE_CoinRules_Transfer
+  override val templateOrInterface = Left(cc.coin.CoinRules.COMPANION)
+  override val choice = cc.coin.CoinRules.CHOICE_CoinRules_Transfer
 
-  override val argDecoder = v1.coin.CoinRules_Transfer.valueDecoder()
-  override def argToValue(arg: v1.coin.CoinRules_Transfer) = arg.toValue
+  override val argDecoder = cc.coin.CoinRules_Transfer.valueDecoder()
+  override def argToValue(arg: cc.coin.CoinRules_Transfer) = arg.toValue
 
-  override val resDecoder = v1.coin.TransferResult.valueDecoder
-  override def resToValue(res: v1.coin.TransferResult) = res.toValue
+  override val resDecoder = cc.coin.TransferResult.valueDecoder
+  override def resToValue(res: cc.coin.TransferResult) = res.toValue
 }
 
 case class Tap(node: ExerciseNode[coinCodegen.CoinRules_DevNet_Tap, coinCodegen.Coin.ContractId])
@@ -44,7 +43,7 @@ case class Tap(node: ExerciseNode[coinCodegen.CoinRules_DevNet_Tap, coinCodegen.
 object Tap extends ExerciseNodeCompanion {
   override type Tpl = coinCodegen.CoinRules
   override type Arg = coinCodegen.CoinRules_DevNet_Tap
-  override type Res = v1.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]
+  override type Res = cc.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
   override val templateOrInterface = Left(coinCodegen.CoinRules.COMPANION)
   override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_DevNet_Tap
@@ -53,7 +52,7 @@ object Tap extends ExerciseNodeCompanion {
   override def argToValue(arg: coinCodegen.CoinRules_DevNet_Tap) = arg.toValue
 
   override val resDecoder =
-    v1.coin.CoinCreateSummary.valueDecoder(cid =>
+    cc.coin.CoinCreateSummary.valueDecoder(cid =>
       new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
     )
   override def resToValue(res: Res) = res.toValue(_.toValue)
@@ -62,7 +61,7 @@ object Tap extends ExerciseNodeCompanion {
 object Mint extends ExerciseNodeCompanion {
   override type Tpl = coinCodegen.CoinRules
   override type Arg = coinCodegen.CoinRules_Mint
-  override type Res = v1.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]
+  override type Res = cc.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
   override val templateOrInterface = Left(coinCodegen.CoinRules.COMPANION)
   override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_Mint
@@ -71,7 +70,7 @@ object Mint extends ExerciseNodeCompanion {
   override def argToValue(arg: Arg) = arg.toValue
 
   override val resDecoder =
-    v1.coin.CoinCreateSummary.valueDecoder(cid =>
+    cc.coin.CoinCreateSummary.valueDecoder(cid =>
       new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
     )
   override def resToValue(res: Res) = res.toValue(_.toValue)
@@ -80,7 +79,7 @@ object Mint extends ExerciseNodeCompanion {
 object ImportCrate_Receive extends ExerciseNodeCompanion {
   override type Tpl = cc.coinimport.ImportCrate
   override type Arg = cc.coinimport.ImportCrate_Receive
-  override type Res = Optional[v1.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]]
+  override type Res = Optional[cc.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]]
 
   override val templateOrInterface = Left(cc.coinimport.ImportCrate.COMPANION)
   override val choice = cc.coinimport.ImportCrate.CHOICE_ImportCrate_Receive
@@ -91,7 +90,7 @@ object ImportCrate_Receive extends ExerciseNodeCompanion {
 
   override val resDecoder = {
     PrimitiveValueDecoders.fromOptional(
-      v1.coin.CoinCreateSummary.valueDecoder(cid =>
+      cc.coin.CoinCreateSummary.valueDecoder(cid =>
         new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
       )
     )
@@ -107,7 +106,7 @@ object ImportCrate_ReceiveCoin {
   def unapply(
       event: ExercisedEvent
   )(implicit lc: ErrorLoggingContext): Option[
-    ExerciseNode[cc.coinimport.ImportCrate_Receive, v1.coin.CoinCreateSummary[
+    ExerciseNode[cc.coinimport.ImportCrate_Receive, cc.coin.CoinCreateSummary[
       coinCodegen.Coin.ContractId
     ]]
   ] =
@@ -121,37 +120,37 @@ object ImportCrate_ReceiveCoin {
 }
 
 object LockedCoinUnlock extends ExerciseNodeCompanion {
-  override type Tpl = v1.coin.LockedCoin
-  override type Arg = v1.coin.LockedCoin_Unlock
-  override type Res = v1.coin.CoinCreateSummary[v1.coin.Coin.ContractId]
+  override type Tpl = cc.coin.LockedCoin
+  override type Arg = cc.coin.LockedCoin_Unlock
+  override type Res = cc.coin.CoinCreateSummary[cc.coin.Coin.ContractId]
 
-  override val templateOrInterface = Right(v1.coin.LockedCoin.INTERFACE)
-  override val choice = v1.coin.LockedCoin.CHOICE_LockedCoin_Unlock
+  override val templateOrInterface = Left(cc.coin.LockedCoin.COMPANION)
+  override val choice = cc.coin.LockedCoin.CHOICE_LockedCoin_Unlock
 
-  override val argDecoder = v1.coin.LockedCoin_Unlock.valueDecoder()
+  override val argDecoder = cc.coin.LockedCoin_Unlock.valueDecoder()
   override def argToValue(arg: Arg) = arg.toValue
 
   override val resDecoder =
-    v1.coin.CoinCreateSummary.valueDecoder(cid =>
-      new v1.coin.Coin.ContractId(cid.asContractId().get().getValue)
+    cc.coin.CoinCreateSummary.valueDecoder(cid =>
+      new cc.coin.Coin.ContractId(cid.asContractId().get().getValue)
     )
   override def resToValue(res: Res) = res.toValue(_.toValue)
 }
 
 object LockedCoinOwnerExpireLock extends ExerciseNodeCompanion {
-  override type Tpl = v1.coin.LockedCoin
-  override type Arg = v1.coin.LockedCoin_OwnerExpireLock
-  override type Res = v1.coin.CoinCreateSummary[v1.coin.Coin.ContractId]
+  override type Tpl = cc.coin.LockedCoin
+  override type Arg = cc.coin.LockedCoin_OwnerExpireLock
+  override type Res = cc.coin.CoinCreateSummary[cc.coin.Coin.ContractId]
 
-  override val templateOrInterface = Right(v1.coin.LockedCoin.INTERFACE)
-  override val choice = v1.coin.LockedCoin.CHOICE_LockedCoin_OwnerExpireLock
+  override val templateOrInterface = Left(cc.coin.LockedCoin.COMPANION)
+  override val choice = cc.coin.LockedCoin.CHOICE_LockedCoin_OwnerExpireLock
 
-  override val argDecoder = v1.coin.LockedCoin_OwnerExpireLock.valueDecoder()
+  override val argDecoder = cc.coin.LockedCoin_OwnerExpireLock.valueDecoder()
   override def argToValue(arg: Arg) = arg.toValue
 
   override val resDecoder =
-    v1.coin.CoinCreateSummary.valueDecoder(cid =>
-      new v1.coin.Coin.ContractId(cid.asContractId().get().getValue)
+    cc.coin.CoinCreateSummary.valueDecoder(cid =>
+      new cc.coin.Coin.ContractId(cid.asContractId().get().getValue)
     )
   override def resToValue(res: Res) = res.toValue(_.toValue)
 }
@@ -159,7 +158,7 @@ object LockedCoinOwnerExpireLock extends ExerciseNodeCompanion {
 object LockedCoinExpireCoin extends ExerciseNodeCompanion {
   override type Tpl = coinCodegen.LockedCoin
   override type Arg = coinCodegen.LockedCoin_ExpireCoin
-  override type Res = v1.coin.CoinExpireSummary
+  override type Res = cc.coin.CoinExpireSummary
 
   override val templateOrInterface = Left(coinCodegen.LockedCoin.COMPANION)
   override val choice = coinCodegen.LockedCoin.CHOICE_LockedCoin_ExpireCoin
@@ -167,7 +166,7 @@ object LockedCoinExpireCoin extends ExerciseNodeCompanion {
   override val argDecoder = coinCodegen.LockedCoin_ExpireCoin.valueDecoder()
   override def argToValue(arg: Arg) = arg.toValue
 
-  override val resDecoder = v1.coin.CoinExpireSummary.valueDecoder()
+  override val resDecoder = cc.coin.CoinExpireSummary.valueDecoder()
   override def resToValue(res: Res) = res.toValue
 }
 
@@ -175,7 +174,7 @@ object CoinRules_BuyMemberTraffic extends ExerciseNodeCompanion {
   override type Tpl = coinCodegen.CoinRules
   override type Arg = coinCodegen.CoinRules_BuyMemberTraffic
   override type Res =
-    Tuple2[MemberTraffic.ContractId, Optional[v1.coin.Coin.ContractId]]
+    Tuple2[MemberTraffic.ContractId, Optional[cc.coin.Coin.ContractId]]
   override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_BuyMemberTraffic
   override val templateOrInterface = Left(coinCodegen.CoinRules.COMPANION)
   override val argDecoder = coinCodegen.CoinRules_BuyMemberTraffic.valueDecoder()
@@ -185,7 +184,7 @@ object CoinRules_BuyMemberTraffic extends ExerciseNodeCompanion {
   override val resDecoder = Tuple2.valueDecoder(
     cid => new MemberTraffic.ContractId(cid.asContractId().get().getValue),
     PrimitiveValueDecoders.fromOptional(cid =>
-      new v1.coin.Coin.ContractId(cid.asContractId().get().getValue)
+      new cc.coin.Coin.ContractId(cid.asContractId().get().getValue)
     ),
   )
 
@@ -298,7 +297,7 @@ object LockedCoinCreate {
 object CoinExpire extends ExerciseNodeCompanion {
   override type Tpl = coinCodegen.Coin
   override type Arg = coinCodegen.Coin_Expire
-  override type Res = v1.coin.CoinExpireSummary
+  override type Res = cc.coin.CoinExpireSummary
 
   override val templateOrInterface = Left(coinCodegen.Coin.COMPANION)
   override val choice = coinCodegen.Coin.CHOICE_Coin_Expire
@@ -306,7 +305,7 @@ object CoinExpire extends ExerciseNodeCompanion {
   override val argDecoder = coinCodegen.Coin_Expire.valueDecoder()
   override def argToValue(arg: Arg) = arg.toValue
 
-  override val resDecoder = v1.coin.CoinExpireSummary.valueDecoder()
+  override val resDecoder = cc.coin.CoinExpireSummary.valueDecoder()
   override def resToValue(res: Res) = res.toValue
 }
 

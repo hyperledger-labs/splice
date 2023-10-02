@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc.api.v1.coin.AppTransferContext
+import com.daml.network.codegen.java.cc.coin.AppTransferContext
 import com.daml.network.codegen.java.cn.cns.{
   CnsEntryContext,
   CnsEntryContext_CollectInitialEntryPayment,

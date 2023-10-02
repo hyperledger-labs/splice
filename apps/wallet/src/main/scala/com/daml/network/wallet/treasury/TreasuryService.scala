@@ -6,15 +6,15 @@ import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import com.daml.ledger.javaapi.data.codegen.Exercised
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.api.v1.round as roundApi
-import com.daml.network.codegen.java.cc.api.v1.coin.{
+import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.coin.{
   PaymentTransferContext,
   TransferContext,
   TransferInput,
   ValidatorRight,
 }
-import com.daml.network.codegen.java.cc.api.v1.coin.transferinput.{
+import com.daml.network.codegen.java.cc.coin.transferinput.{
   InputAppRewardCoupon,
   InputCoin,
   InputValidatorRewardCoupon,
@@ -445,7 +445,7 @@ class TreasuryService(
   ) =
     for {
       rules <- scanConnection.getCoinRules()
-    } yield (rules, rules.contractId.toInterface(v1.coin.CoinRules.INTERFACE))
+    } yield (rules, rules.contractId)
 
   /** Select transfer inputs and transfer context to satisfy the coin operations.
     * Currently, this function selects all unlocked coins and all currently redeemable app- and validator rewards.
@@ -462,9 +462,9 @@ class TreasuryService(
       ec: ExecutionContext,
   ): Future[Option[
     (
-        Seq[v1.coin.TransferInput],
+        Seq[cc.coin.TransferInput],
         Set[PartyId],
-        v1.coin.PaymentTransferContext,
+        cc.coin.PaymentTransferContext,
         DisclosedContracts.NE,
     )
   ]] = {
@@ -520,31 +520,30 @@ class TreasuryService(
         val rewardInputRounds =
           appRewardInputs.map(_._1).toSet ++ validatorRewardInputs.map(_._1).toSet
         val transferContext = new TransferContext(
-          openRound.contractId
-            .toInterface(v1.round.OpenMiningRound.INTERFACE),
+          openRound.contractId,
           openIssuingRounds.view
             // only provide rounds that are actually used in transfer context to avoid unnecessary fetching.
             .filter(r => rewardInputRounds.contains(r.payload.round))
             .map(r =>
               (
                 r.payload.round,
-                r.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE),
+                r.contractId,
               )
             )
-            .toMap[roundApi.Round, roundApi.IssuingMiningRound.ContractId]
+            .toMap[Round, IssuingMiningRound.ContractId]
             .asJava,
           validatorRights
             // only provide validator rights that are actually used in transfer context to avoid unnecessary fetching.
             .filter(r =>
               validatorRewardCouponUsers.contains(PartyId.tryFromProtoPrimitive(r.payload.user))
             )
-            .map(r => (r.payload.user, r.contractId.toInterface(v1.coin.ValidatorRight.INTERFACE)))
+            .map(r => (r.payload.user, r.contractId))
             .toMap[String, ValidatorRight.ContractId]
             .asJava,
           // The first (locking coin) leg of app rewards issues rewards to the wallet operator, and respects featured app rights.
           // We consider the validator to be the wallet operator, hence use the validator's featured app right (if it exists).
           validatorFeaturedAppRight
-            .map(r => r.contractId.toInterface(v1.coin.FeaturedAppRight.INTERFACE))
+            .map(r => r.contractId)
             .toJava,
         )
         Some(
@@ -571,16 +570,14 @@ class TreasuryService(
   private def constructTransferInputs(
       maxNumInputs: Int,
       coinInputs: Seq[InputCoin],
-      validatorRewardInputs: Seq[(roundApi.Round, BigDecimal, InputValidatorRewardCoupon)],
-      appRewardInputs: Seq[(roundApi.Round, BigDecimal, InputAppRewardCoupon)],
+      validatorRewardInputs: Seq[(Round, BigDecimal, InputValidatorRewardCoupon)],
+      appRewardInputs: Seq[(Round, BigDecimal, InputAppRewardCoupon)],
       numTapOperations: Int,
   ): Seq[TransferInput] = {
     val sortedRewardInputs = (validatorRewardInputs ++ appRewardInputs)
       .sorted(
         // prioritize the soonest-to-expire, most-valuable rewards.
-        Ordering[(Long, BigDecimal)].on((rw: (roundApi.Round, BigDecimal, _)) =>
-          (rw._1.number, -rw._2)
-        )
+        Ordering[(Long, BigDecimal)].on((rw: (Round, BigDecimal, _)) => (rw._1.number, -rw._2))
       )
       .map(_._3)
     // Since taps in the batch increase the number of transfer inputs, we need to subtract them from the maxNumInputs limit.
@@ -607,11 +604,11 @@ class TreasuryService(
 
   private def getValidatorRewardsAndQuantity(
       maxNumInputs: Int,
-      issuingRoundsMap: Map[roundApi.Round, IssuingMiningRound],
+      issuingRoundsMap: Map[Round, IssuingMiningRound],
   )(implicit
       tc: TraceContext
   ): Future[
-    (BigDecimal, Set[PartyId], Seq[(roundApi.Round, BigDecimal, InputValidatorRewardCoupon)])
+    (BigDecimal, Set[PartyId], Seq[(Round, BigDecimal, InputValidatorRewardCoupon)])
   ] = {
     for {
       validatorRewardCouponsRaw <- walletManager
@@ -636,8 +633,8 @@ class TreasuryService(
         (
           rw._2.payload.round,
           rw._3,
-          new v1.coin.transferinput.InputValidatorRewardCoupon(
-            rw._2.contractId.toInterface(v1.coin.ValidatorRewardCoupon.INTERFACE)
+          new cc.coin.transferinput.InputValidatorRewardCoupon(
+            rw._2.contractId
           ),
         )
       )
@@ -646,10 +643,10 @@ class TreasuryService(
 
   private def getAppRewardsAndQuantity(
       maxNumInputs: Int,
-      issuingRoundsMap: Map[roundApi.Round, IssuingMiningRound],
+      issuingRoundsMap: Map[Round, IssuingMiningRound],
   )(implicit
       tc: TraceContext
-  ): Future[(BigDecimal, Seq[(roundApi.Round, BigDecimal, InputAppRewardCoupon)])] = {
+  ): Future[(BigDecimal, Seq[(Round, BigDecimal, InputAppRewardCoupon)])] = {
     for {
       appRewardCouponInputs <- userStore.listSortedAppRewards(
         maxNumInputs,
@@ -660,8 +657,8 @@ class TreasuryService(
         (
           rw._1.payload.round,
           rw._2,
-          new v1.coin.transferinput.InputAppRewardCoupon(
-            rw._1.contractId.toInterface(v1.coin.AppRewardCoupon.INTERFACE)
+          new cc.coin.transferinput.InputAppRewardCoupon(
+            rw._1.contractId
           ),
         )
       )

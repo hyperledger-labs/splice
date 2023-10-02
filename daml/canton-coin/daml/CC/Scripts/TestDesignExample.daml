@@ -5,10 +5,10 @@ import DA.List.Total
 import DA.Time
 import Daml.Script
 
-import qualified CC.API.V1.Coin as API
-import qualified CC.API.V1.Round as API
 import CN.Util.Assert
 import CC.Coin
+import CC.Expiry
+import CC.Round.Types
 import CC.RelRound
 import CC.Fees
 import CC.Scripts.Util
@@ -24,11 +24,11 @@ template Escrow
   where
     signatory arbiter
     observer p
-    nonconsuming choice Refresh : API.TransferResult
+    nonconsuming choice Refresh : TransferResult
       with
         lockedCoin : ContractId LockedCoin
         paymentCoin : ContractId Coin
-        transferContext : API.AppTransferContext
+        transferContext : AppTransferContext
       controller p
       do LockedCoin{lock,coin=locked} <- fetch lockedCoin
          require "SVC matches locked coin" (locked.svc == this.svc)
@@ -37,26 +37,26 @@ template Escrow
          payment <- fetch paymentCoin
          require "SVC matches payment coin" (payment.svc == this.svc)
          require "owner matches payment coin" (payment.owner == this.p)
-         API.CoinCreateSummary cid _ <- exercise (toInterfaceContractId @API.LockedCoin lockedCoin) (API.LockedCoin_Unlock transferContext.coinRules transferContext.openMiningRound)
-         let transfer = API.Transfer with
+         CoinCreateSummary cid _ <- exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules transferContext.openMiningRound)
+         let transfer = Transfer with
                sender = p
                provider = arbiter
-               inputs = [API.InputCoin cid, API.InputCoin $ toInterfaceContractId paymentCoin]
+               inputs = [InputCoin cid, InputCoin paymentCoin]
                outputs =
-                 [ API.TransferOutput with
+                 [ TransferOutput with
                      receiver = p
                      amount = locked.amount.initialAmount
-                     lock = Some API.TimeLock with
+                     lock = Some TimeLock with
                        holders = [arbiter]
                        expiresAt = lock.expiresAt `addRelTime` days 90
                      receiverFeeRatio = 0.0
-                 , API.TransferOutput with
+                 , TransferOutput with
                      receiver = arbiter
                      amount = arbiterPaymentAmount
                      lock = None
                      receiverFeeRatio = 1.0
                  ]
-         API.exerciseAppTransfer transferContext transfer
+         exerciseAppTransfer transferContext transfer
 
 -- | This matches the example in the design doc
 --  https://docs.google.com/document/d/12cagZTzODP4rgEwDQ3lqoolh5ls2chXZ3ctcgH8Hl28/edit#heading=h.hivyhhs3xqs9
@@ -95,7 +95,7 @@ test = do
     provider = alice.primaryParty
     featured = False
     amount = transferConfig.createFee.fee + transferConfig.lockHolderFee.fee
-    round = API.Round 2
+    round = Round 2
 
   [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
   -- advance 40k rounds
@@ -112,7 +112,7 @@ test = do
     provider = alice.primaryParty
     featured = False
     amount = transferConfig.createFee.fee
-    round = API.Round 40002
+    round = Round 40002
 
   [(paymentCoin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount == refreshCoinAmount)
 
@@ -153,7 +153,7 @@ test = do
         - transferConfig.createFee.fee -- fee for returning change
         -- no subtraction of transferredCoinFee as that fee is paid by the receiver
 
-  result.summary === API.TransferSummary with
+  result.summary === TransferSummary with
     inputAppRewardAmount = 0.0
     inputValidatorRewardAmount = 0.0
     inputCoinAmount = refreshCoinAmount + lockedCoinAmount
@@ -176,7 +176,7 @@ test = do
       Some change = find (\c -> c.owner == alice.primaryParty) newCoins
       Some payment = find (\c -> c.owner == arbiter.primaryParty) newCoins
   newLocked === LockedCoin with
-    lock = API.TimeLock with
+    lock = TimeLock with
       holders = [arbiter.primaryParty]
       expiresAt = t0 `addRelTime` days 180
     coin = Coin with
@@ -204,7 +204,7 @@ test = do
     amount =
       -- rewards are issued for all output fees, but not the senderChangeFee
       sum outputFees
-    round = API.Round 50002
+    round = Round 50002
 
   -- check that the 'arbiter' does not receive featured app rewards when he's the provider
   runNextIssuance app
@@ -217,6 +217,6 @@ test = do
     provider = arbiter.primaryParty
     featured = False -- not featured despite presenting their app right as part of the 'pay' function
     amount = transferConfig.createFee.fee + chargeSteppedRate transferConfig.transferFee reimbursementAmount
-    round = API.Round 50003
+    round = Round 50003
 
   return ()

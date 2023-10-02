@@ -1,8 +1,8 @@
 package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.ContractMetadata
-import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as paymentCodegen,
@@ -509,7 +509,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             payData,
             time(1),
           )
-          lockedCoinCid = new ccApiCodegen.coin.LockedCoin.ContractId(nextCid())
+          lockedCoinCid = new coinCodegen.LockedCoin.ContractId(nextCid())
           (context2, subscription2, state2) = subscriptionInPaymentState(
             user1,
             provider1,
@@ -550,7 +550,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             payData,
             time(1),
           )
-          lockedCoinCid = new ccApiCodegen.coin.LockedCoin.ContractId(nextCid())
+          lockedCoinCid = new coinCodegen.LockedCoin.ContractId(nextCid())
           state2 = subscriptionPaymentState(
             subscription1,
             payData,
@@ -1010,7 +1010,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       subscription: Contract[subsCodegen.Subscription.ContractId, subsCodegen.Subscription],
       payData: subsCodegen.SubscriptionPayData,
       thisPaymentDueAt: CantonTimestamp,
-      lockedCoinCid: ccApiCodegen.coin.LockedCoin.ContractId,
+      lockedCoinCid: coinCodegen.LockedCoin.ContractId,
       round: Long,
   ) = {
     val templateId = subsCodegen.SubscriptionPayment.TEMPLATE_ID
@@ -1023,7 +1023,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       // USD payments would need to apply coin price, but we don't care about the exact value.
       payData.paymentAmount.amount,
       lockedCoinCid,
-      new ccApiCodegen.round.Round(round),
+      new Round(round),
     )
     Contract(
       identifier = templateId,
@@ -1055,7 +1055,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       receiver: PartyId,
       payData: subsCodegen.SubscriptionPayData,
       thisPaymentDueAt: CantonTimestamp,
-      lockedCoinCid: ccApiCodegen.coin.LockedCoin.ContractId,
+      lockedCoinCid: coinCodegen.LockedCoin.ContractId,
       round: Long,
   ) = {
     val contextContract = subscriptionContext(user = sender, service = receiver)
@@ -1130,7 +1130,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           coinContract.payload.amount.initialAmount,
           new roundCodegen.OpenMiningRound.ContractId(openMiningRoundCid),
         ).toValue,
-        new ccApiCodegen.coin.CoinCreateSummary[coinCodegen.Coin.ContractId](
+        new coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId](
           coinContract.contractId,
           new java.math.BigDecimal(coinPrice),
         )

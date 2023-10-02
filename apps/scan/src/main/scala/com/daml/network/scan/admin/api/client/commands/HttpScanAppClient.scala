@@ -6,10 +6,13 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
-import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc.{coin as coinCodegen}
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
-import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.codegen.java.cc.round.{
+  ClosedMiningRound,
+  IssuingMiningRound,
+  OpenMiningRound,
+}
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.http.v0.{definitions, scan as http}
@@ -62,18 +65,18 @@ object HttpScanAppClient {
   case class TransferContextWithInstances(
       coinRules: ContractWithState[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules],
       latestOpenMiningRound: ContractWithState[
-        roundCodegen.OpenMiningRound.ContractId,
-        roundCodegen.OpenMiningRound,
+        OpenMiningRound.ContractId,
+        OpenMiningRound,
       ],
       openMiningRounds: Seq[
-        ContractWithState[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]
+        ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]
       ],
   ) {
     def toUnfeaturedAppTransferContext() = {
       val openMiningRound = latestOpenMiningRound
-      new v1.coin.AppTransferContext(
-        coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
-        openMiningRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
+      new cc.coin.AppTransferContext(
+        coinRules.contractId,
+        openMiningRound.contractId,
         None.toJava,
       )
     }
@@ -117,14 +120,14 @@ object HttpScanAppClient {
         for {
           issuingMiningRounds <- response.issuingMiningRounds.toSeq.traverse {
             case (contractId, maybeIssuingRound) =>
-              ContractWithState.handleMaybeCached(roundCodegen.IssuingMiningRound.COMPANION)(
+              ContractWithState.handleMaybeCached(IssuingMiningRound.COMPANION)(
                 cachedIssuingRoundsMap.get(contractId),
                 maybeIssuingRound,
               )
           }
           openMiningRounds <- response.openMiningRounds.toSeq.traverse {
             case (contractId, maybeOpenRound) =>
-              ContractWithState.handleMaybeCached(roundCodegen.OpenMiningRound.COMPANION)(
+              ContractWithState.handleMaybeCached(OpenMiningRound.COMPANION)(
                 cachedOpenRoundsMap.get(contractId),
                 maybeOpenRound,
               )
@@ -210,7 +213,7 @@ object HttpScanAppClient {
   case object GetClosedRounds
       extends BaseCommand[
         http.GetClosedRoundsResponse,
-        Seq[Contract[roundCodegen.ClosedMiningRound.ContractId, roundCodegen.ClosedMiningRound]],
+        Seq[Contract[ClosedMiningRound.ContractId, ClosedMiningRound]],
       ] {
 
     def submitRequest(
@@ -223,7 +226,7 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.GetClosedRoundsResponse.OK(response) =>
       response.rounds
-        .traverse(round => Contract.fromHttp(roundCodegen.ClosedMiningRound.COMPANION)(round))
+        .traverse(round => Contract.fromHttp(ClosedMiningRound.COMPANION)(round))
         .leftMap(_.toString)
     }
   }

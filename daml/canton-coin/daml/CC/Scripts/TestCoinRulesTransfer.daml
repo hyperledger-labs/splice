@@ -5,9 +5,8 @@ import DA.List
 import DA.Time
 import Daml.Script
 
-import qualified CC.API.V1.Coin as API
-import qualified CC.API.V1.Round as API
 import CC.Coin
+import CC.Expiry
 import CC.Fees
 import CC.Scripts.Parameters
 import CC.Scripts.Util
@@ -35,36 +34,36 @@ testUsageFees = do
 
   normalizedBalanceBeforeTransfer <- getNormalizedBalance app.svc
 
-  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.svc] $ exerciseCmd context.coinRules API.CoinRules_Transfer with
-    transfer = API.Transfer with
+  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.svc] $ exerciseCmd context.coinRules CoinRules_Transfer with
+    transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
-      inputs = map (\c -> API.InputCoin $ toInterfaceContractId c)[coin1, coin2, coin3]
-      outputs = [ API.TransferOutput with
+      inputs = map (\c -> InputCoin c)[coin1, coin2, coin3]
+      outputs = [ TransferOutput with
                     receiver = alice.primaryParty
                     receiverFeeRatio = 0.0
                     amount = outputAmount1
                     lock = None
                   -- test locking a coin with no lock-holder
-                , API.TransferOutput with
+                , TransferOutput with
                     receiver = alice.primaryParty
                     receiverFeeRatio = 0.0
                     amount = outputAmount2
-                    lock = Some API.TimeLock with
+                    lock = Some TimeLock with
                       expiresAt = addRelTime now (days 1)
                       holders = []
                 -- normal receiver coin
-                , API.TransferOutput with
+                , TransferOutput with
                     receiver = bob.primaryParty
                     receiverFeeRatio = 0.4
                     amount = outputAmount2
                     lock = None
                   -- test locking a coin owned by a non-sender party
-                , API.TransferOutput with
+                , TransferOutput with
                     receiver = bob.primaryParty
                     receiverFeeRatio = 0.75
                     amount = outputAmount3
-                    lock = Some API.TimeLock with
+                    lock = Some TimeLock with
                       expiresAt = addRelTime now (days 1)
                       holders = [alice.primaryParty, bob.primaryParty, bob.primaryParty] -- duplicates get removed
 
@@ -90,7 +89,7 @@ testUsageFees = do
         - config.createFee.fee - expectedLockFee1 - expectedSenderTransferFee
         - expectedSenderLockFee3
 
-  transferResult.summary === API.TransferSummary with
+  transferResult.summary === TransferSummary with
     inputAppRewardAmount = 0.0
     inputValidatorRewardAmount = 0.0
     inputCoinAmount = 100.0
@@ -127,7 +126,7 @@ testCoinUsedInRoundBeforeItsCreation = do
 
   openRoundsSorted <- getOpenRoundsSorted app
   let (round1Cid, round1) = head openRoundsSorted
-      round1IfcCid = (toInterfaceContractId @API.OpenMiningRound round1Cid)
+      round1IfcCid = round1Cid
       contextWithRound1 = context with context = context.context with openMiningRound = round1IfcCid
 
   -- The input coin is created in round 2
@@ -136,12 +135,12 @@ testCoinUsedInRoundBeforeItsCreation = do
   round1.round.number === 1
 
   transferResult <- submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $
-    exerciseCmd contextWithRound1.coinRules API.CoinRules_Transfer with
-      transfer = API.Transfer with
+    exerciseCmd contextWithRound1.coinRules CoinRules_Transfer with
+      transfer = Transfer with
         sender = alice.primaryParty
         provider = alice.primaryParty
-        inputs = [API.InputCoin $ toInterfaceContractId coinRound2Cid]
-        outputs = [ API.TransferOutput with
+        inputs = [InputCoin coinRound2Cid]
+        outputs = [ TransferOutput with
                       receiver = bob.primaryParty
                       amount = 10.0
                       lock = None
@@ -197,10 +196,10 @@ testCoinUsedAfterHoldingFeeChanged = do
   context <- getPaymentTransferContext app alice
 
   -- use the coin created in round 2 before holding fee changes
-  transferResult2 <- transfer context.coinRules context.context app.svc alice.primaryParty bob.primaryParty coinRound2Cid transferAmount
+  transferResult2 <- submitTransfer context.coinRules context.context app.svc alice.primaryParty bob.primaryParty coinRound2Cid transferAmount
 
   -- use the coin created in round 3 when holding fee changes
-  transferResult3 <- transfer context.coinRules context.context app.svc alice.primaryParty bob.primaryParty coinRound3Cid transferAmount
+  transferResult3 <- submitTransfer context.coinRules context.context app.svc alice.primaryParty bob.primaryParty coinRound3Cid transferAmount
 
   -- Both coins are used as transfer input at round 7
 
@@ -211,15 +210,15 @@ testCoinUsedAfterHoldingFeeChanged = do
   -- Smaller holding fee is used as the coin is created in round 3 when holding fee is redueced
   transferResult3.summary.holdingFees === 0.00005 * (7.0 - 3.0)
 
-transfer: ContractId API.CoinRules -> API.TransferContext -> Party -> Party -> Party -> ContractId Coin -> Decimal -> Script API.TransferResult
-transfer coinRulesCid transferContext svc sender receiver coinCid amount = do
+submitTransfer: ContractId CoinRules -> TransferContext -> Party -> Party -> Party -> ContractId Coin -> Decimal -> Script TransferResult
+submitTransfer coinRulesCid transferContext svc sender receiver coinCid amount = do
   submitMulti [sender, receiver] [svc] $
-    exerciseCmd coinRulesCid API.CoinRules_Transfer with
-      transfer = API.Transfer with
+    exerciseCmd coinRulesCid CoinRules_Transfer with
+      transfer = Transfer with
         sender = sender
         provider = sender
-        inputs = [API.InputCoin $ toInterfaceContractId coinCid]
-        outputs = [ API.TransferOutput with
+        inputs = [InputCoin coinCid]
+        outputs = [ TransferOutput with
                       receiver
                       amount
                       lock = None

@@ -3,9 +3,10 @@ package com.daml.network.scan.admin.api.client
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.{coin as coinCodegen}
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -237,16 +238,16 @@ final class ScanConnection private (
       val openMiningRound = context.latestOpenMiningRound
       (
         new coinCodegen.AppTransferContext(
-          coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
-          openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
-          featured.map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE)).toJava,
+          coinRules.contractId,
+          openMiningRound.contractId,
+          featured.map(_.contractId).toJava,
         ),
         DisclosedContracts(coinRules, openMiningRound),
       )
     }
   }
 
-  def getAppTransferContextForRound(providerPartyId: PartyId, round: roundCodegen.Round)(implicit
+  def getAppTransferContextForRound(providerPartyId: PartyId, round: Round)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
@@ -263,12 +264,9 @@ final class ScanConnection private (
           Right(
             (
               new coinCodegen.AppTransferContext(
-                coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
-                openMiningRound.contractId
-                  .toInterface(roundCodegen.OpenMiningRound.INTERFACE),
-                featured
-                  .map(_.contractId.toInterface(coinCodegen.FeaturedAppRight.INTERFACE))
-                  .toJava,
+                coinRules.contractId,
+                openMiningRound.contractId,
+                featured.map(_.contractId).toJava,
               ),
               DisclosedContracts(coinRules, openMiningRound),
             )

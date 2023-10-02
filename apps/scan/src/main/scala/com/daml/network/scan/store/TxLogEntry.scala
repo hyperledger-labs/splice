@@ -1,7 +1,7 @@
 package com.daml.network.scan.store
 
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
-import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc
 import com.daml.network.history.*
 import com.daml.network.scan.store.TxLogIndexRecord.*
 import com.daml.network.store.TxLogStore
@@ -212,8 +212,8 @@ object TxLogEntry {
   }
 
   private def parseSenderAmount(
-      arg: v1.coin.CoinRules_Transfer,
-      res: v1.coin.TransferResult,
+      arg: cc.coin.CoinRules_Transfer,
+      res: cc.coin.TransferResult,
   ): SenderAmount = {
     val sender = arg.transfer.sender
 
@@ -235,8 +235,8 @@ object TxLogEntry {
   }
 
   private def parseReceiverAmounts(
-      arg: v1.coin.CoinRules_Transfer,
-      res: v1.coin.TransferResult,
+      arg: cc.coin.CoinRules_Transfer,
+      res: cc.coin.TransferResult,
   ): Seq[ReceiverAmount] = {
 
     // Note: the same receiver party can appear multiple times in the transfer result
@@ -272,14 +272,14 @@ object TxLogEntry {
     * @param receiverFee Actual amount of fees paid by the receiver.
     */
   private final case class OutputWithFees(
-      output: v1.coin.TransferOutput,
+      output: cc.coin.TransferOutput,
       senderFee: BigDecimal,
       receiverFee: BigDecimal,
   )
 
   private def parseOutputAmounts(
-      arg: v1.coin.CoinRules_Transfer,
-      res: v1.coin.TransferResult,
+      arg: cc.coin.CoinRules_Transfer,
+      res: cc.coin.TransferResult,
   ): Seq[OutputWithFees] = {
     assert(
       arg.transfer.outputs.size() == res.summary.outputFees.size(),

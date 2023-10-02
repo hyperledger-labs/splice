@@ -1,8 +1,10 @@
 package com.daml.network.util
 
 import com.daml.ledger.javaapi
-import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.cc.round.IssuingMiningRound
+import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_BuyMemberTraffic
 import com.daml.network.codegen.java.cn.wallet.install.{
   CoinOperation,
@@ -115,20 +117,19 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
         )
     ) { case Seq(install) => install }
     val executeBatchCmd = walletInstall.id.exerciseWalletAppInstall_ExecuteBatch(
-      new v1.coin.PaymentTransferContext(
-        transferContext.coinRules.contract.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
-        new v1.coin.TransferContext(
-          transferContext.latestOpenMiningRound.contract.contractId
-            .toInterface(v1.round.OpenMiningRound.INTERFACE),
-          Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
-          Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,
+      new cc.coin.PaymentTransferContext(
+        transferContext.coinRules.contract.contractId,
+        new cc.coin.TransferContext(
+          transferContext.latestOpenMiningRound.contract.contractId,
+          Map.empty[Round, IssuingMiningRound.ContractId].asJava,
+          Map.empty[String, cc.coin.ValidatorRight.ContractId].asJava,
           None.toJava,
         ),
       ),
       inputCoins
         .map(_.contract.contractId.contractId)
-        .map[v1.coin.TransferInput](cid =>
-          new v1.coin.transferinput.InputCoin(new v1.coin.Coin.ContractId(cid))
+        .map[cc.coin.TransferInput](cid =>
+          new cc.coin.transferinput.InputCoin(new cc.coin.Coin.ContractId(cid))
         )
         .asJava,
       List[CoinOperation](

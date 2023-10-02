@@ -1,6 +1,7 @@
 -- | Functions for computing coin and lock expiry times and conditions.
 module CC.Expiry
   ( BoundedSet(..)
+  , TimeLock(..)
   , doesLockExpireBeforeCoin
   , isCoinExpired
   -- for testing
@@ -13,12 +14,11 @@ module CC.Expiry
   )
   where
 
+-- import CC.Coin
 import CC.Fees
+import CC.Round.Types
 import CC.Round
 import CC.RelRound
-
-import qualified CC.API.V1.Coin as API
-import qualified CC.API.V1.Round as API
 
 import DA.BigNumeric
 import DA.Date
@@ -100,12 +100,12 @@ boundedCeiling AfterMaxBound = AfterMaxBound
 -----------------------
 
 -- | Add a BoundedSet of RelRound to a positive Round.
-addBoundedRelRound : API.Round -> BoundedSet RelRound -> BoundedSet API.Round
-addBoundedRelRound (API.Round x) y = API.Round <$> addBoundedInt x ((.diff) <$> y)
+addBoundedRelRound : Round -> BoundedSet RelRound -> BoundedSet Round
+addBoundedRelRound (Round x) y = Round <$> addBoundedInt x ((.diff) <$> y)
 
 -- | Add a positive RelRound to BoundedSet of Round.
-addToBoundedRound : BoundedSet API.Round -> RelRound -> BoundedSet API.Round
-addToBoundedRound x (RelRound y) = API.Round <$> addBoundedInt y ((.number) <$> x)
+addToBoundedRound : BoundedSet Round -> RelRound -> BoundedSet Round
+addToBoundedRound x (RelRound y) = Round <$> addBoundedInt y ((.number) <$> x)
 
 
 -- BoundedSet Time
@@ -144,13 +144,13 @@ spentWithRatePerRound rate amount =
     roundsUntilExpired = amount `boundedDivCeilingDecimal` rate.rate
 
 -- | Compute the round where the coin expires. i.e. the coin is fully expired.
-amountExpiresAt : ExpiringAmount -> BoundedSet API.Round
+amountExpiresAt : ExpiringAmount -> BoundedSet Round
 amountExpiresAt e =
   e.createdAt `addBoundedRelRound` spentWithRatePerRound e.ratePerRound e.initialAmount
 
 -- | `estimateOpenRoundCreatedAt tickDuration currentMiningRound targetRound` estimates
 -- creation `Time` of a specified `targetRound`.
-estimateOpenRoundCreatedAt : RelTime -> OpenMiningRound -> BoundedSet API.Round -> BoundedSet Time
+estimateOpenRoundCreatedAt : RelTime -> OpenMiningRound -> BoundedSet Round -> BoundedSet Time
 estimateOpenRoundCreatedAt tickDuration currentMiningRound (Singleton targetRound)
   | currentMiningRound.round >= targetRound = error $ "Target round has to be after or equal to the current OpenMiningRound"
   | otherwise = do
@@ -162,8 +162,15 @@ estimateOpenRoundCreatedAt tickDuration currentMiningRound (Singleton targetRoun
     addBoundedRelTime currentMiningRound.opensAt relTime
 estimateOpenRoundCreatedAt _ _ AfterMaxBound = AfterMaxBound
 
+
+-- | A lock held by multiple parties until its expiry.
+data TimeLock = TimeLock with
+    holders: [Party]
+    expiresAt: Time
+  deriving (Eq, Show, Ord)
+
 -- | `doesLockExpireBeforeCoin` computes whether a `TimeLock` expires before a `Coin`
-doesLockExpireBeforeCoin : OpenMiningRound -> API.TimeLock -> ExpiringAmount -> RelTime -> Bool
+doesLockExpireBeforeCoin : OpenMiningRound -> TimeLock -> ExpiringAmount -> RelTime -> Bool
 doesLockExpireBeforeCoin currentOpenRound lock e tickDuration =
   let r = amountExpiresAt e
       -- Note: we exploit that there are exactly three open rounds active at any
@@ -179,7 +186,7 @@ isCoinExpired : OpenMiningRound -> ExpiringAmount -> Bool
 isCoinExpired round coinAmount =
   let expiresAtRound = amountExpiresAt coinAmount
   in case expiresAtRound of
-    -- Expiring round cannot be represented by API.Round due to coin amount is too large.
+    -- Expiring round cannot be represented by Round due to coin amount is too large.
     -- This coin will never expire unless it is broken into smaller amount.
     Singleton x -> x.number <= round.round.number - 2
     AfterMaxBound -> False

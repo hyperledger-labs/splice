@@ -4,7 +4,6 @@ import DA.Assert
 import DA.Time
 import Daml.Script
 
-import qualified CC.API.V1.Coin as API
 import CC.Coin
 import CN.Wallet.Install
 import CN.Wallet.Payment
@@ -42,7 +41,7 @@ testTransferOffers = script do
 
 -- TODO(#2957): remove read-as SVC.
   let completeTransfer accepted coin transferContext = submitMulti [aliceValidator.primaryParty] [alice.primaryParty, aliceValidator.primaryParty, app.svc] $ exerciseCmd aliceInstall WalletAppInstall_ExecuteBatch with
-        inputs = [API.InputCoin $ toInterfaceContractId coin]
+        inputs = [InputCoin coin]
         operations = [CO_CompleteAcceptedTransfer accepted]
         context = transferContext
 

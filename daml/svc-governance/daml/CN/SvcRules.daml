@@ -12,9 +12,8 @@ import DA.Time
 import CC.Coin
 
 import CC.Round
+import CC.Round.Types
 import CC.Util
-import CC.API.V1.Coin (CoinCreateSummary(..), CoinExpireSummary(..))
-import CC.API.V1.Round (Round(..))
 import CC.ValidatorLicense
 import CN.Wallet.Subscriptions
 import CC.GlobalDomain (initialMemberTraffic, MemberTraffic)

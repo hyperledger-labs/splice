@@ -215,7 +215,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
 
   private def expiringAmount(amount: Double) = new cc.fees.ExpiringAmount(
     BigDecimal(amount).bigDecimal,
-    new cc.api.v1.round.Round(0L),
+    new cc.round.types.Round(0L),
     new cc.fees.RatePerRound(BigDecimal(amount).bigDecimal),
   )
 

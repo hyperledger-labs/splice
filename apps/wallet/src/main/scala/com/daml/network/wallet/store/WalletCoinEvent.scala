@@ -2,7 +2,6 @@ package com.daml.network.wallet.store
 
 import com.daml.ledger.javaapi.data.{DamlOptional, Unit as DamlUnit}
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
 import com.daml.network.codegen.java.cn.svcrules as svcCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
@@ -117,9 +116,9 @@ object AcceptedTransferOffer_Complete extends ExerciseNodeCompanion {
   override type Tpl = transferCodegen.AcceptedTransferOffer
   override type Arg = transferCodegen.AcceptedTransferOffer_Complete
   override type Res = daTypes.Tuple2[
-    daTypes.Tuple2[ccApiCodegen.coin.TransferResult, transferCodegen.TransferOfferTrackingInfo],
+    daTypes.Tuple2[coinCodegen.TransferResult, transferCodegen.TransferOfferTrackingInfo],
     java.util.Optional[
-      ccApiCodegen.coin.Coin.ContractId
+      coinCodegen.Coin.ContractId
     ],
   ]
 
@@ -131,14 +130,14 @@ object AcceptedTransferOffer_Complete extends ExerciseNodeCompanion {
 
   override val resDecoder = daTypes.Tuple2.valueDecoder(
     daTypes.Tuple2.valueDecoder(
-      ccApiCodegen.coin.TransferResult.valueDecoder(),
+      coinCodegen.TransferResult.valueDecoder(),
       transferCodegen.TransferOfferTrackingInfo.valueDecoder(),
     ),
     x =>
       x.asOptional()
         .get
         .getValue
-        .map(cid => new ccApiCodegen.coin.Coin.ContractId(cid.asContractId().get.getValue)),
+        .map(cid => new coinCodegen.Coin.ContractId(cid.asContractId().get.getValue)),
   )
   override def resToValue(res: Res) =
     res.toValue(_.toValue(_.toValue, _.toValue), x => DamlOptional.of(x.map(_.toValue)))
@@ -198,7 +197,7 @@ object AppPaymentRequest_Accept extends ExerciseNodeCompanion {
   override type Arg = paymentCodegen.AppPaymentRequest_Accept
   override type Res =
     daTypes.Tuple2[paymentCodegen.AcceptedAppPayment.ContractId, java.util.Optional[
-      ccApiCodegen.coin.Coin.ContractId
+      coinCodegen.Coin.ContractId
     ]]
 
   override val templateOrInterface = Left(paymentCodegen.AppPaymentRequest.COMPANION)
@@ -213,7 +212,7 @@ object AppPaymentRequest_Accept extends ExerciseNodeCompanion {
       x.asOptional()
         .get
         .getValue
-        .map(cid => new ccApiCodegen.coin.Coin.ContractId(cid.asContractId().get.getValue)),
+        .map(cid => new coinCodegen.Coin.ContractId(cid.asContractId().get.getValue)),
   )
   override def resToValue(res: Res) = res.toValue(
     _.toValue,
@@ -239,7 +238,7 @@ object AcceptedAppPayment_Collect extends ExerciseNodeCompanion {
 object AcceptedAppPayment_Reject extends ExerciseNodeCompanion {
   override type Tpl = paymentCodegen.AcceptedAppPayment
   override type Arg = paymentCodegen.AcceptedAppPayment_Reject
-  override type Res = ccApiCodegen.coin.CoinCreateSummary[ccApiCodegen.coin.Coin.ContractId]
+  override type Res = coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
   override val templateOrInterface = Left(paymentCodegen.AcceptedAppPayment.COMPANION)
   override val choice = paymentCodegen.AcceptedAppPayment.CHOICE_AcceptedAppPayment_Reject
@@ -248,8 +247,8 @@ object AcceptedAppPayment_Reject extends ExerciseNodeCompanion {
   override def argToValue(arg: Arg) = arg.toValue
 
   override val resDecoder =
-    ccApiCodegen.coin.CoinCreateSummary.valueDecoder(cid =>
-      new ccApiCodegen.coin.Coin.ContractId(cid.asContractId().get().getValue)
+    coinCodegen.CoinCreateSummary.valueDecoder(cid =>
+      new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
     )
   override def resToValue(res: Res) = res.toValue(_.toValue)
 }
@@ -257,7 +256,7 @@ object AcceptedAppPayment_Reject extends ExerciseNodeCompanion {
 object AcceptedAppPayment_Expire extends ExerciseNodeCompanion {
   override type Tpl = paymentCodegen.AcceptedAppPayment
   override type Arg = paymentCodegen.AcceptedAppPayment_Expire
-  override type Res = ccApiCodegen.coin.CoinCreateSummary[ccApiCodegen.coin.Coin.ContractId]
+  override type Res = coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
   override val templateOrInterface = Left(paymentCodegen.AcceptedAppPayment.COMPANION)
   override val choice = paymentCodegen.AcceptedAppPayment.CHOICE_AcceptedAppPayment_Expire
@@ -266,8 +265,8 @@ object AcceptedAppPayment_Expire extends ExerciseNodeCompanion {
   override def argToValue(arg: Arg) = arg.toValue
 
   override val resDecoder =
-    ccApiCodegen.coin.CoinCreateSummary.valueDecoder(cid =>
-      new ccApiCodegen.coin.Coin.ContractId(cid.asContractId().get().getValue)
+    coinCodegen.CoinCreateSummary.valueDecoder(cid =>
+      new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
     )
   override def resToValue(res: Res) = res.toValue(_.toValue)
 }
@@ -277,7 +276,7 @@ object SubscriptionRequest_AcceptAndMakePayment extends ExerciseNodeCompanion {
   override type Arg = subsCodegen.SubscriptionRequest_AcceptAndMakePayment
   override type Res =
     daTypes.Tuple2[subsCodegen.SubscriptionInitialPayment.ContractId, java.util.Optional[
-      ccApiCodegen.coin.Coin.ContractId
+      coinCodegen.Coin.ContractId
     ]]
 
   override val templateOrInterface = Left(subsCodegen.SubscriptionRequest.COMPANION)
@@ -293,7 +292,7 @@ object SubscriptionRequest_AcceptAndMakePayment extends ExerciseNodeCompanion {
       x.asOptional()
         .get
         .getValue
-        .map(cid => new ccApiCodegen.coin.Coin.ContractId(cid.asContractId().get.getValue)),
+        .map(cid => new coinCodegen.Coin.ContractId(cid.asContractId().get.getValue)),
   )
   override def resToValue(res: Res) = res.toValue(_.toValue, x => DamlOptional.of(x.map(_.toValue)))
 }
@@ -304,7 +303,7 @@ object SubscriptionInitialPayment_Collect extends ExerciseNodeCompanion {
   override type Res = daTypes.Tuple3[
     subsCodegen.Subscription.ContractId,
     subsCodegen.SubscriptionIdleState.ContractId,
-    ccApiCodegen.coin.Coin.ContractId,
+    coinCodegen.Coin.ContractId,
   ]
 
   override val templateOrInterface = Left(subsCodegen.SubscriptionInitialPayment.COMPANION)
@@ -317,7 +316,7 @@ object SubscriptionInitialPayment_Collect extends ExerciseNodeCompanion {
   override val resDecoder = daTypes.Tuple3.valueDecoder(
     cid => new subsCodegen.Subscription.ContractId(cid.asContractId().get().getValue),
     cid => new subsCodegen.SubscriptionIdleState.ContractId(cid.asContractId().get().getValue),
-    cid => new ccApiCodegen.coin.Coin.ContractId(cid.asContractId().get().getValue),
+    cid => new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue),
   )
 
   override def resToValue(res: Res) = res.toValue(
@@ -330,7 +329,7 @@ object SubscriptionInitialPayment_Collect extends ExerciseNodeCompanion {
 object SubscriptionInitialPayment_Reject extends ExerciseNodeCompanion {
   override type Tpl = subsCodegen.SubscriptionInitialPayment
   override type Arg = subsCodegen.SubscriptionInitialPayment_Reject
-  override type Res = ccApiCodegen.coin.CoinCreateSummary[ccApiCodegen.coin.Coin.ContractId]
+  override type Res = coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
   override val templateOrInterface = Left(subsCodegen.SubscriptionInitialPayment.COMPANION)
   override val choice =
@@ -340,8 +339,8 @@ object SubscriptionInitialPayment_Reject extends ExerciseNodeCompanion {
   override def argToValue(arg: Arg) = arg.toValue
 
   override val resDecoder =
-    ccApiCodegen.coin.CoinCreateSummary.valueDecoder(cid =>
-      new ccApiCodegen.coin.Coin.ContractId(cid.asContractId().get().getValue)
+    coinCodegen.CoinCreateSummary.valueDecoder(cid =>
+      new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
     )
   override def resToValue(res: Res) = res.toValue(_.toValue)
 }
@@ -349,7 +348,7 @@ object SubscriptionInitialPayment_Reject extends ExerciseNodeCompanion {
 object SubscriptionInitialPayment_Expire extends ExerciseNodeCompanion {
   override type Tpl = subsCodegen.SubscriptionInitialPayment
   override type Arg = subsCodegen.SubscriptionInitialPayment_Expire
-  override type Res = ccApiCodegen.coin.CoinCreateSummary[ccApiCodegen.coin.Coin.ContractId]
+  override type Res = coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
   override val templateOrInterface = Left(subsCodegen.SubscriptionInitialPayment.COMPANION)
   override val choice =
@@ -359,8 +358,8 @@ object SubscriptionInitialPayment_Expire extends ExerciseNodeCompanion {
   override def argToValue(arg: Arg) = arg.toValue
 
   override val resDecoder =
-    ccApiCodegen.coin.CoinCreateSummary.valueDecoder(cid =>
-      new ccApiCodegen.coin.Coin.ContractId(cid.asContractId().get().getValue)
+    coinCodegen.CoinCreateSummary.valueDecoder(cid =>
+      new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
     )
   override def resToValue(res: Res) = res.toValue(_.toValue)
 }
@@ -369,7 +368,7 @@ object SubscriptionIdleState_MakePayment extends ExerciseNodeCompanion {
   override type Tpl = subsCodegen.SubscriptionIdleState
   override type Arg = subsCodegen.SubscriptionIdleState_MakePayment
   override type Res = daTypes.Tuple2[subsCodegen.SubscriptionPayment.ContractId, java.util.Optional[
-    ccApiCodegen.coin.Coin.ContractId
+    coinCodegen.Coin.ContractId
   ]]
 
   override val templateOrInterface = Left(subsCodegen.SubscriptionIdleState.COMPANION)
@@ -384,7 +383,7 @@ object SubscriptionIdleState_MakePayment extends ExerciseNodeCompanion {
       x.asOptional()
         .get
         .getValue
-        .map(cid => new ccApiCodegen.coin.Coin.ContractId(cid.asContractId().get.getValue)),
+        .map(cid => new coinCodegen.Coin.ContractId(cid.asContractId().get.getValue)),
   )
   override def resToValue(res: Res) = res.toValue(_.toValue, x => DamlOptional.of(x.map(_.toValue)))
 }
@@ -410,7 +409,7 @@ object SubscriptionPayment_Collect extends ExerciseNodeCompanion {
   override type Arg = subsCodegen.SubscriptionPayment_Collect
   override type Res = daTypes.Tuple2[
     subsCodegen.SubscriptionIdleState.ContractId,
-    ccApiCodegen.coin.Coin.ContractId,
+    coinCodegen.Coin.ContractId,
   ]
 
   override val templateOrInterface = Left(subsCodegen.SubscriptionPayment.COMPANION)
@@ -421,7 +420,7 @@ object SubscriptionPayment_Collect extends ExerciseNodeCompanion {
 
   override val resDecoder = daTypes.Tuple2.valueDecoder(
     cid => new subsCodegen.SubscriptionIdleState.ContractId(cid.asContractId().get().getValue),
-    cid => new ccApiCodegen.coin.Coin.ContractId(cid.asContractId().get().getValue),
+    cid => new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue),
   )
 
   override def resToValue(res: Res) = res.toValue(
@@ -435,7 +434,7 @@ object SubscriptionPayment_Reject extends ExerciseNodeCompanion {
   override type Arg = subsCodegen.SubscriptionPayment_Reject
   override type Res = daTypes.Tuple2[
     subsCodegen.SubscriptionIdleState.ContractId,
-    ccApiCodegen.coin.CoinCreateSummary[ccApiCodegen.coin.Coin.ContractId],
+    coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId],
   ]
 
   override val templateOrInterface = Left(subsCodegen.SubscriptionPayment.COMPANION)
@@ -446,8 +445,8 @@ object SubscriptionPayment_Reject extends ExerciseNodeCompanion {
 
   override val resDecoder = daTypes.Tuple2.valueDecoder(
     cid => new subsCodegen.SubscriptionIdleState.ContractId(cid.asContractId().get().getValue),
-    ccApiCodegen.coin.CoinCreateSummary.valueDecoder(cid =>
-      new ccApiCodegen.coin.Coin.ContractId(cid.asContractId().get().getValue)
+    coinCodegen.CoinCreateSummary.valueDecoder(cid =>
+      new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
     ),
   )
 
@@ -462,7 +461,7 @@ object SubscriptionPayment_Expire extends ExerciseNodeCompanion {
   override type Arg = subsCodegen.SubscriptionPayment_Expire
   override type Res = daTypes.Tuple2[
     subsCodegen.SubscriptionIdleState.ContractId,
-    ccApiCodegen.coin.CoinCreateSummary[ccApiCodegen.coin.Coin.ContractId],
+    coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId],
   ]
 
   override val templateOrInterface = Left(subsCodegen.SubscriptionPayment.COMPANION)
@@ -473,8 +472,8 @@ object SubscriptionPayment_Expire extends ExerciseNodeCompanion {
 
   override val resDecoder = daTypes.Tuple2.valueDecoder(
     cid => new subsCodegen.SubscriptionIdleState.ContractId(cid.asContractId().get().getValue),
-    ccApiCodegen.coin.CoinCreateSummary.valueDecoder(cid =>
-      new ccApiCodegen.coin.Coin.ContractId(cid.asContractId().get().getValue)
+    coinCodegen.CoinCreateSummary.valueDecoder(cid =>
+      new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
     ),
   )
 
@@ -487,7 +486,7 @@ object SubscriptionPayment_Expire extends ExerciseNodeCompanion {
 object SvcRules_CollectSvReward extends ExerciseNodeCompanion {
   override type Tpl = svcCodegen.SvcRules
   override type Arg = svcCodegen.SvcRules_CollectSvReward
-  override type Res = ccApiCodegen.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]
+  override type Res = coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
   override val templateOrInterface = Left(svcCodegen.SvcRules.COMPANION)
   override val choice = svcCodegen.SvcRules.CHOICE_SvcRules_CollectSvReward
@@ -496,7 +495,7 @@ object SvcRules_CollectSvReward extends ExerciseNodeCompanion {
   override def argToValue(arg: Arg) = arg.toValue
 
   override val resDecoder =
-    ccApiCodegen.coin.CoinCreateSummary.valueDecoder(cid =>
+    coinCodegen.CoinCreateSummary.valueDecoder(cid =>
       new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
     )
   override def resToValue(res: Res) = res.toValue(_.toValue)

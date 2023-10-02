@@ -4,6 +4,7 @@ import Daml.Script
 
 import CC.Expiry
 import CC.Fees
+import CC.Round.Types
 import CC.Round
 import CC.Schedule
 import CC.Scripts.Parameters
@@ -13,13 +14,11 @@ import DA.Assert
 import DA.Date
 import DA.Time
 
-import qualified CC.API.V1.Round as API
-
 testBoundedSet : Script ()
 testBoundedSet = script do
   let rate = RatePerRound 0.000005
-      round0 = API.Round 0
-      round1 = API.Round 1
+      round0 = Round 0
+      round1 = Round 1
   -- overflow when applying div
   amountExpiresAt (expiringAmount rate maxDecimal round0) === AfterMaxBound
   amountExpiresAt (expiringAmount rate 49999999999999999999999.9999999999 round0) === AfterMaxBound
@@ -31,9 +30,9 @@ testBoundedSet = script do
   amountExpiresAt (expiringAmount rate 46116860184273.879035 round1) === AfterMaxBound
 
   -- no overflow
-  amountExpiresAt (expiringAmount rate 46116860184273.879035 round0) === Singleton (API.Round maxInt)
-  amountExpiresAt (expiringAmount rate 46116860184273.87903 round1) === Singleton (API.Round maxInt)
-  amountExpiresAt (expiringAmount rate 46116860184273.87903 round0) === Singleton (API.Round (maxInt - 1))
+  amountExpiresAt (expiringAmount rate 46116860184273.879035 round0) === Singleton (Round maxInt)
+  amountExpiresAt (expiringAmount rate 46116860184273.87903 round1) === Singleton (Round maxInt)
+  amountExpiresAt (expiringAmount rate 46116860184273.87903 round0) === Singleton (Round (maxInt - 1))
   return ()
 
 testEstimateOpenRoundCreatedAt : Script ()
@@ -57,38 +56,38 @@ testEstimateOpenRoundCreatedAt = script do
       transferConfigUsd = coinConfigUsd.transferConfig
       issuanceConfig0 = getValueAsOf issuingFor0 coinConfigUsd.issuanceCurve
       issuanceConfig3 = getValueAsOf issuingFor3 coinConfigUsd.issuanceCurve
-      openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
-      openRound3 = openRound0 with round = API.Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
+      openRound0 = OpenMiningRound with svc = app.svc; round = Round 0; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
+      openRound3 = openRound0 with round = Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
 
 
   let almostMax = time (date 9999 Dec 31) 23 57 30
   -- estimated to be at 9999-12-31T23:57:30.000000Z
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (API.Round 1678408704)) === (Singleton (almostMax))
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 1678408704)) === (Singleton (almostMax))
   -- estimated to be at 10000-01-01T00:00:00.000000Z, which is larger than max value of DA.Time. ie, 9999-12-31T23:59:59.999999Z
   -- this will be regarded as never expired. (AfterMaxTime)
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (API.Round 1678408705)) === AfterMaxBound
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (API.Round 61489146914)) === AfterMaxBound
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 1678408705)) === AfterMaxBound
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 61489146914)) === AfterMaxBound
 
   -- estimate the creation time of round relative to round 0
-  assertError(\_ -> estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (API.Round (-1))))
-  assertError(\_ -> estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (API.Round (0))))
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (API.Round 1)) === (Singleton t00_00) -- T00:00:00
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (API.Round 2)) === (Singleton t02_30) -- T00:02:30
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (API.Round 3)) === (Singleton t05_00) -- T00:05:00
+  assertError(\_ -> estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round (-1))))
+  assertError(\_ -> estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round (0))))
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 1)) === (Singleton t00_00) -- T00:00:00
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 2)) === (Singleton t02_30) -- T00:02:30
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 3)) === (Singleton t05_00) -- T00:05:00
 
   -- estimate the creation time of round relative to round 3
-  assertError(\_ -> estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (API.Round (3))))
-  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (API.Round 4)) === (Singleton t07_30) -- T00:07:30
-  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (API.Round 5)) === (Singleton t10_00) -- T00:10:00
-  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (API.Round 6)) === (Singleton t12_30) -- T00:12:30
+  assertError(\_ -> estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round (3))))
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round 4)) === (Singleton t07_30) -- T00:07:30
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round 5)) === (Singleton t10_00) -- T00:10:00
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round 6)) === (Singleton t12_30) -- T00:12:30
 
 testAmountExpiresAt : Script ()
 testAmountExpiresAt = do
   let largeAmount = ExpiringAmount with
         initialAmount = 26116860184273.879035
-        createdAt = API.Round 4000000000000000000
+        createdAt = Round 4000000000000000000
         ratePerRound = RatePerRound(0.000005)
-  amountExpiresAt largeAmount === Singleton (API.Round(maxInt))
+  amountExpiresAt largeAmount === Singleton (Round(maxInt))
 
   let largeAmountThatOverflow = largeAmount with
         initialAmount = largeAmount.initialAmount + 0.000005
@@ -96,13 +95,13 @@ testAmountExpiresAt = do
 
   let largeAmountCreatedAt0ThatOverflow = ExpiringAmount with
         initialAmount = 46116860184273.87904
-        createdAt = API.Round 0
+        createdAt = Round 0
         ratePerRound = RatePerRound(0.000005)
   amountExpiresAt largeAmountCreatedAt0ThatOverflow === AfterMaxBound
 
   let amountWithLargestAmountAndLeastHoldingFee = ExpiringAmount with
         initialAmount = maxDecimal
-        createdAt = API.Round 0
+        createdAt = Round 0
         ratePerRound = RatePerRound(0.0000000001)
   amountExpiresAt amountWithLargestAmountAndLeastHoldingFee === AfterMaxBound
 

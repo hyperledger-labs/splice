@@ -1,8 +1,7 @@
 module CC.Round where
 
-import qualified CC.API.V1.Round as API
-import CC.API.V1.Round (Round(..))
 import CC.CoinConfig
+import CC.Round.Types
 import CC.Issuance
 
 import DA.Time
@@ -26,9 +25,11 @@ template OpenMiningRound
     signatory svc
     ensure isDefinedRound round
 
-    interface instance API.OpenMiningRound for OpenMiningRound where
-      view = API.OpenMiningRoundView with ..
-
+    nonconsuming choice OpenMiningRound_Fetch : OpenMiningRound
+      with
+        p : Party
+      controller p
+      do pure this
 
 -- | A mining round for which the total sum of registered rewards
 -- is being computed. Rewards can no longer be registered aginst such a round.
@@ -56,9 +57,6 @@ template IssuingMiningRound
     signatory svc
     ensure isDefinedRound round
 
-    interface instance API.IssuingMiningRound for IssuingMiningRound where
-      view = API.IssuingMiningRoundView with ..
-
 -- | A record that a specific mining round has been closed, which can
 -- be used to archive expired rewards.
 template ClosedMiningRound
@@ -71,7 +69,3 @@ template ClosedMiningRound
   where
     signatory svc
     ensure isDefinedRound round
-
--- | Check if a round has a positive round number
-isDefinedRound : Round -> Bool
-isDefinedRound round = round.number >= 0

@@ -82,7 +82,10 @@ class AdvanceOpenMiningRoundTrigger(
       _ <- task.work.openRounds.toSeq.traverse(co =>
         OptionT(
           store.multiDomainAcsStore
-            .lookupContractByIdOnDomain(cc.round.OpenMiningRound.COMPANION)(domainId, co.contractId)
+            .lookupContractByIdOnDomain(cc.round.OpenMiningRound.COMPANION)(
+              domainId,
+              co.contractId,
+            )
         )
       )
     } yield ()).isEmpty

@@ -2,7 +2,7 @@ package com.daml.network.console
 
 import akka.actor.ActorSystem
 import com.daml.network.auth.AuthUtil
-import com.daml.network.codegen.java.cc.round as cr
+import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
@@ -197,7 +197,7 @@ class SvAppBackendReference(
   }
 
   @Help.Summary("List open mining rounds (via admin API)")
-  def listOpenMiningRounds(): Seq[Contract[cr.OpenMiningRound.ContractId, cr.OpenMiningRound]] = {
+  def listOpenMiningRounds(): Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]] = {
     consoleEnvironment.run {
       httpCommand(
         HttpSvAdminAppClient.ListOpenMiningRounds

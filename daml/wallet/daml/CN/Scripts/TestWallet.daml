@@ -5,9 +5,8 @@ import DA.Time
 import Daml.Script
 import DA.List
 
-import qualified CC.API.V1.Coin as API
-import CC.API.V1.Round (Round(..))
 import CC.Coin
+import CC.Round.Types
 import CC.Schedule
 import CC.GlobalDomain
 import CN.Wallet.Install
@@ -55,7 +54,7 @@ acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transfer
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   -- TODO(#2957): remove read-as SVC.
   (accept, _change) <- submitMulti [sender.primaryParty, walletProvider] [app.svc] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
-    inputs = [API.InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     context
     walletProvider
   return accept
@@ -112,7 +111,7 @@ testSingleReceiverCCPaymentRequest = script do
     sender = alice.primaryParty
     provider = provider1.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoinCid
+    lockedCoin = lockedCoinCid
     deliveryOffer = toInterfaceContractId offerCid
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = paymentAmount)
@@ -122,7 +121,7 @@ testSingleReceiverCCPaymentRequest = script do
   AcceptedAppPayment_Collect_Result _ [(receiver, coinCid)] <- collectAcceptedPayment app provider1 acceptedPaymentCid
   receiver === bob.primaryParty
 
-  Some coin <- queryContractId bob.primaryParty (fromInterfaceContractId @Coin coinCid)
+  Some coin <- queryContractId bob.primaryParty coinCid
   coin.amount.initialAmount === paymentAmount
 
   pure ()
@@ -175,7 +174,7 @@ testSingleReceiverUSDPaymentRequest = script do
     sender = alice.primaryParty
     provider = provider1.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoinCid
+    lockedCoin = lockedCoinCid
     deliveryOffer = toInterfaceContractId offerCid
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 60.0)
@@ -218,7 +217,7 @@ testCCPaymentRequest = script do
       ]
     provider = provider1.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoin
+    lockedCoin = lockedCoin
     deliveryOffer = toInterfaceContractId deliveryOffer
     round = lockedCoinPayload.coin.amount.createdAt
 
@@ -237,9 +236,9 @@ testCCPaymentRequest = script do
     [(bob', bobCoin), (charlie', charlieCoin)] ->  do
       bob' === bob.primaryParty
       charlie' === charlie.primaryParty
-      Some coin <- queryContractId bob' (fromInterfaceContractId @Coin bobCoin)
+      Some coin <- queryContractId bob' bobCoin
       coin.amount.initialAmount === 15.0
-      Some coin <- queryContractId charlie' (fromInterfaceContractId @Coin charlieCoin)
+      Some coin <- queryContractId charlie' charlieCoin
       coin.amount.initialAmount === 10.0
     _ -> abort $ "Expected exactly two coins but got " <> show result.receiverCoins
 
@@ -308,7 +307,7 @@ testUSDPaymentRequest = script do
     sender = alice.primaryParty
     provider = provider1.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoinCid
+    lockedCoin = lockedCoinCid
     deliveryOffer = toInterfaceContractId deliveryOffer
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 20.0),
@@ -336,7 +335,7 @@ testMixedPaymentRequest = script do
     sender = alice.primaryParty
     provider = provider1.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoinCid
+    lockedCoin = lockedCoinCid
     deliveryOffer = toInterfaceContractId deliveryOffer
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 10.0),
@@ -371,7 +370,7 @@ testSuccessfulBatchCCPaymentRequests = script do
   context <- getPaymentTransferContext app alice
   executeBatchResult <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     context
-    inputs = [API.InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     operations = [CO_AppPayment transferRequest, CO_AppPayment transferRequest2]
 
   let [COO_AcceptedAppPayment payment1Cid, COO_AcceptedAppPayment payment2Cid] = executeBatchResult.outcomes
@@ -387,7 +386,7 @@ testSuccessfulBatchCCPaymentRequests = script do
     sender = alice.primaryParty
     provider = provider1.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoinCid
+    lockedCoin = lockedCoinCid
     deliveryOffer = toInterfaceContractId deliveryOffer
     ccReceiverAmounts = [
       ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 1.0 ]
@@ -401,7 +400,7 @@ testSuccessfulBatchCCPaymentRequests = script do
       ]
     provider = provider1.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoinCid2
+    lockedCoin = lockedCoinCid2
     deliveryOffer = toInterfaceContractId deliveryOffer2
     round = lockedCoin2.coin.amount.createdAt
 
@@ -430,7 +429,7 @@ testInsufficientFundsBatchCCPaymentRequests = script do
   -- trying to fulfill the request for 10,000 CC will fail
   context <- getPaymentTransferContext app alice
   ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [API.InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     operations = [CO_AppPayment transferRequest3, CO_AppPayment transferRequest4]
     context
 
@@ -450,7 +449,7 @@ testInsufficientFundsBatchCCPaymentRequests = script do
       ]
     provider = provider1.primaryParty
     svc = app.svc
-    lockedCoin = toInterfaceContractId lockedCoinCid4
+    lockedCoin = lockedCoinCid4
     deliveryOffer = toInterfaceContractId deliveryOffer4
     round = lockedCoin4.coin.amount.createdAt
 
@@ -477,14 +476,14 @@ testCO_MergeTransferInputs = script do
   context <- getPaymentTransferContext app alice
 
   ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [API.InputCoin $ toInterfaceContractId coin, API.InputCoin $ toInterfaceContractId coin2]
+    inputs = [InputCoin coin, InputCoin coin2]
     operations = [CO_MergeTransferInputs]
     context
 
   let [COO_MergeTransferInputs (Some resultCoin)] = outcomes
   aliceCoins <- query @Coin alice.primaryParty
   let [_, (mergedCoinCid, _)] = sortOn (\(_, p) -> p.amount.initialAmount) aliceCoins
-  resultCoin === (toInterfaceContractId @API.Coin mergedCoinCid)
+  resultCoin === mergedCoinCid
 
   pure ()
 
@@ -589,7 +588,7 @@ testBuyMemberTraffic = script do
     svcParty = app.svc
     validatorParty = provider1Validator.primaryParty
   _ <- tap app provider1Validator 10.0
-  
+
   -- provider1 purchases extra traffic for the same participant
   COO_BuyMemberTraffic providerTrafficCid <- executeCoinOperation app provider1Validator $
     CO_BuyMemberTraffic (minTopupAmount + 1) testParticipantId domainId (minutes 1) None
@@ -664,7 +663,7 @@ testInsufficientFundsBatchSubscriptions = script do
   coin <- tap  app alice 5.0
   -- TODO(#2957): remove read-as SVC.
   ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [API.InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
 
@@ -673,7 +672,7 @@ testInsufficientFundsBatchSubscriptions = script do
   coin <- tap app alice 15.0
   -- TODO(#2957): remove read-as SVC.
   ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [API.InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
   initialPaymentCid <- case outcomes of
@@ -690,7 +689,7 @@ testInsufficientFundsBatchSubscriptions = script do
   coin <- tap app alice 5.0
   -- TODO(#2957): remove read-as SVC.
   ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [API.InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context
   outcomes === [COO_Error (ITR_InsufficientFunds (5.17))]
@@ -698,7 +697,7 @@ testInsufficientFundsBatchSubscriptions = script do
   coin <- tap app alice 15.0
   -- TODO(#2957): remove read-as SVC.
   ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
-    inputs = [API.InputCoin $ toInterfaceContractId coin]
+    inputs = [InputCoin coin]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context
   case outcomes of
@@ -720,7 +719,7 @@ executeCoinOperation app user op = do
   context <- getPaymentTransferContext app user
   coins <- queryFilter @Coin user.primaryParty (\coin -> coin.owner == user.primaryParty)
   result <- submitUser user.userId $ exerciseCmd installCid WalletAppInstall_ExecuteBatch with
-    inputs = [API.InputCoin $ toInterfaceContractId coin._1 | coin <- coins]
+    inputs = [InputCoin coin._1 | coin <- coins]
     operations = [op]
     context
   let [outcome] = result.outcomes

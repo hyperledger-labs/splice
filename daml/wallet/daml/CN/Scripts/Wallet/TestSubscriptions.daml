@@ -6,8 +6,7 @@ import DA.List
 import Daml.Script
 
 import CC.Coin
-import qualified CC.API.V1.Coin as API
-import CC.API.V1.Round (Round)
+import CC.Round.Types
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 
@@ -78,7 +77,7 @@ testSubscription = script do
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
 
   (subscriptionCid, subscriptionStateCid, coinCid) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
-  Some coin <- queryContractId pizzeria.primaryParty (fromInterfaceContractId @Coin coinCid)
+  Some coin <- queryContractId pizzeria.primaryParty coinCid
   coin.amount.initialAmount === 12.0
 
   Some subscription <- queryContractId alice.primaryParty subscriptionCid
@@ -238,7 +237,7 @@ testUSDSubscription = script do
 
   payment3Cid <- makeSubscriptionPayment app alice validator None subscriptionState2Cid
   (_, coinCid) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment3Cid
-  Some coin <- queryContractId pizzeria.primaryParty (fromInterfaceContractId @Coin coinCid)
+  Some coin <- queryContractId pizzeria.primaryParty coinCid
   coin.amount.initialAmount === 1.0
 
   coins4 <- query @Coin pizzeria.primaryParty
@@ -288,12 +287,12 @@ failMakeSubscriptionPayment app sender walletProvider providerFeaturedAppRight s
     context
     walletProvider
 
-collectInitialSubscriptionPayment : CCApp -> CCUser -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId API.Coin)
+collectInitialSubscriptionPayment : CCApp -> CCUser -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
 collectInitialSubscriptionPayment app provider receiver sender payment = do
   (_, round) <- getLatestOpenRound app
   collectInitialSubscriptionPaymentInRound app round.round provider receiver sender payment
 
-collectInitialSubscriptionPaymentInRound : CCApp -> Round -> CCUser -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId API.Coin)
+collectInitialSubscriptionPaymentInRound : CCApp -> Round -> CCUser -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
 collectInitialSubscriptionPaymentInRound app round provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
   transferContext <- getAppTransferContextForRound app provider round
@@ -308,12 +307,12 @@ collectInitialSubscriptionPaymentMustFail app provider receiver sender payment =
   submitMultiMustFail [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect with
     transferContext
 
-collectSubscriptionPayment : CCApp -> CCUser -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId API.Coin)
+collectSubscriptionPayment : CCApp -> CCUser -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Coin)
 collectSubscriptionPayment app provider receiver sender payment = do
   (_, round) <- getLatestOpenRound app
   collectSubscriptionPaymentInRound app round.round provider receiver sender payment
 
-collectSubscriptionPaymentInRound : CCApp -> Round -> CCUser -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId API.Coin)
+collectSubscriptionPaymentInRound : CCApp -> Round -> CCUser -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Coin)
 collectSubscriptionPaymentInRound app round provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
   transferContext <- getAppTransferContextForRound app provider round

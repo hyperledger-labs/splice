@@ -2,9 +2,8 @@ module CN.Wallet.TransferOffer where
 
 import DA.Text
 
-import qualified CC.API.V1.Coin as API
-import CC.API.V1.Round
-
+import CC.Coin
+import CC.Round
 import CN.Util.Assert
 import CN.Wallet.Payment
 
@@ -75,10 +74,10 @@ template AcceptedTransferOffer
     signatory sender, receiver
 
     nonconsuming choice AcceptedTransferOffer_Complete
-      : ((API.TransferResult, TransferOfferTrackingInfo), Optional (ContractId API.Coin))
+      : ((TransferResult, TransferOfferTrackingInfo), Optional (ContractId Coin))
       with
-        inputs : [API.TransferInput]
-        transferContext : API.PaymentTransferContext
+        inputs : [TransferInput]
+        transferContext : PaymentTransferContext
         walletProvider : Party
       controller sender, walletProvider
       do
@@ -87,19 +86,19 @@ template AcceptedTransferOffer
         contextRound <- exercise @OpenMiningRound transferContext.context.openMiningRound (OpenMiningRound_Fetch sender)
         ccAmount <- paymentAmountToCC svc sender contextRound amount
         let
-          transfer = API.Transfer with
+          transfer = Transfer with
             sender
             -- The sender's wallet provider gets the app rewards
             provider = walletProvider
             inputs = inputs
             outputs =
-              [ API.TransferOutput with
+              [ TransferOutput with
                   receiver
                   amount = ccAmount
                   lock = None
                   receiverFeeRatio = 0.0
               ]
-        result <- API.exercisePaymentTransfer transferContext transfer
+        result <- exercisePaymentTransfer transferContext transfer
         archive self
         pure ((result, TransferOfferTrackingInfo { .. }), result.senderChangeCoin)
 

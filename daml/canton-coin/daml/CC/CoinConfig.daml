@@ -9,17 +9,6 @@ import DA.Time
 data CC = CC deriving (Show, Eq)
 data USD = USD deriving (Show, Eq)
 
--- | Configuration includes TransferConfig, issuance curve and tickDuration
---
--- See CC.Scripts.Parameters for concrete values.
-data CoinConfig currency = CoinConfig with
-    transferConfig : TransferConfig currency -- ^ Configuration determining the fees and limits for CC transfers
-    issuanceCurve : Schedule RelTime IssuanceConfig -- ^ Issuance curve to use.
-    globalDomain : GlobalDomainConfig -- ^ Configuration for the global domain and its fees.
-    -- TODO(M4-85): the values in here are likely quite large (several URls and long domainIds) and not required for executing transfers. Split this part of the config out into a separate contract as a performance optimization.
-    tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
-  deriving (Eq, Show)
-
 -- | Configuration determining the fees and limits for CC transfers granted by
 -- the CoinRules.
 --
@@ -32,6 +21,17 @@ data TransferConfig currency = TransferConfig with
     maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
     maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
     maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked coin.
+  deriving (Eq, Show)
+
+-- | Configuration includes TransferConfig, issuance curve and tickDuration
+--
+-- See CC.Scripts.Parameters for concrete values.
+data CoinConfig currency = CoinConfig with
+    transferConfig : TransferConfig currency -- ^ Configuration determining the fees and limits for CC transfers
+    issuanceCurve : Schedule RelTime IssuanceConfig -- ^ Issuance curve to use.
+    globalDomain : GlobalDomainConfig -- ^ Configuration for the global domain and its fees.
+    -- TODO(M4-85): the values in here are likely quite large (several URls and long domainIds) and not required for executing transfers. Split this part of the config out into a separate contract as a performance optimization.
+    tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
   deriving (Eq, Show)
 
 -- Check constraints on config params on which the implementation of the choices rely.

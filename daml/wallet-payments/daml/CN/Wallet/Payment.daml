@@ -8,8 +8,10 @@ import DA.Time
 
 import CN.Util.Assert
 import CN.Util.ExpiringContract
-import CC.API.V1.Coin
-import CC.API.V1.Round
+import CC.Coin
+import CC.Expiry
+import CC.Round
+import CC.Round.Types
 
 data DeliveryOfferView = DeliveryOfferView
   with
@@ -45,7 +47,7 @@ data ReceiverCCAmount = ReceiverCCAmount
    ccAmount : Decimal
  deriving (Show, Eq, Ord)
 
-paymentAmountToCC : Party -> Party -> OpenMiningRoundView -> PaymentAmount -> Update Decimal
+paymentAmountToCC : Party -> Party -> OpenMiningRound -> PaymentAmount -> Update Decimal
 paymentAmountToCC svc submitter openMiningRound pq =
   case pq.currency of
     USD ->
@@ -55,7 +57,7 @@ paymentAmountToCC svc submitter openMiningRound pq =
     CC ->
       pure pq.amount
 
-receiverAmountToCCReceiverAmount : Party -> Party -> OpenMiningRoundView -> ReceiverAmount -> Update ReceiverCCAmount
+receiverAmountToCCReceiverAmount : Party -> Party -> OpenMiningRound -> ReceiverAmount -> Update ReceiverCCAmount
 receiverAmountToCCReceiverAmount svc submitter openMiningRound rq =
   do
     cc <- paymentAmountToCC svc submitter openMiningRound rq.amount

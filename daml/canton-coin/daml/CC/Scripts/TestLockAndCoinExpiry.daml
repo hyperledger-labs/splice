@@ -8,6 +8,7 @@ import CC.Coin
 import CC.Fees
 import CC.Expiry
 import CC.Round
+import CC.Round.Types
 import CC.RelRound
 import CC.Schedule
 import CC.Scripts.Parameters
@@ -15,9 +16,6 @@ import CC.Scripts.Util
 
 import DA.Foldable (forA_)
 import DA.Time
-
-import qualified CC.API.V1.Coin as API
-import qualified CC.API.V1.Round as API
 
 test : Script ()
 test = script do
@@ -42,24 +40,24 @@ test = script do
       transferConfigUsd = coinConfigUsd.transferConfig
       issuanceConfig0 = getValueAsOf issuingFor0 coinConfigUsd.issuanceCurve
       issuanceConfig3 = getValueAsOf issuingFor3 coinConfigUsd.issuanceCurve
-      openRound0 = OpenMiningRound with svc = app.svc; round = API.Round 0; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
-      openRound3 = openRound0 with round = API.Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
+      openRound0 = OpenMiningRound with svc = app.svc; round = Round 0; coinPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
+      openRound3 = openRound0 with round = Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
 
   -- Lock expires at T00:12:30
-  let lockExpiresAt12_30 = API.TimeLock with holders = [alice.primaryParty]; expiresAt = t12_30
+  let lockExpiresAt12_30 = TimeLock with holders = [alice.primaryParty]; expiresAt = t12_30
   -- Lock expires at T00:15:00
-  let lockExpiresAt15_00 = API.TimeLock with holders = [alice.primaryParty]; expiresAt = t15_00
+  let lockExpiresAt15_00 = TimeLock with holders = [alice.primaryParty]; expiresAt = t15_00
   -- Lock expires at T00:17:30
-  let lockExpiresAt17_30 = API.TimeLock with holders = [alice.primaryParty]; expiresAt = t17_30
+  let lockExpiresAt17_30 = TimeLock with holders = [alice.primaryParty]; expiresAt = t17_30
 
   -- This coin is estimated to expire at round 5.
   -- we exploit that there are exactly three open rounds active at any point in time.
   -- we wait for 2 more rounds to ensure that a coin can be expired as soon as
   -- it can definitely not be used as an input to transfer anymore.
   -- This coin can still be used until round 7 (5 + 2) which is created at T00:15:00 and opens at T00:17:30
-  let amountExpiresAtRound5 = ExpiringAmount with initialAmount = config.transferConfig.holdingFee.rate * 3.5; createdAt = API.Round 1; ratePerRound = config.transferConfig.holdingFee
+  let amountExpiresAtRound5 = ExpiringAmount with initialAmount = config.transferConfig.holdingFee.rate * 3.5; createdAt = Round 1; ratePerRound = config.transferConfig.holdingFee
   let bounded = amountExpiresAt amountExpiresAtRound5
-  bounded === Singleton (API.Round 5)
+  bounded === Singleton (Round 5)
   let (Singleton r) = bounded
   estimateOpenRoundCreatedAt config.tickDuration openRound3 (Singleton(addRelRound r (RelRound 2))) === Singleton t15_00
 
@@ -75,7 +73,7 @@ test = script do
   let lockExpiresAfterCoin = doesLockExpireBeforeCoin openRound3 lockExpiresAt17_30 amountExpiresAtRound5 config.tickDuration
   assert $ not lockExpiresAfterCoin
 
-  let largeAmount = ExpiringAmount with initialAmount = 10000.0; createdAt = API.Round 1; ratePerRound = config.transferConfig.holdingFee
+  let largeAmount = ExpiringAmount with initialAmount = 10000.0; createdAt = Round 1; ratePerRound = config.transferConfig.holdingFee
   -- lock expires at T00:12:30 before coin with large amount, which is regarded as never expires (EstimatedTime.AfterMaxTime)
   let lockExpiresBeforeLargeCoin = doesLockExpireBeforeCoin openRound3 lockExpiresAt12_30 largeAmount config.tickDuration
   assert lockExpiresBeforeLargeCoin
@@ -90,13 +88,13 @@ testLargeCoinExpiry = script do
   let coinPrice = 2.5
       configUsd = defaultCoinConfig
       transferConfigCC = scaleFees (1.0 / coinPrice) configUsd.transferConfig
-      e = ExpiringAmount with initialAmount = 10000.0; createdAt = API.Round 1; ratePerRound = transferConfigCC.holdingFee
+      e = ExpiringAmount with initialAmount = 10000.0; createdAt = Round 1; ratePerRound = transferConfigCC.holdingFee
       Singleton r = amountExpiresAt e
       expiringRound = Singleton $ addRelRound r (RelRound 2)
       issuingFor = minutes 5
       currentMiningRound = OpenMiningRound with
         svc = app.svc
-        round = API.Round 1
+        round = Round 1
         coinPrice = 1.0
         opensAt = now
         targetClosesAt = addRelTime now (minutes 5)
@@ -122,7 +120,7 @@ testExpireLockedCoin = do
   cid <- getLockedCoin app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (seconds 90 - convertMicrosecondsToRelTime 1)
   Some(lockedCoin) <- queryContractId @LockedCoin alice.primaryParty cid
 
-  roundCid <- advanceRound app (API.Round 3)
+  roundCid <- advanceRound app (Round 3)
 
   -- Lock is not yet expired
   -- svc fails to expire the coin
@@ -130,7 +128,7 @@ testExpireLockedCoin = do
     exerciseCmd cid (LockedCoin_ExpireCoin roundCid coinRules)
 
   -- Current round is 4
-  roundCid <- advanceRound app (API.Round 4)
+  roundCid <- advanceRound app (Round 4)
 
   -- Coin is not yet expired
   -- 2 rounds before current round = 4 - 2 = 2 which is before round 3 when the coin expires
@@ -139,7 +137,7 @@ testExpireLockedCoin = do
     exerciseCmd cid (LockedCoin_ExpireCoin roundCid coinRules)
 
   -- Current round is 5
-  roundCid <- advanceRound app (API.Round 5)
+  roundCid <- advanceRound app (Round 5)
 
   normalizedBalanceBeforeExpiry <- getNormalizedBalance app.svc
 
@@ -171,10 +169,10 @@ testExpireCoin = do
   Some(coin) <- queryContractId @Coin alice.primaryParty cid
 
   coin.amount.initialAmount === 0.0000050001
-  coin.amount.createdAt === API.Round 1
+  coin.amount.createdAt === Round 1
 
   -- current latest active round is 3
-  latestActiveRoundCid <- advanceRound app (API.Round 3)
+  latestActiveRoundCid <- advanceRound app (Round 3)
 
   -- 2 rounds before latest active round = 3 - 2 = 1 which is before round 3 when the coin expires
   -- svc fails to expire the coin
@@ -182,7 +180,7 @@ testExpireCoin = do
     exerciseCmd cid (Coin_Expire latestActiveRoundCid coinRules)
 
   -- current latest active round is 4
-  latestActiveRoundCid <- advanceRound app (API.Round 4)
+  latestActiveRoundCid <- advanceRound app (Round 4)
 
   -- 2 rounds before current latest active round => 4 - 2 = 2 which is before round 3 when the coin expires
   -- svc fails to expire the coin
@@ -190,7 +188,7 @@ testExpireCoin = do
     exerciseCmd cid (Coin_Expire latestActiveRoundCid coinRules)
 
   -- current latest active round is 5
-  latestActiveRoundCid <- advanceRound app (API.Round 5)
+  latestActiveRoundCid <- advanceRound app (Round 5)
 
   normalizedBalanceBeforeExpiry <- getNormalizedBalance app.svc
 
@@ -213,7 +211,7 @@ testExpireCoin = do
   onlyCoin.amount.initialAmount === 1.0
   pure ()
 
-advanceRound : CCApp -> API.Round -> Script (ContractId OpenMiningRound)
+advanceRound : CCApp -> Round -> Script (ContractId OpenMiningRound)
 advanceRound app expectedRound  = do
   runNextIssuance app
   (latestActiveRoundCid, _) <- getLatestActiveOpenRound app
@@ -226,30 +224,30 @@ addRelRoundN n t relTime
   | n <= 0 = t
   | otherwise = addRelRoundN (n-1) (addRelTime t relTime) relTime
 
-testChoice : CCApp -> [Party] -> [Party] -> (ContractId API.CoinRules -> Commands a) -> Script a
+testChoice : CCApp -> [Party] -> [Party] -> (ContractId CoinRules -> Commands a) -> Script a
 testChoice app actAs readAs buildCommand = do
   Some (coinRules, _) <- queryCoinRulesByKey app.svc
-  submitMulti actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
+  submitMulti actAs readAs (buildCommand coinRules)
 
-testChoiceFailed : HasField "svc" r Party => r -> [Party] -> [Party] -> (ContractId API.CoinRules -> Commands a) -> Script ()
+testChoiceFailed : HasField "svc" r Party => r -> [Party] -> [Party] -> (ContractId CoinRules -> Commands a) -> Script ()
 testChoiceFailed app actAs readAs buildCommand = do
   Some (coinRules, _) <- queryCoinRulesByKey app.svc
-  submitMultiMustFail actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
+  submitMultiMustFail actAs readAs (buildCommand coinRules)
   pure ()
 
-getLockedCoinCmd : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (Commands API.TransferResult)
+getLockedCoinCmd : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (Commands TransferResult)
 getLockedCoinCmd app owner lockHolder amount lockDuration = do
   now <- getTime
   coin <- tap app owner (amount + 1.0)
-  let transfer = API.Transfer with
+  let transfer = Transfer with
         sender = owner.primaryParty
         provider = owner.primaryParty
-        inputs = map (API.InputCoin . toInterfaceContractId) [coin]
+        inputs = map InputCoin [coin]
         outputs =
-          [ API.TransferOutput with
+          [ TransferOutput with
               receiver = owner.primaryParty
               amount = amount
-              lock = Some API.TimeLock with
+              lock = Some TimeLock with
                 holders = [lockHolder]
                 expiresAt = now `addRelTime` lockDuration
               receiverFeeRatio = 0.0
@@ -258,16 +256,15 @@ getLockedCoinCmd app owner lockHolder amount lockDuration = do
   featuredAppRight <- getFeaturedAppRight app owner.primaryParty
 
   (rules, _) <- fetchCoinRulesByKey app.svc
-  return $ exerciseCmd (toInterfaceContractId @API.CoinRules rules)
-    API.CoinRules_Transfer with
-      transfer, context = API.coinTransferContext (toInterfaceContractId openRound) featuredAppRight
+  return $ exerciseCmd rules
+    CoinRules_Transfer with
+      transfer, context = coinTransferContext openRound featuredAppRight
 
 getLockedCoin : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (ContractId LockedCoin)
 getLockedCoin app owner lockHolder amount lockDuration = do
   cmd <- getLockedCoinCmd app owner lockHolder amount lockDuration
   result <- submitMulti [owner.primaryParty, lockHolder] [app.svc] cmd
-  let [API.TransferResultLockedCoin lockedCoinApi] = result.createdCoins
-  let lockedCoin = fromInterfaceContractId @LockedCoin lockedCoinApi
+  let [TransferResultLockedCoin lockedCoin] = result.createdCoins
   pure lockedCoin
 
 getLockedCoinMustFail : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script ()

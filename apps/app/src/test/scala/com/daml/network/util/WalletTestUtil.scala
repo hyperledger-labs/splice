@@ -1,7 +1,7 @@
 package com.daml.network.util
 
 import com.daml.ledger.javaapi.data.ExercisedEvent
-import com.daml.network.codegen.java.cc.api.v1 as coinApiCodegen
+import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.fees as feesCodegen
 import com.daml.network.codegen.java.cn.directory as dirCodegen
@@ -932,7 +932,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       owner.toProtoPrimitive,
       new feesCodegen.ExpiringAmount(
         amount.bigDecimal,
-        new coinApiCodegen.round.Round(round),
+        new Round(round),
         new feesCodegen.RatePerRound(holdingFee.bigDecimal),
       ),
     )

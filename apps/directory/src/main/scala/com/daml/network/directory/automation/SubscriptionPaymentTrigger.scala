@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.DirectoryUtil
@@ -51,7 +51,7 @@ class SubscriptionPaymentTrigger(
     val provider = store.providerParty
     def rejectPayment(
         reason: String,
-        transferContext: v1.coin.AppTransferContext,
+        transferContext: cc.coin.AppTransferContext,
         disclosedContracts: DisclosedContracts.NE,
         log: String => Unit = logger.warn(_),
     ) = {
@@ -70,7 +70,7 @@ class SubscriptionPaymentTrigger(
           directoryCodegen.DirectoryEntry,
         ],
         deduplicationOffset: String,
-        transferContext: v1.coin.AppTransferContext,
+        transferContext: cc.coin.AppTransferContext,
         disclosedContracts: DisclosedContracts.NE,
     ) = {
       val cmd =

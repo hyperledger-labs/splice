@@ -14,13 +14,13 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.google.protobuf
 import com.daml.network.codegen.java.cc.{
-  api as apiCodegen,
   coin as coinCodegen,
+  expiry as expiryCodegen,
   fees as feesCodegen,
   round as roundCodegen,
   schedule as scheduleCodegen,
 }
-import com.daml.network.codegen.java.cc.api.v1 as ccApiCodegen
+import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
@@ -126,7 +126,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def openMiningRound(svc: PartyId, round: Long, coinPrice: Double) = {
     val template = new roundCodegen.OpenMiningRound(
       svc.toProtoPrimitive,
-      new ccApiCodegen.round.Round(round),
+      new Round(round),
       numeric(coinPrice),
       Instant.now(),
       Instant.now().plusSeconds(600),
@@ -148,7 +148,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def closedMiningRound(svc: PartyId, round: Long) = {
     val template = new roundCodegen.ClosedMiningRound(
       svc.toProtoPrimitive,
-      new ccApiCodegen.round.Round(round),
+      new Round(round),
       numeric(1),
       numeric(1),
       numeric(1),
@@ -170,7 +170,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       owner.toProtoPrimitive,
       new feesCodegen.ExpiringAmount(
         numeric(amount),
-        new ccApiCodegen.round.Round(createdAtRound),
+        new Round(createdAtRound),
         new feesCodegen.RatePerRound(numeric(ratePerRound)),
       ),
     )
@@ -193,7 +193,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     val coinTemplate = coin(owner, amount, createdAtRound, ratePerRound).payload
     val template = new coinCodegen.LockedCoin(
       coinTemplate,
-      new ccApiCodegen.coin.TimeLock(java.util.List.of(), Instant.now()),
+      new expiryCodegen.TimeLock(java.util.List.of(), Instant.now()),
     )
     Contract(
       identifier = templateId,
@@ -219,7 +219,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         provider.toProtoPrimitive,
         featured,
         amount,
-        new apiCodegen.v1.round.Round(round),
+        new Round(round),
       ),
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,
@@ -244,7 +244,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         svcParty.toProtoPrimitive,
         user.toProtoPrimitive,
         amount,
-        new apiCodegen.v1.round.Round(round),
+        new Round(round),
       ),
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,
@@ -272,8 +272,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       subscriptionData,
       payData,
       numeric(amount.bigDecimal),
-      new ccApiCodegen.coin.LockedCoin.ContractId(nextCid()),
-      new ccApiCodegen.round.Round(1L),
+      new coinCodegen.LockedCoin.ContractId(nextCid()),
+      new Round(1L),
     )
     Contract(
       subCodegen.SubscriptionInitialPayment.TEMPLATE_ID,
