@@ -23,8 +23,8 @@ parameters:
     default: "20"
   run-job:
     type: enum
-    enum: [build, deploy-cidaily, deploy-cidaily-testnet, deploy-cilr, deploy-devnet, deploy-testnet, deploy-testnet-preview,
-           healthcheck-cidaily, healthcheck-cidaily-testnet, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet, healthcheck-testnet-preview,
+    enum: [build, deploy-cidaily, deploy-cidaily-testnet, deploy-cilr, deploy-devnet, deploy-testnet,
+           healthcheck-cidaily, healthcheck-cidaily-testnet, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet,
            redeploy-sv-runbook-cidaily, redeploy-sv-runbook-cilr, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
     default: build
   # Tag the current commit for the next TestNet release, overwriting the existing tag if it exists.
