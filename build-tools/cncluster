@@ -981,7 +981,7 @@ function subcmd_preflight_sv() {
     _log "Starting SV preflight on non-DevNet"
     cd "${REPO_ROOT}" && \
                 NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
-                sbt "apps-app/testOnly *NonDevNet*PreflightSvIntegrationTest"
+                sbt "apps-app/testOnly *PreflightSvNonDevNetIntegrationTest"
   fi
 }
 

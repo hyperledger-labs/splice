@@ -165,7 +165,7 @@ final class SvNodePreflightSvIntegrationTest extends SvNodePreflightSvIntegratio
   override protected def isDevNet = true
 }
 
-final class SvNodeNonDevNetPreflightSvIntegrationTest extends SvNodePreflightSvIntegrationTestBase {
+final class SvNodePreflightSvNonDevNetIntegrationTest extends SvNodePreflightSvIntegrationTestBase {
   override protected def svUsername = s"admin@sv.com";
   override protected def isDevNet = false
 
