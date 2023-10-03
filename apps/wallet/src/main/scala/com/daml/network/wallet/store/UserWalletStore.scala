@@ -17,10 +17,16 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.store.{CNNodeAppStoreWithHistory, ConfiguredDefaultDomain, PageLimit}
+import com.daml.network.store.{CNNodeAppStoreWithHistory, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.util.{CNNodeUtil, Contract, TemplateJsonDecoder}
+import com.daml.network.util.{
+  AssignedContract,
+  CNNodeUtil,
+  Contract,
+  ContractWithState,
+  TemplateJsonDecoder,
+}
 import com.daml.network.wallet.store.UserWalletStore.{
   AppPaymentRequest,
   Subscription,
@@ -31,7 +37,7 @@ import com.daml.network.wallet.store.UserWalletStore.{
 }
 import com.daml.network.wallet.store.db.DbUserWalletStore
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
-import com.digitalasset.canton.DomainAlias
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -50,29 +56,29 @@ trait UserWalletStore
       UserWalletTxLogParser.WalletTxLogIndexRecord,
       UserWalletTxLogParser.TxLogEntry,
     ]
-    with ConfiguredDefaultDomain
     with NamedLogging {
 
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
 
-  def lookupInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
-    Option[Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]]
-  ] = defaultAcsDomainIdF.flatMap(
-    multiDomainAcsStore
-      // Note: there is nothing that prevents a party from having multiple WalletAppInstall contracts
-      // here we just take the first one.
-      .listContractsOnDomain(installCodegen.WalletAppInstall.COMPANION, _, PageLimit(1))
-      .map(_.headOption)
-  )
+  final def lookupInstall()(implicit tc: TraceContext): Future[
+    Option[
+      ContractWithState[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
+    ]
+  ] =
+    // Note: there is nothing that prevents a party from having multiple WalletAppInstall contracts
+    // here we just take the first one, preferring an assigned one if available
+    lookupArbitraryPreferAssigned(installCodegen.WalletAppInstall.COMPANION)
 
-  def getInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
-    Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
+  final def getInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
+    AssignedContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ] = for {
     ct <- lookupInstall()
-  } yield ct.getOrElse(
-    throw Status.NOT_FOUND.withDescription("WalletAppInstall contract").asRuntimeException()
-  )
+  } yield ct
+    .flatMap(_.toAssignedContract)
+    .getOrElse(
+      throw Status.NOT_FOUND.withDescription("WalletAppInstall contract").asRuntimeException()
+    )
 
   def signalWhenIngestedOrShutdown(offset: String)(implicit
       tc: TraceContext
@@ -101,9 +107,9 @@ trait UserWalletStore
       tc: TraceContext
   ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]]]
 
-  def listAppPaymentRequests(implicit tc: TraceContext): Future[Seq[AppPaymentRequest]] = {
+  final def listAppPaymentRequests(implicit tc: TraceContext): Future[Seq[AppPaymentRequest]] =
     for {
-      domainId <- defaultAcsDomainIdF
+      domainId <- getInstall().map(_.domain)
       contracts <- multiDomainAcsStore.listContractsOnDomain(
         walletCodegen.AppPaymentRequest.COMPANION,
         domainId,
@@ -119,28 +125,26 @@ trait UserWalletStore
       val deliveryOfferMap = deliveryOffer.map(offer => offer.contractId -> offer).toMap
       // We drop payment requests for which we can't find a corresponding delivery offer, which can be
       // the case if its transfer is still in flight.
-      contracts.flatMap { c =>
-        deliveryOfferMap.get(c.payload.deliveryOffer).map(AppPaymentRequest(c, _))
-      }
+      for {
+        c <- contracts
+        d <- deliveryOfferMap get c.payload.deliveryOffer
+      } yield AppPaymentRequest(
+        AssignedContract(c, domainId).toContractWithState,
+        AssignedContract(d, domainId).toContractWithState,
+      )
     }
-  }
 
   def getAppPaymentRequest(
       cid: walletCodegen.AppPaymentRequest.ContractId
-  )(implicit tc: TraceContext): Future[AppPaymentRequest] = {
+  )(implicit tc: TraceContext): Future[AppPaymentRequest] =
     for {
-      domainId <- defaultAcsDomainIdF
-      appPaymentRequest <- multiDomainAcsStore.getContractByIdOnDomain(
+      appPaymentRequest <- multiDomainAcsStore.getContractById(
         walletCodegen.AppPaymentRequest.COMPANION
-      )(domainId, cid)
-      deliveryOffer <- multiDomainAcsStore.getContractByIdOnDomain(
+      )(cid)
+      deliveryOffer <- multiDomainAcsStore.getContractById(
         walletCodegen.DeliveryOffer.INTERFACE
-      )(
-        domainId,
-        appPaymentRequest.payload.deliveryOffer,
-      )
+      )(appPaymentRequest.payload.deliveryOffer)
     } yield AppPaymentRequest(appPaymentRequest, deliveryOffer)
-  }
 
   def listExpiredAppPaymentRequests: ListExpiredContracts[
     walletCodegen.AppPaymentRequest.ContractId,
@@ -168,41 +172,36 @@ trait UserWalletStore
         .take(limit)
     }
 
-  def listSubscriptions()(implicit
+  final def listSubscriptions()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Seq[Subscription]] = {
     // This is racy: you can miss subscriptions if their state change concurrently, i.e., you don't see them
     // as either idle or payment. This is okay since it'll just refresh in the UI.
     for {
-      domainId <- defaultAcsDomainIdF
-      subscriptions <- multiDomainAcsStore.listContractsOnDomain(
-        subsCodegen.Subscription.COMPANION,
-        domainId,
+      subscriptions <- multiDomainAcsStore.listContracts(
+        subsCodegen.Subscription.COMPANION
       )
       // there's a 1-1 mapping Subscription-SubscriptionContext, so all should be included
-      subscriptionContexts <- multiDomainAcsStore.listContractsOnDomain(
-        subsCodegen.SubscriptionContext.INTERFACE,
-        domainId,
+      subscriptionContexts <- multiDomainAcsStore.listContracts(
+        subsCodegen.SubscriptionContext.INTERFACE
       )
-      subscriptionIdleStates <- multiDomainAcsStore.listContractsOnDomain(
-        subsCodegen.SubscriptionIdleState.COMPANION,
-        domainId,
+      subscriptionIdleStates <- multiDomainAcsStore.listContracts(
+        subsCodegen.SubscriptionIdleState.COMPANION
       )
-      subscriptionPayments <- multiDomainAcsStore.listContractsOnDomain(
-        subsCodegen.SubscriptionPayment.COMPANION,
-        domainId,
+      subscriptionPayments <- multiDomainAcsStore.listContracts(
+        subsCodegen.SubscriptionPayment.COMPANION
       )
     } yield {
       val mainMap = subscriptions.map(sub => sub.contractId -> sub).toMap
       val contextsMap = subscriptionContexts.map(ctx => ctx.contractId -> ctx).toMap
       val idleStates: Seq[(subsCodegen.Subscription.ContractId, SubscriptionState)] =
         subscriptionIdleStates.map(state =>
-          (state.payload.subscription, SubscriptionIdleState(state))
+          (state.payload.subscription, SubscriptionIdleState(state.contract))
         )
       val payments: Seq[(subsCodegen.Subscription.ContractId, SubscriptionState)] =
         subscriptionPayments.map(state =>
-          (state.payload.subscription, SubscriptionPaymentState(state))
+          (state.payload.subscription, SubscriptionPaymentState(state.contract))
         )
       val states: Seq[(subsCodegen.Subscription.ContractId, SubscriptionState)] =
         (idleStates ++ payments).distinctBy(_._1)
@@ -210,9 +209,7 @@ trait UserWalletStore
         (mainId, state) <- states
         main <- mainMap.get(mainId)
         context <- contextsMap.get(main.payload.context)
-      } yield {
-        Subscription(main, context, state)
-      }
+      } yield Subscription(main.contract, context.contract, state)
     }
   }
 
@@ -220,47 +217,31 @@ trait UserWalletStore
       cid: subsCodegen.SubscriptionRequest.ContractId
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[SubscriptionRequest] = {
     for {
-      domainId <- defaultAcsDomainIdF
-      contract <- multiDomainAcsStore.getContractByIdOnDomain(
+      contract <- multiDomainAcsStore.getContractById(
         subsCodegen.SubscriptionRequest.COMPANION
-      )(
-        domainId,
-        cid,
-      )
-      context <- multiDomainAcsStore.getContractByIdOnDomain(
+      )(cid)
+      context <- multiDomainAcsStore.getContractById(
         subsCodegen.SubscriptionContext.INTERFACE
-      )(
-        domainId,
-        contract.payload.subscriptionData.context,
-      )
-    } yield SubscriptionRequest(contract, context)
+      )(contract.payload.subscriptionData.context)
+    } yield SubscriptionRequest(contract.contract, context.contract)
   }
 
   def listSubscriptionRequests()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Seq[SubscriptionRequest]] = {
+  ): Future[Seq[SubscriptionRequest]] =
     for {
-      domainId <- defaultAcsDomainIdF
-      contracts <- multiDomainAcsStore.listContractsOnDomain(
-        subsCodegen.SubscriptionRequest.COMPANION,
-        domainId,
-      )
+      contracts <- multiDomainAcsStore.listContracts(subsCodegen.SubscriptionRequest.COMPANION)
       // there's a 1-1 mapping Subscription-SubscriptionContext, so all should be included
-      contexts <- multiDomainAcsStore.listContractsOnDomain(
-        subsCodegen.SubscriptionContext.INTERFACE,
-        domainId,
-      )
+      contexts <- multiDomainAcsStore.listContracts(subsCodegen.SubscriptionContext.INTERFACE)
     } yield {
       val contextsMap = contexts.map(ctx => ctx.contractId -> ctx).toMap
-      contracts.flatMap { contract =>
+      for {
+        contract <- contracts
         // If the context is missing, that means that the SubscriptionRequest was archived right after fetching it
-        contextsMap.get(contract.payload.subscriptionData.context).map { context =>
-          SubscriptionRequest(contract, context)
-        }
-      }
+        context <- contextsMap.get(contract.payload.subscriptionData.context)
+      } yield SubscriptionRequest(contract.contract, context.contract)
     }
-  }
 
   /** List all non-expired coins owned by a user in descending order according to their current amount in the given submitting round. */
   def listSortedCoinsAndQuantity(
@@ -269,11 +250,7 @@ trait UserWalletStore
   )(implicit
       tc: TraceContext
   ): Future[Seq[(BigDecimal, coinCodegen.transferinput.InputCoin)]] = for {
-    domainId <- defaultAcsDomainIdF
-    coins <- multiDomainAcsStore.listContractsOnDomain(
-      coinCodegen.Coin.COMPANION,
-      domainId,
-    )
+    coins <- multiDomainAcsStore.listContracts(coinCodegen.Coin.COMPANION)
   } yield coins
     .map(c =>
       (
@@ -317,26 +294,21 @@ trait UserWalletStore
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
   ]]
 
-  def lookupFeaturedAppRight()(implicit ec: ExecutionContext, tc: TraceContext): Future[
+  final def lookupFeaturedAppRight()(implicit ec: ExecutionContext, tc: TraceContext): Future[
     Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
-  ] = defaultAcsDomainIdF.flatMap(
-    multiDomainAcsStore
-      // Note: there is nothing that prevents a party from having multiple FeaturedAppRight contracts
-      // here we just take the first one.
-      .listContractsOnDomain(coinCodegen.FeaturedAppRight.COMPANION, _, PageLimit(1))
-      .map(_.headOption)
-  )
+  ] =
+    // Note: there is nothing that prevents a party from having multiple FeaturedAppRight contracts
+    // here we just take the first one.
+    lookupArbitraryPreferAssigned(coinCodegen.FeaturedAppRight.COMPANION)
+      .map(_ map (_.contract))
 
   /** Lists all the validator rights where the corresponding user is entered as the validator. */
-  def getValidatorRightsWhereUserIsValidator()(implicit
+  final def getValidatorRightsWhereUserIsValidator()(implicit
       tc: TraceContext
   ): Future[Seq[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]] =
-    defaultAcsDomainIdF.flatMap(
-      multiDomainAcsStore.listContractsOnDomain(
-        coinCodegen.ValidatorRight.COMPANION,
-        _,
-      )
-    )
+    multiDomainAcsStore
+      .listContracts(coinCodegen.ValidatorRight.COMPANION)
+      .map(_ map (_.contract))
 
   def listTransactions(
       beginAfterEventId: Option[String],
@@ -349,6 +321,30 @@ trait UserWalletStore
       key.endUserParty.toProtoPrimitive,
       key.endUserName,
     )
+
+  // For cases where `companion` can have multiple contracts, but we just need
+  // an arbitrary one; prefer an Assigned contract if available but accept an
+  // in-flight contract as fallback.
+  private[this] def lookupArbitraryPreferAssigned[C, TCid <: ContractId[?], T](
+      companion: C
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[TCid, T]]] = {
+    import cats.data.OptionT, cats.syntax.semigroupk.*, cats.Eval
+    OptionT(
+      multiDomainAcsStore
+        .listAssignedContracts(companion, PageLimit(1))
+        .map(_.headOption.map(_.toContractWithState))
+    ).combineKEval(Eval.always {
+      OptionT(
+        multiDomainAcsStore
+          .listContracts(companion, PageLimit(1))
+          .map(_.headOption)
+      )
+    }).value
+      .value
+  }
 }
 
 object UserWalletStore {
@@ -390,11 +386,11 @@ object UserWalletStore {
   )
 
   final case class AppPaymentRequest(
-      appPaymentRequest: Contract[
+      appPaymentRequest: ContractWithState[
         walletCodegen.AppPaymentRequest.ContractId,
         walletCodegen.AppPaymentRequest,
       ],
-      deliveryOffer: Contract[
+      deliveryOffer: ContractWithState[
         walletCodegen.DeliveryOffer.ContractId,
         walletCodegen.DeliveryOfferView,
       ],
@@ -406,7 +402,6 @@ object UserWalletStore {
   def apply(
       key: Key,
       storage: Storage,
-      globalDomain: DomainAlias,
       loggerFactory: NamedLoggerFactory,
       connection: CNLedgerConnection,
       retryProvider: RetryProvider,
@@ -420,7 +415,6 @@ object UserWalletStore {
       case _: MemoryStorage =>
         new InMemoryUserWalletStore(
           key,
-          globalDomain,
           loggerFactory,
           treeSource,
           retryProvider,
@@ -428,7 +422,6 @@ object UserWalletStore {
       case dbStorage: DbStorage =>
         new DbUserWalletStore(
           key,
-          globalDomain,
           dbStorage,
           loggerFactory,
           treeSource,

@@ -101,7 +101,6 @@ class AcceptedTransferOfferTrigger(
       )
       _ <- connection
         .submit(Seq(store.key.validatorParty), Seq(store.key.endUserParty), cmd)
-        .withDomainId(acceptedOffer.domain)
         .noDedup
         .yieldResult()
     } yield TaskSuccess(s"aborted accepted transfer offer, $reason")
