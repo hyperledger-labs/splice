@@ -1,5 +1,6 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
 
+import { PollingStrategy } from '../..';
 import { useLedgerApiClient } from '../../contexts/LedgerApiContext';
 
 const usePrimaryParty = (): UseQueryResult<string> => {
@@ -7,7 +8,7 @@ const usePrimaryParty = (): UseQueryResult<string> => {
 
   return useQuery({
     queryKey: ['fetchPrimaryParty', ledgerApi],
-    refetchInterval: false, // primary party ID is static
+    refetchInterval: PollingStrategy.NONE, // primary party ID is static
     queryFn: async () => {
       try {
         return ledgerApi!.getPrimaryParty();

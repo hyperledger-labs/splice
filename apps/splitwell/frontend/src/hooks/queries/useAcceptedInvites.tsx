@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract, sameContracts } from 'common-frontend';
+import { Contract, PollingStrategy, sameContracts } from 'common-frontend';
 
 import { AcceptedGroupInvite, Group } from '@daml.js/splitwell/lib/CN/Splitwell';
 
@@ -13,6 +13,7 @@ export const useAcceptedInvites = (
   const groupId = group.payload.id.unpack;
 
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['acceptedInvites', groupId, party],
     queryFn: async () => {
       const invites = (await splitwellClient.listAcceptedGroupInvites(party, groupId))

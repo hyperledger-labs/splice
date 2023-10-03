@@ -28,7 +28,6 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        refetchInterval: 500, // re-fetch all queries every 500ms by default
         structuralSharing: cnReplaceEqualDeep,
       },
     },

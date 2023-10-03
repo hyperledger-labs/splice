@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract } from 'common-frontend';
+import { Contract, PollingStrategy } from 'common-frontend';
 
 import { BalanceUpdate, Group } from '@daml.js/splitwell/lib/CN/Splitwell';
 
@@ -12,6 +12,7 @@ export const useBalanceUpdates = (
   const splitwellClient = useSplitwellClient();
 
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['balanceUpdates', group, party],
     queryFn: async () => {
       const balanceUpdates = (

@@ -1,5 +1,6 @@
 import { AmountDisplay, IntervalDisplay, SubscriptionButton } from 'common-frontend';
 import React, { useState } from 'react';
+import { useDebouncedCallback } from 'use-debounce';
 
 import { CheckCircleOutline, ErrorOutline } from '@mui/icons-material';
 import { Box, Button, Stack, Typography, styled } from '@mui/material';
@@ -17,6 +18,10 @@ const isEntryNameValid = (name: string) => {
 
 const RequestDirectoryEntry: React.FC = () => {
   const [entryName, setEntryName] = useState<string>('');
+  const debounced = useDebouncedCallback(value => {
+    setEntryName(value);
+    setDisplayValidationResult(true);
+  }, 500);
 
   const [displayValidationResult, setDisplayValidationResult] = useState(false);
   const { data: entryLookupResult, isLoading } = useLookupEntryByName(entryName, ENTRY_NAME_SUFFIX);
@@ -35,18 +40,25 @@ const RequestDirectoryEntry: React.FC = () => {
       <Stack direction="row" spacing={2}>
         <Searchbar
           sx={{ flexGrow: '1' }}
-          value={entryName}
           onKeyDown={event => {
-            setDisplayValidationResult(event.key === 'Enter');
+            if (event.key === 'Enter') {
+              setDisplayValidationResult(true);
+              debounced.flush();
+            } else {
+              setDisplayValidationResult(false);
+            }
           }}
-          onChange={event => setEntryName(event.target.value)}
+          onChange={event => debounced(event.target.value)}
           id="entry-name-field"
         />
         <Button
           variant="pill"
           id="search-entry-button"
           disabled={searchButtonDisabled}
-          onClick={() => setDisplayValidationResult(true)}
+          onClick={() => {
+            setDisplayValidationResult(true);
+            debounced.flush();
+          }}
         >
           Search
         </Button>

@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract, useSvClient } from 'common-frontend';
+import { Contract, PollingStrategy, useSvClient } from 'common-frontend';
 
 import { CoinRules } from '@daml.js/canton-coin-0.1.0/lib/CC/Coin';
 import { SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules';
@@ -20,6 +20,7 @@ type SvUiState =
 export const useSvcInfos = (): UseQueryResult<SvUiState> => {
   const { getSvcInfo } = useSvClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['getSvcInfo', SvcRules, CoinRules],
     queryFn: async () => {
       const resp = await getSvcInfo();
@@ -38,6 +39,7 @@ export const useSvcInfos = (): UseQueryResult<SvUiState> => {
 export const useElectionContext = (): UseQueryResult<{ exists: boolean }> | undefined => {
   const { getElectionRequest } = useSvAdminClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['getElectionRequest'],
     queryFn: async () => {
       const resp = await getElectionRequest();

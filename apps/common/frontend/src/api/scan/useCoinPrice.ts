@@ -4,13 +4,14 @@ import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi';
 
 import { OpenMiningRound } from '@daml.js/canton-coin-0.1.0/lib/CC/Round';
 
-import { Contract } from '../../utils';
+import { Contract, PollingStrategy } from '../../utils';
 import { useScanClient } from './ScanClientContext';
 
 const useCoinPrice = (): UseQueryResult<BigNumber> => {
   const scanClient = useScanClient();
 
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['scan-api', 'coinPrice'],
     queryFn: async () => {
       const request: GetOpenAndIssuingMiningRoundsRequest = {

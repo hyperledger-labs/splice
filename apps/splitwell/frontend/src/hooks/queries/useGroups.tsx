@@ -1,5 +1,5 @@
 import { QueryClient, UseQueryResult, useQuery } from '@tanstack/react-query';
-import { AssignedContract } from 'common-frontend';
+import { AssignedContract, PollingStrategy } from 'common-frontend';
 
 import { Group } from '@daml.js/splitwell/lib/CN/Splitwell';
 
@@ -15,6 +15,7 @@ export const getGroups = (party: string, queryClient: QueryClient): AssignedCont
 export const useGroups = (party: string): UseQueryResult<AssignedContract<Group>[]> => {
   const splitwellClient = useSplitwellClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: groupsQueryKey(party),
     queryFn: async () => {
       const newGroups = (await splitwellClient.listGroups(party)).groups;

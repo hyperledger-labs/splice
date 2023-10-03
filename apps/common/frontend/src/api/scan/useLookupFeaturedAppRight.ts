@@ -2,7 +2,7 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
 import { FeaturedAppRight } from '@daml.js/canton-coin-0.1.0/lib/CC/Coin/';
 
-import { Contract } from '../../utils';
+import { Contract, PollingStrategy } from '../../utils';
 import { useScanClient } from './ScanClientContext';
 
 const useLookupFeaturedAppRight = (
@@ -11,6 +11,7 @@ const useLookupFeaturedAppRight = (
   const scanClient = useScanClient();
 
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['scan-api', 'lookupFeaturedAppRight', primaryPartyId, FeaturedAppRight],
     queryFn: async () => {
       const response = await scanClient.lookupFeaturedAppRight(primaryPartyId!);

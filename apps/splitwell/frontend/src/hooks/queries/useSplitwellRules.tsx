@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { AssignedContract, usePrimaryParty } from 'common-frontend';
+import { AssignedContract, PollingStrategy, usePrimaryParty } from 'common-frontend';
 
 import { SplitwellRules } from '@daml.js/splitwell/lib/CN/Splitwell';
 
@@ -12,6 +12,7 @@ export const useSplitwellRules = (): UseQueryResult<AssignedContract<SplitwellRu
   const primaryPartyId = primaryPartyQuery.data;
 
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: [QuerySplitwellRulesOperationName, primaryPartyId],
     queryFn: async () => {
       if (primaryPartyId) {

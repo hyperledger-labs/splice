@@ -5,13 +5,16 @@ import { Subscription } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subsc
 
 import { useProviderParty } from '..';
 
-const useSubscriptions = (): UseQueryResult<Contract<Subscription>[]> => {
+const useSubscriptions = (
+  refetchInterval: false | number
+): UseQueryResult<Contract<Subscription>[]> => {
   const operationName = 'querySubscriptions';
   const ledgerApi = useLedgerApiClient();
   const { data: primaryPartyId } = usePrimaryParty();
   const { data: providerPartyId } = useProviderParty();
 
   return useQuery({
+    refetchInterval,
     queryKey: [operationName, ledgerApi, Subscription],
     queryFn: async () => {
       const response = await ledgerApi!.query(operationName, Subscription);

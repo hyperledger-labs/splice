@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract } from 'common-frontend';
+import { Contract, PollingStrategy } from 'common-frontend';
 
 import { CoinPriceVote } from '@daml.js/svc-governance/lib/CN/SVC/CoinPrice';
 
@@ -10,6 +10,7 @@ import { CoinPriceVote as CPVModel } from '../models/models';
 export const useCoinPriceVotes = (): UseQueryResult<CPVModel[]> => {
   const { listCoinPriceVotes } = useSvAdminClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['listCoinPriceVotes'],
     queryFn: async () => {
       const { coin_price_votes } = await listCoinPriceVotes();

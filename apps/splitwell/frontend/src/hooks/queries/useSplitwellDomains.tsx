@@ -1,4 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { PollingStrategy } from 'common-frontend';
 
 import { useSplitwellClient } from '../../contexts/SplitwellServiceContext';
 
@@ -21,6 +22,6 @@ export const useSplitwellDomains = (): UseQueryResult<SplitwellDomains> => {
       console.debug(`Splitwell domains from provider: ${JSON.stringify(domains)}`);
       return domains;
     },
-    refetchInterval: false,
+    refetchInterval: PollingStrategy.NONE,
   });
 };

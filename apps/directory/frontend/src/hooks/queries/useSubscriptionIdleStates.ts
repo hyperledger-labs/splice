@@ -5,13 +5,16 @@ import { SubscriptionIdleState } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wal
 
 import { useProviderParty } from '..';
 
-const useSubscriptionIdleStates = (): UseQueryResult<Contract<SubscriptionIdleState>[]> => {
+const useSubscriptionIdleStates = (
+  refetchInterval: false | number
+): UseQueryResult<Contract<SubscriptionIdleState>[]> => {
   const operationName = 'querySubscriptionIdleStates';
   const ledgerApi = useLedgerApiClient();
   const { data: primaryPartyId } = usePrimaryParty();
   const { data: providerPartyId } = useProviderParty();
 
   return useQuery({
+    refetchInterval,
     queryKey: [operationName, ledgerApi, SubscriptionIdleState],
     queryFn: async () => {
       const response = await ledgerApi!.query(operationName, SubscriptionIdleState);

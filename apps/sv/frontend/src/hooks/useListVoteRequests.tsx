@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract } from 'common-frontend';
+import { Contract, PollingStrategy } from 'common-frontend';
 
 import { VoteRequest, VoteResult } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
@@ -16,6 +16,7 @@ export type ListSvcRulesVoteResultsParams = {
 export const useListSvcRulesVoteRequests = (): UseQueryResult<Contract<VoteRequest>[]> => {
   const { listSvcRulesVoteRequests } = useSvAdminClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['listSvcRulesVoteRequests'],
     queryFn: async () => {
       const { svc_rules_vote_requests } = await listSvcRulesVoteRequests();
@@ -30,6 +31,7 @@ export const useListSvcRulesVoteResults = (
 ): UseQueryResult<VoteResult[]> => {
   const { listSvcRulesVoteResults } = useSvAdminClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: [
       'listSvcRulesVoteResults',
       limit,

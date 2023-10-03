@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { usePrimaryParty } from 'common-frontend';
+import { PollingStrategy, usePrimaryParty } from 'common-frontend';
 
 import { useSplitwellClient } from '../../contexts/SplitwellServiceContext';
 
@@ -21,6 +21,6 @@ export const useConnectedDomains = (): UseQueryResult<string[] | null> => {
         return null;
       }
     },
-    refetchInterval: false,
+    refetchInterval: PollingStrategy.NONE,
   });
 };

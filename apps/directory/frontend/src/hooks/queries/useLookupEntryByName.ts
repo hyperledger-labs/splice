@@ -1,5 +1,5 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
-import { Contract, useDirectoryClient, usePrimaryParty } from 'common-frontend';
+import { Contract, PollingStrategy, useDirectoryClient, usePrimaryParty } from 'common-frontend';
 
 import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
@@ -33,6 +33,7 @@ const useLookupEntryByName = (
           }
         });
     },
+    refetchInterval: PollingStrategy.NONE,
     enabled: !!primaryPartyId && !!name,
   });
 };

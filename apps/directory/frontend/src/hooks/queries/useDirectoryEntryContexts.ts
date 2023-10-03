@@ -5,13 +5,16 @@ import { DirectoryEntryContext } from '@daml.js/directory/lib/CN/Directory';
 
 import { useProviderParty } from '..';
 
-const useDirectoryEntryContexts = (): UseQueryResult<Contract<DirectoryEntryContext>[]> => {
+const useDirectoryEntryContexts = (
+  refetchInterval: false | number
+): UseQueryResult<Contract<DirectoryEntryContext>[]> => {
   const operationName = 'querySubscriptions';
   const ledgerApi = useLedgerApiClient();
   const { data: primaryPartyId } = usePrimaryParty();
   const { data: providerPartyId } = useProviderParty();
 
   return useQuery({
+    refetchInterval,
     queryKey: [operationName, ledgerApi, DirectoryEntryContext],
     queryFn: async () => {
       const response = await ledgerApi!.query(operationName, DirectoryEntryContext);

@@ -1,4 +1,5 @@
 import { useInfiniteQuery, UseInfiniteQueryResult } from '@tanstack/react-query';
+import { PollingStrategy } from 'common-frontend';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { Transaction } from '../models/models';
@@ -7,6 +8,7 @@ export const useTransactions: () => UseInfiniteQueryResult<Transaction[]> = () =
   const { listTransactions } = useWalletClient();
 
   return useInfiniteQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['transactions'],
     queryFn: async ({ pageParam }) => {
       const txs = await listTransactions(pageParam);

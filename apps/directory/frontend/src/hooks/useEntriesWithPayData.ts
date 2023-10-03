@@ -1,4 +1,4 @@
-import { Contract } from 'common-frontend';
+import { Contract, PollingStrategy } from 'common-frontend';
 import { useMemo } from 'react';
 
 import { DirectoryEntry, DirectoryEntryContext } from '@daml.js/directory/lib/CN/Directory';
@@ -44,9 +44,9 @@ type SubscriptionPayDataMap = Map<ContractId<Subscription>, SubscriptionPayData>
  * This hook queries both templates and constructs a Map between the underlying
  * subscription contract IDs and their associated payment data
  */
-const useSubscriptionsPayData = (): SubscriptionPayDataMap => {
-  const { data: subscriptionIdleStates = [] } = useSubscriptionIdleStates();
-  const { data: subscriptionPayments = [] } = useSubscriptionPayments();
+const useSubscriptionsPayData = (refetchInterval: false | number): SubscriptionPayDataMap => {
+  const { data: subscriptionIdleStates = [] } = useSubscriptionIdleStates(refetchInterval);
+  const { data: subscriptionPayments = [] } = useSubscriptionPayments(refetchInterval);
 
   function toPayDataAndCid(
     contract: Contract<SubscriptionIdleState> | Contract<SubscriptionPayment>
@@ -79,9 +79,11 @@ const useSubscriptionsPayData = (): SubscriptionPayDataMap => {
  * This hook joins the former to the latter, while also casting the
  * DirectoryEntryContext type to the SubscriptionContext type
  */
-const useEntriesWithSubscriptionContext = (): EntryWithSubscriptionContext[] => {
-  const { data: directoryEntries = [] } = useDirectoryEntries();
-  const { data: directoryEntriesContexts = [] } = useDirectoryEntryContexts();
+const useEntriesWithSubscriptionContext = (
+  refetchInterval: false | number
+): EntryWithSubscriptionContext[] => {
+  const { data: directoryEntries = [] } = useDirectoryEntries(refetchInterval);
+  const { data: directoryEntriesContexts = [] } = useDirectoryEntryContexts(refetchInterval);
 
   return directoryEntries.reduce((acc, entry) => {
     const context = directoryEntriesContexts.find(dec => dec.payload.name === entry.payload.name);
@@ -105,9 +107,11 @@ const useEntriesWithSubscriptionContext = (): EntryWithSubscriptionContext[] => 
  * data associated with the underlying subscription
  */
 const useEntriesWithPayData = (): EntryWithPayData[] => {
-  const entriesWithSubscriptionContext = useEntriesWithSubscriptionContext();
-  const subscriptionsPayData = useSubscriptionsPayData();
-  const { data: subscriptions = [] } = useSubscriptions();
+  const refetchInterval = PollingStrategy.FIXED;
+
+  const entriesWithSubscriptionContext = useEntriesWithSubscriptionContext(refetchInterval);
+  const subscriptionsPayData = useSubscriptionsPayData(refetchInterval);
+  const { data: subscriptions = [] } = useSubscriptions(refetchInterval);
 
   return entriesWithSubscriptionContext.reduce((acc, { entry, subscriptionCtxCid }) => {
     const subscriptionCid = subscriptions.find(

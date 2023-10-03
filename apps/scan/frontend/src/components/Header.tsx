@@ -1,10 +1,11 @@
+import { PollingStrategy } from 'common-frontend';
 import { useGetRoundOfLatestData } from 'common-frontend/scan-api';
 import { useMemo } from 'react';
 
 import { Stack, Typography } from '@mui/material';
 
 const Header: React.FC = () => {
-  const { data: latestRound, error } = useGetRoundOfLatestData();
+  const { data: latestRound, error } = useGetRoundOfLatestData(PollingStrategy.FIXED);
 
   const round = useMemo(() => {
     if (error) {

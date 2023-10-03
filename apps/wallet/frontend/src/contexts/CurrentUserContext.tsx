@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useDirectoryClient } from 'common-frontend';
+import { PollingStrategy, useDirectoryClient } from 'common-frontend';
 import { createContext, useContext, useState } from 'react';
 
 import { Party } from '@daml/types';
@@ -21,6 +21,7 @@ export const CurrentUserProvider: React.FC<React.PropsWithChildren> = ({ childre
   const [currentUser, setCurrentUser] = useState<CurrentUser>({ state: 'not_onboarded' });
 
   useQuery({
+    refetchInterval: PollingStrategy.NONE,
     queryKey: ['lookupEntryByParty', primaryPartyId],
     queryFn: async () => {
       const directoryEntry = await lookupEntryByParty(primaryPartyId!);

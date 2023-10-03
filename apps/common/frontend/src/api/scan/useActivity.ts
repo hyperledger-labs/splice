@@ -1,6 +1,7 @@
 import { useInfiniteQuery, UseInfiniteQueryResult } from '@tanstack/react-query';
 import { ListActivityRequest, ListActivityResponseItem } from 'scan-openapi';
 
+import { PollingStrategy } from '../..';
 import { useScanClient } from './ScanClientContext';
 
 const useActivity = (): UseInfiniteQueryResult<ListActivityResponseItem[]> => {
@@ -19,7 +20,7 @@ const useActivity = (): UseInfiniteQueryResult<ListActivityResponseItem[]> => {
       return lastPage && lastPage[lastPage.length - 1].event_id;
     },
     keepPreviousData: true,
-    refetchInterval: false,
+    refetchInterval: PollingStrategy.NONE,
   });
 };
 

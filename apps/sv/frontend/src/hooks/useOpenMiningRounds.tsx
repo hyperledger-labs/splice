@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract } from 'common-frontend';
+import { Contract, PollingStrategy } from 'common-frontend';
 
 import { OpenMiningRound } from '@daml.js/canton-coin-0.1.0/lib/CC/Round';
 
@@ -8,6 +8,7 @@ import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 export const useOpenMiningRounds = (): UseQueryResult<Contract<OpenMiningRound>[]> => {
   const { listOpenMiningRounds } = useSvAdminClient();
   return useQuery({
+    refetchInterval: PollingStrategy.FIXED,
     queryKey: ['listOpenMiningRounds'],
     queryFn: async () => {
       const { open_mining_rounds } = await listOpenMiningRounds();
