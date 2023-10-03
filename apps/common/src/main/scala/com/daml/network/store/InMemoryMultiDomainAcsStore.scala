@@ -330,6 +330,13 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     }
   }
 
+  final def findContract[C, TCid <: ContractId[_], T](companion: C)(
+      p: Contract[TCid, T] => Boolean = (_: Any) => true
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T]
+  ): Future[Option[ContractWithState[TCid, T]]] =
+    findContractWithOffset(companion)(p).map(_.value)
+
   override def findAnyContractWithOffset[C, TCid <: ContractId[_], T](companion: C)(implicit
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,

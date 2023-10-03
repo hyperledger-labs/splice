@@ -14,10 +14,10 @@ import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.store.MultiDomainAcsStore.ContractState
-import com.daml.network.util.{Codec, Contract, ContractMetadataUtil}
+import com.daml.network.util.{Codec, Contract, ContractWithState, ContractMetadataUtil}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -55,30 +55,21 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getOpenAndIssuingMiningRounds") { _ => _ =>
       for {
-        domainId <- store.defaultAcsDomainIdF
-        issuingRounds <- store.multiDomainAcsStore.listContractsOnDomain(
-          IssuingMiningRound.COMPANION,
-          domainId,
-        )
-        openRounds <- store.multiDomainAcsStore.listContractsOnDomain(
-          OpenMiningRound.COMPANION,
-          domainId,
-        )
-        summarizingRounds <- store.multiDomainAcsStore.listContractsOnDomain(
-          SummarizingMiningRound.COMPANION,
-          domainId,
-        )
+        issuingRounds <- store.multiDomainAcsStore
+          .listContracts(IssuingMiningRound.COMPANION)
+        openRounds <- store.multiDomainAcsStore
+          .listContracts(OpenMiningRound.COMPANION)
+        summarizingRounds <- store.multiDomainAcsStore
+          .listContracts(SummarizingMiningRound.COMPANION)
         issuingRoundsCachedByClient = body.cachedIssuingRoundContractIds.toSet
         openRoundsCachedByClient = body.cachedOpenMiningRoundContractIds.toSet
         issuingRoundsResponseMap = selectRoundsToRespondWith(
           issuingRounds,
           issuingRoundsCachedByClient,
-          domainId,
         )
         openRoundsResponseMap = selectRoundsToRespondWith(
           openRounds,
           openRoundsCachedByClient,
-          domainId,
         )
         ttl = tryComputeTimeToLive(openRounds, summarizingRounds, issuingRounds)
       } yield {
@@ -98,9 +89,9 @@ class HttpScanHandler(
     */
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def tryComputeTimeToLive(
-      openRounds: Seq[Contract[OpenMiningRound.ContractId, OpenMiningRound]],
-      summarizingRounds: Seq[Contract[SummarizingMiningRound.ContractId, SummarizingMiningRound]],
-      issuingRounds: Seq[Contract[IssuingMiningRound.ContractId, IssuingMiningRound]],
+      openRounds: Seq[Contract.Has[?, OpenMiningRound]],
+      summarizingRounds: Seq[Contract.Has[?, SummarizingMiningRound]],
+      issuingRounds: Seq[Contract.Has[?, IssuingMiningRound]],
   ) = {
     val microseconds: Seq[Long] = (openRounds.map(r =>
       r.payload.tickDuration.microseconds.toLong
@@ -113,12 +104,10 @@ class HttpScanHandler(
   }
 
   private def selectRoundsToRespondWith[TCid, T](
-      rounds: Seq[Contract[TCid, T]],
+      rounds: Seq[ContractWithState[TCid, T]],
       cachedRounds: Set[String],
-      onlyDomainId: DomainId,
   )(implicit tc: TraceContext): Map[String, MaybeCachedContractWithState] = {
-    val constDomain = Some(onlyDomainId.toProtoPrimitive)
-    rounds.map { round =>
+    rounds.view.map { round =>
       val roundIsAlreadyCached =
         cachedRounds.contains(round.contractId.contractId)
       (
@@ -129,8 +118,8 @@ class HttpScanHandler(
               show"Not sending ${PrettyContractId(round)}, as it is cached by the client."
             )
             None
-          } else Some(round.toHttp),
-          constDomain,
+          } else Some(round.contract.toHttp),
+          round.state.fold(domain => Some(domain.toProtoPrimitive), None),
         ),
       )
     }.toMap
@@ -206,14 +195,12 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getClosedRounds") { _ => _ =>
       for {
-        domainId <- store.defaultAcsDomainIdF
-        rounds <- store.multiDomainAcsStore.listContractsOnDomain(
-          ClosedMiningRound.COMPANION,
-          domainId,
+        rounds <- store.multiDomainAcsStore.listContracts(
+          ClosedMiningRound.COMPANION
         )
       } yield {
         val filteredRounds = rounds.sortBy(_.payload.round.number)
-        definitions.GetClosedRoundsResponse(filteredRounds.toVector.map(r => r.toHttp))
+        definitions.GetClosedRoundsResponse(filteredRounds.toVector.map(r => r.contract.toHttp))
       }
     }
   }
@@ -224,13 +211,11 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.listFeaturedAppRights") { _ => _ =>
       for {
-        domainId <- store.defaultAcsDomainIdF
-        apps <- store.multiDomainAcsStore.listContractsOnDomain(
-          coinCodegen.FeaturedAppRight.COMPANION,
-          domainId,
+        apps <- store.multiDomainAcsStore.listContracts(
+          coinCodegen.FeaturedAppRight.COMPANION
         )
       } yield {
-        definitions.ListFeaturedAppRightsResponse(apps.toVector.map(a => a.toHttp))
+        definitions.ListFeaturedAppRightsResponse(apps.toVector.map(a => a.contract.toHttp))
       }
     }
   }
@@ -243,13 +228,11 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.lookupFeaturedAppRight") { _ => _ =>
       for {
-        domainId <- store.defaultAcsDomainIdF
         right <- store.findFeaturedAppRight(
-          domainId,
-          PartyId.tryFromProtoPrimitive(providerPartyId),
+          PartyId.tryFromProtoPrimitive(providerPartyId)
         )
       } yield {
-        definitions.LookupFeaturedAppRightResponse(right.map(r => r.toHttp))
+        definitions.LookupFeaturedAppRightResponse(right.map(_.toHttp))
       }
     }
   }

@@ -11,7 +11,6 @@ import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCode
 import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, svcrules as svcrulesCodegen}
 import com.daml.network.codegen.java.cn.svc.globaldomain as globaldomainCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.config.{CNDbConfig, DomainConfig}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.history.{
   CoinExpire,
@@ -20,7 +19,6 @@ import com.daml.network.history.{
   Transfer,
 }
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import com.daml.network.scan.config.{ScanAppBackendConfig, ScanDomainConfig}
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.TxLogEntry.*
 import com.daml.network.scan.store.TxLogIndexRecord.{
@@ -641,7 +639,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         } yield {
           eventually() {
             store
-              .findFeaturedAppRight(dummyDomain, userParty(1))
+              .findFeaturedAppRight(userParty(1))
               .futureValue should be(Some(wanted))
           }
         }
@@ -1093,12 +1091,6 @@ class InMemoryScanStoreTest extends ScanStoreTest {
   override protected def mkStore(endUserParty: PartyId): Future[InMemoryScanStore] = {
     val store = new InMemoryScanStore(
       endUserParty,
-      ScanAppBackendConfig(
-        storage = CNDbConfig.Memory(),
-        svUser = endUserParty.toProtoPrimitive,
-        participantClient = null,
-        domains = new ScanDomainConfig(DomainConfig(DomainAlias.tryCreate(domain))),
-      ),
       loggerFactory,
       transactionTreeSource,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
@@ -1136,12 +1128,6 @@ class DbScanStoreTest
     val store = new DbScanStore(
       endUserParty,
       storage,
-      ScanAppBackendConfig(
-        storage = CNDbConfig.Memory(), // Note: this field is not used by the store
-        svUser = endUserParty.toProtoPrimitive,
-        participantClient = null,
-        domains = new ScanDomainConfig(DomainConfig(DomainAlias.tryCreate(domain))),
-      ),
       loggerFactory,
       transactionTreeSource,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),

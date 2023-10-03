@@ -195,8 +195,8 @@ object PrettyInstances extends PrettyInstances {
   }
 
   object PrettyContractId {
-    def apply(contract: Contract[?, ?]): PrettyContractId =
-      PrettyContractId(contract.identifier, contract.contractId)
+    def apply(contract: Contract.Has[?, ?]): PrettyContractId =
+      PrettyContractId(contract.contract.identifier, contract.contractId)
 
     def apply(
         identifier: javaapi.data.Identifier,

@@ -5,14 +5,8 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
-import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{
-  CNNodeAppStoreWithHistory,
-  ConfiguredDefaultDomain,
-  MultiDomainAcsStore,
-  TxLogStore,
-}
+import com.daml.network.store.{CNNodeAppStoreWithHistory, MultiDomainAcsStore, TxLogStore}
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.store.TxLogStore.TransactionTreeSource
@@ -34,20 +28,15 @@ trait ScanStore
     extends CNNodeAppStoreWithHistory[
       TxLogIndexRecord,
       TxLogEntry,
-    ]
-    with ConfiguredDefaultDomain {
+    ] {
 
   override protected def txLogParser = new ScanTxLogParser(loggerFactory)
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 
-  protected[this] def scanConfig: ScanAppBackendConfig
-
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter =
     ScanStore.contractFilter(svcParty)
-
-  override final def defaultAcsDomain = scanConfig.domains.global.alias
 
   def lookupCoinRules()(implicit
       tc: TraceContext
@@ -132,10 +121,7 @@ trait ScanStore
       tc: TraceContext
   ): Future[Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]]
 
-  def findFeaturedAppRight(
-      domainId: DomainId,
-      providerPartyId: PartyId,
-  )(implicit
+  def findFeaturedAppRight(providerPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
@@ -184,7 +170,6 @@ object ScanStore {
   def apply(
       svcParty: PartyId,
       storage: Storage,
-      scanConfig: ScanAppBackendConfig,
       loggerFactory: NamedLoggerFactory,
       connection: CNLedgerConnection,
       retryProvider: RetryProvider,
@@ -198,13 +183,12 @@ object ScanStore {
       case _: MemoryStorage =>
         new InMemoryScanStore(
           svcParty = svcParty,
-          scanConfig,
           loggerFactory,
           treeSource,
           retryProvider,
         )
       case db: DbStorage =>
-        new DbScanStore(svcParty, db, scanConfig, loggerFactory, treeSource, retryProvider)
+        new DbScanStore(svcParty, db, loggerFactory, treeSource, retryProvider)
     }
   }
 

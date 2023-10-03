@@ -8,7 +8,6 @@ import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.db.ScanTables.{ScanAcsStoreRowData, ScanTxLogRowData}
 import com.daml.network.scan.store.{ScanStore, TxLogEntry, TxLogIndexRecord}
 import com.daml.network.store.{Limit, LimitHelpers}
@@ -34,7 +33,6 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 class DbScanStore(
     override val svcParty: PartyId,
     storage: DbStorage,
-    override protected[this] val scanConfig: ScanAppBackendConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val transactionTreeSource: TransactionTreeSource,
     override protected val retryProvider: RetryProvider,
@@ -485,8 +483,7 @@ class DbScanStore(
     }
 
   override def findFeaturedAppRight(
-      domainId: DomainId,
-      providerPartyId: PartyId,
+      providerPartyId: PartyId
   )(implicit
       tc: TraceContext
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] =

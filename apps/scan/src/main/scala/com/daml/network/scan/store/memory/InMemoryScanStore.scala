@@ -9,13 +9,12 @@ import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
-import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.{ScanStore, TxLogEntry, TxLogIndexRecord}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.{HardLimit, InMemoryCNNodeAppStore}
 import com.daml.network.util.{Contract, ContractWithState}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -24,7 +23,6 @@ import java.time.Instant
 
 class InMemoryScanStore(
     override val svcParty: PartyId,
-    override protected[this] val scanConfig: ScanAppBackendConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val transactionTreeSource: TransactionTreeSource,
     override protected val retryProvider: RetryProvider,
@@ -347,19 +345,16 @@ class InMemoryScanStore(
     )
 
   override def findFeaturedAppRight(
-      domainId: DomainId,
-      providerPartyId: PartyId,
+      providerPartyId: PartyId
   )(implicit tc: TraceContext): Future[
     Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
-  ] = {
-    multiDomainAcsStore.findContractOnDomain(
-      coinCodegen.FeaturedAppRight.COMPANION
-    )(
-      domainId,
-      (co: Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]) =>
-        co.payload.provider == providerPartyId.toProtoPrimitive,
-    )
-  }
+  ] =
+    multiDomainAcsStore
+      .findContract(coinCodegen.FeaturedAppRight.COMPANION) {
+        co: Contract[?, coinCodegen.FeaturedAppRight] =>
+          co.payload.provider == providerPartyId.toProtoPrimitive
+      }
+      .map(_ map (_.contract))
 
   override def close(): Unit = {
     super.close()
