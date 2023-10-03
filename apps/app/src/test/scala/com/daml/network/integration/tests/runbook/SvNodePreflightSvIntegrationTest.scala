@@ -171,7 +171,8 @@ final class SvNodePreflightSvNonDevNetIntegrationTest extends SvNodePreflightSvI
 
   "ParticipantId matches the expected one" in { _ =>
     val svUiUrl = s"https://sv.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    val participantId = "1220a07b1a67efd1e0421230a109b57e519223574f8e2d7bcb7c348c8d011e1461b9"
+    // we need to update this hard-coded string when we change it
+    val participantId = "122094f834829f4e48f0712fca8fec13ac867e97da47311729508704f7f59994c7b5"
 
     withFrontEnd("sv") { implicit webDriver =>
       clue(s"Logging in to sv ui at ${svUiUrl}") {
