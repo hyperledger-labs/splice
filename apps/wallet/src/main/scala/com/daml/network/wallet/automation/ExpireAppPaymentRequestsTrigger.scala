@@ -49,6 +49,7 @@ class ExpireAppPaymentRequestsTrigger(
       )
       _ <- connection
         .submit(Seq(store.key.validatorParty), Seq(store.key.endUserParty), cmd)
+        .withDomainId(task.work.domain)
         .noDedup
         .yieldResult()
     } yield TaskSuccess("expired app payment request")

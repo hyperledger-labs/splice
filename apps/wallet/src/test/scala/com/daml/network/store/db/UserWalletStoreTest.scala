@@ -1237,6 +1237,7 @@ class InMemoryUserWalletStoreTest extends UserWalletStoreTest {
   ): Future[InMemoryUserWalletStore] = {
     val store = new InMemoryUserWalletStore(
       key = storeKey(endUserParty),
+      defaultAcsDomain = domainAlias,
       loggerFactory = loggerFactory,
       transactionTreeSource = transactionTreeSource,
       retryProvider =
@@ -1276,6 +1277,7 @@ class DbUserWalletStoreTest
 
     val store = new DbUserWalletStore(
       key = storeKey(endUserParty),
+      defaultAcsDomain = domainAlias,
       storage = storage,
       loggerFactory = loggerFactory,
       transactionTreeSource = transactionTreeSource,

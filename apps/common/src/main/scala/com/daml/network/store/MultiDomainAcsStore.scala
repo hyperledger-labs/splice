@@ -115,31 +115,26 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
       traceContext: TraceContext
   ): Future[Boolean]
 
-  /** Like `lookupContractById` but
-    *
-    * Throws [[Status.NOT_FOUND]] if no such contract exists.
-    */
-  final def getContractById[C, TCid <: ContractId[_], T](
-      companion: C
-  )(id: ContractId[_])(implicit
-      ec: ExecutionContext,
-      companionClass: ContractCompanion[C, TCid, T],
-      traceContext: TraceContext,
-  ): Future[ContractWithState[TCid, T]] =
-    orContractIdNotFound(lookupContractById(companion)(id))(companion, id)
-
   /** Like `lookupContractByIdOnDomain` but
     *
     * Throws [[Status.NOT_FOUND]] if no such contract exists.
     */
-  final def getContractByIdOnDomain[C, TCid <: ContractId[_], T](
+  def getContractByIdOnDomain[C, TCid <: ContractId[_], T](
       companion: C
   )(domain: DomainId, id: ContractId[_])(implicit
       ec: ExecutionContext,
       companionClass: ContractCompanion[C, TCid, T],
       traceContext: TraceContext,
   ): Future[Contract[TCid, T]] =
-    orContractIdNotFound(lookupContractByIdOnDomain(companion)(domain, id))(companion, id)
+    lookupContractByIdOnDomain(companion)(domain, id).map(result =>
+      result.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(
+            show"contract id not found: ${PrettyContractId(companionClass.typeId(companion), id)}"
+          )
+          .asRuntimeException
+      )
+    )
 
   def listContracts[C, TCid <: ContractId[_], T](
       companion: C,
@@ -726,19 +721,4 @@ object MultiDomainAcsStore {
       param("state", _.state),
     )
   }
-
-  private def orContractIdNotFound[A, C](found: Future[Option[A]])(companion: C, id: ContractId[_])(
-      implicit
-      ec: ExecutionContext,
-      companionClass: ContractCompanion[C, ?, ?],
-  ): Future[A] =
-    found.map { result =>
-      result.getOrElse(
-        throw Status.NOT_FOUND
-          .withDescription(
-            show"contract id not found: ${PrettyContractId(companionClass.typeId(companion), id)}"
-          )
-          .asRuntimeException
-      )
-    }
 }

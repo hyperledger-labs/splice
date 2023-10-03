@@ -111,8 +111,8 @@ class HttpWalletHandler(
         appPaymentRequest <- userStore.getAppPaymentRequest(requestCid)
       } yield r0.GetAppPaymentRequestResponseOK(
         d0.AppPaymentRequest(
-          appPaymentRequest.appPaymentRequest.contract.toHttp,
-          appPaymentRequest.deliveryOffer.contract.toHttp,
+          appPaymentRequest.appPaymentRequest.toHttp,
+          appPaymentRequest.deliveryOffer.toHttp,
         )
       )
     }
@@ -128,8 +128,8 @@ class HttpWalletHandler(
         appPaymentRequests <- userStore.listAppPaymentRequests
       } yield d0.ListAppPaymentRequestsResponse(appPaymentRequests.map { appPaymentRequest =>
         d0.AppPaymentRequest(
-          appPaymentRequest.appPaymentRequest.contract.toHttp,
-          appPaymentRequest.deliveryOffer.contract.toHttp,
+          appPaymentRequest.appPaymentRequest.toHttp,
+          appPaymentRequest.deliveryOffer.toHttp,
         )
       }.toVector)
     }
