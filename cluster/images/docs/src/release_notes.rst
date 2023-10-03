@@ -3,6 +3,15 @@
 Release Notes
 =============
 
+2023-10-09
+----------
+
+* Frontend updates
+
+  * The "SVC Configuration" and "Canton Coin Configuration" tabs in the SV UI were renamed to,
+    respectively, "SVC Info" and "Canton Coin Info",
+    to reflect the fact that they also show non-configuration information.
+
 2023-10-02
 ----------
 

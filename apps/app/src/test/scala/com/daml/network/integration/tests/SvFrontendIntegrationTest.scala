@@ -72,11 +72,11 @@ class SvFrontendIntegrationTest
             inside(find(id("information-tab-general"))) { case Some(e) =>
               e.text shouldBe "General"
             }
-            inside(find(id("information-tab-svc-configuration"))) { case Some(e) =>
-              e.text shouldBe "SVC Configuration"
+            inside(find(id("information-tab-svc-info"))) { case Some(e) =>
+              e.text shouldBe "SVC Info"
             }
-            inside(find(id("information-tab-cc-configuration"))) { case Some(e) =>
-              e.text shouldBe "Canton Coin Configuration"
+            inside(find(id("information-tab-cc-info"))) { case Some(e) =>
+              e.text shouldBe "Canton Coin Info"
             }
             inside(find(id("information-tab-cometBft-debug"))) { case Some(e) =>
               e.text shouldBe "CometBFT Debug Info"

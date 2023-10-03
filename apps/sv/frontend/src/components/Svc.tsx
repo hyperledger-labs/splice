@@ -249,8 +249,8 @@ const SvcViewPrettyJSON = () => {
       <Box mt={4} sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={value} onChange={handleChange} aria-label="json tabs">
           <Tab label="General" {...tabProps('general')} />
-          <Tab label="SVC Configuration" {...tabProps('svc-configuration')} />
-          <Tab label="Canton Coin Configuration" {...tabProps('cc-configuration')} />
+          <Tab label="SVC Info" {...tabProps('svc-info')} />
+          <Tab label="Canton Coin Info" {...tabProps('cc-info')} />
           <Tab label="CometBFT Debug Info" {...tabProps('cometBft-debug')} />
           <Tab label="Domain Node Status" {...tabProps('canton-domain-status')} />
         </Tabs>
