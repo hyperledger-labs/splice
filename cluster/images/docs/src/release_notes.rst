@@ -3,16 +3,12 @@
 Release Notes
 =============
 
-2023-10-16
+2023-10-09
 ----------
 
 * Deployment updates
 
-  * The URL of the global domain has changed to `http://sequencer.sv-1.svc.<cluster>.network.canton.global:5008`. This change is reflected in the values specified in `participant-values.yaml`, `validator-values.yaml` and `sv-values.yaml`.
-
-
-2023-10-09
-----------
+  * The URL of the global domain has changed to `http://sequencer.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:5008`. This change is reflected in the values specified in `participant-values.yaml`, `validator-values.yaml` and `sv-values.yaml`.
 
 * Frontend updates
 
@@ -21,7 +17,7 @@ Release Notes
     to reflect the fact that they also show non-configuration information.
 
 * Bugfixes:
-  
+
   * Fixed broken Recent Activity tab link on the scan UI.
 
 2023-10-02
