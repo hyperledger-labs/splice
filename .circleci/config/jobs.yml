@@ -315,6 +315,13 @@ jobs:
             fi
             cncluster activate
             cncluster ci_apply
+      - run_bash_command_in_nix:
+          cmd_name: Update deployment branch for cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep GITHUB_TOKEN"
+          cmd: |
+            scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
+          cmd_retry_count: 5
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
       - collect_test_timings_and_send_to_datadog
