@@ -37,6 +37,7 @@ class LocalRunbookIntegrationTest
   // Note that system properties can only be used in tests at this point.
   System.setProperty("NETWORK_APPS_ADDRESS", "localhost")
   System.setProperty("NETWORK_APPS_ADDRESS_PROTOCOL", "http")
+  System.setProperty("GLOBAL_DOMAIN_URL", "http://localhost:5008")
 
   override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
     ("ParticipantLedgerApi", 7001),

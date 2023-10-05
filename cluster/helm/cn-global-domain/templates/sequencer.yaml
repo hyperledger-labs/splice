@@ -99,10 +99,10 @@ spec:
   selector:
     app: {{ .Release.Name }}-sequencer
   ports:
-    - name: cs-pub-api
+    - name: grpc-cs-pub-api
       port: 5008
       protocol: TCP
-    - name: cs-adm-api
+    - name: grpc-cs-adm-api
       port: 5009
       protocol: TCP
     - name: cs-metrics

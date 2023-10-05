@@ -235,6 +235,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     approvedSvIdentities,
     domain: {
       enable: includesCometBftGlobalDomainNode,
+      sequencerPublicUrl: `http://sequencer.sv.svc.${CLUSTER_BASENAME}.network.canton.global:5008`,
     },
   };
 

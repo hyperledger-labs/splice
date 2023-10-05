@@ -26,7 +26,6 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import io.grpc.Status
 
-import java.net.URI
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Connections to the domain node (composed of sequencer + mediator) operated by the SV running this SV app.
@@ -37,7 +36,8 @@ final class LocalDomainNode(
     val sequencerAdminConnection: SequencerAdminConnection,
     val mediatorAdminConnection: MediatorAdminConnection,
     val staticDomainParameters: StaticDomainParameters,
-    val sequencerPublicConfig: ClientConfig,
+    val sequencerInternalConfig: ClientConfig,
+    val sequencerExternalPublicUrl: String,
     override val loggerFactory: NamedLoggerFactory,
     override protected[this] val retryProvider: RetryProvider,
 )(implicit
@@ -51,8 +51,8 @@ final class LocalDomainNode(
 
   val sequencerConnection =
     new GrpcSequencerConnection(
-      LocalDomainNode.toEndpoints(sequencerPublicConfig),
-      transportSecurity = sequencerPublicConfig.tls.isDefined,
+      LocalDomainNode.toEndpoints(sequencerInternalConfig),
+      transportSecurity = sequencerInternalConfig.tls.isDefined,
       customTrustCertificates = None,
       SequencerAlias.Default,
     )
@@ -245,9 +245,6 @@ final class LocalDomainNode(
           Future.unit
       }
 
-  def getSequencerPublicUri: URI =
-    LocalDomainNode.toEndpoint(sequencerPublicConfig).toURI(sequencerPublicConfig.tls.isDefined)
-
   private def onboardLocalSequencer(
       domainAlias: DomainAlias,
       domainId: DomainId,
@@ -300,7 +297,7 @@ final class LocalDomainNode(
       )
       _ <- participantAdminConnection.modifyDomainConnectionConfig(
         domainAlias,
-        addLocalSequencerConnection(sequencerPublicConfig),
+        addLocalSequencerConnection(sequencerInternalConfig),
       )
       _ = logger.info("Participant is now connected to new sequencer")
     } yield ()

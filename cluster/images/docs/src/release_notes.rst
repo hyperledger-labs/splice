@@ -3,6 +3,14 @@
 Release Notes
 =============
 
+2023-10-16
+----------
+
+* Deployment updates
+
+  * The URL of the global domain has changed to `http://sequencer.sv-1.svc.<cluster>.network.canton.global:5008`. This change is reflected in the values specified in `participant-values.yaml`, `validator-values.yaml` and `sv-values.yaml`.
+
+
 2023-10-09
 ----------
 

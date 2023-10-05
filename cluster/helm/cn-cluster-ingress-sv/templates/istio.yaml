@@ -144,3 +144,38 @@ spec:
               number: 80
             host: directory-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
+{{- if .Values.withDomainNode }}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: sequencer-sv-{{ (.Values.cluster).svNamespace }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+    - "sequencer.{{ (.Values.cluster).svNamespace }}.svc.{{ (.Values.cluster).hostname }}"
+  gateways:
+    - cluster-ingress/cn-apps-gateway
+  http:
+  - match:
+    - port: 5008
+    route:
+    - destination:
+        port:
+          number: 5008
+        host: global-domain-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+  - match:
+    - port: 5009
+    route:
+    - destination:
+        port:
+          number: 5009
+        host: global-domain-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+  - match:
+    - port: 10313
+    route:
+    - destination:
+        port:
+          number: 10313
+        host: global-domain-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+{{- end }}
+---

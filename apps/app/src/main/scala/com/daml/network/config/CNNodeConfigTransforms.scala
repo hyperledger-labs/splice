@@ -432,7 +432,7 @@ object CNNodeConfigTransforms {
   private def portTransform(bump: Int, c: SvSequencerConfig): SvSequencerConfig =
     c.focus(_.adminApi)
       .modify(portTransform(bump, _))
-      .focus(_.publicApi)
+      .focus(_.internalApi)
       .modify(portTransform(bump, _))
 
   private def portTransform(bump: Int, c: SvMediatorConfig): SvMediatorConfig =

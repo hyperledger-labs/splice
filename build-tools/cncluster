@@ -960,7 +960,7 @@ function subcmd_sbt_for_preflight() {
     _needs_auth0_management_api_creds
 
     (cd "${REPO_ROOT}" && \
-         DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 \
+         DOMAIN_URL=http://sequencer.sv-1.svc.${GCP_CLUSTER_BASENAME}.network.canton.global:5008 \
          NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global \
          NETWORK_APPS_ADDRESS_PROTOCOL=https \
          VALIDATOR_USER_NAME=manual_preflight \

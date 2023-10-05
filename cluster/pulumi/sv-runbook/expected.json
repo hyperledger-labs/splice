@@ -284,7 +284,7 @@
         "enableHealthProbes": true,
         "globalDomain": {
           "alias": "global",
-          "url": "http://svrun.network.com.network.canton.global:5008"
+          "url": "http://sequencer.sv-1.svc.svrun.network.com.network.canton.global:5008"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": "postgres",
@@ -402,9 +402,10 @@
           "enabled": true
         },
         "domain": {
-          "enable": true
+          "enable": true,
+          "sequencerPublicUrl": "http://sequencer.sv.svc.svrun.network.canton.global:5008"
         },
-        "globalDomainUrl": "http://svrun.network.com.network.canton.global:5008",
+        "globalDomainUrl": "http://sequencer.sv-1.svc.svrun.network.com.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv"
@@ -462,7 +463,7 @@
         },
         "clusterUrl": "svrun.network.com.network.canton.global",
         "disableAllocateLedgerApiUserParty": true,
-        "globalDomainUrl": "http://svrun.network.com.network.canton.global:5008",
+        "globalDomainUrl": "http://sequencer.sv-1.svc.svrun.network.com.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
         "scanAddress": "https://scan.sv-1.svc.svrun.network.com.network.canton.global/api/v0/scan",

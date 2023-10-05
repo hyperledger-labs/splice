@@ -142,7 +142,8 @@ class SvApp(
             .valueOr(err =>
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
             ),
-          config.sequencer.publicApi,
+          config.sequencer.internalApi,
+          config.sequencer.externalPublicApiUrl,
           loggerFactory,
           retryProvider,
         )

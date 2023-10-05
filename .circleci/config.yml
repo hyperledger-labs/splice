@@ -1689,7 +1689,7 @@ jobs:
           cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
           post_sbt_cmd: ./stop-frontends.sh
           additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
-          extra_env_vars: POSTGRES_DB=postgres DOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight"
+          extra_env_vars: POSTGRES_DB=postgres DOMAIN_URL=http://sequencer.sv-1.svc.${GCP_CLUSTER_BASENAME}.network.canton.global:5008 NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight"
           extra_parameters: -DAUTH0_TENANT=dev
           timeout: "15m"
           cmd_retry_count: 3

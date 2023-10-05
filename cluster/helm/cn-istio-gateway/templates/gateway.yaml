@@ -43,14 +43,12 @@ spec:
       name: grpc-cd-pub-api
       protocol: GRPC
     hosts:
-    - "{{ (.Values.cluster).hostname }}"
     - "*.{{ (.Values.cluster).hostname }}"
   - port:
       number: 5009
       name: grpc-cd-adm-api
       protocol: GRPC
     hosts:
-    - "{{ (.Values.cluster).hostname }}"
     - "*.{{ (.Values.cluster).hostname }}"
   - port:
       number: 10313
@@ -60,7 +58,6 @@ spec:
       mode: SIMPLE
       credentialName: cn-{{ (.Values.cluster).basename }}net-tls
     hosts:
-    - "{{ (.Values.cluster).hostname }}"
     - "*.{{ (.Values.cluster).hostname }}"
   - port:
       number: 5002

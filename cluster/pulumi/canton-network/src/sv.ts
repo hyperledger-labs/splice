@@ -220,7 +220,10 @@ export function installSvNode(config: SvConfig): {
       // defaults for ports and address are fine,
       // we need to include a dummy value though
       // because helm does not distinguish between an empty object and unset.
-      { enable: config.withDomainNode },
+      {
+        enable: config.withDomainNode,
+        sequencerPublicUrl: `http://sequencer.${config.nodename}.svc.${CLUSTER_BASENAME}.network.canton.global:5008`,
+      },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
       expiresIn: onboarding.expiresIn,
       secretFrom: {
@@ -294,6 +297,7 @@ export function installSvNode(config: SvConfig): {
     {
       withScan: config.withScan,
       withDirectoryBackend: config.withDirectoryBackend,
+      withDomainNode: config.withDomainNode,
       cluster: {
         hostname: `${CLUSTER_BASENAME}.network.canton.global`,
         svNamespace: xns.logicalName,

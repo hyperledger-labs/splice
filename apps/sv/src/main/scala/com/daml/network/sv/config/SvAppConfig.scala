@@ -158,7 +158,8 @@ case class CometBftConfig(
 
 final case class SvSequencerConfig(
     adminApi: ClientConfig,
-    publicApi: ClientConfig,
+    internalApi: ClientConfig,
+    externalPublicApiUrl: String,
 )
 
 final case class SvMediatorConfig(

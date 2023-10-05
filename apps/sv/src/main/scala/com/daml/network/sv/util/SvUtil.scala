@@ -87,7 +87,7 @@ object SvUtil {
     node.sequencerAdminConnection.getSequencerId.map { sequencerId =>
       LocalSequencerConfig(
         sequencerId.toProtoPrimitive,
-        node.getSequencerPublicUri.toString,
+        node.sequencerExternalPublicUrl,
       )
     }
   }.sequence
