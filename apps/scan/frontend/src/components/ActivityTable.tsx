@@ -29,7 +29,7 @@ export const ActivityTable: React.FC = () => {
 
   const pagedActivities = activityQuery.data ? activityQuery.data.pages : [];
   return (
-    <Stack spacing={4} direction="column">
+    <Stack spacing={4} direction="column" data-testid="activity-table">
       {isLoading ? (
         <Loading />
       ) : isError ? (
@@ -49,6 +49,7 @@ export const ActivityTable: React.FC = () => {
               <TableCell align="right">Price</TableCell>
             </TableRow>
           </TableHead>
+
           <TableBody>
             {pagedActivities.map(
               activities =>

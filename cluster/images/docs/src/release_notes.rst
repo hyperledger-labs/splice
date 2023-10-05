@@ -20,6 +20,10 @@ Release Notes
     respectively, "SVC Info" and "Canton Coin Info",
     to reflect the fact that they also show non-configuration information.
 
+* Bugfixes:
+  
+  * Fixed broken Recent Activity tab link on the scan UI.
+
 2023-10-02
 ----------
 
