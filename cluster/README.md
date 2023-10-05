@@ -4,9 +4,7 @@
   - [Available Clusters](#available-clusters)
   - [Connecting to a Cluster](#connecting-to-a-cluster)
     - [Granting VPN Access to External Partners](#granting-vpn-access-to-external-partners)
-    - [Available Cluster Services](#available-cluster-services)
     - [Connecting Locally Hosted Canton Network Apps to a Cluster](#connecting-locally-hosted-canton-network-apps-to-a-cluster)
-    - [Connecting Locally Hosted Canton Components to a Cluster](#connecting-locally-hosted-canton-components-to-a-cluster)
     - [Network Configuration Within Kubernetes](#network-configuration-within-kubernetes)
   - [Cluster Tooling](#cluster-tooling)
   - [Pulumi and Helm](#pulumi-and-helm)
@@ -76,20 +74,20 @@ The global Canton Network clusters are currently hosted in Google
 Cloud. There are multiple clusters, each with a different purpose, all
 of which are accessible only through VPN:
 
-| Cluster         | URL                                       | Deployment Policy           | Purpose                                |
-|-----------------|-------------------------------------------|-----------------------------|----------------------------------------|
-| TestNet         | http://test.network.canton.global         | Weekly, Midnight UTC Sunday | Longer Running Tests                   |
-| DevNet          | http://dev.network.canton.global          | Weekly, 3AM UTC Monday      | Current, Tested `main`                 |
-| CIDaily         | http://cidaily.network.canton.global      | Nightly, 6AM UTC            | Current, Tested `main`                 |
-| CIMain          | http://cimain.network.canton.global       | After every push to `main`  | Latest `main`                          |
-| ScratchNetA     | http://scratcha.network.canton.global     | Ad hoc, manual              | Cluster Configuration Development      |
-| ScratchNetB     | http://scratchb.network.canton.global     | Ad hoc, manual              | Cluster Configuration Development      |
-| ScratchNetC     | http://scratchc.network.canton.global     | Ad hoc, manual              | Cluster Configuration Development      |
-| ScratchNetD     | http://scratchd.network.canton.global     | Ad hoc, manual              | Cluster Configuration Development      |
-| ScratchNetE     | http://scratche.network.canton.global     | Ad hoc, manual              | Cluster Configuration Development      |
-| ScratchNetF     | http://scratchf.network.canton.global     | Ad hoc, manual              | Cluster Configuration Development      |
-| ScratchNetG     | http://scratchg.network.canton.global     | Ad hoc, manual              | Cluster Configuration Development      |
-| TestNet Preview | http://test-preview.network.canton.global | Ad hoc, through CI          | Longer Running Tests with devnet=false |
+| Cluster         | URL                                          | Deployment Policy           | Purpose                                |
+|-----------------|----------------------------------------------|-----------------------------|----------------------------------------|
+| TestNet         | http://test.network.canton.global            | Weekly, Midnight UTC Sunday | Longer Running Tests                   |
+| DevNet          | http://dev.network.canton.global             | Weekly, 3AM UTC Monday      | Current, Tested `main`                 |
+| CIDaily         | http://cidaily.network.canton.global         | Nightly, 6AM UTC            | Current, Tested `main`                 |
+| CIMain          | http://cimain.network.canton.global          | After every push to `main`  | Latest `main`                          |
+| CIDaily TestNet | http://cidaily-testnet.network.canton.global | Daily, through CI           | Longer Running Tests with devnet=false |
+| CILR            | http://cilr.network.canton.global            | Monthly, on the first       | Test behavior of long running clusters |
+| ScratchNetA     | http://scratcha.network.canton.global        | Ad hoc, manual              | Cluster Configuration Development      |
+| ScratchNetB     | http://scratchb.network.canton.global        | Ad hoc, manual              | Cluster Configuration Development      |
+| ScratchNetC     | http://scratchc.network.canton.global        | Ad hoc, manual              | Cluster Configuration Development      |
+| ScratchNetD     | http://scratchd.network.canton.global        | Ad hoc, manual              | Cluster Configuration Development      |
+| ScratchNetE     | http://scratche.network.canton.global        | Ad hoc, manual              | Cluster Configuration Development      |
+
 
 The automatic deployments are configured as
 [Scheduled](https://app.circleci.com/settings/project/github/DACH-NY/canton-network-node/triggers?return-to=https%3A%2F%2Fapp.circleci.com%2Fpipelines%2Fgithub%2FDACH-NY%2Fcanton-network-node)
@@ -147,12 +145,6 @@ The process by which access is granted is this:
   account and send documentation to the external user.
 * Once the account has been confirmed, the ticket can be closed.
 
-### Available Cluster Services
-
-Provided you are connecting through one of the listed VPNs, a full
-list of services provided through the cluster is available via
-`cncluster ports`.
-
 ### Connecting Locally Hosted Canton Network Apps to a Cluster
 
 The preferred way to connect a locally hosted Canton Network App to a
@@ -161,17 +153,6 @@ section on Self Hosting apps. This is available through the cluster
 specific documentation that we make available through the cluster
 links. The source for this documentation is available
 [here](/cluster/images/docs/src/validator_operator/self_hosting.rst).
-
-### Connecting Locally Hosted Canton Components to a Cluster
-
-It is also possible to connect locally hosted Canton components into
-this environment. This includes the REPL, participant nodes, and
-domain nodes.  If you don't have Canton, you may install it following the
-instructions [here](https://docs.daml.com/canton/usermanual/installation.html).
-
-As part of the runbook a participant node is spun up and connects to
-the DevNet domain. Therefore, the runbook contains alternative scripts
-for connecting a local participant to the DevNet domain.
 
 ### Network Configuration Within Kubernetes
 
@@ -374,8 +355,8 @@ Given approval, a manual deployment of `main` can be done as follows:
 3. Add a parameter named `run-job`, with one of the following values:
    * `deploy-devnet` - Reset the state of `DevNet` and deploy a new code set.
    * `deploy-testnet` - Reset the state of `TestNet` and deploy a new code set.
-   * `deploy-testnet-preview` - Reset the state of `TestNet Preview` and deploy a new code set.
-4. When deploying a network that bootstraps from ACS and participant identities dumps (such as `TestNet` and `TestNet Preview`), you might need to override the default bootstrapping config using an additional `bootstrapping-config` parameter. See [Bootstrapping from a Cluster Data Dump](#bootstrapping-from-a-cluster-data-dump).
+   * `deploy-cidaily-testnet` - Reset the state of `CIDaily TestNet` and deploy a new code set.
+4. When deploying a network that bootstraps from ACS and participant identities dumps (such as `TestNet` and `CIDaily TestNet`), you might need to override the default bootstrapping config using an additional `bootstrapping-config` parameter. See [Bootstrapping from a Cluster Data Dump](#bootstrapping-from-a-cluster-data-dump).
 5. Observe progress of the job via the CI console.
 
 #### Optional deployment settings
@@ -388,8 +369,8 @@ For the manual deployments the following optional configs are available via para
 
 To confirm the deployment, you can use a command like the following to
 inspect pod state. The `--all-namespaces` flag is necessary because we
-now run our clusters with multiple Kubernetes namespaces for various
-sub-modules. Without this flag, `kubectl get pods` will skip listing
+run our clusters with a Kubernetes namespace for each
+sub-module. Without this flag, `kubectl get pods` will skip listing
 most of our `Pods`.
 
 `(cd cluster/deployment/devnet && kubectl get pods --all-namespaces)`
@@ -504,13 +485,14 @@ See See https://cloud.google.com/logging/docs/view/logging-query-language for do
 
 #### GCE Dashboards
 
-Each of our two GCE projects has a corresponding dashboard that shows
+Each of our GCE projects has a corresponding dashboard that shows
 high level stats for the clusters hosted in that project. This
 includes information on memory, network, and CPU usage trends over
 time:
 
 * [`TestNet`/`DevNet`](https://console.cloud.google.com/monitoring/dashboards/builder/f4d4f86d-7c59-4b27-9a73-fb6e0418e45b?project=da-cn-devnet&dashboardBuilderState=%257B%2522editModeEnabled%2522:false%257D&timeDomain=1m)
 * [`Staging`/`ScratchNet`](https://console.cloud.google.com/monitoring/dashboards/builder/ef100871-4e71-409e-a3c2-706b2dbd5465?project=da-cn-scratchnet&dashboardBuilderState=%257B%2522editModeEnabled%2522:false%257D&timeDomain=1m)
+* [`cilr`](https://console.cloud.google.com/monitoring/dashboards/builder/80e9d615-0230-4566-a391-1264215d1fd4;duration=P1M?project=da-cn-ci)
 
 #### GCE Log Explorer
 
@@ -519,6 +501,7 @@ feature, available here:
 
 * [`TestNet`/`DevNet`](https://console.cloud.google.com/logs/query?project=da-cn-devnet)
 * [`Staging`/`ScratchNet`](https://console.cloud.google.com/logs/query?project=da-cn-scratchnet)
+* [CI Clusters (`daily`, `daily-testnet`, `cilr`, and `main`)](https://console.cloud.google.com/logs/query;duration=P1M?project=da-cn-ci)
 
 Log volumes can be very high, and not all of our current processes
 generate logs in the GCE JSON format. This makes it important to use
@@ -651,7 +634,8 @@ We have configured alert policies on Google Cloud for our `devnet`, `testnet`, a
 Our policies can be configured and extended via the
 [Google alerting dashoard](https://console.cloud.google.com/monitoring/alerting?project=da-cn-devnet).
 When an alert triggers, we are notified over Slack on the `#team-canton-network-internal-ci` channel.
-At the time of writing, we have only configured alerts on unexpectedly high CPU usage.
+At the time of writing, we have only configured alerts on unexpectedly high CPU usage and
+disk volume utilization beyond 80%.
 
 ### Checking Pod Node Assignments and Memory Usage
 
