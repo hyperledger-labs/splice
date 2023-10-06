@@ -87,6 +87,8 @@ spec:
       - env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
+        - name: CN_APP_DIRECTORY_UI_CLUSTER
+          value: {{ .Values.clusterUrl | quote }}
         image: "{{ .Values.imageRepo }}/scan-web-ui:{{ (.Values.cluster).imageTag }}"
         imagePullPolicy: Always
         name: scan-web-ui

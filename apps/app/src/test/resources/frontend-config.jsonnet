@@ -80,6 +80,7 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
   },
   scan: {
     scan: { url: "http://localhost:5012" },
+    directory: { url: "http://localhost:5110" },
   },
   sv1: {
     sv: { url: "http://localhost:5014" },

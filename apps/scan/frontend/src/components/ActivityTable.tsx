@@ -2,9 +2,9 @@ import * as React from 'react';
 import BigNumber from 'bignumber.js';
 import {
   AmountDisplay,
+  DirectoryEntry,
   ErrorDisplay,
   Loading,
-  PartyId,
   RateDisplay,
   TitledTable,
 } from 'common-frontend';
@@ -292,10 +292,10 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
         </Typography>
       </TableCell>
       <TableCell>
-        <PartyId partyId={activity.provider} />
+        <DirectoryEntry partyId={activity.provider} />
       </TableCell>
       <TableCell>
-        <PartyId partyId={activity.sender} />
+        <DirectoryEntry partyId={activity.sender} />
       </TableCell>
       <TableCell>
         {(() => {
@@ -307,7 +307,7 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
                 </Typography>
               );
             default:
-              return <PartyId className="receiver" partyId={activity.receiver} />;
+              return <DirectoryEntry className="receiver" partyId={activity.receiver} />;
           }
         })()}
       </TableCell>

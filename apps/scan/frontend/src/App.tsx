@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { cnReplaceEqualDeep, theme } from 'common-frontend';
+import { DirectoryClientProvider, cnReplaceEqualDeep, theme } from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
 import {
@@ -34,7 +34,9 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   return (
     <QueryClientProvider client={queryClient}>
       <ReactQueryDevtools initialIsOpen={false} />
-      <ScanClientProvider url={config.services.scan.url}>{children}</ScanClientProvider>
+      <DirectoryClientProvider url={config.services.directory.url}>
+        <ScanClientProvider url={config.services.scan.url}>{children}</ScanClientProvider>
+      </DirectoryClientProvider>
     </QueryClientProvider>
   );
 };
