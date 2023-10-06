@@ -299,9 +299,16 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
       "return correct results" in {
         for {
-          store1 <- mkStore(user1)
-          store2 <- mkStore(user2)
-          storeP <- mkStore(provider1)
+          Seq(store1, store2, storeP) <- Future.traverse(Seq(user1, user2, provider1)) {
+            endUserParty =>
+              for {
+                store <- mkStore(endUserParty)
+                _ <- dummyDomain.create(
+                  walletInstall(endUserParty),
+                  createdEventSignatories = Seq(endUserParty, svcParty),
+                )(store.multiDomainAcsStore)
+              } yield store
+          }
           allAcsStores = Seq(
             store1.multiDomainAcsStore,
             store2.multiDomainAcsStore,
@@ -365,6 +372,10 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       "return correct results if a request is archived" in {
         for {
           store1 <- mkStore(user1)
+          _ <- dummyDomain.create(
+            walletInstall(user1),
+            createdEventSignatories = Seq(user1, svcParty),
+          )(store1.multiDomainAcsStore)
           request1 = appPaymentRequest(
             user1,
             provider1,
@@ -1207,7 +1218,6 @@ class InMemoryUserWalletStoreTest extends UserWalletStoreTest {
   ): Future[InMemoryUserWalletStore] = {
     val store = new InMemoryUserWalletStore(
       key = storeKey(endUserParty),
-      defaultAcsDomain = domainAlias,
       loggerFactory = loggerFactory,
       transactionTreeSource = transactionTreeSource,
       retryProvider =
@@ -1247,7 +1257,6 @@ class DbUserWalletStoreTest
 
     val store = new DbUserWalletStore(
       key = storeKey(endUserParty),
-      defaultAcsDomain = domainAlias,
       storage = storage,
       loggerFactory = loggerFactory,
       transactionTreeSource = transactionTreeSource,

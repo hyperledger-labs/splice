@@ -54,7 +54,6 @@ class ExpireTransferOfferTrigger(
           logger.debug("Expiring expired transfer offer")
           connection
             .submit(Seq(store.key.validatorParty), Seq(store.key.endUserParty), cmd)
-            .withDomainId(task.work.domain)
             .noDedup
             .yieldResult()
         case _ =>
