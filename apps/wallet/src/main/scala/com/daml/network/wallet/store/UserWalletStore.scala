@@ -3,12 +3,7 @@ package com.daml.network.wallet.store
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
-import com.daml.network.codegen.java.cn.{
-  cns as cnsCongen,
-  directory as directoryCodegen,
-  splitwell as splitwellCodegen,
-}
-import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
+import com.daml.network.codegen.java.cn.{cns as cnsCongen, directory as directoryCodegen}
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
@@ -22,7 +17,6 @@ import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{CNNodeUtil, Contract, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletStore.{
-  AppPaymentRequest,
   Subscription,
   SubscriptionIdleState,
   SubscriptionPaymentState,
@@ -42,7 +36,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 /** A store for serving all queries for a specific wallet end-user. */
 trait UserWalletStore
@@ -101,45 +94,29 @@ trait UserWalletStore
       tc: TraceContext
   ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]]]
 
-  def listAppPaymentRequests(implicit tc: TraceContext): Future[Seq[AppPaymentRequest]] = {
+  def listAppPaymentRequests(implicit tc: TraceContext): Future[
+    Seq[Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]]
+  ] = {
     for {
       domainId <- defaultAcsDomainIdF
       contracts <- multiDomainAcsStore.listContractsOnDomain(
         walletCodegen.AppPaymentRequest.COMPANION,
         domainId,
       )
-      // there's a 1-1 mapping AppPaymentRequest-DeliveryOffer, so all should be included
-      // This is racy: you can miss delivery offers if their state change concurrently.
-      // This is okay since it'll just refresh in the UI.
-      deliveryOffer <- multiDomainAcsStore.listContractsOnDomain(
-        walletCodegen.DeliveryOffer.INTERFACE,
-        domainId,
-      )
-    } yield {
-      val deliveryOfferMap = deliveryOffer.map(offer => offer.contractId -> offer).toMap
-      // We drop payment requests for which we can't find a corresponding delivery offer, which can be
-      // the case if its transfer is still in flight.
-      contracts.flatMap { c =>
-        deliveryOfferMap.get(c.payload.deliveryOffer).map(AppPaymentRequest(c, _))
-      }
-    }
+    } yield contracts
   }
 
   def getAppPaymentRequest(
       cid: walletCodegen.AppPaymentRequest.ContractId
-  )(implicit tc: TraceContext): Future[AppPaymentRequest] = {
+  )(implicit tc: TraceContext): Future[
+    Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
+  ] = {
     for {
       domainId <- defaultAcsDomainIdF
       appPaymentRequest <- multiDomainAcsStore.getContractByIdOnDomain(
         walletCodegen.AppPaymentRequest.COMPANION
       )(domainId, cid)
-      deliveryOffer <- multiDomainAcsStore.getContractByIdOnDomain(
-        walletCodegen.DeliveryOffer.INTERFACE
-      )(
-        domainId,
-        appPaymentRequest.payload.deliveryOffer,
-      )
-    } yield AppPaymentRequest(appPaymentRequest, deliveryOffer)
+    } yield appPaymentRequest
   }
 
   def listExpiredAppPaymentRequests: ListExpiredContracts[
@@ -389,17 +366,6 @@ object UserWalletStore {
       context: SubscriptionContextContract,
   )
 
-  final case class AppPaymentRequest(
-      appPaymentRequest: Contract[
-        walletCodegen.AppPaymentRequest.ContractId,
-        walletCodegen.AppPaymentRequest,
-      ],
-      deliveryOffer: Contract[
-        walletCodegen.DeliveryOffer.ContractId,
-        walletCodegen.DeliveryOfferView,
-      ],
-  )
-
   type TxLogIndexRecord = UserWalletTxLogParser.WalletTxLogIndexRecord
   type TxLogEntry = UserWalletTxLogParser.TxLogEntry
 
@@ -569,34 +535,7 @@ object UserWalletStore {
               )
             ),
           ),
-        ),
-        mkFilter(walletCodegen.DeliveryOffer.INTERFACE)(
-          co =>
-            co.payload.svc == svc &&
-              co.payload.sender == endUser,
-          Seq(
-            InterfaceImplementation(
-              splitwellCodegen.TransferInProgress.COMPANION
-            )(offer =>
-              new walletCodegen.DeliveryOfferView(
-                offer.group.svc,
-                offer.sender,
-                s"Transfer from '${offer.sender}' to [${offer.receiverAmounts.asScala
-                    .map(r => s"'${r.receiver}'")
-                    .mkString(", ")}]",
-              )
-            ),
-            InterfaceImplementation(
-              testWalletCodegen.TestDeliveryOffer.COMPANION
-            )(offer =>
-              new walletCodegen.DeliveryOfferView(
-                offer.svc,
-                offer.sender,
-                offer.description,
-              )
-            ),
-          ),
-        ),
+        )
       ),
     )
   }

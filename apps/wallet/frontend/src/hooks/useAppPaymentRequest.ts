@@ -1,10 +1,11 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { PollingStrategy } from 'common-frontend';
+import { Contract, PollingStrategy } from 'common-frontend';
+
+import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { AppPaymentRequest } from '../models/models';
 
-export const useAppPaymentRequest = (cid: string): UseQueryResult<AppPaymentRequest> => {
+export const useAppPaymentRequest = (cid: string): UseQueryResult<Contract<AppPaymentRequest>> => {
   const { getAppPaymentRequest } = useWalletClient();
   return useQuery({
     refetchInterval: PollingStrategy.NONE,

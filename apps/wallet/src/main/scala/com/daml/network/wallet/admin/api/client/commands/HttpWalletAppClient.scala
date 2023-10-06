@@ -114,33 +114,6 @@ object HttpWalletAppClient {
     }
   }
 
-  final case class AppPaymentRequest(
-      appPaymentRequest: Contract[
-        walletCodegen.AppPaymentRequest.ContractId,
-        walletCodegen.AppPaymentRequest,
-      ],
-      deliveryOffer: Contract[
-        walletCodegen.DeliveryOffer.ContractId,
-        walletCodegen.DeliveryOfferView,
-      ],
-  )
-
-  object AppPaymentRequest {
-    def parseHttp(
-        response: definitions.AppPaymentRequest
-    )(implicit decoder: TemplateJsonDecoder): Either[String, AppPaymentRequest] = {
-      (for {
-        appPaymentRequest <- Contract
-          .fromHttp(walletCodegen.AppPaymentRequest.COMPANION)(
-            response.appPaymentRequest
-          )
-        deliveryOffer <- Contract.fromHttp(walletCodegen.DeliveryOffer.INTERFACE)(
-          response.deliveryOffer
-        )
-      } yield AppPaymentRequest(appPaymentRequest, deliveryOffer)).leftMap(_.toString)
-    }
-  }
-
   final case class SubscriptionContext(
       description: String
   )
@@ -309,7 +282,7 @@ object HttpWalletAppClient {
   case object ListAppPaymentRequests
       extends InternalBaseCommand[
         http.ListAppPaymentRequestsResponse,
-        Seq[AppPaymentRequest],
+        Seq[Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]],
       ] {
     def submitRequest(
         client: Client,
@@ -321,13 +294,17 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListAppPaymentRequestsResponse.OK(response) =>
       response.paymentRequests
-        .traverse(req => AppPaymentRequest.parseHttp(req))
+        .traverse(req => Contract.fromHttp(walletCodegen.AppPaymentRequest.COMPANION)(req))
+        .leftMap(_.toString)
     }
   }
 
   case class GetAppPaymentRequest(
       contractId: walletCodegen.AppPaymentRequest.ContractId
-  ) extends InternalBaseCommand[http.GetAppPaymentRequestResponse, AppPaymentRequest] {
+  ) extends InternalBaseCommand[
+        http.GetAppPaymentRequestResponse,
+        Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest],
+      ] {
     def submitRequest(
         client: Client,
         headers: List[HttpHeader],
@@ -337,7 +314,7 @@ object HttpWalletAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case GetAppPaymentRequestResponse.OK(response) =>
-      AppPaymentRequest.parseHttp(response)
+      Contract.fromHttp(walletCodegen.AppPaymentRequest.COMPANION)(response).leftMap(_.toString)
     }
   }
 

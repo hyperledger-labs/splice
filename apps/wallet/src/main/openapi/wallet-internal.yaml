@@ -136,7 +136,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AppPaymentRequest"
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
@@ -572,17 +572,6 @@ components:
         total_holding_fees:
           type: string
 
-    AppPaymentRequest:
-      type: object
-      required:
-        - appPaymentRequest
-        - deliveryOffer
-      properties:
-        appPaymentRequest:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        deliveryOffer:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-
     ListAppPaymentRequestsResponse:
       type: object
       required:
@@ -591,7 +580,7 @@ components:
         payment_requests:
           type: array
           items:
-            $ref: "#/components/schemas/AppPaymentRequest"
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     AcceptAppPaymentRequestRequest:
       type: object

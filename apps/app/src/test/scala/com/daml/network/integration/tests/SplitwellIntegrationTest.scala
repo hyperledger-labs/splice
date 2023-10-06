@@ -109,7 +109,7 @@ class SplitwellIntegrationTest
 
       actAndCheck(
         "alice initiates payment accept request on global domain",
-        aliceWalletClient.acceptAppPaymentRequest(paymentRequest.appPaymentRequest.contractId),
+        aliceWalletClient.acceptAppPaymentRequest(paymentRequest.contractId),
       )(
         "alice sees balance update on splitwell domain",
         _ =>
@@ -146,6 +146,46 @@ class SplitwellIntegrationTest
       actAndCheck("alice creates group2", aliceSplitwellClient.requestGroup("group2"))(
         "alice observes group",
         _ => aliceSplitwellClient.listGroups() should have size 2,
+      )
+    }
+
+    "archives stale TransferInProgress contracts" in { implicit env =>
+      val (aliceUserParty, bobUserParty, _, _, key, _) = initSplitwellTest()
+
+      aliceWalletClient.tap(50)
+
+      val (paymentRequest, _) =
+        actAndCheck(
+          "alice initiates transfer on splitwell domain",
+          aliceSplitwellClient.initiateTransfer(
+            key,
+            Seq(
+              new walletCodegen.ReceiverCCAmount(
+                bobUserParty.toProtoPrimitive,
+                BigDecimal(42.0).bigDecimal,
+              )
+            ),
+          ),
+        )(
+          "alice sees payment request",
+          _ => aliceWalletClient.listAppPaymentRequests().headOption.value,
+        )
+
+      aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
+        .filterJava(splitwellCodegen.TransferInProgress.COMPANION)(
+          aliceUserParty
+        ) should have size 1
+
+      actAndCheck(
+        "alice reject payment request",
+        aliceWalletClient.rejectAppPaymentRequest(paymentRequest),
+      )(
+        "splitwell automation archives transfer in progress",
+        _ =>
+          aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
+            .filterJava(splitwellCodegen.TransferInProgress.COMPANION)(
+              aliceUserParty
+            ) should have size 0,
       )
     }
   }

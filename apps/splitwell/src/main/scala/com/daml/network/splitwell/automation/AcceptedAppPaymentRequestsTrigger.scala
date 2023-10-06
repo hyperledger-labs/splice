@@ -8,13 +8,14 @@ import com.daml.network.automation.{
   TaskSuccess,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.util.{DisclosedContracts, AssignedContract}
+import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -43,9 +44,6 @@ class AcceptedAppPaymentRequestsTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val provider = store.providerParty
-    val transferInProgressId = splitwellCodegen.TransferInProgress.ContractId.unsafeFromInterface(
-      payment.payload.deliveryOffer
-    )
     val round = payment.payload.round
     def rejectPayment(
         reason: String,
@@ -67,15 +65,12 @@ class AcceptedAppPaymentRequestsTrigger(
       result <- transferContextE match {
         case Right((transferContext, disclosedContracts)) =>
           for {
-            transferInProgress <- store.multiDomainAcsStore
-              .lookupContractByIdOnDomainOrRetry(splitwellCodegen.TransferInProgress.COMPANION)(
-                payment.domain,
-                transferInProgressId,
-              )
+            transferInProgress <- store
+              .lookupTransferInProgress(payment.payload.reference)
               .map(
-                _.getOrElse(
+                _.value.getOrElse(
                   throw new IllegalStateException(
-                    s"Invariant violation: assign progress $transferInProgressId not known"
+                    show"Invariant violation: no transfer-in-progress contract found for payment request ${payment.payload.reference}"
                   )
                 )
               )

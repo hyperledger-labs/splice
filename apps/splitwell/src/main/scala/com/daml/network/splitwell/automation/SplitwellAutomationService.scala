@@ -6,11 +6,14 @@ import com.daml.network.automation.{
   AssignTrigger,
   CNNodeAppAutomationService,
   TransferFollowTrigger,
+  UnassignTrigger,
 }
+import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -23,6 +26,7 @@ class SplitwellAutomationService(
     clock: Clock,
     store: SplitwellStore,
     ledgerClient: CNLedgerClient,
+    globalDomain: DomainAlias,
     scanConnection: ScanConnection,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -61,6 +65,21 @@ class SplitwellAutomationService(
 
   registerTrigger(
     new GroupRequestTrigger(triggerContext, store, connection)
+  )
+
+  registerTrigger(
+    new StaleTransferInProgressTrigger(triggerContext, store, connection)
+  )
+
+  registerTrigger(
+    new UnassignTrigger.Template(
+      triggerContext,
+      store,
+      connection,
+      globalDomain,
+      store.providerParty,
+      splitwellCodegen.TransferInProgress.COMPANION,
+    )
   )
 
   registerTrigger(

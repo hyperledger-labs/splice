@@ -359,7 +359,7 @@ final class SplitwellAppClientReference(
       ),
       domainId = Some(domain),
       disclosedContracts = Seq(rules.toDisclosedContract),
-    ).exerciseResult
+    ).exerciseResult._2
   }
 
   @Help.Summary("Net balances of the parties in the group.")

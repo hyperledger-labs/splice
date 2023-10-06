@@ -1,7 +1,6 @@
 package com.daml.network.store.memory
 
 import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
-import com.daml.network.codegen.java.cn.wallet.payment.DeliveryOffer
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{
   HardLimit,
@@ -10,7 +9,7 @@ import com.daml.network.store.{
   MultiDomainAcsStoreTest,
 }
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
-import com.daml.network.util.{Contract, ContractWithState}
+import com.daml.network.util.Contract
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLogging
@@ -54,30 +53,6 @@ class InMemoryMultiDomainAcsStoreTest
     } yield {
       round1.map(_.contract) shouldBe Seq(c(1))
       round2.map(_.contract) shouldBe Seq(c(2))
-    }
-  }
-
-  "InMemoryMultiDomainAcsStore" should {
-    // TODO(#5012): Move to MultiDomainAcsStoreTest once implemented for DbMultiDomainAcsStore
-    "interfaces" in {
-      implicit val store = mkStore()
-      for {
-        _ <- acs()
-        _ <- d1.create(transferInProgress(1))
-        _ <- d1.create(testDeliveryOffer(2))
-        cs <- store.listContracts(DeliveryOffer.INTERFACE, limit = HardLimit(2L))
-      } yield {
-        cs shouldBe Seq(
-          ContractWithState(
-            deliveryOffer(1, "TransferInProgress"),
-            ContractState.Assigned(d1),
-          ),
-          ContractWithState(
-            deliveryOffer(2, "TestDeliveryOffer"),
-            ContractState.Assigned(d1),
-          ),
-        )
-      }
     }
   }
 }

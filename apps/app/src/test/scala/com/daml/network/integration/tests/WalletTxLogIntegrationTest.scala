@@ -133,7 +133,7 @@ class WalletTxLogIntegrationTest
         aliceWalletClient.tap(30.0)
       }
 
-      val ((_, reqCid, _), _) = actAndCheck(
+      val ((reqCid, _), _) = actAndCheck(
         "Alice creates self-payment request",
         createSelfPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
@@ -223,7 +223,7 @@ class WalletTxLogIntegrationTest
         aliceWalletClient.tap(30.0)
       }
 
-      val ((_, reqCid, _), _) = actAndCheck(
+      val ((reqCid, _), _) = actAndCheck(
         "Alice creates self-payment request",
         createSelfPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
@@ -312,7 +312,7 @@ class WalletTxLogIntegrationTest
         aliceWalletClient.tap(100.0)
       }
 
-      val ((_, reqCid, _), _) = actAndCheck(
+      val ((reqCid, _), _) = actAndCheck(
         "Alice creates payment request",
         createPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
@@ -515,7 +515,7 @@ class WalletTxLogIntegrationTest
 
       actAndCheck(
         "Alice confirms the payment request",
-        aliceWalletClient.acceptAppPaymentRequest(paymentRequest.appPaymentRequest.contractId),
+        aliceWalletClient.acceptAppPaymentRequest(paymentRequest.contractId),
       )(
         "All parties see new balances",
         _ => {
@@ -1168,7 +1168,7 @@ class WalletTxLogIntegrationTest
     "handle failed automation (app payment)" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
-      val ((_, reqCid, _), _) = actAndCheck(
+      val ((reqCid, _), _) = actAndCheck(
         "Alice creates self-payment request",
         createSelfPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,

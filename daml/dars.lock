@@ -1,10 +1,10 @@
 daml/app-manager/.daml/dist/app-manager-0.1.0.dar 3943a4270fa412e4c4442f79fed5d7d1e8940676337486b8fa868d2d063e7520
 daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar f4693252b3cab434649f66f5fd309ae98ca01512b10b482086aa8ff529ca83e3
-daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar fb2c56f8098c6b17f82ae8a1efee7077f591d0cd7d8aeb8097ce8f7a562e795a
+daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar 2c4f3d98dc987902a5839d91c25d2021f8d48b3fa39717cee0b4a76d76538e40
 daml/cn-util/.daml/dist/cn-util-0.1.0.dar e43fba5e5c294a4727855b7065cb1daa6e09b5fd66f7fe55ba353ed711bd4417
-daml/directory-service/.daml/dist/directory-service-0.1.0.dar ab605eca7c09dd64625e95e4a1d632058276f05fbdfe2f67009e66f35d3b3106
-daml/splitwell/.daml/dist/splitwell-0.1.0.dar cbca8a4f8d6170f38cd7a5c9cc0371cc3ccb4fb5bf5daf0702aa2c3849ac6bde
-daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar cd4045672cca65cea095e2a25842fba9a44975572453e4723e53dcb6d44d3935
+daml/directory-service/.daml/dist/directory-service-0.1.0.dar fed218d21b100681cf407c7f5dacc25780b7465d8796a788c721cd5fe891e9c7
+daml/splitwell/.daml/dist/splitwell-0.1.0.dar ff93a50c983a59e716938ff0498a93ac7f4d6f1d22e5de27bec3272d8933db4c
+daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar a5e9447947dbd78e30fc6ebc1e2c7f7578d50607b640c66382ec12e0f63655ac
 daml/validator-lifecycle/.daml/dist/validator-lifecycle-0.1.0.dar 60ef650de6a0f32b3876cd7ee439fee34228a5957b99c1357951309230f538a6
-daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar 4a7912638e1d0b3d3de052c0541ca122d18f8b69ee748bfe19dfc5ce1958e8ef
-daml/wallet/.daml/dist/wallet-0.1.0.dar 03cd8c9735effaaefd42a5fb92884c9654fc764140e15d3c63ae4452d58f07d1
+daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar af6437dd69e9125325b8397ae8964740afdfcf66ceba942b9719fc4e0cbc6d62
+daml/wallet/.daml/dist/wallet-0.1.0.dar 162b51bf7f73614dc9139efcb97364ded9c0e06ce1e3d0ffe8934fdc9e7522c9

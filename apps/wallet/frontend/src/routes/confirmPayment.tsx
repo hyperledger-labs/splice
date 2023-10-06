@@ -39,13 +39,9 @@ export const ConfirmPayment: React.FC = () => {
     return <ErrorDisplay message={'Error while fetching payment requests and coin price'} />;
   }
 
-  const appPayment = appPaymentRequestQuery.data;
-  const { appPaymentRequest, deliveryOffer } = appPayment;
+  const appPaymentRequest = appPaymentRequestQuery.data;
 
-  const total = computeTotal(
-    appPayment.appPaymentRequest.payload.receiverAmounts,
-    coinPriceQuery.data
-  );
+  const total = computeTotal(appPaymentRequest.payload.receiverAmounts, coinPriceQuery.data);
 
   if (!total) {
     console.error('No receivers in app payment.');
@@ -72,7 +68,7 @@ export const ConfirmPayment: React.FC = () => {
     <Container maxWidth="sm">
       <Stack alignItems="center" paddingTop={4} spacing={4}>
         {recipientInfo}
-        <PaymentDescription description={deliveryOffer.payload.description} />
+        <PaymentDescription description={appPaymentRequest.payload.description} />
         <TotalPaymentContainer
           contractId={appPaymentRequest.contractId}
           total={total}

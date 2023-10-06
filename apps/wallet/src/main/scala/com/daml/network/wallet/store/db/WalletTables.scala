@@ -122,13 +122,6 @@ object WalletTables extends AcsTables {
             contractFilter,
           )(noIndex)
             .orElse(
-              tryToDecode(
-                walletCodegen.DeliveryOffer.INTERFACE,
-                createdEvent,
-                contractFilter,
-              )(noIndex)
-            )
-            .orElse(
               Left(s"Template $t cannot be decoded as an entry for the user wallet store.")
             )
       }

@@ -93,7 +93,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               BigDecimal("1.18"),
             )
             // one-time payment
-            val (_, cid, _) = createPaymentRequest(
+            val (cid, _) = createPaymentRequest(
               aliceValidatorBackend.participantClientWithAdminToken,
               aliceDamlUser,
               aliceUserParty,

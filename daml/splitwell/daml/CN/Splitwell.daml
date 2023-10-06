@@ -115,7 +115,7 @@ template SplitwellRules
            payer = user
            ..
 
-    nonconsuming choice SplitwellRules_InitiateTransfer : ContractId AppPaymentRequest
+    nonconsuming choice SplitwellRules_InitiateTransfer : (ContractId TransferInProgress, ContractId AppPaymentRequest)
       with
         group : ContractId Group
         receiverAmounts : [ReceiverCCAmount]
@@ -200,24 +200,26 @@ template Group
            update = ExternalPayment with
              payer, amount, description
 
-    nonconsuming choice Group_InitiateTransfer : ContractId AppPaymentRequest
+    nonconsuming choice Group_InitiateTransfer : (ContractId TransferInProgress, ContractId AppPaymentRequest)
       with
         sender : Party
         receiverAmounts : [ReceiverCCAmount]
       controller sender
       do require "sender is a member" (sender `elem` groupMembers this)
          require "receiver is a member" (fmap (\x -> x.receiver) receiverAmounts `subset` groupMembers this)
+         now <- getTime
+         paymentRequest <- create AppPaymentRequest with
+           sender, provider, svc
+           receiverAmounts = map (\rq -> ReceiverAmount rq.receiver (PaymentAmount rq.ccAmount CC)) receiverAmounts
+           description = "Transfer from " <> show sender <> " to " <> show (map (.receiver) receiverAmounts)
+           expiresAt = now `addRelTime` acceptDuration
          deliveryOffer <- create TransferInProgress
            with
              group = this
              sender
              receiverAmounts
-         now <- getTime
-         create AppPaymentRequest with
-           sender, provider, svc
-           receiverAmounts = map (\rq -> ReceiverAmount rq.receiver (PaymentAmount rq.ccAmount CC)) receiverAmounts
-           expiresAt = now `addRelTime` acceptDuration
-           deliveryOffer = toInterfaceContractId deliveryOffer
+             appPaymentRequest = paymentRequest
+         pure (deliveryOffer, paymentRequest)
 
     nonconsuming choice Group_Net : ContractId BalanceUpdate
       with
@@ -247,13 +249,17 @@ template TransferInProgress
     group : Group
     sender : Party
     receiverAmounts : [ReceiverCCAmount]
+    appPaymentRequest : ContractId AppPaymentRequest
   where
     signatory signatory group
-    interface instance DeliveryOffer for TransferInProgress where
-      view = DeliveryOfferView with
-        svc = group.svc
-        sender
-        description = "Transfer from " <> show sender <> " to " <> show (transferInProgress_receivers this)
+
+    -- ^ Driven by provider-based automation that archives this once the corresponding app payment contracts are archived.
+    choice TransferInProgress_Abort : ()
+      with
+        actor : Party
+      controller actor
+      do require "Actor is signatory" (actor `elem` signatory this)
+         pure ()
 
     postconsuming choice TransferInProgress_CompleteTransfer : [ContractId BalanceUpdate]
       with
@@ -261,19 +267,17 @@ template TransferInProgress
         transferContext : AppTransferContext
       controller group.provider
       do acceptedPayment <- fetch acceptedPaymentCid
-         require "Payment is for this TransferInProgress" (toInterfaceContractId self == acceptedPayment.deliveryOffer)
          exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
          acceptedPayment.sender === sender
          openMiningRound <- exercise @OpenMiningRound transferContext.openMiningRound (OpenMiningRound_Fetch group.provider)
-
-         let  expectedAcceptedPayment = AcceptedAppPayment with
+         let expectedAcceptedPayment = AcceptedAppPayment with
                sender = sender
                provider = group.provider
                ccReceiverAmounts = receiverAmounts
                svc = group.svc
                lockedCoin = acceptedPayment.lockedCoin
-               deliveryOffer = acceptedPayment.deliveryOffer
                round = openMiningRound.round
+               reference = appPaymentRequest
          acceptedPayment === expectedAcceptedPayment
          forA receiverAmounts \ReceiverCCAmount{receiver, ccAmount} ->
            create BalanceUpdate with

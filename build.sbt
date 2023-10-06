@@ -667,7 +667,6 @@ lazy val `apps-wallet` =
       `wallet-daml`,
       // TODO (#2676) Remove this once we have multi-domain interface support.
       `directory-daml`,
-      `splitwell-daml`,
       `svc-governance-daml`,
       `canton-name-service-daml`,
     )

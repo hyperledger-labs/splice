@@ -220,12 +220,9 @@ class TreasuryService(
 
         case op: coinoperation.CO_AppPayment =>
           for {
-            paymentRequest <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
+            _ <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
               walletCodegen.AppPaymentRequest.COMPANION
             )(domainId, op.contractIdValue)
-            _ <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
-              walletCodegen.DeliveryOffer.INTERFACE
-            )(domainId, paymentRequest.payload.deliveryOffer)
           } yield ()
 
         case op: coinoperation.CO_CompleteAcceptedTransfer =>

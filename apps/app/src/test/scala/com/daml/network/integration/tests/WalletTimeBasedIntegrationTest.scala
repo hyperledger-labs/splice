@@ -421,7 +421,7 @@ class WalletTimeBasedIntegrationTest
         "Alice accepts the payment request",
         aliceWalletClient
           .listAppPaymentRequests()
-          .map(req => aliceWalletClient.acceptAppPaymentRequest(req.appPaymentRequest.contractId)),
+          .map(req => aliceWalletClient.acceptAppPaymentRequest(req.contractId)),
       )(
         "Request no longer exists",
         _ => aliceWalletClient.listAppPaymentRequests() should have length 0,

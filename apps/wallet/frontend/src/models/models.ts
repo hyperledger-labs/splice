@@ -6,7 +6,6 @@ import {
 } from 'common-frontend/daml.js/wallet-0.1.0/lib/CN/Wallet/TransferOffer/module';
 import { CoinPosition } from 'wallet-openapi';
 
-import * as payment from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 import {
   Subscription,
   SubscriptionContext,
@@ -94,11 +93,6 @@ export type SubscriptionState =
 export interface SubscriptionRequestWithContext {
   subscriptionRequest: Contract<SubscriptionRequest>;
   context: Contract<SubscriptionContext>;
-}
-
-export interface AppPaymentRequest {
-  appPaymentRequest: Contract<payment.AppPaymentRequest>;
-  deliveryOffer: Contract<payment.DeliveryOffer>;
 }
 
 //=== Endpoint responses ===

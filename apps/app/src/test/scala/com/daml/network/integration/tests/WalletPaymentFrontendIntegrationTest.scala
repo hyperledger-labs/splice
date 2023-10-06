@@ -51,7 +51,7 @@ class WalletPaymentFrontendIntegrationTest
 
         val description = "this will be accepted (in CC)"
 
-        val (_, paymentRequestContractId, _) = createPaymentRequest(
+        val (paymentRequestContractId, _) = createPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
@@ -132,7 +132,7 @@ class WalletPaymentFrontendIntegrationTest
 
         val description = "this will be accepted (in USD)"
 
-        val (_, paymentRequestContractId, _) = createPaymentRequest(
+        val (paymentRequestContractId, _) = createPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
@@ -217,7 +217,7 @@ class WalletPaymentFrontendIntegrationTest
 
         val description = "this will be accepted (in CC)"
 
-        val (_, paymentRequestContractId, _) = createPaymentRequest(
+        val (paymentRequestContractId, _) = createPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
@@ -301,7 +301,7 @@ class WalletPaymentFrontendIntegrationTest
 
         val description = "this will be accepted (in USD)"
 
-        val (_, paymentRequestContractId, _) = createPaymentRequest(
+        val (paymentRequestContractId, _) = createPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
@@ -385,7 +385,7 @@ class WalletPaymentFrontendIntegrationTest
 
         val description = "this will be accepted (in USD)"
 
-        val (_, paymentRequestContractId, _) = createPaymentRequest(
+        val (paymentRequestContractId, _) = createPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,

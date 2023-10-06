@@ -18,6 +18,7 @@ import {
 } from 'wallet-openapi';
 
 import * as payment from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
+import { AppPaymentRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 import {
   Subscription,
   SubscriptionContext,
@@ -38,7 +39,6 @@ import {
   Transfer,
   WalletBalance,
   SubscriptionRequestWithContext,
-  AppPaymentRequest,
   Unknown,
   Notification,
 } from '../models/models';
@@ -73,7 +73,7 @@ export interface WalletClient {
   rejectTransferOffer: (offerContractId: string) => Promise<void>;
   listAcceptedTransferOffers: () => Promise<ListAcceptedTransferOffersResponse>;
 
-  getAppPaymentRequest: (contractId: string) => Promise<AppPaymentRequest>;
+  getAppPaymentRequest: (contractId: string) => Promise<Contract<AppPaymentRequest>>;
   acceptAppPaymentRequest: (requestContractId: string) => Promise<void>;
   rejectAppPaymentRequest: (requestContractId: string) => Promise<void>;
 
@@ -233,12 +233,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       getAppPaymentRequest: async contractId => {
         const response = await walletClient.getAppPaymentRequest(contractId);
-        const appPaymentRequest = Contract.decodeOpenAPI(
-          response.appPaymentRequest,
-          payment.AppPaymentRequest
-        );
-        const deliveryOffer = Contract.decodeOpenAPI(response.deliveryOffer, payment.DeliveryOffer);
-        return { appPaymentRequest, deliveryOffer };
+        return Contract.decodeOpenAPI(response, payment.AppPaymentRequest);
       },
       acceptAppPaymentRequest: async requestContractId => {
         await walletClient.acceptAppPaymentRequest(requestContractId);

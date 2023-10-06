@@ -18,34 +18,20 @@ import CN.Scripts.Wallet.TestSubscriptions
 import CC.Fees
 import CC.Scripts.Util
 
-template TestDeliveryOffer
-  with
-    svc : Party
-    sender : Party
-    description : Text
-  where
-    signatory sender
-    interface instance DeliveryOffer for TestDeliveryOffer where
-      view = DeliveryOfferView with
-        description
-        svc
-        sender
-
-createPaymentRequest : CCApp -> Party -> Party -> [(Party, PaymentAmount)] -> Script (ContractId AppPaymentRequest, ContractId TestDeliveryOffer)
+createPaymentRequest : CCApp -> Party -> Party -> [(Party, PaymentAmount)] -> Script (ContractId AppPaymentRequest)
 createPaymentRequest app provider sender receiverAmounts = do
   t <- getTime
-  deliveryOffer <- submit sender $ createCmd (TestDeliveryOffer app.svc sender ("multi, sender: " <> show sender <> ", amount: " <> show receiverAmounts))
+  let description = "multi, sender: " <> show sender <> ", amount: " <> show receiverAmounts
   -- multi-party submit to simplify test
-  res <- submitMulti (sender :: provider :: map fst receiverAmounts) [] $ createCmd AppPaymentRequest with
+  submitMulti (sender :: provider :: map fst receiverAmounts) [] $ createCmd AppPaymentRequest with
     sender
     provider
     svc = app.svc
     receiverAmounts = map (uncurry ReceiverAmount) receiverAmounts
-    deliveryOffer = toInterfaceContractId deliveryOffer
     expiresAt = t `addRelTime` minutes 5
-  return (res, deliveryOffer)
+    description
 
-createSingleReceiverPaymentRequest : CCApp -> Party -> Party -> Party -> PaymentAmount -> Script (ContractId AppPaymentRequest, ContractId TestDeliveryOffer)
+createSingleReceiverPaymentRequest : CCApp -> Party -> Party -> Party -> PaymentAmount -> Script (ContractId AppPaymentRequest)
 createSingleReceiverPaymentRequest app provider sender receiver amount = do
   createPaymentRequest app provider sender [(receiver, amount)]
 
@@ -97,7 +83,7 @@ testSingleReceiverCCPaymentRequest = script do
 
   let paymentAmount = 41.5 -- chosen to not return sender change
   coin <- tap app alice 42.0
-  (transferRequest, offerCid) <- createSingleReceiverPaymentRequest app
+  transferRequest <- createSingleReceiverPaymentRequest app
     provider1.primaryParty alice.primaryParty bob.primaryParty
     (PaymentAmount paymentAmount CC)
 
@@ -112,13 +98,13 @@ testSingleReceiverCCPaymentRequest = script do
     provider = provider1.primaryParty
     svc = app.svc
     lockedCoin = lockedCoinCid
-    deliveryOffer = toInterfaceContractId offerCid
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = paymentAmount)
       ]
     round = lockedCoin.coin.amount.createdAt
+    reference = transferRequest
 
-  AcceptedAppPayment_Collect_Result _ [(receiver, coinCid)] <- collectAcceptedPayment app provider1 acceptedPaymentCid
+  AcceptedAppPayment_Collect_Result [(receiver, coinCid)] <- collectAcceptedPayment app provider1 acceptedPaymentCid
   receiver === bob.primaryParty
 
   Some coin <- queryContractId bob.primaryParty coinCid
@@ -132,7 +118,7 @@ testExpiringCCPaymentRequest = script do
   runNextIssuance app
   runCoinDepositBots app
 
-  (transferRequest, _offerCid) <- createSingleReceiverPaymentRequest app
+  transferRequest <- createSingleReceiverPaymentRequest app
     provider1.primaryParty alice.primaryParty bob.primaryParty
     (PaymentAmount 30.0 CC)
 
@@ -162,7 +148,7 @@ testSingleReceiverUSDPaymentRequest = script do
   runCoinDepositBots app
 
   coin <- tap app alice 62.0 -- Need to cover a 30USD payment with 1USD=2CC
-  (transferRequest, offerCid) <- createSingleReceiverPaymentRequest app
+  transferRequest <- createSingleReceiverPaymentRequest app
     provider1.primaryParty alice.primaryParty bob.primaryParty
     (PaymentAmount 30.0 USD)
 
@@ -175,11 +161,11 @@ testSingleReceiverUSDPaymentRequest = script do
     provider = provider1.primaryParty
     svc = app.svc
     lockedCoin = lockedCoinCid
-    deliveryOffer = toInterfaceContractId offerCid
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 60.0)
       ]
     round = lockedCoin.coin.amount.createdAt
+    reference = transferRequest
 
   pure ()
 
@@ -196,7 +182,7 @@ testCCPaymentRequest = script do
   config <- getCoinConfig app
   let transferConfig = config.transferConfig
   coin <- tap app alice 27.0
-  (transferRequest, deliveryOffer) <-
+  transferRequest <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [
       (bob.primaryParty, PaymentAmount 15.0 CC),
       (charlie.primaryParty, PaymentAmount 10.0 CC)]
@@ -218,8 +204,8 @@ testCCPaymentRequest = script do
     provider = provider1.primaryParty
     svc = app.svc
     lockedCoin = lockedCoin
-    deliveryOffer = toInterfaceContractId deliveryOffer
     round = lockedCoinPayload.coin.amount.createdAt
+    reference = transferRequest
 
   checkCoinPositions alice [1.0, 1.615]
   checkCoinPositions bob [1.0]
@@ -271,7 +257,7 @@ testCCPaymentCollectionRoundInLatestRoundMustFail = script do
   runCoinDepositBots app
 
   coin <- tap app alice 27.0
-  (transferRequest, _deliveryOffer) <-
+  transferRequest <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [
       (bob.primaryParty, PaymentAmount 15.0 CC),
       (charlie.primaryParty, PaymentAmount 10.0 CC)]
@@ -296,7 +282,7 @@ testUSDPaymentRequest = script do
   runCoinDepositBots app
 
   coin <- tap app alice 52.0
-  (transferRequest, deliveryOffer) <-
+  transferRequest <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [
       (bob.primaryParty, PaymentAmount 10.0 USD),
       (charlie.primaryParty, PaymentAmount 15.0 USD)]
@@ -308,12 +294,12 @@ testUSDPaymentRequest = script do
     provider = provider1.primaryParty
     svc = app.svc
     lockedCoin = lockedCoinCid
-    deliveryOffer = toInterfaceContractId deliveryOffer
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 20.0),
       (ReceiverCCAmount with receiver = charlie.primaryParty, ccAmount = 30.0)
       ]
     round = lockedCoin.coin.amount.createdAt
+    reference = transferRequest
 
   pure ()
 
@@ -324,7 +310,7 @@ testMixedPaymentRequest = script do
   runCoinDepositBots app
 
   coin <- tap app alice 32.0
-  (transferRequest, deliveryOffer) <-
+  transferRequest <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [
       (bob.primaryParty, PaymentAmount 10.0 CC),
       (charlie.primaryParty, PaymentAmount 10.0 USD)]
@@ -336,12 +322,12 @@ testMixedPaymentRequest = script do
     provider = provider1.primaryParty
     svc = app.svc
     lockedCoin = lockedCoinCid
-    deliveryOffer = toInterfaceContractId deliveryOffer
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 10.0),
       (ReceiverCCAmount with receiver = charlie.primaryParty, ccAmount = 20.0)
       ]
     round = lockedCoin.coin.amount.createdAt
+    reference = transferRequest
 
   pure ()
 
@@ -352,10 +338,10 @@ testSuccessfulBatchCCPaymentRequests = script do
   runCoinDepositBots app
 
   coin <- tap app alice 42.0
-  (transferRequest, deliveryOffer) <- createSingleReceiverPaymentRequest app
+  transferRequest <- createSingleReceiverPaymentRequest app
     provider1.primaryParty alice.primaryParty bob.primaryParty
     (PaymentAmount 1.0 CC)
-  (transferRequest2, deliveryOffer2) <-
+  transferRequest2 <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [
       (bob.primaryParty, PaymentAmount 2.0 CC),
       (alice.primaryParty, PaymentAmount 2.0 CC)]
@@ -387,10 +373,10 @@ testSuccessfulBatchCCPaymentRequests = script do
     provider = provider1.primaryParty
     svc = app.svc
     lockedCoin = lockedCoinCid
-    deliveryOffer = toInterfaceContractId deliveryOffer
     ccReceiverAmounts = [
       ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 1.0 ]
     round = lockedCoin.coin.amount.createdAt
+    reference = transferRequest
 
   acceptedPayment2 === AcceptedAppPayment with
     sender = alice.primaryParty
@@ -401,8 +387,8 @@ testSuccessfulBatchCCPaymentRequests = script do
     provider = provider1.primaryParty
     svc = app.svc
     lockedCoin = lockedCoinCid2
-    deliveryOffer = toInterfaceContractId deliveryOffer2
     round = lockedCoin2.coin.amount.createdAt
+    reference = transferRequest2
 
   pure ()
 
@@ -419,10 +405,10 @@ testInsufficientFundsBatchCCPaymentRequests = script do
     svcParty = app.svc
     validatorParty = aliceValidator.primaryParty
 
-  (transferRequest3, _deliveryOffer3) <- createSingleReceiverPaymentRequest app
+  transferRequest3 <- createSingleReceiverPaymentRequest app
     provider1.primaryParty alice.primaryParty bob.primaryParty
     (PaymentAmount 10000.0 CC)
-  (transferRequest4, deliveryOffer4) <-
+  transferRequest4 <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [
       (bob.primaryParty, PaymentAmount 3.0 CC),
       (alice.primaryParty, PaymentAmount 3.0 CC)]
@@ -450,8 +436,8 @@ testInsufficientFundsBatchCCPaymentRequests = script do
     provider = provider1.primaryParty
     svc = app.svc
     lockedCoin = lockedCoinCid4
-    deliveryOffer = toInterfaceContractId deliveryOffer4
     round = lockedCoin4.coin.amount.createdAt
+    reference = transferRequest4
 
   pure ()
 

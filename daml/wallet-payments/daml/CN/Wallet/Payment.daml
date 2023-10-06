@@ -2,7 +2,6 @@
 {-# OPTIONS -Wno-unused-matches #-}
 module CN.Wallet.Payment where
 
-import DA.Action
 import DA.List (dedupSort)
 import DA.Time
 
@@ -12,20 +11,6 @@ import CC.Coin
 import CC.Expiry
 import CC.Round
 import CC.Round.Types
-
-data DeliveryOfferView = DeliveryOfferView
-  with
-    svc : Party
-    sender : Party
-    description : Text
-
--- | The description of an offer of delivery for payment.
---
--- Contracts implementing this interface are used to carry extra data along the payment request and approval flow.
--- Their lifetime is bound 1-1 with the lifetime of the 'AppPaymentRequest' and 'AcceptedAppPayment' referencing them.
-interface DeliveryOffer
-  where
-    viewtype DeliveryOfferView
 
 data Currency = USD | CC deriving (Eq, Show, Ord)
 
@@ -75,7 +60,7 @@ template AppPaymentRequest
     provider : Party -- ^ The app provider; receives usage rewards.
     svc : Party -- ^ The issuer of CC that should be used to make the payment.
     expiresAt : Time -- ^ When the payment request expires.
-    deliveryOffer : ContractId DeliveryOffer -- ^ The reference to the reason / good for which the payment is requested.
+    description : Text -- ^ Human readable description of the reason / good for which the payment is requested.
   where
 
     signatory sender, appPaymentRequest_receivers this, provider
@@ -93,9 +78,6 @@ template AppPaymentRequest
         walletProvider : Party
       controller sender, walletProvider
       do now <- getTime
-         -- check that the reference is active and implements DeliveryOffer
-         void $ fetch deliveryOffer
-
          contextRound <- exercise context.context.openMiningRound (OpenMiningRound_Fetch provider)
 
          -- Convert from USD to CC amounts
@@ -129,16 +111,16 @@ template AppPaymentRequest
          let round = result.round
          acceptedPayment <- create AcceptedAppPayment
            with
-             svc, provider, ccReceiverAmounts, sender, deliveryOffer, lockedCoin, round
+             svc, provider, ccReceiverAmounts, sender, lockedCoin, round, reference = self
          return (acceptedPayment, result.senderChangeCoin)
 
     choice AppPaymentRequest_Withdraw : ()
       controller appPaymentRequest_receivers this
-      do archive deliveryOffer
+      do pure ()
 
     choice AppPaymentRequest_Reject : ()
       controller sender
-      do archive deliveryOffer
+      do pure ()
 
 
 data ReceiverCoin = ReceiverCoin with receiver : Party, lockedCoin : ContractId LockedCoin
@@ -156,7 +138,6 @@ mkReceiverOutput receiverAmount =
     lock = None
 
 data AcceptedAppPayment_Collect_Result = AcceptedAppPayment_Collect_Result with
-  deliveryOffer: ContractId DeliveryOffer
   receiverCoins: [(Party, ContractId Coin)]
 
 template AcceptedAppPayment
@@ -166,8 +147,8 @@ template AcceptedAppPayment
     provider : Party
     svc : Party
     lockedCoin : ContractId LockedCoin
-    deliveryOffer : ContractId DeliveryOffer
     round : Round -- ^ The round in which the locked coin was created, added as an extra field so we can avoid ingesting locked coins.
+    reference : ContractId AppPaymentRequest -- ^ The contract id of the original payment request to correlate it. Note that the contract will no longer be active.
   where
     signatory sender, provider, map (\r -> r.receiver) ccReceiverAmounts
 
@@ -188,24 +169,19 @@ template AcceptedAppPayment
         result <- exerciseAppTransfer context transfer
         require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
         let coins = map (\(TransferResultCoin coinCid) -> coinCid) result.createdCoins
-        -- defensive check that the reference is still active
-        void $ fetch deliveryOffer
         let receivers = map (\r -> r.receiver) ccReceiverAmounts
         pure AcceptedAppPayment_Collect_Result with
-            deliveryOffer
             receiverCoins = zip receivers coins
 
     choice AcceptedAppPayment_Reject : CoinCreateSummary (ContractId Coin)
       with
         context : AppTransferContext
       controller map (\r -> r.receiver) ccReceiverAmounts
-      do archive deliveryOffer
-         exercise lockedCoin (LockedCoin_Unlock context.coinRules context.openMiningRound)
+      do exercise lockedCoin (LockedCoin_Unlock context.coinRules context.openMiningRound)
 
     choice AcceptedAppPayment_Expire : CoinCreateSummary (ContractId Coin)
       with
         context : AppTransferContext
       controller sender
-      do -- TODO(#3152): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedCoin, and the AcceptedAppPayment in #3152
-         archive deliveryOffer
+      do -- TODO(#3152) Split out coin unlocking from payment expiry
          exercise lockedCoin (LockedCoin_OwnerExpireLock context.coinRules context.openMiningRound)

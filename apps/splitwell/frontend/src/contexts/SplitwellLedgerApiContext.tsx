@@ -15,7 +15,10 @@ import {
   GroupInvite,
   SplitwellRules,
 } from '@daml.js/splitwell/lib/CN/Splitwell';
-import { ReceiverCCAmount } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+import {
+  AppPaymentRequest,
+  ReceiverCCAmount,
+} from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 import Ledger, { LedgerOptions } from '@daml/ledger';
 import { ContractId } from '@daml/types';
 
@@ -167,21 +170,23 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
     receiverAmounts: ReceiverCCAmount[],
     domainId: string,
     rules: Contract<SplitwellRules>
-  ) {
+  ): Promise<ContractId<AppPaymentRequest>> {
     const group = this.getGroup(groupId, groups);
-    return await this.exercise(
-      [sender],
-      [],
-      SplitwellRules.SplitwellRules_InitiateTransfer,
-      rules.contractId,
-      {
-        group: group.contract.contractId,
-        receiverAmounts: receiverAmounts,
-        user: sender,
-      },
-      domainId,
-      [Contract.toDisclosedContract(SplitwellRules, rules)]
-    );
+    return (
+      await this.exercise(
+        [sender],
+        [],
+        SplitwellRules.SplitwellRules_InitiateTransfer,
+        rules.contractId,
+        {
+          group: group.contract.contractId,
+          receiverAmounts: receiverAmounts,
+          user: sender,
+        },
+        domainId,
+        [Contract.toDisclosedContract(SplitwellRules, rules)]
+      )
+    )._2;
   }
 
   async requestSplitwellInstall(user: string, domainId: string, rules: Contract<SplitwellRules>) {

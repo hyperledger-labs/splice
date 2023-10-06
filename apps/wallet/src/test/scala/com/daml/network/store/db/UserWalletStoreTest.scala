@@ -9,7 +9,6 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubscCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
@@ -19,7 +18,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.StoreTest
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
-import com.daml.network.wallet.store.UserWalletStore.{AppPaymentRequest, SubscriptionRequest}
+import com.daml.network.wallet.store.UserWalletStore.SubscriptionRequest
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.TransferOfferStatus
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
@@ -256,19 +255,20 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
       "return correct results" in {
         def paymentExpiringAt(t: Long) =
-          appPaymentRequestWithOffer(user1, provider1, 10.0, paymentCodegen.Currency.CC, time(t))
+          appPaymentRequest(
+            user1,
+            provider1,
+            10.0,
+            paymentCodegen.Currency.CC,
+            time(t),
+            s"expiring at $t",
+          )
 
         for {
           store <- mkStore(user1)
-          (offer1, request1) = paymentExpiringAt(1)
-          (offer3, request3) = paymentExpiringAt(3)
-          _ <- dummyDomain.create(offer1, createdEventSignatories = Seq(user1))(
-            store.multiDomainAcsStore
-          )
+          request1 = paymentExpiringAt(1)
+          request3 = paymentExpiringAt(3)
           _ <- dummyDomain.create(request1, createdEventSignatories = Seq(user1))(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(offer3, createdEventSignatories = Seq(user1))(
             store.multiDomainAcsStore
           )
           _ <- dummyDomain.create(request3, createdEventSignatories = Seq(user1))(
@@ -307,40 +307,44 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             store2.multiDomainAcsStore,
             storeP.multiDomainAcsStore,
           )
-          (offer1, request1) = appPaymentRequestWithOffer(
+          request1 = appPaymentRequest(
             user1,
             provider1,
             10.0,
             paymentCodegen.Currency.CC,
             time(1),
+            s"request for $user1",
           )
-          (offer2, request2) = appPaymentRequestWithOffer(
+          request2 = appPaymentRequest(
             user2,
             provider1,
             10.0,
             paymentCodegen.Currency.CC,
             time(1),
+            s"request for $user2",
           )
-          _ <- dummyDomain.createMulti(offer1, createdEventSignatories = Seq(user1))(allAcsStores)
           _ <- dummyDomain.createMulti(request1, createdEventSignatories = Seq(user1))(allAcsStores)
-          _ <- dummyDomain.createMulti(offer2, createdEventSignatories = Seq(user2))(allAcsStores)
           _ <- dummyDomain.createMulti(request2, createdEventSignatories = Seq(user2))(allAcsStores)
         } yield {
-          def resultCids(r: AppPaymentRequest) =
-            r.deliveryOffer.contractId.contractId -> r.appPaymentRequest.contractId.contractId
+          def resultCids(
+              r: Contract[
+                paymentCodegen.AppPaymentRequest.ContractId,
+                paymentCodegen.AppPaymentRequest,
+              ]
+          ) = r.contractId.contractId
 
           eventually() {
             // Listing - user only sees their own request
             val actual1 = store1.listAppPaymentRequests.futureValue.map(resultCids)
             val expected1 = Seq(
-              offer1.contractId.contractId -> request1.contractId.contractId
+              request1.contractId.contractId
             )
             actual1 should contain theSameElementsInOrderAs expected1
 
             // Listing - user only sees their own request
             val actual2 = store2.listAppPaymentRequests.futureValue.map(resultCids)
             val expected2 = Seq(
-              offer2.contractId.contractId -> request2.contractId.contractId
+              request2.contractId.contractId
             )
             actual2 should contain theSameElementsInOrderAs expected2
 
@@ -350,7 +354,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
             // Pointwise lookup - only user1 store should see request1
             store1.getAppPaymentRequest(request1.contractId).map(resultCids).futureValue should be(
-              offer1.contractId.contractId -> request1.contractId.contractId
+              request1.contractId.contractId
             )
             assertThrows[Throwable](store2.getAppPaymentRequest(request1.contractId).futureValue)
             assertThrows[Throwable](storeP.getAppPaymentRequest(request1.contractId).futureValue)
@@ -361,65 +365,61 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       "return correct results if a request is archived" in {
         for {
           store1 <- mkStore(user1)
-          (offer1, request1) = appPaymentRequestWithOffer(
+          request1 = appPaymentRequest(
             user1,
             provider1,
             10.0,
             paymentCodegen.Currency.CC,
             time(1),
+            "request1",
           )
-          (offer2, request2) = appPaymentRequestWithOffer(
+          request2 = appPaymentRequest(
             user1,
             provider1,
             20.0,
             paymentCodegen.Currency.CC,
             time(2),
+            "request2",
           )
-          (offer3, request3) = appPaymentRequestWithOffer(
+          request3 = appPaymentRequest(
             user1,
             provider1,
             30.0,
             paymentCodegen.Currency.CC,
             time(3),
-          )
-          _ <- dummyDomain.create(offer1, createdEventSignatories = Seq(user1))(
-            store1.multiDomainAcsStore
+            "request3",
           )
           _ <- dummyDomain.create(request1, createdEventSignatories = Seq(user1))(
-            store1.multiDomainAcsStore
-          )
-          // Withdrawing or rejecting a request atomically archives both the offer and the request
-          _ <- dummyDomain.create(offer2, createdEventSignatories = Seq(user1))(
             store1.multiDomainAcsStore
           )
           _ <- dummyDomain.create(request2, createdEventSignatories = Seq(user1))(
             store1.multiDomainAcsStore
           )
-          _ <- dummyDomain.archive(offer2)(store1.multiDomainAcsStore)
           _ <- dummyDomain.archive(request2)(store1.multiDomainAcsStore)
-          // Accepting a request archives the request, but not the offer
-          _ <- dummyDomain.create(offer3, createdEventSignatories = Seq(user1))(
-            store1.multiDomainAcsStore
-          )
           _ <- dummyDomain.create(request3, createdEventSignatories = Seq(user1))(
             store1.multiDomainAcsStore
           )
           _ <- dummyDomain.archive(request3)(store1.multiDomainAcsStore)
         } yield {
-          def resultCids(r: AppPaymentRequest) =
-            r.deliveryOffer.contractId.contractId -> r.appPaymentRequest.contractId.contractId
+          def resultCids(
+              r: Contract[
+                paymentCodegen.AppPaymentRequest.ContractId,
+                paymentCodegen.AppPaymentRequest,
+              ]
+          ) =
+            r.contractId.contractId
 
           eventually() {
             // Listing - only request1 should be visible
             val actual = store1.listAppPaymentRequests.futureValue.map(resultCids)
             val expected = Seq(
-              offer1.contractId.contractId -> request1.contractId.contractId
+              request1.contractId.contractId
             )
             actual should contain theSameElementsInOrderAs expected
 
             // Pointwise lookup - only request1 should be visible
             store1.getAppPaymentRequest(request1.contractId).map(resultCids).futureValue should be(
-              offer1.contractId.contractId -> request1.contractId.contractId
+              request1.contractId.contractId
             )
             assertThrows[Throwable](store1.getAppPaymentRequest(request2.contractId).futureValue)
             assertThrows[Throwable](store1.getAppPaymentRequest(request3.contractId).futureValue)
@@ -881,31 +881,13 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def deliveryOffer(
-      sender: PartyId
-  ) = {
-    val templateId = testWalletCodegen.TestDeliveryOffer.TEMPLATE_ID
-    val template = new testWalletCodegen.TestDeliveryOffer(
-      svcParty.toProtoPrimitive,
-      sender.toProtoPrimitive,
-      s"Party $sender promises to deliver something",
-    )
-    Contract(
-      identifier = templateId,
-      contractId = new testWalletCodegen.TestDeliveryOffer.ContractId(nextCid()),
-      payload = template,
-      metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
-    )
-  }
-
   private def appPaymentRequest(
       sender: PartyId,
       provider: PartyId,
       amount: Double,
       currency: paymentCodegen.Currency,
       expiresAt: CantonTimestamp,
-      deliveryOfferCid: testWalletCodegen.TestDeliveryOffer.ContractId,
+      description: String,
   ) = {
     val templateId = paymentCodegen.AppPaymentRequest.TEMPLATE_ID
     val template = new paymentCodegen.AppPaymentRequest(
@@ -919,7 +901,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       provider.toProtoPrimitive,
       svcParty.toProtoPrimitive,
       expiresAt.toInstant,
-      deliveryOfferCid.toInterface(paymentCodegen.DeliveryOffer.INTERFACE),
+      description,
     )
     Contract(
       identifier = templateId,
@@ -928,18 +910,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
-  }
-
-  private def appPaymentRequestWithOffer(
-      sender: PartyId,
-      provider: PartyId,
-      amount: Double,
-      currency: paymentCodegen.Currency,
-      expiresAt: CantonTimestamp,
-  ) = {
-    val offer = deliveryOffer(sender)
-    val request = appPaymentRequest(sender, provider, amount, currency, expiresAt, offer.contractId)
-    (offer, request)
   }
 
   private def subscriptionContext(

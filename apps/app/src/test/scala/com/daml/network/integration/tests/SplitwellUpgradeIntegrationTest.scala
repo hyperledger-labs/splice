@@ -283,13 +283,13 @@ class SplitwellUpgradeIntegrationTest
           prCid =>
             bobWalletClient
               .listAppPaymentRequests()
-              .collectFirst { case pr if prCid == pr.appPaymentRequest.contractId => pr }
+              .collectFirst { case pr if prCid == pr.contractId => pr }
               .value,
         )
         val aBalanceUpdate = clue("Alice enters another payment") {
           aliceSplitwellClient.enterPayment(aGroupKey, BigDecimal("33.33"), "time left")
         }
-        eventually() { assertAllOn(globalAlias)(bobPyReqId, bobPyReq.deliveryOffer.contractId) }
+        eventually() { assertAllOn(globalAlias)(bobPyReqId) }
         assertAllOn(splitwellAlias)(
           newAbGroup.contract.contractId,
           aGroup.contract.contractId,
@@ -347,7 +347,7 @@ class SplitwellUpgradeIntegrationTest
 
             actAndCheck(
               "Alice accepts the payment after migration",
-              bobWalletClient.acceptAppPaymentRequest(bobPyReq.appPaymentRequest.contractId),
+              bobWalletClient.acceptAppPaymentRequest(bobPyReq.contractId),
             )(
               "balance updated on the upgrade domain",
               _ =>

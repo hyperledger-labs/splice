@@ -6,7 +6,6 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.fees as feesCodegen
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
-import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
 import com.daml.network.codegen.java.cn.wallet.{
@@ -463,30 +462,6 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     directory.requestDirectoryEntry(entryName, entryUrl, entryDescription)
   }
 
-  def createTestDeliveryOffer(
-      participantClientWithAdminToken: CNParticipantClientReference,
-      userId: String,
-      userParty: PartyId,
-      domainId: Option[DomainId] = None,
-      description: String = "description",
-  )(implicit env: CNNodeTestConsoleEnvironment): testWalletCodegen.TestDeliveryOffer.ContractId = {
-    val deliveryOffer = new testWalletCodegen.TestDeliveryOffer(
-      sv1ScanBackend.getSvcPartyId().toProtoPrimitive,
-      userParty.toProtoPrimitive,
-      description,
-    )
-    clue("Create delivery offer") {
-      val result = participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
-        userId = userId,
-        actAs = Seq(userParty),
-        readAs = Seq.empty,
-        update = deliveryOffer.create,
-        domainId = domainId,
-      )
-      testWalletCodegen.TestDeliveryOffer.COMPANION.toContractId(result.contractId)
-    }
-  }
-
   def paymentAmount(
       amount: BigDecimal,
       currency: paymentCodegen.Currency,
@@ -518,18 +493,9 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       domainId: Option[DomainId] = None,
       description: String = "description",
   )(implicit env: CNNodeTestConsoleEnvironment): (
-      testWalletCodegen.TestDeliveryOffer.ContractId,
       paymentCodegen.AppPaymentRequest.ContractId,
       paymentCodegen.AppPaymentRequest,
   ) = {
-    val deliveryOfferId =
-      createTestDeliveryOffer(
-        participantClientWithAdminToken,
-        userId,
-        userParty,
-        description = description,
-      )
-
     val now = env.environment.clock.now
 
     val paymentRequest = new paymentCodegen.AppPaymentRequest(
@@ -538,7 +504,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userParty.toProtoPrimitive,
       svcParty.toProtoPrimitive,
       now.plus(expirationTime).toInstant,
-      deliveryOfferId.toInterface(paymentCodegen.DeliveryOffer.INTERFACE),
+      description,
     )
 
     val signatories =
@@ -555,7 +521,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       paymentCodegen.AppPaymentRequest.COMPANION.toContractId(result.contractId)
     }
 
-    (deliveryOfferId, requestCid, paymentRequest)
+    (requestCid, paymentRequest)
   }
 
   def createSelfPaymentRequest(
@@ -568,7 +534,6 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       domainId: Option[DomainId] = None,
       description: String = "description",
   )(implicit env: CNNodeTestConsoleEnvironment): (
-      testWalletCodegen.TestDeliveryOffer.ContractId,
       paymentCodegen.AppPaymentRequest.ContractId,
       paymentCodegen.AppPaymentRequest,
   ) = {

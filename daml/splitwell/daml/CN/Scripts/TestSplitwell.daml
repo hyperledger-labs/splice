@@ -117,13 +117,15 @@ enterPayment payer provider groupKey amount description = do
 initiateTransfer : CCUser -> CCUser -> GroupKey -> [ReceiverCCAmount] -> Script (ContractId AppPaymentRequest)
 initiateTransfer sender provider groupKey receiverAmounts = do
   group <- getGroup sender groupKey
-  exerciseSplitwellRules sender provider SplitwellRules_InitiateTransfer with user = sender.primaryParty, ..
+  (_, request) <- exerciseSplitwellRules sender provider SplitwellRules_InitiateTransfer with user = sender.primaryParty, ..
+  pure request
 
 completeTransfer : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script ()
 completeTransfer app provider acceptedPaymentCid = do
   transferContext <- getAppTransferContext app provider
-  Some AcceptedAppPayment{deliveryOffer} <- queryContractId provider.primaryParty acceptedPaymentCid
-  void $ submitUser provider.userId $ exerciseCmd (fromInterfaceContractId @TransferInProgress deliveryOffer) TransferInProgress_CompleteTransfer with ..
+  Some AcceptedAppPayment{reference} <- queryContractId provider.primaryParty acceptedPaymentCid
+  [(transferInProgress, _)] <- queryFilter @TransferInProgress provider.primaryParty (\c -> c.appPaymentRequest == reference)
+  void $ submitUser provider.userId $ exerciseCmd transferInProgress TransferInProgress_CompleteTransfer with ..
 
 test : Script ()
 test = script do

@@ -100,6 +100,7 @@ class SplitwellApp(
       clock,
       store,
       ledgerClient,
+      config.domains.global.alias,
       scanConnection,
       retryProvider,
       loggerFactory,

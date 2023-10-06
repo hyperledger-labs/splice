@@ -49,7 +49,7 @@ class WalletPaymentIntegrationTest
 
       val description = "a payment for cool stuff"
 
-      val (_, cid, reqC) =
+      val (cid, reqC) =
         createSelfPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
           aliceWalletClient.config.ledgerApiUser,
@@ -61,8 +61,7 @@ class WalletPaymentIntegrationTest
         val reqFound = eventuallySucceeds() {
           aliceWalletClient.getAppPaymentRequest(cid)
         }
-        reqFound.appPaymentRequest.payload shouldBe reqC
-        reqFound.deliveryOffer.payload.description shouldBe description
+        reqFound.payload shouldBe reqC
         reqFound
       }
 
@@ -70,14 +69,13 @@ class WalletPaymentIntegrationTest
         val reqList = eventually() {
           aliceWalletClient.listAppPaymentRequests().headOption.value
         }
-        reqList.appPaymentRequest.payload shouldBe reqC
-        reqList.deliveryOffer.payload.description shouldBe description
+        reqList.payload shouldBe reqC
         reqList
       }
 
       actAndCheck(
         "Reject the payment request",
-        aliceWalletClient.rejectAppPaymentRequest(reqFound.appPaymentRequest.contractId),
+        aliceWalletClient.rejectAppPaymentRequest(reqFound.contractId),
       )(
         "Rejected request disappears from list",
         _ => aliceWalletClient.listAppPaymentRequests() shouldBe empty,
@@ -87,7 +85,7 @@ class WalletPaymentIntegrationTest
     "allow a user to list and accept app payment requests" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
-      val (referenceId, cid, reqC) =
+      val (cid, reqC) =
         createSelfPaymentRequest(
           aliceValidatorBackend.participantClientWithAdminToken,
           aliceWalletClient.config.ledgerApiUser,
@@ -95,7 +93,7 @@ class WalletPaymentIntegrationTest
         )
 
       eventuallySucceeds() {
-        aliceWalletClient.getAppPaymentRequest(cid).appPaymentRequest.payload shouldBe reqC
+        aliceWalletClient.getAppPaymentRequest(cid).payload shouldBe reqC
       }
 
       clue("Tap 50 coins") {
@@ -127,8 +125,8 @@ class WalletPaymentIntegrationTest
             aliceUserParty.toProtoPrimitive,
             svcParty.toProtoPrimitive,
             r.payload.lockedCoin,
-            referenceId.toInterface(walletCodegen.DeliveryOffer.INTERFACE),
             r.payload.round,
+            cid,
           )
         }
       }

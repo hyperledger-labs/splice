@@ -62,16 +62,6 @@ class UserWalletAutomationService(
       paymentCodegen.AppPaymentRequest.COMPANION,
     )
   )
-  registerTrigger(
-    new UnassignTrigger.Interface(
-      triggerContext,
-      store,
-      connection,
-      globalDomain,
-      store.key.endUserParty,
-      paymentCodegen.DeliveryOffer.INTERFACE,
-    )
-  )
 
   registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.endUserParty))
 }

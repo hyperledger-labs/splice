@@ -4,9 +4,8 @@ import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{ContractMetadata, Identifier}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
-import com.daml.network.codegen.java.cn.scripts.testwallet.TestDeliveryOffer
 import com.daml.network.codegen.java.cn.splitwell.*
-import com.daml.network.codegen.java.cn.wallet.payment.{DeliveryOffer, DeliveryOfferView}
+import com.daml.network.codegen.java.cn.wallet.payment.AppPaymentRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.ledger.api.ReassignmentEvent
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord}
@@ -45,31 +44,6 @@ abstract class MultiDomainAcsStoreTest[
       svcParty,
       templateFilters = Map(
         mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured)
-      ),
-      interfaceFilters = Map(
-        mkFilter(DeliveryOffer.INTERFACE)(
-          _ => true,
-          Seq(
-            InterfaceImplementation(
-              TransferInProgress.COMPANION
-            )(offer =>
-              new DeliveryOfferView(
-                offer.group.svc,
-                offer.sender,
-                s"TransferInProgress",
-              )
-            ),
-            InterfaceImplementation(
-              TestDeliveryOffer.COMPANION
-            )(offer =>
-              new DeliveryOfferView(
-                offer.svc,
-                offer.sender,
-                "TestDeliveryOffer",
-              )
-            ),
-          ),
-        )
       ),
     )
   }
@@ -146,7 +120,8 @@ abstract class MultiDomainAcsStoreTest[
     appRewardCoupon(i, svcParty, true, contractId = validContractId(i))
 
   def transferInProgress(
-      i: Int
+      i: Int,
+      paymentRequest: AppPaymentRequest.ContractId,
   ) =
     Contract(
       identifier = TransferInProgress.TEMPLATE_ID,
@@ -162,37 +137,7 @@ abstract class MultiDomainAcsStoreTest[
         ),
         svcParty.toProtoPrimitive,
         Seq.empty.asJava,
-      ),
-      metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
-    )
-
-  def testDeliveryOffer(
-      i: Int
-  ) =
-    Contract(
-      identifier = TestDeliveryOffer.TEMPLATE_ID,
-      contractId = new TestDeliveryOffer.ContractId(s"#$i"),
-      payload = new TestDeliveryOffer(
-        svcParty.toProtoPrimitive,
-        svcParty.toProtoPrimitive,
-        "",
-      ),
-      metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
-    )
-
-  def deliveryOffer(
-      i: Int,
-      description: String,
-  ) =
-    Contract(
-      identifier = DeliveryOffer.TEMPLATE_ID,
-      contractId = new DeliveryOffer.ContractId(s"#$i"),
-      payload = new DeliveryOfferView(
-        svcParty.toProtoPrimitive,
-        svcParty.toProtoPrimitive,
-        description,
+        paymentRequest,
       ),
       metadata = ContractMetadata.Empty(),
       createArgumentsBlob = protobuf.Any.getDefaultInstance,

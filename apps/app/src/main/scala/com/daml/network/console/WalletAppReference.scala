@@ -76,7 +76,9 @@ abstract class WalletAppReference(
     "Queries the configured remote participant for the PaymentRequests of the configured user. " +
       "Returns all found payment requests."
   )
-  def listAppPaymentRequests(): Seq[HttpWalletAppClient.AppPaymentRequest] = {
+  def listAppPaymentRequests(): Seq[
+    Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
+  ] = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.ListAppPaymentRequests)
     }
@@ -89,7 +91,7 @@ abstract class WalletAppReference(
   )
   def getAppPaymentRequest(
       contractId: walletCodegen.AppPaymentRequest.ContractId
-  ): HttpWalletAppClient.AppPaymentRequest = {
+  ): Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest] = {
     consoleEnvironment.run {
       httpCommand(
         HttpWalletAppClient.GetAppPaymentRequest(contractId)
