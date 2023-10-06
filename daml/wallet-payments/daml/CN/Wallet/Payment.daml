@@ -114,14 +114,24 @@ template AppPaymentRequest
              svc, provider, ccReceiverAmounts, sender, lockedCoin, round, reference = self
          return (acceptedPayment, result.senderChangeCoin)
 
-    choice AppPaymentRequest_Withdraw : ()
+    choice AppPaymentRequest_Withdraw : ContractId TerminatedAppPayment
       controller appPaymentRequest_receivers this
-      do pure ()
+      do create TerminatedAppPayment with reference = self, sender, provider, receivers = map (\a -> a.receiver) receiverAmounts
 
-    choice AppPaymentRequest_Reject : ()
+    choice AppPaymentRequest_Reject : ContractId TerminatedAppPayment
       controller sender
-      do pure ()
+      do create TerminatedAppPayment with reference = self, sender, provider, receivers = map (\a -> a.receiver) receiverAmounts
 
+-- | Instead of just archiving payments (e.g. when the request is accepted) we create an
+-- TerminatedAppPayment contract. This allows the coordinating workflow to archive its own contracts once the app-payment workflow terminated.
+template TerminatedAppPayment
+  with
+    sender : Party
+    provider : Party
+    receivers : [Party]
+    reference : ContractId AppPaymentRequest
+  where
+    signatory sender, provider, receivers
 
 data ReceiverCoin = ReceiverCoin with receiver : Party, lockedCoin : ContractId LockedCoin
   deriving (Eq, Show)
@@ -177,11 +187,13 @@ template AcceptedAppPayment
       with
         context : AppTransferContext
       controller map (\r -> r.receiver) ccReceiverAmounts
-      do exercise lockedCoin (LockedCoin_Unlock context.coinRules context.openMiningRound)
+      do create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) ccReceiverAmounts
+         exercise lockedCoin (LockedCoin_Unlock context.coinRules context.openMiningRound)
 
     choice AcceptedAppPayment_Expire : CoinCreateSummary (ContractId Coin)
       with
         context : AppTransferContext
       controller sender
       do -- TODO(#3152) Split out coin unlocking from payment expiry
+         create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) ccReceiverAmounts
          exercise lockedCoin (LockedCoin_OwnerExpireLock context.coinRules context.openMiningRound)

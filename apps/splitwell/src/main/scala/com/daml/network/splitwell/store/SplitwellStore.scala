@@ -1,6 +1,5 @@
 package com.daml.network.splitwell.store
 
-import cats.syntax.traverseFilter.*
 import com.daml.network.automation.TransferFollowTrigger
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
@@ -10,7 +9,6 @@ import com.daml.network.splitwell.store.memory.InMemorySplitwellStore
 import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
   InMemoryMultiDomainAcsStore,
-  Limit,
   MultiDomainAcsStore,
   ConfiguredDefaultDomain,
   TxLogStore,
@@ -195,43 +193,8 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefault
       (co: Contract[
         splitwellCodegen.TransferInProgress.ContractId,
         splitwellCodegen.TransferInProgress,
-      ]) => co.payload.appPaymentRequest == paymentRequest
+      ]) => co.payload.reference == paymentRequest
     )
-
-  /** List all transfer in progress contracts for which there is no
-    * matching payment request/accepted payment.
-    */
-  def listStaleTransferInProgress(
-  )(implicit traceContext: TraceContext): Future[Seq[AssignedContract[
-    splitwellCodegen.TransferInProgress.ContractId,
-    splitwellCodegen.TransferInProgress,
-  ]]] =
-    for {
-      cs <- multiDomainAcsStore.listAssignedContracts(
-        splitwellCodegen.TransferInProgress.COMPANION,
-        Limit.DefaultLimit,
-      )
-      filteredCs <- cs.toList.filterA(c =>
-        multiDomainAcsStore
-          .lookupContractById(walletCodegen.AppPaymentRequest.COMPANION)(
-            c.payload.appPaymentRequest
-          )
-          .flatMap { paymentRequestO =>
-            paymentRequestO match {
-              case Some(_) => Future.successful(false)
-              case None =>
-                multiDomainAcsStore
-                  .findContractWithOffset(walletCodegen.AcceptedAppPayment.COMPANION)(
-                    (co: Contract[
-                      walletCodegen.AcceptedAppPayment.ContractId,
-                      walletCodegen.AcceptedAppPayment,
-                    ]) => co.payload.reference == c.payload.appPaymentRequest
-                  )
-                  .map(_.value.isEmpty)
-            }
-          }
-      )
-    } yield filteredCs
 
   protected[this] def groupMembers(group: splitwellCodegen.Group): Set[String] =
     group.members.asScala.toSet + group.owner
@@ -302,8 +265,10 @@ object SplitwellStore {
         mkFilter(splitwellCodegen.BalanceUpdate.COMPANION)(co =>
           co.payload.group.provider == provider
         ),
-        mkFilter(walletCodegen.AppPaymentRequest.COMPANION)(co => co.payload.provider == provider),
         mkFilter(walletCodegen.AcceptedAppPayment.COMPANION)(co => co.payload.provider == provider),
+        mkFilter(walletCodegen.TerminatedAppPayment.COMPANION)(co =>
+          co.payload.provider == provider
+        ),
       ),
     )
   }

@@ -1,5 +1,6 @@
 module CN.Scripts.TestWallet where
 
+import DA.Action
 import DA.Assert
 import DA.Time
 import Daml.Script
@@ -328,6 +329,52 @@ testMixedPaymentRequest = script do
       ]
     round = lockedCoin.coin.amount.createdAt
     reference = transferRequest
+
+  pure ()
+
+assertTerminatedPayment : Party -> ContractId AppPaymentRequest -> Script ()
+assertTerminatedPayment p reference = do
+  terminated <- queryFilter @TerminatedAppPayment p (\c -> c.reference == reference)
+  unless (length terminated == 1) $ abort ("Expected one TerminatedAppPayment for " <> show reference <> " but got " <> show terminated)
+
+testTerminatedPayments : Script ()
+testTerminatedPayments = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runCoinDepositBots app
+
+  featureApp app provider1
+
+  let paymentAmount = 41.5
+
+  let createPaymentRequest = createSingleReceiverPaymentRequest app
+        provider1.primaryParty alice.primaryParty bob.primaryParty
+        (PaymentAmount paymentAmount CC)
+
+  paymentRequest <- createPaymentRequest
+  submit alice.primaryParty $ exerciseCmd paymentRequest AppPaymentRequest_Reject
+  assertTerminatedPayment alice.primaryParty paymentRequest
+
+  paymentRequest <- createPaymentRequest
+  submit bob.primaryParty $ exerciseCmd paymentRequest AppPaymentRequest_Withdraw
+  assertTerminatedPayment alice.primaryParty paymentRequest
+
+  let createAcceptedPayment = do
+        coin <- tap app alice 42.0
+        paymentRequest <- createPaymentRequest
+        accepted <- acceptPaymentRequest app alice aliceValidator.primaryParty None paymentRequest coin
+        pure (paymentRequest, accepted)
+
+  (paymentRequest, acceptedPayment) <- createAcceptedPayment
+  context <- getAppTransferContext app alice
+  submitMulti [bob.primaryParty] [app.svc] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Reject context)
+  assertTerminatedPayment alice.primaryParty paymentRequest
+
+  (paymentRequest, acceptedPayment) <- createAcceptedPayment
+  context <- getAppTransferContext app alice
+  passTime (minutes 10)
+  submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Expire context)
+  assertTerminatedPayment alice.primaryParty paymentRequest
 
   pure ()
 

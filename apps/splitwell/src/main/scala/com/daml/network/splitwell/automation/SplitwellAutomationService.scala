@@ -68,7 +68,7 @@ class SplitwellAutomationService(
   )
 
   registerTrigger(
-    new StaleTransferInProgressTrigger(triggerContext, store, connection)
+    new TerminatedAppPaymentTrigger(triggerContext, store, connection)
   )
 
   registerTrigger(

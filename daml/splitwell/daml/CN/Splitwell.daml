@@ -218,7 +218,7 @@ template Group
              group = this
              sender
              receiverAmounts
-             appPaymentRequest = paymentRequest
+             reference = paymentRequest
          pure (deliveryOffer, paymentRequest)
 
     nonconsuming choice Group_Net : ContractId BalanceUpdate
@@ -249,17 +249,19 @@ template TransferInProgress
     group : Group
     sender : Party
     receiverAmounts : [ReceiverCCAmount]
-    appPaymentRequest : ContractId AppPaymentRequest
+    reference : ContractId AppPaymentRequest
   where
     signatory signatory group
 
-    -- ^ Driven by provider-based automation that archives this once the corresponding app payment contracts are archived.
-    choice TransferInProgress_Abort : ()
+    choice TransferInProgress_Terminate : ()
       with
         actor : Party
+        terminatedAppPaymentCid : ContractId TerminatedAppPayment
       controller actor
       do require "Actor is signatory" (actor `elem` signatory this)
-         pure ()
+         terminated <- fetch terminatedAppPaymentCid
+         require "Reference matches" (terminated.reference == reference)
+         archive terminatedAppPaymentCid
 
     postconsuming choice TransferInProgress_CompleteTransfer : [ContractId BalanceUpdate]
       with
@@ -271,13 +273,13 @@ template TransferInProgress
          acceptedPayment.sender === sender
          openMiningRound <- exercise @OpenMiningRound transferContext.openMiningRound (OpenMiningRound_Fetch group.provider)
          let expectedAcceptedPayment = AcceptedAppPayment with
-               sender = sender
+               sender
                provider = group.provider
                ccReceiverAmounts = receiverAmounts
                svc = group.svc
                lockedCoin = acceptedPayment.lockedCoin
                round = openMiningRound.round
-               reference = appPaymentRequest
+               reference
          acceptedPayment === expectedAcceptedPayment
          forA receiverAmounts \ReceiverCCAmount{receiver, ccAmount} ->
            create BalanceUpdate with

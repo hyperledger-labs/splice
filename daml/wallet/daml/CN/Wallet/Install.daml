@@ -201,7 +201,7 @@ template WalletAppInstall
           endUserName
           outcomes = reverse accepted
 
-    nonconsuming choice WalletAppInstall_AppPaymentRequest_Reject : ()
+    nonconsuming choice WalletAppInstall_AppPaymentRequest_Reject : ContractId TerminatedAppPayment
       with
         cid : ContractId AppPaymentRequest
       controller validatorParty

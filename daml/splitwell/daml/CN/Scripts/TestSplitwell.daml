@@ -124,7 +124,7 @@ completeTransfer : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script ()
 completeTransfer app provider acceptedPaymentCid = do
   transferContext <- getAppTransferContext app provider
   Some AcceptedAppPayment{reference} <- queryContractId provider.primaryParty acceptedPaymentCid
-  [(transferInProgress, _)] <- queryFilter @TransferInProgress provider.primaryParty (\c -> c.appPaymentRequest == reference)
+  [(transferInProgress, _)] <- queryFilter @TransferInProgress provider.primaryParty (\c -> c.reference == reference)
   void $ submitUser provider.userId $ exerciseCmd transferInProgress TransferInProgress_CompleteTransfer with ..
 
 test : Script ()
