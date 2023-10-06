@@ -310,7 +310,11 @@ class ParticipantAdminConnection(
           TopologyStoreId.AuthorizedStore.filterName,
           filterParty = partyId.filterString,
         ).map(_.nonEmpty),
-        proposeInitialPartyToParticipant(partyId, participantId, signedBy),
+        proposeInitialPartyToParticipant(
+          partyId,
+          participantId,
+          signedBy,
+        ),
         logger,
       )
       _ <- retryProvider.waitUntil(

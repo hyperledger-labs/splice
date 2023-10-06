@@ -14,4 +14,6 @@ object CNThresholds {
 
   def getMediatorDomainStateThreshold(svcSize: Int): PositiveInt = FPlus1Threshold(svcSize)
 
+  def getPartyToParticipantThreshold(svcSize: Int): PositiveInt = FPlus1Threshold(svcSize)
+
 }

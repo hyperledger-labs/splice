@@ -34,7 +34,10 @@ import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
 import com.digitalasset.canton.topology.store.{StoredTopologyTransactionsX, TimeQueryX}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
-import com.daml.network.config.CNThresholds.getMediatorDomainStateThreshold
+import com.daml.network.config.CNThresholds.{
+  getMediatorDomainStateThreshold,
+  getPartyToParticipantThreshold,
+}
 import com.digitalasset.canton.topology.transaction.{
   DomainParametersStateX,
   HostingParticipant,
@@ -359,11 +362,13 @@ class TopologyAdminConnection(
       serial = PositiveInt.one,
     ).map(_ => ())
 
+  // TODO(#7884): handle threshold update for sv off-boarding
   def ensurePartyToParticipant(
       domainId: DomainId,
       party: PartyId,
       newParticipant: ParticipantId,
       signedBy: Fingerprint,
+      svcRulesMembersSize: Int,
   )(implicit traceContext: TraceContext): Future[Unit] =
     ensureTopologyMapping[PartyToParticipantX](
       show"Party $party is authorized on $newParticipant",
@@ -381,7 +386,11 @@ class TopologyAdminConnection(
             participants = HostingParticipant(
               newParticipant,
               ParticipantPermissionX.Submission,
-            ) +: previous.participants
+            ) +: previous.participants,
+            threshold = getPartyToParticipantThreshold(
+              List(svcRulesMembersSize, previous.participants.length + 1)
+                .foldLeft(Int.MaxValue)(_ min _)
+            ),
           )
         ),
       signedBy,
