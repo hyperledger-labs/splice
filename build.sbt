@@ -265,6 +265,7 @@ lazy val `apps-common` =
       `canton-name-service-daml`,
       `wallet-daml` % "test",
       `splitwell-daml` % "test",
+      `svc-governance-daml` % "test",
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(

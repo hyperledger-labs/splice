@@ -241,6 +241,22 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         }
       }
 
+      "do not return expired coins from other domains" in {
+        val expiresAtRound2 = coin(storeSvParty, 1.0, 1, 1.0)
+        val expiresAtRound3 = coin(storeSvParty, 1.0, 2, 1.0)
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(svcRules())(store.multiDomainAcsStore)
+          _ <- createMiningRoundsTriple(store, startRound = 3L) // oldest is round 3, newest is 5
+          _ <- dummy2Domain.create(expiresAtRound2)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(expiresAtRound3)(store.multiDomainAcsStore)
+          result <- store.listExpiredCoins(CantonTimestamp.now(), 100)(traceContext)
+        } yield {
+          val contracts = result.map(_.contract)
+          contracts should contain theSameElementsAs Seq(expiresAtRound3)
+        }
+      }
+
     }
 
     "listLockedExpiredCoins" should {
@@ -263,6 +279,22 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         } yield {
           val contracts = result.map(_.contract)
           contracts should contain theSameElementsAs Seq(expiresAtRound2, expiresAtRound3)
+        }
+      }
+
+      "do not return expired locked coins from other domains" in {
+        val expiresAtRound2 = lockedCoin(storeSvParty, 1.0, 1, 1.0)
+        val expiresAtRound3 = lockedCoin(storeSvParty, 1.0, 2, 1.0)
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(svcRules())(store.multiDomainAcsStore)
+          _ <- createMiningRoundsTriple(store, startRound = 3L) // oldest is round 3, newest is 5
+          _ <- dummy2Domain.create(expiresAtRound2)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(expiresAtRound3)(store.multiDomainAcsStore)
+          result <- store.listLockedExpiredCoins(CantonTimestamp.now(), 100)(traceContext)
+        } yield {
+          val contracts = result.map(_.contract)
+          contracts should contain theSameElementsAs Seq(expiresAtRound3)
         }
       }
 
@@ -312,14 +344,17 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     "listAppRewardCouponsOnDomain" should {
 
-      // TODO (#5314): add cases with a different domain
       "list all the app reward coupons on the domain" in {
         val inRound = (1 to 3).map(n => appRewardCoupon(round = 3, userParty(n)))
         val outOfRound = (1 to 3).map(n => appRewardCoupon(round = 2, userParty(n)))
+        val inRoundOtherDomain = (1 to 3).map(n => appRewardCoupon(round = 3, userParty(n)))
         for {
           store <- mkStore()
           _ <- Future.traverse(inRound ++ outOfRound)(
             dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          _ <- Future.traverse(inRoundOtherDomain)(
+            dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listAppRewardCouponsOnDomain(round = 3, dummyDomain, Limit.DefaultLimit)
         } yield {
@@ -331,14 +366,17 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     "listValidatorRewardCouponsOnDomain" should {
 
-      // TODO (#5314): add cases with a different domain
       "list all the validator reward coupons on the domain" in {
         val inRound = (1 to 3).map(n => validatorRewardCoupon(round = 3, userParty(n)))
         val outOfRound = (1 to 3).map(n => validatorRewardCoupon(round = 2, userParty(n)))
+        val inRoundOtherDomain = (1 to 3).map(n => validatorRewardCoupon(round = 3, userParty(n)))
         for {
           store <- mkStore()
           _ <- Future.traverse(inRound ++ outOfRound)(
             dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          _ <- Future.traverse(inRoundOtherDomain)(
+            dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listValidatorRewardCouponsOnDomain(
             round = 3,
@@ -359,12 +397,19 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val provider2InRound = (1 to 3).map(_ => appRewardCoupon(round = 3, userParty(2)))
         val provider1OutOfRound = (1 to 3).map(_ => appRewardCoupon(round = 2, userParty(1)))
         val provider2OutOfRound = (1 to 3).map(_ => appRewardCoupon(round = 2, userParty(2)))
+        val provider1OtherDomain = (1 to 3).map(_ => appRewardCoupon(round = 3, userParty(1)))
+        val provider2OtherDomain = (1 to 3).map(_ => appRewardCoupon(round = 3, userParty(2)))
         for {
           store <- mkStore()
           _ <- Future.traverse(
             provider1InRound ++ provider2InRound ++ provider1OutOfRound ++ provider2OutOfRound
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          _ <- Future.traverse(
+            provider1OtherDomain ++ provider2OtherDomain
+          )(
+            dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listAppRewardCouponsGroupedByCounterparty(
             roundNumber = 3,
@@ -390,12 +435,19 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val provider2InRound = (1 to 3).map(_ => validatorRewardCoupon(round = 3, userParty(2)))
         val provider1OutOfRound = (1 to 3).map(_ => validatorRewardCoupon(round = 2, userParty(1)))
         val provider2OutOfRound = (1 to 3).map(_ => validatorRewardCoupon(round = 2, userParty(2)))
+        val provider1OtherDomain = (1 to 3).map(_ => validatorRewardCoupon(round = 3, userParty(1)))
+        val provider2OtherDomain = (1 to 3).map(_ => validatorRewardCoupon(round = 3, userParty(2)))
         for {
           store <- mkStore()
           _ <- Future.traverse(
             provider1InRound ++ provider2InRound ++ provider1OutOfRound ++ provider2OutOfRound
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          _ <- Future.traverse(
+            provider1OtherDomain ++ provider2OtherDomain
+          )(
+            dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listValidatorRewardCouponsGroupedByCounterparty(
             roundNumber = 3,
@@ -735,7 +787,51 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    // TODO (#5314): this is missing tests for all the usages of "NotOnDomain"
+    "listLaggingSvcRulesFollowers" should {
+      "list followers" in {
+
+        val leaderContract = svcRules()
+        val followerContract1 = coinRules()
+        val followerContract2 = svReward(storeSvParty, 1)
+        val alreadyReassigned = svReward(storeSvParty, 2)
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(leaderContract)(store.multiDomainAcsStore)
+          _ <- dummy2Domain.create(followerContract1)(store.multiDomainAcsStore)
+          _ <- dummy2Domain.create(followerContract2)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(alreadyReassigned)(store.multiDomainAcsStore)
+          result <- store.listSvcRulesTransferFollowers()
+        } yield result.map(x =>
+          x.leader.contractId -> x.follower.contractId
+        ) should contain theSameElementsAs Seq(
+          leaderContract.contractId -> followerContract1.contractId,
+          leaderContract.contractId -> followerContract2.contractId,
+        )
+      }
+    }
+
+    "listCoinRulesTransferFollowers" should {
+      "list followers" in {
+
+        val leaderContract = coinRules()
+        val followerContract1 = openMiningRound(svcParty, 1, 1.0)
+        val followerContract2 = svcReward(1)
+        val alreadyReassigned = svcReward(2)
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(leaderContract)(store.multiDomainAcsStore)
+          _ <- dummy2Domain.create(followerContract1)(store.multiDomainAcsStore)
+          _ <- dummy2Domain.create(followerContract2)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(alreadyReassigned)(store.multiDomainAcsStore)
+          result <- store.listCoinRulesTransferFollowers()
+        } yield result.map(x =>
+          x.leader.contractId -> x.follower.contractId
+        ) should contain theSameElementsAs Seq(
+          leaderContract.contractId -> followerContract1.contractId,
+          leaderContract.contractId -> followerContract2.contractId,
+        )
+      }
+    }
 
     "listInitialPaymentConfirmationByCnsName" should {
 

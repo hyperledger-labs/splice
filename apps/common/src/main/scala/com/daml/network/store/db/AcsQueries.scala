@@ -3,14 +3,25 @@ package com.daml.network.store.db
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
-import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
+import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, ContractState}
+import com.daml.network.store.db.AcsQueries.{
+  SelectFromAcsTableWithStateResult,
+  SelectFromContractStateResult,
+}
 import com.daml.network.store.db.AcsTables.TxLogStoreRowTemplate
-import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
+import com.daml.network.util.{
+  AssignedContract,
+  Contract,
+  ContractWithState,
+  QualifiedName,
+  TemplateJsonDecoder,
+}
 import slick.jdbc.{GetResult, PositionedResult}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json
+import io.grpc.Status
 import slick.jdbc.canton.SQLActionBuilder
 
 trait AcsQueries extends AcsJdbcTypes {
@@ -51,24 +62,6 @@ trait AcsQueries extends AcsJdbcTypes {
         )
       )
     }
-
-  protected def selectFromContractState(
-      storeId: Int,
-      where: SQLActionBuilder,
-      orderLimit: SQLActionBuilder = sql"",
-  ) =
-    (sql"""
-       select
-         state_number,
-         assigned_domain,
-         reassignment_counter,
-         reassignment_target_domain,
-         reassignment_source_domain,
-         reassignment_submitter,
-         reassignment_unassign_id
-       from contract_state
-       where acs.store_id = $storeId and """ ++ where ++ sql"""
-       """ ++ orderLimit).toActionBuilder.as[AcsQueries.SelectFromContractStateResult]
 
   /** Similar to [[selectFromAcsTable]], but also returns the contract state (i.e., the domain to which a contract is currently assigned) */
   protected def selectFromAcsTableWithState(
@@ -315,6 +308,40 @@ trait AcsQueries extends AcsJdbcTypes {
       )
   }
 
+  protected def assignedContractFromRow[C, TCid <: ContractId[_], T](companion: C)(
+      row: SelectFromAcsTableWithStateResult
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      templateJsonDecoder: TemplateJsonDecoder,
+  ): AssignedContract[TCid, T] = {
+    val contract = contractFromRow(companion)(row.acsRow)
+    row.stateRow.assignedDomain match {
+      case Some(domain) => AssignedContract(contract, domain)
+      case None =>
+        throw Status.FAILED_PRECONDITION
+          .withDescription(
+            s"Cannot read contract ${contract.contractId} as AssignedContract, it is in flight with ${row.stateRow}"
+          )
+          .asRuntimeException()
+    }
+  }
+
+  protected def contractWithStateFromRow[C, TCid <: ContractId[_], T](companion: C)(
+      row: SelectFromAcsTableWithStateResult
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      templateJsonDecoder: TemplateJsonDecoder,
+  ): ContractWithState[TCid, T] = {
+    val state = contractStateFromRow(row.stateRow)
+    val contract = contractFromRow(companion)(row.acsRow)
+    ContractWithState(contract, state)
+  }
+
+  protected def contractStateFromRow(
+      row: SelectFromContractStateResult
+  ): ContractState = {
+    row.assignedDomain.fold[ContractState](ContractState.InFlight)(id => ContractState.Assigned(id))
+  }
 }
 
 object AcsQueries {

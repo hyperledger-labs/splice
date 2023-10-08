@@ -273,7 +273,6 @@ class DbSvSvcStore(
     } yield limited.map(contractFromRow(Confirmation.COMPANION)(_))
   }
 
-  // TODO (#5314): this is not checking for domain
   override def listAppRewardCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[AppRewardCoupon.ContractId, AppRewardCoupon]]] = waitUntilAcsIngested {
@@ -285,6 +284,7 @@ class DbSvSvcStore(
                  where store_id = $storeId
                    and template_id_qualified_name = ${QualifiedName(AppRewardCoupon.TEMPLATE_ID)}
                    and reward_round = $round
+                   and assigned_domain = $domainId
                    and reward_party is not null -- otherwise index is not used
                  limit ${sqlLimit(limit)}
                """).toActionBuilder.as[SelectFromAcsTableResult],
@@ -294,7 +294,6 @@ class DbSvSvcStore(
     } yield limited.map(contractFromRow(AppRewardCoupon.COMPANION)(_))
   }
 
-  // TODO (#5314): this is not checking for domain
   override def listValidatorRewardCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(
       implicit tc: TraceContext
   ): Future[Seq[Contract[ValidatorRewardCoupon.ContractId, ValidatorRewardCoupon]]] =
@@ -308,6 +307,7 @@ class DbSvSvcStore(
                      and template_id_qualified_name = ${QualifiedName(
                   ValidatorRewardCoupon.TEMPLATE_ID
                 )}
+                     and assigned_domain = $domainId
                      and reward_round = $round
                      and reward_party is not null -- otherwise index is not used
                    limit ${sqlLimit(limit)}
@@ -326,7 +326,6 @@ class DbSvSvcStore(
       tc: TraceContext
   ): Future[Seq[Seq[AppRewardCoupon.ContractId]]] = waitUntilAcsIngested {
     for {
-      // TODO (#5314) only consider those on roundDomain
       result <- storage
         .query(
           sql"""
@@ -334,6 +333,7 @@ class DbSvSvcStore(
               from svc_acs_store
               where store_id = $storeId
                 and template_id_qualified_name = ${QualifiedName(AppRewardCoupon.TEMPLATE_ID)}
+                and assigned_domain = $roundDomain
                 and reward_round = $roundNumber
                 and reward_party is not null -- otherwise index is not used
               group by reward_party
@@ -351,7 +351,6 @@ class DbSvSvcStore(
   )(implicit tc: TraceContext): Future[Seq[Seq[ValidatorRewardCoupon.ContractId]]] =
     waitUntilAcsIngested {
       for {
-        // TODO (#5314) only consider those on roundDomain
         result <- storage
           .query(
             sql"""
@@ -361,6 +360,7 @@ class DbSvSvcStore(
                   and template_id_qualified_name = ${QualifiedName(
                 ValidatorRewardCoupon.TEMPLATE_ID
               )}
+                  and assigned_domain = $roundDomain
                   and reward_round = $roundNumber
                   and reward_party is not null -- otherwise index is not used
                 group by reward_party
@@ -379,22 +379,19 @@ class DbSvSvcStore(
     waitUntilAcsIngested {
       (for {
         svcRules <- OptionT(lookupSvcRules())
-        // TODO (#5314) only those domain-matching SvcRules
         result <- storage.querySingle(
-          (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
-            sql"""
-            where store_id = $storeId
-              and template_id_qualified_name = ${QualifiedName(ClosedMiningRound.TEMPLATE_ID)}
-              and mining_round is not null
-            order by mining_round
-            limit 1
-           """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
+          selectFromAcsTableWithState(
+            DbSvSvcStore.acsTableName,
+            storeId,
+            where =
+              sql"""template_id_qualified_name = ${QualifiedName(ClosedMiningRound.TEMPLATE_ID)}
+              and assigned_domain = ${svcRules.domain}
+              and mining_round is not null""",
+            orderLimit = sql"""order by mining_round limit 1""",
+          ).headOption,
           "lookupOldestClosedMiningRound",
         )
-      } yield AssignedContract(
-        contractFromRow(ClosedMiningRound.COMPANION)(result),
-        svcRules.domain,
-      )).value
+      } yield assignedContractFromRow(ClosedMiningRound.COMPANION)(result)).value
     }
 
   override def lookupConfirmationByActionWithOffset(
@@ -613,13 +610,14 @@ class DbSvSvcStore(
     implicit tc =>
       waitUntilAcsIngested {
         for {
+          domainId <- getSvcRules().map(_.domain)
           rows <- storage.query(
             selectFromAcsTableWithState(
               DbSvSvcStore.acsTableName,
               storeId,
               where = sql"""
                 template_id_qualified_name = ${QualifiedName(companion.TEMPLATE_ID)}
-                and assigned_domain is not null
+                and assigned_domain = $domainId
                 and acs.coin_round_of_expiry <= (
                   select mining_round - 2
                   from svc_acs_store
@@ -633,8 +631,8 @@ class DbSvSvcStore(
             ),
             "listExpiredRoundBased",
           )
-          assigned = rows.map(multiDomainAcsStore.assignedContractFromRow(companion)(_))
-        } yield assigned // TODO (#5314) only those domain-matching SvcRules
+          assigned = rows.map(assignedContractFromRow(companion)(_))
+        } yield assigned
       }
 
   override def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Long)(
@@ -1014,7 +1012,7 @@ class DbSvSvcStore(
         )
       limited = applyLimit(Limit.DefaultLimit, result)
       withState = limited.map(
-        multiDomainAcsStore.contractWithStateFromRow(ImportCrate.COMPANION)(_)
+        contractWithStateFromRow(ImportCrate.COMPANION)(_)
       )
     } yield AcsStoreDump.ImportShipment(openRound, withState)
   }
@@ -1039,7 +1037,7 @@ class DbSvSvcStore(
         )
         .getOrRaise(offsetExpectedError())
       assigned = resultWithOffset.row.map(
-        multiDomainAcsStore.assignedContractFromRow(CnsEntry.COMPANION)(_)
+        assignedContractFromRow(CnsEntry.COMPANION)(_)
       )
     } yield MultiDomainAcsStore.QueryResult(
       resultWithOffset.offset,
@@ -1069,7 +1067,7 @@ class DbSvSvcStore(
         )
         .getOrRaise(offsetExpectedError())
       assigned = resultWithOffset.row.map(
-        multiDomainAcsStore.assignedContractFromRow(SubscriptionInitialPayment.COMPANION)(_)
+        assignedContractFromRow(SubscriptionInitialPayment.COMPANION)(_)
       )
     } yield MultiDomainAcsStore.QueryResult(
       resultWithOffset.offset,
@@ -1098,7 +1096,7 @@ class DbSvSvcStore(
         )
         .getOrRaise(offsetExpectedError())
       assigned = resultWithOffset.row.map(
-        multiDomainAcsStore.assignedContractFromRow(FeaturedAppRight.COMPANION)(_)
+        assignedContractFromRow(FeaturedAppRight.COMPANION)(_)
       )
     } yield MultiDomainAcsStore.QueryResult(
       resultWithOffset.offset,

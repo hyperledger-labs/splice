@@ -49,10 +49,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import slick.jdbc.canton.SQLActionBuilder
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, ReassignmentId}
-import com.daml.network.store.db.AcsQueries.{
-  SelectFromAcsTableWithStateResult,
-  SelectFromContractStateResult,
-}
+import com.daml.network.store.db.AcsQueries.SelectFromAcsTableWithStateResult
 import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.nonempty.NonEmpty
 
@@ -1120,33 +1117,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   }
 
   override def close(): Unit = ()
-
-  def assignedContractFromRow[C, TCid <: ContractId[_], T](companion: C)(
-      row: SelectFromAcsTableWithStateResult
-  )(implicit companionClass: ContractCompanion[C, TCid, T]): AssignedContract[TCid, T] = {
-    val contract = contractFromRow(companion)(row.acsRow)
-    row.stateRow.assignedDomain match {
-      case Some(domain) => AssignedContract(contract, domain)
-      case None =>
-        throw new RuntimeException(
-          s"Cannot read contract ${contract.contractId} as AssignedContract, it is in flight with ${row.stateRow}"
-        )
-    }
-  }
-
-  def contractWithStateFromRow[C, TCid <: ContractId[_], T](companion: C)(
-      row: SelectFromAcsTableWithStateResult
-  )(implicit companionClass: ContractCompanion[C, TCid, T]): ContractWithState[TCid, T] = {
-    val state = contractStateFromRow(row.stateRow)
-    val contract = contractFromRow(companion)(row.acsRow)
-    ContractWithState(contract, state)
-  }
-
-  private def contractStateFromRow(
-      row: SelectFromContractStateResult
-  ): ContractState = {
-    row.assignedDomain.fold[ContractState](ContractState.InFlight)(id => ContractState.Assigned(id))
-  }
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
   private def reassignmentEventUnassignFromRow(

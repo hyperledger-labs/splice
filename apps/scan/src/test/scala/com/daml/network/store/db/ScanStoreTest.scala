@@ -644,6 +644,22 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           }
         }
       }
+
+      "return the FeaturedAppRight of the wanted domain" in {
+        val wanted = featuredAppRight(userParty(1))
+        val unwanted = featuredAppRight(userParty(1))
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(wanted)(store.multiDomainAcsStore)
+          _ <- dummy2Domain.create(unwanted)(store.multiDomainAcsStore)
+        } yield {
+          eventually() {
+            store
+              .findFeaturedAppRight(dummyDomain, userParty(1))
+              .futureValue should be(Some(wanted))
+          }
+        }
+      }
     }
 
     "listActivity" should {

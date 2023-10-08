@@ -24,6 +24,7 @@ import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
+import com.daml.network.codegen.java.cn.svcrules as svcCodegen
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -284,16 +285,55 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
-  protected def featuredAppRight(providerParty: PartyId) = {
+  protected def featuredAppRight(
+      providerParty: PartyId,
+      contractId: String = nextCid(),
+  ) = {
     val template = new FeaturedAppRight(svcParty.toProtoPrimitive, providerParty.toProtoPrimitive)
     Contract(
       FeaturedAppRight.TEMPLATE_ID,
-      new FeaturedAppRight.ContractId(providerParty.toProtoPrimitive),
+      new FeaturedAppRight.ContractId(contractId),
       template,
       ContractMetadata.Empty(),
       protobuf.Any.getDefaultInstance,
     )
   }
+
+  protected def svReward(
+      svParty: PartyId,
+      round: Int,
+      amount: Numeric.Numeric = numeric(1.0),
+      contractId: String = nextCid(),
+  ): Contract[svcCodegen.SvReward.ContractId, svcCodegen.SvReward] =
+    Contract(
+      identifier = svcCodegen.SvReward.TEMPLATE_ID,
+      contractId = new svcCodegen.SvReward.ContractId(contractId),
+      payload = new svcCodegen.SvReward(
+        svcParty.toProtoPrimitive,
+        svParty.toProtoPrimitive,
+        new apiCodegen.v1.round.Round(round),
+        amount,
+      ),
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
+    )
+
+  protected def svcReward(
+      round: Int,
+      amount: Numeric.Numeric = numeric(1.0),
+      contractId: String = nextCid(),
+  ): Contract[coinCodegen.SvcReward.ContractId, coinCodegen.SvcReward] =
+    Contract(
+      identifier = coinCodegen.SvcReward.TEMPLATE_ID,
+      contractId = new coinCodegen.SvcReward.ContractId(contractId),
+      payload = new coinCodegen.SvcReward(
+        svcParty.toProtoPrimitive,
+        new apiCodegen.v1.round.Round(round),
+        amount,
+      ),
+      metadata = ContractMetadata.Empty(),
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
+    )
 
   protected def toCreatedEvent[TCid <: ContractId[T], T](
       contract: Contract[TCid, T],

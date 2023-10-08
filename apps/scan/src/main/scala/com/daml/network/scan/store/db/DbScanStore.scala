@@ -134,8 +134,6 @@ class DbScanStore(
         """)
   }
 
-  // TODO (#5314): most queries do not properly handle multi-domain
-
   override def lookupCoinRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[CoinRules.ContractId, CoinRules]]] =
@@ -153,7 +151,7 @@ class DbScanStore(
           )
           .value
         contractWithState = row.map(
-          multiDomainAcsStore.contractWithStateFromRow(CoinRules.COMPANION)(_)
+          contractWithStateFromRow(CoinRules.COMPANION)(_)
         )
       } yield contractWithState
     }
@@ -175,7 +173,7 @@ class DbScanStore(
           )
           .value
         contractWithState = row.map(
-          multiDomainAcsStore.contractWithStateFromRow(CnsRules.COMPANION)(_)
+          contractWithStateFromRow(CnsRules.COMPANION)(_)
         )
       } yield contractWithState
     }
@@ -197,7 +195,7 @@ class DbScanStore(
           )
           .value
         contractWithState = row.map(
-          multiDomainAcsStore.contractWithStateFromRow(SvcRules.COMPANION)(_)
+          contractWithStateFromRow(SvcRules.COMPANION)(_)
         )
       } yield contractWithState
     }
@@ -477,7 +475,7 @@ class DbScanStore(
           )
         limited = applyLimit(Limit.DefaultLimit, rows)
         withState = limited.map(
-          multiDomainAcsStore.contractWithStateFromRow(ImportCrate.COMPANION)(_)
+          contractWithStateFromRow(ImportCrate.COMPANION)(_)
         )
       } yield withState
     }
@@ -495,6 +493,7 @@ class DbScanStore(
               sql"""
                   where store_id = $storeId
                     and template_id_qualified_name = ${QualifiedName(FeaturedAppRight.TEMPLATE_ID)}
+                    and assigned_domain = $domainId
                     and featured_app_right_provider = $providerPartyId
                   limit 1;
                  """).toActionBuilder.as[SelectFromAcsTableResult].headOption,

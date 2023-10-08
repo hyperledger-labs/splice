@@ -13,7 +13,6 @@ import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topupCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.ConfiguredDefaultDomain
-import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.AcsTables.ContractStateRowData
@@ -200,7 +199,7 @@ class DbValidatorStore(
     for {
       resultWithOffset <- storage
         .querySingle(
-          selectFromAcsTableWithOffset(
+          selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
             sql"""
@@ -214,16 +213,11 @@ class DbValidatorStore(
           "lookupWalletInstallByNameWithOffset",
         )
         .getOrElse(throw offsetExpectedError())
-      domain <- defaultAcsDomainIdF // TODO (#5314) use state from query
     } yield QueryResult(
       resultWithOffset.offset,
-      resultWithOffset.row.map { r =>
-        ContractWithState(
-          contractFromRow(walletCodegen.WalletAppInstall.COMPANION)(r),
-          Assigned(domain),
-        )
-
-      },
+      resultWithOffset.row.map(
+        contractWithStateFromRow(walletCodegen.WalletAppInstall.COMPANION)(_)
+      ),
     )
   }
 
@@ -268,7 +262,7 @@ class DbValidatorStore(
     for {
       resultWithOffset <- storage
         .querySingle(
-          selectFromAcsTableWithOffset(
+          selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
             sql"""
@@ -282,15 +276,11 @@ class DbValidatorStore(
           "lookupValidatorRightByPartyWithOffset",
         )
         .getOrElse(throw offsetExpectedError())
-      domain <- defaultAcsDomainIdF // TODO (#5314) use state from query
     } yield QueryResult(
       resultWithOffset.offset,
-      resultWithOffset.row.map { r =>
-        ContractWithState(
-          contractFromRow(coinCodegen.ValidatorRight.COMPANION)(r),
-          Assigned(domain),
-        )
-      },
+      resultWithOffset.row.map(
+        contractWithStateFromRow(coinCodegen.ValidatorRight.COMPANION)(_)
+      ),
     )
   }
 
@@ -318,7 +308,7 @@ class DbValidatorStore(
         )
         .value
       result = row.map(
-        multiDomainAcsStore.contractWithStateFromRow(
+        contractWithStateFromRow(
           appManagerCodegen.AppConfiguration.COMPANION
         )(_)
       )
@@ -350,7 +340,7 @@ class DbValidatorStore(
         )
         .getOrElse(throw offsetExpectedError())
       contractWithState = resultWithOffset.row.map(
-        multiDomainAcsStore.contractWithStateFromRow(
+        contractWithStateFromRow(
           appManagerCodegen.AppConfiguration.COMPANION
         )(_)
       )
@@ -381,7 +371,7 @@ class DbValidatorStore(
         )
         .getOrElse(throw offsetExpectedError())
       contractWithState = resultWithOffset.row.map(
-        multiDomainAcsStore.contractWithStateFromRow(
+        contractWithStateFromRow(
           appManagerCodegen.AppRelease.COMPANION
         )(_)
       )
@@ -412,7 +402,7 @@ class DbValidatorStore(
         )
         .getOrElse(throw offsetExpectedError())
       contractWithState = resultWithOffset.row.map(
-        multiDomainAcsStore.contractWithStateFromRow(
+        contractWithStateFromRow(
           appManagerCodegen.RegisteredApp.COMPANION
         )(_)
       )
@@ -443,7 +433,7 @@ class DbValidatorStore(
         )
         .getOrElse(throw offsetExpectedError())
       contractWithState = resultWithOffset.row.map(
-        multiDomainAcsStore.contractWithStateFromRow(
+        contractWithStateFromRow(
           appManagerCodegen.InstalledApp.COMPANION
         )(_)
       )
@@ -473,7 +463,7 @@ class DbValidatorStore(
           "listApprovedReleaseConfigurations",
         )
       result = rows.map(
-        multiDomainAcsStore.contractWithStateFromRow(
+        contractWithStateFromRow(
           appManagerCodegen.ApprovedReleaseConfiguration.COMPANION
         )(_)
       )
@@ -508,7 +498,7 @@ class DbValidatorStore(
         )
         .getOrElse(throw offsetExpectedError())
       contractWithState = resultWithOffset.row.map(
-        multiDomainAcsStore.contractWithStateFromRow(
+        contractWithStateFromRow(
           appManagerCodegen.ApprovedReleaseConfiguration.COMPANION
         )(_)
       )
