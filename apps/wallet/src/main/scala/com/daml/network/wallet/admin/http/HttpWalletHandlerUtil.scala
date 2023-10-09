@@ -74,11 +74,16 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
       install <- userStore.getInstall()
       unadornedUpdate <- getUpdate(install.contractId, userStore)
       update = install.exercise(_ => unadornedUpdate)
+      domainId <- dislosedContracts
+        .inferDomain(None)
+        .fold {
+          store.domains.getDomainId(walletManager.globalDomain)
+        }(Future.successful)
       result <- dedup match {
         case None =>
           getUserWallet(user).connection
             .submit(Seq(validatorParty), Seq(userParty), update, priority = priority)
-            .withDisclosedContracts(dislosedContracts)
+            .withDomainId(domainId, dislosedContracts)
             .noDedup
             .yieldResult()
         case Some((commandId, dedupConfig)) =>
@@ -90,7 +95,7 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
               priority = priority,
             )
             .withDedup(commandId, dedupConfig)
-            .withDisclosedContracts(dislosedContracts)
+            .withDomainId(domainId, dislosedContracts)
             .yieldResult()
       }
 

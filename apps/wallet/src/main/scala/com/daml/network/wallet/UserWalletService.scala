@@ -52,6 +52,7 @@ class UserWalletService(
     UserWalletStore(
       key,
       storage,
+      globalDomain,
       loggerFactory,
       // The store needs its own connection to expand tx-history entries
       ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),

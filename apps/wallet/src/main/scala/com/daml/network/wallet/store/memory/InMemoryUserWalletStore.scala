@@ -10,6 +10,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -18,6 +19,7 @@ import scala.concurrent.*
 
 class InMemoryUserWalletStore(
     override val key: UserWalletStore.Key,
+    override val defaultAcsDomain: DomainAlias,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val transactionTreeSource: TransactionTreeSource,
     override protected val retryProvider: RetryProvider,
@@ -47,13 +49,13 @@ class InMemoryUserWalletStore(
       case None => true
     }
     for {
-      rewards <- multiDomainAcsStore.listContracts(
-        coinCodegen.ValidatorRewardCoupon.COMPANION
+      domainId <- defaultAcsDomainIdF
+      rewards <- multiDomainAcsStore.listContractsOnDomain(
+        coinCodegen.ValidatorRewardCoupon.COMPANION,
+        domainId,
       )
-    } yield rewards.view
+    } yield rewards
       .filter(rw => filterActiveRounds(rw.payload.round.number))
-      .map(_.contract)
-      .toSeq
       .sortBy(_.payload.round.number)
       .take(maxNumInputs.getOrElse(Int.MaxValue))
   }
@@ -67,27 +69,28 @@ class InMemoryUserWalletStore(
   )(implicit tc: TraceContext): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
   ]] = for {
-    rewards <- multiDomainAcsStore.listContracts(
-      coinCodegen.AppRewardCoupon.COMPANION
+    domainId <- defaultAcsDomainIdF
+    rewards <- multiDomainAcsStore.listContractsOnDomain(
+      coinCodegen.AppRewardCoupon.COMPANION,
+      domainId,
     )
   } yield rewards
     .flatMap { rw =>
       val issuingO = issuingRoundsMap.get(rw.payload.round)
       issuingO
-        .map { i =>
-          val quantity = rw.payload.amount.multiply(
+        .map(i => {
+          val quantity =
             if (rw.payload.featured)
-              i.issuancePerFeaturedAppRewardCoupon
+              rw.payload.amount.multiply(i.issuancePerFeaturedAppRewardCoupon)
             else
-              i.issuancePerUnfeaturedAppRewardCoupon
-          )
-          (rw.contract, BigDecimal(quantity))
-        }
+              rw.payload.amount.multiply(i.issuancePerUnfeaturedAppRewardCoupon)
+          (rw, BigDecimal(quantity))
+        })
     }
     .sorted(
       Ordering[(Long, BigDecimal)].on(
         (x: (
-            Contract.Has[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
+            Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
             BigDecimal,
         )) => (x._1.payload.round.number, -x._2)
       )
