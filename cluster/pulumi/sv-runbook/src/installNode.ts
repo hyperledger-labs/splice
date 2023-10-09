@@ -83,9 +83,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const svKey = svKeyFromSecret('sv');
 
-  const svNamespace = exactNamespace(SV_NAMESPACE, {
-    'istio-injection': 'enabled',
-  });
+  const svNamespace = exactNamespace(SV_NAMESPACE, true);
 
   const loopback =
     TARGET_CLUSTER === CLUSTER_BASENAME

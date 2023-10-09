@@ -6,6 +6,7 @@ import {
   installCNHelmChart,
   BackupConfig,
   BootstrappingDumpConfig,
+  CLUSTER_BASENAME,
 } from 'cn-pulumi-common';
 import type { Auth0Client } from 'cn-pulumi-common';
 
@@ -25,9 +26,21 @@ export async function installValidator1(
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig
 ): Promise<pulumi.Resource> {
-  const xns = exactNamespace(name);
+  const xns = exactNamespace(name, true);
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
+
+  const loopback = installCNHelmChart(
+    xns,
+    'loopback',
+    'cn-cluster-loopback-gateway',
+    {
+      cluster: {
+        basename: CLUSTER_BASENAME,
+      },
+    },
+    [xns.ns]
+  );
 
   const participant = installParticipant(
     xns,
@@ -35,7 +48,8 @@ export async function installValidator1(
     postgresDb,
     auth0UserNameEnvVarSource('validator'),
     // We disable auto-init if we have a dump to bootstrap from.
-    !!participantBootstrapDump
+    !!participantBootstrapDump,
+    [loopback]
   );
 
   installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, [

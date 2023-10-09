@@ -1072,6 +1072,78 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "/cluster/helm/cn-cluster-loopback-gateway/",
+      "compat": "true",
+      "name": "loopback",
+      "namespace": "splitwell",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ingress": "istio-ingress.cluster-ingress",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "104.198.172.213/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "20.250.62.34/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "cometbftPorts": [
+          26656,
+          26666,
+          26676,
+          26686,
+          26696
+        ],
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+      }
+    },
+    "name": "helm-splitwell-loopback",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "/cluster/helm/cn-participant/",
       "compat": "true",
       "name": "participant",
@@ -1472,7 +1544,7 @@
           }
         ],
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
+        "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "onboardingSecretFrom": {
           "secretKeyRef": {
@@ -2402,7 +2474,7 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
+        "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
           "limits": {
@@ -3229,7 +3301,7 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
+        "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
           "limits": {
@@ -3983,7 +4055,7 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
+        "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
           "limits": {
@@ -4737,7 +4809,7 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
+        "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
           "limits": {
@@ -4753,6 +4825,78 @@
       }
     },
     "name": "helm-sv-4-validator-sv-4",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cluster-loopback-gateway/",
+      "compat": "true",
+      "name": "loopback",
+      "namespace": "validator1",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ingress": "istio-ingress.cluster-ingress",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "104.198.172.213/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "20.250.62.34/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "cometbftPorts": [
+          26656,
+          26666,
+          26676,
+          26686,
+          26696
+        ],
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+      }
+    },
+    "name": "helm-validator1-loopback",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5144,7 +5288,7 @@
           }
         ],
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
+        "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "onboardingSecretFrom": {
           "secretKeyRef": {
@@ -5209,7 +5353,9 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
-        "labels": {},
+        "labels": {
+          "istio-injection": "enabled"
+        },
         "name": "splitwell"
       }
     },
@@ -5384,7 +5530,9 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
-        "labels": {},
+        "labels": {
+          "istio-injection": "enabled"
+        },
         "name": "validator1"
       }
     },

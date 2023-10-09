@@ -5,6 +5,7 @@ import {
   installAuth0Secret,
   exactNamespace,
   installCNHelmChart,
+  CLUSTER_BASENAME,
 } from 'cn-pulumi-common';
 import type { Auth0Client, BackupConfig, BootstrappingDumpConfig } from 'cn-pulumi-common';
 
@@ -22,11 +23,23 @@ export async function installSplitwell(
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig
 ): Promise<pulumi.Resource> {
-  const xns = exactNamespace('splitwell');
+  const xns = exactNamespace('splitwell', true);
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
 
   const domain = installDomain(xns, 'domain', postgresDb);
+
+  const loopback = installCNHelmChart(
+    xns,
+    'loopback',
+    'cn-cluster-loopback-gateway',
+    {
+      cluster: {
+        basename: CLUSTER_BASENAME,
+      },
+    },
+    [xns.ns]
+  );
 
   const participant = installParticipant(
     xns,
@@ -35,7 +48,7 @@ export async function installSplitwell(
     auth0UserNameEnvVarSource('validator'),
     // We disable auto-init if we have a dump to bootstrap from.
     !!participantBootstrapDump,
-    [domain]
+    [domain, loopback]
   );
 
   installCNHelmChart(

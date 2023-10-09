@@ -93,7 +93,7 @@ export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
       additionalUsers: config.additionalUsers || [],
       validatorPartyHint: config.validatorPartyHint,
       appDars: config.appDars || [],
-      globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
+      globalDomainUrl: `http://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global:5008`,
       extraDomains: config.extraDomains,
       validatorWalletUser: config.validatorWalletUser,
       svSponsorAddress: config.svSponsorAddress,
