@@ -1,0 +1,96 @@
+import { Contract } from 'directory-openapi';
+
+import {
+  AcceptedGroupInvite,
+  BalanceUpdate,
+  BalanceUpdateType,
+  GroupInvite,
+} from '@daml.js/splitwell/lib/CN/Splitwell';
+
+export const makeGroupInvite = (provider: string, owner: string, groupName: string): Contract => ({
+  template_id:
+    'cbca8a4f8d6170f38cd7a5c9cc0371cc3ccb4fb5bf5daf0702aa2c3849ac6bde:CN.Splitwell:GroupInvite',
+  contract_id:
+    '008a4f445f23361cf92ffd48bf8556429921060a40c7169dc11c5a28717d7750e3ca021220bcce6356513ce1790a1c525f5e7709be50336235d2c08be698a581a4e2bc2c6d',
+  payload: GroupInvite.encode({
+    group: {
+      provider: provider,
+      id: {
+        unpack: groupName,
+      },
+      owner: owner,
+      members: [],
+      svc: 'svc::122065980b045703ed871be9b93afb28b61c874b667434259d1df090096837e3ffd0',
+      acceptDuration: {
+        microseconds: '300000000',
+      },
+    },
+  }),
+  metadata: {
+    createdAt: '2023-10-06T13:24:12.679640Z',
+    contractKeyHash: '',
+    driverMetadata: 'CiYKJAgBEiBiT5xszvznNqxlhONdO9hqlEBSewW-lCCKBEiU1m_9Mw==',
+  },
+  create_arguments_blob: '',
+});
+
+export const makeAcceptedGroupInvite = (
+  provider: string,
+  owner: string,
+  invitee: string,
+  groupName: string
+): Contract => ({
+  template_id:
+    'e1d9f49e8143e1cc8a105fabea49506924df3a6d7f497bd89e0334ebbdc4be80:CN.Splitwell:AcceptedGroupInvite',
+  contract_id:
+    '009b07644e1035fe72b4af0ad627e678c4af667ee7b8c44aa10c7f98fd7f89b165ca021220b9deaf4a8a931a689c191bbf08136ffbdceb9d6b7926f9b9daf06682743d8f8e',
+  payload: AcceptedGroupInvite.encode({
+    groupKey: {
+      owner: owner,
+      provider: provider,
+      id: {
+        unpack: groupName,
+      },
+    },
+    invitee: invitee,
+  }),
+  metadata: {
+    createdAt: '2023-10-09T15:14:28.412766Z',
+    contractKeyHash: '',
+    driverMetadata: 'CiYKJAgBEiDtAV9pVocUfA2KD3I24A9deHI51c1ePu3nxw-ut4bJBQ==',
+  },
+  create_arguments_blob: '',
+});
+
+export const makeBalanceUpdate = (
+  provider: string,
+  owner: string,
+  groupName: string,
+  update: BalanceUpdateType,
+  contractId: string
+): Contract => ({
+  template_id:
+    'e1d9f49e8143e1cc8a105fabea49506924df3a6d7f497bd89e0334ebbdc4be80:CN.Splitwell:BalanceUpdate',
+  contract_id: contractId,
+  payload: BalanceUpdate.encode({
+    group: {
+      provider: provider,
+      id: {
+        unpack: groupName,
+      },
+      owner: owner,
+      members: [],
+      svc: 'svc::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
+      acceptDuration: {
+        microseconds: '300000000',
+      },
+    },
+    update: update,
+  }),
+  metadata: {
+    createdAt: '2023-10-09T15:00:35.324749Z',
+    contractKeyHash: '',
+    driverMetadata: 'CiYKJAgBEiDdDpicMK4e_zzeZzEidYVT9FfXt4Z-2DWpEAP6zhvtvQ==',
+  },
+  create_arguments_blob: '',
+});

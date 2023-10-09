@@ -1,25 +1,204 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { test, expect } from 'vitest';
+import { rest } from 'msw';
+import {
+  ListAcceptedGroupInvitesResponse,
+  ListBalanceUpdatesResponse,
+  ListGroupInvitesResponse,
+} from 'splitwell-openapi';
+import { test, expect, describe } from 'vitest';
 
 import App from '../App';
+import {
+  alicePartyId,
+  bobPartyId,
+  groupName,
+  splitwellDomainId,
+  splitwellProviderPartyId,
+} from './mocks/constants';
+import { makeAcceptedGroupInvite, makeBalanceUpdate, makeGroupInvite } from './mocks/templates';
+import { server } from './setup/setup';
 
-test('login shows alice party ID', async () => {
-  // arrange
-  const user = userEvent.setup();
-  render(<App />);
+describe('alice can', () => {
+  test('login and see her party ID', async () => {
+    const user = userEvent.setup();
+    render(<App />);
 
-  // act
-  const input = screen.getByRole('textbox');
-  await user.type(input, 'alice');
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'alice_wallet_user');
 
-  const button = screen.getByRole('button');
-  await user.click(button);
+    const button = screen.getByRole('button', { name: 'Log In' });
+    await user.click(button);
 
-  // assert
-  expect(() =>
-    screen.findByDisplayValue(
-      'alice::122015ba7aa9054dbad217110e8fbf5dd550a59fb56df5986913f7b9a8e63bad8570'
-    )
-  ).toBeDefined();
+    await expect(screen.findByDisplayValue(alicePartyId)).resolves.toBeDefined();
+  });
+
+  test('submit a group create request', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const input = await screen.findByRole('textbox', { name: 'Group ID' });
+    await user.type(input, groupName);
+
+    const button = screen.getByRole('button', { name: 'Create Group' });
+    await user.click(button);
+  });
+
+  test('see a group', async () => {
+    render(<App />);
+
+    await expect(screen.findByText(groupName)).resolves.toBeDefined();
+  });
+
+  test('request a membership invite', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await expect(screen.findByText(groupName)).resolves.toBeDefined();
+
+    const createInviteButton = screen.getByRole('button', { name: 'Create Invite' });
+    await user.click(createInviteButton);
+
+    const fakeGroupInvite = makeGroupInvite(splitwellProviderPartyId, alicePartyId, groupName);
+
+    server.use(
+      rest.get(
+        `${window.canton_network_config.services.splitwell.url}/group-invites`,
+        (_, res, ctx) => {
+          return res(
+            ctx.json<ListGroupInvitesResponse>({
+              group_invites: [
+                {
+                  contract: fakeGroupInvite,
+                  domain_id: splitwellDomainId,
+                },
+              ],
+            })
+          );
+        }
+      )
+    );
+
+    const copyInviteButton = await screen.findByRole('button', { name: 'Copy invite' });
+    await user.click(copyInviteButton);
+
+    await expect(window.navigator.clipboard.readText()).resolves.toBe(
+      `{"contractId":"008a4f445f23361cf92ffd48bf8556429921060a40c7169dc11c5a28717d7750e3ca021220bcce6356513ce1790a1c525f5e7709be50336235d2c08be698a581a4e2bc2c6d","payload":{"group":{"owner":"${alicePartyId}","svc":"svc::122065980b045703ed871be9b93afb28b61c874b667434259d1df090096837e3ffd0","members":[],"id":{"unpack":"${groupName}"},"provider":"${splitwellProviderPartyId}","acceptDuration":{"microseconds":"300000000"}}},"metadata":{"createdAt":"2023-10-06T13:24:12.679640Z","keyHash":"","driverMetadata":"CiYKJAgBEiBiT5xszvznNqxlhONdO9hqlEBSewW-lCCKBEiU1m_9Mw=="},"domainId":"${splitwellDomainId}"}`
+    );
+  });
+
+  test('see pending membership request', async () => {
+    render(<App />);
+
+    server.use(
+      rest.get(
+        `${window.canton_network_config.services.splitwell.url}/accepted-group-invites`,
+        (_, res, ctx) => {
+          return res(
+            ctx.json<ListAcceptedGroupInvitesResponse>({
+              accepted_group_invites: [
+                makeAcceptedGroupInvite(
+                  splitwellProviderPartyId,
+                  alicePartyId,
+                  bobPartyId,
+                  groupName
+                ),
+              ],
+            })
+          );
+        }
+      )
+    );
+
+    await expect(screen.findByRole('button', { name: 'Add' })).resolves.toBeDefined();
+  });
+
+  test('view balance updates', async () => {
+    render(<App />);
+
+    server.use(
+      rest.get(
+        `${window.canton_network_config.services.splitwell.url}/balance-updates`,
+        (_, res, ctx) => {
+          return res(
+            ctx.json<ListBalanceUpdatesResponse>({
+              balance_updates: [
+                makeBalanceUpdate(
+                  splitwellProviderPartyId,
+                  alicePartyId,
+                  groupName,
+                  {
+                    tag: 'ExternalPayment',
+                    value: {
+                      payer: alicePartyId,
+                      description: 'dinner',
+                      amount: '15.0',
+                    },
+                  },
+                  'cid1'
+                ),
+                makeBalanceUpdate(
+                  splitwellProviderPartyId,
+                  alicePartyId,
+                  groupName,
+                  {
+                    tag: 'Transfer',
+                    value: {
+                      sender: bobPartyId,
+                      receiver: alicePartyId,
+                      amount: '40.0',
+                    },
+                  },
+                  'cid2'
+                ),
+                makeBalanceUpdate(
+                  splitwellProviderPartyId,
+                  alicePartyId,
+                  groupName,
+                  {
+                    tag: 'ExternalPayment',
+                    value: {
+                      payer: alicePartyId,
+                      description: 'expenses',
+                      amount: '30.0',
+                    },
+                  },
+                  'cid3'
+                ),
+              ],
+            })
+          );
+        }
+      )
+    );
+
+    // eslint-disable-next-line testing-library/no-node-access
+    const balanceUpdates = (await screen.findByText('Balance Updates')).parentElement; // testing-library doesn't provide any functions for accessing the parent element, so use direct node access
+    expect(balanceUpdates).toBeDefined();
+
+    const balanceUpdatesList = within(balanceUpdates!).getAllByRole('listitem');
+
+    expect(balanceUpdatesList.length).toBe(3);
+
+    await expect(
+      within(balanceUpdatesList[0]).findByText('alice.unverified.cns')
+    ).resolves.toBeDefined();
+    await expect(
+      within(balanceUpdatesList[0]).findByText('paid 30.0 CC for expenses')
+    ).resolves.toBeDefined();
+
+    await expect(
+      within(balanceUpdatesList[1]).findByText('bob.unverified.cns')
+    ).resolves.toBeDefined();
+    await expect(
+      within(balanceUpdatesList[1]).findByText('sent 40.0 CC to')
+    ).resolves.toBeDefined();
+
+    await expect(
+      within(balanceUpdatesList[2]).findByText('alice.unverified.cns')
+    ).resolves.toBeDefined();
+    await expect(
+      within(balanceUpdatesList[2]).findByText('paid 15.0 CC for dinner')
+    ).resolves.toBeDefined();
+  });
 });

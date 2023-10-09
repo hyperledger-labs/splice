@@ -4,7 +4,7 @@ import { defineConfig, mergeConfig } from 'vitest/config';
 export default defineConfig(
   mergeConfig(vitest_common_conf, {
     test: {
-      setupFiles: ['./src/test-setup/setup.ts'],
+      setupFiles: ['./src/__tests__/setup/setup.ts'],
     },
   })
 );
