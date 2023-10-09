@@ -27,80 +27,20 @@ spec:
   resolution: DNS
 ---
 apiVersion: networking.istio.io/v1alpha3
-kind: Gateway
-metadata:
-  name: istio-egressgateway
-  namespace: {{ .Release.Namespace }}
-spec:
-  selector:
-    istio: egressgateway
-  servers:
-  - port:
-      number: 80
-      name: http
-      protocol: HTTP
-    hosts:
-    - "{{ (.Values.cluster).basename }}.network.canton.global"
-    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
-  - port:
-      number: 443
-      name: tls
-      protocol: TLS
-    hosts:
-    - "{{ (.Values.cluster).basename }}.network.canton.global"
-    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
-    tls:
-      mode: PASSTHROUGH
-  - port:
-      number: 5008
-      name: grpc-domain
-      protocol: GRPC
-    hosts:
-    - "{{ (.Values.cluster).basename }}.network.canton.global"
-    - "*.{{ (.Values.cluster).basename }}.network.canton.global"
-  {{- range $index, $value := .Values.cometbftPorts }}
-  - port:
-      number: {{ $value }}
-      name: cometbft{{ add $index 1 }}-p2p
-      protocol: TCP
-    hosts:
-      # We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
-      - "*"
-  {{- end }}
----
-apiVersion: networking.istio.io/v1alpha3
-kind: DestinationRule
-metadata:
-  name: egressgateway-for-loopback
-  namespace: {{ .Release.Namespace }}
-spec:
-  host: istio-egressgateway
-  subsets:
-  - name: loopback
----
-apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: direct-loopback-through-egress-gateway
+  name: direct-loopback-through-ingress-gateway
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
     - "{{ (.Values.cluster).basename }}.network.canton.global"
     - "*.{{ (.Values.cluster).basename }}.network.canton.global"
   gateways:
-  - istio-egressgateway
   - mesh
   http:
   - match:
     - gateways:
       - mesh
-    route:
-    - destination:
-        host: istio-egressgateway
-        subset: loopback
-  - match:
-    - gateways:
-      - istio-egressgateway
     route:
     - destination:
         host: "{{ (.Values.cluster).ingress }}.svc.cluster.local"
@@ -113,28 +53,11 @@ spec:
       - "*.{{ (.Values.cluster).basename }}.network.canton.global"
     route:
     - destination:
-        host: istio-egressgateway
-        subset: loopback
-  - match:
-    - gateways:
-      - istio-egressgateway
-      sniHosts:
-      - "{{ (.Values.cluster).basename }}.network.canton.global"
-      - "*.{{ (.Values.cluster).basename }}.network.canton.global"
-    route:
-    - destination:
         host: "{{ (.Values.cluster).ingress }}.svc.cluster.local"
   tcp:
-    - match:
-        - gateways:
-            - mesh
-      route:
-        - destination:
-            host: istio-egressgateway
-            subset: loopback
-    - match:
-        - gateways:
-            - istio-egressgateway
-      route:
-        - destination:
-            host: "{{ (.Values.cluster).ingress }}.svc.cluster.local"
+  - match:
+      - gateways:
+          - mesh
+    route:
+      - destination:
+          host: "{{ (.Values.cluster).ingress }}.svc.cluster.local"
