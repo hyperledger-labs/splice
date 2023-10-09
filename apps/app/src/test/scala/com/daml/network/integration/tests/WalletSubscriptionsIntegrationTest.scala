@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionRequest
+import com.daml.network.codegen.java.cn.wallet.subscriptions.{Subscription, SubscriptionRequest}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -56,9 +56,8 @@ class WalletSubscriptionsIntegrationTest
       val requestId = clue("List subscription requests to find out request ID") {
         eventually() {
           inside(aliceWalletClient.listSubscriptionRequests()) { case Seq(r) =>
-            r.subscriptionRequest.payload shouldBe request
-            r.context.payload.description shouldBe description
-            r.subscriptionRequest.contractId
+            r.payload shouldBe request
+            r.contractId
           }
         }
       }
@@ -66,7 +65,6 @@ class WalletSubscriptionsIntegrationTest
       clue("Get the subscription request") {
         aliceWalletClient
           .getSubscriptionRequest(requestId)
-          .subscriptionRequest
           .payload shouldBe request
       }
 
@@ -105,9 +103,8 @@ class WalletSubscriptionsIntegrationTest
           "the created subscription request is listed correctly",
           request =>
             inside(aliceWalletClient.listSubscriptionRequests()) { case Seq(r) =>
-              r.subscriptionRequest.payload shouldBe request
-              r.context.payload.description shouldBe description
-              r.subscriptionRequest.contractId
+              r.payload shouldBe request
+              r.contractId
             },
         )
         clue("Alice gets some coins") {
@@ -163,7 +160,9 @@ class WalletSubscriptionsIntegrationTest
           "an automated subscription payment is eventually initiated by the wallet",
           _ =>
             inside(aliceWalletClient.listSubscriptions()) { case Seq(sub) =>
-              sub.subscription.payload should equal(request.subscriptionData)
+              sub.subscription.payload should equal(
+                new Subscription(request.subscriptionData, requestId)
+              )
               inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
                 state.payload.subscription shouldBe sub.subscription.contractId
                 state.payload.payData should equal(request.payData)
@@ -204,7 +203,9 @@ class WalletSubscriptionsIntegrationTest
           "the subscription is back in idle state",
           _ =>
             inside(aliceWalletClient.listSubscriptions()) { case Seq(sub) =>
-              sub.subscription.payload should equal(request.subscriptionData)
+              sub.subscription.payload should equal(
+                new Subscription(request.subscriptionData, requestId)
+              )
               inside(sub.state) { case HttpWalletAppClient.SubscriptionIdleState(state) =>
                 state.payload.subscription should equal(sub.subscription.contractId)
                 state.payload.payData should equal(request.payData)

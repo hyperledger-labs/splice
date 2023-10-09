@@ -56,10 +56,7 @@ class CnsSubscriptionRenewalPaymentTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val AssignedContract(payment, _) = subscriptionPayment
-    val contextId = CnsEntryContext.ContractId.unsafeFromInterface(
-      payment.payload.subscriptionData.context
-    )
-    svcStore.lookupCnsEntryContext(contextId).flatMap {
+    svcStore.lookupCnsEntryContext(subscriptionPayment.contract.payload.reference).flatMap {
       case Some(cnsContext) =>
         for {
           transferContextOpt <- svcStore.getSvcTransferContextForRound(payment.payload.round)
@@ -68,7 +65,7 @@ class CnsSubscriptionRenewalPaymentTrigger(
               svcStore.lookupCnsEntryByName(cnsContext.payload.name).flatMap {
                 case Some(entry) =>
                   collectPayment(
-                    contextId,
+                    cnsContext.contract.contractId,
                     payment.contractId,
                     entry,
                     transferContext,
@@ -93,7 +90,7 @@ class CnsSubscriptionRenewalPaymentTrigger(
         } yield result
       case None =>
         TaskSuccess(
-          s"skipping as associated cns entry context not found: $contextId."
+          s"skipping as no associated cns entry context for reference ${subscriptionPayment.contract.payload.reference} was found."
         ).pure[Future]
     }
   }

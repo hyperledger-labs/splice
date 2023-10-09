@@ -8,7 +8,6 @@ import { CoinPosition } from 'wallet-openapi';
 
 import {
   Subscription,
-  SubscriptionContext,
   SubscriptionIdleState,
   SubscriptionPayment,
   SubscriptionRequest,
@@ -82,18 +81,12 @@ export interface WalletTransferOffer {
 
 export interface WalletSubscription {
   subscription: Contract<Subscription>;
-  context: Contract<SubscriptionContext>;
   state: SubscriptionState;
 }
 
 export type SubscriptionState =
   | { type: 'idle'; value: Contract<SubscriptionIdleState> }
   | { type: 'payment'; value: Contract<SubscriptionPayment> };
-
-export interface SubscriptionRequestWithContext {
-  subscriptionRequest: Contract<SubscriptionRequest>;
-  context: Contract<SubscriptionContext>;
-}
 
 //=== Endpoint responses ===
 export interface GetBalanceResponse {
@@ -117,7 +110,7 @@ export interface ListAcceptedTransferOffersResponse {
 }
 
 export interface ListSubscriptionRequestsResponse {
-  subscriptionRequestsList: SubscriptionRequestWithContext[];
+  subscriptionRequestsList: Contract<SubscriptionRequest>[];
 }
 
 export interface ListSubscriptionsResponse {

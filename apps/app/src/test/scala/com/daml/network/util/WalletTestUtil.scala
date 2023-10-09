@@ -6,7 +6,6 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.fees as feesCodegen
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
-import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
 import com.daml.network.codegen.java.cn.wallet.{
   payment as paymentCodegen,
@@ -442,7 +441,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       wallet.listSubscriptionRequests() should have length 1
     }
     wallet.acceptSubscriptionRequest(
-      wallet.listSubscriptionRequests().head.subscriptionRequest.contractId
+      wallet.listSubscriptionRequests().head.contractId
     )
   }
 
@@ -563,51 +562,23 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     paymentCodegen.Currency.CC,
   )
 
-  protected def createSubscriptionContext(
-      participantClientWithAdminToken: CNParticipantClientReference,
-      userId: String,
-      userParty: PartyId,
-      serviceParty: PartyId,
-      domainId: Option[DomainId] = None,
-      description: String = "description",
-  )(implicit
-      env: CNNodeTestConsoleEnvironment
-  ): testSubsCodegen.TestSubscriptionContext.ContractId = {
-    val context = new testSubsCodegen.TestSubscriptionContext(
-      sv1ScanBackend.getSvcPartyId().toProtoPrimitive,
-      userParty.toProtoPrimitive,
-      serviceParty.toProtoPrimitive,
-      description,
-    )
-    clue("Create a subscription context") {
-      val result = participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
-        userId = userId,
-        actAs = Seq(userParty, serviceParty).distinct,
-        readAs = Seq.empty,
-        update = context.create,
-        domainId = domainId,
-      )
-      testSubsCodegen.TestSubscriptionContext.COMPANION.toContractId(result.contractId)
-    }
-  }
-
   private def createSubscriptionData(
-      contextId: testSubsCodegen.TestSubscriptionContext.ContractId,
       userParty: PartyId,
       receiverParty: PartyId,
       providerParty: PartyId,
       paymentInterval: Duration,
       paymentDuration: Duration,
       amount: paymentCodegen.PaymentAmount,
+      description: String,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
-    val subscription = new subsCodegen.Subscription(
+    val subscription = new subsCodegen.SubscriptionData(
       userParty.toProtoPrimitive,
       receiverParty.toProtoPrimitive,
       providerParty.toProtoPrimitive,
       svcParty.toProtoPrimitive,
-      contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
+      description,
     )
     val payData = new subsCodegen.SubscriptionPayData(
       amount,
@@ -618,22 +589,22 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   }
 
   private def createSelfSubscriptionData(
-      contextId: testSubsCodegen.TestSubscriptionContext.ContractId,
       userParty: PartyId,
       paymentInterval: Duration,
       paymentDuration: Duration,
       amount: paymentCodegen.PaymentAmount,
+      description: String,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
     createSubscriptionData(
-      contextId,
       userParty,
       userParty,
       userParty,
       paymentInterval,
       paymentDuration,
       amount,
+      description,
     )
   }
 
@@ -647,27 +618,20 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       amount: paymentCodegen.PaymentAmount = defaultPaymentAmount,
       paymentInterval: Duration = defaultSubscriptionInterval,
       paymentDuration: Duration = defaultSubscriptionDuration,
+      description: String = "description",
       domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
-    val contextId =
-      createSubscriptionContext(
-        participantClientWithAdminToken,
-        userId,
-        userParty,
-        receiverParty,
-        domainId,
-      )
     val (subscription, payData) =
       createSubscriptionData(
-        contextId,
         userParty,
         receiverParty,
         providerParty,
         paymentInterval,
         paymentDuration,
         amount,
+        description,
       )
     val subscriptionRequest = new subsCodegen.SubscriptionRequest(
       subscription,
@@ -697,17 +661,8 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
-    val contextId =
-      createSubscriptionContext(
-        participantClientWithAdminToken,
-        userId,
-        userParty,
-        userParty,
-        domainId,
-        description,
-      )
     val (subscription, payData) =
-      createSelfSubscriptionData(contextId, userParty, paymentInterval, paymentDuration, amount)
+      createSelfSubscriptionData(userParty, paymentInterval, paymentDuration, amount, description)
     val subscriptionRequest = new subsCodegen.SubscriptionRequest(
       subscription,
       payData,
@@ -736,24 +691,13 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
-    val contextId =
-      createSubscriptionContext(
-        participantClientWithAdminToken,
-        userId,
-        userParty,
-        userParty,
-        domainId,
-        description,
-      )
     val (subscriptionData, payData) =
-      createSelfSubscriptionData(contextId, userParty, paymentInterval, paymentDuration, amount)
+      createSelfSubscriptionData(userParty, paymentInterval, paymentDuration, amount, description)
+    val dummyReference = new subsCodegen.SubscriptionRequest.ContractId("00" * 33 + "01")
     val subscriptionId = clue("Create a subscription") {
       val subscription = new subsCodegen.Subscription(
-        userParty.toProtoPrimitive,
-        userParty.toProtoPrimitive,
-        userParty.toProtoPrimitive,
-        svcParty.toProtoPrimitive,
-        contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
+        subscriptionData,
+        dummyReference,
       )
       val result = participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
         userId = userId,
@@ -772,6 +716,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         subscriptionData,
         payData,
         nextPaymentDueAt,
+        dummyReference,
       )
       participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
         userId = userId,

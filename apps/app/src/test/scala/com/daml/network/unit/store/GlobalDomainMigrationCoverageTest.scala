@@ -138,6 +138,7 @@ object GlobalDomainMigrationCoverageTest {
       subsCodegen.SubscriptionInitialPayment.COMPANION -> todoCnsDirectory,
       subsCodegen.SubscriptionIdleState.COMPANION -> todoCnsDirectory,
       subsCodegen.SubscriptionPayment.COMPANION -> todoCnsDirectory,
+      subsCodegen.TerminatedSubscription.COMPANION -> todoCnsDirectory,
       globaldomain.MemberTraffic.COMPANION -> "tied to a specific domainId, never migrated",
       topUpCodegen.ValidatorTopUpState.COMPANION -> "tied to a specific domainId, never migrated",
       vo.UsedSecret.COMPANION -> "TODO (#7821) follow SvcRules in SvSv",

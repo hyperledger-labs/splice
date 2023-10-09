@@ -247,8 +247,8 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       // and accept it.
       val initialPayment = eventually()(inside(refs.wallet.listSubscriptionRequests()) {
         case Seq(storeRequest) =>
-          storeRequest.subscriptionRequest.contractId shouldBe subscriptionRequest
-          refs.wallet.acceptSubscriptionRequest(storeRequest.subscriptionRequest.contractId)
+          storeRequest.contractId shouldBe subscriptionRequest
+          refs.wallet.acceptSubscriptionRequest(storeRequest.contractId)
       })
       // Wait for the SubscriptionInitialPayment to be archived
       eventually() {
@@ -437,6 +437,35 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
           )
         }
       }
+    }
+
+    "archives terminated DirectoryEntryContext contracts" in { implicit env =>
+      val aliceStaticRefs =
+        StaticUserRefs(aliceValidatorBackend, aliceDirectoryClient, aliceWalletClient)
+      val aliceRefs = setupUser(aliceStaticRefs)
+      val ((_, subscriptionRequest), _) = actAndCheck(
+        "request directory entry",
+        aliceRefs.directory
+          .requestDirectoryEntry(testEntryName, "https://example.com", "description"),
+      )(
+        "alice sees subscription request",
+        _ => aliceRefs.wallet.listSubscriptionRequests() should have size 1,
+      )
+      aliceDirectoryClient.ledgerApi.ledger_api_extensions.acs
+        .filterJava(codegen.DirectoryEntryContext.COMPANION)(
+          aliceRefs.userParty
+        ) should have size 1
+      actAndCheck(
+        "alice rejects subscription request",
+        aliceWalletClient.rejectSubscriptionRequest(subscriptionRequest),
+      )(
+        "DirectoryEntryContext gets archived",
+        _ =>
+          aliceDirectoryClient.ledgerApi.ledger_api_extensions.acs
+            .filterJava(codegen.DirectoryEntryContext.COMPANION)(
+              aliceRefs.userParty
+            ) should have size 0,
+      )
     }
 
     def setupUser(refs: StaticUserRefs): DynamicUserRefs = {

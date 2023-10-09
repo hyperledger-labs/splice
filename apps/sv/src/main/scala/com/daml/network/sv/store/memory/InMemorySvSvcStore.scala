@@ -21,6 +21,7 @@ import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvO
 import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   SubscriptionIdleState,
   SubscriptionInitialPayment,
+  SubscriptionRequest,
 }
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.RetryProvider
@@ -30,7 +31,7 @@ import TxLogStore.TransactionTreeSource
 import com.daml.network.sv.store.SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract}
+import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract, ContractWithState}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
@@ -461,13 +462,9 @@ class InMemorySvSvcStore(
     // Join with the CnsEntryContexts
     subscriptionsWithContext <- dueSubscriptions.toList
       .traverse { subscription =>
-        multiDomainAcsStore
-          .lookupContractById(cn.cns.CnsEntryContext.COMPANION)(
-            cn.cns.CnsEntryContext.ContractId.unsafeFromInterface(
-              subscription.payload.subscriptionData.context
-            )
-          )
-          .map(context => (subscription, context))
+        lookupCnsEntryContext(subscription.payload.reference).map(context =>
+          (subscription, context)
+        )
       }
     // Only deliver the ones referencing an active cns entry context
     result = subscriptionsWithContext
@@ -628,6 +625,12 @@ class InMemorySvSvcStore(
       })
     } yield result map (_ map (_.contract))
 
+  override def lookupCnsEntryContext(reference: SubscriptionRequest.ContractId)(implicit
+      tc: TraceContext
+  ): Future[Option[ContractWithState[cn.cns.CnsEntryContext.ContractId, cn.cns.CnsEntryContext]]] =
+    multiDomainAcsStore.findContract(cn.cns.CnsEntryContext.COMPANION)(c =>
+      c.payload.reference == reference
+    )
 }
 
 private[memory] object InMemorySvSvcStore {

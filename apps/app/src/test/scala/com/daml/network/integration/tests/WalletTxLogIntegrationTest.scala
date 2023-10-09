@@ -616,7 +616,7 @@ class WalletTxLogIntegrationTest
 
       val (_, initialPayment) = actAndCheck(
         "Alice accepts the request",
-        aliceWalletClient.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
+        aliceWalletClient.acceptSubscriptionRequest(request.contractId),
       )(
         "Request disappears from Alice's list",
         initPaymentCid => {
@@ -647,11 +647,14 @@ class WalletTxLogIntegrationTest
         eventually() {
           inside(aliceWalletClient.listSubscriptions()) { case Seq(sub) =>
             sub.subscription.payload should equal(
-              request.subscriptionRequest.payload.subscriptionData
+              new subsCodegen.Subscription(
+                request.payload.subscriptionData,
+                request.contractId,
+              )
             )
             inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
               state.payload.subscription shouldBe sub.subscription.contractId
-              state.payload.payData should equal(request.subscriptionRequest.payload.payData)
+              state.payload.payData should equal(request.payload.payData)
               state
             }
           }
@@ -781,7 +784,7 @@ class WalletTxLogIntegrationTest
 
       val (initialPaymentCid, _) = actAndCheck(
         "Alice accepts the request",
-        aliceWalletClient.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
+        aliceWalletClient.acceptSubscriptionRequest(request.contractId),
       )(
         "Request disappears from Alice's list",
         _ => {
@@ -871,7 +874,7 @@ class WalletTxLogIntegrationTest
 
       val (_, initialPayment) = actAndCheck(
         "Alice accepts the request",
-        aliceWalletClient.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
+        aliceWalletClient.acceptSubscriptionRequest(request.contractId),
       )(
         "Request disappears from Alice's list",
         initPaymentCid => {
@@ -902,11 +905,14 @@ class WalletTxLogIntegrationTest
         eventually() {
           inside(aliceWalletClient.listSubscriptions()) { case Seq(sub) =>
             sub.subscription.payload should equal(
-              request.subscriptionRequest.payload.subscriptionData
+              new subsCodegen.Subscription(
+                request.payload.subscriptionData,
+                request.contractId,
+              )
             )
             inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
               state.payload.subscription shouldBe sub.subscription.contractId
-              state.payload.payData should equal(request.subscriptionRequest.payload.payData)
+              state.payload.payData should equal(request.payload.payData)
               state.contractId
             }
           }
@@ -1014,7 +1020,7 @@ class WalletTxLogIntegrationTest
         aliceWalletClient.tap(100.0)
       }
 
-      val ((entryContextCid, _), request) = actAndCheck(
+      val (_, request) = actAndCheck(
         "Request cns entry",
         requestCnsEntry(
           aliceValidatorBackend.participantClientWithAdminToken,
@@ -1029,7 +1035,7 @@ class WalletTxLogIntegrationTest
 
       actAndCheck(
         "Alice accepts the request",
-        aliceWalletClient.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
+        aliceWalletClient.acceptSubscriptionRequest(request.contractId),
       )(
         "Request disappears from Alice's list",
         _ => {
@@ -1037,9 +1043,7 @@ class WalletTxLogIntegrationTest
           aliceWalletClient
             .listSubscriptions()
             .find(
-              _.context.contractId == entryContextCid.toInterface(
-                subsCodegen.SubscriptionContext.INTERFACE
-              )
+              _.subscription.payload.reference == request.contractId
             )
             .value
         },
@@ -1050,12 +1054,15 @@ class WalletTxLogIntegrationTest
         eventually() {
           inside(aliceWalletClient.listSubscriptions()) { case Seq(sub) =>
             sub.subscription.payload should equal(
-              request.subscriptionRequest.payload.subscriptionData
+              new subsCodegen.Subscription(
+                request.payload.subscriptionData,
+                request.contractId,
+              )
             )
 
             inside(sub.state) { case HttpWalletAppClient.SubscriptionPayment(state) =>
               state.payload.subscription shouldBe sub.subscription.contractId
-              state.payload.payData should equal(request.subscriptionRequest.payload.payData)
+              state.payload.payData should equal(request.payload.payData)
               state
             }
           }
@@ -1217,7 +1224,7 @@ class WalletTxLogIntegrationTest
 
       clue("Alice tries to accept the request and fails") {
         assertCommandFailsDueToInsufficientFunds(
-          aliceWalletClient.acceptSubscriptionRequest(request.subscriptionRequest.contractId)
+          aliceWalletClient.acceptSubscriptionRequest(request.contractId)
         )
       }
 
@@ -1260,7 +1267,7 @@ class WalletTxLogIntegrationTest
 
       val (_, initialPayment) = actAndCheck(
         "Alice accepts the request",
-        aliceWalletClient.acceptSubscriptionRequest(request.subscriptionRequest.contractId),
+        aliceWalletClient.acceptSubscriptionRequest(request.contractId),
       )(
         "Request disappears from Alice's list",
         initPaymentCid => {

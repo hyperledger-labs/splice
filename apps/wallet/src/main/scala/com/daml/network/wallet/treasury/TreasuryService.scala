@@ -198,24 +198,16 @@ class TreasuryService(
       op0 match {
         case op: coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
           for {
-            subscriptionRequest <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
+            _ <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
               subsCodegen.SubscriptionRequest.COMPANION
             )(domainId, op.contractIdValue)
-            _ <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
-              subsCodegen.SubscriptionContext.INTERFACE
-            )(domainId, subscriptionRequest.payload.subscriptionData.context)
           } yield ()
 
         case op: coinoperation.CO_SubscriptionMakePayment =>
           for {
-            subscriptionState <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
+            _ <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
               subsCodegen.SubscriptionIdleState.COMPANION
             )(domainId, op.contractIdValue)
-            _ <- userStore.multiDomainAcsStore
-              .getContractByIdOnDomain(subsCodegen.SubscriptionContext.INTERFACE)(
-                domainId,
-                subscriptionState.payload.subscriptionData.context,
-              )
           } yield ()
 
         case op: coinoperation.CO_AppPayment =>

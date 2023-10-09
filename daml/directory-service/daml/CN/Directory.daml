@@ -19,14 +19,19 @@ template DirectoryEntryContext
     name : Text
     url : Text
     description : Text
+    reference : ContractId SubscriptionRequest
   where
     signatory provider, user
 
-    interface instance SubscriptionContext for DirectoryEntryContext where
-      view = SubscriptionContextView with
-        description = "Directory entry: " <> show name
-        svc
-        sender = user
+    choice DirectoryEntryContext_Terminate : ()
+      with
+        actor : Party
+        terminatedSubscriptionCid : ContractId TerminatedSubscription
+      controller actor
+      do aborted <- fetch terminatedSubscriptionCid
+         require "Reference matches" (aborted.reference == reference)
+         archive terminatedSubscriptionCid
+         pure ()
 
         -- Collect a user's initial payment for a directory entry allocation.
     -- By collecting the initial payment, the directory service provider ultimately agrees to both
@@ -38,15 +43,15 @@ template DirectoryEntryContext
       controller provider
       do
         payment <- fetch paymentCid
-        Some (_, context) <- fetchFromInterface @DirectoryEntryContext payment.subscriptionData.context
+        require "Reference matches" (reference == payment.reference)
         -- accept payment which creates the subscription
         (_, subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionInitialPayment_Collect with
           transferContext
         subscriptionState <- fetch subscriptionStateCid
         -- deliver the promised good: create the directory entry
-        entryCid <- case context of
-          DirectoryEntryContext{..} -> create DirectoryEntry with
+        entryCid <- create DirectoryEntry with
             expiresAt = subscriptionState.nextPaymentDueAt
+            description
             ..
         -- return the created contracts
         pure (entryCid, subscriptionStateCid, coinCid)
@@ -60,11 +65,12 @@ template DirectoryEntryContext
       controller provider
       do
         payment <- fetch paymentCid
-        Some (_, context) <- fetchFromInterface @DirectoryEntryContext payment.subscriptionData.context
+        subscription <- fetch payment.subscription
+        require "Reference matches" (reference == subscription.reference)
         entry <- fetch entryCid
         -- sanity checks
         require "Current entry matches subscription context"
-          ((DirectoryEntryContext svc entry.provider entry.user entry.name entry.url entry.description) == context)
+          ((DirectoryEntryContext svc entry.provider entry.user entry.name entry.url entry.description reference) == this)
         require "Subscription entry renewal times are in sync"
           (payment.thisPaymentDueAt == entry.expiresAt)
         -- accept payment
@@ -133,11 +139,10 @@ template DirectoryInstall with
         description : Text
       controller user
       do
-        context <- create DirectoryEntryContext with ..
-        let subscriptionData = Subscription with
+        let subscriptionData = SubscriptionData with
               sender = user
               receiver = provider
-              context = toInterfaceContractId context
+              description = "Directory entry: " <> show name
               ..
         let payData = SubscriptionPayData with
               paymentAmount = PaymentAmount entryFee USD
@@ -146,6 +151,7 @@ template DirectoryInstall with
         request <- create SubscriptionRequest with
           subscriptionData
           payData
+        context <- create DirectoryEntryContext with reference = request, ..
         pure (context, request)
 
 -- | A request from a user to a directory service provider for an installation.

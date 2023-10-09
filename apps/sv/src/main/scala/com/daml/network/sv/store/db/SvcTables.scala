@@ -45,7 +45,7 @@ object SvcTables extends AcsTables with NamedLogging {
       actionCnsEntryContextCid: Option[cn.cns.CnsEntryContext.ContractId] = None,
       actionCnsEntryContextPaymentId: Option[sub.SubscriptionInitialPayment.ContractId] = None,
       actionCnsEntryContextArcType: Option[String] = None,
-      subscriptionContextContractId: Option[sub.SubscriptionContext.ContractId] = None,
+      subscriptionReferenceContractId: Option[sub.SubscriptionRequest.ContractId] = None,
       subscriptionNextPaymentDueAt: Option[Timestamp] = None,
       featuredAppRightProvider: Option[PartyId] = None,
   )
@@ -261,21 +261,28 @@ object SvcTables extends AcsTables with NamedLogging {
             SvcAcsStoreRowData(
               contract,
               cnsEntryName = Some(contract.payload.name),
+              subscriptionReferenceContractId = Some(contract.payload.reference),
             )
           }
         case sub.SubscriptionInitialPayment.TEMPLATE_ID =>
           tryToDecode(sub.SubscriptionInitialPayment.COMPANION, createdEvent) { contract =>
-            SvcAcsStoreRowData(contract)
+            SvcAcsStoreRowData(
+              contract,
+              subscriptionReferenceContractId = Some(contract.payload.reference),
+            )
           }
         case sub.SubscriptionPayment.TEMPLATE_ID =>
           tryToDecode(sub.SubscriptionPayment.COMPANION, createdEvent) { contract =>
-            SvcAcsStoreRowData(contract)
+            SvcAcsStoreRowData(
+              contract,
+              subscriptionReferenceContractId = Some(contract.payload.reference),
+            )
           }
         case sub.SubscriptionIdleState.TEMPLATE_ID =>
           tryToDecode(sub.SubscriptionIdleState.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
-              subscriptionContextContractId = Some(contract.payload.subscriptionData.context),
+              subscriptionReferenceContractId = Some(contract.payload.reference),
               subscriptionNextPaymentDueAt =
                 Some(Timestamp.assertFromInstant(contract.payload.nextPaymentDueAt)),
             )

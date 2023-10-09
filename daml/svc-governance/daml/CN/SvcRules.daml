@@ -1000,12 +1000,23 @@ template SvcRules with
 
     nonconsuming choice SvcRules_ExpireSubscription : ()
       with
+        cnsEntryContextCid : ContractId CnsEntryContext
         subscriptionIdleStateCid: ContractId SubscriptionIdleState
         choiceArg : SubscriptionIdleState_ExpireSubscription
       controller leader
       do
         requireUnlocked lock
-        exercise subscriptionIdleStateCid choiceArg
+        aborted <- exercise subscriptionIdleStateCid choiceArg
+        exercise cnsEntryContextCid (CnsEntryContext_Terminate svc aborted)
+
+    nonconsuming choice SvcRules_TerminateSubscription : ()
+      with
+        cnsEntryContextCid : ContractId CnsEntryContext
+        terminatedSubscriptionCid : ContractId TerminatedSubscription
+      controller leader
+      do
+        requireUnlocked lock
+        exercise cnsEntryContextCid (CnsEntryContext_Terminate svc terminatedSubscriptionCid)
 
 
     -- Reward management driven directly by the leader

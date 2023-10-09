@@ -666,10 +666,7 @@ lazy val `apps-wallet` =
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
       `wallet-daml`,
-      // TODO (#2676) Remove this once we have multi-domain interface support.
-      `directory-daml`,
       `svc-governance-daml`,
-      `canton-name-service-daml`,
     )
     .settings(
       BuildCommon.sharedAppSettings,

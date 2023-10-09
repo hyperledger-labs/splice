@@ -19,7 +19,11 @@ const useSubscriptions = (
     queryFn: async () => {
       const response = await ledgerApi!.query(operationName, Subscription);
       return response
-        .filter(s => s.payload.sender === primaryPartyId && s.payload.provider === providerPartyId)
+        .filter(
+          s =>
+            s.payload.subscriptionData.sender === primaryPartyId &&
+            s.payload.subscriptionData.provider === providerPartyId
+        )
         .map(ledgerApi!.toContract);
     },
     enabled: !!ledgerApi && !!primaryPartyId && !!providerPartyId, // wait for dependencies to be defined

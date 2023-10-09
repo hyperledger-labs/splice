@@ -252,18 +252,20 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
 
   protected def subscriptionInitialPayment(
+      reference: subCodegen.SubscriptionRequest.ContractId,
       paymentId: subCodegen.SubscriptionInitialPayment.ContractId,
       userParty: PartyId,
       providerParty: PartyId,
       amount: BigDecimal,
   ) = {
-    val subscriptionData = new subCodegen.Subscription(
-      userParty.toProtoPrimitive,
-      providerParty.toProtoPrimitive,
-      providerParty.toProtoPrimitive,
-      svcParty.toProtoPrimitive,
-      new subCodegen.SubscriptionContext.ContractId(nextCid()),
-    )
+    val subscriptionData =
+      new subCodegen.SubscriptionData(
+        userParty.toProtoPrimitive,
+        providerParty.toProtoPrimitive,
+        providerParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        "description",
+      )
     val payData = new subCodegen.SubscriptionPayData(
       new paymentCodegen.PaymentAmount(numeric(amount.bigDecimal), paymentCodegen.Currency.CC),
       new RelTime(1L),
@@ -275,6 +277,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       numeric(amount.bigDecimal),
       new coinCodegen.LockedCoin.ContractId(nextCid()),
       new Round(1L),
+      reference,
     )
     Contract(
       subCodegen.SubscriptionInitialPayment.TEMPLATE_ID,

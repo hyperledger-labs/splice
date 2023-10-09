@@ -1,4 +1,4 @@
-package com.daml.network.splitwell.automation
+package com.daml.network.directory.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{
@@ -7,49 +7,51 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.splitwell.store.SplitwellStore
+import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class TerminatedAppPaymentTrigger(
+class TerminatedSubscriptionTrigger(
     override protected val context: TriggerContext,
-    store: SplitwellStore,
+    store: DirectoryStore,
     connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
 ) extends OnAssignedContractTrigger.Template[
-      walletCodegen.TerminatedAppPayment.ContractId,
-      walletCodegen.TerminatedAppPayment,
-    ](store, walletCodegen.TerminatedAppPayment.COMPANION) {
+      subsCodegen.TerminatedSubscription.ContractId,
+      subsCodegen.TerminatedSubscription,
+    ](store, subsCodegen.TerminatedSubscription.COMPANION) {
 
   override def completeTask(
       task: AssignedContract[
-        walletCodegen.TerminatedAppPayment.ContractId,
-        walletCodegen.TerminatedAppPayment,
+        subsCodegen.TerminatedSubscription.ContractId,
+        subsCodegen.TerminatedSubscription,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      transferInProgressO <- store.lookupTransferInProgress(task.contract.payload.reference)
-      _ <- transferInProgressO.value match {
+      directoryEntryContextO <- store.lookupDirectoryEntryContext(task.contract.payload.reference)
+      _ <- directoryEntryContextO match {
         case None =>
-          throw Status.INTERNAL
-            .withDescription("No corresponding TransferInProgress for TerminatedAppPayment")
-            .asRuntimeException()
-        case Some(transferInProgress) =>
+          // TODO(#7934) Log an error here.
+          Future.successful(
+            TaskSuccess(
+              "Ignoring TerminatedSubscription as there is no corresponding DirectoryEntryContext"
+            )
+          )
+        case Some(directoryEntryContext) =>
           for {
             _ <- connection
               .submit(
                 Seq(store.providerParty),
                 Seq.empty,
-                transferInProgress.contractId.exerciseTransferInProgress_Terminate(
+                directoryEntryContext.contractId.exerciseDirectoryEntryContext_Terminate(
                   store.providerParty.toProtoPrimitive,
                   task.contract.contractId,
                 ),
@@ -59,6 +61,8 @@ class TerminatedAppPaymentTrigger(
               .yieldUnit()
           } yield ()
       }
-    } yield TaskSuccess("Archived TransferInProgress because corresponding payment got terminated")
+    } yield TaskSuccess(
+      "Archived DirectoryEntrytContext because corresponding subscription got terminated"
+    )
   }
 }

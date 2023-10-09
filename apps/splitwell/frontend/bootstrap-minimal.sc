@@ -69,7 +69,7 @@ def ensureDirectoryEntry(
       utils.retry_until_true { wallet.listSubscriptionRequests().length == 1 }
       println("Accepting submission request")
       wallet.acceptSubscriptionRequest(
-        wallet.listSubscriptionRequests()(0).subscriptionRequest.contractId
+        wallet.listSubscriptionRequests()(0).contractId
       )
       println("Waiting for CNS entry allocation")
       utils.retry_until_true {

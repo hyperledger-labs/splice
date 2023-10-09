@@ -644,7 +644,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           }
         }
       }
-
     }
 
     "listActivity" should {

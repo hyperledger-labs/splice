@@ -40,10 +40,11 @@ import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvO
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   Subscription,
-  SubscriptionContext,
+  SubscriptionData,
   SubscriptionIdleState,
   SubscriptionInitialPayment,
   SubscriptionPayData,
+  SubscriptionRequest,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.RetryProvider
@@ -183,11 +184,30 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       _.lookupCnsEntryByNameWithOffset("good")
     )
     def paymentId(n: Int) = new SubscriptionInitialPayment.ContractId(validContractId(n))
+    def newReferenceId = new SubscriptionRequest.ContractId(nextCid())
     lookupTests("lookupSubscriptionInitialPaymentWithOffset")(
-      create = subscriptionInitialPayment(paymentId(1), userParty(1), svcParty, BigDecimal(1.0)),
+      create = subscriptionInitialPayment(
+        newReferenceId,
+        paymentId(1),
+        userParty(1),
+        svcParty,
+        BigDecimal(1.0),
+      ),
       noise = Seq(
-        subscriptionInitialPayment(paymentId(2), userParty(2), svcParty, BigDecimal(2.0)),
-        subscriptionInitialPayment(paymentId(3), userParty(3), svcParty, BigDecimal(3.0)),
+        subscriptionInitialPayment(
+          newReferenceId,
+          paymentId(2),
+          userParty(2),
+          svcParty,
+          BigDecimal(2.0),
+        ),
+        subscriptionInitialPayment(
+          newReferenceId,
+          paymentId(3),
+          userParty(3),
+          svcParty,
+          BigDecimal(3.0),
+        ),
       ),
     )(
       _.lookupSubscriptionInitialPaymentWithOffset(paymentId(1))
@@ -755,7 +775,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
                 subscriptionIdleState(
                   n,
                   nextPaymentDueAt,
-                  contextContract.contractId,
                 )
 
               (contextContract, idleStateContract)
@@ -1251,6 +1270,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       name,
       s"https://example.com/$name",
       s"Test with $name",
+      new SubscriptionRequest.ContractId(validContractId(n, "ab")),
     )
 
     Contract(
@@ -1265,17 +1285,17 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
   private def subscriptionIdleState(
       n: Int,
       nextPaymentDueAt: Instant,
-      cnsEntryContextCid: CnsEntryContext.ContractId,
+      entryDescription: String = "Sample fake description",
   ) = {
     val templateId = SubscriptionIdleState.TEMPLATE_ID
     val template = new SubscriptionIdleState(
       new Subscription.ContractId(validContractId(n, "aa")),
-      new Subscription(
+      new SubscriptionData(
         userParty(n).toProtoPrimitive,
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
-        cnsEntryContextCid.toInterface(SubscriptionContext.INTERFACE),
+        entryDescription,
       ),
       new SubscriptionPayData(
         new PaymentAmount(numeric(BigDecimal("1")), Currency.CC),
@@ -1283,6 +1303,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         new RelTime(1_000_000L),
       ),
       nextPaymentDueAt,
+      new SubscriptionRequest.ContractId(validContractId(n, "ab")),
     )
     Contract(
       identifier = templateId,

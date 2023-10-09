@@ -41,7 +41,13 @@ import com.daml.network.sv.store.SvSvcStore.ignoredContractsForAcsDump
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract, TemplateJsonDecoder}
+import com.daml.network.util.{
+  AssignedContract,
+  CNNodeUtil,
+  Contract,
+  ContractWithState,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -806,6 +812,13 @@ trait SvSvcStore
       )
     }
   }
+
+  def lookupCnsEntryContext(
+      reference: sub.SubscriptionRequest.ContractId
+  )(implicit tc: TraceContext): Future[Option[ContractWithState[
+    cn.cns.CnsEntryContext.ContractId,
+    cn.cns.CnsEntryContext,
+  ]]]
 }
 
 object SvSvcStore {

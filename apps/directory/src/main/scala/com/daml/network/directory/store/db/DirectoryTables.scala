@@ -5,7 +5,6 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionContext
 import com.daml.network.store.db.AcsTables
 import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.PartyId
@@ -18,7 +17,7 @@ object DirectoryTables extends AcsTables {
       directoryInstallUser: Option[PartyId],
       directoryEntryName: Option[String],
       directoryEntryOwner: Option[PartyId],
-      subscriptionContextContractId: Option[ContractId[SubscriptionContext]],
+      subscriptionReferenceContractId: Option[ContractId[subsCodegen.SubscriptionRequest]],
       subscriptionNextPaymentDueAt: Option[Timestamp],
   )
 
@@ -33,7 +32,7 @@ object DirectoryTables extends AcsTables {
               directoryInstallUser = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
               directoryEntryName = None,
               directoryEntryOwner = None,
-              subscriptionContextContractId = None,
+              subscriptionReferenceContractId = None,
               subscriptionNextPaymentDueAt = None,
             )
           }
@@ -46,7 +45,7 @@ object DirectoryTables extends AcsTables {
                 directoryInstallUser = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
                 directoryEntryName = None,
                 directoryEntryOwner = None,
-                subscriptionContextContractId = None,
+                subscriptionReferenceContractId = None,
                 subscriptionNextPaymentDueAt = None,
               )
           }
@@ -58,7 +57,7 @@ object DirectoryTables extends AcsTables {
               directoryInstallUser = None,
               directoryEntryName = Some(contract.payload.name),
               directoryEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
-              subscriptionContextContractId = None,
+              subscriptionReferenceContractId = None,
               subscriptionNextPaymentDueAt = None,
             )
           }
@@ -70,7 +69,7 @@ object DirectoryTables extends AcsTables {
               directoryInstallUser = None,
               directoryEntryName = Some(contract.payload.name),
               directoryEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
-              subscriptionContextContractId = None,
+              subscriptionReferenceContractId = Some(contract.payload.reference),
               subscriptionNextPaymentDueAt = None,
             )
           }
@@ -82,7 +81,7 @@ object DirectoryTables extends AcsTables {
               directoryInstallUser = None,
               directoryEntryName = None,
               directoryEntryOwner = None,
-              subscriptionContextContractId = Some(contract.payload.subscriptionData.context),
+              subscriptionReferenceContractId = Some(contract.payload.reference),
               subscriptionNextPaymentDueAt =
                 Some(Timestamp.assertFromInstant(contract.payload.nextPaymentDueAt)),
             )
@@ -95,7 +94,7 @@ object DirectoryTables extends AcsTables {
               directoryInstallUser = None,
               directoryEntryName = None,
               directoryEntryOwner = None,
-              subscriptionContextContractId = Some(contract.payload.subscriptionData.context),
+              subscriptionReferenceContractId = Some(contract.payload.reference),
               subscriptionNextPaymentDueAt = None,
             )
           }
@@ -107,7 +106,7 @@ object DirectoryTables extends AcsTables {
               directoryInstallUser = None,
               directoryEntryName = None,
               directoryEntryOwner = None,
-              subscriptionContextContractId = Some(contract.payload.subscriptionData.context),
+              subscriptionReferenceContractId = Some(contract.payload.reference),
               subscriptionNextPaymentDueAt = None,
             )
           }

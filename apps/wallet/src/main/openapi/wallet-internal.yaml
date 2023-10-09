@@ -314,7 +314,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SubscriptionRequest"
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
@@ -624,7 +624,7 @@ components:
         subscription_requests:
           type: array
           items:
-            $ref: "#/components/schemas/SubscriptionRequest"
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     ListSubscriptionInitialPaymentsResponse:
       type: object
@@ -636,30 +636,16 @@ components:
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
-    SubscriptionRequest:
-      type: object
-      required:
-        - subscriptionRequest
-        - context
-      properties:
-        subscriptionRequest:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        context:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-
     Subscription:
       type: object
       required:
         - subscription
         - state
-        - context
       properties:
         subscription:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
         state:
           $ref: "#/components/schemas/SubscriptionState"
-        context:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
     SubscriptionState:
       type: object
       properties:

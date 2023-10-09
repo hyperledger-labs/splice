@@ -21,7 +21,6 @@ import * as payment from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 import { AppPaymentRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 import {
   Subscription,
-  SubscriptionContext,
   SubscriptionIdleState,
   SubscriptionPayment,
   SubscriptionRequest,
@@ -38,7 +37,6 @@ import {
   Transaction,
   Transfer,
   WalletBalance,
-  SubscriptionRequestWithContext,
   Unknown,
   Notification,
 } from '../models/models';
@@ -77,7 +75,7 @@ export interface WalletClient {
   acceptAppPaymentRequest: (requestContractId: string) => Promise<void>;
   rejectAppPaymentRequest: (requestContractId: string) => Promise<void>;
 
-  getSubscriptionRequest: (contractId: string) => Promise<SubscriptionRequestWithContext>;
+  getSubscriptionRequest: (contractId: string) => Promise<Contract<SubscriptionRequest>>;
   listSubscriptionRequests: () => Promise<ListSubscriptionRequestsResponse>;
   acceptSubscriptionRequest: (requestContractId: string) => Promise<void>;
   listSubscriptions: () => Promise<ListSubscriptionsResponse>;
@@ -243,24 +241,14 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       getSubscriptionRequest: async contractId => {
         const response = await walletClient.getSubscriptionRequest(contractId);
-        const subscriptionRequest = Contract.decodeOpenAPI(
-          response.subscriptionRequest,
-          SubscriptionRequest
-        );
-        const context = Contract.decodeOpenAPI(response.context, SubscriptionContext);
-        return { subscriptionRequest, context };
+        return Contract.decodeOpenAPI(response, SubscriptionRequest);
       },
       listSubscriptionRequests: async (): Promise<ListSubscriptionRequestsResponse> => {
         const res = await walletClient.listSubscriptionRequests();
         return {
-          subscriptionRequestsList: res.subscription_requests.map(sr => {
-            const subscription = Contract.decodeOpenAPI(
-              sr.subscriptionRequest,
-              SubscriptionRequest
-            );
-            const context = Contract.decodeOpenAPI(sr.context, SubscriptionContext);
-            return { subscriptionRequest: subscription, context };
-          }),
+          subscriptionRequestsList: res.subscription_requests.map(sr =>
+            Contract.decodeOpenAPI(sr, SubscriptionRequest)
+          ),
         };
       },
       acceptSubscriptionRequest: async requestContractId => {
@@ -280,8 +268,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
                   type: 'idle' as 'idle',
                   value: Contract.decodeOpenAPI(sub.state.idle!, SubscriptionIdleState),
                 };
-            const context = Contract.decodeOpenAPI(sub.context, SubscriptionContext);
-            return { subscription, state, context };
+            return { subscription, state };
           }),
         };
       },

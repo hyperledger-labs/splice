@@ -9,7 +9,6 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubscCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.daml.network.wallet.store.db.DbUserWalletStore
@@ -18,7 +17,6 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.StoreTest
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
-import com.daml.network.wallet.store.UserWalletStore.SubscriptionRequest
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.TransferOfferStatus
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
@@ -440,18 +438,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
         for {
           store <- mkStore(user1)
-          (context2, subscription2, idleState2) = subscriptionDueAt(3, 1)
-          (context1, subscription1, idleState1) = subscriptionDueAt(3, 2)
-          _ <- dummyDomain.create(context2, createdEventSignatories = Seq(user1))(
-            store.multiDomainAcsStore
-          )
+          (subscription2, idleState2) = subscriptionDueAt(3, 1)
+          (subscription1, idleState1) = subscriptionDueAt(3, 2)
           _ <- dummyDomain.create(subscription2, createdEventSignatories = Seq(user1))(
             store.multiDomainAcsStore
           )
           _ <- dummyDomain.create(idleState2, createdEventSignatories = Seq(user1))(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(context1, createdEventSignatories = Seq(user1))(
             store.multiDomainAcsStore
           )
           _ <- dummyDomain.create(subscription1, createdEventSignatories = Seq(user1))(
@@ -503,14 +495,14 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             store2.multiDomainAcsStore,
             storeP.multiDomainAcsStore,
           )
-          (context1, subscription1, state1) = subscriptionInIdleState(
+          (subscription1, state1) = subscriptionInIdleState(
             user1,
             provider1,
             payData,
             time(1),
           )
           lockedCoinCid = new coinCodegen.LockedCoin.ContractId(nextCid())
-          (context2, subscription2, state2) = subscriptionInPaymentState(
+          (subscription2, state2) = subscriptionInPaymentState(
             user1,
             provider1,
             payData,
@@ -518,12 +510,10 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             lockedCoinCid,
             1L,
           )
-          _ <- dummyDomain.createMulti(context1, createdEventSignatories = Seq(user1))(allAcsStores)
           _ <- dummyDomain.createMulti(subscription1, createdEventSignatories = Seq(user1))(
             allAcsStores
           )
           _ <- dummyDomain.createMulti(state1, createdEventSignatories = Seq(user1))(allAcsStores)
-          _ <- dummyDomain.createMulti(context2, createdEventSignatories = Seq(user1))(allAcsStores)
           _ <- dummyDomain.createMulti(subscription2, createdEventSignatories = Seq(user1))(
             allAcsStores
           )
@@ -544,7 +534,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         val payData = subscriptionPayData()
         for {
           store1 <- mkStore(user1)
-          (context1, subscription1, state1) = subscriptionInIdleState(
+          (subscription1, state1) = subscriptionInIdleState(
             user1,
             provider1,
             payData,
@@ -557,9 +547,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             time(1),
             lockedCoinCid,
             1,
-          )
-          _ <- dummyDomain.create(context1, createdEventSignatories = Seq(user1))(
-            store1.multiDomainAcsStore
           )
           _ <- dummyDomain.create(subscription1, createdEventSignatories = Seq(user1))(
             store1.multiDomainAcsStore
@@ -584,14 +571,11 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         val payData = subscriptionPayData()
         for {
           store1 <- mkStore(user1)
-          (context1, subscription1, state1) = subscriptionInIdleState(
+          (subscription1, state1) = subscriptionInIdleState(
             user1,
             provider1,
             payData,
             time(1),
-          )
-          _ <- dummyDomain.create(context1, createdEventSignatories = Seq(user1))(
-            store1.multiDomainAcsStore
           )
           _ <- dummyDomain.create(subscription1, createdEventSignatories = Seq(user1))(
             store1.multiDomainAcsStore
@@ -599,7 +583,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           // If a subscription is expired because of a missed payment, all 3 contracts are archived
           _ <- dummyDomain.archive(state1)(store1.multiDomainAcsStore)
           _ <- dummyDomain.archive(subscription1)(store1.multiDomainAcsStore)
-          _ <- dummyDomain.archive(context1)(store1.multiDomainAcsStore)
         } yield {
           eventually() {
             val actual = resultCids(store1)
@@ -622,51 +605,42 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             store2.multiDomainAcsStore,
             storeP.multiDomainAcsStore,
           )
-          context1 = subscriptionContext(user1, provider1)
-          subscription1 = subscription(context1)
-          request1 = subscriptionRequest(subscription1.payload, payData)
-          context2 = subscriptionContext(user2, provider1)
-          subscription2 = subscription(context2)
-          request2 = subscriptionRequest(subscription2.payload, payData)
-          _ <- dummyDomain.createMulti(context1, createdEventSignatories = Seq(user1))(allAcsStores)
+          reference1 = new subsCodegen.SubscriptionRequest.ContractId(nextCid())
+          subscription1 = subscription(user1, provider1, reference1)
+          request1 = subscriptionRequest(subscription1.payload.subscriptionData, payData)
+          reference2 = new subsCodegen.SubscriptionRequest.ContractId(nextCid())
+          subscription2 = subscription(user2, provider1, reference2)
+          request2 = subscriptionRequest(subscription2.payload.subscriptionData, payData)
           _ <- dummyDomain.createMulti(subscription1, createdEventSignatories = Seq(user1))(
             allAcsStores
           )
           _ <- dummyDomain.createMulti(request1, createdEventSignatories = Seq(user1))(allAcsStores)
-          _ <- dummyDomain.createMulti(context2, createdEventSignatories = Seq(user2))(allAcsStores)
           _ <- dummyDomain.createMulti(subscription2, createdEventSignatories = Seq(user2))(
             allAcsStores
           )
           _ <- dummyDomain.createMulti(request2, createdEventSignatories = Seq(user2))(allAcsStores)
         } yield {
-          def resultCids(r: SubscriptionRequest) =
-            r.context.contractId.contractId -> r.subscription.contractId.contractId
-
           eventually() {
             // Listing - user only sees their own request
-            val actual1 = store1.listSubscriptionRequests().futureValue.map(resultCids)
-            val expected1 = Seq(
-              context1.contractId.contractId -> request1.contractId.contractId
-            )
+            val actual1 = store1.listSubscriptionRequests().futureValue.map(_.contractId)
+            val expected1 = Seq(request1.contractId)
             actual1 should contain theSameElementsInOrderAs expected1
 
             // Listing - user only sees their own request
-            val actual2 = store2.listSubscriptionRequests().futureValue.map(resultCids)
-            val expected2 = Seq(
-              context2.contractId.contractId -> request2.contractId.contractId
-            )
+            val actual2 = store2.listSubscriptionRequests().futureValue.map(_.contractId)
+            val expected2 = Seq(request2.contractId)
             actual2 should contain theSameElementsInOrderAs expected2
 
             // Listing - provider doesn't see any request
-            val actualP = storeP.listSubscriptionRequests().futureValue.map(resultCids)
+            val actualP = storeP.listSubscriptionRequests().futureValue.map(_.contractId)
             actualP should be(empty)
 
             // Pointwise lookup - only user1 store should see request1
             store1
               .getSubscriptionRequest(request1.contractId)
-              .map(resultCids)
-              .futureValue should be(
-              context1.contractId.contractId -> request1.contractId.contractId
+              .futureValue
+              .contractId should be(
+              request1.contractId
             )
             assertThrows[Throwable](store2.getSubscriptionRequest(request1.contractId).futureValue)
             assertThrows[Throwable](storeP.getSubscriptionRequest(request1.contractId).futureValue)
@@ -912,39 +886,21 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def subscriptionContext(
-      user: PartyId,
-      service: PartyId,
-  ) = {
-    val templateId = testSubscCodegen.TestSubscriptionContext.TEMPLATE_ID
-    val template = new testSubscCodegen.TestSubscriptionContext(
-      svcParty.toProtoPrimitive,
-      user.toProtoPrimitive,
-      service.toProtoPrimitive,
-      s"Party $user subscribes to a service provided by party $service",
-    )
-    Contract(
-      identifier = templateId,
-      contractId = new testSubscCodegen.TestSubscriptionContext.ContractId(nextCid()),
-      payload = template,
-      metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
-    )
-  }
-
   private def subscription(
-      contextContract: Contract[
-        testSubscCodegen.TestSubscriptionContext.ContractId,
-        testSubscCodegen.TestSubscriptionContext,
-      ]
+      user: PartyId,
+      provider: PartyId,
+      reference: subsCodegen.SubscriptionRequest.ContractId,
   ) = {
     val templateId = subsCodegen.Subscription.TEMPLATE_ID
     val template = new subsCodegen.Subscription(
-      contextContract.payload.user,
-      contextContract.payload.service,
-      contextContract.payload.service,
-      svcParty.toProtoPrimitive,
-      contextContract.contractId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
+      new subsCodegen.SubscriptionData(
+        user.toProtoPrimitive,
+        provider.toProtoPrimitive,
+        provider.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        s"Party $user subscribes to a service provided by party $provider",
+      ),
+      reference,
     )
     Contract(
       identifier = templateId,
@@ -963,9 +919,10 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     val templateId = subsCodegen.SubscriptionIdleState.TEMPLATE_ID
     val template = new subsCodegen.SubscriptionIdleState(
       subscriptionContract.contractId,
-      subscriptionContract.payload,
+      subscriptionContract.payload.subscriptionData,
       payData,
       nextPaymentDueAt.toInstant,
+      subscriptionContract.payload.reference,
     )
     Contract(
       identifier = templateId,
@@ -986,7 +943,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     val templateId = subsCodegen.SubscriptionPayment.TEMPLATE_ID
     val template = new subsCodegen.SubscriptionPayment(
       subscription.contractId,
-      subscription.payload,
+      subscription.payload.subscriptionData,
       payData,
       thisPaymentDueAt.toInstant,
       // Note: this targetAmount is only correct for CC payments.
@@ -994,6 +951,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       payData.paymentAmount.amount,
       lockedCoinCid,
       new Round(round),
+      subscription.payload.reference,
     )
     Contract(
       identifier = templateId,
@@ -1010,14 +968,14 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       payData: subsCodegen.SubscriptionPayData,
       nextPaymentDueAt: CantonTimestamp,
   ) = {
-    val contextContract = subscriptionContext(user = sender, service = receiver)
-    val subscriptionContract = subscription(contextContract)
+    val reference = new subsCodegen.SubscriptionRequest.ContractId(nextCid())
+    val subscriptionContract = subscription(sender, receiver, reference)
     val idleStateContract = subscriptionIdleState(
       subscriptionContract,
       payData,
       nextPaymentDueAt,
     )
-    (contextContract, subscriptionContract, idleStateContract)
+    (subscriptionContract, idleStateContract)
   }
 
   private def subscriptionInPaymentState(
@@ -1028,8 +986,8 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       lockedCoinCid: coinCodegen.LockedCoin.ContractId,
       round: Long,
   ) = {
-    val contextContract = subscriptionContext(user = sender, service = receiver)
-    val subscriptionContract = subscription(contextContract)
+    val reference = new subsCodegen.SubscriptionRequest.ContractId(nextCid())
+    val subscriptionContract = subscription(sender, receiver, reference)
     val paymentStateContract = subscriptionPaymentState(
       subscriptionContract,
       payData,
@@ -1037,7 +995,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       lockedCoinCid,
       round,
     )
-    (contextContract, subscriptionContract, paymentStateContract)
+    (subscriptionContract, paymentStateContract)
   }
 
   private def subscriptionPayData(
@@ -1054,7 +1012,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def subscriptionRequest(
-      subscriptionData: subsCodegen.Subscription,
+      subscriptionData: subsCodegen.SubscriptionData,
       payData: subsCodegen.SubscriptionPayData,
   ) = {
     val templateId = subsCodegen.SubscriptionRequest.TEMPLATE_ID

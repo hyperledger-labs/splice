@@ -102,13 +102,13 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
       <TableCell variant="party">
         <DirectoryEntry
           className="sub-receiver"
-          partyId={subscription.subscription.payload.receiver}
+          partyId={subscription.subscription.payload.subscriptionData.receiver}
         />
       </TableCell>
       <TableCell variant="party">
         <Service
-          provider={subscription.subscription.payload.provider}
-          description={subscription.context.payload.description}
+          provider={subscription.subscription.payload.subscriptionData.provider}
+          description={subscription.subscription.payload.subscriptionData.description}
         />
       </TableCell>
       <TableCell align="right">

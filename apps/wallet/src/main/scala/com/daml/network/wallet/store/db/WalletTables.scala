@@ -10,7 +10,6 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.store.MultiDomainAcsStore.ContractFilter
 import com.daml.network.store.db.AcsTables
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.UserWalletTxLogParser
@@ -26,8 +25,7 @@ object WalletTables extends AcsTables {
 
   object UserWalletAcsStoreRowData {
     def fromCreatedEvent(
-        createdEvent: CreatedEvent,
-        contractFilter: ContractFilter,
+        createdEvent: CreatedEvent
     ): Either[String, UserWalletAcsStoreRowData] = {
       def noIndex(contract: Contract[?, ?]) =
         UserWalletAcsStoreRowData(
@@ -115,15 +113,7 @@ object WalletTables extends AcsTables {
         case coinCodegen.FeaturedAppRight.TEMPLATE_ID =>
           tryToDecode(coinCodegen.FeaturedAppRight.COMPANION, createdEvent)(noIndex)
         case t =>
-          // TODO (#2676) Remove the hacky interface decoding machinery once we have proper interface support for multi-domain.
-          tryToDecode(
-            subsCodegen.SubscriptionContext.INTERFACE,
-            createdEvent,
-            contractFilter,
-          )(noIndex)
-            .orElse(
-              Left(s"Template $t cannot be decoded as an entry for the user wallet store.")
-            )
+          Left(s"Template $t cannot be decoded as an entry for the user wallet store.")
       }
     }
   }

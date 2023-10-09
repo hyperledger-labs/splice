@@ -159,7 +159,7 @@ class WalletTimeBasedIntegrationTest
               "the corresponding subscription request is created",
               { _ =>
                 inside(aliceWalletClient.listSubscriptionRequests()) { case Seq(r) =>
-                  r.subscriptionRequest.contractId
+                  r.contractId
                 }
               },
             )

@@ -45,9 +45,6 @@ class SubscriptionPaymentTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val AssignedContract(payment, domainId) = paymentReady
-    val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
-      payment.payload.subscriptionData.context
-    )
     val provider = store.providerParty
     def rejectPayment(
         reason: String,
@@ -65,6 +62,7 @@ class SubscriptionPaymentTrigger(
         .map(_ => TaskSuccess(s"rejected subscription payment: $reason"))
     }
     def collectPayment(
+        contextId: directoryCodegen.DirectoryEntryContext.ContractId,
         entry: Contract[
           directoryCodegen.DirectoryEntry.ContractId,
           directoryCodegen.DirectoryEntry,
@@ -95,11 +93,8 @@ class SubscriptionPaymentTrigger(
           .yieldUnit()
       } yield TaskSuccess("renewed directory entry.")
     }
-    store.multiDomainAcsStore
-      .lookupContractByIdOnDomain(directoryCodegen.DirectoryEntryContext.COMPANION)(
-        domainId,
-        contextId,
-      )
+    store
+      .lookupDirectoryEntryContext(paymentReady.contract.payload.reference)
       .flatMap {
         case Some(directoryEntryContext) =>
           for {
@@ -116,6 +111,7 @@ class SubscriptionPaymentTrigger(
                   case QueryResult(offset, Some(entry)) =>
                     // collect the payment and renew the entry
                     collectPayment(
+                      directoryEntryContext.contract.contractId,
                       entry,
                       offset,
                       transferContext,
@@ -151,7 +147,11 @@ class SubscriptionPaymentTrigger(
             }
           } yield result
         case None =>
-          Future.successful(TaskSuccess(s"skipping as subscription context $contextId not known."))
+          Future.successful(
+            TaskSuccess(
+              s"skipping as directory entry context for reference ${paymentReady.contract.payload.reference} not known."
+            )
+          )
       }
   }
 }

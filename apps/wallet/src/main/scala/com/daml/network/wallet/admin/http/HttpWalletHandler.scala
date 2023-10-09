@@ -158,12 +158,7 @@ class HttpWalletHandler(
         userStore <- getUserStore(user)
         subRequests <- userStore.listSubscriptionRequests()
       } yield {
-        d0.ListSubscriptionRequestsResponse(subRequests.map { subRequest =>
-          d0.SubscriptionRequest(
-            subRequest.subscription.toHttp,
-            subRequest.context.toHttp,
-          )
-        }.toVector)
+        d0.ListSubscriptionRequestsResponse(subRequests.map(_.toHttp).toVector)
       }
     }
   }
@@ -189,7 +184,6 @@ class HttpWalletHandler(
                   case UserWalletStore.SubscriptionPaymentState(contract) =>
                     d0.SubscriptionState(payment = Some(contract.toHttp))
                 },
-                subscription.context.toHttp,
               )
             }.toVector
           )
@@ -385,10 +379,7 @@ class HttpWalletHandler(
         userStore <- getUserStore(user)
         subscriptionRequest <- userStore.getSubscriptionRequest(requestCid)
       } yield r0.GetSubscriptionRequestResponseOK(
-        d0.SubscriptionRequest(
-          subscriptionRequest.subscription.toHttp,
-          subscriptionRequest.context.toHttp,
-        )
+        subscriptionRequest.toHttp
       )
     }
   }

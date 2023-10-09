@@ -9,9 +9,10 @@ import com.daml.network.codegen.java.cn.directory.{
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   Subscription,
-  SubscriptionContext,
+  SubscriptionData,
   SubscriptionIdleState,
   SubscriptionPayData,
+  SubscriptionRequest,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.{DomainConfig, GlobalOnlyDomainConfig}
@@ -125,7 +126,6 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
                 subscriptionIdleState(
                   n,
                   nextPaymentDueAt,
-                  contextContract.contractId,
                 )
 
               (contextContract, idleStateContract)
@@ -245,6 +245,7 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
       name,
       entryUrl,
       entryDescription,
+      new SubscriptionRequest.ContractId(validContractId(n, "ab")),
     )
     Contract(
       identifier = templateId,
@@ -258,17 +259,17 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
   private def subscriptionIdleState(
       n: Int,
       nextPaymentDueAt: Instant,
-      directoryEntryContextCid: DirectoryEntryContext.ContractId,
+      entryDescription: String = "Sample fake description",
   ) = {
     val templateId = SubscriptionIdleState.TEMPLATE_ID
     val template = new SubscriptionIdleState(
       new Subscription.ContractId(validContractId(n, "aa")),
-      new Subscription(
+      new SubscriptionData(
         userParty(n).toProtoPrimitive,
         provider.toProtoPrimitive,
         provider.toProtoPrimitive,
         svcParty.toProtoPrimitive,
-        directoryEntryContextCid.toInterface(SubscriptionContext.INTERFACE),
+        entryDescription,
       ),
       new SubscriptionPayData(
         new PaymentAmount(numeric(BigDecimal("1")), Currency.CC),
@@ -276,6 +277,7 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
         new RelTime(1_000_000L),
       ),
       nextPaymentDueAt,
+      new SubscriptionRequest.ContractId(validContractId(n, "ab")),
     )
     Contract(
       identifier = templateId,

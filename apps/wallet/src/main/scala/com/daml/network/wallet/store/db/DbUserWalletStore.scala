@@ -71,7 +71,7 @@ class DbUserWalletStore(
       contractState: ContractStateRowData,
   )(implicit tc: TraceContext) = {
     UserWalletAcsStoreRowData
-      .fromCreatedEvent(createdEvent, acsContractFilter)
+      .fromCreatedEvent(createdEvent)
       .map {
         case UserWalletAcsStoreRowData(
               contract,

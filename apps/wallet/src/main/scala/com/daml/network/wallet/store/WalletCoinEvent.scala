@@ -1,6 +1,6 @@
 package com.daml.network.wallet.store
 
-import com.daml.ledger.javaapi.data.{DamlOptional, Unit as DamlUnit}
+import com.daml.ledger.javaapi.data.DamlOptional
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.svcrules as svcCodegen
 import com.daml.network.codegen.java.cn.wallet.{
@@ -391,7 +391,7 @@ object SubscriptionIdleState_MakePayment extends ExerciseNodeCompanion {
 object SubscriptionIdleState_ExpireSubscription extends ExerciseNodeCompanion {
   override type Tpl = subsCodegen.SubscriptionIdleState
   override type Arg = subsCodegen.SubscriptionIdleState_ExpireSubscription
-  override type Res = DamlUnit
+  override type Res = subsCodegen.TerminatedSubscription.ContractId
 
   override val templateOrInterface = Left(subsCodegen.SubscriptionIdleState.COMPANION)
   override val choice =
@@ -400,8 +400,9 @@ object SubscriptionIdleState_ExpireSubscription extends ExerciseNodeCompanion {
   override val argDecoder = subsCodegen.SubscriptionIdleState_ExpireSubscription.valueDecoder()
   override def argToValue(arg: Arg) = arg.toValue
 
-  override val resDecoder = _ => DamlUnit.getInstance()
-  override def resToValue(res: Res) = DamlUnit.getInstance()
+  override val resDecoder = result =>
+    new subsCodegen.TerminatedSubscription.ContractId(result.asContractId().get.getValue)
+  override def resToValue(res: Res) = res.toValue
 }
 
 object SubscriptionPayment_Collect extends ExerciseNodeCompanion {

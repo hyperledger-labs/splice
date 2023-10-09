@@ -34,6 +34,7 @@ class ExpiredCnsSubscriptionTrigger(
     svcRules <- store.getSvcRules()
     cmd = svcRules.exercise(
       _.exerciseSvcRules_ExpireSubscription(
+        task.work.context.contractId,
         task.work.state.contractId,
         new SubscriptionIdleState_ExpireSubscription(store.key.svcParty.toProtoPrimitive),
       )

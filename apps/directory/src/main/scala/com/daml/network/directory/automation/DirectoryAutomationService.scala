@@ -47,4 +47,7 @@ class DirectoryAutomationService(
   registerTrigger(
     new ExpiredDirectorySubscriptionTrigger(triggerContext, store, connection)
   )
+  registerTrigger(
+    new TerminatedSubscriptionTrigger(triggerContext, store, connection)
+  )
 }

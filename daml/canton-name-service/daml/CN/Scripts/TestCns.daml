@@ -38,10 +38,11 @@ testWithSubscription = script do
     inputs = [InputCoin coin]
     context = paymentContext
     walletProvider = app.svc
+  pure ()
 
   (_, round) <- getLatestActiveOpenRound app
   let transferConfigCC = transferConfigCCFromOpenRound round
-  [(_, reward)] <- query @CC.Coin.AppRewardCoupon app.svc
+  [(acceptRewardCid, reward)] <- query @CC.Coin.AppRewardCoupon app.svc
   reward.amount ===
     transferConfigCC.createFee.fee +
     transferConfigCC.lockHolderFee.fee
@@ -58,7 +59,7 @@ testWithSubscription = script do
   svcCoins <- queryFilter @Coin app.svc (\coin -> coin.owner == app.svc)
   svcCoins === []
 
-  [(_, reward), _] <- query @CC.Coin.AppRewardCoupon app.svc
+  [(_, reward)] <- filter (\(cid, _) -> cid /= acceptRewardCid) <$> query @CC.Coin.AppRewardCoupon app.svc
   reward.amount ===
     transferConfigCC.createFee.fee +
     transferConfigCC.transferFee.initialRate * defaultCnsRulesConfig.entryFee
@@ -137,4 +138,31 @@ testWithSubscription = script do
   -- svc can then also terminate the subscription
   submit app.svc $ exerciseCmd subscriptionStateCid (SubscriptionIdleState_ExpireSubscription app.svc)
 
+  pure ()
+
+terminatedSubscriptionCanBeCleanedUp : Script ()
+terminatedSubscriptionCanBeCleanedUp = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  runNextIssuance app
+  runCoinDepositBots app
+
+  cnsRulesCid <- submitMulti [app.svc] [] $ createCmd CnsRules with
+    svc = app.svc
+    config = defaultCnsRulesConfig
+
+  (entryContext, subscriptionRequest) <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+    name = "cns.darth.vader"
+    url = "https://darth-vader-cns.com"
+    description = "Darth Vader's CNS Description"
+    user = alice.primaryParty
+
+  terminated <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_Reject
+  submit app.svc $ exerciseCmd entryContext (CnsEntryContext_Terminate app.svc terminated)
+
+  entryContexts <- query @CnsEntryContext app.svc
+  entryContexts === []
+
+  terminatedSubscriptions <- query @TerminatedSubscription app.svc
+  terminatedSubscriptions === []
   pure ()

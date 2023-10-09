@@ -3,8 +3,6 @@ package com.daml.network.wallet.store
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
-import com.daml.network.codegen.java.cn.{cns as cnsCongen, directory as directoryCodegen}
-import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
@@ -20,7 +18,6 @@ import com.daml.network.wallet.store.UserWalletStore.{
   Subscription,
   SubscriptionIdleState,
   SubscriptionPaymentState,
-  SubscriptionRequest,
   SubscriptionState,
 }
 import com.daml.network.wallet.store.db.DbUserWalletStore
@@ -157,11 +154,6 @@ trait UserWalletStore
         subsCodegen.Subscription.COMPANION,
         domainId,
       )
-      // there's a 1-1 mapping Subscription-SubscriptionContext, so all should be included
-      subscriptionContexts <- multiDomainAcsStore.listContractsOnDomain(
-        subsCodegen.SubscriptionContext.INTERFACE,
-        domainId,
-      )
       subscriptionIdleStates <- multiDomainAcsStore.listContractsOnDomain(
         subsCodegen.SubscriptionIdleState.COMPANION,
         domainId,
@@ -172,7 +164,6 @@ trait UserWalletStore
       )
     } yield {
       val mainMap = subscriptions.map(sub => sub.contractId -> sub).toMap
-      val contextsMap = subscriptionContexts.map(ctx => ctx.contractId -> ctx).toMap
       val idleStates: Seq[(subsCodegen.Subscription.ContractId, SubscriptionState)] =
         subscriptionIdleStates.map(state =>
           (state.payload.subscription, SubscriptionIdleState(state))
@@ -186,16 +177,17 @@ trait UserWalletStore
       for {
         (mainId, state) <- states
         main <- mainMap.get(mainId)
-        context <- contextsMap.get(main.payload.context)
       } yield {
-        Subscription(main, context, state)
+        Subscription(main, state)
       }
     }
   }
 
   def getSubscriptionRequest(
       cid: subsCodegen.SubscriptionRequest.ContractId
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[SubscriptionRequest] = {
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[
+    Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]
+  ] = {
     for {
       domainId <- defaultAcsDomainIdF
       contract <- multiDomainAcsStore.getContractByIdOnDomain(
@@ -204,39 +196,23 @@ trait UserWalletStore
         domainId,
         cid,
       )
-      context <- multiDomainAcsStore.getContractByIdOnDomain(
-        subsCodegen.SubscriptionContext.INTERFACE
-      )(
-        domainId,
-        contract.payload.subscriptionData.context,
-      )
-    } yield SubscriptionRequest(contract, context)
+    } yield contract
   }
 
   def listSubscriptionRequests()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Seq[SubscriptionRequest]] = {
+  ): Future[
+    Seq[Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]]
+  ] = {
     for {
       domainId <- defaultAcsDomainIdF
-      contracts <- multiDomainAcsStore.listContractsOnDomain(
-        subsCodegen.SubscriptionRequest.COMPANION,
-        domainId,
-      )
-      // there's a 1-1 mapping Subscription-SubscriptionContext, so all should be included
-      contexts <- multiDomainAcsStore.listContractsOnDomain(
-        subsCodegen.SubscriptionContext.INTERFACE,
-        domainId,
-      )
-    } yield {
-      val contextsMap = contexts.map(ctx => ctx.contractId -> ctx).toMap
-      contracts.flatMap { contract =>
-        // If the context is missing, that means that the SubscriptionRequest was archived right after fetching it
-        contextsMap.get(contract.payload.subscriptionData.context).map { context =>
-          SubscriptionRequest(contract, context)
-        }
-      }
-    }
+      requests <- multiDomainAcsStore
+        .listContractsOnDomain(
+          subsCodegen.SubscriptionRequest.COMPANION,
+          domainId,
+        )
+    } yield requests
   }
 
   /** List all non-expired coins owned by a user in descending order according to their current amount in the given submitting round. */
@@ -329,12 +305,6 @@ trait UserWalletStore
 }
 
 object UserWalletStore {
-  type SubscriptionContextContract =
-    Contract[
-      subsCodegen.SubscriptionContext.ContractId,
-      subsCodegen.SubscriptionContextView,
-    ]
-
   sealed trait SubscriptionState {
     val contract: Contract[?, ?]
   }
@@ -355,15 +325,7 @@ object UserWalletStore {
         subsCodegen.Subscription.ContractId,
         subsCodegen.Subscription,
       ],
-      context: SubscriptionContextContract,
       state: SubscriptionState,
-  )
-  final case class SubscriptionRequest(
-      subscription: Contract[
-        subsCodegen.SubscriptionRequest.ContractId,
-        subsCodegen.SubscriptionRequest,
-      ],
-      context: SubscriptionContextContract,
   )
 
   type TxLogIndexRecord = UserWalletTxLogParser.WalletTxLogIndexRecord
@@ -483,8 +445,8 @@ object UserWalletStore {
         ),
         // Subscriptions
         mkFilter(subsCodegen.Subscription.COMPANION)(co =>
-          co.payload.svc == svc &&
-            co.payload.sender == endUser
+          co.payload.subscriptionData.svc == svc &&
+            co.payload.subscriptionData.sender == endUser
         ),
         mkFilter(subsCodegen.SubscriptionRequest.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
@@ -506,36 +468,6 @@ object UserWalletStore {
         mkFilter(coinCodegen.FeaturedAppRight.COMPANION)(co =>
           co.payload.svc == svc && co.payload.provider == endUser
         ),
-      ),
-      Map(
-        mkFilter(subsCodegen.SubscriptionContext.INTERFACE)(
-          co =>
-            co.payload.svc == svc &&
-              co.payload.sender == endUser,
-          Seq(
-            InterfaceImplementation(directoryCodegen.DirectoryEntryContext.COMPANION)(ctx =>
-              new subsCodegen.SubscriptionContextView(
-                ctx.svc,
-                ctx.user,
-                s"""Directory entry: "${ctx.name}"""",
-              )
-            ),
-            InterfaceImplementation(testSubsCodegen.TestSubscriptionContext.COMPANION)(ctx =>
-              new subsCodegen.SubscriptionContextView(
-                ctx.svc,
-                ctx.user,
-                ctx.description,
-              )
-            ),
-            InterfaceImplementation(cnsCongen.CnsEntryContext.COMPANION)(ctx =>
-              new subsCodegen.SubscriptionContextView(
-                ctx.svc,
-                ctx.user,
-                ctx.description,
-              )
-            ),
-          ),
-        )
       ),
     )
   }

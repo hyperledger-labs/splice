@@ -58,10 +58,7 @@ class CnsSubscriptionInitialPaymentTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val AssignedContract(payment, _) = subscriptionInitialPayment
-    val contextId = CnsEntryContext.ContractId.unsafeFromInterface(
-      payment.payload.subscriptionData.context
-    )
-    svcStore.lookupCnsEntryContext(contextId).flatMap {
+    svcStore.lookupCnsEntryContext(subscriptionInitialPayment.contract.payload.reference).flatMap {
       case Some(cnsContext) =>
         val entryName = cnsContext.payload.name
         for {
@@ -69,7 +66,7 @@ class CnsSubscriptionInitialPaymentTrigger(
           result <- transferContextOpt match {
             case Some(transferContext) =>
               def confirmToReject(reason: String) = confirmRejectPayment(
-                contextId,
+                cnsContext.contract.contractId,
                 payment.contractId,
                 entryName,
                 reason,
@@ -109,7 +106,7 @@ class CnsSubscriptionInitialPaymentTrigger(
                         case None =>
                           // confirm to collect the payment and create the entry
                           confirmCollectPayment(
-                            contextId,
+                            cnsContext.contract.contractId,
                             payment.contractId,
                             entryName,
                             transferContext,
@@ -132,7 +129,7 @@ class CnsSubscriptionInitialPaymentTrigger(
                 .getSvcTransferContext()
                 .flatMap(
                   confirmRejectPayment(
-                    contextId,
+                    cnsContext.contract.contractId,
                     payment.contractId,
                     entryName,
                     s"round ${payment.payload.round} is no longer active.",
@@ -144,7 +141,7 @@ class CnsSubscriptionInitialPaymentTrigger(
 
       case None =>
         TaskSuccess(
-          s"skipping as associated cns entry context not found: $contextId."
+          s"skipping as no cns entry context for reference ${subscriptionInitialPayment.contract.payload.reference} was found."
         ).pure[Future]
     }
   }

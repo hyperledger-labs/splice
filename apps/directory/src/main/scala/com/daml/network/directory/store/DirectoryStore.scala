@@ -11,7 +11,7 @@ import com.daml.network.store.{
   ConfiguredDefaultDomain,
   MultiDomainAcsStore,
 }
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -96,6 +96,13 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefault
       now: CantonTimestamp,
       limit: Int,
   )(implicit tc: TraceContext): Future[Seq[DirectoryStore.IdleDirectorySubscription]]
+
+  def lookupDirectoryEntryContext(
+      reference: subsCodegen.SubscriptionRequest.ContractId
+  )(implicit tc: TraceContext): Future[Option[ContractWithState[
+    directoryCodegen.DirectoryEntryContext.ContractId,
+    directoryCodegen.DirectoryEntryContext,
+  ]]]
 }
 
 object DirectoryStore {
@@ -176,6 +183,9 @@ object DirectoryStore {
         co.payload.provider == provider
       ),
       mkFilter(directoryCodegen.DirectoryInstall.COMPANION)(co => co.payload.provider == provider),
+      mkFilter(subsCodegen.TerminatedSubscription.COMPANION)(co =>
+        co.payload.subscriptionData.provider == provider
+      ),
     )
   }
 

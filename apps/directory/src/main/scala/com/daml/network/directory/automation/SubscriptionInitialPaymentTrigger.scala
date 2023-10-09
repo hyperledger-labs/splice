@@ -44,9 +44,6 @@ class SubscriptionInitialPaymentTrigger(
         subsCodegen.SubscriptionInitialPayment,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
-      payment.payload.subscriptionData.context
-    )
     def rejectPayment(
         reason: String,
         transferContext: cc.coin.AppTransferContext,
@@ -62,6 +59,7 @@ class SubscriptionInitialPaymentTrigger(
         .map(_ => TaskSuccess(s"rejected initial subscription payment: $reason"))
     }
     def collectPaymentAndCreateEntry(
+        contextId: directoryCodegen.DirectoryEntryContext.ContractId,
         entryName: String,
         deduplicationOffset: String,
         transferContext: cc.coin.AppTransferContext,
@@ -89,10 +87,9 @@ class SubscriptionInitialPaymentTrigger(
       } yield TaskSuccess("created directory entry.")
     }
 
-    store.multiDomainAcsStore
-      .lookupContractByIdOnDomain(directoryCodegen.DirectoryEntryContext.COMPANION)(
-        payment.domain,
-        contextId,
+    store
+      .lookupDirectoryEntryContext(
+        payment.contract.payload.reference
       )
       .flatMap {
         case Some(context) =>
@@ -106,7 +103,7 @@ class SubscriptionInitialPaymentTrigger(
                 // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
                 val entryName = context.payload.name
                 val entryUrl = context.payload.url
-                val entryDescription = context.payload.description
+                val entryDescription = context.contract.payload.description
 
                 if (!DirectoryUtil.isValidEntryName(entryName)) {
                   rejectPayment(
@@ -137,6 +134,7 @@ class SubscriptionInitialPaymentTrigger(
                       )
                     case QueryResult(offset, None) =>
                       collectPaymentAndCreateEntry(
+                        context.contract.contractId,
                         entryName,
                         offset,
                         transferContext,
@@ -157,7 +155,11 @@ class SubscriptionInitialPaymentTrigger(
             }
           } yield result
         case None =>
-          Future.successful(TaskSuccess(s"skipping as subscription context $contextId not known."))
+          Future.successful(
+            TaskSuccess(
+              s"skipping as directory entry context for reference ${payment.contract.payload.reference} is not known."
+            )
+          )
       }
 
   }

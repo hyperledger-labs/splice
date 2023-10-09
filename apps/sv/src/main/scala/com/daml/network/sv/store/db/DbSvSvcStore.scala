@@ -19,6 +19,7 @@ import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvO
 import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   SubscriptionIdleState,
   SubscriptionInitialPayment,
+  SubscriptionRequest,
 }
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.TxLogStore.TransactionTreeSource
@@ -29,7 +30,13 @@ import com.daml.network.store.{AcsStoreDump, Limit, LimitHelpers, MultiDomainAcs
 import com.daml.network.sv.store.db.SvcTables.{SvcAcsStoreRowData, SvcTxLogRowData}
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
 import com.daml.network.util.Contract.Companion.Template
-import com.daml.network.util.{AssignedContract, Contract, QualifiedName, TemplateJsonDecoder}
+import com.daml.network.util.{
+  AssignedContract,
+  Contract,
+  ContractWithState,
+  QualifiedName,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -106,7 +113,7 @@ class DbSvSvcStore(
             actionCnsEntryContextCid,
             actionCnsEntryContextPaymentId,
             actionCnsEntryContextArcType,
-            subscriptionContextContractId,
+            subscriptionReferenceContractId,
             subscriptionNextPaymentDueAt,
             featuredAppRightProvider,
           ) =>
@@ -131,7 +138,7 @@ class DbSvSvcStore(
                                         confirmer, sv_onboarding_token, sv_candidate_party, sv_candidate_name, validator,
                                         total_traffic_purchased, voter, vote_request_cid, requester, election_request_epoch,
                                         import_crate_receiver, member_traffic_member, cns_entry_name, action_cns_entry_context_cid,
-                                        action_cns_entry_context_payment_id, action_cns_entry_context_arc_type, subscription_context_contract_id,
+                                        action_cns_entry_context_payment_id, action_cns_entry_context_arc_type, subscription_reference_contract_id,
                                         subscription_next_payment_due_at, featured_app_right_provider)
               values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
             templateId
@@ -143,7 +150,7 @@ class DbSvSvcStore(
                       $confirmer, $safeSvOnboardingToken, $svCandidateParty, $safeSvCandidateName, $validator,
                       $totalTrafficPurchased, $voter, $voteRequestCid, $requester, $electionRequestEpoch,
                       $importCrateReceiver, $memberTrafficMember, $safeCnsEntryName, $actionCnsEntryContextCid,
-                      $actionCnsEntryContextPaymentId, $safeActionCnsEntryContextArcType, $subscriptionContextContractId,
+                      $actionCnsEntryContextPaymentId, $safeActionCnsEntryContextArcType, $subscriptionReferenceContractId,
                       $subscriptionNextPaymentDueAt, $featuredAppRightProvider)
               on conflict do nothing
             """
@@ -210,7 +217,7 @@ class DbSvSvcStore(
                        ctx.contract_expires_at
               from     svc_acs_store idle
               join     svc_acs_store ctx
-              on       idle.subscription_context_contract_id = ctx.contract_id
+              on       idle.subscription_reference_contract_id = ctx.subscription_reference_contract_id
                 and      ctx.store_id = idle.store_id
               where    idle.store_id = $storeId
                 and      idle.template_id_qualified_name = ${QualifiedName(
@@ -1159,6 +1166,27 @@ class DbSvSvcStore(
       }
     } yield recentVoteResults
   }
+
+  override def lookupCnsEntryContext(reference: SubscriptionRequest.ContractId)(implicit
+      tc: TraceContext
+  ): Future[Option[ContractWithState[CnsEntryContext.ContractId, CnsEntryContext]]] =
+    waitUntilAcsIngested {
+      for {
+        row <- storage
+          .querySingle(
+            selectFromAcsTableWithState(
+              DbSvSvcStore.acsTableName,
+              storeId,
+              where = sql"""
+               template_id_qualified_name = ${QualifiedName(CnsEntryContext.COMPANION.TEMPLATE_ID)}
+           and subscription_reference_contract_id = $reference""",
+              orderLimit = sql"""limit 1""",
+            ).headOption,
+            "lookupCnsEntryContext",
+          )
+          .value
+      } yield row.map(contractWithStateFromRow(CnsEntryContext.COMPANION)(_))
+    }
 }
 
 object DbSvSvcStore {

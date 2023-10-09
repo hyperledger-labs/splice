@@ -1,12 +1,13 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { PollingStrategy } from 'common-frontend';
+import { Contract, PollingStrategy } from 'common-frontend';
+
+import { SubscriptionRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { SubscriptionRequestWithContext } from '../models/models';
 
 export const useSubscriptionRequest = (
   cid: string
-): UseQueryResult<SubscriptionRequestWithContext> => {
+): UseQueryResult<Contract<SubscriptionRequest>> => {
   const { getSubscriptionRequest } = useWalletClient();
 
   return useQuery({

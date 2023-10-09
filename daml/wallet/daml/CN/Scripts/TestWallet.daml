@@ -682,13 +682,12 @@ testInsufficientFundsBatchSubscriptions = script do
         paymentDuration = days 1
         paymentAmount = PaymentAmount 10.0 USD
 
-  context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pasta")
-  let subscriptionData = Subscription with
+  let subscriptionData = SubscriptionData with
         sender = alice.primaryParty
         receiver = pizzeria.primaryParty
         provider = provider.primaryParty
         svc = app.svc
-        context = toInterfaceContractId context
+        description = "test subscription"
 
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
 

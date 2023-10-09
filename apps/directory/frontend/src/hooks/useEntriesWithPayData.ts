@@ -1,13 +1,13 @@
 import { Contract, PollingStrategy } from 'common-frontend';
 import { useMemo } from 'react';
 
-import { DirectoryEntry, DirectoryEntryContext } from '@daml.js/directory/lib/CN/Directory';
+import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 import {
   Subscription,
-  SubscriptionContext,
   SubscriptionIdleState,
   SubscriptionPayData,
   SubscriptionPayment,
+  SubscriptionRequest,
 } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';
 
@@ -31,7 +31,7 @@ interface EntryWithPayData {
 
 interface EntryWithSubscriptionContext {
   entry: Contract<DirectoryEntry>;
-  subscriptionCtxCid: ContractId<SubscriptionContext>;
+  subscriptionReference: ContractId<SubscriptionRequest>;
 }
 
 type SubscriptionPayDataMap = Map<ContractId<Subscription>, SubscriptionPayData>;
@@ -92,12 +92,7 @@ const useEntriesWithSubscriptionContext = (
       // do nothing. Once the DEC arrives, this hook will re-render and add it to the result.
       return acc;
     } else {
-      const subscriptionCtxCid = DirectoryEntryContext.toInterface(
-        SubscriptionContext,
-        context.contractId
-      );
-
-      return [...acc, { entry, subscriptionCtxCid }];
+      return [...acc, { entry, subscriptionReference: context.payload.reference }];
     }
   }, [] as EntryWithSubscriptionContext[]);
 };
@@ -113,9 +108,9 @@ const useEntriesWithPayData = (): EntryWithPayData[] => {
   const subscriptionsPayData = useSubscriptionsPayData(refetchInterval);
   const { data: subscriptions = [] } = useSubscriptions(refetchInterval);
 
-  return entriesWithSubscriptionContext.reduce((acc, { entry, subscriptionCtxCid }) => {
+  return entriesWithSubscriptionContext.reduce((acc, { entry, subscriptionReference }) => {
     const subscriptionCid = subscriptions.find(
-      s => s.payload.context === subscriptionCtxCid
+      s => s.payload.reference === subscriptionReference
     )?.contractId;
 
     const paymentData = subscriptionCid ? subscriptionsPayData.get(subscriptionCid) : undefined;

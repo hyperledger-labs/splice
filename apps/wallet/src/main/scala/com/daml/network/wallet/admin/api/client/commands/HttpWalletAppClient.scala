@@ -82,40 +82,6 @@ object HttpWalletAppClient {
   final case class Subscription(
       subscription: Contract[subsCodegen.Subscription.ContractId, subsCodegen.Subscription],
       state: SubscriptionState,
-      context: Contract[
-        subsCodegen.SubscriptionContext.ContractId,
-        subsCodegen.SubscriptionContextView,
-      ],
-  )
-
-  final case class SubscriptionRequest(
-      subscriptionRequest: Contract[
-        subsCodegen.SubscriptionRequest.ContractId,
-        subsCodegen.SubscriptionRequest,
-      ],
-      context: Contract[
-        subsCodegen.SubscriptionContext.ContractId,
-        subsCodegen.SubscriptionContextView,
-      ],
-  )
-
-  object SubscriptionRequest {
-    def parseHttp(
-        subscriptionRequest: definitions.SubscriptionRequest
-    )(implicit decoder: TemplateJsonDecoder): Either[String, SubscriptionRequest] = {
-      (for {
-        main <- Contract.fromHttp(subsCodegen.SubscriptionRequest.COMPANION)(
-          subscriptionRequest.subscriptionRequest
-        )
-        context <- Contract.fromHttp(subsCodegen.SubscriptionContext.INTERFACE)(
-          subscriptionRequest.context
-        )
-      } yield SubscriptionRequest(main, context)).leftMap(_.toString)
-    }
-  }
-
-  final case class SubscriptionContext(
-      description: String
   )
 
   sealed trait SubscriptionState extends Product with Serializable;
@@ -383,7 +349,7 @@ object HttpWalletAppClient {
   case object ListSubscriptionRequests
       extends InternalBaseCommand[
         http.ListSubscriptionRequestsResponse,
-        Seq[SubscriptionRequest],
+        Seq[Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]],
       ] {
     def submitRequest(
         client: Client,
@@ -394,7 +360,9 @@ object HttpWalletAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.ListSubscriptionRequestsResponse.OK(response) =>
-      response.subscriptionRequests.traverse(req => SubscriptionRequest.parseHttp(req))
+      response.subscriptionRequests
+        .traverse(req => Contract.fromHttp(subsCodegen.SubscriptionRequest.COMPANION)(req))
+        .leftMap(_.toString)
     }
   }
 
@@ -446,9 +414,6 @@ object HttpWalletAppClient {
             main <- Contract
               .fromHttp(subsCodegen.Subscription.COMPANION)(sub.subscription)
               .leftMap(_.toString)
-            context <- Contract
-              .fromHttp(subsCodegen.SubscriptionContext.INTERFACE)(sub.context)
-              .leftMap(_.toString)
             state <- (sub.state match {
               case SubscriptionStateContract(SubscriptionStateIdleContract(contract)) =>
                 Contract
@@ -465,7 +430,7 @@ object HttpWalletAppClient {
                   )
                 )
             }).leftMap(_.toString)
-          } yield Subscription(main, state, context)
+          } yield Subscription(main, state)
         )
     }
   }
@@ -474,7 +439,7 @@ object HttpWalletAppClient {
       contractId: subsCodegen.SubscriptionRequest.ContractId
   ) extends InternalBaseCommand[
         http.GetSubscriptionRequestResponse,
-        SubscriptionRequest,
+        Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest],
       ] {
     def submitRequest(
         client: Client,
@@ -485,7 +450,9 @@ object HttpWalletAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case GetSubscriptionRequestResponse.OK(subscriptionRequest) =>
-      SubscriptionRequest.parseHttp(subscriptionRequest)
+      Contract
+        .fromHttp(subsCodegen.SubscriptionRequest.COMPANION)(subscriptionRequest)
+        .leftMap(_.toString)
     }
   }
 

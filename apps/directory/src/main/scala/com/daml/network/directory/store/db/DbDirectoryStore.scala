@@ -10,7 +10,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
-import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -70,7 +70,7 @@ class DbDirectoryStore(
             directoryInstallUser,
             directoryEntryName,
             directoryEntryOwner,
-            subscriptionContextContractId,
+            subscriptionReferenceContractId,
             subscriptionNextPaymentDueAt,
           ) =>
         val safeDirectoryName = directoryEntryName.map(lengthLimited)
@@ -88,7 +88,7 @@ class DbDirectoryStore(
                                         assigned_domain, reassignment_counter, reassignment_target_domain,
                                         reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
                                         directory_install_user, directory_entry_name,
-                                        directory_entry_owner, subscription_context_contract_id,
+                                        directory_entry_owner, subscription_reference_contract_id,
                                         subscription_next_payment_due_at)
               values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
             templateId
@@ -97,7 +97,7 @@ class DbDirectoryStore(
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
                       $directoryInstallUser, $safeDirectoryName,
-                      $directoryEntryOwner, $subscriptionContextContractId,
+                      $directoryEntryOwner, $subscriptionReferenceContractId,
                       $subscriptionNextPaymentDueAt)
               on conflict do nothing
             """
@@ -232,7 +232,7 @@ class DbDirectoryStore(
                        ctx.contract_expires_at
               from     directory_acs_store idle
               join     directory_acs_store ctx
-              on       idle.subscription_context_contract_id = ctx.contract_id
+              on       idle.subscription_reference_contract_id = ctx.subscription_reference_contract_id
                 and      ctx.store_id = idle.store_id
               where    idle.store_id = $storeId
                 and      idle.template_id_qualified_name = ${QualifiedName(
@@ -254,4 +254,29 @@ class DbDirectoryStore(
     }
   }
 
+  override def lookupDirectoryEntryContext(
+      reference: subsCodegen.SubscriptionRequest.ContractId
+  )(implicit tc: TraceContext): Future[Option[ContractWithState[
+    directoryCodegen.DirectoryEntryContext.ContractId,
+    directoryCodegen.DirectoryEntryContext,
+  ]]] =
+    waitUntilAcsIngested {
+      for {
+        row <- storage
+          .querySingle(
+            selectFromAcsTableWithState(
+              DirectoryTables.acsTableName,
+              storeId,
+              where = sql"""
+               template_id_qualified_name = ${QualifiedName(
+                  directoryCodegen.DirectoryEntryContext.COMPANION.TEMPLATE_ID
+                )}
+           and subscription_reference_contract_id = $reference""",
+              orderLimit = sql"""limit 1""",
+            ).headOption,
+            "lookupDirectoryEntryContext",
+          )
+          .value
+      } yield row.map(contractWithStateFromRow(directoryCodegen.DirectoryEntryContext.COMPANION)(_))
+    }
 }

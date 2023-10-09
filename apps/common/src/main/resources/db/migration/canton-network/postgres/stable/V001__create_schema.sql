@@ -262,9 +262,9 @@ create table directory_acs_store(
     -- party-id of the directory user that owns a directory entry contracts
     directory_entry_owner text,
 
-    -- the contract-id of a subscription's context contract
+    -- the contract-id of a subscription's reference contract
     -- used for a DB-level join of subscriptions and their context contracts
-    subscription_context_contract_id text,
+    subscription_reference_contract_id text,
 
     -- subscriptions: when the next payment is due
     subscription_next_payment_due_at bigint
@@ -272,8 +272,8 @@ create table directory_acs_store(
 
 -- pointwise lookup of payment context contracts
 create index directory_acs_store_sid_sccid
-    on directory_acs_store (store_id, subscription_context_contract_id)
-    where subscription_context_contract_id is not null;
+    on directory_acs_store (store_id, subscription_reference_contract_id)
+    where subscription_reference_contract_id is not null;
 
 -- retrieve directory installs by user
 create index directory_acs_store_sid_diu
@@ -513,7 +513,7 @@ create table svc_acs_store
 
     -- the contract-id of a subscription's context contract
     -- used for a DB-level join of subscriptions and their context contracts
-    subscription_context_contract_id text,
+    subscription_reference_contract_id text,
 
     -- subscriptions: when the next payment is due
     subscription_next_payment_due_at bigint,
@@ -600,8 +600,8 @@ create index svc_acs_store_sid_tid_acecc
     where action_cns_entry_context_cid is not null;
 
 create index svc_acs_store_sid_tid_sccid
-    on svc_acs_store (store_id, template_id_qualified_name, subscription_context_contract_id)
-    where subscription_context_contract_id is not null;
+    on svc_acs_store (store_id, template_id_qualified_name, subscription_reference_contract_id)
+    where subscription_reference_contract_id is not null;
 
 create index svc_acs_store_sid_tid_snpd
     on svc_acs_store (store_id, template_id_qualified_name, subscription_next_payment_due_at)

@@ -212,13 +212,13 @@ template WalletAppInstall
       controller validatorParty
       do exercise cid (AppPaymentRequest_Expire endUserParty)
 
-    nonconsuming choice WalletAppInstall_SubscriptionRequest_Reject : ()
+    nonconsuming choice WalletAppInstall_SubscriptionRequest_Reject : ContractId TerminatedSubscription
       with
         cid : ContractId SubscriptionRequest
       controller validatorParty
       do exercise cid SubscriptionRequest_Reject
 
-    nonconsuming choice WalletAppInstall_SubscriptionIdleState_CancelSubscription : ()
+    nonconsuming choice WalletAppInstall_SubscriptionIdleState_CancelSubscription : ContractId TerminatedSubscription
       with
         cid : ContractId SubscriptionIdleState
       controller validatorParty

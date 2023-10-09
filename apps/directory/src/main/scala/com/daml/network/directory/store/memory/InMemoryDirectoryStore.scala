@@ -5,7 +5,7 @@ import com.daml.network.directory.config.DirectoryDomainConfig
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{InMemoryCNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ContractWithState}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -94,14 +94,8 @@ class InMemoryDirectoryStore(
     // Join with the DirectoryEntryContexts
     subscriptionsWithContext <- dueSubscriptions.toList
       .traverse { subscription =>
-        multiDomainAcsStore
-          .lookupContractByIdOnDomain(directoryCodegen.DirectoryEntryContext.COMPANION)(
-            domainId,
-            directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
-              subscription.payload.subscriptionData.context
-            ),
-          )
-          .map(context => (subscription, context))
+        lookupDirectoryEntryContext(subscription.payload.reference)
+          .map(context => (subscription, context.map(_.contract)))
       }
     // Only deliver the ones referencing an active directory entry context
     // TODO(tech-debt): consider whether this kind of join might be leading to stale subscriptions not being expired.
@@ -114,4 +108,14 @@ class InMemoryDirectoryStore(
       .take(limit)
       .toSeq
   } yield result
+
+  override def lookupDirectoryEntryContext(
+      reference: subsCodegen.SubscriptionRequest.ContractId
+  )(implicit tc: TraceContext): Future[Option[ContractWithState[
+    directoryCodegen.DirectoryEntryContext.ContractId,
+    directoryCodegen.DirectoryEntryContext,
+  ]]] =
+    multiDomainAcsStore.findContract(directoryCodegen.DirectoryEntryContext.COMPANION)(c =>
+      c.payload.reference == reference
+    )
 }

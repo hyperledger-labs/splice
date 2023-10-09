@@ -456,3 +456,29 @@ testDecentralizedCns = do
 
   pure ()
 
+
+terminatedSubscriptionCanBeCleanedUp : Script ()
+terminatedSubscriptionCanBeCleanedUp = script do
+  (app, svc, (sv1, _, _, _)) <- initDevNetCollective
+
+  alice <- setupUser app "alice" app.svc
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  [(cnsRulesCid, _)] <- query @CnsRules svc
+
+  (entryContext, subscriptionRequest) <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+    name = "cns.darth.vader"
+    url = "https://darth-vader-cns.com"
+    description = "Darth Vader's CNS Description"
+    user = alice.primaryParty
+
+  aborted <- submit alice.primaryParty $ exerciseCmd subscriptionRequest SubscriptionRequest_Reject
+
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid (SvcRules_TerminateSubscription entryContext aborted)
+
+  entryContexts <- query @CnsEntryContext app.svc
+  entryContexts === []
+
+  terminatedSubscriptions <- query @TerminatedSubscription app.svc
+  terminatedSubscriptions === []
+  pure ()

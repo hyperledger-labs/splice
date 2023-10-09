@@ -188,6 +188,60 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
         }
       }
     }
+
+    "archives terminated CnsEntryContext contracts" in { implicit env =>
+      val aliceStaticRefs = StaticUserRefs(aliceValidatorBackend, aliceWalletClient)
+      val aliceRefs = setupUser(aliceStaticRefs)
+      val (subscriptionRequest, _) = actAndCheck(
+        "request directory entry",
+        requestEntry(aliceRefs, testEntryName),
+      )(
+        "alice sees subscription request",
+        _ => aliceRefs.wallet.listSubscriptionRequests() should have size 1,
+      )
+      aliceRefs.validator.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(codegen.CnsEntryContext.COMPANION)(
+          aliceRefs.userParty
+        ) should have size 1
+      actAndCheck(
+        "alice rejects subscription request",
+        aliceWalletClient.rejectSubscriptionRequest(subscriptionRequest),
+      )(
+        "DirectoryEntryContext gets archived",
+        _ =>
+          aliceRefs.validator.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(codegen.CnsEntryContext.COMPANION)(
+              aliceRefs.userParty
+            ) should have size 0,
+      )
+    }
+
+  }
+
+  private def requestEntry(
+      refs: DynamicUserRefs,
+      entryName: String,
+      entryUrl: String = "https://cns-dir-url.com",
+      entryDescription: String = "Sample CNS Entry Description",
+  )(implicit env: CNNodeTestConsoleEnvironment) = {
+    val cnsRules = sv1ScanBackend.getCnsRules()
+
+    val cmd = cnsRules.contractId.exerciseCnsRules_RequestEntry(
+      entryName,
+      entryUrl,
+      entryDescription,
+      refs.userParty.toProtoPrimitive,
+    )
+    refs.validator.participantClientWithAdminToken.ledger_api_extensions.commands
+      .submitWithResult(
+        userId = refs.validator.config.ledgerApiUser,
+        actAs = Seq(refs.userParty),
+        readAs = Seq.empty,
+        update = cmd,
+        disclosedContracts = DisclosedContracts(cnsRules).toLedgerApiDisclosedContracts,
+      )
+      .exerciseResult
+      ._2
   }
 
   private def requestAndPayForEntry(
@@ -196,36 +250,17 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
       entryUrl: String = "https://cns-dir-url.com",
       entryDescription: String = "Sample CNS Entry Description",
   )(implicit env: CNNodeTestConsoleEnvironment) = {
-    val cnsRules = sv1ScanBackend.getCnsRules()
-
     // for paying the cns entry initial payment.
     refs.wallet.tap(5.0)
 
-    // Request entry and get some money to pay for it
-    val cmd = cnsRules.contractId.exerciseCnsRules_RequestEntry(
-      entryName,
-      entryUrl,
-      entryDescription,
-      refs.userParty.toProtoPrimitive,
-    )
-    val subscriptionRequest =
-      refs.validator.participantClientWithAdminToken.ledger_api_extensions.commands
-        .submitWithResult(
-          userId = refs.validator.config.ledgerApiUser,
-          actAs = Seq(refs.userParty),
-          readAs = Seq.empty,
-          update = cmd,
-          disclosedContracts = DisclosedContracts(cnsRules).toLedgerApiDisclosedContracts,
-        )
-        .exerciseResult
-        ._2
+    val subscriptionRequest = requestEntry(refs, entryName, entryUrl, entryDescription)
 
     actAndCheck(
       s"Wait for subscription request to be ingested into store and accept it.",
       eventually() {
         inside(refs.wallet.listSubscriptionRequests()) { case Seq(storeRequest) =>
-          storeRequest.subscriptionRequest.contractId shouldBe subscriptionRequest
-          refs.wallet.acceptSubscriptionRequest(storeRequest.subscriptionRequest.contractId)
+          storeRequest.contractId shouldBe subscriptionRequest
+          refs.wallet.acceptSubscriptionRequest(storeRequest.contractId)
 
         }
       },
