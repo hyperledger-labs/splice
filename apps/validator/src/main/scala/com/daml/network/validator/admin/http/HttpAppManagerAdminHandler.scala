@@ -1,17 +1,16 @@
 package com.daml.network.validator.admin.http
 
-import akka.stream.Materializer
 import akka.http.scaladsl.model.{ContentType, HttpRequest, HttpResponse}
+import akka.stream.Materializer
 import cats.data.EitherT
-import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.http.v0.{app_manager_admin as v0, definitions}
+import com.daml.network.validator.admin.AppManagerService
 import com.daml.network.validator.store.AppManagerStore
 import com.daml.network.validator.util.{DarUtil, HttpUtil}
-import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -21,30 +20,18 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
-import io.opentelemetry.api.trace.Tracer
-
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
-import org.apache.commons.compress.compressors.{CompressorStreamFactory}
-import scala.concurrent.{ExecutionContext, Future}
-import com.google.protobuf.ByteString
 import io.circe.parser.decode
 import io.grpc.Status
-import java.io.{
-  BufferedInputStream,
-  BufferedReader,
-  ByteArrayInputStream,
-  File,
-  FileInputStream,
-  InputStream,
-  InputStreamReader,
-}
+import io.opentelemetry.api.trace.Tracer
+
+import java.io.{ByteArrayInputStream, File}
 import java.util.Base64
-import java.util.stream.Collectors
+import scala.concurrent.{ExecutionContext, Future}
 
 class HttpAppManagerAdminHandler(
-    ledgerConnection: CNLedgerConnection,
     participantAdminConnection: ParticipantAdminConnection,
     store: AppManagerStore,
+    appManagerService: AppManagerService,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -75,32 +62,16 @@ class HttpAppManagerAdminHandler(
             )
           )
         case Right(configuration) =>
-          if (configuration.version != 0) {
-            Future.successful(
+          appManagerService
+            .registerApp(providerUserId, configuration, release._1)
+            .map(_ => v0.AppManagerAdminResource.RegisterAppResponse.Created)
+            .recover { case _: IllegalArgumentException =>
               v0.AppManagerAdminResource.RegisterAppResponse.BadRequest(
                 definitions.ErrorResponse(
                   s"Configuration version on registration must be 0 but was ${configuration.version}"
                 )
               )
-            )
-          } else {
-            for {
-              providerPartyId <- ledgerConnection.getPrimaryParty(providerUserId)
-              _ <- storeAppRelease(providerPartyId, release._1)
-              _ <- store.storeAppConfiguration(
-                AppManagerStore.AppConfiguration(
-                  providerPartyId,
-                  configuration,
-                )
-              )
-              _ <- store.storeRegisteredApp(
-                AppManagerStore.RegisteredApp(
-                  providerPartyId,
-                  configuration,
-                )
-              )
-            } yield v0.AppManagerAdminResource.RegisterAppResponse.Created
-          }
+            }
       }
     }
   }
@@ -122,7 +93,7 @@ class HttpAppManagerAdminHandler(
       val providerParty = PartyId.tryFromProtoPrimitive(provider)
       for {
         _ <- store.getLatestAppConfiguration(providerParty) // Check that app is registered
-        _ <- storeAppRelease(providerParty, release._1)
+        _ <- appManagerService.storeAppRelease(providerParty, release._1)
       } yield v0.AppManagerAdminResource.PublishAppReleaseResponse.Created
     }
   }
@@ -135,26 +106,6 @@ class HttpAppManagerAdminHandler(
     // File is deleted by the generated code in guardrail.
     File.createTempFile("release_", ".tgz")
 
-  private def storeAppRelease(provider: PartyId, release: java.io.File)(implicit
-      tc: TraceContext
-  ): Future[Unit] =
-    for {
-      releaseManifest <- Future { readAppRelease(release) }
-      dars <- Future { readDars(new FileInputStream(release)) }
-      _ <- participantAdminConnection.uploadDarFiles(
-        dars.map(_._1)
-      )
-      _ <- store.storeAppRelease(
-        AppManagerStore.AppRelease(
-          provider,
-          definitions.AppRelease(
-            releaseManifest.version,
-            dars.map(_._2.toHexString).toVector,
-          ),
-        )
-      )
-    } yield ()
-
   def updateAppConfiguration(
       respond: v0.AppManagerAdminResource.UpdateAppConfigurationResponse.type
   )(provider: String, body: definitions.UpdateAppConfigurationRequest)(
@@ -164,7 +115,8 @@ class HttpAppManagerAdminHandler(
     withSpan(s"$workflowId.updateAppConfiguration") { _ => _ =>
       val providerParty = PartyId.tryFromProtoPrimitive(provider)
       validateAppConfiguration(providerParty, body.configuration).flatMap {
-        case Left(err) => Future.successful(err)
+        case Left(err) =>
+          Future.successful(err)
         case Right(()) =>
           for {
             _ <- store.storeAppConfiguration(
@@ -211,31 +163,7 @@ class HttpAppManagerAdminHandler(
     withSpan(s"$workflowId.installApp") { _ => _ =>
       val appUrl = AppManagerStore.AppUrl(body.appUrl)
       for {
-        configuration <- HttpUtil.getHttpJson[definitions.AppConfiguration](
-          appUrl.latestAppConfiguration
-        )
-        releases <- configuration.releaseConfigurations.traverse { releaseConfig =>
-          HttpUtil.getHttpJson[definitions.AppRelease](
-            appUrl.appRelease(releaseConfig.releaseVersion)
-          )
-        }
-        _ <- releases.traverse_(release =>
-          store.storeAppRelease(AppManagerStore.AppRelease(appUrl.provider, release))
-        )
-        _ <- store.storeAppConfiguration(
-          AppManagerStore.AppConfiguration(
-            appUrl.provider,
-            configuration,
-          )
-        )
-        _ <- store.storeInstalledApp(
-          AppManagerStore.InstalledApp(
-            appUrl.provider,
-            appUrl,
-            configuration,
-            Seq.empty,
-          )
-        )
+        _ <- appManagerService.installApp(appUrl)
       } yield v0.AppManagerAdminResource.InstallAppResponse.Created
     }
   }
@@ -305,41 +233,4 @@ class HttpAppManagerAdminHandler(
       } yield (),
       logger,
     )
-
-  private def readTarGz(file: File): TarArchiveInputStream =
-    readTarGz(new FileInputStream(file))
-
-  private def readTarGz(inputStream: InputStream): TarArchiveInputStream = {
-    val uncompressedInputStream = new CompressorStreamFactory().createCompressorInputStream(
-      new BufferedInputStream(inputStream)
-    )
-    new TarArchiveInputStream(new BufferedInputStream(uncompressedInputStream))
-  }
-
-  private def readAppRelease(file: File): definitions.AppReleaseUpload = {
-    val archiveInputStream = readTarGz(file)
-    val _ =
-      LazyList
-        .continually(archiveInputStream.getNextTarEntry())
-        .takeWhile(_ != null)
-        .find(x => x.getName.dropWhile(x => x != '/') == "/release.json")
-        .getOrElse(throw new IllegalArgumentException("No release manifest in bundle"))
-    val manifestString = new BufferedReader(new InputStreamReader(archiveInputStream))
-      .lines()
-      .collect(Collectors.joining("\n"));
-    decode[definitions.AppReleaseUpload](manifestString).valueOr(err =>
-      throw new IllegalArgumentException(s"Invalid release manifest: $err")
-    )
-  }
-
-  private def readDars(file: InputStream): Seq[(UploadablePackage, Hash, ByteString)] = {
-    val archiveInputStream = readTarGz(file)
-    LazyList
-      .continually(archiveInputStream.getNextTarEntry())
-      .takeWhile(_ != null)
-      .filter(entry => entry.getName.dropWhile(x => x != '/').startsWith("/dars/") && entry.isFile)
-      .map { entry =>
-        DarUtil.readDar(new File(entry.getName).getName, archiveInputStream)
-      }
-  }
 }

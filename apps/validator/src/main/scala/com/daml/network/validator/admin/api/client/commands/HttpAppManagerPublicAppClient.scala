@@ -42,7 +42,28 @@ object HttpAppManagerPublicAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.GetLatestAppConfigurationResponse.OK(response) =>
-      Right(response)
+      Right(response.configuration)
+    }
+  }
+
+  final case class GetLatestAppConfigurationByName(name: String)
+      extends BaseCommand[
+        http.GetLatestAppConfigurationByNameResponse,
+        definitions.AppConfiguration,
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetLatestAppConfigurationByNameResponse] =
+      client.getLatestAppConfigurationByName(name, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetLatestAppConfigurationByNameResponse.OK(response) =>
+      Right(response.configuration)
     }
   }
 

@@ -92,6 +92,7 @@ class AppManagerIntegrationTest
             )
           )(config),
       )
+      .withoutInitialManagerApps
       .withAdditionalSetup { implicit env =>
         // Shared integration test so we upload here rather than within the tests.
         splitwellValidatorBackend.registerApp(
@@ -102,6 +103,13 @@ class AppManagerIntegrationTest
       }
 
   "app manager" should {
+
+    "find an app by name" in { implicit env =>
+      splitwellValidatorBackend.getLatestAppConfigurationByName(configuration1_0.name) should be(
+        configuration1_0
+      )
+    }
+
     "support app registration" in { implicit env =>
       val provider = splitwellBackend.getProviderPartyId()
       splitwellValidatorBackend.listRegisteredApps() shouldBe Seq(
@@ -130,6 +138,18 @@ class AppManagerIntegrationTest
         ByteString.readFrom(new FileInputStream("daml/splitwell/.daml/dist/splitwell-0.1.0.dar"))
       val downloadedDar = splitwellValidatorBackend.getDarFile(darHash)
       uploadedDar shouldBe downloadedDar
+    }
+
+    "fail to register an app with the same name" in { implicit env =>
+      // note that this was called already in the `environmentDefinition`
+      assertThrowsAndLogsCommandFailures(
+        splitwellValidatorBackend.registerApp(
+          splitwellBackend.config.providerUser,
+          configuration1_0,
+          splitwellBundleEntity,
+        ),
+        _.errorMessage should include(s"App with name ${configuration1_0.name} already exists."),
+      )
     }
 
     "fail to authorize if the app does not exist" in { implicit env =>

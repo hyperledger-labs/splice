@@ -80,6 +80,13 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
     appManagerCodegen.AppConfiguration,
   ]]]
 
+  def lookupLatestAppConfigurationByName(
+      name: String
+  )(implicit tc: TraceContext): Future[Option[ContractWithState[
+    appManagerCodegen.AppConfiguration.ContractId,
+    appManagerCodegen.AppConfiguration,
+  ]]]
+
   def lookupAppConfiguration(
       provider: PartyId,
       version: Long,

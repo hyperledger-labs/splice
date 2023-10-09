@@ -34,14 +34,8 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.{CoinConfigSchedule, HasHealth, UploadablePackage}
-import com.daml.network.validator.admin.http.{
-  HttpAppManagerAdminHandler,
-  HttpAppManagerHandler,
-  HttpAppManagerPublicHandler,
-  HttpValidatorAdminHandler,
-  HttpValidatorHandler,
-  HttpValidatorPublicHandler,
-}
+import com.daml.network.validator.admin.AppManagerService
+import com.daml.network.validator.admin.http.*
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{
   AppInstance,
@@ -465,6 +459,27 @@ class ValidatorApp(
       trafficBalanceService = newTrafficBalanceService(participantAdminConnection, scanConnection)
       _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
 
+      // some parts of initialization depend on traffic balance being available
+      _ <- retryProvider.waitUntil(
+        "traffic balance is available", {
+          for {
+            reserved <- trafficBalanceService.lookupReservedTraffic(domainId)
+            available <- trafficBalanceService.lookupAvailableTraffic(domainId)
+            topupsEnabled = reserved.isDefined
+            hasAvailableTraffic = available.exists(_.value > 0)
+            _ <-
+              if (topupsEnabled && !hasAvailableTraffic) {
+                Future.failed(
+                  Status.FAILED_PRECONDITION
+                    .withDescription("Traffic not yet available.")
+                    .asRuntimeException()
+                )
+              } else Future.unit
+          } yield ()
+        },
+        logger,
+      )
+
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
@@ -531,12 +546,28 @@ class ValidatorApp(
           }
           for {
             _ <- participantAdminConnection.uploadDarFiles(Seq(dar))
-          } yield {
-            val oauth2Manager = new OAuth2Manager(config, loggerFactory)
-            val appManagerAdminHandler = new HttpAppManagerAdminHandler(
+            service = new AppManagerService(
+              validatorParty,
               automation.connection,
               participantAdminConnection,
               automation.appManagerStore,
+            )
+            _ <- config.initialRegisteredApps.values.toList.traverse { app =>
+              service.registerApp(
+                app.providerUserId,
+                app.config,
+                new java.io.File(app.releaseFile),
+              )
+            }
+            // TODO (#7458): use the endpoint implemented in #7516
+//            _ <- config.initialInstalledApps.values.toList.traverse { app =>
+//            }
+          } yield {
+            val oauth2Manager = new OAuth2Manager(config, loggerFactory)
+            val appManagerAdminHandler = new HttpAppManagerAdminHandler(
+              participantAdminConnection,
+              automation.appManagerStore,
+              service,
               retryProvider,
               loggerFactory,
             )

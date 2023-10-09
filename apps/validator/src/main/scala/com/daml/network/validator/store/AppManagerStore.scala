@@ -197,6 +197,20 @@ final class AppManagerStore(
         )
       )
 
+  def lookupLatestAppConfigurationByName(
+      name: String
+  )(implicit tc: TraceContext): Future[Option[AppConfiguration]] =
+    store
+      .lookupLatestAppConfigurationByName(name)
+      .map(
+        _.map((c: ContractWithState[_, codegen.AppConfiguration]) =>
+          AppConfiguration(
+            PartyId.tryFromProtoPrimitive(c.payload.provider),
+            decodeOrThrow[definitions.AppConfiguration](c.contract.payload.json),
+          )
+        )
+      )
+
   def lookupAppConfiguration(
       provider: PartyId,
       version: Long,
@@ -312,7 +326,8 @@ object AppManagerStore {
       provider: PartyId,
       configuration: definitions.AppConfiguration,
   ) {
-    def toHttp: definitions.AppConfiguration = configuration
+    def toHttp: definitions.GetAppConfigurationResult =
+      definitions.GetAppConfigurationResult(provider.toProtoPrimitive, configuration)
   }
 
   final case class RegisteredApp(

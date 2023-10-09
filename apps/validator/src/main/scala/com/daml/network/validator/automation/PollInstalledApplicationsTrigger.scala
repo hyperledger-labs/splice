@@ -45,9 +45,11 @@ final class PollInstalledApplicationsTrigger(
       app: AppManagerStore.InstalledApp
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
-      configuration <- HttpUtil.getHttpJson[definitions.AppConfiguration](
-        app.appUrl.latestAppConfiguration
-      )
+      configuration <- HttpUtil
+        .getHttpJson[definitions.GetAppConfigurationResult](
+          app.appUrl.latestAppConfiguration
+        )
+        .map(_.configuration)
       outcome <-
         if (app.latestConfiguration.version > configuration.version) {
           Future.successful(show"No new configuration for app ${app.provider}")

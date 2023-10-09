@@ -9,6 +9,7 @@ import com.daml.network.codegen.java.cc.{
   validatorlicense as validatorLicenseCodegen,
 }
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
+import com.daml.network.codegen.java.cn.appmanager.store.AppConfiguration
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topupCodegen
 import com.daml.network.environment.RetryProvider
@@ -89,6 +90,7 @@ class DbValidatorStore(
             validatorParty,
             trafficDomainId,
             appConfigurationVersion,
+            appConfigurationName,
             appReleaseVersion,
             jsonHash,
           ) =>
@@ -101,6 +103,7 @@ class DbValidatorStore(
           lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)
         val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
         val safeUserName = userName.map(lengthLimited)
+        val safeAppConfigurationName = appConfigurationName.map(lengthLimited)
         val safeAppReleaseVersion = appReleaseVersion.map(lengthLimited)
         val safeJsonHash = jsonHash.map(lengthLimited)
         sqlu"""
@@ -109,7 +112,7 @@ class DbValidatorStore(
                                         assigned_domain, reassignment_counter, reassignment_target_domain,
                                         reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
                                         user_party, user_name, provider_party, validator_party,
-                                        traffic_domain_id, app_configuration_version, app_release_version, json_hash)
+                                        traffic_domain_id, app_configuration_version, app_configuration_name, app_release_version, json_hash)
               values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
             templateId
           )}, $createArguments, $contractMetadataCreatedAt,
@@ -117,7 +120,7 @@ class DbValidatorStore(
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
                       $userParty, $safeUserName, $providerParty, $validatorParty, $trafficDomainId,
-                      $appConfigurationVersion, $safeAppReleaseVersion, $safeJsonHash)
+                      $appConfigurationVersion, $safeAppConfigurationName, $safeAppReleaseVersion, $safeJsonHash)
               on conflict do nothing
             """
     }
@@ -314,6 +317,36 @@ class DbValidatorStore(
       )
     } yield result
   }
+
+  override def lookupLatestAppConfigurationByName(name: String)(implicit
+      tc: TraceContext
+  ): Future[Option[ContractWithState[AppConfiguration.ContractId, AppConfiguration]]] =
+    waitUntilAcsIngested {
+      for {
+        row <- storage
+          .querySingle(
+            selectFromAcsTableWithState(
+              ValidatorTables.acsTableName,
+              storeId,
+              where = sql"""
+                template_id_qualified_name = ${QualifiedName(
+                  appManagerCodegen.AppConfiguration.TEMPLATE_ID
+                )}
+                and app_configuration_name = ${lengthLimited(name)}
+                """,
+              orderLimit = sql"""order by app_configuration_version desc
+                                 limit 1""",
+            ).headOption,
+            "lookupLatestAppConfigurationByName",
+          )
+          .value
+        result = row.map(
+          multiDomainAcsStore.contractWithStateFromRow(
+            appManagerCodegen.AppConfiguration.COMPANION
+          )(_)
+        )
+      } yield result
+    }
 
   override def lookupAppConfiguration(
       provider: PartyId,

@@ -3,6 +3,7 @@ package com.daml.network.validator.config
 import akka.http.scaladsl.model.Uri
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.*
+import com.daml.network.http.v0.definitions
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvAppClientConfig
 import com.daml.network.wallet.config.TreasuryConfig
@@ -34,6 +35,14 @@ object ValidatorOnboardingConfig {
   }
 }
 
+final case class InitialRegisteredApp(
+    providerUserId: String,
+    config: definitions.AppConfiguration,
+    releaseFile: String,
+)
+
+final case class InitialInstalledApp(appUrl: Uri)
+
 final case class AppManagerConfig(
     issuerUrl: Uri,
     appManagerUiUrl: Uri,
@@ -43,7 +52,10 @@ final case class AppManagerConfig(
     // Interval at which the app manager polls installed apps to discover new versions.
     // Set to 1 minute to avoid spamming logs but still be able to demo things in our cluster.
     // We may want to consider increasing it to 10min or even an hour.
-    installedAppsPollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(1),
+    installedAppsPollingInterval: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofMinutes(1),
+    initialRegisteredApps: Map[String, InitialRegisteredApp],
+    initialInstalledApps: Map[String, InitialInstalledApp],
 ) {
   def authorizationEndpoint: Uri = appManagerUiUrl.withPath(appManagerUiUrl.path / "authorize")
   def tokenEndpoint: Uri =

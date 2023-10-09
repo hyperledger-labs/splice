@@ -27,6 +27,8 @@ import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext
 import com.google.protobuf
 
 import scala.concurrent.Future
+import com.daml.network.http.v0.definitions
+import io.circe.syntax.*
 
 abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
 
@@ -148,10 +150,10 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
         val signatories = Seq(validator)
         for {
           store <- mkStore()
-          contractP1V1 = appConfiguration(provider1, 1)
-          contractP1V2 = appConfiguration(provider1, 2)
-          contractP2V1 = appConfiguration(provider2, 1)
-          contractP2V2 = appConfiguration(provider2, 2)
+          contractP1V1 = appConfiguration(provider1, 1, "a")
+          contractP1V2 = appConfiguration(provider1, 2, "a")
+          contractP2V1 = appConfiguration(provider2, 1, "b")
+          contractP2V2 = appConfiguration(provider2, 2, "b")
           _ <- dummyDomain.create(contractP1V1, createdEventSignatories = signatories)(
             store.multiDomainAcsStore
           )
@@ -168,6 +170,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
           latest2 <- store.lookupLatestAppConfiguration(provider2)
           resultP1V1 <- store.lookupAppConfiguration(provider1, 1)
           resultP2V2 <- store.lookupAppConfiguration(provider2, 2)
+          nameResult <- store.lookupLatestAppConfigurationByName("a")
         } yield {
           latest1.value.contract.contractId should be(
             contractP1V2.contractId
@@ -180,6 +183,9 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
           )
           resultP2V2.value.value.contractId should be(
             contractP2V2.contractId
+          )
+          nameResult.value.contract.contractId should be(
+            contractP1V2.contractId
           )
         }
       }
@@ -273,11 +279,11 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
         for {
           store <- mkStore()
           app1 = registeredApp(provider1)
-          configP1V1 = appConfiguration(provider1, 1)
-          configP1V2 = appConfiguration(provider1, 2)
+          configP1V1 = appConfiguration(provider1, 1, "a")
+          configP1V2 = appConfiguration(provider1, 2, "a")
           app2 = registeredApp(provider2)
           app3 = registeredApp(provider3)
-          configP3V1 = appConfiguration(provider3, 1)
+          configP3V1 = appConfiguration(provider3, 1, "b")
           _ <- dummyDomain.create(app1, createdEventSignatories = signatories)(
             store.multiDomainAcsStore
           )
@@ -315,13 +321,13 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
         for {
           store <- mkStore()
           app1 = registeredApp(provider1)
-          configP1V1 = appConfiguration(provider1, 1)
-          configP1V2 = appConfiguration(provider1, 2)
+          configP1V1 = appConfiguration(provider1, 1, "a")
+          configP1V2 = appConfiguration(provider1, 2, "a")
           approvedConfigP1V1 = approvedReleaseConfig(provider1, 1)
           approvedConfigP1V2 = approvedReleaseConfig(provider1, 2)
           installedApp1 = installedApp(provider1)
           app2 = registeredApp(provider2)
-          configP2V1 = appConfiguration(provider2, 1)
+          configP2V1 = appConfiguration(provider2, 1, "b")
           installedApp2 = installedApp(provider2)
           _ <- dummyDomain.create(app1, createdEventSignatories = signatories)(
             store.multiDomainAcsStore
@@ -455,14 +461,19 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def appConfiguration(provider: PartyId, version: Long) = {
+  private def appConfiguration(provider: PartyId, version: Long, name: String) = {
     val templateId = appManagerCodegen.AppConfiguration.TEMPLATE_ID
-    val json = "{}"
+    val json = new definitions.AppConfiguration(
+      version,
+      name,
+      "https://example.com/ui",
+      Vector("https://example.com/ui"),
+    ).asJson
     val template = new appManagerCodegen.AppConfiguration(
       validator.toProtoPrimitive,
       provider.toProtoPrimitive,
       version,
-      json,
+      json.noSpaces,
     )
     Contract(
       identifier = templateId,

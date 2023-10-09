@@ -148,6 +148,13 @@ abstract class ValidatorAppReference(
       )
     }
 
+  def getLatestAppConfigurationByName(name: String): definitions.AppConfiguration =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpAppManagerPublicAppClient.GetLatestAppConfigurationByName(name)
+      )
+    }
+
   def getAppRelease(provider: PartyId, version: String): definitions.AppRelease =
     consoleEnvironment.run {
       httpCommand(

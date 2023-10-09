@@ -111,6 +111,18 @@ case class CNNodeEnvironmentDefinition(
       setup(env)
     })
 
+  def withoutInitialManagerApps: CNNodeEnvironmentDefinition = {
+    addConfigTransform((_, config) =>
+      config.copy(validatorApps = config.validatorApps.map { case (name, config) =>
+        name -> config.copy(appManager =
+          config.appManager.map(
+            _.copy(initialInstalledApps = Map.empty, initialRegisteredApps = Map.empty)
+          )
+        )
+      })
+    )
+  }
+
   def withoutAutomaticRewardsCollectionAndCoinMerging: CNNodeEnvironmentDefinition =
     addConfigTransform((_, config) =>
       CNNodeConfigTransforms.updateAllAutomationConfigs(

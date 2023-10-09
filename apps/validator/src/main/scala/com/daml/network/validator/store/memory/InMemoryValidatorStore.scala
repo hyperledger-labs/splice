@@ -6,6 +6,7 @@ import com.daml.network.codegen.java.cc.{
   validatorlicense as validatorLicenseCodegen,
 }
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
+import com.daml.network.codegen.java.cn.appmanager.store.AppConfiguration
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.RetryProvider
@@ -13,6 +14,7 @@ import com.daml.network.store.{InMemoryCNNodeAppStoreWithoutHistory, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.util.{Contract, ContractWithState}
 import com.daml.network.validator.store.ValidatorStore
+import com.daml.network.http.v0.definitions
 import com.daml.network.wallet.store.WalletStore
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -127,6 +129,23 @@ class InMemoryValidatorStore(
       .map {
         _.maxByOption(c => c.contract.payload.version)
       }
+
+  override def lookupLatestAppConfigurationByName(name: String)(implicit
+      tc: TraceContext
+  ): Future[Option[ContractWithState[AppConfiguration.ContractId, AppConfiguration]]] = {
+    multiDomainAcsStore
+      .filterContracts(
+        appManagerCodegen.AppConfiguration.COMPANION,
+        (c: Contract[_, appManagerCodegen.AppConfiguration]) =>
+          io.circe.parser
+            .decode[definitions.AppConfiguration](c.payload.json)
+            .map(_.name)
+            .contains(name),
+      )
+      .map {
+        _.maxByOption(c => c.contract.payload.version)
+      }
+  }
 
   override def lookupAppConfiguration(
       provider: PartyId,

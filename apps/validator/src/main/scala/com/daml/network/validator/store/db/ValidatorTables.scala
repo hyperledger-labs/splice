@@ -11,7 +11,9 @@ import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.store.db.AcsTables
 import com.daml.network.util.Contract
+import com.daml.network.http.v0.definitions
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import cats.syntax.either.*
 
 object ValidatorTables extends AcsTables {
 
@@ -24,6 +26,7 @@ object ValidatorTables extends AcsTables {
       validatorParty: Option[PartyId] = None,
       trafficDomainId: Option[DomainId] = None,
       appConfigurationVersion: Option[Long] = None,
+      appConfigurationName: Option[String] = None,
       appReleaseVersion: Option[String] = None,
       jsonHash: Option[String] = None,
   )
@@ -78,13 +81,20 @@ object ValidatorTables extends AcsTables {
             )
           )
         case appManagerCodegen.AppConfiguration.TEMPLATE_ID =>
-          tryToDecode(appManagerCodegen.AppConfiguration.COMPANION, createdEvent)(contract =>
-            ValidatorAcsStoreRowData(
-              contract = contract,
-              contractExpiresAt = None,
-              providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
-              appConfigurationVersion = Some(contract.payload.version),
+          for {
+            contract <- tryToDecode(appManagerCodegen.AppConfiguration.COMPANION, createdEvent)(
+              identity
             )
+            name <- io.circe.parser
+              .decode[definitions.AppConfiguration](contract.payload.json)
+              .map(_.name)
+              .leftMap(_ => s"Failed to extract name from ${contract.payload.json}")
+          } yield ValidatorAcsStoreRowData(
+            contract = contract,
+            contractExpiresAt = None,
+            providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+            appConfigurationVersion = Some(contract.payload.version),
+            appConfigurationName = Some(name),
           )
         case appManagerCodegen.AppRelease.TEMPLATE_ID =>
           tryToDecode(appManagerCodegen.AppRelease.COMPANION, createdEvent)(contract =>

@@ -164,6 +164,9 @@ create table validator_acs_store(
     -- AppConfiguration.version
     app_configuration_version bigint,
 
+    -- AppConfiguration.name
+    app_configuration_name text,
+
     -- AppRelease.version
     app_release_version text,
 

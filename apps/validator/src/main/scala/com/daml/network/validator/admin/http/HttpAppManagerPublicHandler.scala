@@ -5,7 +5,8 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.HttpClientBuilder
 import com.daml.network.environment.{BaseAppConnection, ParticipantAdminConnection}
-import com.daml.network.http.v0.{app_manager_public as v0, definitions}
+import com.daml.network.http.v0.app_manager_public.AppManagerPublicResource
+import com.daml.network.http.v0.{definitions, app_manager_public as v0}
 import com.daml.network.validator.config.AppManagerConfig
 import com.daml.network.validator.store.AppManagerStore
 import com.daml.network.validator.util.OAuth2Manager
@@ -19,6 +20,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import io.circe.Json
+
 import java.util.Base64
 
 class HttpAppManagerPublicHandler(
@@ -113,6 +115,26 @@ class HttpAppManagerPublicHandler(
     withNewTrace(workflowId) { implicit tc => _ =>
       store.getLatestAppConfiguration(PartyId.tryFromProtoPrimitive(provider)).map(_.toHttp)
     }
+
+  override def getLatestAppConfigurationByName(
+      respond: AppManagerPublicResource.GetLatestAppConfigurationByNameResponse.type
+  )(
+      name: String
+  )(extracted: Unit): Future[AppManagerPublicResource.GetLatestAppConfigurationByNameResponse] = {
+    withNewTrace(workflowId) { implicit tc => _ =>
+      store
+        .lookupLatestAppConfigurationByName(name)
+        .map(
+          _.fold[AppManagerPublicResource.GetLatestAppConfigurationByNameResponse](
+            AppManagerPublicResource.GetLatestAppConfigurationByNameResponseNotFound(
+              definitions.ErrorResponse(s"Could not found AppConfiguration with name $name")
+            )
+          )(config =>
+            AppManagerPublicResource.GetLatestAppConfigurationByNameResponseOK(config.toHttp)
+          )
+        )
+    }
+  }
 
   def getAppRelease(respond: v0.AppManagerPublicResource.GetAppReleaseResponse.type)(
       provider: String,

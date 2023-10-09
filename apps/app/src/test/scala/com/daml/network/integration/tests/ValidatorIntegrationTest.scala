@@ -32,6 +32,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       .simpleTopology(this.getClass.getSimpleName)
       .withTrafficTopupsDisabled // TODO(#7222)
       .withManualStart
+      .withoutInitialManagerApps // TODO (#7539): this should no longer be required once app-instances is removed
 
   "start and restart cleanly" in { implicit env =>
     initSvcWithSv1Only()

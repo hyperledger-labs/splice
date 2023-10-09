@@ -277,6 +277,28 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListRegisteredAppsResponse"
+
+  /app-manager/apps/registered/name/{name}/configuration/latest/configuration.json:
+    get:
+      tags: [ app_manager_public ]
+      x-jvm-package: app_manager_public
+      operationId: "getLatestAppConfigurationByName"
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAppConfigurationResult"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
   /app-manager/apps/registered/{provider}/configuration/latest/configuration.json:
     get:
       tags: [app_manager_public]
@@ -294,7 +316,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/AppConfiguration"
+                "$ref": "#/components/schemas/GetAppConfigurationResult"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /app-manager/apps/registered/{provider}/release/{version}/release.json:
@@ -752,6 +774,17 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ReleaseConfiguration"
+
+    GetAppConfigurationResult:
+      type: object
+      required:
+        - provider
+        - configuration
+      properties:
+        provider:
+          type: string
+        configuration:
+          $ref: "#/components/schemas/AppConfiguration"
 
     ReleaseConfiguration:
       type: object

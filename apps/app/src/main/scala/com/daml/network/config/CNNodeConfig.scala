@@ -10,6 +10,12 @@ import com.daml.network.directory.config.{
   DirectoryAppClientConfig,
   DirectoryAppExternalClientConfig,
 }
+import com.daml.network.http.v0.definitions.{
+  AppConfiguration,
+  Domain,
+  ReleaseConfiguration,
+  Timespan,
+}
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.splitwell.config.{
   SplitwellAppBackendConfig,
@@ -44,13 +50,12 @@ import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
 import pureconfig.error.FailureReason
-import scala.concurrent.duration.*
 
+import scala.concurrent.duration.*
 import java.io.File
 import scala.annotation.nowarn
 import scala.util.Try
 import scala.util.control.NoStackTrace
-
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import com.digitalasset.canton.DiscardOps
@@ -514,6 +519,18 @@ object CNNodeConfig {
       deriveReader[ValidatorExtraDomainConfig]
     implicit val validatorDomainConfigReader: ConfigReader[ValidatorDomainConfig] =
       deriveReader[ValidatorDomainConfig]
+    implicit val offsetDateTimeConfigurationReader: ConfigReader[java.time.OffsetDateTime] =
+      implicitly[ConfigReader[String]].map(java.time.OffsetDateTime.parse)
+    implicit val timespanConfigurationReader: ConfigReader[Timespan] = deriveReader[Timespan]
+    implicit val domainConfigurationReader: ConfigReader[Domain] = deriveReader[Domain]
+    implicit val releaseConfigurationReader: ConfigReader[ReleaseConfiguration] =
+      deriveReader[ReleaseConfiguration]
+    implicit val appConfigurationReader: ConfigReader[AppConfiguration] =
+      deriveReader[AppConfiguration]
+    implicit val initialRegisteredAppReader: ConfigReader[InitialRegisteredApp] =
+      deriveReader[InitialRegisteredApp]
+    implicit val initialInstalledAppReader: ConfigReader[InitialInstalledApp] =
+      deriveReader[InitialInstalledApp]
     implicit val appManagerConfigReader: ConfigReader[AppManagerConfig] =
       deriveReader[AppManagerConfig]
     implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
@@ -699,6 +716,18 @@ object CNNodeConfig {
       deriveWriter[ValidatorExtraDomainConfig]
     implicit val validatorDomainConfigWriter: ConfigWriter[ValidatorDomainConfig] =
       deriveWriter[ValidatorDomainConfig]
+    implicit val offsetDateTimeConfigurationWriter: ConfigWriter[java.time.OffsetDateTime] =
+      implicitly[ConfigWriter[String]].contramap(_.toString)
+    implicit val timespanConfigurationWriter: ConfigWriter[Timespan] = deriveWriter[Timespan]
+    implicit val domainConfigurationWriter: ConfigWriter[Domain] = deriveWriter[Domain]
+    implicit val releaseConfigurationWriter: ConfigWriter[ReleaseConfiguration] =
+      deriveWriter[ReleaseConfiguration]
+    implicit val appConfigurationWriter: ConfigWriter[AppConfiguration] =
+      deriveWriter[AppConfiguration]
+    implicit val initialRegisteredAppWriter: ConfigWriter[InitialRegisteredApp] =
+      deriveWriter[InitialRegisteredApp]
+    implicit val initialInstalledAppWriter: ConfigWriter[InitialInstalledApp] =
+      deriveWriter[InitialInstalledApp]
     implicit val appManagerConfigWriter: ConfigWriter[AppManagerConfig] =
       deriveWriter[AppManagerConfig]
     implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =
