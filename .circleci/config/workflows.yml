@@ -237,7 +237,7 @@ workflows:
         context:
           - artifactory
           - slack-context
-        workflow_names: "deploy_cidaily cidaily_health_check"
+        workflow_names: "deploy_cidaily cidaily_health_check redeploy_sv_runbook_cidaily"
     - deploy_cluster:
         <<: *main-branch-only
         context:
@@ -305,7 +305,7 @@ workflows:
         context:
           - artifactory
           - slack-context
-        workflow_names: "deploy_cilr cilr_health_check"
+        workflow_names: "deploy_cilr cilr_health_check redeploy_sv_runbook_cidaily"
     - deploy_cluster:
         <<: *main-branch-only
         context:
