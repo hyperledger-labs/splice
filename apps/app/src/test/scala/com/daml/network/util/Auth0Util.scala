@@ -7,6 +7,8 @@ import com.auth0.json.mgmt.users.User
 import scala.jdk.CollectionConverters.*
 import com.daml.network.auth.OAuthApi.TokenResponse
 import com.daml.network.auth.AuthToken
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.TraceContext
 
 class Auth0User(val id: String, val email: String, val password: String, val auth0: Auth0Util)
     extends AutoCloseable {
@@ -17,7 +19,8 @@ class Auth0Util(
     domain: String,
     managementApiClientId: String,
     managementApiClientSecret: String,
-) {
+    override val loggerFactory: NamedLoggerFactory,
+) extends NamedLogging {
   private val auth = new AuthAPI(domain, managementApiClientId, managementApiClientSecret)
   val api = new ManagementAPI(domain, requestManagementAPIToken())
 
@@ -39,10 +42,10 @@ class Auth0Util(
     api.users.delete(id).execute()
   }
 
-  def listUsers(filter: UserFilter): List[User] = {
+  def listUsers(filter: UserFilter)(implicit tc: TraceContext): List[User] = {
     val page = api.users().list(filter).execute()
 
-    println(s"Found ${page.getTotal} total users, returning limit of ${page.getLimit()}")
+    logger.info(s"Found ${page.getTotal} total users, returning limit of ${page.getLimit()}")
     page.getItems().asScala.toList
   }
 

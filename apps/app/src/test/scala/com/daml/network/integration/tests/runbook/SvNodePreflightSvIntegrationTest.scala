@@ -187,7 +187,6 @@ final class SvNodePreflightSvNonDevNetIntegrationTest extends SvNodePreflightSvI
       clue("The suffix matches the participantID") {
         eventually() {
           val valueCells = findAll(className("general-svc-value-name")).toSeq
-          println(valueCells)
           forAtLeast(1, valueCells)(cell => seleniumText(cell) should include(participantId))
         }
       }

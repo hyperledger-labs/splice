@@ -334,7 +334,7 @@ object CNNodeTests {
       val clientId = readMandatoryEnvVar(s"${prefix}_MANAGEMENT_API_CLIENT_ID");
       val clientSecret = readMandatoryEnvVar(s"${prefix}_MANAGEMENT_API_CLIENT_SECRET");
 
-      retryAuth0Calls(new Auth0Util(domain, clientId, clientSecret))
+      retryAuth0Calls(new Auth0Util(domain, clientId, clientSecret, loggerFactory))
     }
 
     def retryAuth0Calls[T](f: => T): T = {
