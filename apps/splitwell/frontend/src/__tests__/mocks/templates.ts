@@ -31,7 +31,6 @@ export const makeGroupInvite = (provider: string, owner: string, groupName: stri
     contractKeyHash: '',
     driverMetadata: 'CiYKJAgBEiBiT5xszvznNqxlhONdO9hqlEBSewW-lCCKBEiU1m_9Mw==',
   },
-  create_arguments_blob: '',
 });
 
 export const makeAcceptedGroupInvite = (
@@ -59,7 +58,6 @@ export const makeAcceptedGroupInvite = (
     contractKeyHash: '',
     driverMetadata: 'CiYKJAgBEiDtAV9pVocUfA2KD3I24A9deHI51c1ePu3nxw-ut4bJBQ==',
   },
-  create_arguments_blob: '',
 });
 
 export const makeBalanceUpdate = (
@@ -92,5 +90,4 @@ export const makeBalanceUpdate = (
     contractKeyHash: '',
     driverMetadata: 'CiYKJAgBEiDdDpicMK4e_zzeZzEidYVT9FfXt4Z-2DWpEAP6zhvtvQ==',
   },
-  create_arguments_blob: '',
 });

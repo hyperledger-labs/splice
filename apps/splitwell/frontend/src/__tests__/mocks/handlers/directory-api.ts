@@ -36,7 +36,6 @@ export const buildDirectoryMock = (directoryUrl: string): RestHandler[] => [
                 contractKeyHash: '',
                 driverMetadata: 'CiYKJAgBEiCA3Xq2jwcJPurU0kuu6VzhIA-rIPA7p_Uw3UROVcjXYw==',
               },
-              create_arguments_blob: '',
             },
           })
         );
@@ -64,7 +63,6 @@ export const buildDirectoryMock = (directoryUrl: string): RestHandler[] => [
                 contractKeyHash: '',
                 driverMetadata: 'CiYKJAgBEiCA3Xq2jwcJPurU0kuu6VzhIA-rIPA7p_Uw3UROVcjXYw==',
               },
-              create_arguments_blob: '',
             },
           })
         );
