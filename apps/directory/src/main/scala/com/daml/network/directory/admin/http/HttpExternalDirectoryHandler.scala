@@ -91,7 +91,6 @@ class HttpExternalDirectoryHandler(
     val filter = MultiDomainAcsStore.IngestionFilter(
       partyId,
       Set(QualifiedName(DirectoryInstall.TEMPLATE_ID)),
-      Set(QualifiedName(DirectoryInstall.TEMPLATE_ID)),
     )
 
     retryProvider.retryForClientCalls(

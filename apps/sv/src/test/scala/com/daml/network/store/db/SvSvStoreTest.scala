@@ -17,7 +17,6 @@ import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
-import com.google.protobuf
 
 import java.time.Instant
 import scala.concurrent.Future
@@ -133,7 +132,6 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
       contractId = new vo.ValidatorOnboarding.ContractId(s"$domain#$n"),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -148,7 +146,6 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
       new UsedSecret.ContractId(validContractId(1)),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -160,7 +157,6 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
       new ApprovedSvIdentity.ContractId(validContractId(1)),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 

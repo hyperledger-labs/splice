@@ -25,9 +25,7 @@ import com.digitalasset.canton.ledger.api.validation.NoLoggingValueValidator
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.util.ErrorUtil
-import com.google.protobuf
 import io.circe.{Json, parser as circe}
-import org.apache.commons.codec.binary.Hex
 
 import scala.util.Try
 
@@ -47,7 +45,6 @@ final case class Contract[TCid, T](
     override val contractId: TCid & ContractId[_],
     override val payload: T & DamlRecord[_],
     metadata: ContractMetadata,
-    createArgumentsBlob: protobuf.Any,
 ) extends PrettyPrinting
     with Contract.Has[TCid, T] {
 
@@ -64,7 +61,6 @@ final case class Contract[TCid, T](
         )
         .valueOr(err => ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")),
       metadata = ContractMetadataUtil.toHttp(metadata),
-      createArgumentsBlob = Hex.encodeHexString(createArgumentsBlob.toByteArray),
     )
   }
 
@@ -73,8 +69,7 @@ final case class Contract[TCid, T](
       .newBuilder()
       .setCreateArguments(
         payload.toValue.toProtoRecord
-      ) // TODO(#2676): use createArgumentsBlob here. Can't use it yet because currently the blob is always empty when
-      // using the update-service.
+      )
       .setContractId(contractId.contractId)
       .setTemplateId(identifier.toProto)
       .setMetadata(metadata.toProto)
@@ -151,7 +146,6 @@ object Contract {
       contract: http.Contract,
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
     val metadata = ContractMetadataUtil.fromHttp(contract.metadata)
-    val createArgumentsBlob = protobuf.Any.parseFrom(Hex.decodeHex(contract.createArgumentsBlob))
     for {
       templateId <- LfIdentifier
         .fromString(contract.templateId)
@@ -166,7 +160,6 @@ object Contract {
         javaTemplateId,
         contract.payload,
         metadata,
-        createArgumentsBlob,
       )
     } yield result
   }
@@ -179,7 +172,6 @@ object Contract {
       javaTemplateId: Identifier,
       payload: Json,
       metadata: ContractMetadata,
-      createArgumentsBlob: protobuf.Any,
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
     for {
       _ <- Either.cond(
@@ -200,7 +192,6 @@ object Contract {
       contractId = contractId,
       payload = payload,
       metadata = metadata,
-      createArgumentsBlob = createArgumentsBlob,
     )
   }
 
@@ -225,8 +216,8 @@ object Contract {
   /** This method is private on purpose because we only want to allow the construction of a
     * [[com.daml.network.util.Contract]] instance through passing a [[com.daml.ledger.javaapi.data.CreatedEvent]]
     * instance and not through a [[com.daml.ledger.javaapi.data.Contract]] because
-    * the [[com.daml.ledger.javaapi.data.Contract]] doesn't have the `metadata` and `createArgumentsBlob`
-    * arguments we need.
+    * the [[com.daml.ledger.javaapi.data.Contract]] doesn't have the `metadata`
+    * argument we need.
     */
   private def fromCodegenContract[TCid <: ContractId[?], T <: DamlRecord[?]](
       contract: CodegenContract[TCid, T],
@@ -237,7 +228,6 @@ object Contract {
       contractId = contract.id,
       payload = contract.data,
       metadata = ev.getContractMetadata,
-      createArgumentsBlob = ev.getCreateArgumentsBlob,
     )
   }
 

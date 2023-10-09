@@ -98,7 +98,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contractId = new coinCodegen.CoinRules.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -118,7 +117,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contractId = new cnsCodegen.CnsRules.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -142,7 +140,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       new roundCodegen.OpenMiningRound.ContractId(round.toString),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -160,7 +157,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       new roundCodegen.ClosedMiningRound.ContractId(nextCid()),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -180,7 +176,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contractId = new coinCodegen.Coin.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -201,7 +196,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contractId = new coinCodegen.LockedCoin.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -223,7 +217,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         new Round(round),
       ),
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
 
   protected def numeric(value: BigDecimal, scale: Int = 10) = {
@@ -248,7 +241,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         new Round(round),
       ),
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
 
   protected def subscriptionInitialPayment(
@@ -284,7 +276,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       paymentId,
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -298,7 +289,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       new FeaturedAppRight.ContractId(contractId),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -318,7 +308,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         amount,
       ),
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
 
   protected def svcReward(
@@ -335,7 +324,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         amount,
       ),
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
 
   protected def toCreatedEvent[TCid <: ContractId[T], T](
@@ -349,7 +337,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       failedInterfaceViews = Map.empty.asJava,
       templateId = contract.identifier,
       arguments = contract.payload.toValue,
-      createArgumentsBlob = contract.createArgumentsBlob,
+      createArgumentsBlob = protobuf.Any.getDefaultInstance,
       contractMetadata = contract.metadata,
       witnessParties = Seq.empty.asJava,
       signatories = signatories.map(_.toProtoPrimitive).asJava,

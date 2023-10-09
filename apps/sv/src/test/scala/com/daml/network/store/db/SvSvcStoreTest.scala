@@ -71,7 +71,6 @@ import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
-import com.google.protobuf
 
 import java.time.Instant
 import java.util
@@ -1122,7 +1121,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new VoteRequest.ContractId(validContractId(n)),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -1144,7 +1142,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new Vote.ContractId(validContractId((n))),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -1160,7 +1157,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new Confirmation.ContractId(validContractId(n)),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -1198,7 +1194,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new SvcRules.ContractId(validContractId(1)),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -1222,7 +1217,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new MemberTraffic.ContractId(nextCid()),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -1240,7 +1234,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new ElectionRequest.ContractId(nextCid()),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -1259,7 +1252,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new CnsEntry.ContractId(nextCid()),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -1278,7 +1270,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new CnsEntryContext.ContractId(validContractId(n, "cc")),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -1310,7 +1301,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       contractId = new SubscriptionIdleState.ContractId(s"$domain#$n"),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -1334,7 +1324,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new SvOnboardingRequest.ContractId(nextCid()),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -1356,7 +1345,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new SvOnboardingConfirmed.ContractId(nextCid()),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -1372,7 +1360,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new ImportCrate.ContractId(nextCid()),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 

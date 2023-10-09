@@ -26,7 +26,6 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
-import com.google.protobuf
 import org.scalatest.{Assertion, Succeeded}
 
 import java.time.Instant
@@ -797,7 +796,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       contractId = new installCodegen.WalletAppInstall.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -824,7 +822,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       contractId = new transferOffersCodegen.TransferOffer.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -851,7 +848,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       contractId = new transferOffersCodegen.AcceptedTransferOffer.ContractId(cid),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -882,7 +878,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       contractId = new paymentCodegen.AppPaymentRequest.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -907,7 +902,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       contractId = new subsCodegen.Subscription.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -929,7 +923,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       contractId = new subsCodegen.SubscriptionIdleState.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -958,7 +951,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       contractId = new subsCodegen.SubscriptionPayment.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -1025,7 +1017,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       contractId = new subsCodegen.SubscriptionRequest.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 

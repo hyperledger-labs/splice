@@ -209,7 +209,6 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
               contractKeyHash: '',
               driverMetadata: 'CiYKJAgBEiBqc5xj84d-yWt2ckLRXUenjSJJfLRVnaBMBsn_3IApMg==',
             },
-            create_arguments_blob: '',
           },
           domain_id:
             'global-domain::1220af85fa0c58e7f551de289be22793993ce7672cb0751afa2f2de397ce4a695677',
@@ -248,7 +247,6 @@ export const buildDirectoryMock = (directoryUrl: string): RestHandler[] => [
                 contractKeyHash: '',
                 driverMetadata: 'CiYKJAgBEiCXgBoBsVAjxBQQBHjwClCXH2Q36rFqPdR9wr9OKphDqQ==',
               },
-              create_arguments_blob: '',
             },
           })
         );

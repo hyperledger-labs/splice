@@ -24,7 +24,6 @@ import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
-import com.google.protobuf
 
 import scala.concurrent.Future
 import com.daml.network.http.v0.definitions
@@ -406,7 +405,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       contractId = new walletCodegen.WalletAppInstall.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -422,7 +420,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       contractId = new validatorLicenseCodegen.ValidatorLicense.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -438,7 +435,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       contractId = new coinCodegen.ValidatorRight.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -457,7 +453,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       contractId = new topUpCodegen.ValidatorTopUpState.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -480,7 +475,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       contractId = new appManagerCodegen.AppConfiguration.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -498,7 +492,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       contractId = new appManagerCodegen.AppRelease.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -513,7 +506,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       contractId = new appManagerCodegen.RegisteredApp.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -530,7 +522,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       contractId = new appManagerCodegen.InstalledApp.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -550,7 +541,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       contractId = new appManagerCodegen.ApprovedReleaseConfiguration.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 

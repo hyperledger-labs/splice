@@ -30,7 +30,6 @@ import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
-import com.google.protobuf
 
 import java.time.Instant
 import scala.concurrent.Future
@@ -200,7 +199,6 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
       contractId = new DirectoryInstall.ContractId(s"$domain#$n"),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -227,7 +225,6 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
       contractId = new DirectoryEntry.ContractId(s"$domain#$cId"),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -252,7 +249,6 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
       contractId = new DirectoryEntryContext.ContractId(validContractId(n, "dc")),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -284,7 +280,6 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
       contractId = new SubscriptionIdleState.ContractId(s"$domain#$n"),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 

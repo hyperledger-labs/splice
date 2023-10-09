@@ -35,7 +35,6 @@ import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{Member, PartyId}
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
-import com.google.protobuf
 
 import java.time.Instant
 import java.util.{Collections, Optional}
@@ -1025,7 +1024,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       new ImportCrate.ContractId(s"${receiver.toProtoPrimitive}::$n"),
       template,
       ContractMetadata.Empty(),
-      protobuf.Any.getDefaultInstance,
     )
   }
 
@@ -1079,7 +1077,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       contractId = new svcrulesCodegen.SvcRules.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
   }
 

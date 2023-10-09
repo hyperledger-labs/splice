@@ -13,7 +13,6 @@ import com.daml.network.util.{AssignedContract, Contract, ContractWithState}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.topology.DomainId
-import com.google.protobuf
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
@@ -140,7 +139,6 @@ abstract class MultiDomainAcsStoreTest[
         paymentRequest,
       ),
       metadata = ContractMetadata.Empty(),
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
     )
 
   protected val d1: DomainId = DomainId.tryFromString("domain1::domain")

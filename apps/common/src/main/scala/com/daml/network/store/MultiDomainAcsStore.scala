@@ -6,12 +6,7 @@ import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.transaction_filter.TransactionFilter as LapiTransactionFilter
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.ledger.javaapi.data.{ContractMetadata, CreatedEvent, Identifier, Template}
-import com.daml.ledger.javaapi.data.codegen.{
-  ContractId,
-  DamlRecord,
-  ContractCompanion as JavaContractCompanion,
-  InterfaceCompanion as JavaInterfaceCompanion,
-}
+import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractCompanion as JavaContractCompanion}
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
@@ -20,7 +15,6 @@ import com.daml.network.environment.ledger.api.{
   TreeUpdate,
 }
 import com.daml.network.util.Contract.Companion
-import com.daml.network.util.Contract.Companion.Interface
 import com.daml.network.util.{
   AssignedContract,
   Contract,
@@ -36,13 +30,11 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.google.protobuf
 import com.google.protobuf.ByteString
 import io.circe.Json
 import io.grpc.Status
 
 import java.time.Instant
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -230,44 +222,6 @@ object MultiDomainAcsStore {
 
   case class JsonAcsSnapshot(offset: String, contracts: Seq[Contract[?, ?]])
 
-  // TODO (#2676) Remove the hacky interface decoding machinery once we have proper interface support for multi-domain.
-  abstract class InterfaceDecoder {
-    def fromCreatedEvent[I, Id <: ContractId[I], View <: DamlRecord[_]](
-        companion: JavaInterfaceCompanion[I, Id, View]
-    )(ev: CreatedEvent): Option[Contract[Id, View]]
-  }
-
-  final case class InterfaceImplementation[I, Id <: ContractId[I], View <: DamlRecord[
-    _
-  ], TCid <: ContractId[Tmpl], Tmpl <: Template](
-      companion: Contract.Companion.Template[TCid, Tmpl],
-      view: Tmpl => View,
-  ) {
-    def toInterfaceContract(
-        interfaceCompanion: JavaInterfaceCompanion[I, Id, View]
-    )(ev: CreatedEvent): Option[Contract[Id, View]] = {
-      val templateContractO: Option[Contract[TCid, Tmpl]] = Contract.fromCreatedEvent(companion)(ev)
-      templateContractO.map(templateContract =>
-        Contract[Id, View](
-          interfaceCompanion.TEMPLATE_ID,
-          interfaceCompanion.toContractId(new ContractId(templateContract.contractId.contractId)),
-          view(templateContract.payload),
-          ev.getContractMetadata,
-          ev.getCreateArgumentsBlob,
-        )
-      )
-    }
-  }
-
-  object InterfaceImplementation {
-    def apply[I, Id <: ContractId[I], View <: DamlRecord[_], TCid <: ContractId[
-      Tmpl
-    ], Tmpl <: Template](
-        companion: Contract.Companion.Template[TCid, Tmpl]
-    ): (Tmpl => View) => InterfaceImplementation[I, Id, View, TCid, Tmpl] =
-      view => InterfaceImplementation(companion, view)
-  }
-
   /** Static specification of a set of create events in scope for ingestion into an MultiDomainAcsStore. */
   trait ContractFilter {
 
@@ -280,15 +234,8 @@ object MultiDomainAcsStore {
     /** Whether the scope might contain an event of the given template. */
     def mightContain[TC, TCid, T](templateCompanion: JavaContractCompanion[TC, TCid, T]): Boolean
 
-    /** Whether the scope might contain an event of the given interface. */
-    def mightContain[I, Id, View](interfaceCompanion: JavaInterfaceCompanion[I, Id, View]): Boolean
-
-    /** Whether the scope might contain an event of the given template OR interface. */
+    /** Whether the scope might contain an event of the given template. */
     def mightContain(identifier: Identifier): Boolean
-
-    def decodeInterface[I, Id <: ContractId[I], View <: DamlRecord[_]](
-        interfaceCompanion: JavaInterfaceCompanion[I, Id, View]
-    )(ev: CreatedEvent): Option[Contract[Id, View]]
 
     def decodeMatchingContract(ev: CreatedEvent): Option[Contract[?, ?]]
 
@@ -311,46 +258,27 @@ object MultiDomainAcsStore {
         QualifiedName,
         (CreatedEvent => Boolean, CreatedEvent => Option[Contract[?, ?]]),
       ],
-      interfaceFilters: Map[QualifiedName, (CreatedEvent => Boolean, InterfaceDecoder)] = Map.empty,
   ) extends ContractFilter {
 
     override val ingestionFilter =
       IngestionFilter(
         primaryParty,
         templateIds = templateFilters.keySet,
-        interfaceIds = interfaceFilters.keySet,
       )
 
     override def contains(ev: CreatedEvent): Boolean =
       templateFilters.get(QualifiedName(ev.getTemplateId)).exists { case (evPredicate, _) =>
         evPredicate(ev)
-      } ||
-        // TODO (#2676) Avoid linear search once we have proper interface support in multi-domain.
-        interfaceFilters.exists { case (_, (evPredicate, _)) => evPredicate(ev) }
+      }
 
     override def mightContain[TC, TCid, T](
         templateCompanion: JavaContractCompanion[TC, TCid, T]
     ): Boolean =
       templateFilters.contains(QualifiedName(templateCompanion.TEMPLATE_ID))
 
-    override def mightContain[I, Id, View](
-        interfaceCompanion: JavaInterfaceCompanion[I, Id, View]
-    ): Boolean =
-      interfaceFilters.contains(QualifiedName(interfaceCompanion.TEMPLATE_ID))
-
     override def mightContain(identifier: Identifier): Boolean = {
-      templateFilters.contains(QualifiedName(identifier)) || interfaceFilters
-        .contains(QualifiedName(identifier))
+      templateFilters.contains(QualifiedName(identifier))
     }
-
-    override def decodeInterface[I, Id <: ContractId[I], View <: DamlRecord[?]](
-        interfaceCompanion: JavaInterfaceCompanion[I, Id, View]
-    )(ev: CreatedEvent): Option[Contract[Id, View]] =
-      interfaceFilters
-        .get(QualifiedName(interfaceCompanion.TEMPLATE_ID))
-        .flatMap { case (_, decoder) =>
-          decoder.fromCreatedEvent(interfaceCompanion)(ev)
-        }
 
     override def decodeMatchingContract(ev: CreatedEvent): Option[Contract[?, ?]] =
       for {
@@ -381,54 +309,12 @@ object MultiDomainAcsStore {
       ),
     )
 
-  /** Construct a contract filter for input into a [[SimpleContractFilter]]. */
-  def mkFilter[I, Id <: ContractId[I], View <: DamlRecord[_]](
-      interfaceCompanion: JavaInterfaceCompanion[I, Id, View]
-  )(
-      p: Contract[Id, View] => Boolean,
-      implementations: Seq[InterfaceImplementation[I, Id, View, _, _]],
-  ): (QualifiedName, (CreatedEvent => Boolean, InterfaceDecoder)) = {
-    val decoder: InterfaceDecoder = new InterfaceDecoder {
-
-      val implementationViews: Map[Identifier, CreatedEvent => Option[Contract[Id, View]]] =
-        implementations.map { i =>
-          i.companion.TEMPLATE_ID -> i.toInterfaceContract(interfaceCompanion)
-        }.toMap
-
-      // the pattern : interfaceCompanion.type is sufficient proof that
-      // Id=Id_ and View=View_ because companions are singleton values, and
-      // : *.type is checked with `eq`, see SLS 8.2
-      @nowarn("msg=cannot be checked at runtime")
-      override def fromCreatedEvent[I_, Id_ <: ContractId[I_], View_ <: DamlRecord[_]](
-          companion: JavaInterfaceCompanion[I_, Id_, View_]
-      )(ev: CreatedEvent): Option[Contract[Id_, View_]] = companion match {
-        case _: interfaceCompanion.type =>
-          implementationViews
-            .get(ev.getTemplateId)
-            .flatMap(toIface => toIface(ev))
-        case _ =>
-          throw new IllegalArgumentException(
-            s"Tried to decode ${companion.TEMPLATE_ID} but decoder is for ${interfaceCompanion.TEMPLATE_ID}"
-          )
-      }
-    }
-    (
-      QualifiedName(interfaceCompanion.TEMPLATE_ID),
-      (
-        (ev: CreatedEvent) =>
-          decoder.fromCreatedEvent(interfaceCompanion)(ev).map(p).getOrElse(false),
-        decoder,
-      ),
-    )
-  }
-
   /** A smaller version of [[TransactionFilter]], only powerful enough for
     * intended [[MultiDomainAcsStore]] ingestion.
     */
   final case class IngestionFilter(
       primaryParty: PartyId,
       templateIds: Set[QualifiedName],
-      interfaceIds: Set[QualifiedName],
   ) {
 
     // TODO (#7855) callers should use `toTransactionFilter` instead when
@@ -484,8 +370,6 @@ object MultiDomainAcsStore {
         templateId,
         payload,
         metadata,
-        createArgumentsBlob =
-          com.google.protobuf.Any.getDefaultInstance, // TODO (#5012): this shouldn't be empty to support interfaces
       )
     }
 
@@ -501,7 +385,6 @@ object MultiDomainAcsStore {
         templateId: Identifier,
         payload: Json,
         metadata: ContractMetadata,
-        createArgumentsBlob: com.google.protobuf.Any,
     )(implicit decoder: TemplateJsonDecoder): Either[ProtoDeserializationError, Contract[TCid, T]]
   }
 
@@ -529,7 +412,6 @@ object MultiDomainAcsStore {
           templateId: Identifier,
           payload: Json,
           metadata: ContractMetadata,
-          createArgumentsBlob: protobuf.Any,
       )(implicit
           decoder: TemplateJsonDecoder
       ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
@@ -537,45 +419,6 @@ object MultiDomainAcsStore {
           templateId,
           payload,
           metadata,
-          createArgumentsBlob,
-        )
-      }
-    }
-
-  implicit def interfaceCompanion[I, Id <: ContractId[I], View <: DamlRecord[_]]
-      : ContractCompanion[Contract.Companion.Interface[Id, I, View], Id, View] =
-    new ContractCompanion[Contract.Companion.Interface[Id, I, View], Id, View] {
-      override def fromCreatedEvent(companion: Contract.Companion.Interface[Id, I, View])(
-          filter: MultiDomainAcsStore.ContractFilter,
-          event: CreatedEvent,
-      ): Option[Contract[Id, View]] =
-        filter.decodeInterface(companion)(event)
-
-      override def mightContain(filter: MultiDomainAcsStore.ContractFilter)(
-          companion: Contract.Companion.Interface[Id, I, View]
-      ): Boolean = filter.mightContain(companion)
-
-      override def typeId(companion: Contract.Companion.Interface[Id, I, View]): Identifier =
-        companion.TEMPLATE_ID
-
-      override def toContractId(companion: Interface[Id, I, View], contractId: String): Id =
-        companion.toContractId(new ContractId[I](contractId))
-
-      override protected def fromJson(
-          companion: Interface[Id, I, View],
-          cId: Id,
-          templateId: Identifier,
-          payload: Json,
-          metadata: ContractMetadata,
-          createArgumentsBlob: protobuf.Any,
-      )(implicit
-          decoder: TemplateJsonDecoder
-      ): Either[ProtoDeserializationError, Contract[Id, View]] = {
-        Contract.fromHttp(typeId(companion), cId, decoder.decodeInterface(companion))(
-          templateId,
-          payload,
-          metadata,
-          createArgumentsBlob,
         )
       }
     }

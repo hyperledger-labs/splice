@@ -129,15 +129,12 @@ components:
           type: object
         metadata:
           $ref: "#/components/schemas/ContractMetadata"
-        create_arguments_blob:
-          type: string # base-16 encoded.
       required:
         [
           "template_id",
           "contract_id",
           "payload",
           "metadata",
-          "create_arguments_blob",
         ]
 
     ErrorResponse:
