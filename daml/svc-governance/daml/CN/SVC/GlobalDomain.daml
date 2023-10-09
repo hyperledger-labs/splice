@@ -64,19 +64,26 @@ data SequencerConfig = SequencerConfig with
     -- ^ Any participant should subscribe this sequencer after this time.
   deriving (Eq, Show)
 
+-- | Config for a mediator.
+data MediatorConfig = MediatorConfig with
+    mediatorId : Text
+    -- ^ The id of the mediator.
+  deriving (Eq, Show)
+
 -- | A map from domain-ids to the configuration of a member's node for this domain.
 type DomainNodeConfigMap = Map.Map Text DomainNodeConfig
 
 -- | The configuration of a member's node for a particular domain.
 data DomainNodeConfig = DomainNodeConfig with
 
-    -- TODO(M3-47): extend this record with the configuration of Canton sequencers and mediators.
-
     cometBft : CometBftConfig
     -- ^ The configuration of this member's CometBFT nodes and keys.
 
     sequencer : Optional SequencerConfig
     -- ^ The configuration of this member's optional local sequencer.
+
+    mediator : Optional MediatorConfig
+    -- ^ The configuration of this member's optional local mediator.
   deriving (Eq, Show)
 
 noDomainNodes : DomainNodeConfigMap
@@ -91,7 +98,7 @@ data DomainNodeConfigLimits = DomainNodeConfigLimits with
 -----------------
 
 emptyDomainNodeConfig : DomainNodeConfig
-emptyDomainNodeConfig = DomainNodeConfig emptyCometBftConfig None
+emptyDomainNodeConfig = DomainNodeConfig emptyCometBftConfig None None
 
 
 -- helper functions

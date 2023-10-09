@@ -15,7 +15,11 @@ import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
-import com.daml.network.codegen.java.cn.svc.globaldomain.{DomainNodeConfig, SequencerConfig}
+import com.daml.network.codegen.java.cn.svc.globaldomain.{
+  DomainNodeConfig,
+  SequencerConfig,
+  MediatorConfig,
+}
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.{cc, cn}
@@ -1113,7 +1117,7 @@ object SvApp {
       svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
   ): Boolean = svcRules.payload.isDevNet
 
-  private[sv] def reconcileSequencerConfigIfRequired(
+  private[sv] def reconcileDomainNodeConfigIfRequired(
       svcStore: SvSvcStore,
       localDomainNode: Option[LocalDomainNode],
       domainId: DomainId,
@@ -1130,6 +1134,7 @@ object SvApp {
 
     def setConfigIfRequired() = for {
       localSequencerConfig <- SvUtil.getSequencerConfig(localDomainNode).map(_.toJava)
+      localMediatorConfig <- SvUtil.getMediatorConfig(localDomainNode).map(_.toJava)
       svcRules <- svcStore.getSvcRules()
       // TODO(#4901): do not use default, but reconcile all configured domains
       memberInfo = Option(svcRules.payload.members.get(svParty.toProtoPrimitive))
@@ -1150,6 +1155,11 @@ object SvApp {
                 // TODO(#7717) Don't use now here, calculate the available time as described in
                 // https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
                 Instant.now(),
+              )
+            ),
+            localMediatorConfig.map(c =>
+              new MediatorConfig(
+                c.mediatorId
               )
             ),
           )

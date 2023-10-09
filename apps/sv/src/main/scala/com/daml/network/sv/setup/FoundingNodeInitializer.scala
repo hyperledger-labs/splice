@@ -332,7 +332,7 @@ class FoundingNodeInitializer(
     def reconcileSequencerConfigIfRequired(
         localDomainNode: Option[LocalDomainNode]
     ): Future[Unit] = {
-      SvApp.reconcileSequencerConfigIfRequired(
+      SvApp.reconcileDomainNodeConfigIfRequired(
         svcStore,
         localDomainNode,
         domainId,

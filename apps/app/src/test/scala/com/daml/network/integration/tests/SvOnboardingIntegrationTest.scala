@@ -405,6 +405,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
         val memberInfo = membersInfoFromSvcRules.get(svParty.toProtoPrimitive)
         forAll(memberInfo.domainNodes.values()) { domainNode =>
           domainNode.sequencer.toScala.value.url shouldBe localSequencerUrl.toString
+          domainNode.mediator.toScala.value.mediatorId should not be empty
         }
 
         clue("published sequencer information can be seen via scan") {

@@ -6,7 +6,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.cc.{coin as coinCodegen}
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{
   ClosedMiningRound,
@@ -16,8 +16,7 @@ import com.daml.network.codegen.java.cc.round.{
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.http.v0.{definitions, scan as http}
-import com.daml.network.http.v0.definitions.GetCoinRulesRequest
-import com.daml.network.http.v0.definitions.GetCnsRulesRequest
+import com.daml.network.http.v0.definitions.{GetCnsRulesRequest, GetCoinRulesRequest}
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.codegen.java.cc
 import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}

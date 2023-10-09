@@ -11,6 +11,7 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
   DomainNodeConfig,
   DomainNodeConfigLimits,
   GlobalDomainConfig,
+  MediatorConfig,
   SequencerConfig,
 }
 import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRulesConfig}
@@ -92,6 +93,19 @@ object SvUtil {
     }
   }.sequence
 
+  case class LocalMediatorConfig(mediatorId: String)
+
+  def getMediatorConfig(localDomainNode: Option[LocalDomainNode])(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[LocalMediatorConfig]] = localDomainNode.map { node =>
+    node.mediatorAdminConnection.getMediatorId.map { mediatorId =>
+      LocalMediatorConfig(
+        mediatorId.toProtoPrimitive
+      )
+    }
+  }.sequence
+
   def getFounderDomainNodeConfig(
       cometBftNode: Option[CometBftNode],
       localDomainNode: LocalDomainNode,
@@ -135,11 +149,18 @@ object SvUtil {
           Instant.now,
         )
       )
+      localMediatorConfig <- getMediatorConfig(Some(localDomainNode))
+      mediatorConfig = localMediatorConfig.map(c =>
+        new MediatorConfig(
+          c.mediatorId
+        )
+      ),
     } yield {
       Map(
         domainId.toProtoPrimitive -> new DomainNodeConfig(
           cometBftConfig,
           sequencerConfig.toJava,
+          mediatorConfig.toJava,
         )
       ).asJava
     }

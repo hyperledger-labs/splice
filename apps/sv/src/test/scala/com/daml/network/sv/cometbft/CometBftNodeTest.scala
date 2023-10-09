@@ -108,6 +108,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
                   Seq[SequencingKeyConfig]().asJava,
                 ),
                 Optional.empty(),
+                Optional.empty(),
               )
             ).asJava,
           ),

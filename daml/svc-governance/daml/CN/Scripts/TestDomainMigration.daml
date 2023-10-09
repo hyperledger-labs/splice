@@ -52,6 +52,8 @@ testDomainMigration = do
           sequencerId = "sequencer-id-" <> partyToText sv
           url = "sequencer.address:1234"
           availableAfter = now
+        mediator = Some MediatorConfig with
+          mediatorId = "mediator-id-" <> partyToText sv
 
   -- The SVC marks the domain as operational
   executeSvcRulesConfigChange app $ \config ->

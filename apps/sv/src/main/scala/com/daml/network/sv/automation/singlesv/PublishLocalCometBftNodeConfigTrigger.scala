@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn as daml
 import com.daml.network.codegen.java.cn.cometbft.SequencingKeyConfig
-import com.daml.network.codegen.java.cn.svc.globaldomain.SequencerConfig
+import com.daml.network.codegen.java.cn.svc.globaldomain.{MediatorConfig, SequencerConfig}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.store.SvSvcStore
@@ -64,6 +64,7 @@ class PublishLocalCometBftNodeConfigTrigger(
       svNodeMemberInfo.name,
       svcRules,
       domainNodeConfig.flatMap(_.sequencer.toScala).toJava,
+      domainNodeConfig.flatMap(_.mediator.toScala).toJava,
       localSvNodeConfig,
       domainId,
     )).value
@@ -107,6 +108,7 @@ object PublishLocalCometBftNodeConfigTrigger {
       svNodeId: String,
       svcRules: AssignedContract[daml.svcrules.SvcRules.ContractId, daml.svcrules.SvcRules],
       sequencerConfig: Optional[SequencerConfig],
+      mediatorConfig: Optional[MediatorConfig],
       localSvNodeConfig: proto.cometbft.SvNodeConfig,
       domainId: DomainId,
   ) extends PrettyPrinting {
@@ -140,6 +142,7 @@ object PublishLocalCometBftNodeConfigTrigger {
           localSvNodeConfig.sequencingKeys.map(key => new SequencingKeyConfig(key.pubKey)).asJava,
         ),
         sequencerConfig,
+        mediatorConfig,
       )
   }
 }

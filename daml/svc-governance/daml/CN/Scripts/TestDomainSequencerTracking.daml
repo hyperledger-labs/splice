@@ -33,6 +33,8 @@ testDomainMigration = do
           sequencerId = "sequencer-id-" <> partyToText sv
           url = "sequencer-" <> partyToText sv <> ".address:1234"
           availableAfter = now
+        mediator = Some MediatorConfig with
+          mediatorId = "mediator-id-" <> partyToText sv
 
   -- sequencer info are published to svcRules and coinRules
   [(_, svcRules)] <- query @SvcRules svc
