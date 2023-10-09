@@ -34,10 +34,7 @@ import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
 import com.digitalasset.canton.topology.store.{StoredTopologyTransactionsX, TimeQueryX}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
-import com.daml.network.config.CNThresholds.{
-  getMediatorDomainStateThreshold,
-  getPartyToParticipantThreshold,
-}
+import com.daml.network.config.CNThresholds.getPartyToParticipantThreshold
 import com.digitalasset.canton.topology.transaction.{
   DomainParametersStateX,
   HostingParticipant,
@@ -471,7 +468,6 @@ class TopologyAdminConnection(
       domainId: DomainId,
       newActiveMediator: MediatorId,
       signedBy: Fingerprint,
-      svcRulesMembersSize: Int,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
@@ -485,9 +481,7 @@ class TopologyAdminConnection(
         MediatorDomainStateX.create(
           previous.domain,
           previous.group,
-          getMediatorDomainStateThreshold(
-            List(svcRulesMembersSize, previous.active.length + 1).foldLeft(Int.MaxValue)(_ min _)
-          ),
+          previous.threshold,
           newActiveMediator +: previous.active,
           previous.observers,
         ),
