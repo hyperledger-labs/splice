@@ -311,7 +311,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       payload = new svcCodegen.SvReward(
         svcParty.toProtoPrimitive,
         svParty.toProtoPrimitive,
-        new apiCodegen.v1.round.Round(round),
+        new Round(round),
         amount,
       ),
       metadata = ContractMetadata.Empty(),
@@ -328,7 +328,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contractId = new coinCodegen.SvcReward.ContractId(contractId),
       payload = new coinCodegen.SvcReward(
         svcParty.toProtoPrimitive,
-        new apiCodegen.v1.round.Round(round),
+        new Round(round),
         amount,
       ),
       metadata = ContractMetadata.Empty(),

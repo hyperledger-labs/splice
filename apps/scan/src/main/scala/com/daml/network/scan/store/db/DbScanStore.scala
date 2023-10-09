@@ -493,7 +493,6 @@ class DbScanStore(
               sql"""
                   where store_id = $storeId
                     and template_id_qualified_name = ${QualifiedName(FeaturedAppRight.TEMPLATE_ID)}
-                    and assigned_domain = $domainId
                     and featured_app_right_provider = $providerPartyId
                   limit 1;
                  """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
