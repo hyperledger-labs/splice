@@ -341,7 +341,7 @@ class DbValidatorStore(
           )
           .value
         result = row.map(
-          multiDomainAcsStore.contractWithStateFromRow(
+          contractWithStateFromRow(
             appManagerCodegen.AppConfiguration.COMPANION
           )(_)
         )
