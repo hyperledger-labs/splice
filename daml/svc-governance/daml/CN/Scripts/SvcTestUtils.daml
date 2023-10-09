@@ -3,7 +3,6 @@ module CN.Scripts.SvcTestUtils where
 
 import DA.Action (unless, when, void)
 import DA.Foldable (forA_)
-import DA.Optional (fromSome)
 import DA.List
 import qualified DA.Map as Map
 import qualified DA.Text as T
@@ -24,8 +23,6 @@ import CN.SvcBootstrap
 import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
 import CN.Scripts.CnsRulesParameters
-import CN.Util.ExpiringContract
-
 
 initMainNetCollective : Script (CCApp, Party, (Party, Party, Party, Party))
 initMainNetCollective = initCollective None False
@@ -306,11 +303,18 @@ initateAndAcceptVote app (initiator::others) action = do
 expireAllExpiredContracts : Party -> Script ()
 expireAllExpiredContracts actor = do
   now <- getTime
-  cos <- queryInterface @ExpiringContract actor
-  forA_ cos $ \(cid, optView) ->
-    trace optView $
-    when ((fromSome optView).expiresAt <= now) $
-      submit actor $ exerciseCmd cid ExpiringContract_Expire with actor
+  votes <- query @Vote actor
+  forA_ votes $ \(cid, vote) ->
+    when (vote.expiresAt <= now) $
+      submit actor $ exerciseCmd cid Vote_Expire
+  voteRequests <- query @VoteRequest actor
+  forA_ voteRequests $ \(cid, voteRequest) ->
+    when (voteRequest.expiresAt <= now) $
+      submit actor $ exerciseCmd cid VoteRequest_Expire
+  confirmation <- query @Confirmation actor
+  forA_ confirmation $ \(cid, confirmation) ->
+    when (confirmation.expiresAt <= now) $
+      submit actor $ exerciseCmd cid Confirmation_Expire
 
 -- | Update all currently desired prices to the target price
 updateAgreedCoinPrice : Party -> Decimal -> Script [ContractId CoinPriceVote]

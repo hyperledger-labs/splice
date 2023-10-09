@@ -24,7 +24,6 @@ import CN.SvOnboarding
 import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
 import CN.Util.Assert
-import CN.Util.ExpiringContract
 import CC.Schedule (getValueAsOf)
 
 
@@ -201,9 +200,10 @@ template Confirmation with
     -- As for 'ElectionRequest' we only make the 'svc' a signatory.
     signatory svc
 
-    interface instance ExpiringContract for Confirmation where
-      view = ExpiringContractView with
-        expiresAt
+    choice Confirmation_Expire : ()
+      controller svc
+      do now <- getTime
+         require "Contract has expired" (expiresAt <= now)
 
 -- | A request for the other members to vote on the execution of an action requiring confirmation.
 -- We use this for implementing on-ledger governance actions triggered by SV operators in a uniform way.
@@ -223,17 +223,10 @@ template VoteRequest
   where
     signatory svc
 
-    interface instance ExpiringContract for VoteRequest where
-      view = ExpiringContractView with
-        expiresAt
-
-    -- Archive if we are past the `expiresAt`.
     choice VoteRequest_Expire : ()
       controller svc
-      do
-        now <- getTime
-        require "Vote Request has expired" (now >= expiresAt)
-        pure ()
+      do now <- getTime
+         require "Contract has expired" (expiresAt <= now)
 
 -- | A `Vote` created by an SV operator in response to a specific `VoteRequest`.
 template Vote
@@ -251,9 +244,10 @@ template Vote
   where
     signatory svc
 
-    interface instance ExpiringContract for Vote where
-      view = ExpiringContractView with
-        expiresAt
+    choice Vote_Expire : ()
+      controller svc
+      do now <- getTime
+         require "Contract has expired" (expiresAt <= now)
 
 data Reason = Reason with
     url : Text -- ^ Url pointing to additional background on the reason, ideally using a https://w3c-ccg.github.io/hashlink/
@@ -651,7 +645,7 @@ template SvcRules with
         -- validate request
         request <- fetch requestCid
         require "SVC matches" (request.svc == svc)
-        ensureNotExpired request
+        ensureNotExpired request.expiresAt
         -- create vote
         create Vote with
           svc
@@ -681,7 +675,7 @@ template SvcRules with
         archive voteCid
         require "SVC matches" (vote.svc == svc)
         require "Voter matches" (vote.voter == voter)
-        ensureNotExpired vote
+        ensureNotExpired vote.expiresAt
         -- create new vote
         create Vote with
           svc
@@ -703,7 +697,7 @@ template SvcRules with
         request <- fetch requestCid
         archive requestCid
         require "SVC matches" (request.svc == svc)
-        ensureNotExpired request
+        ensureNotExpired request.expiresAt
         -- validate and archive votes
         let s = summarizeCollective this
         let numVotes = length voteCids
@@ -714,7 +708,7 @@ template SvcRules with
           require "SVC matches" (vote.svc == svc)
           require "Request matches" (vote.requestCid == requestCid)
           require "Confirmer is (still) a collective member" (vote.voter `Map.member` members)
-          ensureNotExpired vote
+          ensureNotExpired vote.expiresAt
           pure vote
         -- we expect honest voters to cast at most one vote,
         -- and we expect the leader to pick at most one vote in case there are multiple
@@ -1277,3 +1271,8 @@ requireWellformedReason : SvcRulesConfig -> Reason -> Update ()
 requireWellformedReason config reason = do
   require "Reason URL is not too long" (T.length reason.url <= config.maxTextLength)
   require "Reason body is not too long" (T.length reason.body <= config.maxTextLength)
+
+ensureNotExpired : Time -> Update ()
+ensureNotExpired expiresAt = do
+  now <- getTime
+  require "Contract has not yet expired" (now < expiresAt)

@@ -6,7 +6,6 @@ import DA.List (dedupSort)
 import DA.Time
 
 import CN.Util.Assert
-import CN.Util.ExpiringContract
 import CC.Coin
 import CC.Expiry
 import CC.Round
@@ -66,9 +65,14 @@ template AppPaymentRequest
     signatory sender, appPaymentRequest_receivers this, provider
     ensure all (\rq -> rq.amount.amount > 0.0) receiverAmounts
 
-    interface instance ExpiringContract for AppPaymentRequest where
-      view = ExpiringContractView with
-        expiresAt
+    choice AppPaymentRequest_Expire : ContractId TerminatedAppPayment
+      with
+        actor : Party
+      controller actor
+      do now <- getTime
+         require "Actor is a stakeholder" (actor `elem` stakeholder this)
+         require "Contract has expired" (expiresAt <= now)
+         create TerminatedAppPayment with reference = self, sender, provider, receivers = map (\a -> a.receiver) receiverAmounts
 
     choice AppPaymentRequest_Accept
       : (ContractId AcceptedAppPayment, Optional (ContractId Coin))
