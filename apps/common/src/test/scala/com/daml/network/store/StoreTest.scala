@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord as CodegenDamlRecord}
 import com.daml.ledger.javaapi.data.{
   ContractMetadata,
   CreatedEvent,
@@ -93,7 +93,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       false,
       false,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new coinCodegen.CoinRules.ContractId(nextCid()),
       payload = template,
@@ -112,7 +112,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         new java.math.BigDecimal(1.0).setScale(10),
       ),
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new cnsCodegen.CnsRules.ContractId(nextCid()),
       payload = template,
@@ -135,7 +135,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       new RelTime(1_000_000),
     )
 
-    Contract(
+    contract(
       roundCodegen.OpenMiningRound.TEMPLATE_ID,
       new roundCodegen.OpenMiningRound.ContractId(round.toString),
       template,
@@ -152,7 +152,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       numeric(1),
     )
 
-    Contract(
+    contract(
       roundCodegen.ClosedMiningRound.TEMPLATE_ID,
       new roundCodegen.ClosedMiningRound.ContractId(nextCid()),
       template,
@@ -171,7 +171,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         new feesCodegen.RatePerRound(numeric(ratePerRound)),
       ),
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new coinCodegen.Coin.ContractId(nextCid()),
       payload = template,
@@ -191,7 +191,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       coinTemplate,
       new expiryCodegen.TimeLock(java.util.List.of(), Instant.now()),
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new coinCodegen.LockedCoin.ContractId(nextCid()),
       payload = template,
@@ -206,7 +206,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       amount: Numeric.Numeric = numeric(1.0),
       contractId: String = nextCid(),
   ): Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon] =
-    Contract(
+    contract(
       identifier = coinCodegen.AppRewardCoupon.TEMPLATE_ID,
       contractId = new coinCodegen.AppRewardCoupon.ContractId(contractId),
       payload = new coinCodegen.AppRewardCoupon(
@@ -231,7 +231,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     coinCodegen.ValidatorRewardCoupon.ContractId,
     coinCodegen.ValidatorRewardCoupon,
   ] =
-    Contract(
+    contract(
       identifier = coinCodegen.ValidatorRewardCoupon.TEMPLATE_ID,
       contractId = new coinCodegen.ValidatorRewardCoupon.ContractId(nextCid()),
       payload = new coinCodegen.ValidatorRewardCoupon(
@@ -271,7 +271,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       new Round(1L),
       reference,
     )
-    Contract(
+    contract(
       subCodegen.SubscriptionInitialPayment.TEMPLATE_ID,
       paymentId,
       template,
@@ -284,7 +284,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contractId: String = nextCid(),
   ) = {
     val template = new FeaturedAppRight(svcParty.toProtoPrimitive, providerParty.toProtoPrimitive)
-    Contract(
+    contract(
       FeaturedAppRight.TEMPLATE_ID,
       new FeaturedAppRight.ContractId(contractId),
       template,
@@ -298,7 +298,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       amount: Numeric.Numeric = numeric(1.0),
       contractId: String = nextCid(),
   ): Contract[svcCodegen.SvReward.ContractId, svcCodegen.SvReward] =
-    Contract(
+    contract(
       identifier = svcCodegen.SvReward.TEMPLATE_ID,
       contractId = new svcCodegen.SvReward.ContractId(contractId),
       payload = new svcCodegen.SvReward(
@@ -315,7 +315,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       amount: Numeric.Numeric = numeric(1.0),
       contractId: String = nextCid(),
   ): Contract[coinCodegen.SvcReward.ContractId, coinCodegen.SvcReward] =
-    Contract(
+    contract(
       identifier = coinCodegen.SvcReward.TEMPLATE_ID,
       contractId = new coinCodegen.SvcReward.ContractId(contractId),
       payload = new coinCodegen.SvcReward(
@@ -812,6 +812,22 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       actingParties = Seq.empty.asJava,
       childEventIds = Seq.empty.asJava,
     )
+
+  /** Convenience wrapper that autoinfers the payloadValue assuming
+    * that the contract was created using the version we're decoding to.
+    */
+  protected def contract[TCid, T](
+      identifier: Identifier,
+      contractId: TCid & ContractId[_],
+      payload: T & CodegenDamlRecord[_],
+      metadata: ContractMetadata,
+  ): Contract[TCid, T] = Contract(
+    identifier,
+    contractId,
+    payload,
+    Some(payload.toValue),
+    metadata,
+  )
 }
 
 object StoreTest {

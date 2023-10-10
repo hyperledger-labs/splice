@@ -78,20 +78,21 @@ class DbScanStore(
         val templateId = contract.identifier
         val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
         val createArguments = payloadJsonFromContract(contract.payload)
+        val createArgumentsValue = payloadValueJsonStringFromRecord(contract.mandatoryPayloadValue)
         val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
         val contractMetadataContractKeyHash =
           lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)
         val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
         val safeImportCrateReceiverName = importCrateReceiverName.map(lengthLimited)
         sqlu"""
-              insert into scan_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, contract_metadata_created_at,
+              insert into scan_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, create_arguments_value, contract_metadata_created_at,
               contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
               assigned_domain, reassignment_counter, reassignment_target_domain,
               reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
               round, validator, amount, import_crate_receiver, featured_app_right_provider)
               values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
             templateId
-          )}, $createArguments, $contractMetadataCreatedAt,
+          )}, $createArguments, $createArgumentsValue, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},

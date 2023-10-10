@@ -791,7 +791,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       endUserParty.toProtoPrimitive,
       endUserParty.toProtoPrimitive,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new installCodegen.WalletAppInstall.ContractId(nextCid()),
       payload = template,
@@ -817,7 +817,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       expiresAt.toInstant,
       trackingId,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new transferOffersCodegen.TransferOffer.ContractId(nextCid()),
       payload = template,
@@ -843,7 +843,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       expiresAt.toInstant,
       trackingId,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new transferOffersCodegen.AcceptedTransferOffer.ContractId(cid),
       payload = template,
@@ -873,7 +873,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       expiresAt.toInstant,
       description,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new paymentCodegen.AppPaymentRequest.ContractId(nextCid()),
       payload = template,
@@ -897,7 +897,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       ),
       reference,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new subsCodegen.Subscription.ContractId(nextCid()),
       payload = template,
@@ -918,7 +918,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       nextPaymentDueAt.toInstant,
       subscriptionContract.payload.reference,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new subsCodegen.SubscriptionIdleState.ContractId(nextCid()),
       payload = template,
@@ -946,7 +946,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       new Round(round),
       subscription.payload.reference,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new subsCodegen.SubscriptionPayment.ContractId(nextCid()),
       payload = template,
@@ -1012,7 +1012,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       subscriptionData,
       payData,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new subsCodegen.SubscriptionRequest.ContractId(nextCid()),
       payload = template,

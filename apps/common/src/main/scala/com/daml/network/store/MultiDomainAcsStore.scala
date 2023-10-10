@@ -352,6 +352,7 @@ object MultiDomainAcsStore {
         templateId: Identifier,
         contractId: String,
         payload: Json,
+        payloadValue: Json,
         createdAt: Instant,
         contractKeyHash: Option[String],
         driverInternal: Array[Byte],
@@ -369,6 +370,7 @@ object MultiDomainAcsStore {
         cId,
         templateId,
         payload,
+        payloadValue,
         metadata,
       )
     }
@@ -384,6 +386,7 @@ object MultiDomainAcsStore {
         cId: TCid,
         templateId: Identifier,
         payload: Json,
+        payloadValue: Json,
         metadata: ContractMetadata,
     )(implicit decoder: TemplateJsonDecoder): Either[ProtoDeserializationError, Contract[TCid, T]]
   }
@@ -411,6 +414,7 @@ object MultiDomainAcsStore {
           cId: TCid,
           templateId: Identifier,
           payload: Json,
+          payloadValue: Json,
           metadata: ContractMetadata,
       )(implicit
           decoder: TemplateJsonDecoder
@@ -418,6 +422,7 @@ object MultiDomainAcsStore {
         Contract.fromHttp(typeId(companion), cId, decoder.decodeTemplate(companion))(
           templateId,
           payload,
+          Some(payloadValue),
           metadata,
         )
       }

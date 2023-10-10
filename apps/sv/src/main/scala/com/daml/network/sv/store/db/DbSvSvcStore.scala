@@ -121,6 +121,7 @@ class DbSvSvcStore(
         val templateId = contract.identifier
         val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
         val createArguments = payloadJsonFromContract(contract.payload)
+        val createArgumentsValue = payloadValueJsonStringFromRecord(contract.mandatoryPayloadValue)
         val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
         val contractMetadataContractKeyHash =
           lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)
@@ -130,7 +131,7 @@ class DbSvSvcStore(
         val safeCnsEntryName = cnsEntryName.map(lengthLimited)
         val safeActionCnsEntryContextArcType = actionCnsEntryContextArcType.map(lengthLimited)
         sqlu"""
-              insert into svc_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, contract_metadata_created_at,
+              insert into svc_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, create_arguments_value, contract_metadata_created_at,
                                         contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
                                         assigned_domain, reassignment_counter, reassignment_target_domain,
                                         reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
@@ -142,7 +143,7 @@ class DbSvSvcStore(
                                         subscription_next_payment_due_at, featured_app_right_provider)
               values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
             templateId
-          )}, $createArguments, $contractMetadataCreatedAt,
+          )}, $createArguments, $createArgumentsValue, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
@@ -201,6 +202,7 @@ class DbSvSvcStore(
                        idle.template_id_package_id,
                        idle.template_id_qualified_name,
                        idle.create_arguments,
+                       idle.create_arguments_value,
                        idle.contract_metadata_created_at,
                        idle.contract_metadata_contract_key_hash,
                        idle.contract_metadata_driver_internal,
@@ -211,6 +213,7 @@ class DbSvSvcStore(
                        ctx.template_id_package_id,
                        ctx.template_id_qualified_name,
                        ctx.create_arguments,
+                       ctx.create_arguments_value,
                        ctx.contract_metadata_created_at,
                        ctx.contract_metadata_contract_key_hash,
                        ctx.contract_metadata_driver_internal,

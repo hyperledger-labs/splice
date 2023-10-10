@@ -1116,7 +1116,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       expiry,
     )
 
-    Contract(
+    contract(
       VoteRequest.TEMPLATE_ID,
       new VoteRequest.ContractId(validContractId(n)),
       template,
@@ -1137,7 +1137,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       Instant.now().plusSeconds(3600),
     )
 
-    Contract(
+    contract(
       Vote.TEMPLATE_ID,
       new Vote.ContractId(validContractId((n))),
       template,
@@ -1152,7 +1152,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       action,
       Instant.now().plusSeconds(3600),
     )
-    Contract(
+    contract(
       Confirmation.TEMPLATE_ID,
       new Confirmation.ContractId(validContractId(n)),
       template,
@@ -1189,7 +1189,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       false,
     )
 
-    Contract(
+    contract(
       SvcRules.TEMPLATE_ID,
       new SvcRules.ContractId(validContractId(1)),
       template,
@@ -1212,7 +1212,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       numeric(1.0),
     )
 
-    Contract(
+    contract(
       MemberTraffic.TEMPLATE_ID,
       new MemberTraffic.ContractId(nextCid()),
       template,
@@ -1229,7 +1229,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       Collections.emptyList(),
     )
 
-    Contract(
+    contract(
       ElectionRequest.TEMPLATE_ID,
       new ElectionRequest.ContractId(nextCid()),
       template,
@@ -1247,7 +1247,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       Instant.now().plusSeconds(3600),
     )
 
-    Contract(
+    contract(
       CnsEntry.TEMPLATE_ID,
       new CnsEntry.ContractId(nextCid()),
       template,
@@ -1265,7 +1265,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new SubscriptionRequest.ContractId(validContractId(n, "ab")),
     )
 
-    Contract(
+    contract(
       CnsEntryContext.TEMPLATE_ID,
       new CnsEntryContext.ContractId(validContractId(n, "cc")),
       template,
@@ -1296,7 +1296,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       nextPaymentDueAt,
       new SubscriptionRequest.ContractId(validContractId(n, "ab")),
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new SubscriptionIdleState.ContractId(s"$domain#$n"),
       payload = template,
@@ -1319,7 +1319,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       expiry,
     )
 
-    Contract(
+    contract(
       SvOnboardingRequest.TEMPLATE_ID,
       new SvOnboardingRequest.ContractId(nextCid()),
       template,
@@ -1340,7 +1340,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       expiry,
     )
 
-    Contract(
+    contract(
       SvOnboardingConfirmed.TEMPLATE_ID,
       new SvOnboardingConfirmed.ContractId(nextCid()),
       template,
@@ -1355,7 +1355,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       payload,
     )
 
-    Contract(
+    contract(
       ImportCrate.TEMPLATE_ID,
       new ImportCrate.ContractId(nextCid()),
       template,

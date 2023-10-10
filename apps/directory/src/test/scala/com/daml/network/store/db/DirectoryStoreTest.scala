@@ -23,7 +23,7 @@ import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.StoreTest
-import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
+import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.offset.Offset
@@ -194,7 +194,7 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
       new RelTime(1_000_000_000),
       new RelTime(1_000_000_000),
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new DirectoryInstall.ContractId(s"$domain#$n"),
       payload = template,
@@ -220,7 +220,7 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
       entryDescription,
       Instant.now().plusSeconds(3600),
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new DirectoryEntry.ContractId(s"$domain#$cId"),
       payload = template,
@@ -244,7 +244,7 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
       entryDescription,
       new SubscriptionRequest.ContractId(validContractId(n, "ab")),
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new DirectoryEntryContext.ContractId(validContractId(n, "dc")),
       payload = template,
@@ -275,7 +275,7 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
       nextPaymentDueAt,
       new SubscriptionRequest.ContractId(validContractId(n, "ab")),
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new SubscriptionIdleState.ContractId(s"$domain#$n"),
       payload = template,

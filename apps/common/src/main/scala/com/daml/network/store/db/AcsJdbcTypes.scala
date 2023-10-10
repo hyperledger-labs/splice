@@ -13,6 +13,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String300}
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.google.protobuf
 import io.circe.Json
 import slick.ast.FieldSymbol
 import slick.jdbc.{GetResult, JdbcType, PositionedParameters, PositionedResult, SetParameter}
@@ -21,6 +22,8 @@ import spray.json.{JsString, JsValue, JsonFormat, deserializationError}
 import java.sql.{PreparedStatement, ResultSet}
 
 trait AcsJdbcTypes {
+  import AcsJdbcTypes.JsonString
+
   val profile: slick.jdbc.JdbcProfile
 
   import profile.api.*
@@ -180,6 +183,25 @@ trait AcsJdbcTypes {
         case None => pp.setNull(java.sql.Types.OTHER)
       }
 
+  protected implicit lazy val jsonStringGetResult: GetResult[JsonString] = GetResult { rs =>
+    val value = rs.nextString()
+    if (rs.wasNull())
+      throw new IllegalStateException("Tried to deserialize as Json, but the value was null.")
+    else
+      JsonString(value)
+  }
+
+  protected implicit lazy val jsonStringSetParameter: SetParameter[JsonString] =
+    (jsonString: JsonString, pp: PositionedParameters) =>
+      pp.setObject(jsonString.value, java.sql.Types.OTHER)
+
+  protected implicit lazy val jsonStringSetParameterOption: SetParameter[Option[JsonString]] =
+    (jsonStringOpt: Option[JsonString], pp: PositionedParameters) =>
+      jsonStringOpt match {
+        case Some(jsonString) => jsonStringSetParameter(jsonString, pp)
+        case None => pp.setNull(java.sql.Types.OTHER)
+      }
+
   private val contractCodec = {
     // copied from JsonContractIdFormat
     implicit val ContractIdFormat: JsonFormat[LfValue.ContractId] =
@@ -213,6 +235,14 @@ trait AcsJdbcTypes {
     contractCodec.apiValueToJsValue(Contract.javaValueToLfValue(value))
   }
 
+  protected def payloadValueJsonStringFromRecord(
+      payloadValue: com.daml.ledger.javaapi.data.DamlRecord
+  ): JsonString = {
+    val builder = new java.lang.StringBuilder()
+    protobuf.util.JsonFormat.printer().appendTo(payloadValue.toProtoRecord, builder)
+    JsonString(builder.toString)
+  }
+
   /** The DB may truncate strings of unbounded length, so it's advised to use a LengthLimitedString instead.
     * We use String2066 because it's the max length of an [[com.digitalasset.canton.protocol.LfTemplateId]].
     */
@@ -231,4 +261,8 @@ trait AcsJdbcTypes {
         s"Failed to decode ${companion.TEMPLATE_ID} from CreatedEvent of contract id ${createdEvent.getContractId}."
       )
   }
+}
+
+object AcsJdbcTypes {
+  final case class JsonString(value: String)
 }

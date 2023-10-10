@@ -34,7 +34,9 @@ create table acs_store_template(
     contract_id text not null,
     template_id_package_id text not null,
     template_id_qualified_name text not null,
+    -- TODO(#7963) Reconsider storage duplication between create_arguments and create_arguments_value
     create_arguments jsonb not null,
+    create_arguments_value jsonb not null,
 
     -- contract metadata for explicit disclosure
     contract_metadata_created_at bigint,

@@ -1019,7 +1019,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       receiver.toProtoPrimitive,
       new IP_Coin(coinTemplate(n.toDouble, receiver)),
     )
-    Contract(
+    contract(
       ImportCrate.TEMPLATE_ID,
       new ImportCrate.ContractId(s"${receiver.toProtoPrimitive}::$n"),
       template,
@@ -1072,7 +1072,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       true,
       false,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new svcrulesCodegen.SvcRules.ContractId(nextCid()),
       payload = template,

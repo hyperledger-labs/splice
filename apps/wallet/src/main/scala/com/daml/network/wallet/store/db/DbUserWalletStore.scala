@@ -80,19 +80,21 @@ class DbUserWalletStore(
           val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
           val templateId = contract.identifier
           val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
-          val createArguments = contract.toHttp.payload
+          val createArguments = payloadJsonFromContract(contract.payload)
+          val createArgumentsValue =
+            payloadValueJsonStringFromRecord(contract.mandatoryPayloadValue)
           val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
           val contractMetadataContractKeyHash =
             lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)
           val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
           sqlu"""
-              insert into user_wallet_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, contract_metadata_created_at,
+              insert into user_wallet_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, create_arguments_value, contract_metadata_created_at,
                                         contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
                                         assigned_domain, reassignment_counter, reassignment_target_domain,
                                         reassignment_source_domain, reassignment_submitter, reassignment_unassign_id)
               values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
               templateId
-            )}, $createArguments, $contractMetadataCreatedAt,
+            )}, $createArguments, $createArgumentsValue, $contractMetadataCreatedAt,
                       $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId})

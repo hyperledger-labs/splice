@@ -11,7 +11,7 @@ import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.store.db.DbSvSvStore
 import com.daml.network.sv.store.memory.InMemorySvSvStore
 import com.daml.network.sv.store.{SvStore, SvSvStore}
-import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
+import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
@@ -127,7 +127,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
       )
     val templateId = vo.ValidatorOnboarding.TEMPLATE_ID
 
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new vo.ValidatorOnboarding.ContractId(s"$domain#$n"),
       payload = template,
@@ -141,7 +141,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
 
     val templateId = vo.UsedSecret.TEMPLATE_ID
 
-    Contract(
+    contract(
       templateId,
       new UsedSecret.ContractId(validContractId(1)),
       template,
@@ -152,7 +152,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
   private def approvedSvIdentity(name: String) = {
     val template = new ApprovedSvIdentity(storeSvParty.toProtoPrimitive, name, "some key")
 
-    Contract(
+    contract(
       ApprovedSvIdentity.TEMPLATE_ID,
       new ApprovedSvIdentity.ContractId(validContractId(1)),
       template,

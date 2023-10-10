@@ -26,6 +26,7 @@ export const makeGroupInvite = (provider: string, owner: string, groupName: stri
       },
     },
   }),
+  payload_value: {},
   metadata: {
     createdAt: '2023-10-06T13:24:12.679640Z',
     contractKeyHash: '',
@@ -53,6 +54,7 @@ export const makeAcceptedGroupInvite = (
     },
     invitee: invitee,
   }),
+  payload_value: {},
   metadata: {
     createdAt: '2023-10-09T15:14:28.412766Z',
     contractKeyHash: '',
@@ -85,6 +87,7 @@ export const makeBalanceUpdate = (
     },
     update: update,
   }),
+  payload_value: {},
   metadata: {
     createdAt: '2023-10-09T15:00:35.324749Z',
     contractKeyHash: '',

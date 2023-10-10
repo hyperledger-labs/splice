@@ -14,7 +14,7 @@ import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, CNPostgresTest}
-import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
+import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.store.db.DbValidatorStore
@@ -400,7 +400,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       endUserName,
       endUserParty.toProtoPrimitive,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new walletCodegen.WalletAppInstall.ContractId(nextCid()),
       payload = template,
@@ -415,7 +415,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       sponsor.toProtoPrimitive,
       svcParty.toProtoPrimitive,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new validatorLicenseCodegen.ValidatorLicense.ContractId(nextCid()),
       payload = template,
@@ -430,7 +430,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       user.toProtoPrimitive,
       validator.toProtoPrimitive,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new coinCodegen.ValidatorRight.ContractId(nextCid()),
       payload = template,
@@ -448,7 +448,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       domainId.toProtoPrimitive,
       lastPurchasedAt,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new topUpCodegen.ValidatorTopUpState.ContractId(nextCid()),
       payload = template,
@@ -470,7 +470,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       version,
       json.noSpaces,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new appManagerCodegen.AppConfiguration.ContractId(nextCid()),
       payload = template,
@@ -487,7 +487,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       version,
       json,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new appManagerCodegen.AppRelease.ContractId(nextCid()),
       payload = template,
@@ -501,7 +501,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       validator.toProtoPrimitive,
       provider.toProtoPrimitive,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new appManagerCodegen.RegisteredApp.ContractId(nextCid()),
       payload = template,
@@ -517,7 +517,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       provider.toProtoPrimitive,
       url,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new appManagerCodegen.InstalledApp.ContractId(nextCid()),
       payload = template,
@@ -536,7 +536,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       json,
       jsonHash,
     )
-    Contract(
+    contract(
       identifier = templateId,
       contractId = new appManagerCodegen.ApprovedReleaseConfiguration.ContractId(nextCid()),
       payload = template,

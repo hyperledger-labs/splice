@@ -122,7 +122,7 @@ abstract class MultiDomainAcsStoreTest[
       i: Int,
       paymentRequest: AppPaymentRequest.ContractId,
   ) =
-    Contract(
+    contract(
       identifier = TransferInProgress.TEMPLATE_ID,
       contractId = new TransferInProgress.ContractId(s"#$i"),
       payload = new TransferInProgress(

@@ -55,6 +55,7 @@ export const buildSplitwellMock = (splitwellUrl: string): RestHandler[] => [
               payload: SplitwellRules.encode({
                 provider: splitwellProviderPartyId,
               }),
+              payload_value: {},
               metadata: {
                 createdAt: '2023-10-05T15:35:40.054390Z',
                 contractKeyHash: '',
@@ -115,6 +116,7 @@ export const buildSplitwellMock = (splitwellUrl: string): RestHandler[] => [
                   microseconds: '300000000',
                 },
               }),
+              payload_value: {},
               metadata: {
                 createdAt: '2023-10-06T09:20:54.077318Z',
                 contractKeyHash: '',
