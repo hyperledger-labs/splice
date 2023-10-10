@@ -154,7 +154,7 @@ class UserWalletManager(
   /** Lists the validator reward coupons collectable by the current user (i.e. where they are the validator). */
   def listValidatorRewardCouponsCollectableBy(
       validatorUserStore: UserWalletStore,
-      maxNumInputs: Option[Int],
+      limit: Int,
       activeIssuingRounds: Option[Set[Long]],
   )(implicit
       tc: TraceContext
@@ -194,13 +194,12 @@ class UserWalletManager(
                   Future.successful(Seq.empty)
                 case Some(walletOfHostedUser) =>
                   walletOfHostedUser.store
-                    .listSortedValidatorRewards(maxNumInputs, activeIssuingRounds)
+                    .listSortedValidatorRewards(limit, activeIssuingRounds)
               }
           }
         )
       validatorRewardCoupons <- Future.sequence(validatorRewardCouponsFs)
-      // TODO(#6176): do not take unbounded number of items
-    } yield validatorRewardCoupons.flatten.take(maxNumInputs.getOrElse(Int.MaxValue))
+    } yield validatorRewardCoupons.flatten.take(limit)
 
   override def isHealthy: Boolean = endUserWalletsMap.values.forall(_._2.isHealthy)
 

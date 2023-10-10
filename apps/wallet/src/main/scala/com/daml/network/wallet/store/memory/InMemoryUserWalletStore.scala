@@ -39,7 +39,7 @@ class InMemoryUserWalletStore(
     * and optionally filtered by a set of issuing rounds.
     */
   override def listSortedValidatorRewards(
-      maxNumInputs: Option[Int],
+      limit: Int,
       activeIssuingRoundsO: Option[Set[Long]],
   )(implicit tc: TraceContext): Future[Seq[
     Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
@@ -57,14 +57,14 @@ class InMemoryUserWalletStore(
     } yield rewards
       .filter(rw => filterActiveRounds(rw.payload.round.number))
       .sortBy(_.payload.round.number)
-      .take(maxNumInputs.getOrElse(Int.MaxValue))
+      .take(limit)
   }
 
   /** Returns the validator reward coupon sorted by their round in ascending order and their value in descending order.
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
     */
   override def listSortedAppRewards(
-      maxNumInputs: Int,
+      limit: Int,
       issuingRoundsMap: Map[Round, IssuingMiningRound],
   )(implicit tc: TraceContext): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
@@ -95,7 +95,7 @@ class InMemoryUserWalletStore(
         )) => (x._1.payload.round.number, -x._2)
       )
     )
-    .take(maxNumInputs)
+    .take(limit)
 
   override def listTransactions(
       beginAfterEventId: Option[String],

@@ -22,6 +22,7 @@ import com.daml.network.environment.{CommandPriority, RetryProvider}
 import com.daml.network.http.v0.wallet.WalletResource as r0
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.store.Limit
 import com.daml.network.util.{CNNodeUtil, Codec, Contract, DisclosedContracts}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.store.UserWalletStore
@@ -199,10 +200,9 @@ class HttpWalletHandler(
     withSpan(s"$workflowId.listValidatorRewardCoupons") { implicit traceContext => _ =>
       for {
         userStore <- getUserStore(user)
-        // TODO(#6176): add pagination or document that this only returns the first N items.
         validatorRewardCoupons <- walletManager.listValidatorRewardCouponsCollectableBy(
           userStore,
-          None,
+          Limit.DefaultLimit.limit.toInt,
           None,
         )
       } yield d0.ListValidatorRewardCouponsResponse(

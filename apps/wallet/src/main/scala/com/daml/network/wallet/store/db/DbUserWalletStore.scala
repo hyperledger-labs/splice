@@ -132,7 +132,7 @@ class DbUserWalletStore(
     * and optionally filtered by a set of issuing rounds.
     */
   override def listSortedValidatorRewards(
-      maxNumInputs: Option[Int],
+      limit: Int,
       activeIssuingRoundsO: Option[Set[Long]],
   )(implicit tc: TraceContext): Future[Seq[
     Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
@@ -152,14 +152,13 @@ class DbUserWalletStore(
       }
     )
     .sortBy(_.payload.round.number)
-    // TODO(#6176): limits should not be optional
-    .take(maxNumInputs.getOrElse(Int.MaxValue))
+    .take(limit)
 
   /** Returns the validator reward coupon sorted by their round in ascending order and their value in descending order.
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `issuingRoundsMap`.
     */
   override def listSortedAppRewards(
-      maxNumInputs: Int,
+      limit: Int,
       issuingRoundsMap: Map[Round, IssuingMiningRound],
   )(implicit tc: TraceContext): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
@@ -192,7 +191,7 @@ class DbUserWalletStore(
         )) => (x._1.payload.round.number, -x._2)
       )
     )
-    .take(maxNumInputs)
+    .take(limit)
 
   override def listTransactions(
       beginAfterEventIdO: Option[String],

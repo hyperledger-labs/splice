@@ -480,7 +480,11 @@ class TreasuryService(
       )
       (validatorRewardsCoinQuantity, validatorRewardCouponUsers, validatorRewardInputs) <-
         getValidatorRewardsAndQuantity(
-          maxNumInputs,
+          // We select the rewards to collect them through a transfer.
+          // Those rewards are then an input to a transfer.
+          // So we can't use more rewards than maxNumInputs.
+          // If there are more, we'll just collect maxNumInputs first and once that completes collect the remainder.
+          validatorRewardCouponsLimit = maxNumInputs,
           issuingRoundsMap,
         )
       (appRewardsTotalCoinQuantity, appRewardInputs) <- getAppRewardsAndQuantity(
@@ -592,7 +596,7 @@ class TreasuryService(
   }
 
   private def getValidatorRewardsAndQuantity(
-      maxNumInputs: Int,
+      validatorRewardCouponsLimit: Int,
       issuingRoundsMap: Map[Round, IssuingMiningRound],
   )(implicit
       tc: TraceContext
@@ -603,7 +607,7 @@ class TreasuryService(
       validatorRewardCouponsRaw <- walletManager
         .listValidatorRewardCouponsCollectableBy(
           userStore,
-          Some(maxNumInputs),
+          limit = validatorRewardCouponsLimit,
           Some(issuingRoundsMap.keySet.map(_.number)),
         )
       validatorRewardCouponUsers = validatorRewardCouponsRaw

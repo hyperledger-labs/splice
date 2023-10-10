@@ -254,7 +254,7 @@ trait UserWalletStore
     * and optionally filtered by a set of issuing rounds.
     */
   def listSortedValidatorRewards(
-      maxNumInputs: Option[Int],
+      limit: Int,
       activeIssuingRoundsO: Option[Set[Long]],
   )(implicit tc: TraceContext): Future[Seq[
     Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
@@ -264,7 +264,7 @@ trait UserWalletStore
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
     */
   def listSortedAppRewards(
-      maxNumInputs: Int,
+      limit: Int,
       issuingRoundsMap: Map[cc.round.types.Round, roundCodegen.IssuingMiningRound],
   )(implicit tc: TraceContext): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)

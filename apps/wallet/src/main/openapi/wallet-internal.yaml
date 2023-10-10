@@ -692,6 +692,7 @@ components:
 
     ListAppRewardCouponsResponse:
       type: object
+      description: Includes only up to 1000 elements.
       required:
         - app_reward_coupons
       properties:
@@ -702,6 +703,7 @@ components:
 
     ListValidatorRewardCouponsResponse:
       type: object
+      description: Includes only up to 1000 elements.
       required:
         - validator_reward_coupons
       properties:
