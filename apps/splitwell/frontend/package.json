@@ -65,7 +65,7 @@
     "lint:fix": "eslint --ignore-pattern src/com/* --fix --max-warnings=0 -- src",
     "type:check": "tsc --noEmit",
     "start": "vite --force",
-    "test": "vitest",
-    "test:sbt": "vitest --run"
+    "test": "PORT=0 vitest",
+    "test:sbt": "PORT=0 vitest --run"
   }
 }

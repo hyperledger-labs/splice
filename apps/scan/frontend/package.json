@@ -48,7 +48,7 @@
   "scripts": {
     "build": "vite build",
     "check": "npm run format:check && npm run lint:check",
-    "test:sbt": "vitest --run",
+    "test:sbt": "PORT=0 vitest --run",
     "fix": "npm run format:fix && npm run lint:fix",
     "format:check": "prettier --check -- src",
     "format:fix": "prettier --write -- src",
@@ -56,6 +56,6 @@
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "type:check": "tsc --noEmit",
     "start": "vite --force",
-    "test": "vitest"
+    "test": "PORT=0 vitest"
   }
 }

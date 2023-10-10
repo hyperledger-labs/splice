@@ -1,20 +1,19 @@
 import { cleanup } from '@testing-library/react';
 import crypto from 'crypto';
-import { setupServer } from 'msw/node';
 import { beforeAll, afterAll, afterEach, vi } from 'vitest';
 
-import { buildDirectoryMock, buildScanMock } from '../__tests__/mocks';
+import { buildServer } from '../mocks/server';
 import { config } from './config';
 
 // Provide an implementation for webcrypto when generating insecure jwts in the app
 vi.stubGlobal('crypto', { subtle: crypto.webcrypto.subtle });
 
+type Config = typeof config;
+export type Services = Config['services'];
+
 // Provide a global variable for the app config in the test environment
 window.canton_network_config = config;
-const server = setupServer(
-  ...buildScanMock(window.canton_network_config.services.scan.url),
-  ...buildDirectoryMock(window.canton_network_config.services.directory.url)
-);
+const server = buildServer(window.canton_network_config.services);
 
 // Start server before all tests
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
