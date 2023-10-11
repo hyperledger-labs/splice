@@ -12,6 +12,7 @@ Release Notes
     Party IDs are shown as-is if they are not found in CNS.
 
 * Removed the unused "users" field from participant identities dumps.
+* A transaction history API has been added to Scan. Please see the Scan OpenAPI specification.
 
 2023-10-09
 ----------

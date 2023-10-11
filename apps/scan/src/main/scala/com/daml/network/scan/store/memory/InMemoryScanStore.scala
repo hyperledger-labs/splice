@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
-import com.daml.network.scan.store.{ScanStore, TxLogEntry, TxLogIndexRecord}
+import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry, TxLogIndexRecord}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.{HardLimit, InMemoryCNNodeAppStore}
 import com.daml.network.util.{Contract, ContractWithState}
@@ -20,6 +20,9 @@ import io.grpc.Status
 
 import scala.concurrent.*
 import java.time.Instant
+import com.daml.network.scan.store.SortOrder.Ascending
+import com.daml.network.scan.store.SortOrder.Descending
+import com.daml.network.store.TxLogStore
 
 class InMemoryScanStore(
     override val svcParty: PartyId,
@@ -224,21 +227,29 @@ class InMemoryScanStore(
       }),
     )
 
-  override def listActivity(
-      beginAfterEventId: Option[String],
+  override def listTransactions(
+      pageEndEventId: Option[String],
+      sortOrder: SortOrder,
       limit: Int,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[TxLogEntry.ActivityLogEntry]] = {
+  ): Future[Seq[TxLogEntry.TransactionLogEntry]] = {
     def filter(txi: TxLogIndexRecord) = txi match {
-      case _: TxLogIndexRecord.ActivityIndexRecord => true
+      case _: TxLogIndexRecord.TransactionIndexRecord => true
       case _ => false
     }
-    val indices = beginAfterEventId.fold(
-      txLog.filterTxLogIndicesByOffset(0, limit)(filter)
-    )(
-      txLog.filterTxLogIndicesAfterEventId(_, limit)(filter)
-    )
+    val fromEnd = txLog.getQueue.view
+    val fromBeginning = txLog.getQueue.view.reverse
+    val indices = sortOrder match {
+      case Descending =>
+        pageEndEventId.fold(
+          TxLogStore.firstPage(fromEnd, limit)(filter)
+        )(endId => TxLogStore.nextPage(fromEnd, endId, limit)(filter))
+      case Ascending =>
+        pageEndEventId.fold(
+          TxLogStore.firstPage(fromBeginning, limit)(filter)
+        )(endId => TxLogStore.nextPage(fromBeginning, endId, limit)(filter))
+    }
     for {
       records <- indices
         .traverse { index =>
@@ -251,7 +262,7 @@ class InMemoryScanStore(
           )
         }
         .map {
-          _.collect { case entry: TxLogEntry.ActivityLogEntry =>
+          _.collect { case entry: TxLogEntry.TransactionLogEntry =>
             entry
           }.take(limit)
         }

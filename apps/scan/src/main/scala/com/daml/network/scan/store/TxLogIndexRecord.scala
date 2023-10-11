@@ -150,7 +150,7 @@ object TxLogIndexRecord {
     override val shortType: String = "bac"
   }
 
-  final case class ActivityIndexRecord(
+  final case class TransactionIndexRecord(
       offset: String,
       eventId: String,
       domainId: DomainId,
@@ -159,17 +159,17 @@ object TxLogIndexRecord {
 
     override def acsContractId: Option[codegen.ContractId[_]] = None
 
-    override val companion: TxLogIndexRecordCompanion = ActivityIndexRecord
+    override val companion: TxLogIndexRecordCompanion = TransactionIndexRecord
   }
 
-  object ActivityIndexRecord extends TxLogIndexRecordCompanion {
+  object TransactionIndexRecord extends TxLogIndexRecordCompanion {
     override val shortType: String = "rar"
     def apply(
         tx: TransactionTree,
         event: TreeEvent,
         domainId: DomainId,
-    ): ActivityIndexRecord =
-      ActivityIndexRecord(
+    ): TransactionIndexRecord =
+      TransactionIndexRecord(
         offset = tx.getOffset(),
         eventId = event.getEventId(),
         domainId = domainId,

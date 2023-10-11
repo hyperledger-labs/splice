@@ -22,7 +22,7 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.TxLogEntry.*
 import com.daml.network.scan.store.TxLogIndexRecord.{
-  ActivityIndexRecord,
+  TransactionIndexRecord,
   OpenMiningRoundIndexRecord,
 }
 import com.daml.network.scan.store.db.DbScanStore
@@ -41,6 +41,7 @@ import java.util.{Collections, Optional}
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
+import com.daml.network.scan.store.SortOrder
 
 abstract class ScanStoreTest extends StoreTest with HasExecutionContext with StoreErrors {
 
@@ -645,15 +646,15 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       }
     }
 
-    "listActivity" should {
-      "return the most recent activities in pages" in {
+    "listTransactions" should {
+      "return the most recent txs in pages" in {
         val limit = 10
-        val nrActivities = 20
+        val nrTransfers = 20
         val now = java.time.Instant.EPOCH
         val zero = BigDecimal(0)
-        val activities: List[TransferLogEntry] = (1 to nrActivities).map { i =>
+        val txs: List[TransferLogEntry] = (1 to nrTransfers).map { i =>
           TransferLogEntry(
-            ActivityIndexRecord(
+            TransactionIndexRecord(
               s"$i",
               s"$i",
               domainId = dummyDomain,
@@ -674,21 +675,21 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             coinPrice = BigDecimal(1.0),
           )
         }.toList
-        def stripEventId(activity: TransferLogEntry) =
-          activity.copy(indexRecord = activity.indexRecord.copy(eventId = ""))
-        val expectedFirstPage = activities.reverse.take(limit).toList
-        val expectedSecondPage = activities.reverse.drop(limit).take(limit).toList
+        def stripEventId(tx: TransferLogEntry) =
+          tx.copy(indexRecord = tx.indexRecord.copy(eventId = ""))
+        val expectedFirstPage = txs.reverse.take(limit).toList
+        val expectedSecondPage = txs.reverse.drop(limit).take(limit).toList
 
-        def transferFromActivity(
+        def transferFromTransaction(
             store: ScanStore,
             coinRulesContract: Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules],
-            activity: TransferLogEntry,
+            tx: TransferLogEntry,
             offset: String,
         ) = {
-          val senderParty = PartyId.tryFromProtoPrimitive(activity.sender.party)
-          val senderAmount = activity.sender.inputCoinAmount
-          val receiverParty = PartyId.tryFromProtoPrimitive(activity.receivers(0).party)
-          val receiverAmount = activity.receivers(0).amount
+          val senderParty = PartyId.tryFromProtoPrimitive(tx.sender.party)
+          val senderAmount = tx.sender.inputCoinAmount
+          val receiverParty = PartyId.tryFromProtoPrimitive(tx.receivers(0).party)
+          val receiverAmount = tx.receivers(0).amount
           dummyDomain
             .exercise(
               contract = coinRulesContract,
@@ -707,7 +708,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
                 changeToInitialAmountAsOfRoundZero = 0,
                 changeToHoldingFeesRate = holdingFee,
                 inputCoinAmount = senderAmount.toDouble,
-                coinPrice = activity.coinPrice.toDouble,
+                coinPrice = tx.coinPrice.toDouble,
               ),
               offset = offset,
             )(
@@ -722,37 +723,60 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         for {
           store <- mkStore()
           coinRulesContract = coinRules()
-          _ <- activities.foldLeft(Future.successful(())) { (f, activity) =>
+          _ <- txs.foldLeft(Future.successful(())) { (f, tx) =>
             f.flatMap { _ =>
-              transferFromActivity(store, coinRulesContract, activity, activity.indexRecord.offset)
+              transferFromTransaction(
+                store,
+                coinRulesContract,
+                tx,
+                tx.indexRecord.offset,
+              )
             }
           }
         } yield {
           eventually() {
-            val firstPage = store
-              .listByType[TransferLogEntry](None, limit)
+            val firstPageDescending = store
+              .listByType[TransferLogEntry](None, SortOrder.Descending, limit)
               .futureValue
               .toList
 
-            firstPage
+            firstPageDescending
               .map(stripEventId) should be(
               expectedFirstPage
                 .map(stripEventId)
             )
-
-            val secondPage = store
+            val nextPageDescending = store
               .listByType[TransferLogEntry](
-                Some(firstPage.last.indexRecord.eventId),
+                Some(firstPageDescending.last.indexRecord.eventId),
+                SortOrder.Descending,
                 limit,
               )
               .futureValue
               .toList
 
-            secondPage
+            nextPageDescending
               .map(stripEventId) should be(
               expectedSecondPage
                 .map(stripEventId)
             )
+
+            val firstPageAscending = store
+              .listByType[TransferLogEntry](None, SortOrder.Ascending, limit)
+              .futureValue
+              .toList
+
+            firstPageAscending should be(nextPageDescending.reverse)
+
+            val nextPageAscending = store
+              .listByType[TransferLogEntry](
+                Some(firstPageAscending.last.indexRecord.eventId),
+                SortOrder.Ascending,
+                limit,
+              )
+              .futureValue
+              .toList
+
+            nextPageAscending should be(firstPageDescending.reverse)
           }
         }
       }
@@ -768,11 +792,11 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 
   implicit class ScanStoreExt(store: ScanStore) {
     @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-    def listByType[T](beginAfterEventId: Option[String], limit: Int)(implicit
+    def listByType[T](beginAfterEventId: Option[String], sortOrder: SortOrder, limit: Int)(implicit
         tag: ClassTag[T]
     ): Future[Seq[T]] = {
       store
-        .listActivity(beginAfterEventId, limit)
+        .listTransactions(beginAfterEventId, sortOrder, limit)
         .map(_.collect {
           case c if tag.runtimeClass.isInstance(c) => c.asInstanceOf[T]
         }.toSeq)

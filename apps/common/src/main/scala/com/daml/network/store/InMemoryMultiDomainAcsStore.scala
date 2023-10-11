@@ -477,17 +477,15 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
   /** TX log APIs
     */
 
-  def filterTxLogIndicesByOffset(offset: Int, limit: Int)(filter: TXI => Boolean): Seq[TXI] =
-    stateVar.txLog.view.drop(offset).filter(filter).take(limit).toSeq
+  def getQueue: Queue[TXI] = stateVar.txLog
 
-  def filterTxLogIndicesAfterEventId(beginAfterEventId: String, limit: Int)(
+  def filterTxLogIndicesByOffset(limit: Int)(filter: TXI => Boolean): Seq[TXI] =
+    TxLogStore.firstPage(stateVar.txLog.view, limit)(filter)
+
+  def filterTxLogIndicesAfterEventId(pageEndEventId: String, limit: Int)(
       filter: TXI => Boolean
   ): Seq[TXI] =
-    stateVar.txLog.view
-      .filter(txi => filter(txi))
-      .dropWhile(_.eventId != beginAfterEventId)
-      .slice(1, 1 + limit)
-      .toSeq
+    TxLogStore.nextPage(stateVar.txLog.view, pageEndEventId, limit)(filter)
 
   def findLatestTxLogIndex[A, Z](init: Z)(p: (Z, TXI) => Either[A, Z])(implicit
       ec: ExecutionContext

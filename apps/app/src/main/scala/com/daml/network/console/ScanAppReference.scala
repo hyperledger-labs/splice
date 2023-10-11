@@ -220,14 +220,27 @@ abstract class ScanAppReference(
       )
     }
 
-  import com.daml.network.http.v0.definitions.ListActivityResponseItem
-  def listActivity(
-      beginAfterEventId: Option[String],
+  import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem
+  import com.daml.network.http.v0.definitions.TransactionHistoryRequest.SortOrder
+
+  def listTransactions(
+      pageEndEventId: Option[String],
+      sortOrder: SortOrder,
       pageSize: Int,
-  ): Seq[ListActivityResponseItem] =
+  ): Seq[TransactionHistoryResponseItem] =
     consoleEnvironment.run {
       httpCommand(
-        HttpScanAppClient.ListActivity(beginAfterEventId, pageSize)
+        HttpScanAppClient.ListTransactions(pageEndEventId, sortOrder, pageSize)
+      )
+    }
+
+  def listActivity(
+      pageEndEventId: Option[String],
+      pageSize: Int,
+  ): Seq[TransactionHistoryResponseItem] =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.ListTransactions(pageEndEventId, SortOrder.Desc, pageSize)
       )
     }
 }

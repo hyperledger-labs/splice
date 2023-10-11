@@ -15,6 +15,8 @@ import com.daml.network.wallet.automation.CollectRewardsAndMergeCoinsTrigger
 import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
+import com.daml.network.http.v0.definitions.TransactionHistoryRequest
+import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem
 
 class ScanIntegrationTest
     extends CNNodeIntegrationTest
@@ -47,7 +49,95 @@ class ScanIntegrationTest
         )(config)
       )
 
-  "list tap and coin merge transactions in recent activity" in { implicit env =>
+  "list transaction pages in ascending and descending order" in { implicit env =>
+    onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+    val aliceUserName = aliceWalletClient.config.ledgerApiUser
+
+    def aliceMergeCoinsTrigger =
+      aliceValidatorBackend
+        .userWalletAutomation(aliceUserName)
+        .trigger[CollectRewardsAndMergeCoinsTrigger]
+
+    aliceMergeCoinsTrigger.pause().futureValue
+
+    val nrTaps = 10
+    val coinAmounts = (1 to nrTaps).toSeq.map(BigDecimal(_))
+    val pageSize = nrTaps / 2
+
+    def toCoinAmounts(page: Seq[TransactionHistoryResponseItem]) =
+      page.flatMap(_.tap.map(t => BigDecimal(t.coinAmount)))
+
+    actAndCheck(
+      "Tap coins for Alice", {
+        (1 to nrTaps).foreach { i =>
+          aliceWalletClient.tap(BigDecimal(i))
+        }
+      },
+    )(
+      "Coins should appear in Alice's wallet",
+      _ => {
+        aliceWalletClient.list().coins should have length nrTaps.toLong
+      },
+    )
+    val tapsFirstPageAscending = sv1ScanBackend
+      .listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, pageSize)
+
+    toCoinAmounts(tapsFirstPageAscending) should be(
+      coinAmounts.take(pageSize)
+    )
+
+    val firstPageEndEventId = tapsFirstPageAscending.last.eventId
+    val tapsSecondPageAscending = sv1ScanBackend
+      .listTransactions(
+        Some(firstPageEndEventId),
+        TransactionHistoryRequest.SortOrder.Asc,
+        pageSize.toInt,
+      )
+    toCoinAmounts(tapsSecondPageAscending) should be(
+      coinAmounts.drop(pageSize).take(pageSize)
+    )
+
+    sv1ScanBackend
+      .listTransactions(
+        Some(tapsSecondPageAscending.last.eventId),
+        TransactionHistoryRequest.SortOrder.Asc,
+        pageSize.toInt,
+      ) should be(empty)
+
+    val tapsFirstPageDescending = sv1ScanBackend
+      .listTransactions(
+        None,
+        TransactionHistoryRequest.SortOrder.Desc,
+        pageSize.toInt,
+      )
+    toCoinAmounts(tapsFirstPageDescending) should be(
+      coinAmounts.reverse.take(pageSize)
+    )
+
+    val firstPageEndEventIdDescending = tapsFirstPageDescending.last.eventId
+    val tapsSecondPageDescending = sv1ScanBackend
+      .listTransactions(
+        Some(firstPageEndEventIdDescending),
+        TransactionHistoryRequest.SortOrder.Desc,
+        pageSize.toInt,
+      )
+
+    sv1ScanBackend
+      .listTransactions(
+        Some(tapsSecondPageDescending.last.eventId),
+        TransactionHistoryRequest.SortOrder.Desc,
+        pageSize.toInt,
+      ) should be(empty)
+
+    toCoinAmounts(tapsSecondPageDescending) should be(
+      coinAmounts.reverse.drop(pageSize).take(pageSize)
+    )
+    toCoinAmounts(
+      tapsFirstPageAscending ++ tapsSecondPageAscending
+    ) should be(toCoinAmounts((tapsFirstPageDescending ++ tapsSecondPageDescending).reverse))
+  }
+
+  "list tap and coin merge transactions" in { implicit env =>
     val aliceUserName = aliceWalletClient.config.ledgerApiUser
     val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
@@ -211,7 +301,7 @@ class ScanIntegrationTest
       }
   }
 
-  "list activity for collected app and validator and SV rewards" in { implicit env =>
+  "list collected app and validator and SV rewards" in { implicit env =>
     val (alice, _) = onboardAliceAndBob()
     waitForWalletUser(aliceValidatorWalletClient)
     waitForWalletUser(bobValidatorWalletClient)

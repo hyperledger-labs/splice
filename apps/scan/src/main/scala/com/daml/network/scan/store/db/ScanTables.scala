@@ -344,7 +344,7 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseTrafficPurchase = None,
             extraTrafficPurchaseCcSpent = None,
           )
-        case rar @ TxLogIndexRecord.ActivityIndexRecord(
+        case rar @ TxLogIndexRecord.TransactionIndexRecord(
               offset,
               eventId,
               domainId,

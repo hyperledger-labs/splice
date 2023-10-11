@@ -26,6 +26,13 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import java.time.{OffsetDateTime, ZoneOffset}
+import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
+  DevnetTap,
+  Mint,
+  Transfer,
+  SvRewardCollected,
+}
+import com.daml.network.scan.store.SortOrder
 
 class HttpScanHandler(
     store: ScanStore,
@@ -452,6 +459,29 @@ class HttpScanHandler(
     }
   }
 
+  override def listTransactionHistory(
+      respond: v0.ScanResource.ListTransactionHistoryResponse.type
+  )(
+      request: definitions.TransactionHistoryRequest
+  )(extracted: TraceContext): Future[v0.ScanResource.ListTransactionHistoryResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listTransactions") { _ => _ =>
+      val pageEndEventId =
+        if (request.pageEndEventId.exists(_.isEmpty)) None else request.pageEndEventId
+      val sortOrder = request.sortOrder
+        .fold[SortOrder](SortOrder.Ascending) {
+          case definitions.TransactionHistoryRequest.SortOrder.members.Asc => SortOrder.Ascending
+          case definitions.TransactionHistoryRequest.SortOrder.members.Desc => SortOrder.Descending
+        }
+
+      for {
+        txs <- store.listTransactions(pageEndEventId, sortOrder, request.pageSize.toInt)
+      } yield definitions.TransactionHistoryResponse(
+        txs.map(_.toResponseItem).toVector
+      )
+    }
+  }
+
   override def listActivity(
       respond: v0.ScanResource.ListActivityResponse.type
   )(
@@ -461,9 +491,37 @@ class HttpScanHandler(
     withSpan(s"$workflowId.listActivity") { _ => _ =>
       val beginAfterId = if (request.beginAfterId.exists(_.isEmpty)) None else request.beginAfterId
       for {
-        activities <- store.listActivity(beginAfterId, request.pageSize.toInt)
+        transactions <- store.listTransactions(
+          beginAfterId,
+          SortOrder.Descending,
+          request.pageSize.toInt,
+        )
       } yield definitions.ListActivityResponse(
-        activities.map(_.toResponseItem).toVector
+        transactions.map { tx =>
+          val txItem = tx.toResponseItem
+          import definitions.ListActivityResponseItem.*
+          definitions.ListActivityResponseItem(
+            activityType = txItem.transactionType match {
+              case DevnetTap =>
+                ActivityType.DevnetTap
+              case Mint =>
+                ActivityType.Mint
+              case Transfer =>
+                ActivityType.Transfer
+              case SvRewardCollected =>
+                ActivityType.SvRewardCollected
+            },
+            eventId = txItem.eventId,
+            offset = txItem.offset,
+            domainId = txItem.domainId,
+            date = txItem.date,
+            svRewardCollected = txItem.svRewardCollected,
+            mint = txItem.mint,
+            tap = txItem.tap,
+            transfer = txItem.transfer,
+            coinPrice = txItem.coinPrice,
+          )
+        }.toVector
       )
     }
   }

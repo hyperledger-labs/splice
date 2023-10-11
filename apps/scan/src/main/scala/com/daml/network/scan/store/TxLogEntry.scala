@@ -34,22 +34,22 @@ object TxLogEntry {
   object OpenMiningRoundLogEntry {
     val transaction_type = "open_mining_round"
   }
-  sealed trait ActivityType {
-    def toResponse: httpDef.ListActivityResponseItem.ActivityType
+  sealed trait TransactionType {
+    def toResponse: httpDef.TransactionHistoryResponseItem.TransactionType
   }
-  object ActivityType {
-    import httpDef.ListActivityResponseItem.{ActivityType as HttpActivityType}
-    case object Transfer extends ActivityType {
-      def toResponse = HttpActivityType.Transfer
+  object TransactionType {
+    import httpDef.TransactionHistoryResponseItem.{TransactionType as HttpTransactionType}
+    case object Transfer extends TransactionType {
+      def toResponse = HttpTransactionType.Transfer
     }
-    case object Mint extends ActivityType {
-      def toResponse = HttpActivityType.Mint
+    case object Mint extends TransactionType {
+      def toResponse = HttpTransactionType.Mint
     }
-    case object Tap extends ActivityType {
-      def toResponse = HttpActivityType.DevnetTap
+    case object Tap extends TransactionType {
+      def toResponse = HttpTransactionType.DevnetTap
     }
-    case object SvRewardCollected extends ActivityType {
-      def toResponse = HttpActivityType.SvRewardCollected
+    case object SvRewardCollected extends TransactionType {
+      def toResponse = HttpTransactionType.SvRewardCollected
     }
   }
 
@@ -86,9 +86,9 @@ object TxLogEntry {
     )
   }
 
-  sealed trait ActivityLogEntry extends TxLogEntry {
-    def activityType: ActivityType
-    def toResponseItem: httpDef.ListActivityResponseItem
+  sealed trait TransactionLogEntry extends TxLogEntry {
+    def transactionType: TransactionType
+    def toResponseItem: httpDef.TransactionHistoryResponseItem
     def date: Instant
   }
 
@@ -103,7 +103,7 @@ object TxLogEntry {
       val sender = parseSenderAmount(node.argument.value, node.result.value)
       val receivers = parseReceiverAmounts(node.argument.value, node.result.value)
       TransferLogEntry(
-        indexRecord = ActivityIndexRecord(tx, event, domainId),
+        indexRecord = TransactionIndexRecord(tx, event, domainId),
         date = tx.getEffectiveAt,
         provider = node.argument.value.transfer.provider,
         sender = sender,
@@ -114,16 +114,16 @@ object TxLogEntry {
   }
 
   final case class TransferLogEntry(
-      indexRecord: ActivityIndexRecord,
+      indexRecord: TransactionIndexRecord,
       date: Instant,
       provider: String,
       sender: SenderAmount,
       receivers: Seq[ReceiverAmount],
       coinPrice: BigDecimal,
-  ) extends ActivityLogEntry {
-    val activityType = ActivityType.Transfer
-    def toResponseItem = httpDef.ListActivityResponseItem(
-      activityType = activityType.toResponse,
+  ) extends TransactionLogEntry {
+    val transactionType = TransactionType.Transfer
+    def toResponseItem = httpDef.TransactionHistoryResponseItem(
+      transactionType = transactionType.toResponse,
       eventId = indexRecord.eventId,
       offset = indexRecord.optOffset,
       domainId = indexRecord.domainId.toProtoPrimitive,
@@ -140,15 +140,15 @@ object TxLogEntry {
   }
 
   final case class TapLogEntry(
-      indexRecord: ActivityIndexRecord,
+      indexRecord: TransactionIndexRecord,
       date: Instant,
       coinOwner: String,
       coinAmount: BigDecimal,
       coinPrice: BigDecimal,
-  ) extends ActivityLogEntry {
-    val activityType = ActivityType.Tap
-    def toResponseItem = httpDef.ListActivityResponseItem(
-      activityType = activityType.toResponse,
+  ) extends TransactionLogEntry {
+    val transactionType = TransactionType.Tap
+    def toResponseItem = httpDef.TransactionHistoryResponseItem(
+      transactionType = transactionType.toResponse,
       eventId = indexRecord.eventId,
       offset = indexRecord.optOffset,
       domainId = indexRecord.domainId.toProtoPrimitive,
@@ -164,15 +164,15 @@ object TxLogEntry {
   }
 
   final case class MintLogEntry(
-      indexRecord: ActivityIndexRecord,
+      indexRecord: TransactionIndexRecord,
       date: Instant,
       coinOwner: String,
       coinAmount: BigDecimal,
       coinPrice: BigDecimal,
-  ) extends ActivityLogEntry {
-    val activityType = ActivityType.Mint
-    def toResponseItem = httpDef.ListActivityResponseItem(
-      activityType = activityType.toResponse,
+  ) extends TransactionLogEntry {
+    val transactionType = TransactionType.Mint
+    def toResponseItem = httpDef.TransactionHistoryResponseItem(
+      transactionType = transactionType.toResponse,
       eventId = indexRecord.eventId,
       offset = indexRecord.optOffset,
       domainId = indexRecord.domainId.toProtoPrimitive,
@@ -188,15 +188,15 @@ object TxLogEntry {
   }
 
   final case class SvRewardCollectedLogEntry(
-      indexRecord: ActivityIndexRecord,
+      indexRecord: TransactionIndexRecord,
       date: Instant,
       coinOwner: String,
       coinAmount: BigDecimal,
       coinPrice: BigDecimal,
-  ) extends ActivityLogEntry {
-    val activityType = ActivityType.SvRewardCollected
-    def toResponseItem = httpDef.ListActivityResponseItem(
-      activityType = activityType.toResponse,
+  ) extends TransactionLogEntry {
+    val transactionType = TransactionType.SvRewardCollected
+    def toResponseItem = httpDef.TransactionHistoryResponseItem(
+      transactionType = transactionType.toResponse,
       eventId = indexRecord.eventId,
       offset = indexRecord.optOffset,
       domainId = indexRecord.domainId.toProtoPrimitive,

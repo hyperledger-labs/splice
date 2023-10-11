@@ -12,6 +12,7 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Try
 import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
 import com.digitalasset.canton.topology.DomainId
+import scala.collection.SeqView
 
 /** Stores historical information that can be used to construct application-specific historical events,
   * such as a user notification or an item from a bank statement.
@@ -35,6 +36,26 @@ trait TxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
 }
 
 object TxLogStore {
+  def firstPage[TXI <: TxLogStore.IndexRecord](log: SeqView[TXI], pageSize: Int)(
+      filter: TXI => Boolean
+  ) =
+    log
+      .filter(filter)
+      .take(pageSize)
+      .toSeq
+
+  def nextPage[TXI <: TxLogStore.IndexRecord](
+      log: SeqView[TXI],
+      pageEndEventId: String,
+      pageSize: Int,
+  )(
+      filter: TXI => Boolean
+  ) =
+    log
+      .filter(txi => filter(txi))
+      .dropWhile(_.eventId != pageEndEventId)
+      .slice(1, 1 + pageSize)
+      .toSeq
 
   /** Stores all information about a historical event that is needed to display the event in a frontend.
     * Instances of Entry are not persisted.

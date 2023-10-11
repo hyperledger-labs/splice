@@ -110,7 +110,7 @@ class InMemoryUserWalletStore(
         false
     }
     val indices = beginAfterEventId.fold(
-      txLog.filterTxLogIndicesByOffset(0, limit)(filter)
+      txLog.filterTxLogIndicesByOffset(limit)(filter)
     )(
       txLog.filterTxLogIndicesAfterEventId(_, limit)(filter)
     )

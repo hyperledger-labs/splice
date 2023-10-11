@@ -23,6 +23,13 @@ import io.grpc.Status
 import scala.concurrent.{ExecutionContext, Future}
 import java.time.Instant
 
+sealed trait SortOrder
+
+object SortOrder {
+  case object Ascending extends SortOrder
+  case object Descending extends SortOrder
+}
+
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
 trait ScanStore
     extends CNNodeAppStoreWithHistory[
@@ -125,12 +132,13 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
-  def listActivity(
-      beginAfterEventId: Option[String],
+  def listTransactions(
+      pageEndEventId: Option[String],
+      sortOrder: SortOrder,
       limit: Int,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[TxLogEntry.ActivityLogEntry]]
+  ): Future[Seq[TxLogEntry.TransactionLogEntry]]
 
   protected def loadTxLogEntry(
       txLogReader: TxLogStore.Reader[TxLogIndexRecord, TxLogEntry],

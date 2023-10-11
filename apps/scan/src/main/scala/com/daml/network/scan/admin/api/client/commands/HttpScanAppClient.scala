@@ -522,9 +522,12 @@ object HttpScanAppClient {
 
   final case class SvcSequencer(id: SequencerId, url: String, svName: String)
 
-  case class ListActivity(beginAfterEventId: Option[String], pageSize: Int)
-      extends BaseCommand[http.ListActivityResponse, Seq[
-        definitions.ListActivityResponseItem
+  case class ListTransactions(
+      pageEndEventId: Option[String],
+      sortOrder: definitions.TransactionHistoryRequest.SortOrder,
+      pageSize: Int,
+  ) extends BaseCommand[http.ListTransactionHistoryResponse, Seq[
+        definitions.TransactionHistoryResponseItem
       ]] {
     override def submitRequest(
         client: http.ScanClient,
@@ -532,15 +535,17 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.ListActivityResponse] =
-      client.listActivity(
-        definitions.ListActivityRequest(beginAfterEventId, pageSize.toLong),
+    ], http.ListTransactionHistoryResponse] = {
+      client.listTransactionHistory(
+        definitions
+          .TransactionHistoryRequest(pageEndEventId, Some(sortOrder), pageSize.toLong),
         headers,
       )
+    }
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.ListActivityResponse.OK(response) =>
-        Right(response.activities)
+      case http.ListTransactionHistoryResponse.OK(response) =>
+        Right(response.transactions)
     }
   }
 }

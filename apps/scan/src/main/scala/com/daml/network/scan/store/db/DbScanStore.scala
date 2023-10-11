@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.db.ScanTables.{ScanAcsStoreRowData, ScanTxLogRowData}
-import com.daml.network.scan.store.{ScanStore, TxLogEntry, TxLogIndexRecord}
+import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry, TxLogIndexRecord}
 import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
@@ -29,6 +29,8 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import com.daml.network.scan.store.SortOrder.Ascending
+import com.daml.network.scan.store.SortOrder.Descending
 
 class DbScanStore(
     override val svcParty: PartyId,
@@ -238,46 +240,54 @@ class DbScanStore(
       } yield result.getOrElse(0)
     }
 
-  override def listActivity(
-      beginAfterEventId: Option[String],
+  override def listTransactions(
+      pageEndEventId: Option[String],
+      sortOrder: SortOrder,
       limit: Int,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[TxLogEntry.ActivityLogEntry]] =
+  ): Future[Seq[TxLogEntry.TransactionLogEntry]] =
     waitUntilAcsIngested {
-      val dbType = TxLogIndexRecord.ActivityIndexRecord.dbType
+      val dbType = TxLogIndexRecord.TransactionIndexRecord.dbType
+      // Literal sort order since Postgres complains when trying to bind it to a parameter
+      val (compareEntryNumber, orderLimit) = sortOrder match {
+        case Ascending =>
+          (sql" > ", sql""" order by entry_number asc limit $limit;""")
+        case Descending =>
+          (sql" < ", sql""" order by entry_number desc limit $limit;""")
+      }
+
       for {
         rows <- storage.query(
-          beginAfterEventId.fold(
-            sql"""
+          pageEndEventId.fold(
+            (sql"""
+                select event_id, domain_id
+                from scan_txlog_store
+                where store_id = $storeId
+                  and index_record_type = ${dbType}""" ++ orderLimit).toActionBuilder
+              .as[(String, String)]
+          )(pageEndEventId =>
+            (sql"""
                 select event_id, domain_id
                 from scan_txlog_store
                 where store_id = $storeId
                   and index_record_type = ${dbType}
-                order by entry_number desc
-                limit $limit;
-          """.as[(String, String)]
-          )(beginAfterEventId => sql"""
-                select event_id, domain_id
+                   and entry_number """ ++ compareEntryNumber ++
+              sql"""(
+                select entry_number
                 from scan_txlog_store
                 where store_id = $storeId
-                  and index_record_type = ${dbType}
-                  and entry_number < (
-                      select entry_number
-                      from scan_txlog_store
-                      where store_id = $storeId
-                      and event_id = ${lengthLimited(beginAfterEventId)}
-                      and index_record_type = ${dbType}
-                  )
-                order by entry_number desc
-                limit $limit;
-           """.as[(String, String)]),
-          "listActivity",
+                and event_id = ${lengthLimited(pageEndEventId)}
+                and index_record_type = ${dbType}
+            )""" ++ orderLimit).toActionBuilder
+              .as[(String, String)]
+          ),
+          "listTransactions",
         )
         entries <- rows.traverse { case (eventId, domainId) =>
           loadTxLogEntry(txLogReader, eventId, DomainId.tryFromString(domainId), None, dbType)
         }: Future[Seq[TxLogEntry]]
-        activityEntries = entries.collect { case e: TxLogEntry.ActivityLogEntry =>
+        activityEntries = entries.collect { case e: TxLogEntry.TransactionLogEntry =>
           e
         }
       } yield activityEntries

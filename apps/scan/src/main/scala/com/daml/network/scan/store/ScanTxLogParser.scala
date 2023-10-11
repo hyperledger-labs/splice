@@ -48,7 +48,7 @@ class ScanTxLogParser(
               exercised,
               domainId,
               node.result.value,
-              ActivityType.Tap,
+              TransactionType.Tap,
             )
           case Mint(node) =>
             State.fromCoinCreateSummary(
@@ -56,7 +56,7 @@ class ScanTxLogParser(
               exercised,
               domainId,
               node.result.value,
-              ActivityType.Mint,
+              TransactionType.Mint,
             )
           case SvcRules_CollectSvReward(node) =>
             State.fromCoinCreateSummary(
@@ -64,7 +64,7 @@ class ScanTxLogParser(
               exercised,
               domainId,
               node.result.value,
-              ActivityType.SvRewardCollected,
+              TransactionType.SvRewardCollected,
             )
           case ImportCrate_Receive(_) =>
             State.empty
@@ -249,29 +249,29 @@ object ScanTxLogParser {
         event: TreeEvent,
         domainId: DomainId,
         ccsum: CoinCreateSummary[T],
-        activityType: ActivityType,
+        activityType: TransactionType,
     ): State = {
       val coin = getCoinFromSummary(tx, ccsum)
       val activityEntry = activityType match {
-        case ActivityType.Tap =>
+        case TransactionType.Tap =>
           TapLogEntry(
-            indexRecord = ActivityIndexRecord(tx, event, domainId),
+            indexRecord = TransactionIndexRecord(tx, event, domainId),
             date = tx.getEffectiveAt,
             coinOwner = coin.owner,
             coinAmount = coin.amount.initialAmount,
             coinPrice = ccsum.coinPrice,
           )
-        case ActivityType.Mint =>
+        case TransactionType.Mint =>
           MintLogEntry(
-            indexRecord = ActivityIndexRecord(tx, event, domainId),
+            indexRecord = TransactionIndexRecord(tx, event, domainId),
             date = tx.getEffectiveAt,
             coinOwner = coin.owner,
             coinAmount = coin.amount.initialAmount,
             coinPrice = ccsum.coinPrice,
           )
-        case ActivityType.SvRewardCollected =>
+        case TransactionType.SvRewardCollected =>
           SvRewardCollectedLogEntry(
-            indexRecord = ActivityIndexRecord(tx, event, domainId),
+            indexRecord = TransactionIndexRecord(tx, event, domainId),
             date = tx.getEffectiveAt,
             coinOwner = coin.owner,
             coinAmount = coin.amount.initialAmount,
