@@ -232,7 +232,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     sv1,
     'validator1',
     validator1Onboarding,
-    withDomainFees,
+    // TODO(#8004) - enable topups for validator1
+    false,
     isDevNet,
     'auth0|63e3d75ff4114d87a2c1e4f5',
     backupConfig,
@@ -244,7 +245,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     sv1,
     'auth0|63e12e0415ad881ffe914e61',
     splitwellOnboarding,
-    withDomainFees,
+    // TODO(#8004) - enable topups for splitwell validator
+    false,
     backupConfig,
     bootstrappingDumpConfig
   );
