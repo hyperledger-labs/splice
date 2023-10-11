@@ -1903,10 +1903,12 @@ jobs:
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Test
+          additional_nix_args: "--keep GITHUB_TOKEN"
           cmd: |
             set -euo pipefail
 
-            git rev-parse --short HEAD
+            git tag --force test-tag
+            git push --force origin test-tag
 
   update_pipeline_schedule:
     docker:
