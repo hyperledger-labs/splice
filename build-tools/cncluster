@@ -1357,6 +1357,10 @@ function subcmd_ci_apply_sv() {
 
     _cluster_show
 
+    if [ -n "${BOOTSTRAPPING_CONFIG:-}" ]; then
+       _info "Bootstrapping SV from ${BOOTSTRAPPING_CONFIG}"
+    fi
+
     local -x TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
 
     local -x CHARTS_VERSION="${1-}"
