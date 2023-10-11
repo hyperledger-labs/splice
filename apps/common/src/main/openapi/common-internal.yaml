@@ -67,7 +67,6 @@ components:
         - id
         - keys
         - bootstrapTxs
-        - users
       properties:
         id:
           type: string
@@ -79,10 +78,6 @@ components:
           type: array
           items:
             type: string
-        users:
-          type: array
-          items:
-            $ref: "#/components/schemas/ParticipantUser"
         version:
           type: string
 

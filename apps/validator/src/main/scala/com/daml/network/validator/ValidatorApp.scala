@@ -359,7 +359,6 @@ class ValidatorApp(
       _ <- setupWalletDars(participantAdminConnection)
       participantIdentitiesStore = new ParticipantIdentitiesStore(
         participantAdminConnection,
-        ledgerClient.connection("ParticipantIdentitiesStore", loggerFactory),
         config.participantIdentitiesBackup,
         clock,
         loggerFactory,

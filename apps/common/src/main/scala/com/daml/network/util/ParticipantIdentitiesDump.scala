@@ -1,7 +1,7 @@
 package com.daml.network.util
 
 import better.files.File
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.daml.network.http.v0.definitions as http
@@ -16,7 +16,6 @@ final case class ParticipantIdentitiesDump(
     id: ParticipantId,
     keys: Seq[ParticipantIdentitiesDump.ParticipantKey],
     bootstrapTxs: Seq[GenericSignedTopologyTransactionX],
-    users: Seq[ParticipantIdentitiesDump.ParticipantUser],
     version: Option[String],
 ) {
   def toHttp: http.ParticipantIdentitiesDump = {
@@ -26,9 +25,6 @@ final case class ParticipantIdentitiesDump(
         .map(key => http.ParticipantKey(Base64.getEncoder().encodeToString(key.keyPair), key.name))
         .toVector,
       bootstrapTxs.map(tx => Base64.getEncoder().encodeToString(tx.toByteArray)).toVector,
-      users
-        .map(user => http.ParticipantUser(user.id, user.primaryParty.map(_.toProtoPrimitive)))
-        .toVector,
       version,
     )
   }
@@ -50,9 +46,6 @@ object ParticipantIdentitiesDump {
             .fromByteArray(Base64.getDecoder.decode(t))
             .fold(err => throw new IllegalArgumentException(err.message), identity)
         ),
-        users = response.users.toSeq.map(user =>
-          ParticipantUser(user.id, user.primaryParty.map(PartyId.tryFromProtoPrimitive(_)))
-        ),
         version = response.version,
       )
     ).toEither.left.map(_.getMessage())
@@ -72,9 +65,5 @@ object ParticipantIdentitiesDump {
   final case class ParticipantKey(
       keyPair: Array[Byte],
       name: Option[String],
-  )
-  final case class ParticipantUser(
-      id: String,
-      primaryParty: Option[PartyId],
   )
 }

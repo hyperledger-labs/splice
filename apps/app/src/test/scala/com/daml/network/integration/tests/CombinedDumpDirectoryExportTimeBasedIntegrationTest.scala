@@ -2,7 +2,6 @@ package com.daml.network.integration.tests
 
 import com.daml.network.config.BackupDumpConfig
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.ParticipantIdentitiesDump
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 final class CombinedDumpDirectoryExportTimeBasedIntegrationTest
@@ -39,27 +38,6 @@ final class CombinedDumpDirectoryExportTimeBasedIntegrationTest
         val svParticipantDump = clue("Getting participant identities dump from SV1") {
           sv1ValidatorBackend.dumpParticipantIdentities()
         }
-        val sv1Party = sv1Backend.getSvcInfo().svParty
-        clue("Checking exported users list") {
-          svParticipantDump.users should contain(
-            ParticipantIdentitiesDump.ParticipantUser(
-              sv1Backend.config.ledgerApiUser,
-              Some(sv1Party),
-            )
-          )
-          svParticipantDump.users should contain(
-            ParticipantIdentitiesDump.ParticipantUser(
-              sv1ValidatorBackend.config.ledgerApiUser,
-              Some(sv1Party),
-            )
-          )
-          svParticipantDump.users should contain(
-            ParticipantIdentitiesDump.ParticipantUser(
-              sv1ValidatorBackend.config.validatorWalletUser.value,
-              Some(sv1Party),
-            )
-          )
-        }
         writeParticipantDump("sv1", svParticipantDump.toJson.spaces2)
     }
   }
@@ -70,15 +48,6 @@ final class CombinedDumpDirectoryExportTimeBasedIntegrationTest
           clue("Getting participant identities dump from Alice's validator") {
             aliceValidatorBackend.dumpParticipantIdentities()
           }
-        val validatorParty = aliceValidatorBackend.getValidatorPartyId()
-        clue("Checking exported users list") {
-          validatorParticipantDump.users should contain(
-            ParticipantIdentitiesDump.ParticipantUser(
-              aliceValidatorBackend.config.ledgerApiUser,
-              Some(validatorParty),
-            )
-          )
-        }
         writeParticipantDump("alice", validatorParticipantDump.toJson.spaces2)
     }
   }

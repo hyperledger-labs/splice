@@ -37,14 +37,14 @@ import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
   SyncCloseable,
 }
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset.Value
 import com.digitalasset.canton.topology.{DomainId, Identifier, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{AkkaUtil, ErrorUtil, LoggerUtil}
+import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.FieldMask
 import io.grpc.{Status, StatusRuntimeException}
@@ -53,7 +53,6 @@ import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.implicitNotFound
-import scala.collection.immutable.Seq
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -486,19 +485,6 @@ class CNLedgerConnection(
       },
       logger,
     )
-
-  def listAllUsers()(implicit elc: ErrorLoggingContext, ec: ExecutionContext): Future[Seq[User]] =
-    client.listUsers(None, Integer.MAX_VALUE).map { case (users, nextPageToken) =>
-      if (nextPageToken.isDefined) {
-        // If we have more than Integer.MAX_VALUE users we are probably going to see other problems first.
-        ErrorUtil.internalError(
-          new IllegalStateException(
-            "Participant has more users than can be listed in one API call."
-          )
-        )
-      }
-      users
-    }
 
   def getUser(user: String, identityProviderId: Option[String] = None): Future[User] =
     client.getUser(user, identityProviderId)

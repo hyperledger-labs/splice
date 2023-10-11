@@ -2,22 +2,19 @@ package com.daml.network.validator.store
 
 import cats.syntax.traverse.*
 import com.daml.network.config.BackupDumpConfig
-import com.daml.network.environment.{BuildInfo, CNLedgerConnection, ParticipantAdminConnection}
+import com.daml.network.environment.{BuildInfo, ParticipantAdminConnection}
 import com.daml.network.util.{BackupDump, ParticipantIdentitiesDump}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.nio.file.{Path, Paths}
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future, blocking}
-import scala.jdk.OptionConverters.*
 
 /** A store for accessing the participant identities. */
 class ParticipantIdentitiesStore(
     participantAdminConnection: ParticipantAdminConnection,
-    connection: CNLedgerConnection,
     backupDumpConfig: Option[BackupDumpConfig],
     clock: Clock,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -41,21 +38,10 @@ class ParticipantIdentitiesStore(
           )
       )
       bootstrapTxs <- participantAdminConnection.getIdentityBootstrapTransactions(id.uid)
-      users <- connection
-        .listAllUsers()
-        .map(users =>
-          users.map(user =>
-            ParticipantIdentitiesDump.ParticipantUser(
-              user.getId(),
-              user.getPrimaryParty().toScala.map(PartyId.tryFromProtoPrimitive),
-            )
-          )
-        )
     } yield ParticipantIdentitiesDump(
       id,
       keys,
       bootstrapTxs,
-      users,
       Some(BuildInfo.compiledVersion),
     )
 
@@ -83,7 +69,7 @@ class ParticipantIdentitiesStore(
         // then makes all the logging stuff below very confusing.
         val filename = ParticipantIdentitiesStore.dumpFilename(now)
         val fileDesc =
-          s"participant identities dump containing ${dump.keys.size} keys and ${dump.users.size} users to ${dumpConfig.locationDescription} at path: $filename"
+          s"participant identities dump containing ${dump.keys.size} keys to ${dumpConfig.locationDescription} at path: $filename"
         logger.debug(s"Attempting to write $fileDesc")
         val path = BackupDump.write(
           dumpConfig,

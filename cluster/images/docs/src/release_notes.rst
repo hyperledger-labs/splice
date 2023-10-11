@@ -11,6 +11,8 @@ Release Notes
   * The recent activity tab in Scan now looks up CNS entries for party IDs.
     Party IDs are shown as-is if they are not found in CNS.
 
+* Removed certain unused fields from the participant identities dumps.
+
 2023-10-09
 ----------
 
