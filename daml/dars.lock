@@ -1,10 +1,10 @@
 daml/app-manager/.daml/dist/app-manager-0.1.0.dar 3943a4270fa412e4c4442f79fed5d7d1e8940676337486b8fa868d2d063e7520
-daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar be3d5a1b16e1b375f2f6bf0e4f00a16093c2bb7decee7be24f7348eaaaa2f56b
-daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar c5ec10ae6feec66453539f439ae83bc18983c85e156881d4f60aaba066af6bd7
+daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar d3449efbba029e99b55fb157e38d762fb792f7db849b3c8fe2dc62f92fc8fb3d
+daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar bb2e25659bb0f4b55d8998f395a91b15c5d14c799310f3390a4129fefb11e921
 daml/cn-util/.daml/dist/cn-util-0.1.0.dar dc2da89e3df6a2cf6c6768fc4939c39b85808616bfcee66a30013cf1f179c692
-daml/directory-service/.daml/dist/directory-service-0.1.0.dar 00fead4aa9b691bc4f846d59c20d29a6fa465ffed8645cc7f7f4f2f1244740c3
-daml/splitwell/.daml/dist/splitwell-0.1.0.dar be9d66f83f5e88aa4731a69a85d6288f1b9e9f51aa3b4fc50ee17085cacfa9e9
-daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar ac1ca55471ed3014878f4000ee8738cde153b86814cf662d44952e4efda4eb15
+daml/directory-service/.daml/dist/directory-service-0.1.0.dar 3901aa85e112d023feec8b4cabfe67fb48b98fe0b6d8cc9cf43b761f16f7992c
+daml/splitwell/.daml/dist/splitwell-0.1.0.dar c747cd03af3af2c3e0c2bfafbccd276b34549547a35c02e942b7a7bfdd0cc112
+daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar 5c9d3cd92508c8676021c6e05eebb382760ee36b4e9bb6d87db30b0a387ba2b2
 daml/validator-lifecycle/.daml/dist/validator-lifecycle-0.1.0.dar f8c6c49fb05d18d598893b1b3a09f80fc3f6810e1f79f3dde4a18b8870ff1bba
-daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar 7e18d49bce94252b6ae63eae6b9022d96b06724fea3a68d8134937c9b08fbaea
-daml/wallet/.daml/dist/wallet-0.1.0.dar 9f0095678c9c8ae83f2074f21e70930f72846fbe59d77ec3b887d064a79b7d11
+daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar 7f4ffff685aff3e2ca22c8d6d9c9ad0ee710c334163dd8ad3fc50283fc60899b
+daml/wallet/.daml/dist/wallet-0.1.0.dar 662ca0fbe1c084050f6a9a0856cfcea968f415707a6a52c465b235e002e344bf

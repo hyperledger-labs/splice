@@ -1,6 +1,8 @@
 package com.daml.network.util
 
+import cats.syntax.either.*
 import com.daml.ledger.javaapi.data.Unit as DamlUnit
+import com.daml.lf.archive.DarDecoder
 import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cc
@@ -24,13 +26,48 @@ import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
+import java.io.InputStream
 import java.math.RoundingMode
 import java.time.{Duration, Instant}
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipInputStream
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.util.Using
 
 object CNNodeUtil {
+
+  private def readDarVersion(resourcePath: String): String = {
+    val resourceStream = getClass.getClassLoader.getResourceAsStream(resourcePath)
+    if (resourceStream == null) {
+      throw new IllegalArgumentException(s"Failed to parse resource: $resourcePath")
+    }
+    readDarVersion(resourcePath, resourceStream)
+  }
+
+  private def readDarVersion(name: String, stream: InputStream): String = {
+    Using.resource(new ZipInputStream(stream)) { zipStream =>
+      val dar = DarDecoder
+        .readArchive(name, zipStream)
+        .valueOr(err => throw new IllegalArgumentException(s"Failed to decode dar: $err"))
+      val metadata = dar.main._2.metadata.getOrElse(
+        throw new AssertionError(s"Package is missing metadata which is mandatory in LF >= 1.8")
+      )
+      metadata.version
+    }
+  }
+
+  private def readPackageConfig(): cc.coinconfig.PackageConfig = {
+    new cc.coinconfig.PackageConfig(
+      readDarVersion("dar/canton-coin-0.1.0.dar"),
+      readDarVersion("dar/canton-name-service-0.1.0.dar"),
+      readDarVersion("dar/directory-service-0.1.0.dar"),
+      readDarVersion("dar/svc-governance-0.1.0.dar"),
+      readDarVersion("dar/validator-lifecycle-0.1.0.dar"),
+      readDarVersion("dar/wallet-0.1.0.dar"),
+      readDarVersion("dar/wallet-payments-0.1.0.dar"),
+    )
+  }
 
   def selectLatestOpenMiningRound[Ct <: ContractWithState[?, cc.round.OpenMiningRound]](
       now: CantonTimestamp,
@@ -211,6 +248,7 @@ object CNNodeUtil {
 
     // tick duration
     new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
+    readPackageConfig(),
   )
 
   def defaultCnsConfig(

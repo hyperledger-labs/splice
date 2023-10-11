@@ -280,6 +280,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
               initialValue.issuanceCurve,
               initialValue.globalDomain,
               initialValue.tickDuration,
+              initialValue.packageConfig,
             ),
           )
 

@@ -66,6 +66,14 @@ defaultCoinConfig = CoinConfig with
   -- Duration of one tick, which is half the target duration of one round
   -- default: 2.5 minutes
   tickDuration = seconds 150
+  packageConfig = PackageConfig with
+    cantonCoin = "0.1.0"
+    cantonNameService = "0.1.0"
+    directoryService = "0.1.0"
+    svcGovernance = "0.1.0"
+    validatorLifecycle = "0.1.0"
+    wallet = "0.1.0"
+    walletPayments = "0.1.0"
 
 -- | Default configuration schedule with single current coin config
 defaultCoinConfigSchedule : Schedule Time (CoinConfig USD)

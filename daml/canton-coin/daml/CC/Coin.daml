@@ -712,6 +712,7 @@ scaleCoinConfig coinPrice config = CoinConfig with
   globalDomain = config.globalDomain
   issuanceCurve = config.issuanceCurve
   tickDuration = config.tickDuration
+  packageConfig = config.packageConfig
 
 computeFees : Party -> TransferContext -> Party -> [TransferOutput] -> Update [Decimal]
 computeFees svc context sender outputs = do

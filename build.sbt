@@ -261,11 +261,15 @@ lazy val `apps-common` =
       `canton-community-common`,
       `canton-community-app` % "compile->compile;test->test",
       `canton-community-testing` % "test",
+      // We include all DARs here to make sure they are available as resources.
       `canton-coin-daml`,
       `canton-name-service-daml`,
-      `wallet-daml` % "test",
-      `splitwell-daml` % "test",
-      `svc-governance-daml` % "test",
+      `directory-daml`,
+      `splitwell-daml`,
+      `svc-governance-daml`,
+      `validator-lifecycle-daml`,
+      `wallet-daml`,
+      `wallet-payments-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(
