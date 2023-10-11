@@ -19,6 +19,9 @@ auth:
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
 
 topup:
+  # At present, domain fees are disabled on DevNet. So, DevNet deployments should disable topups by setting enabled to false.
+  # enabled: false
+
   enabled: true
   targetThroughput: 33300
   minTopupInterval: "1m"
