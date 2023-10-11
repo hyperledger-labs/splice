@@ -684,6 +684,21 @@ jobs:
       - cluster_lock_reaper:
           cluster: "scratchnete"
 
+  mark_branch_for_testnet:
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Test
+          cmd: |
+            set -euo pipefail
+
+            git rev-parse --short HEAD
+
   update_pipeline_schedule:
     docker:
     - image: cimg/base:2021.04

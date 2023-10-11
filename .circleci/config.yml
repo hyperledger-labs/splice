@@ -31,8 +31,9 @@ parameters:
     type: enum
     enum: [build, deploy-cidaily, deploy-cidaily-testnet, deploy-cilr, deploy-devnet, deploy-testnet,
            healthcheck-cidaily, healthcheck-cidaily-testnet, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet,
-           redeploy-sv-runbook-cidaily, redeploy-sv-runbook-cilr, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
-    default: build
+           redeploy-sv-runbook-cidaily, redeploy-sv-runbook-cilr, publish-public-artifacts, auth0-user-cleanup,
+           cluster-lock-reaper, mark-branch-for-testnet]
+    default: mark-branch-for-testnet
   # Tag the current commit for the next DevNet release, overwriting the existing tag if it exists.
   mark-for-devnet:
     type: boolean
@@ -1892,6 +1893,21 @@ jobs:
       - cluster_lock_reaper:
           cluster: "scratchnete"
 
+  mark_branch_for_testnet:
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Test
+          cmd: |
+            set -euo pipefail
+
+            git rev-parse --short HEAD
+
   update_pipeline_schedule:
     docker:
     - image: cimg/base:2021.04
@@ -2780,6 +2796,15 @@ workflows:
             context:
               - canton-network-vpn
               - slack-context
+
+  mark_branch_for_testnet:
+    when:
+      equal: [ mark-branch-for-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - mark_branch_for_testnet:
+          <<: *notify-fail
+          context:
+            - slack-context
 
   deploy_scratchneta:
     when:

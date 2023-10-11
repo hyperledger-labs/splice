@@ -728,3 +728,12 @@ workflows:
             context:
               - canton-network-vpn
               - slack-context
+
+  mark_branch_for_testnet:
+    when:
+      equal: [ mark-branch-for-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - mark_branch_for_testnet:
+          <<: *notify-fail
+          context:
+            - slack-context

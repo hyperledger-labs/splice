@@ -25,8 +25,9 @@ parameters:
     type: enum
     enum: [build, deploy-cidaily, deploy-cidaily-testnet, deploy-cilr, deploy-devnet, deploy-testnet,
            healthcheck-cidaily, healthcheck-cidaily-testnet, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet,
-           redeploy-sv-runbook-cidaily, redeploy-sv-runbook-cilr, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
-    default: build
+           redeploy-sv-runbook-cidaily, redeploy-sv-runbook-cilr, publish-public-artifacts, auth0-user-cleanup,
+           cluster-lock-reaper, mark-branch-for-testnet]
+    default: mark-branch-for-testnet
   # Tag the current commit for the next DevNet release, overwriting the existing tag if it exists.
   mark-for-devnet:
     type: boolean
