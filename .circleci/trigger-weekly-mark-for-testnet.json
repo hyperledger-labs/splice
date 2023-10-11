@@ -1,0 +1,20 @@
+{
+  "name": "Weekly mark next TestNet",
+  "description": "Weekly mark current DevNet for next TestNet",
+  "attribution-actor": "system",
+  "parameters": {
+    "branch": "devnet",
+    "run-job": "mark-for-testnet"
+  },
+  "timetable": {
+    "per-hour": 1,
+    "hours-of-day": [
+      1
+    ],
+    "days-of-week": [
+      "THU"
+    ],
+    "days-of-month": [],
+    "months": ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+  }
+}

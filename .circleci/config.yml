@@ -31,7 +31,8 @@ parameters:
     type: enum
     enum: [build, deploy-cidaily, deploy-cidaily-testnet, deploy-cilr, deploy-devnet, deploy-testnet,
            healthcheck-cidaily, healthcheck-cidaily-testnet, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet,
-           redeploy-sv-runbook-cidaily, redeploy-sv-runbook-cilr, publish-public-artifacts, auth0-user-cleanup, cluster-lock-reaper]
+           redeploy-sv-runbook-cidaily, redeploy-sv-runbook-cilr, publish-public-artifacts, auth0-user-cleanup,
+           cluster-lock-reaper, mark-for-testnet]
     default: build
   # Tag the current commit for the next DevNet release, overwriting the existing tag if it exists.
   mark-for-devnet:
@@ -1892,6 +1893,22 @@ jobs:
       - cluster_lock_reaper:
           cluster: "scratchnete"
 
+  mark_for_testnet:
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Mark commit for next TestNet release
+          additional_nix_args: "--keep GITHUB_TOKEN"
+          cmd: |
+            git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            git tag --force testnet-next
+            git push --force origin testnet-next
+
   update_pipeline_schedule:
     docker:
     - image: cimg/base:2021.04
@@ -2780,6 +2797,15 @@ workflows:
             context:
               - canton-network-vpn
               - slack-context
+
+  mark_for_testnet:
+    when:
+      equal: [ mark-for-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - mark_for_testnet:
+          <<: *notify-fail
+          context:
+            - slack-context
 
   deploy_scratchneta:
     when:

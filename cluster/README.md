@@ -335,6 +335,10 @@ A convenient way to move the `devnet-next` tag to the commit of the next `CIDail
 This will remove that tag. The next `CIDaily` deployment will then recreate the tag.
 Note that if the next `CIDaily` deployment fails, the next `DevNet` deployment will too (for lack of a tag).
 
+On Wednesday night, another trigger marks the version running on `DevNet`
+at that point in time with a `testnet-next` tag. That version will then be
+deployed on TestNet in the following TestNet upgrade (usually the following Monday morning).
+
 ### Manually Deploying via CI
 
 If necessary, it is possible to manually trigger CI/CD deployments to
