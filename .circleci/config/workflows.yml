@@ -325,7 +325,6 @@ workflows:
           - datadog
           - slack-context
         cluster: "cilr"
-        use_published_artifacts: true
         requires:
           - deploy_cluster
     - preflight_check:
