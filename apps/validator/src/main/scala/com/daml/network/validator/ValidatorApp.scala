@@ -524,8 +524,8 @@ class ValidatorApp(
 
       storeDomain <- store.domains.getDomainId(config.domains.global.alias)
       directoryExternalHandler = new HttpExternalDirectoryHandler(
+        walletManager,
         storeDomain,
-        ledgerClient.connection("HttpExternalDirectoryHandler", loggerFactory),
         config.domains.global.alias,
         retryProvider,
         loggerFactory,

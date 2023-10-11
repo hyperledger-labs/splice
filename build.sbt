@@ -666,6 +666,7 @@ lazy val `apps-wallet` =
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
       `wallet-daml`,
+      `directory-daml`,
       `svc-governance-daml`,
     )
     .settings(
@@ -704,6 +705,7 @@ lazy val `apps-directory` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
+      `apps-wallet`,
       `wallet-daml`,
       `directory-daml`,
     )

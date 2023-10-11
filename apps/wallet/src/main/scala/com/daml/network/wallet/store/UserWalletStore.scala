@@ -3,6 +3,7 @@ package com.daml.network.wallet.store
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
@@ -46,6 +47,16 @@ trait UserWalletStore
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
 
+  def lookupDirectoryInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
+    Option[
+      Contract[directoryCodegen.DirectoryInstall.ContractId, directoryCodegen.DirectoryInstall]
+    ]
+  ] = defaultAcsDomainIdF.flatMap(
+    multiDomainAcsStore
+      .listContractsOnDomain(directoryCodegen.DirectoryInstall.COMPANION, _, PageLimit(1))
+      .map(_.headOption)
+  )
+
   def lookupInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
     Option[Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]]
   ] = defaultAcsDomainIdF.flatMap(
@@ -54,6 +65,16 @@ trait UserWalletStore
       // here we just take the first one.
       .listContractsOnDomain(installCodegen.WalletAppInstall.COMPANION, _, PageLimit(1))
       .map(_.headOption)
+  )
+
+  def getDirectoryInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
+    Contract[directoryCodegen.DirectoryInstall.ContractId, directoryCodegen.DirectoryInstall]
+  ] = for {
+    ct <- lookupDirectoryInstall()
+  } yield ct.getOrElse(
+    throw Status.NOT_FOUND
+      .withDescription("DirectoryInstall contract not found")
+      .asRuntimeException()
   )
 
   def getInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
@@ -398,6 +419,7 @@ object UserWalletStore {
           co.payload.svcParty == svc &&
             co.payload.endUserParty == endUser
         ),
+        mkFilter(directoryCodegen.DirectoryInstall.COMPANION)(co => co.payload.user == endUser),
         // Coins
         mkFilter(coinCodegen.Coin.COMPANION)(co =>
           co.payload.svc == svc &&
