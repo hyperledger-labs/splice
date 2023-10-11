@@ -9,6 +9,8 @@ set -euo pipefail
 set +u
 TRIGGER_DEFINITION_FILE=$1
 
+echo "Processing $TRIGGER_DEFINITION_FILE"
+
 if [[ -z $TRIGGER_DEFINITION_FILE ]]; then
     echo "Error: usage $0 trigger-definition-file"
     exit 1

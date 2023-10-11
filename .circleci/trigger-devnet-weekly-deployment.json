@@ -4,7 +4,7 @@
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
-      "run-job": "deploy-devnet",
+      "run-job": "deploy-devnet"
     },
     "timetable" : {
       "per-hour" : 1,
