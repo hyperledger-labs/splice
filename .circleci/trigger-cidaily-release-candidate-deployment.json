@@ -5,7 +5,7 @@
     "parameters" : {
       "branch" : "main",
       "run-job": "deploy-cidaily",
-      "mark-for-testnet": true
+      "mark-for-devnet": true
     },
     "timetable" : {
       "per-hour" : 1,

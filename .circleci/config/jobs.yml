@@ -783,17 +783,17 @@ jobs:
              git tag "${RELEASE_TAG}"
              git push origin "${RELEASE_TAG}"
            fi
-           if [[ << pipeline.parameters.mark-for-testnet >> == true ]]; then
+           if [[ << pipeline.parameters.mark-for-devnet >> == true ]]; then
              # This is a mutating tag pointing to the most recent
-             # valid build for TestNet, and therefore the next build
-             # to go to TestNet.
-             git tag --force testnet-next
-             git push --force origin testnet-next
-           elif [[ << pipeline.parameters.mark-for-testnet-if-unmarked >> == true ]] &&
-             ! [ $(git tag -l testnet-next) ]
+             # valid build for DevNet, and therefore the next build
+             # to go to DevNet.
+             git tag --force devnet-next
+             git push --force origin devnet-next
+           elif [[ << pipeline.parameters.mark-for-devnet-if-unmarked >> == true ]] &&
+             ! [ $(git tag -l devnet-next) ]
            then
-             git tag testnet-next
-             git push origin testnet-next
+             git tag devnet-next
+             git push origin devnet-next
            fi
       - collect_test_timings_and_send_to_datadog
 
