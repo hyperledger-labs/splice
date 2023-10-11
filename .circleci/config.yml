@@ -1491,12 +1491,23 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
+      deploy_version:
+        type: string
+        default: ""
     steps:
       - checkout
       - record_job_start_time
       - setup_nix
+      - when:
+          condition: << parameters.deploy_version >>
+          steps:
+          - run_bash_command_in_nix:
+              cmd_name: Checkout commit << parameters.deploy_version >>
+              cmd: git checkout << parameters.deploy_version >>
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
           cluster: << parameters.cluster >>
           cmd: |
             make cluster/build
@@ -1528,50 +1539,11 @@ jobs:
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep GITHUB_TOKEN"
           cmd: |
-            scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
-          cmd_retry_count: 5
-      - notify-cluster-fail:
-          cluster: << parameters.cluster >>
-      - collect_test_timings_and_send_to_datadog
-
-  deploy_cluster_testnet_release:
-    circleci_ip_ranges: true
-    docker:
-      - image: cimg/base:2021.04
-    environment:
-      <<: *env
-      CIRCLE_TAG: git-<< pipeline.git.revision >>
-    parameters:
-      <<: *cluster-parameter
-    steps:
-      - checkout
-      - record_job_start_time
-      - setup_nix
-      - run_bash_command_in_nix:
-          cmd_name: Checkout testnet-next commit
-          cmd: git checkout testnet-next
-      - run_bash_command_in_nix:
-          cmd_name: Build Helm & Pulumi artifacts
-          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
-          no_output_timeout: "20m"
-          cluster: << parameters.cluster >>
-          cmd: make cluster/build
-      - run_bash_command_in_nix:
-          cmd_name: Deploy Pulumi/Helm configuration to cluster.
-          cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
-          gce_authenticate: true
-          cmd: |
-            export RESTORE_CLUSTER=1
-            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
-              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
-              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
-                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
-                exit 1
-              fi
+            # TODO(#7554): remove this condition once all deployment tags are past the point where we introduced this script (in #7875)
+            if [ -f scripts/update-deployment-branch.sh ]; then
+              scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
             fi
-            cncluster activate
-            cncluster ci_apply
+          cmd_retry_count: 5
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
       - collect_test_timings_and_send_to_datadog
@@ -2513,13 +2485,15 @@ workflows:
           - datadog
           - slack-context
         workflow_names: "deploy_testnet testnet_health_check"
-    - deploy_cluster_testnet_release:
+    - deploy_cluster:
         <<: *main-branch-only
         context:
           - artifactory
           - datadog
           - slack-context
         cluster: "testnet"
+        deploy_version: "testnet-next"
+        restore_cluster: true
         requires:
            - wait_for_previous_pipeline
     - preflight_check:
@@ -2532,7 +2506,7 @@ workflows:
           - slack-context
         cluster: "testnet"
         requires:
-          - deploy_cluster_testnet_release
+          - deploy_cluster
 
   deploy_cidaily_testnet:
     when:

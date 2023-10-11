@@ -1395,3 +1395,4 @@ When [deploying via CI](#manually-deploying-via-ci), you can use the `bootstrapp
   * [Conceptual Overview](https://www.pulumi.com/docs/concepts/)
   * [Google Cloud Objects](https://www.pulumi.com/registry/packages/gcp/api-docs/)
   * [Kubernetes Objects](https://www.pulumi.com/registry/packages/kubernetes/api-docs/)
+
