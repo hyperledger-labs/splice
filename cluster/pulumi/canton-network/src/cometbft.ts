@@ -2,6 +2,7 @@ import * as pulumi from '@pulumi/pulumi';
 import { Service } from '@pulumi/kubernetes/core/v1';
 import { Output } from '@pulumi/pulumi';
 import {
+  clusterLargeDisk,
   CLUSTER_DNS_NAME,
   CLUSTER_BASENAME,
   ExactNamespace,
@@ -135,6 +136,9 @@ export function installCometBftNode(
     },
     metrics: {
       enable: true,
+    },
+    db: {
+      volumeSize: clusterLargeDisk ? '320Gi' : '80Gi',
     },
   });
   return Service.get(

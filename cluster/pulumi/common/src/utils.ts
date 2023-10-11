@@ -56,6 +56,7 @@ export function envFlag(flagName: string, defaultFlag = false): boolean {
 }
 
 export const isDevNet = envFlag('IS_DEVNET', true);
+export const clusterLargeDisk = envFlag('CLUSTER_LARGE_DISK', false);
 
 // Refrence to upstream infrastructure stack.
 export const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);

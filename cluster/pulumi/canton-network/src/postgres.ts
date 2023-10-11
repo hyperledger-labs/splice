@@ -1,7 +1,7 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
-import { envFlag, ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
+import { clusterLargeDisk, envFlag, ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 
 const enableCloudSql = envFlag('ENABLE_CLOUD_SQL', false);
 
@@ -127,6 +127,9 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
 
     const pg = installCNHelmChart(xns, name, 'cn-postgres', {
       postgresPassword: this.password,
+      db: {
+        volumeSize: clusterLargeDisk ? '320Gi' : '160Gi',
+      },
     });
 
     this.registerOutputs({
