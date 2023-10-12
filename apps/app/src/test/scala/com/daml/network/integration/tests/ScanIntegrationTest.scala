@@ -12,6 +12,7 @@ import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.wallet.automation.CollectRewardsAndMergeCoinsTrigger
+import com.daml.network.validator.automation.TopupMemberTrafficTrigger
 import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
@@ -44,28 +45,18 @@ class ScanIntegrationTest
         )(config)
       )
       .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
+          _.withPausedTrigger[TopupMemberTrafficTrigger]
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
         CNNodeConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
           _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
         )(config)
       )
 
   "list transaction pages in ascending and descending order" in { implicit env =>
-    val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-    val aliceUserName = aliceWalletClient.config.ledgerApiUser
-
-    def filterTapsByAlice(txs: Seq[TransactionHistoryResponseItem]) = txs.filter { tx =>
-      tx.tap.exists { tap =>
-        tap.coinOwner == aliceUserParty.uid.toProtoPrimitive
-      }
-    }
-
-    def aliceMergeCoinsTrigger =
-      aliceValidatorBackend
-        .userWalletAutomation(aliceUserName)
-        .trigger[CollectRewardsAndMergeCoinsTrigger]
-
-    aliceMergeCoinsTrigger.pause().futureValue
-
+    onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val nrTaps = 10
     val coinAmounts = (1 to nrTaps).toSeq.map(BigDecimal(_))
     val pageSize = nrTaps / 2
@@ -87,67 +78,60 @@ class ScanIntegrationTest
     )
 
     eventually() {
-      val tapsFirstPageAscending = filterTapsByAlice(
+      val tapsFirstPageAscending =
         sv1ScanBackend
           .listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, pageSize)
-      )
 
       toCoinAmounts(tapsFirstPageAscending) should be(
         coinAmounts.take(pageSize)
       )
 
       val firstPageEndEventId = tapsFirstPageAscending.last.eventId
-      val tapsSecondPageAscending = filterTapsByAlice(
+      val tapsSecondPageAscending =
         sv1ScanBackend
           .listTransactions(
             Some(firstPageEndEventId),
             TransactionHistoryRequest.SortOrder.Asc,
             pageSize.toInt,
           )
-      )
+
       toCoinAmounts(tapsSecondPageAscending) should be(
         coinAmounts.drop(pageSize).take(pageSize)
       )
 
-      filterTapsByAlice(
-        sv1ScanBackend
-          .listTransactions(
-            Some(tapsSecondPageAscending.last.eventId),
-            TransactionHistoryRequest.SortOrder.Asc,
-            pageSize.toInt,
-          )
-      ) should be(empty)
+      sv1ScanBackend
+        .listTransactions(
+          Some(tapsSecondPageAscending.last.eventId),
+          TransactionHistoryRequest.SortOrder.Asc,
+          pageSize.toInt,
+        ) should be(empty)
 
-      val tapsFirstPageDescending = filterTapsByAlice(
+      val tapsFirstPageDescending =
         sv1ScanBackend
           .listTransactions(
             None,
             TransactionHistoryRequest.SortOrder.Desc,
             pageSize.toInt,
           )
-      )
       toCoinAmounts(tapsFirstPageDescending) should be(
         coinAmounts.reverse.take(pageSize)
       )
 
       val firstPageEndEventIdDescending = tapsFirstPageDescending.last.eventId
-      val tapsSecondPageDescending = filterTapsByAlice(
+      val tapsSecondPageDescending =
         sv1ScanBackend
           .listTransactions(
             Some(firstPageEndEventIdDescending),
             TransactionHistoryRequest.SortOrder.Desc,
             pageSize.toInt,
           )
-      )
 
-      filterTapsByAlice(
-        sv1ScanBackend
-          .listTransactions(
-            Some(tapsSecondPageDescending.last.eventId),
-            TransactionHistoryRequest.SortOrder.Desc,
-            pageSize.toInt,
-          )
-      ) should be(empty)
+      sv1ScanBackend
+        .listTransactions(
+          Some(tapsSecondPageDescending.last.eventId),
+          TransactionHistoryRequest.SortOrder.Desc,
+          pageSize.toInt,
+        ) should be(empty)
 
       toCoinAmounts(tapsSecondPageDescending) should be(
         coinAmounts.reverse.drop(pageSize).take(pageSize)
