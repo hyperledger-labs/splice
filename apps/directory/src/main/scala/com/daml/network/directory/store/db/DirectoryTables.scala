@@ -53,7 +53,7 @@ object DirectoryTables extends AcsTables {
           tryToDecode(directoryCodegen.DirectoryEntry.COMPANION, createdEvent) { contract =>
             DirectoryAcsStoreRowData(
               contract = contract,
-              contractExpiresAt = None,
+              contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
               directoryInstallUser = None,
               directoryEntryName = Some(contract.payload.name),
               directoryEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
@@ -107,6 +107,18 @@ object DirectoryTables extends AcsTables {
               directoryEntryName = None,
               directoryEntryOwner = None,
               subscriptionReferenceContractId = Some(contract.payload.reference),
+              subscriptionNextPaymentDueAt = None,
+            )
+          }
+        case subsCodegen.TerminatedSubscription.TEMPLATE_ID =>
+          tryToDecode(subsCodegen.TerminatedSubscription.COMPANION, createdEvent) { contract =>
+            DirectoryAcsStoreRowData(
+              contract = contract,
+              contractExpiresAt = None,
+              directoryInstallUser = None,
+              directoryEntryName = None,
+              directoryEntryOwner = None,
+              subscriptionReferenceContractId = None,
               subscriptionNextPaymentDueAt = None,
             )
           }

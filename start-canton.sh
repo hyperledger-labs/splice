@@ -146,6 +146,7 @@ fi
 
 # Create the DB's in parallel
 printf '%s\n' "${db_names[@]}" | xargs -P 64 -I {} ./scripts/postgres.sh "$POSTGRES_MODE" createdb {}
+POSTGRES_MODE=$POSTGRES_MODE ./scripts/create-cn-apps-dbs.sh
 
 # Tmux session setup
 function tmux_cmd() {

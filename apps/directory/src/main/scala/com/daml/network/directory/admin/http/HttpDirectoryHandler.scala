@@ -3,9 +3,11 @@ package com.daml.network.directory.admin.http
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.http.v0.{definitions, directory as v0}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.annotation.nowarn
@@ -30,8 +32,21 @@ class HttpDirectoryHandler(
   ): Future[v0.DirectoryResource.ListEntriesResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.listEntries") { _ => _ =>
-      for { entries <- store.listEntries(namePrefix.getOrElse(""), pageSize) } yield definitions
-        .ListEntriesResponse(entries.map(_.toHttp).toVector)
+      // TODO (#7988): pass this as a NonNegativeInt as opposed to re-converting to Int
+      for {
+        limit <- NonNegativeInt
+          .create(pageSize)
+          .fold(
+            _ =>
+              Future.failed(
+                Status.INVALID_ARGUMENT
+                  .withDescription("pageSize cannot be negative")
+                  .asRuntimeException()
+              ),
+            Future.successful,
+          )
+        entries <- store.listEntries(namePrefix.getOrElse(""), limit.value)
+      } yield definitions.ListEntriesResponse(entries.map(_.toHttp).toVector)
     }
   }
 

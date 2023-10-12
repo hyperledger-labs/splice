@@ -64,6 +64,8 @@ class DirectoryApp(
       metrics,
     ) {
 
+  override def packages = super.packages ++ Seq("dar/directory-service-0.1.0.dar")
+
   override def initialize(
       ledgerClient: CNLedgerClient,
       svParty: PartyId,
