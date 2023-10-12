@@ -12,7 +12,6 @@ import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.wallet.automation.CollectRewardsAndMergeCoinsTrigger
-import com.daml.network.validator.automation.TopupMemberTrafficTrigger
 import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
@@ -45,15 +44,11 @@ class ScanIntegrationTest
         )(config)
       )
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
-          _.withPausedTrigger[TopupMemberTrafficTrigger]
-        )(config)
-      )
-      .addConfigTransforms((_, config) =>
         CNNodeConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
           _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
         )(config)
       )
+      .withTrafficTopupsDisabled
 
   "list transaction pages in ascending and descending order" in { implicit env =>
     onboardWalletUser(aliceWalletClient, aliceValidatorBackend)

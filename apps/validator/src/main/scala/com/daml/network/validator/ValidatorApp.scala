@@ -456,27 +456,6 @@ class ValidatorApp(
       trafficBalanceService = newTrafficBalanceService(participantAdminConnection, scanConnection)
       _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
 
-      // some parts of initialization depend on traffic balance being available
-      _ <- retryProvider.waitUntil(
-        "traffic balance is available", {
-          for {
-            reserved <- trafficBalanceService.lookupReservedTraffic(domainId)
-            available <- trafficBalanceService.lookupAvailableTraffic(domainId)
-            topupsEnabled = reserved.isDefined
-            hasAvailableTraffic = available.exists(_.value > 0)
-            _ <-
-              if (topupsEnabled && !hasAvailableTraffic) {
-                Future.failed(
-                  Status.FAILED_PRECONDITION
-                    .withDescription("Traffic not yet available.")
-                    .asRuntimeException()
-                )
-              } else Future.unit
-          } yield ()
-        },
-        logger,
-      )
-
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
