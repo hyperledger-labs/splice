@@ -7,6 +7,7 @@ import com.daml.grpc.adapter.client.akka.ClientAdapter
 import com.daml.ledger.api.v1.*
 import com.daml.ledger.api.v1.admin.*
 import com.daml.ledger.javaapi.data.{
+  Command,
   CreateUserRequest,
   CreateUserResponse,
   GetLedgerEndResponse,
@@ -20,7 +21,7 @@ import com.daml.ledger.javaapi.data.{
   TransactionTree,
   User,
 }
-import com.daml.ledger.javaapi.data.codegen.{ContractId, HasCommands}
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.auth.AuthToken
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.daml.network.util.DisclosedContracts
@@ -189,7 +190,7 @@ private[environment] class LedgerClient(
       deduplicationConfig: DedupConfig,
       actAs: Seq[String],
       readAs: Seq[String],
-      commands: Seq[HasCommands],
+      commands: Seq[Command],
       disclosedContracts: DisclosedContracts,
       waitFor: SubmitAndWaitFor[Z],
   )(implicit ec: ExecutionContext): Future[Z] = {
@@ -200,7 +201,7 @@ private[environment] class LedgerClient(
       .addAllActAs(actAs.asJava)
       .addAllReadAs(readAs.asJava)
       .addAllCommands {
-        HasCommands.toCommands(commands.asJava).asScala.map(_.toProtoCommand).asJava
+        commands.map(_.toProtoCommand).asJava
       }
       .addAllDisclosedContracts(disclosedContracts.toLedgerApiDisclosedContracts.asJava)
     deduplicationConfig match {

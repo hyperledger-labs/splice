@@ -15,7 +15,7 @@ import com.daml.network.directory.automation.DirectoryAutomationService
 import com.daml.network.directory.config.DirectoryAppBackendConfig
 import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus}
+import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus, PackageIdResolver}
 import com.daml.network.http.v0.directory.DirectoryResource
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -72,7 +72,11 @@ class DirectoryApp(
   ): Future[DirectoryApp.State] =
     for {
       initConnection <- Future.successful(
-        ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+        ledgerClient.connection(
+          this.getClass.getSimpleName,
+          loggerFactory,
+          PackageIdResolver.NO_COMMAND_SUBMISSION,
+        )
       )
       svcParty <- initConnection.getSvcPartyFromUserMetadata(config.svUser)
       scanConnection <- ScanConnection(

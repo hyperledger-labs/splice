@@ -6,7 +6,12 @@ import com.daml.network.automation.{
   CNNodeAppAutomationService,
   TransferFollowTrigger,
 }
-import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{
+  CNLedgerClient,
+  PackageIdResolver,
+  ParticipantAdminConnection,
+  RetryProvider,
+}
 import com.daml.network.sv.automation.confirmation.{
   ArchiveClosedMiningRoundsTrigger,
   CnsSubscriptionInitialPaymentTrigger,
@@ -18,6 +23,7 @@ import com.daml.network.sv.automation.singlesv.*
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
@@ -44,6 +50,13 @@ class SvSvcAutomationService(
       config.automation,
       clock,
       svcStore,
+      PackageIdResolver
+        .inferFromCoinRules(
+          clock,
+          svcStore,
+          loggerFactory,
+          SvSvcAutomationService.extraPackageIdResolver,
+        ),
       ledgerClient,
       retryProvider,
     ) {
@@ -148,4 +161,18 @@ class SvSvcAutomationService(
   registerTrigger(
     new CnsSubscriptionInitialPaymentTrigger(triggerContext, svcStore, connection)
   )
+}
+
+object SvSvcAutomationService {
+  private[automation] def extraPackageIdResolver(template: QualifiedName): Option[String] =
+    template.moduleName match {
+      // SvcBootstrap is how we create CoinRules in the first place so we cannot infer the package id for that from CoinRules.
+      case "CN.SvcBootstrap" =>
+        Some(com.daml.network.codegen.java.cn.svcbootstrap.SvcBootstrap.TEMPLATE_ID.getPackageId)
+      // ImportCrates are created before CoinRules. Given that this is only a hack until we have upgrading
+      // we can hardcode this.
+      case "CC.CoinImport" =>
+        Some(com.daml.network.codegen.java.cc.coinimport.ImportCrate.TEMPLATE_ID.getPackageId)
+      case _ => None
+    }
 }

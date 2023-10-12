@@ -7,7 +7,12 @@ import com.daml.network.codegen.java.cc.{coin as coinCodegen}
 import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.round.types.Round
-import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
+import com.daml.network.environment.{
+  CNLedgerClient,
+  HttpAppConnection,
+  PackageIdResolver,
+  RetryProvider,
+}
 import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
@@ -49,7 +54,8 @@ final class ScanConnection private (
     mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends HttpAppConnection(config.adminApi, retryProvider, loggerFactory) {
+) extends HttpAppConnection(config.adminApi, retryProvider, loggerFactory)
+    with PackageIdResolver.HasCoinRulesPayload {
   import ScanConnection.GetCoinRulesDomain
 
   // register the callback to potentially invalidate the CoinRules cache.
@@ -171,6 +177,9 @@ final class ScanConnection private (
         )
       )
   }
+
+  def getCoinRulesPayload()(implicit tc: TraceContext): Future[CoinRules] =
+    getCoinRules().map(_.payload)
 
   def getLatestOpenMiningRound()(implicit
       ec: ExecutionContext,

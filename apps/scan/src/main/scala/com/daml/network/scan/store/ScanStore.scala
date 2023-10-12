@@ -3,7 +3,7 @@ package com.daml.network.scan.store
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.{CNLedgerConnection, PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{CNNodeAppStoreWithHistory, MultiDomainAcsStore, TxLogStore}
@@ -35,7 +35,8 @@ trait ScanStore
     extends CNNodeAppStoreWithHistory[
       TxLogIndexRecord,
       TxLogEntry,
-    ] {
+    ]
+    with PackageIdResolver.HasCoinRulesPayload {
 
   override protected def txLogParser = new ScanTxLogParser(loggerFactory)
 
@@ -48,6 +49,20 @@ trait ScanStore
   def lookupCoinRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
+
+  private def getCoinRules()(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
+    lookupCoinRules().map(
+      _.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription("No active CoinRules contract")
+          .asRuntimeException()
+      )
+    )
+
+  def getCoinRulesPayload()(implicit tc: TraceContext): Future[cc.coin.CoinRules] =
+    getCoinRules().map(_.contract.payload)
 
   def lookupCnsRules()(implicit
       tc: TraceContext
@@ -109,19 +124,12 @@ trait ScanStore
   def getBaseRateTrafficLimitsAsOf(t: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[cc.globaldomain.BaseRateTrafficLimits] =
-    lookupCoinRules().map(
-      _.map(cr =>
-        CoinConfigSchedule(cr)
-          .getConfigAsOf(t)
-          .globalDomain
-          .fees
-          .baseRateTrafficLimits
-      )
-        .getOrElse(
-          throw Status.NOT_FOUND
-            .withDescription("No active CoinRules contract")
-            .asRuntimeException()
-        )
+    getCoinRulesPayload().map(cr =>
+      CoinConfigSchedule(cr)
+        .getConfigAsOf(t)
+        .globalDomain
+        .fees
+        .baseRateTrafficLimits
     )
 
   def listImportCrates(receiverParty: PartyId)(implicit
