@@ -355,16 +355,20 @@ class HttpWalletHandler(
   )(contractId: String)(tuser: TracedUser): Future[r0.RejectAppPaymentRequestResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.rejectAppPaymentRequest") { implicit traceContext => _ =>
-      exerciseWalletAction((installCid, _) => {
-        val requestCid = Codec.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
-          contractId
-        )
-        Future.successful(
-          installCid
-            .exerciseWalletAppInstall_AppPaymentRequest_Reject(requestCid)
-            .map(_ => r0.RejectAppPaymentRequestResponseOK)
-        )
-      })(user)
+      val requestCid = Codec.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
+        contractId
+      )
+      retryProvider.retryForClientCalls(
+        "Reject app payment request",
+        exerciseWalletAction((installCid, _) => {
+          Future.successful(
+            installCid
+              .exerciseWalletAppInstall_AppPaymentRequest_Reject(requestCid)
+              .map(_ => r0.RejectAppPaymentRequestResponseOK)
+          )
+        })(user),
+        logger,
+      )
     }
   }
 

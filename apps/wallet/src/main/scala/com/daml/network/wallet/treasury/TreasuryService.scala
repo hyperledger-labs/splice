@@ -34,7 +34,7 @@ import com.daml.network.codegen.java.cn.wallet.install.{
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
 import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{CNNodeUtil, Contract, DisclosedContracts, HasHealth}
+import com.daml.network.util.{AssignedContract, CNNodeUtil, DisclosedContracts, HasHealth}
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
@@ -194,48 +194,46 @@ class TreasuryService(
   private def tryLookupCoinOperation(
       op0: installCodegen.CoinOperation
   )(implicit tc: TraceContext): Future[Unit] =
-    userStore.domains.waitForDomainConnection(userStore.defaultAcsDomain).flatMap { domainId =>
-      op0 match {
-        case op: coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
-          for {
-            _ <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
-              subsCodegen.SubscriptionRequest.COMPANION
-            )(domainId, op.contractIdValue)
-          } yield ()
+    op0 match {
+      case op: coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
+        for {
+          _ <- userStore.multiDomainAcsStore.getContractById(
+            subsCodegen.SubscriptionRequest.COMPANION
+          )(op.contractIdValue)
+        } yield ()
 
-        case op: coinoperation.CO_SubscriptionMakePayment =>
-          for {
-            _ <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
-              subsCodegen.SubscriptionIdleState.COMPANION
-            )(domainId, op.contractIdValue)
-          } yield ()
+      case op: coinoperation.CO_SubscriptionMakePayment =>
+        for {
+          _ <- userStore.multiDomainAcsStore.getContractById(
+            subsCodegen.SubscriptionIdleState.COMPANION
+          )(op.contractIdValue)
+        } yield ()
 
-        case op: coinoperation.CO_AppPayment =>
-          for {
-            _ <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
-              walletCodegen.AppPaymentRequest.COMPANION
-            )(domainId, op.contractIdValue)
-          } yield ()
+      case op: coinoperation.CO_AppPayment =>
+        for {
+          _ <- userStore.multiDomainAcsStore.getContractById(
+            walletCodegen.AppPaymentRequest.COMPANION
+          )(op.contractIdValue)
+        } yield ()
 
-        case op: coinoperation.CO_CompleteAcceptedTransfer =>
-          for {
-            _ <- userStore.multiDomainAcsStore.getContractByIdOnDomain(
-              transferOffersCodegen.AcceptedTransferOffer.COMPANION
-            )(domainId, op.contractIdValue)
-          } yield ()
+      case op: coinoperation.CO_CompleteAcceptedTransfer =>
+        for {
+          _ <- userStore.multiDomainAcsStore.getContractById(
+            transferOffersCodegen.AcceptedTransferOffer.COMPANION
+          )(op.contractIdValue)
+        } yield ()
 
-        case _: coinoperation.CO_MergeTransferInputs => Future.unit
+      case _: coinoperation.CO_MergeTransferInputs => Future.unit
 
-        case _: coinoperation.CO_Tap => Future.unit
+      case _: coinoperation.CO_Tap => Future.unit
 
-        // TODO(tech-debt): Ideally, we should modify the BuyMemberTraffic choice to also return
-        //  the ValidatorTopUpState contract Id in the COOutcome and ingest these into the store
-        //  in order to do the staleness check here. BuyMemberTraffic txs are always placed into
-        //  their own batch so a failure of this tx should not impact other coin txs.
-        case _: coinoperation.CO_BuyMemberTraffic => Future.unit
+      // TODO(tech-debt): Ideally, we should modify the BuyMemberTraffic choice to also return
+      //  the ValidatorTopUpState contract Id in the COOutcome and ingest these into the store
+      //  in order to do the staleness check here. BuyMemberTraffic txs are always placed into
+      //  their own batch so a failure of this tx should not impact other coin txs.
+      case _: coinoperation.CO_BuyMemberTraffic => Future.unit
 
-        case op => throw new NotImplementedError(show"Unexpected coin operation: $op")
-      }
+      case op => throw new NotImplementedError(show"Unexpected coin operation: $op")
     }
 
   private def isErrorOutcome(outcome: installCodegen.CoinOperationOutcome): Boolean =
@@ -356,7 +354,7 @@ class TreasuryService(
   /** Helper method to execute a batch.
     */
   private def doExecuteBatch(
-      install: Contract[WalletAppInstall.ContractId, WalletAppInstall],
+      install: AssignedContract[WalletAppInstall.ContractId, WalletAppInstall],
       transferContext: PaymentTransferContext,
       inputs: Seq[TransferInput],
       batch: CoinOperationBatch,
@@ -639,7 +637,7 @@ class TreasuryService(
       issuingRoundsMap: Map[Round, IssuingMiningRound],
   )(implicit
       tc: TraceContext
-  ): Future[(BigDecimal, Seq[(Round, BigDecimal, InputAppRewardCoupon)])] = {
+  ): Future[(BigDecimal, Seq[(Round, BigDecimal, InputAppRewardCoupon)])] =
     for {
       appRewardCouponInputs <- userStore.listSortedAppRewards(
         maxNumInputs,
@@ -656,7 +654,6 @@ class TreasuryService(
         )
       )
     } yield (appRewardsCoinQuantity, appRewardInputs)
-  }
 }
 
 object TreasuryService {
@@ -716,7 +713,7 @@ object TreasuryService {
     }
 
     def computeExecuteBatchCmd(
-        install: Contract[WalletAppInstall.ContractId, WalletAppInstall],
+        install: AssignedContract[WalletAppInstall.ContractId, WalletAppInstall],
         transferContext: PaymentTransferContext,
         inputs: Seq[TransferInput],
     ) =

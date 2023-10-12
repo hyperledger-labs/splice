@@ -569,6 +569,15 @@ object RetryProvider {
                         .findFirstMatchIn(description)
                         .isDefined
                       ||
+                      // TODO (#8011) Remove me once Canton yields a different error for in-flight contracts
+                      (statusCode == Status.Code.INVALID_ARGUMENT &&
+                        errorDetails.exists {
+                          case ed: ErrorDetails.ErrorInfoDetail =>
+                            ed.errorCodeId == com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.MalformedRequest.id &&
+                            ed.metadata.get("reason").exists(_ contains "Unknown contract")
+                          case _ => false
+                        })
+                      ||
                       // CANCELLED can also be a deliberate cancellation from the client
                       // so we only retry if we observe RST_STREAM which we sometimes see
                       // around Canton restarts.

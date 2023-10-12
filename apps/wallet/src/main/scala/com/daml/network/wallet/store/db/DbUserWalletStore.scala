@@ -18,7 +18,6 @@ import com.daml.network.wallet.store.db.WalletTables.{
   UserWalletTxLogStoreRowData,
 }
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
@@ -32,7 +31,6 @@ import scala.concurrent.*
 
 class DbUserWalletStore(
     override val key: UserWalletStore.Key,
-    override val defaultAcsDomain: DomainAlias,
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val transactionTreeSource: TransactionTreeSource,
@@ -140,12 +138,10 @@ class DbUserWalletStore(
     Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
   ]] = for {
     _ <- waitUntilAcsIngested()
-    domainId <- defaultAcsDomainIdF
-    rewards <- multiDomainAcsStore.listContractsOnDomain(
-      coinCodegen.ValidatorRewardCoupon.COMPANION,
-      domainId,
+    rewards <- multiDomainAcsStore.listContracts(
+      coinCodegen.ValidatorRewardCoupon.COMPANION
     )
-  } yield rewards
+  } yield rewards.view
     // TODO(#6119) Perform filter, sort, and limit in the database query
     .filter(rw =>
       activeIssuingRoundsO match {
@@ -153,6 +149,8 @@ class DbUserWalletStore(
         case None => true
       }
     )
+    .map(_.contract)
+    .toSeq
     .sortBy(_.payload.round.number)
     .take(limit)
 
@@ -166,10 +164,8 @@ class DbUserWalletStore(
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
   ]] = for {
     _ <- waitUntilAcsIngested()
-    domainId <- defaultAcsDomainIdF
-    rewards <- multiDomainAcsStore.listContractsOnDomain(
-      coinCodegen.AppRewardCoupon.COMPANION,
-      domainId,
+    rewards <- multiDomainAcsStore.listContracts(
+      coinCodegen.AppRewardCoupon.COMPANION
     )
   } yield rewards
     // TODO(#6119) Perform filter, sort, and limit in the database query
@@ -182,13 +178,13 @@ class DbUserWalletStore(
               rw.payload.amount.multiply(i.issuancePerFeaturedAppRewardCoupon)
             else
               rw.payload.amount.multiply(i.issuancePerUnfeaturedAppRewardCoupon)
-          (rw, BigDecimal(quantity))
+          (rw.contract, BigDecimal(quantity))
         })
     }
     .sorted(
       Ordering[(Long, BigDecimal)].on(
         (x: (
-            Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
+            Contract.Has[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
             BigDecimal,
         )) => (x._1.payload.round.number, -x._2)
       )
@@ -203,7 +199,6 @@ class DbUserWalletStore(
   ): Future[Seq[UserWalletTxLogParser.TransactionHistoryTxLogEntry]] = {
     waitUntilAcsIngested {
       for {
-        _ <- defaultAcsDomainIdF
         events <- storage
           .query(
             beginAfterEventIdO.fold(
