@@ -10,7 +10,6 @@ import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
@@ -24,7 +23,6 @@ import scala.concurrent.ExecutionContext
 /** A service managing the treasury, automation, and store for an end-user's wallet. */
 class UserWalletService(
     ledgerClient: CNLedgerClient,
-    globalDomain: DomainAlias,
     key: UserWalletStore.Key,
     walletManager: UserWalletManager,
     automationConfig: AutomationConfig,
@@ -74,7 +72,7 @@ class UserWalletService(
     store,
     treasury,
     ledgerClient,
-    globalDomain,
+    scanConnection.getCoinRulesDomain,
     automationConfig,
     clock,
     retryProvider,

@@ -5,12 +5,12 @@ import cats.syntax.either.*
 import com.daml.network.codegen.java.cn.appmanager.store as codegen
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.http.v0.definitions
+import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.ContractWithState
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.validator.store.ValidatorStore
-import com.daml.network.validator.util.ValidatorUtil.GetCoinRulesDomain
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}

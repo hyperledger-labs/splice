@@ -100,12 +100,10 @@ class SplitwellApp(
       clock,
       store,
       ledgerClient,
-      config.domains.global.alias,
       scanConnection,
       retryProvider,
       loggerFactory,
     )
-    _ <- store.domains.waitForDomainConnection(config.domains.global.alias)
     preferred <- store.domains.waitForDomainConnection(config.domains.splitwell.preferred.alias)
     others <- config.domains.splitwell.others
       .map(_.alias)

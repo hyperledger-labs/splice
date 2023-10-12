@@ -12,8 +12,7 @@ import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.config.*
 
 case class SplitwellDomainConfig(
-    global: DomainConfig,
-    splitwell: SplitwellDomains,
+    splitwell: SplitwellDomains
 )
 
 // Domains used for splitwell operations. There is one preferred domain

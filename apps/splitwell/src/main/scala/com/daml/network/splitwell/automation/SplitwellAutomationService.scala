@@ -13,7 +13,6 @@ import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -26,7 +25,6 @@ class SplitwellAutomationService(
     clock: Clock,
     store: SplitwellStore,
     ledgerClient: CNLedgerClient,
-    globalDomain: DomainAlias,
     scanConnection: ScanConnection,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -76,7 +74,7 @@ class SplitwellAutomationService(
       triggerContext,
       store,
       connection,
-      globalDomain,
+      scanConnection.getCoinRulesDomain,
       store.providerParty,
       splitwellCodegen.TransferInProgress.COMPANION,
     )

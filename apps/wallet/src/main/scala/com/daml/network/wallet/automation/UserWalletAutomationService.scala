@@ -2,12 +2,12 @@ package com.daml.network.wallet.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{AssignTrigger, CNNodeAppAutomationService, UnassignTrigger}
+import UnassignTrigger.GetTargetDomain
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -18,7 +18,7 @@ class UserWalletAutomationService(
     store: UserWalletStore,
     treasury: TreasuryService,
     ledgerClient: CNLedgerClient,
-    globalDomain: DomainAlias,
+    globalDomain: GetTargetDomain,
     automationConfig: AutomationConfig,
     clock: Clock,
     retryProvider: RetryProvider,

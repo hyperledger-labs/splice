@@ -3,10 +3,10 @@ package com.daml.network.validator.admin.http
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, validator_admin as v0}
+import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorStore}
 import com.daml.network.validator.util.ValidatorUtil
-import ValidatorUtil.GetCoinRulesDomain
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.StatusRuntimeException

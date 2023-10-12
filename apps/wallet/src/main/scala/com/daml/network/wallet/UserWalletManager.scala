@@ -104,7 +104,6 @@ class UserWalletManager(
         )
       val walletService = new UserWalletService(
         ledgerClient,
-        globalDomain,
         key,
         this,
         automationConfig,

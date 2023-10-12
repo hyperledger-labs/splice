@@ -45,7 +45,6 @@ import com.daml.network.validator.config.{
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorStore}
 import com.daml.network.validator.util.{OAuth2Manager, ValidatorUtil}
-import ValidatorUtil.getCoinRulesDomainFromScanConnection
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
 import com.digitalasset.canton.DomainAlias
@@ -487,7 +486,7 @@ class ValidatorApp(
         new HttpValidatorHandler(
           automation,
           validatorUserName = config.ledgerApiUser,
-          getCoinRulesDomain = getCoinRulesDomainFromScanConnection(scanConnection),
+          getCoinRulesDomain = scanConnection.getCoinRulesDomain,
           participantAdminConnection,
           retryProvider,
           loggerFactory,
@@ -499,7 +498,7 @@ class ValidatorApp(
           participantIdentitiesStore,
           validatorUserName = config.ledgerApiUser,
           validatorWalletUserName = config.validatorWalletUser,
-          getCoinRulesDomain = getCoinRulesDomainFromScanConnection(scanConnection),
+          getCoinRulesDomain = scanConnection.getCoinRulesDomain,
           participantAdminConnection,
           retryProvider = retryProvider,
           loggerFactory,

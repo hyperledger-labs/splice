@@ -1,6 +1,5 @@
 package com.daml.network.validator.util
 
-import akka.stream.Materializer
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -76,7 +75,7 @@ private[validator] object ValidatorUtil {
       knownParty: Option[PartyId],
       storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
-      getCoinRulesDomain: GetCoinRulesDomain,
+      getCoinRulesDomain: ScanConnection.GetCoinRulesDomain,
       participantAdminConnection: ParticipantAdminConnection,
       retryProvider: RetryProvider,
       logger: TracedLogger,
@@ -206,22 +205,5 @@ private[validator] object ValidatorUtil {
       logger.debug(s"User $endUserParty offboarded")
       ()
     }
-  }
-
-  type GetCoinRulesDomain = () => TraceContext => Future[DomainId]
-
-  def getCoinRulesDomainFromScanConnection(
-      scanConnection: ScanConnection
-  )(implicit ec: ExecutionContext, mat: Materializer): GetCoinRulesDomain = { () => implicit tc =>
-    scanConnection
-      .getCoinRules()
-      .flatMap(
-        _.state.fold(
-          Future.successful,
-          Future failed Status.FAILED_PRECONDITION
-            .withDescription("CoinRules is in-flight, no current global domain")
-            .asRuntimeException(),
-        )
-      )
   }
 }

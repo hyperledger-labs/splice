@@ -24,7 +24,7 @@ import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -50,6 +50,7 @@ final class ScanConnection private (
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
 ) extends HttpAppConnection(config.adminApi, retryProvider, loggerFactory) {
+  import ScanConnection.GetCoinRulesDomain
 
   // register the callback to potentially invalidate the CoinRules cache.
   coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedCoinRulesCache)
@@ -157,6 +158,18 @@ final class ScanConnection private (
           coinRules
         }
     }
+  }
+
+  def getCoinRulesDomain: GetCoinRulesDomain = { () => implicit tc =>
+    getCoinRules()
+      .flatMap(
+        _.state.fold(
+          Future.successful,
+          Future failed Status.FAILED_PRECONDITION
+            .withDescription("CoinRules is in-flight, no current global domain")
+            .asRuntimeException(),
+        )
+      )
   }
 
   def getLatestOpenMiningRound()(implicit
@@ -347,6 +360,7 @@ object ScanConnection {
       (sortedOpenMiningRounds, sortedIssuingMiningRounds)
   }
 
+  type GetCoinRulesDomain = () => TraceContext => Future[DomainId]
 }
 
 /** Connection to the admin API of CC Scan usable for version and availability checks

@@ -9,19 +9,20 @@ import com.daml.network.environment.ledger.api.LedgerClient
 import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
 import com.daml.network.util.{Contract, AssignedContract}
 import com.daml.network.util.PrettyInstances.*
-import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
+import UnassignTrigger.GetTargetDomain
+
 class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: ContractId[_], T](
     override protected val context: TriggerContext,
     store: CNNodeAppStore[_, _],
     connection: CNLedgerConnection,
-    targetDomain: DomainAlias,
+    targetDomain: GetTargetDomain,
     partyId: PartyId,
     companion: C,
 )(implicit
@@ -42,7 +43,7 @@ class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Contrac
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val contract = task.contract
     for {
-      targetDomainId <- store.domains.getDomainId(targetDomain)
+      targetDomainId <- targetDomain()(tc)
       cid = PrettyContractId(companion.TEMPLATE_ID, contract.contractId)
       outcome <-
         if (task.domain == targetDomainId) {
@@ -70,4 +71,6 @@ object UnassignTrigger {
     UnassignTrigger[Contract.Companion.Template[TCid, T], TCid, T]
   type Interface[I, Id <: ContractId[I], View <: DamlRecord[View]] =
     UnassignTrigger[Contract.Companion.Interface[Id, I, View], Id, View]
+
+  type GetTargetDomain = () => TraceContext => Future[DomainId]
 }
