@@ -378,7 +378,6 @@ class ValidatorApp(
       store = ValidatorStore(
         key,
         storage,
-        config.domains,
         loggerFactory,
         retryProvider,
       )

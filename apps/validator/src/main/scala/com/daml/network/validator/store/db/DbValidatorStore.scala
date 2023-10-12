@@ -13,13 +13,11 @@ import com.daml.network.codegen.java.cn.appmanager.store.AppConfiguration
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topupCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.ConfiguredDefaultDomain
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
-import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
 import com.daml.network.wallet.store.WalletStore
@@ -37,7 +35,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class DbValidatorStore(
     override val key: ValidatorStore.Key,
-    domainConfig: ValidatorDomainConfig,
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
@@ -56,11 +53,8 @@ class DbValidatorStore(
       ),
     )
     with ValidatorStore
-    with ConfiguredDefaultDomain
     with AcsTables
     with AcsQueries {
-
-  override final def defaultAcsDomain = domainConfig.global.alias
 
   override val walletKey = WalletStore.Key(
     key.validatorParty,
@@ -132,7 +126,6 @@ class DbValidatorStore(
   )(implicit tc: TraceContext): Future[Option[
     Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]
   ]] = for {
-    _ <- defaultAcsDomainIdF
     row <- storage
       .querySingle(
         (selectFromAcsTable(ValidatorTables.acsTableName) ++
@@ -154,7 +147,6 @@ class DbValidatorStore(
   )(implicit tc: TraceContext): Future[Option[
     Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]
   ]] = for {
-    _ <- defaultAcsDomainIdF
     row <- storage
       .querySingle(
         (selectFromAcsTable(ValidatorTables.acsTableName) ++
@@ -176,7 +168,6 @@ class DbValidatorStore(
   ): Future[
     Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
   ] = for {
-    _ <- defaultAcsDomainIdF
     row <- storage
       .querySingle(
         (selectFromAcsTable(ValidatorTables.acsTableName) ++

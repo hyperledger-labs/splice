@@ -12,7 +12,6 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
 import MultiDomainAcsStore.{ConstrainedTemplate, QueryResult}
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
-import com.daml.network.validator.config.ValidatorDomainConfig
 import com.daml.network.validator.store.db.DbValidatorStore
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.daml.network.wallet.store.WalletStore
@@ -214,7 +213,6 @@ object ValidatorStore {
   def apply(
       key: Key,
       storage: Storage,
-      domains: ValidatorDomainConfig,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
   )(implicit
@@ -226,7 +224,7 @@ object ValidatorStore {
       case _: MemoryStorage =>
         new InMemoryValidatorStore(key, loggerFactory, retryProvider)
       case storage: DbStorage =>
-        new DbValidatorStore(key, domains, storage, loggerFactory, retryProvider)
+        new DbValidatorStore(key, storage, loggerFactory, retryProvider)
     }
 
   case class Key(

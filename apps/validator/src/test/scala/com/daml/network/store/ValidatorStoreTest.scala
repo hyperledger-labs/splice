@@ -597,7 +597,6 @@ class DbValidatorStoreTest
 
     val store = new DbValidatorStore(
       key = storeKey,
-      domainConfig = domainConfig,
       storage = storage,
       loggerFactory = loggerFactory,
       retryProvider =
