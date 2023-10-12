@@ -30,6 +30,7 @@
             - datadog
             - slack-context
           cluster: "_CLUSTERNAME_"
+          update_deployment_branch: false
           requires:
             - deployment_test
             - docker_images_push

@@ -286,6 +286,9 @@ jobs:
       deploy_version:
         type: string
         default: ""
+      update_deployment_branch:
+        type: boolean
+        default: true
     steps:
       - checkout
       - record_job_start_time
@@ -326,16 +329,19 @@ jobs:
             fi
             cncluster activate
             cncluster ci_apply
-      - run_bash_command_in_nix:
-          cmd_name: Update deployment branch for cluster
-          cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN"
-          cmd: |
-            # TODO(#7554): remove this condition once all deployment tags are past the point where we introduced this script (in #7875)
-            if [ -f scripts/update-deployment-branch.sh ]; then
-              scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
-            fi
-          cmd_retry_count: 5
+      - when:
+          condition: << parameters.update_deployment_branch >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Update deployment branch for cluster
+                cluster: << parameters.cluster >>
+                additional_nix_args: "--keep GITHUB_TOKEN"
+                cmd: |
+                  # TODO(#7554): remove this condition once all deployment tags are past the point where we introduced this script (in #7875)
+                  if [ -f scripts/update-deployment-branch.sh ]; then
+                    scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
+                  fi
+                cmd_retry_count: 5
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
       - collect_test_timings_and_send_to_datadog
