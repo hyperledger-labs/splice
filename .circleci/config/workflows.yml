@@ -248,6 +248,26 @@ workflows:
         requires:
            - docker_images_push
            - wait_for_previous_pipeline
+    - preflight_check:
+        cluster: "cidaily"
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        wait_for_sv: false
+        # Order: deploy_cluster->preflight_check->publish_public_release->deploy_sv_runbook->preflight_sv_check
+        requires:
+          - docker_images_push
+          - deploy_cluster
+    - publish_public_release:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+        requires:
+          - preflight_check
     - deploy_sv_runbook:
         <<: *main-branch-only
         context:
@@ -259,26 +279,6 @@ workflows:
         requires:
           - deploy_cluster
           - publish_public_release
-    - preflight_check:
-        cluster: "cidaily"
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - canton-network-vpn
-          - datadog
-          - slack-context
-        # require deploy_cluster and deploy_sv_runbook for stability and reliability
-        requires:
-          - docker_images_push
-          - deploy_cluster
-          - deploy_sv_runbook
-    - publish_public_release:
-        <<: *main-branch-only
-        requires:
-          - preflight_check
-        context:
-          - artifactory
-          - datadog
     - preflight_sv_check:
         <<: *main-branch-only
         context:

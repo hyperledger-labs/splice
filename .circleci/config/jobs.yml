@@ -364,6 +364,9 @@ jobs:
       sync_with_cluster_version:
         type: boolean
         default: true
+      wait_for_sv:
+        type: boolean
+        default: true
     machine:
       image: ubuntu-2004:2023.04.2
     environment:
@@ -411,7 +414,7 @@ jobs:
                     cncluster wait sv-3 validator-app
                     cncluster wait sv-4 validator-app
                   fi
-                  if [[ "${APPROVE_SV_RUNBOOK-}" = true || "${IS_DEVNET-}" = true ]]; then
+                  if [[ << parameters.wait_for_sv >> == true && ( "${APPROVE_SV_RUNBOOK-}" = true || "${IS_DEVNET-}" = true ) ]]; then
                     cncluster wait sv validator-app
                   fi
                   echo "Done waiting. All pods in the cluster are:"
@@ -452,7 +455,7 @@ jobs:
                     cncluster wait sv-3 validator-app
                     cncluster wait sv-4 validator-app
                   fi
-                  if [[ "${APPROVE_SV_RUNBOOK-}" = true || "${IS_DEVNET-}" = true ]]; then
+                  if [[ << parameters.wait_for_sv >> == true && ( "${APPROVE_SV_RUNBOOK-}" = true || "${IS_DEVNET-}" = true ) ]]; then
                     cncluster wait sv validator-app
                   fi
                   echo "Done waiting. All pods in the cluster are:"
