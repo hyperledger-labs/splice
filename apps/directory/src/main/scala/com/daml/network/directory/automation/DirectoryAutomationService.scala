@@ -4,7 +4,7 @@ import akka.stream.Materializer
 import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.AutomationConfig
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -29,6 +29,7 @@ class DirectoryAutomationService(
       automationConfig,
       clock,
       store,
+      PackageIdResolver.inferFromCoinRules(clock, scanConnection, loggerFactory),
       ledgerClient,
       retryProvider,
     ) {

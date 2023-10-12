@@ -87,7 +87,11 @@ class FoundingNodeInitializer(
         SvcRulesLock,
     )
   ] = {
-    val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+    val initConnection = ledgerClient.connection(
+      this.getClass.getSimpleName,
+      loggerFactory,
+      PackageIdResolver.NO_COMMAND_SUBMISSION,
+    )
 
     for {
       namespace <- bootstrapDomain(localDomainNode)
@@ -108,8 +112,10 @@ class FoundingNodeInitializer(
       svParty <- SetupUtil.setupSvParty(initConnection, config, participantAdminConnection)
       storeKey = SvStore.Key(svParty, svcParty)
       svStore = newSvStore(storeKey)
+      svcStore = newSvcStore(svStore.key)
       svAutomation = newSvSvAutomationService(
         svStore,
+        svcStore,
         ledgerClient,
       )
       _ <- SetupUtil.ensureSvcPartyMetadataAnnotation(svAutomation.connection, config, svcParty)
@@ -141,7 +147,6 @@ class FoundingNodeInitializer(
         logger,
       )
 
-      svcStore = newSvcStore(svStore.key)
       svcAutomation = newSvSvcAutomationService(
         svStore,
         svcStore,
@@ -557,19 +562,25 @@ class FoundingNodeInitializer(
 
   private def newSvSvAutomationService(
       svStore: SvSvStore,
+      svcStore: SvSvcStore,
       ledgerClient: CNLedgerClient,
   ) =
     new SvSvAutomationService(
       clock,
       config,
       svStore,
+      svcStore,
       ledgerClient,
       retryProvider,
       loggerFactory,
     )
 
   private def newSvcStore(key: SvStore.Key) = {
-    val connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
+    val connection = ledgerClient.connection(
+      this.getClass.getSimpleName,
+      loggerFactory,
+      PackageIdResolver.NO_COMMAND_SUBMISSION,
+    )
     SvSvcStore(
       key,
       storage,

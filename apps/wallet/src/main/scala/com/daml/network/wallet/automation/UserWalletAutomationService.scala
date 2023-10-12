@@ -5,7 +5,9 @@ import com.daml.network.automation.{AssignTrigger, CNNodeAppAutomationService, U
 import UnassignTrigger.GetTargetDomain
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
+import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.util.QualifiedName
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -21,6 +23,7 @@ class UserWalletAutomationService(
     globalDomain: GetTargetDomain,
     automationConfig: AutomationConfig,
     clock: Clock,
+    scanConnection: ScanConnection,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -31,6 +34,12 @@ class UserWalletAutomationService(
       automationConfig,
       clock,
       store,
+      PackageIdResolver.inferFromCoinRules(
+        clock,
+        scanConnection,
+        loggerFactory,
+        UserWalletAutomationService.extraPackageIdResolver,
+      ),
       ledgerClient,
       retryProvider,
     ) {
@@ -64,4 +73,13 @@ class UserWalletAutomationService(
   )
 
   registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.endUserParty))
+}
+
+object UserWalletAutomationService {
+  private[automation] def extraPackageIdResolver(template: QualifiedName): Option[String] =
+    // ImportCrates are created before CoinRules. Given that this is only a hack until we have upgrading
+    // we can hardcode this.
+    Option.when(template.moduleName == "CC.CoinImport")(
+      com.daml.network.codegen.java.cc.coinimport.ImportCrate.TEMPLATE_ID.getPackageId
+    )
 }

@@ -3,7 +3,7 @@ package com.daml.network.scan.automation
 import akka.stream.Materializer
 import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
 import com.daml.network.scan.store.ScanStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -28,6 +28,7 @@ class ScanAutomationService(
       automationConfig,
       clock,
       store,
+      PackageIdResolver.inferFromCoinRules(clock, store, loggerFactory),
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,
