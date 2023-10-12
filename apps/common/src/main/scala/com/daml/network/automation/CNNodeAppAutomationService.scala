@@ -2,12 +2,7 @@ package com.daml.network.automation
 
 import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{
-  CNLedgerClient,
-  CNLedgerConnection,
-  PackageIdResolver,
-  RetryProvider,
-}
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
 import com.daml.network.store.{CNNodeAppStore, CNNodeAppStoreWithIngestion}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.{Clock, WallClock}
@@ -23,7 +18,6 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?, ?]](
     automationConfig: AutomationConfig,
     clock: Clock,
     override val store: Store,
-    packageIdResolver: PackageIdResolver,
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean = false,
@@ -35,12 +29,7 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?, ?]](
     with CNNodeAppStoreWithIngestion[Store] {
 
   override val connection: CNLedgerConnection =
-    ledgerClient.connection(
-      this.getClass.getSimpleName,
-      loggerFactory,
-      packageIdResolver,
-      completionOffsetCallback,
-    )
+    ledgerClient.connection(this.getClass.getSimpleName, loggerFactory, completionOffsetCallback)
 
   private def completionOffsetCallback(offset: String): Future[Unit] =
     store.multiDomainAcsStore.signalWhenIngestedOrShutdown(offset)(TraceContext.empty)

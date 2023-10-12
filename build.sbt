@@ -262,7 +262,6 @@ lazy val `apps-common` =
       `canton-community-app` % "compile->compile;test->test",
       `canton-community-testing` % "test",
       // We include all DARs here to make sure they are available as resources.
-      `app-manager-daml`,
       `canton-coin-daml`,
       `canton-name-service-daml`,
       `directory-daml`,

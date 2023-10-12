@@ -29,7 +29,7 @@ import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.{CNLedgerConnection, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{
   ConstrainedTemplate,
@@ -67,8 +67,7 @@ trait SvSvcStore
     extends CNNodeAppStoreWithHistory[
       SvcTxLogParser.TxLogIndexRecord,
       SvcTxLogParser.TxLogEntry,
-    ]
-    with PackageIdResolver.HasCoinRulesPayload {
+    ] {
   import SvSvcStore.{svcRulesFollowers, coinRulesFollowers}
 
   override protected def txLogParser = new SvcTxLogParser(loggerFactory)
@@ -173,9 +172,6 @@ trait SvSvcStore
         throw Status.NOT_FOUND.withDescription("No active CoinRules contract").asRuntimeException()
       )
     )
-
-  def getCoinRulesPayload()(implicit tc: TraceContext): Future[cc.coin.CoinRules] =
-    getCoinRules().map(_.payload)
 
   def lookupCnsRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[AssignedContract[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]]]

@@ -236,11 +236,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
   private val preInitialize1F = preInitializeBeforeLedgerConnection()
   private val ledgerClientF = preInitialize1F.flatMap { _ => createLedgerClient() }
   private val initializeF = ledgerClientF.flatMap { client =>
-    val initConnection = client.connection(
-      this.getClass.getSimpleName,
-      loggerFactory,
-      PackageIdResolver.NO_COMMAND_SUBMISSION,
-    )
+    val initConnection = client.connection(this.getClass.getSimpleName, loggerFactory)
     waitForUser(initConnection).flatMap(_ => initializeNode(client))
   }
   private[network] def getState = initializeF.value match {

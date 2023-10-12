@@ -63,11 +63,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
   ): Future[State] = for {
     _ <- preInitializeBeforeLedgerConnection()
     _ = logger.info(s"Acquiring ledger connection")
-    initConnection = ledgerClient.connection(
-      this.getClass.getSimpleName,
-      loggerFactory,
-      PackageIdResolver.NO_COMMAND_SUBMISSION,
-    )
+    initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
     _ <- preInitializeAfterLedgerConnection(initConnection)
     serviceParty <-
       retryProvider.getValueWithRetries[PartyId](

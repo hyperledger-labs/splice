@@ -2,12 +2,7 @@ package com.daml.network.wallet
 
 import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{
-  CNLedgerClient,
-  CNLedgerConnection,
-  PackageIdResolver,
-  RetryProvider,
-}
+import com.daml.network.environment.{CNLedgerClient, CNLedgerConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStoreDump
 import com.daml.network.util.{HasHealth, TemplateJsonDecoder}
@@ -57,21 +52,13 @@ class UserWalletService(
       storage,
       loggerFactory,
       // The store needs its own connection to expand tx-history entries
-      ledgerClient.connection(
-        this.getClass.getSimpleName,
-        loggerFactory,
-        PackageIdResolver.NO_COMMAND_SUBMISSION,
-      ),
+      ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),
       retryProvider,
     )
 
   val treasury: TreasuryService = new TreasuryService(
     // The treasury gets its own connection, and is required to manage waiting for the store on its own.
-    ledgerClient.connection(
-      this.getClass.getSimpleName,
-      loggerFactory,
-      PackageIdResolver.inferFromCoinRules(clock, scanConnection, loggerFactory0),
-    ),
+    ledgerClient.connection(this.getClass.getSimpleName, loggerFactory),
     treasuryConfig,
     clock,
     store,
@@ -88,7 +75,6 @@ class UserWalletService(
     scanConnection.getCoinRulesDomain,
     automationConfig,
     clock,
-    scanConnection,
     retryProvider,
     loggerFactory,
   )

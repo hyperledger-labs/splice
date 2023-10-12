@@ -29,17 +29,12 @@ object CoinConfigSchedule {
   def apply(
       cr: AssignedContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
   ): CoinConfigSchedule =
-    CoinConfigSchedule(cr.payload)
+    CoinConfigSchedule(cr.payload.configSchedule)
 
   def apply(
       cr: ContractWithState[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
   ): CoinConfigSchedule =
-    CoinConfigSchedule(cr.payload)
-
-  def apply(
-      cr: cc.coin.CoinRules
-  ): CoinConfigSchedule =
-    CoinConfigSchedule(cr.configSchedule)
+    CoinConfigSchedule(cr.payload.configSchedule)
 
   def apply(
       schedule: cc.schedule.Schedule[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]]

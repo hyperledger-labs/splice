@@ -4,7 +4,6 @@ import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.stream.{KillSwitch, KillSwitches, Materializer}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import cats.syntax.traverse.*
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
 import com.daml.ledger.api.v1.admin.ObjectMetaOuterClass
@@ -68,7 +67,6 @@ class CNLedgerConnection(
     inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
     trafficBalanceServiceO: AtomicReference[Option[TrafficBalanceService]],
     completionOffsetCallback: String => Future[Unit],
-    packageIdResolver: PackageIdResolver,
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
     extends NamedLogging {
 
@@ -307,47 +305,45 @@ class CNLedgerConnection(
         commandOut: SubmitCommands[C],
         result: SubmitResult[C, Z],
     ): Future[Z] = {
-      verifyEnoughExtraTrafficRemains(domainId, priority)
-        .flatMap(_ => commandOut.run(update).toList.traverse(packageIdResolver.resolvePackageId(_)))
-        .flatMap { commands =>
-          import SubmitResult.*, LedgerClient.SubmitAndWaitFor as WF
-          val (commandId, deduplicationConfig) = dedup.split(commandIdDeduplicationOffset)
+      verifyEnoughExtraTrafficRemains(domainId, priority).flatMap { _ =>
+        import SubmitResult.*, LedgerClient.SubmitAndWaitFor as WF
+        val (commandId, deduplicationConfig) = dedup.split(commandIdDeduplicationOffset)
 
-          def clientSubmit[W, U](waitFor: WF[W])(getOffsetAndResult: W => (String, U)): Future[U] =
-            callCallbacksOnCompletionAndWaitForOffset(
-              client.submitAndWait(
-                workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
-                applicationId = applicationId,
-                commandId = commandId,
-                deduplicationConfig = deduplicationConfig,
-                actAs = actAs.map(_.toProtoPrimitive),
-                readAs = readAs.map(_.toProtoPrimitive),
-                commands = commands,
-                disclosedContracts = disclosedContracts assertOnDomain domainId,
-                waitFor = waitFor,
+        def clientSubmit[W, U](waitFor: WF[W])(getOffsetAndResult: W => (String, U)): Future[U] =
+          callCallbacksOnCompletionAndWaitForOffset(
+            client.submitAndWait(
+              workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
+              applicationId = applicationId,
+              commandId = commandId,
+              deduplicationConfig = deduplicationConfig,
+              actAs = actAs.map(_.toProtoPrimitive),
+              readAs = readAs.map(_.toProtoPrimitive),
+              commands = commandOut.run(update),
+              disclosedContracts = disclosedContracts assertOnDomain domainId,
+              waitFor = waitFor,
+            )
+          )(getOffsetAndResult)
+
+        @annotation.tailrec
+        def interpretResult[C0, Z0](update: C0, result: SubmitResult[C0, Z0]): Future[Z0] =
+          result match {
+            case _: Ignored =>
+              clientSubmit(WF.CompletionOffset)(offset => (offset, (): Z0))
+            case _: JustTransaction =>
+              clientSubmit(WF.Transaction)(tx => (tx.getOffset, tx))
+            case k: ResultAndOffset[t, Z0] =>
+              for {
+                tree <- clientSubmit(WF.TransactionTree)(tx => (tx.getOffset, tx))
+              } yield k.continue(
+                tree.getOffset,
+                decodeExerciseResult(update, tree),
               )
-            )(getOffsetAndResult)
+            case wrapper: Contramap[C0, u, Z0] =>
+              interpretResult(wrapper.g(update), wrapper.rec)
+          }
 
-          @annotation.tailrec
-          def interpretResult[C0, Z0](update: C0, result: SubmitResult[C0, Z0]): Future[Z0] =
-            result match {
-              case _: Ignored =>
-                clientSubmit(WF.CompletionOffset)(offset => (offset, (): Z0))
-              case _: JustTransaction =>
-                clientSubmit(WF.Transaction)(tx => (tx.getOffset, tx))
-              case k: ResultAndOffset[t, Z0] =>
-                for {
-                  tree <- clientSubmit(WF.TransactionTree)(tx => (tx.getOffset, tx))
-                } yield k.continue(
-                  tree.getOffset,
-                  decodeExerciseResult(update, tree),
-                )
-              case wrapper: Contramap[C0, u, Z0] =>
-                interpretResult(wrapper.g(update), wrapper.rec)
-            }
-
-          interpretResult(update, result)
-        }
+        interpretResult(update, result)
+      }
     }
   }
 

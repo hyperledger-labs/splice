@@ -70,7 +70,6 @@ class CNLedgerClient(
   def connection(
       connectionClient: String,
       baseLoggerFactory: NamedLoggerFactory,
-      packageIdResolver: PackageIdResolver,
       completionOffsetCallback: String => Future[Unit] = _ => Future.unit,
   ): CNLedgerConnection =
     new CNLedgerConnection(
@@ -81,7 +80,6 @@ class CNLedgerClient(
       callbacks,
       trafficBalanceService,
       completionOffsetCallback,
-      packageIdResolver,
     )
 
   override def onClosed(): Unit = {

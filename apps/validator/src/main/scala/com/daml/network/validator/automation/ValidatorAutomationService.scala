@@ -9,14 +9,8 @@ import com.daml.network.automation.{
 }
 import TransferFollowTrigger.Task as FollowTask
 import com.daml.network.config.{AutomationConfig, BackupDumpConfig}
-import com.daml.network.environment.{
-  CNLedgerClient,
-  PackageIdResolver,
-  ParticipantAdminConnection,
-  RetryProvider,
-}
+import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.QualifiedName
 import com.daml.network.validator.config.{AppManagerConfig, BuyExtraTrafficConfig}
 import com.daml.network.validator.store.{
   AppManagerStore,
@@ -54,12 +48,6 @@ class ValidatorAutomationService(
       automationConfig,
       clock,
       store,
-      PackageIdResolver.inferFromCoinRules(
-        clock,
-        scanConnection,
-        loggerFactory,
-        ValidatorAutomationService.extraPackageIdResolver,
-      ),
       ledgerClient,
       retryProvider,
     ) {
@@ -125,20 +113,4 @@ class ValidatorAutomationService(
     )
   )
   registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.validatorParty))
-}
-
-object ValidatorAutomationService {
-  private[automation] def extraPackageIdResolver(template: QualifiedName): Option[String] =
-    template.moduleName match {
-      // App manager storage is participant local so we can freely choose the package id.
-      case "CN.AppManager.Store" =>
-        Some(
-          com.daml.network.codegen.java.cn.appmanager.store.AppConfiguration.TEMPLATE_ID.getPackageId
-        )
-      // ImportCrates are created before CoinRules. Given that this is only a hack until we have upgrading
-      // we can hardcode this.
-      case "CC.CoinImport" =>
-        Some(com.daml.network.codegen.java.cc.coinimport.ImportCrate.TEMPLATE_ID.getPackageId)
-      case _ => None
-    }
 }

@@ -73,11 +73,7 @@ class JoiningNodeInitializer(
         SvcRulesLock,
     )
   ] = {
-    val initConnection = ledgerClient.connection(
-      this.getClass.getSimpleName,
-      loggerFactory,
-      PackageIdResolver.NO_COMMAND_SUBMISSION,
-    )
+    val initConnection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
     // We need to connect to the domain here because otherwise we create a circular dependency
     // with the validator app: The validator app waits for its user to be provisioned (which happens in createValidatorUser)
     // before establishing a domain connection, but allocating the SV party requires a domain connection.
@@ -110,10 +106,8 @@ class JoiningNodeInitializer(
       ).tupled
       storeKey = SvStore.Key(svParty, svcPartyId)
       svStore = newSvStore(storeKey)
-      svcStore = newSvcStore(svStore.key)
       svAutomation = newSvSvAutomationService(
         svStore,
-        svcStore,
         ledgerClient,
       )
       globalDomain <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
@@ -125,7 +119,7 @@ class JoiningNodeInitializer(
         globalDomain,
         participantId,
       )
-      svcAutomation <-
+      (svcStore, svcAutomation) <-
         if (svcPartyIsAuthorized) {
           logger.info("SVC party is authorized to our participant.")
           for {
@@ -134,6 +128,7 @@ class JoiningNodeInitializer(
               Seq.empty,
               Seq(svStore.key.svcParty),
             )
+            svcStore = newSvcStore(svStore.key)
             svcAutomation =
               newSvSvcAutomationService(
                 svStore,
@@ -156,14 +151,14 @@ class JoiningNodeInitializer(
               },
               logger,
             )
-          } yield svcAutomation
+          } yield (svcStore, svcAutomation)
         } else {
           logger.info(
             "The SVC party is not authorized to our participant. " +
               "Starting onboarding with SVC party migration."
           )
           new WithSvStore(svAutomation, svcPartyHosting, globalDomain)
-            .startOnboardingWithSvcPartyMigration(initConnection, svcStore)
+            .startOnboardingWithSvcPartyMigration(initConnection)
         }
       _ <- waitForSvcMembership(svcStore)
       _ <- SetupUtil.ensureSvcPartyMetadataAnnotation(svAutomation.connection, config, svcPartyId)
@@ -376,9 +371,8 @@ class JoiningNodeInitializer(
     }
 
     def startOnboardingWithSvcPartyMigration(
-        initConnection: CNLedgerConnection,
-        svcStore: SvSvcStore,
-    ): Future[SvSvcAutomationService] = {
+        initConnection: CNLedgerConnection
+    ): Future[(SvSvcStore, SvSvcAutomationService)] = {
       joiningConfig.getOrElse(
         sys.error("An onboarding config is required to start onboarding; exiting.")
       ) match {
@@ -407,13 +401,14 @@ class JoiningNodeInitializer(
                   Seq(svStore.key.svcParty),
                 )
                 _ = logger.info(s"granted ${config.ledgerApiUser} readAs rights for svcParty")
+                svcStore = newSvcStore(svStore.key)
                 svcAutomation = newSvSvcAutomationService(svcStore)
                 _ <- svcAutomation.store.domains.waitForDomainConnection(
                   config.domains.global.alias
                 )
                 withSvcStore = new WithSvcStore(svcAutomation)
                 _ <- withSvcStore.addConfirmedMemberToSvc()
-              } yield svcAutomation
+              } yield (svcStore, svcAutomation)
             case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
           }
       }
@@ -504,25 +499,19 @@ class JoiningNodeInitializer(
 
   private def newSvSvAutomationService(
       svStore: SvSvStore,
-      svcStore: SvSvcStore,
       ledgerClient: CNLedgerClient,
   ) =
     new SvSvAutomationService(
       clock,
       config,
       svStore,
-      svcStore,
       ledgerClient,
       retryProvider,
       loggerFactory,
     )
 
   private def newSvcStore(key: SvStore.Key) = {
-    val connection = ledgerClient.connection(
-      this.getClass.getSimpleName,
-      loggerFactory,
-      PackageIdResolver.NO_COMMAND_SUBMISSION,
-    )
+    val connection = ledgerClient.connection(this.getClass.getSimpleName, loggerFactory)
     SvSvcStore(
       key,
       storage,
