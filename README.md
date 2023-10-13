@@ -508,8 +508,7 @@ file along with your dar changes.
 
 #### Bumping CometBFT
 
-1. Update the version in the `nix/cometbft-driver-sources.json` file
-2. Update the version used for the CometBFT docker image in the `.circleci/config.yml` file
+Update the version in the `nix/cometbft-driver-sources.json` file
 
 #### Bumping Canton
 

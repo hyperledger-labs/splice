@@ -13,6 +13,6 @@ stdenv.mkDerivation rec {
   installPhase = ''
     mkdir -p $out
     tar -xzf $src
-    cp canton-drivers-${sources.version}-all.jar $out/driver.jar
+    cp canton-drivers-${sources.version}/lib/canton-drivers-${sources.version}-all.jar $out/driver.jar
   '';
 }
