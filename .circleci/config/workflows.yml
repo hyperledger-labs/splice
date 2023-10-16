@@ -378,7 +378,6 @@ workflows:
         cluster: "devnet"
         deploy_version: "devnet-next"
         requires:
-           - docker_images_push
            - wait_for_previous_pipeline
     - deploy_sv_runbook:
         <<: *main-branch-only
@@ -400,7 +399,6 @@ workflows:
           - slack-context
         # require deploy_cluster and deploy_sv_runbook for stability and reliability
         requires:
-          - docker_images_push
           - deploy_cluster
           - deploy_sv_runbook
     - publish_public_release:
