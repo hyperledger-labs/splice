@@ -1067,6 +1067,7 @@ commands:
       - set-failed-parallel-run-url
       - run:
           name: Dump input sent to slack/notify
+          when: always
           command: |
             echo "Sending the following as input to slack/notify"
             echo "{ \"text\": \"*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)\" }"
