@@ -1,11 +1,15 @@
 package com.daml.network.util
 
 import io.fabric8.kubernetes.client.{KubernetesClient, KubernetesClientBuilder}
+
 import java.nio.charset.StandardCharsets
 import scala.jdk.CollectionConverters.*
 import io.fabric8.kubernetes.api.model.{Secret, SecretBuilder}
 import com.daml.network.auth.AuthToken
 import com.digitalasset.canton.data.CantonTimestamp
+import com.typesafe.scalalogging.Logger
+
+import scala.util.control.NonFatal
 
 object K8sUtil {
   private val k8s: KubernetesClient = new KubernetesClientBuilder().build()
@@ -61,9 +65,12 @@ object K8sUtil {
     private val preflightTokenSecretName = "auth0-preflight-token-cache"
 
     import spray.json.*
-    private case class Auth0PreflightTokenData(accessToken: String, expiresIn: Long) {
+    private case class Auth0PreflightTokenData(accessToken: String, expiresAtMillis: Long) {
       def toAuthToken: AuthToken =
-        AuthToken(accessToken, CantonTimestamp.now().plusMillis(expiresIn))
+        AuthToken(
+          accessToken,
+          expiresAt = CantonTimestamp.assertFromLong(micros = expiresAtMillis * 1000),
+        )
     }
 
     private object TokenDataJsonProtocol extends DefaultJsonProtocol {
@@ -71,16 +78,26 @@ object K8sUtil {
     }
     import TokenDataJsonProtocol.*
 
-    def getPreflightToken(clientId: String): Option[AuthToken] = {
+    def getPreflightToken(clientId: String)(implicit logger: Logger): Option[AuthToken] = {
       readSecretField(preflightTokenSecretName, clientId) match {
-        case Some(secretData) => {
-          val token = secretData.parseJson.convertTo[Auth0PreflightTokenData].toAuthToken
-          if (token.expiresAt.isAfter(CantonTimestamp.now())) {
-            None
-          } else {
-            Some(token)
+        case Some(secretData) =>
+          // TODO (#8039): remove try catch, logging and fallback to None (let it crash, which shouldn't happen)
+          try {
+            val token = secretData.parseJson.convertTo[Auth0PreflightTokenData].toAuthToken
+            if (token.expiresAt.isAfter(CantonTimestamp.now())) {
+              None
+            } else {
+              Some(token)
+            }
+          } catch {
+            case NonFatal(ex) =>
+              logger.info(
+                "Failed to parse k8s secret containing Auth0Token." +
+                  "This is probably because an older version of the JSON was stored.",
+                ex,
+              )
+              None
           }
-        }
         case None => None
       }
     }
@@ -88,7 +105,7 @@ object K8sUtil {
     def savePreflightToken(clientId: String, token: AuthToken) = {
       val tokenJson = Auth0PreflightTokenData(
         token.accessToken,
-        CantonTimestamp.now().toEpochMilli - token.expiresAt.toEpochMilli,
+        expiresAtMillis = token.expiresAt.toEpochMilli,
       ).toJson.compactPrint
 
       val secret = new SecretBuilder()

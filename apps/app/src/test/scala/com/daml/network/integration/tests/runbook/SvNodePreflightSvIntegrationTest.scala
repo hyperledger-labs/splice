@@ -153,7 +153,7 @@ abstract class SvNodePreflightSvIntegrationTestBase
       "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn",
       "https://validator.example.com/api",
       auth0,
-    )
+    )(noTracingLogger)
 
     val svValidatorClient = vc("svTestValidator").copy(token = Some(token))
     svValidatorClient.dumpParticipantIdentities()

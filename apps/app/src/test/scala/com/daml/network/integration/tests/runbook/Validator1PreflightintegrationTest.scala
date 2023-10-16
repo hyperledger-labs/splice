@@ -59,7 +59,7 @@ class Validator1PreflightIntegrationTest
       "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq",
       "https://canton.network.global",
       auth0,
-    )
+    )(noTracingLogger)
 
     vc("validator1")(env).copy(token = Some(token))
   }

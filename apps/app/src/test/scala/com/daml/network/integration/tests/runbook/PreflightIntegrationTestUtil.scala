@@ -3,6 +3,7 @@ package com.daml.network.integration.tests.runbook
 import akka.http.scaladsl.model.Uri
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.util.{Auth0Util, K8sUtil}
+import com.typesafe.scalalogging.Logger
 import monocle.macros.syntax.lens.*
 import org.scalatest.OptionValues.*
 
@@ -20,7 +21,7 @@ trait PreflightIntegrationTestUtil {
       clientId: String,
       audience: String,
       auth0: Auth0Util,
-  ): String = {
+  )(implicit logger: Logger): String = {
     // lookup token from a cached k8s secret, or request a new one from auth0 if not found or expired
     val cachedToken =
       K8sUtil.PreflightTokenAccessor.getPreflightToken(clientId)
