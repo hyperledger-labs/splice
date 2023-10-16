@@ -3,7 +3,7 @@
   "description": "Weekly mark current DevNet for next TestNet",
   "attribution-actor": "system",
   "parameters": {
-    "branch": "devnet",
+    "branch": "deployment/devnet",
     "run-job": "mark-for-testnet"
   },
   "timetable": {
@@ -12,6 +12,7 @@
       1
     ],
     "days-of-week": [
+      "TUE",
       "THU"
     ],
     "days-of-month": [],
