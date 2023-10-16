@@ -433,10 +433,12 @@ class HttpSvHandler(
       // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
       acsBytes <- svcRulesLock.withLock(s"authorizing SVC party to participant $participantId")(
         for {
+          svcRules <- svcStore.getSvcRules()
           // this will wait until the PartyToParticipant state change completed
           authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
             globalDomain,
             participantId,
+            svcRules.payload.members.size(),
           )
           // Acquiring the ACS snapshot is tricky due to two issues:
           // 1. The snapshot can only be acquired at a "clean" timestamp which means there are no outstanding ACS commitments.

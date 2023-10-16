@@ -182,6 +182,7 @@ class SvcPartyHosting(
   def authorizeSvcPartyToParticipant(
       domain: DomainId,
       participantId: ParticipantId,
+      svcSize: Int,
   )(implicit traceContext: TraceContext): Future[Instant] =
     // check if svc party has already been authorized to be hosted by the participant
     getSvcPartyToParticipantTransaction(domain, participantId).flatMap {
@@ -199,6 +200,7 @@ class SvcPartyHosting(
             svcParty,
             participantId,
             sourceParticipant.uid.namespace.fingerprint,
+            svcSize,
           )
           authorizedAt <- waitForSvcPartyToParticipantAuthorization(
             domain,

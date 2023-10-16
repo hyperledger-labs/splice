@@ -34,6 +34,7 @@ import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
 import com.digitalasset.canton.topology.store.{StoredTopologyTransactionsX, TimeQueryX}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
+import com.daml.network.config.CNThresholds.getPartyToParticipantThreshold
 import com.digitalasset.canton.topology.transaction.{
   DomainParametersStateX,
   HostingParticipant,
@@ -363,6 +364,7 @@ class TopologyAdminConnection(
       party: PartyId,
       newParticipant: ParticipantId,
       signedBy: Fingerprint,
+      svcRulesMembersSize: Int,
   )(implicit traceContext: TraceContext): Future[Unit] =
     ensureTopologyMapping[PartyToParticipantX](
       show"Party $party is authorized on $newParticipant",
@@ -380,7 +382,11 @@ class TopologyAdminConnection(
             participants = HostingParticipant(
               newParticipant,
               ParticipantPermissionX.Submission,
-            ) +: previous.participants
+            ) +: previous.participants,
+            threshold = getPartyToParticipantThreshold(
+              svcRulesMembersSize,
+              previous.participants.length,
+            ),
           )
         ),
       signedBy,
