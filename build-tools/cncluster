@@ -941,8 +941,18 @@ function subcmd_preflight() {
 
     set +e
     subcmd_sbt_for_preflight printTests
-    non_dev_preflight_tests=$(awk '{print $1}' "$REPO_ROOT"/test-full-class-names-preflight.log | paste -s -d' ' -)
-    subcmd_sbt_for_preflight "apps-app/testOnly $non_dev_preflight_tests"
+
+    if [ "${IS_DEVNET-}" != false ]; then
+      _log "Starting DevNet preflight checks"
+      tests_filename="test-full-class-names-preflight.log"
+    else
+      _log "Starting non-DevNet preflight checks"
+      tests_filename="test-full-class-names-preflight-non-devnet.log"
+    fi
+
+    preflight_tests=$(awk '{print $1}' "$REPO_ROOT"/$tests_filename | paste -s -d' ' -)
+
+    subcmd_sbt_for_preflight "apps-app/testOnly $preflight_tests"
     local test_result=$?
     set -e
 
