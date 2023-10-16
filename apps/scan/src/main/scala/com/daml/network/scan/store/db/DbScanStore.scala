@@ -13,7 +13,7 @@ import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry, TxLogIndex
 import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
-import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
+import com.daml.network.util.{ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -22,7 +22,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import cats.implicits.*
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.AcsTables.ContractStateRowData
 
 import java.time.Instant
@@ -495,20 +494,22 @@ class DbScanStore(
       providerPartyId: PartyId
   )(implicit
       tc: TraceContext
-  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
+  ): Future[Option[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
     waitUntilAcsIngested {
       (for {
         row <- storage
           .querySingle(
-            (selectFromAcsTable(ScanTables.acsTableName) ++
-              sql"""
-                  where store_id = $storeId
-                    and template_id_qualified_name = ${QualifiedName(FeaturedAppRight.TEMPLATE_ID)}
+            selectFromAcsTableWithState(
+              ScanTables.acsTableName,
+              storeId,
+              where = sql"""
+                  template_id_qualified_name = ${QualifiedName(FeaturedAppRight.TEMPLATE_ID)}
                     and featured_app_right_provider = $providerPartyId
-                  limit 1;
-                 """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
+                 """,
+              orderLimit = sql"limit 1",
+            ).headOption,
             "findFeaturedAppRight",
           )
-      } yield contractFromRow(FeaturedAppRight.COMPANION)(row)).value
+      } yield contractWithStateFromRow(FeaturedAppRight.COMPANION)(row)).value
     }
 }

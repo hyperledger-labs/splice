@@ -239,7 +239,7 @@ class HttpScanHandler(
           PartyId.tryFromProtoPrimitive(providerPartyId)
         )
       } yield {
-        definitions.LookupFeaturedAppRightResponse(right.map(_.toHttp))
+        definitions.LookupFeaturedAppRightResponse(right.map(_.contract.toHttp))
       }
     }
   }

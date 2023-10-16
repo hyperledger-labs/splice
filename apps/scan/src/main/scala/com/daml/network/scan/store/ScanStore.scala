@@ -10,7 +10,7 @@ import com.daml.network.store.{CNNodeAppStoreWithHistory, MultiDomainAcsStore, T
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.util.{CoinConfigSchedule, Contract, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.util.{CoinConfigSchedule, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -138,7 +138,7 @@ trait ScanStore
 
   def findFeaturedAppRight(providerPartyId: PartyId)(implicit
       tc: TraceContext
-  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
+  ): Future[Option[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
   def listTransactions(
       pageEndEventId: Option[String],

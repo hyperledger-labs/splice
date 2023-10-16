@@ -358,14 +358,13 @@ class InMemoryScanStore(
   override def findFeaturedAppRight(
       providerPartyId: PartyId
   )(implicit tc: TraceContext): Future[
-    Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
+    Option[ContractWithState[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
   ] =
     multiDomainAcsStore
       .findContract(coinCodegen.FeaturedAppRight.COMPANION) {
         co: Contract[?, coinCodegen.FeaturedAppRight] =>
           co.payload.provider == providerPartyId.toProtoPrimitive
       }
-      .map(_ map (_.contract))
 
   override def close(): Unit = {
     super.close()

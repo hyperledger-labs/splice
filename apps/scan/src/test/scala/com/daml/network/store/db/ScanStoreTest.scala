@@ -28,7 +28,13 @@ import com.daml.network.scan.store.TxLogIndexRecord.{
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{StoreErrors, StoreTest, TxLogStore}
-import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
+import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
+import com.daml.network.util.{
+  Contract,
+  ContractWithState,
+  ResourceTemplateDecoder,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
@@ -632,16 +638,15 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       "return the FeaturedAppRight of the wanted provider" in {
         val wanted = featuredAppRight(userParty(1))
         val unwanted = featuredAppRight(userParty(2))
+        val expectedResult = Some(ContractWithState(wanted, Assigned(dummyDomain)))
         for {
           store <- mkStore()
           _ <- dummyDomain.create(wanted)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(unwanted)(store.multiDomainAcsStore)
-        } yield {
-          eventually() {
-            store
-              .findFeaturedAppRight(userParty(1))
-              .futureValue should be(Some(wanted))
-          }
+        } yield eventually() {
+          store
+            .findFeaturedAppRight(userParty(1))
+            .futureValue should be(expectedResult)
         }
       }
     }
