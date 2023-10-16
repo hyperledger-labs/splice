@@ -195,10 +195,10 @@ class ParticipantAdminConnection(
       newConfig = f(oldConfig)
       _ <- newConfig match {
         case None =>
-          logger.info("No update to domain connection config required")
+          logger.trace("No update to domain connection config required")
           Future.unit
         case Some(config) =>
-          logger.info("Updating to new domain connection config")
+          logger.info(s"Updating to new domain connection config for domain $domain")
           setDomainConnectionConfig(config)
       }
     } yield ()

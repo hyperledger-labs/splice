@@ -1563,7 +1563,8 @@
           }
         },
         "svSponsorAddress": "http://sv-app.sv-1:5014",
-        "topup": {}
+        "topup": {},
+        "useSequencersFromScan": true
       }
     },
     "name": "helm-splitwell-validator-splitwell",
@@ -2486,6 +2487,7 @@
           }
         },
         "topup": {},
+        "useSequencersFromScan": false,
         "validatorWalletUser": "auth0|64afbc0956a97fe9577249d7"
       }
     },
@@ -3313,6 +3315,7 @@
           }
         },
         "topup": {},
+        "useSequencersFromScan": false,
         "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
       }
     },
@@ -4067,6 +4070,7 @@
           }
         },
         "topup": {},
+        "useSequencersFromScan": false,
         "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
       }
     },
@@ -4821,6 +4825,7 @@
           }
         },
         "topup": {},
+        "useSequencersFromScan": false,
         "validatorWalletUser": "auth0|64afbc720e20777e46fff490"
       }
     },
@@ -5308,6 +5313,7 @@
         },
         "svSponsorAddress": "http://sv-app.sv-1:5014",
         "topup": {},
+        "useSequencersFromScan": true,
         "validatorPartyHint": "validator1_validator_service_user",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       }

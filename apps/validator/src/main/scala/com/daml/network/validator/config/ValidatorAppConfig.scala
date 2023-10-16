@@ -151,6 +151,8 @@ case class ValidatorAppBackendConfig(
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     participantIdentitiesBackup: Option[BackupDumpConfig] = None,
     appManager: Option[AppManagerConfig] = None,
+    // TODO:(##8016) refactor `allocateLedgerApiUserParty` and `useSequencersFromScan` to a single boolean `svValidator`.
+    useSequencersFromScan: Boolean = true,
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

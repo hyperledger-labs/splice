@@ -473,6 +473,7 @@
           "minTopupInterval": "1m",
           "targetThroughput": 33300
         },
+        "useSequencersFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       }
     },

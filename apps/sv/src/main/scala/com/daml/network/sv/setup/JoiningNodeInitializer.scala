@@ -369,6 +369,7 @@ class JoiningNodeInitializer(
           localDomainNode,
           domainId,
           svcStoreWithIngestion.connection,
+          clock,
           retryProvider,
           logger,
         )

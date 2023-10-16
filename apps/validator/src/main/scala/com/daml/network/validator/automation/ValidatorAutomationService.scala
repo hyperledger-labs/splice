@@ -25,6 +25,7 @@ import com.daml.network.validator.store.{
 }
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.automation.{OffboardUsersTrigger, WalletAppInstallTrigger}
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -36,6 +37,8 @@ class ValidatorAutomationService(
     backupDumpConfig: Option[BackupDumpConfig],
     buyExtraTrafficConfig: BuyExtraTrafficConfig,
     appManagerConfig: Option[AppManagerConfig],
+    useSequencersFromScan: Boolean,
+    globalDomainAlias: DomainAlias,
     clock: Clock,
     walletManager: UserWalletManager,
     store: ValidatorStore,
@@ -125,6 +128,17 @@ class ValidatorAutomationService(
     )
   )
   registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.validatorParty))
+  if (useSequencersFromScan)
+    registerTrigger(
+      new ReconcileSequencerConnectionsTrigger(
+        triggerContext,
+        participantAdminConnection,
+        scanConnection,
+        clock,
+        scanConnection.getCoinRulesDomain,
+        globalDomainAlias,
+      )
+    )
 }
 
 object ValidatorAutomationService {

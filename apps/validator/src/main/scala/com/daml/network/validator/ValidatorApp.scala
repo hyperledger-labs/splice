@@ -122,6 +122,7 @@ class ValidatorApp(
       _ <-
         withParticipantAdminConnection { participantAdminConnection =>
           for {
+            // TODO: (#8014) For regular validator, Instead of using ensureGlobalDomainRegistered, connect global domain with the sequencer list from scan.
             _ <- ensureGlobalDomainRegistered(participantAdminConnection)
             _ <- ensureExtraDomainsRegistered(participantAdminConnection)
             // Note that for the validator of an SV app, the user will be created by the SV app with a
@@ -399,6 +400,8 @@ class ValidatorApp(
         config.participantIdentitiesBackup,
         config.domains.global.buyExtraTraffic,
         config.appManager,
+        config.useSequencersFromScan,
+        config.domains.global.alias,
         clock,
         walletManager,
         store,

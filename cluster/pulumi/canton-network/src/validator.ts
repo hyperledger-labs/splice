@@ -48,6 +48,7 @@ export type ValidatorConfig = {
   additionalConfig?: string;
   additionalUsers?: k8s.types.input.core.v1.EnvVar[];
   participantBootstrapDump?: BootstrappingDumpConfig;
+  useSequencersFromScan?: boolean;
 };
 
 export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
@@ -119,6 +120,7 @@ export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
       participantIdentitiesDumpImport: config.participantBootstrapDump
         ? { secretName: participantBootstrapDumpSecretName }
         : undefined,
+      useSequencersFromScan: config.useSequencersFromScan,
     },
     dependsOn
   );

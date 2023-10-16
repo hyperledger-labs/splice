@@ -329,6 +329,12 @@ final class ScanConnection private (
     } yield AcsStoreDump.ImportShipment(openRound, crates)
   }
 
+  def listSvcSequencers(): Future[Seq[HttpScanAppClient.DomainSequencers]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListSvcSequencers(),
+    )
+  }
 }
 
 object ScanConnection {

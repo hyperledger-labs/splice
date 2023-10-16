@@ -110,6 +110,7 @@ object SvUtil {
       cometBftNode: Option[CometBftNode],
       localDomainNode: LocalDomainNode,
       domainId: DomainId,
+      clock: Clock,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -146,7 +147,7 @@ object SvUtil {
           c.url,
           // TODO(#7717) Don't use now here, calculate the available time as described in
           // https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
-          Instant.now,
+          clock.now.toInstant,
         )
       )
       localMediatorConfig <- getMediatorConfig(Some(localDomainNode))

@@ -3,6 +3,13 @@
 Release Notes
 =============
 
+2023-10-23
+----------
+
+* Deployment updates
+
+  * Added a new value `useSequencersFromScan` in `sv-validator-values.yaml`.
+
 2023-10-16
 ----------
 

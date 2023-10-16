@@ -342,6 +342,7 @@ class FoundingNodeInitializer(
         localDomainNode,
         domainId,
         svcStoreWithIngestion.connection,
+        clock,
         retryProvider,
         logger,
       )
@@ -476,6 +477,7 @@ class FoundingNodeInitializer(
                     cometBftNode,
                     localDomainNode,
                     domainId,
+                    clock,
                   )
                   _ = logger
                     .info(s"Bootstrapping SVC as $svcParty with BFT nodes $founderDomainNodes")

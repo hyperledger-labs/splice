@@ -17,8 +17,8 @@ import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cn.svc.globaldomain.{
   DomainNodeConfig,
-  SequencerConfig,
   MediatorConfig,
+  SequencerConfig,
 }
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -72,7 +72,6 @@ import io.circe.Json
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
-import java.time.Instant
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -1122,6 +1121,7 @@ object SvApp {
       localDomainNode: Option[LocalDomainNode],
       domainId: DomainId,
       connection: CNLedgerConnection,
+      clock: Clock,
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit
@@ -1154,7 +1154,7 @@ object SvApp {
                 c.url,
                 // TODO(#7717) Don't use now here, calculate the available time as described in
                 // https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
-                Instant.now(),
+                clock.now.toInstant,
               )
             ),
             localMediatorConfig.map(c =>

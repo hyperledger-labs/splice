@@ -507,7 +507,7 @@ object HttpScanAppClient {
             domain.sequencers
               .traverse { s =>
                 Codec.decode(Codec.Sequencer)(s.id).map { sequencerId =>
-                  SvcSequencer(sequencerId, s.url, s.svName)
+                  SvcSequencer(sequencerId, s.url, s.svName, s.availableAfter.toInstant)
                 }
               }
               .map { sequencers =>
@@ -520,7 +520,12 @@ object HttpScanAppClient {
 
   final case class DomainSequencers(domainId: DomainId, sequencers: Seq[SvcSequencer])
 
-  final case class SvcSequencer(id: SequencerId, url: String, svName: String)
+  final case class SvcSequencer(
+      id: SequencerId,
+      url: String,
+      svName: String,
+      availableAfter: Instant,
+  )
 
   case class ListTransactions(
       pageEndEventId: Option[String],

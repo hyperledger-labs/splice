@@ -16,6 +16,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.WalletTestUtil
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
@@ -62,6 +63,26 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
 
     // onboard end user
     aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
+  }
+
+  "validator apps connect to all SVC sequencers" in { implicit env =>
+    initSvc()
+    // Start Alice’s validator
+    aliceValidatorBackend.startSync()
+
+    // check that alice's validator connects to all SVC sequencers.
+    eventually() {
+      val sequencerConnections = aliceValidatorBackend.participantClientWithAdminToken.domains
+        .config(
+          aliceValidatorBackend.config.domains.global.alias
+        )
+        .value
+        .sequencerConnections
+
+      sequencerConnections.connections.size shouldBe 4
+      // TODO: (#5093) threshold should be calculated from the size of newValidConnections instead of 1
+      sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
+    }
   }
 
   // TODO(M3-46) clean up once every validator uses this onboarding flow
