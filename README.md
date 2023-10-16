@@ -176,7 +176,8 @@ A list of expected environment definitions is as follows:
 
 * Auth0 Management API credentials (taken from the *API Explorer* application defined within each Auth0 tenant)
    * `AUTH0_CN_MANAGEMENT_API_CLIENT_ID`/`AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET` - Auth0 [API Explorer](https://manage.auth0.com/dashboard/us/canton-network-dev/applications/ECfosW3sLHUfHatCRLEGUQ9YG9XMs9aq/settings) settings page. (Note `canton-network-dev` tenant.)
-   * `AUTH0_SV_MANAGEMENT_API_CLIENT_ID`/`AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET` - Auth0 [API Explorer](https://manage.auth0.com/dashboard/us/canton-network-sv-test/applications/OjD90OemoxGYTLqzmbSTDJlmCi6nbUnu/settings) settings apge. (Note `canton-network-sv-test` tenant.)
+   * `AUTH0_SV_MANAGEMENT_API_CLIENT_ID`/`AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET` - Auth0 [API Explorer](https://manage.auth0.com/dashboard/us/canton-network-sv-test/applications/OjD90OemoxGYTLqzmbSTDJlmCi6nbUnu/settings) settings page. (Note `canton-network-sv-test` tenant.)
+   * `AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID`/`AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET` - Auth0 [API Explorer](https://manage.auth0.com/dashboard/us/canton-network-validator-test/applications/afx3XOvqCQlP43M3MTNJMwgrgKXzXlBV/settings) settings page. (Note `canton-network-validator-test` tenant.)
    * `AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID`/`AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET` Auth0 [API Explorer](https://manage.auth0.com/dashboard/us/canton-network-test/applications/DnmjyCAmMHWVD0yS0jZLgBv8pKL7dVMM/settings) settings page. (Note `canton-network-test` tenant.)
 * Artifactory credentials
    * `ARTIFACTORY_USER`: your username at digitalasset.jfrog.io (can be seen in the top-right corner after logging in with Google SSO)

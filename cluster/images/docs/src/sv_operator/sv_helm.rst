@@ -674,7 +674,7 @@ Another reference Helm chart is provided for that, which can be installed using:
 
 .. code-block:: bash
 
-    helm install cluster-ingress-sv canton-network-helm/cn-cluster-ingress-sv -n cluster-ingress --set cluster.hostname=$YOUR_HOSTNAME --set cluster.svNamespace=sv
+    helm install cluster-ingress-sv canton-network-helm/cn-cluster-ingress-runbook -n cluster-ingress --set cluster.hostname=$YOUR_HOSTNAME --set cluster.svNamespace=sv
 
 
 .. _helm-sv-wallet-ui:

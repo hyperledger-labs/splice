@@ -2,9 +2,14 @@ import * as k8s from '@pulumi/kubernetes';
 import * as fs from 'fs';
 import * as _ from 'lodash';
 import { Input, Resource } from '@pulumi/pulumi';
-import { ExactNamespace, isDevNet, loadYamlFromFile, REPO_ROOT } from 'cn-pulumi-common';
+import {
+  ExactNamespace,
+  isDevNet,
+  installCNSVHelmChart,
+  loadYamlFromFile,
+  REPO_ROOT,
+} from 'cn-pulumi-common';
 
-import { installCNSVHelmChart } from './helm';
 import { CLUSTER_BASENAME, localCharts, SV_NAME, TARGET_CLUSTER, version } from './utils';
 
 const cometBftValues = loadYamlFromFile(

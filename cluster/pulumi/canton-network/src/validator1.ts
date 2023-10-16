@@ -7,12 +7,12 @@ import {
   BackupConfig,
   BootstrappingDumpConfig,
   CLUSTER_BASENAME,
+  ValidatorOnboarding,
 } from 'cn-pulumi-common';
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
 import { installParticipant } from './ledger';
-import { ValidatorOnboarding } from './sv';
 import { installValidatorApp } from './validator';
 
 export async function installValidator1(

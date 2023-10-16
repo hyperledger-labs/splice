@@ -327,6 +327,8 @@ object CNNodeTests {
         case "dev" => "AUTH0_CN"
         // Used for sv preflight checks
         case "sv" => "AUTH0_SV"
+        // Used for validator preflight checks
+        case "validator" => "AUTH0_VALIDATOR"
         // Used locally
         case "test" | "" | null => "AUTH0_TESTS"
         case _ => fail(s"Invalid value for AUTH0_TENANT property: $tenant")

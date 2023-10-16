@@ -121,6 +121,12 @@ const validator1Onboarding = {
   expiresIn: '1h',
 };
 
+const standaloneValidatorOnboarding = {
+  name: 'validator',
+  secret: 'validatorsecret',
+  expiresIn: '1h',
+};
+
 let backupConfig: BackupConfig | undefined;
 let bootstrappingDumpConfig: BootstrappingDumpConfig | undefined;
 
@@ -161,7 +167,11 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     approvedSvIdentities,
     withScan: true,
     withDirectoryBackend: true,
-    expectedValidatorOnboardings: [splitwellOnboarding, validator1Onboarding],
+    expectedValidatorOnboardings: [
+      splitwellOnboarding,
+      validator1Onboarding,
+      standaloneValidatorOnboarding,
+    ],
     isDevNet,
     backupConfig,
     bootstrappingDumpConfig,

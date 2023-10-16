@@ -711,6 +711,28 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "secret": "dmFsaWRhdG9yc2VjcmV0"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-onboarding-validator",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-validator-onboarding-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "private": "c3YyLWlkLXByaXZhdGUta2V5",
           "public": "c3YyLWlkLXB1YmxpYy1rZXk="
         }
@@ -1867,7 +1889,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-sv/",
+      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
       "name": "ingress-sv-sv-1",
       "namespace": "sv-1",
@@ -1877,6 +1899,7 @@
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
           "fixedTokens": false,
+          "hostPrefix": "svc.",
           "hostname": "mock.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
           "ipAddress": "127.0.0.2",
@@ -1925,7 +1948,8 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "withDirectoryBackend": true,
         "withDomainNode": true,
-        "withScan": true
+        "withScan": true,
+        "withSv": true
       }
     },
     "name": "helm-sv-1-ingress-sv-sv-1",
@@ -2391,6 +2415,16 @@
                 "optional": false
               }
             }
+          },
+          {
+            "expiresIn": "1h",
+            "secretFrom": {
+              "secretKeyRef": {
+                "key": "secret",
+                "name": "cn-app-validator-onboarding-validator",
+                "optional": false
+              }
+            }
           }
         ],
         "fixedTokens": false,
@@ -2713,7 +2747,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-sv/",
+      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
       "name": "ingress-sv-sv-2",
       "namespace": "sv-2",
@@ -2723,6 +2757,7 @@
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
           "fixedTokens": false,
+          "hostPrefix": "svc.",
           "hostname": "mock.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
           "ipAddress": "127.0.0.2",
@@ -2771,7 +2806,8 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "withDirectoryBackend": false,
         "withDomainNode": true,
-        "withScan": true
+        "withScan": true,
+        "withSv": true
       }
     },
     "name": "helm-sv-2-ingress-sv-sv-2",
@@ -3541,7 +3577,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-sv/",
+      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
       "name": "ingress-sv-sv-3",
       "namespace": "sv-3",
@@ -3551,6 +3587,7 @@
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
           "fixedTokens": false,
+          "hostPrefix": "svc.",
           "hostname": "mock.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
           "ipAddress": "127.0.0.2",
@@ -3599,7 +3636,8 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "withDirectoryBackend": false,
         "withDomainNode": true,
-        "withScan": false
+        "withScan": false,
+        "withSv": true
       }
     },
     "name": "helm-sv-3-ingress-sv-sv-3",
@@ -4296,7 +4334,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-sv/",
+      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
       "name": "ingress-sv-sv-4",
       "namespace": "sv-4",
@@ -4306,6 +4344,7 @@
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
           "fixedTokens": false,
+          "hostPrefix": "svc.",
           "hostname": "mock.network.canton.global",
           "imageTag": "0.0.1-deadbeef",
           "ipAddress": "127.0.0.2",
@@ -4354,7 +4393,8 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "withDirectoryBackend": false,
         "withDomainNode": true,
-        "withScan": false
+        "withScan": false,
+        "withSv": true
       }
     },
     "name": "helm-sv-4-ingress-sv-sv-4",

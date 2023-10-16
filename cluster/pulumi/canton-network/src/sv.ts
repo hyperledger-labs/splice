@@ -2,6 +2,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import {
   auth0UserNameEnvVarSource,
+  btoa,
   BackupConfig,
   BootstrappingDumpConfig,
   ChartValues,
@@ -15,6 +16,9 @@ import {
   installCNHelmChart,
   installBootstrapDataBucketSecret,
   participantBootstrapDumpSecretName,
+  ValidatorOnboarding,
+  validatorOnboardingSecretName,
+  installValidatorOnboardingSecret,
 } from 'cn-pulumi-common';
 import type { Auth0Client, SvIdKey } from 'cn-pulumi-common';
 
@@ -22,9 +26,6 @@ import * as postgres from './postgres';
 import { installCometBftNode } from './cometbft';
 import { installGlobalDomain, installParticipant } from './ledger';
 import { installValidatorApp } from './validator';
-
-// btoa is only available in DOM so inline the definition here.
-const btoa = (s: string) => Buffer.from(s).toString('base64');
 
 export function installSvKeySecret(
   xns: ExactNamespace,
@@ -65,35 +66,7 @@ export type SvOnboarding =
       sponsorApiUrl: string;
     };
 
-export type ValidatorOnboarding = { name: string; expiresIn: string; secret: string };
-
 export type ApprovedSvIdentity = { name: string; publicKey: string };
-
-export const validatorOnboardingSecretName = (onboarding: ValidatorOnboarding): string =>
-  `cn-app-validator-onboarding-${onboarding.name}`;
-
-export function installValidatorOnboardingSecret(
-  xns: ExactNamespace,
-  onboarding: ValidatorOnboarding
-): k8s.core.v1.Secret {
-  const secretName = validatorOnboardingSecretName(onboarding);
-  return new k8s.core.v1.Secret(
-    `cn-app-${xns.logicalName}-validator-onboarding-${onboarding.name}`,
-    {
-      metadata: {
-        name: secretName,
-        namespace: xns.logicalName,
-      },
-      type: 'Opaque',
-      data: {
-        secret: btoa(onboarding.secret),
-      },
-    },
-    {
-      dependsOn: [xns.ns],
-    }
-  );
-}
 
 export type SvConfig = {
   auth0Client: Auth0Client;
@@ -294,7 +267,7 @@ export function installSvNode(config: SvConfig): {
   installCNHelmChart(
     xns,
     'ingress-sv-' + xns.logicalName,
-    'cn-cluster-ingress-sv',
+    'cn-cluster-ingress-runbook',
     {
       withScan: config.withScan,
       withDirectoryBackend: config.withDirectoryBackend,

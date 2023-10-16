@@ -738,6 +738,7 @@ function _cluster_reset() {
 
     _down_stack canton-network
     _down_stack sv-runbook
+    _down_stack validator-runbook
 
     _info "Cluster in reset/idle state."
 }
@@ -992,6 +993,21 @@ function subcmd_preflight_sv() {
     cd "${REPO_ROOT}" && \
                 NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
                 sbt "apps-app/testOnly *PreflightSvNonDevNetIntegrationTest"
+  fi
+}
+
+###
+
+subcommand_whitelist[preflight_validator]='Run the validator runbook preflight test against the cluster'
+
+function subcmd_preflight_validator() {
+  if [ "${IS_DEVNET-}" != false ]; then
+    _log "Starting Validator preflight"
+    cd "${REPO_ROOT}" && \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+            sbt "apps-app/testOnly *PreflightValidatorIntegrationTest"
+  else
+    _error "Non-devnet preflights not implemented yet"
   fi
 }
 
@@ -1406,6 +1422,51 @@ function subcmd_ci_pdown_sv(){
     fi
 
     subcmd_pulumi sv-runbook down --yes --skip-preview
+}
+
+###
+
+subcommand_whitelist[apply_validator]="Apply the validator-runbook Pulumi stack"
+
+function subcmd_apply_validator(){
+    _needs_auth0_sv_management_api_creds
+
+    local -x TARGET_CLUSTER="${1-}"
+    if [ -z "$TARGET_CLUSTER" ]; then
+        _error "Usage: $SCRIPTNAME apply_validator <target-domain-cluster> [<charts-version>]"
+    fi
+
+    local args=(-c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
+    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
+        args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
+    else
+        args+=(-c "FIXED_TOKENS=0")
+    fi
+
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    local -x CHARTS_VERSION="${2-}"
+
+    _uses_pulumi_stack validator-runbook
+
+    subcmd_install_data_export_bucket_key
+    _get_data_export_bucket_secret | subcmd_pulumi validator-runbook config set --secret DATA_EXPORT_BUCKET_SA_KEY_JSON
+
+    subcmd_pulumi validator-runbook up --yes --skip-preview --show-sames "${args[@]}"
+}
+
+###
+
+subcommand_whitelist[pdown_validator]="Take the current validator-runbook Pulumi configuration down"
+
+function subcmd_pdown_validator(){
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    subcmd_pulumi validator-runbook down --yes --skip-preview
 }
 
 ###

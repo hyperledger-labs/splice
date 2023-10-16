@@ -1,8 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { ChartValues, ExactNamespace, requireEnv } from 'cn-pulumi-common';
 
-export const HELM_CHART_TIMEOUT_SEC = 480;
+import { ChartValues, ExactNamespace, HELM_CHART_TIMEOUT_SEC, requireEnv } from './utils';
 
 export function installCNSVHelmChartByNamespaceName(
   ns: pulumi.Output<string> | string,

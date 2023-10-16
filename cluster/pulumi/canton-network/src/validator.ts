@@ -10,14 +10,11 @@ import {
   fetchAndInstallParticipantBootstrapDump,
   installBootstrapDataBucketSecret,
   participantBootstrapDumpSecretName,
-} from 'cn-pulumi-common';
-import { domainFeesConfig } from 'cn-pulumi-common/src/domainFeesCfg';
-
-import {
   ValidatorOnboarding,
   installValidatorOnboardingSecret,
   validatorOnboardingSecretName,
-} from './sv';
+} from 'cn-pulumi-common';
+import { domainFeesConfig } from 'cn-pulumi-common/src/domainFeesCfg';
 
 export type ExtraDomain = {
   alias: string;

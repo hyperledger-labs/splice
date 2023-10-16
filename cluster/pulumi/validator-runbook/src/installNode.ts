@@ -5,60 +5,47 @@ import {
   Auth0Client,
   BackupConfig,
   ChartValues,
-  directoryUiSecret,
-  envFlag,
   exactNamespace,
   ExactNamespace,
+  REPO_ROOT,
+  auth0UserNameEnvVarSource,
+  directoryUiSecret,
   fixedTokens,
   setupBootstrapping,
-  infraStack,
   imagePullSecretByNamespaceName,
+  infraStack,
   installCNSVHelmChart,
   installCNSVHelmChartByNamespaceName,
   isDevNet,
   loadYamlFromFile,
-  participantBootstrapDumpSecretName,
-  REPO_ROOT,
-  svAppSecrets,
-  svKeySecret,
-  svKeyFromSecret,
-  validatorSecrets,
   ValidatorOnboarding,
-  SvIdKey,
+  validatorOnboardingSecretName,
+  validatorSecrets,
+  installValidatorOnboardingSecret,
   installLoopback,
   imagePullSecret,
 } from 'cn-pulumi-common';
+import { exit } from 'process';
 
 import { auth0Cfg } from './auth0cfg';
-import { includesCometBftGlobalDomainNode, installGlobalDomainNode } from './globalDomain';
-import { walletUIClientId, directoryClientId, svUIClientId } from './secrets';
+import { walletUIClientId, directoryClientId } from './secrets';
 import {
   CLUSTER_BASENAME,
-  localCharts,
-  SV_NAME,
-  SV_NAMESPACE as RUNBOOK_NAMESPACE,
+  VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
   TARGET_CLUSTER,
+  localCharts,
   version,
   withDomainFees,
 } from './utils';
 
 if (!isDevNet) {
-  console.error('Launching in non-devnet mode');
-}
-
-const singleSv = envFlag('SINGLE_SV') || !isDevNet;
-if (singleSv) {
-  console.error('Launching with a single SV');
+  console.error('Launching in non-devnet mode is currently unsupported!');
+  exit(1);
 }
 
 type BootstrapCliConfig = {
   cluster: string;
   date: string;
-};
-
-type ApprovedSvIdentity = {
-  name: string;
-  publicKey: string;
 };
 
 const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
@@ -67,9 +54,8 @@ const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
 
 const participantIdentitiesFile = process.env.PARTICIPANT_IDENTITIES_FILE;
 
-const SV_WALLET_USER_ID =
-  process.env.SV_WALLET_USER_ID ||
-  (isDevNet ? 'auth0|64b16b9ff7a0dfd00ea3704e' : 'auth0|64553aa683015a9687d9cc2e'); // Default to admin@sv-dev.com (devnet) or admin@sv.com (non devnet) at the sv-test tenant by default
+const VALIDATOR_WALLET_USER_ID =
+  process.env.VALIDATOR_WALLET_USER_ID || 'auth0|6526fab5214c99a9a8e1e3cc'; // Default to admin@validator.com at the validator-test tenant by default
 const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
@@ -79,7 +65,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       : `Using charts from the artifactory, version ${version}`
   );
   console.error(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
-  console.error(`Installing SV node in namespace: ${RUNBOOK_NAMESPACE}`);
+  console.error(`Installing validator node in namespace: ${RUNBOOK_NAMESPACE}`);
 
   const xns = exactNamespace(RUNBOOK_NAMESPACE, true);
 
@@ -91,6 +77,12 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       participantIdentitiesFile,
       bootstrappingConfig,
     });
+
+  const onboarding = {
+    name: 'validator',
+    secret: 'validatorsecret',
+    expiresIn: '1h',
+  };
 
   const loopback =
     TARGET_CLUSTER === CLUSTER_BASENAME
@@ -105,10 +97,9 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     special: true,
   }).result;
 
-  const svKey = svKeyFromSecret('sv');
-
-  const { sv, validator } = await installSvAndValidator({
+  const validator = await installValidator({
     xns,
+    onboarding,
     password,
     participantBootstrapDumpSecret,
     auth0Client,
@@ -116,42 +107,45 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     loopback,
     backupConfigSecret,
     backupConfig,
-    svKey,
   });
 
   const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
   installCNSVHelmChartByNamespaceName(
     infraStack.requireOutput('ingressNs') as pulumi.Output<string>,
-    'cluster-ingress-sv',
+    'cluster-ingress-validator',
     'cn-cluster-ingress-runbook',
     {
       cluster: {
+        hostPrefix: '',
         hostname: `${CLUSTER_BASENAME}.network.canton.global`,
         svNamespace: RUNBOOK_NAMESPACE,
       },
+      withSv: false,
+      withScan: false,
+      withDomainNode: false,
     },
     localCharts,
     version,
-    ingressImagePullDeps.concat([sv, validator])
+    ingressImagePullDeps.concat([validator])
   );
 }
 
-type SvConfig = {
+type ValidatorConfig = {
   auth0Client: Auth0Client;
   xns: ExactNamespace;
-  onboarding?: ValidatorOnboarding;
+  onboarding: ValidatorOnboarding;
   backupConfig?: BackupConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
   password: pulumi.Output<string>;
   imagePullDeps: pulumi.Input<pulumi.Resource>[];
   loopback: k8s.helm.v3.Release | null;
   backupConfigSecret?: pulumi.Resource;
-  svKey: pulumi.Input<SvIdKey>;
 };
 
-async function installSvAndValidator(config: SvConfig) {
+async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Release> {
   const {
     xns,
+    onboarding,
     password,
     participantBootstrapDumpSecret,
     auth0Client,
@@ -159,7 +153,6 @@ async function installSvAndValidator(config: SvConfig) {
     loopback,
     backupConfigSecret,
     backupConfig,
-    svKey,
   } = config;
 
   const postgres = installCNSVHelmChart(
@@ -173,8 +166,6 @@ async function installSvAndValidator(config: SvConfig) {
     version
   );
 
-  const globalDomain = installGlobalDomainNode(xns, password, imagePullDeps.concat([postgres]));
-
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
@@ -182,6 +173,7 @@ async function installSvAndValidator(config: SvConfig) {
     }),
     postgresPassword: password,
     disableAutoInit: !!participantBootstrapDumpSecret,
+    participantAdminUserNameFrom: auth0UserNameEnvVarSource('validator'),
   };
 
   const participantValuesWithSpecifiedAud: ChartValues = {
@@ -192,12 +184,6 @@ async function installSvAndValidator(config: SvConfig) {
     },
   };
 
-  const { appSecret: svAppSecret, uiSecret: svAppUISecret } = await svAppSecrets(
-    xns,
-    auth0Client,
-    svUIClientId
-  );
-
   const participant = installCNSVHelmChart(
     xns,
     'participant',
@@ -205,54 +191,8 @@ async function installSvAndValidator(config: SvConfig) {
     participantValuesWithSpecifiedAud,
     localCharts,
     version,
-    imagePullDeps
-      .concat([postgres, svAppSecret, svKeySecret(xns, svKey)])
-      .concat(loopback !== null ? loopback : [])
+    imagePullDeps.concat([postgres]).concat(loopback !== null ? loopback : [])
   );
-
-  const sv234NameSet = new Set<string>([
-    'Canton-Foundation-2',
-    'Canton-Foundation-3',
-    'Canton-Foundation-4',
-  ]);
-
-  const allApprovedSvIdentities = (
-    isDevNet
-      ? loadYamlFromFile(
-          `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-dev.yaml`
-        )
-      : loadYamlFromFile(
-          `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
-        )
-  ).approvedSvIdentities;
-
-  const approvedSvIdentities = singleSv
-    ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv234NameSet.has(id.name))
-    : allApprovedSvIdentities;
-
-  const svValues: ChartValues = {
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`, {
-      TARGET_CLUSTER: TARGET_CLUSTER,
-      YOUR_SV_NAME: SV_NAME,
-      OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
-    }),
-    participantIdentitiesDumpImport: participantBootstrapDumpSecret
-      ? { secretName: participantBootstrapDumpSecretName }
-      : undefined,
-    approvedSvIdentities,
-    domain: {
-      enable: includesCometBftGlobalDomainNode,
-      sequencerPublicUrl: `http://sequencer.sv.svc.${CLUSTER_BASENAME}.network.canton.global:5008`,
-    },
-  };
-
-  const svValuesWithSpecifiedAud: ChartValues = {
-    ...svValues,
-    auth: {
-      ...svValues.auth,
-      audience: auth0Cfg.appToApiAudience['sv'] || DEFAULT_AUDIENCE,
-    },
-  };
 
   const fixedTokensValue: ChartValues = {
     cluster: {
@@ -260,48 +200,30 @@ async function installSvAndValidator(config: SvConfig) {
     },
   };
 
-  const svValuesWithFixedTokens = {
-    ...svValuesWithSpecifiedAud,
-    ...fixedTokensValue,
-  };
-
-  const { appSecret: svValidatorAppSecret, uiSecret: svValidatorUISecret } = await validatorSecrets(
+  const { appSecret: validatorAppSecret, uiSecret: validatorUISecret } = await validatorSecrets(
     xns,
     auth0Client,
     walletUIClientId
   );
 
-  const sv = installCNSVHelmChart(
-    xns,
-    'sv-app',
-    'cn-sv-node',
-    fixedTokens() ? svValuesWithFixedTokens : svValuesWithSpecifiedAud,
-    localCharts,
-    version,
-    imagePullDeps
-      .concat([participant, globalDomain])
-      .concat([svAppSecret, svAppUISecret])
-      .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
-  );
-
-  installCNSVHelmChart(
-    xns,
-    'scan',
-    'cn-scan',
-    fixedTokens() ? fixedTokensValue : {},
-    localCharts,
-    version,
-    imagePullDeps.concat([sv, participant]).concat(svAppSecret)
-  );
-
   const validatorValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
-      SV_WALLET_USER_ID: SV_WALLET_USER_ID,
+      SV_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
     }),
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),
     participantIdentitiesDumpPeriodicBackup: backupConfig,
+    svSponsorAddress: 'http://sv-app.sv-1:5014',
+    onboardingSecretFrom: onboarding
+      ? {
+          secretKeyRef: {
+            name: validatorOnboardingSecretName(onboarding),
+            key: 'secret',
+            optional: false,
+          },
+        }
+      : undefined,
+    validatorPartyHint: 'validator_validator_service_user',
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {
@@ -323,6 +245,14 @@ async function installSvAndValidator(config: SvConfig) {
     validatorValuesWithMaybeDomainFees['topup']['enabled'] = false;
   }
 
+  const dependsOn = imagePullDeps
+    .concat([participant])
+    .concat([validatorAppSecret, validatorUISecret])
+    .concat([directoryUiSecret(xns, auth0Client, directoryClientId)])
+    .concat(backupConfigSecret ? [backupConfigSecret] : [])
+    .concat(onboarding ? [installValidatorOnboardingSecret(xns, onboarding)] : [])
+    .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
+
   const validator = installCNSVHelmChart(
     xns,
     'validator',
@@ -330,12 +260,8 @@ async function installSvAndValidator(config: SvConfig) {
     validatorValuesWithMaybeDomainFees,
     localCharts,
     version,
-    imagePullDeps
-      .concat([sv, participant])
-      .concat([svValidatorAppSecret, svValidatorUISecret])
-      .concat([directoryUiSecret(xns, auth0Client, directoryClientId)])
-      .concat(backupConfigSecret ? [backupConfigSecret] : [])
+    dependsOn
   );
 
-  return { sv, validator };
+  return validator;
 }

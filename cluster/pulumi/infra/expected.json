@@ -40,6 +40,7 @@
         "dnsNames": [
           "test-stack.network.canton.global",
           "*.test-stack.network.canton.global",
+          "*.validator.test-stack.network.canton.global",
           "*.validator1.test-stack.network.canton.global",
           "*.splitwell.test-stack.network.canton.global",
           "*.svc.test-stack.network.canton.global",

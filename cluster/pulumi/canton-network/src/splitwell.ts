@@ -6,12 +6,12 @@ import {
   exactNamespace,
   installCNHelmChart,
   CLUSTER_BASENAME,
+  ValidatorOnboarding,
 } from 'cn-pulumi-common';
 import type { Auth0Client, BackupConfig, BootstrappingDumpConfig } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
 import { installDomain, installParticipant } from './ledger';
-import { ValidatorOnboarding } from './sv';
 import { installValidatorApp } from './validator';
 
 export async function installSplitwell(

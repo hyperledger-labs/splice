@@ -1,0 +1,372 @@
+package com.daml.network.integration.tests.runbook
+
+import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
+import com.daml.network.util.*
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
+
+import scala.collection.mutable
+
+/** Base for preflight tests running against a deployed validator
+  */
+abstract class PreflightValidatorIntegrationTestBase
+    extends FrontendIntegrationTestWithSharedEnvironment("alice-validator", "bob-validator")
+    with FrontendLoginUtil
+    with PreflightIntegrationTestUtil
+    with DirectoryFrontendTestUtil
+    with WalletFrontendTestUtil
+    with SplitwellFrontendTestUtil {
+
+  protected val auth0Users: mutable.Map[String, Auth0User] = mutable.Map.empty[String, Auth0User]
+
+  protected def auth0: Auth0Util
+
+  protected def validatorName: String
+  protected def validatorAuth0Secret: String
+  protected def validatorAuth0Audience: String
+  protected def validatorWalletUser: String
+  protected def walletUiUrl: String
+  protected def directoryUiUrl: String
+
+  // Set this to None if you don't want to run splitwell tests
+  protected def splitwellUiUrl: Option[String]
+
+  override def beforeEach() = {
+    super.beforeEach();
+
+    val aliceUser = retryAuth0Calls(auth0.createUser());
+    logger.debug(
+      s"Created user Alice ${aliceUser.email} with password ${aliceUser.password} (id: ${aliceUser.id})"
+    )
+
+    val bobUser = retryAuth0Calls(auth0.createUser());
+    logger.debug(
+      s"Created user Bob ${bobUser.email} with password ${bobUser.password} (id: ${bobUser.id})"
+    )
+
+    auth0Users += ("alice-validator" -> aliceUser)
+    auth0Users += ("bob-validator" -> bobUser)
+  }
+
+  override def afterEach() = {
+    try super.afterEach()
+    finally auth0Users.values.map(user => retryAuth0Calls(user.close))
+  }
+
+  override def beforeAll() = {
+    super.beforeAll()
+    // Offboard some users if we have too many, to make sure validator does not hit the limit of around 200.
+    // Note that the actual offboarding will actually happen by wallet automation in the background,
+    // and we are not waiting for it here, so it is expected to be happening in parallel to the actual tests
+    limitValidatorUsers()
+  }
+
+  protected def validatorClient = {
+    val env = provideEnvironment
+    val token = getAuth0ClientCredential(
+      validatorAuth0Secret,
+      validatorAuth0Audience,
+      auth0,
+    )(noTracingLogger)
+
+    vc(validatorName)(env).copy(token = Some(token))
+  }
+
+  protected def limitValidatorUsers() = {
+    val users = validatorClient.listUsers()
+
+    val targetNumber = 80 // TODO(tech-debt): consider de-hardcoding this
+    val offboardThreshold = 100 // TODO(tech-debt): consider de-hardcoding this
+    if (users.length > offboardThreshold) {
+      logger.info(
+        s"Validator has ${users.length} users, offboarding some to get below ${targetNumber}"
+      )
+      users
+        .filter(_ != validatorWalletUser)
+        .take(users.length - targetNumber)
+        .foreach { user =>
+          {
+            logger.debug(s"Offboarding user: ${user}")
+            validatorClient.offboardUser(user)
+          }
+        }
+    } else {
+      logger.debug(s"Only ${users.length} users onboarded, not offboarding any")
+    }
+  }
+
+  override def environmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition.preflightTopology(
+      this.getClass.getSimpleName()
+    )
+
+  // when running locally, these tests may fail if the CC DAR deployed to DevNet
+  // differs from the latest one on your branch
+
+  "run through runbook against cluster validator" in { _ =>
+    val aliceUser = auth0Users.get("alice-validator").value
+
+    val bobUser = auth0Users.get("bob-validator").value
+
+    val alicePartyId = withFrontEnd("alice-validator") { implicit webDriver =>
+      val alicePartyId = loginAndOnboardToWalletUi(aliceUser)
+      findAll(className("coins-table-row")) should have size 0
+      alicePartyId
+    }
+
+    val bobPartyId = withFrontEnd("bob-validator") { implicit webDriver =>
+      val bobPartyId = loginAndOnboardToWalletUi(bobUser)
+      findAll(className("coins-table-row")) should have size 0
+      bobPartyId
+    }
+
+    withFrontEnd("alice-validator") { implicit webDriver =>
+      tapCoins(100)
+
+      clue(s"Creating transfer offer for: $bobPartyId") {
+        createTransferOffer(
+          PartyId.tryFromProtoPrimitive(bobPartyId),
+          BigDecimal("10"),
+          90,
+          "p2ptransfer",
+        )
+      }
+
+      click on "logout-button"
+      waitForQuery(id("oidc-login-button"))
+    }
+
+    withFrontEnd("bob-validator") { implicit webDriver =>
+      val acceptButton = eventually() {
+        findAll(className("transfer-offer")).toSeq.headOption match {
+          case Some(element) =>
+            element.childWebElement(className("transfer-offer-accept"))
+          case None => fail("failed to find transfer offer")
+        }
+      }
+
+      acceptButton.click()
+
+      click on "navlink-transactions"
+
+      eventually() {
+        inside(findAll(className("tx-row")).toSeq) { case Seq(tx) =>
+          val transaction = readTransactionFromRow(tx)
+          transaction.action should matchText("Received")
+          val partyR = s"$alicePartyId ${validatorName}_validator_service_user::.*".r
+          val description = transaction.partyDescription.getOrElse(fail("There should be a party."))
+          description should fullyMatch regex partyR
+          transaction.ccAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
+          // we can't test a specific coin price as the coin price on a live network can change
+          val rateR = """^\s*(\d+(?:\.\d+)?)\s*CC/USD\s*$""".r
+          inside(transaction.rate) { case rateR(rate) =>
+            BigDecimal(rate) should be > BigDecimal(0)
+            transaction.usdAmount should beWithin(
+              transaction.ccAmount / BigDecimal(rate) - smallAmount,
+              transaction.ccAmount / BigDecimal(rate) + smallAmount,
+            )
+          }
+        }
+      }
+
+      click on "logout-button"
+      waitForQuery(id("oidc-login-button"))
+    }
+  }
+
+  // test is similar to 'settle debts with a single party' in SplitwellFrontendIntegrationTest
+  "test splitwell group creation and payment against validator" in { _ =>
+    splitwellUiUrl match {
+      case Some(_) =>
+        val groupName = "troika"
+
+        val aliceUser = auth0Users.get("alice-validator").value
+        val bobUser = auth0Users.get("bob-validator").value
+
+        val bobUserPartyId = withFrontEnd("bob-validator") { implicit webDriver =>
+          val bobUserPartyId = loginAndOnboardToWalletUi(bobUser)
+          tapCoins(710)
+          bobUserPartyId
+        }
+
+        val (aliceUserPartyId, invite) = withFrontEnd("alice-validator") { implicit webDriver =>
+          val aliceUserPartyId = loginAndOnboardToWalletUi(aliceUser)
+          tapCoins(60)
+          loginToSplitwellUi(aliceUser)
+
+          (aliceUserPartyId, createGroupAndInviteLink(groupName))
+        }
+
+        withFrontEnd("bob-validator") { implicit webDriver =>
+          loginToSplitwellUi(bobUser)
+          requestGroupMembership(invite)
+        }
+
+        withFrontEnd("alice-validator") { implicit webDriver =>
+          eventually() {
+            findAll(className("add-user-link")).toSeq should not be (empty)
+          }
+          actAndCheck("add user", click on className("add-user-link"))(
+            "user has been added and invite link disappears",
+            _ => findAll(className("add-user-link")).toSeq shouldBe empty,
+          )
+          addTeamLunch(100)
+        }
+
+        withFrontEnd("bob-validator") { implicit webDriver =>
+          enterSplitwellPayment(
+            aliceUserPartyId,
+            PartyId.tryFromProtoPrimitive(aliceUserPartyId),
+            50,
+          )
+
+          // Bob is redirected to wallet ..
+          val acceptButton = eventually() {
+            findAll(className("payment-accept")).toSeq.headOption
+              .valueOrFail("Failed to find accept payment button.")
+          }
+
+          acceptButton.underlying.click()
+
+          // And then back to splitwell, where he is already logged in.
+          // Accepting the payment (which triggers the redirect) and seeing
+          // the balance update in the splitwell UI both take time,
+          // so we use an eventually for each check.
+          eventually() {
+            findAll(className("balances-table-row")).toSeq.headOption
+              .valueOrFail("Failed to find balances table. Did the payment succeed?")
+          }
+          eventually() {
+            inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
+              seleniumText(
+                row.childElement(className("balances-table-receiver"))
+              ) should matchText(aliceUserPartyId)
+
+              row.childElement(className("balances-table-amount")).text.toDouble shouldBe 0.0
+            }
+            val rows = findAll(className("balance-updates-list-item")).toSeq
+            rows should have size 2
+            // We don't guarantee an order on ACS requests atm so we assert independent of the specific order.
+            forExactly(1, rows)(row =>
+              matchRow(
+                Seq("sender", "description"),
+                Seq(aliceUserPartyId, "paid 100.0 CC for Team lunch"),
+              )(row)
+            )
+            forExactly(1, rows)(row =>
+              matchRow(
+                Seq("sender", "description", "receiver"),
+                Seq(bobUserPartyId, "sent 50.0 CC to", aliceUserPartyId),
+              )(row)
+            )
+          }
+        }
+      case None => ()
+    }
+  }
+
+  "test a directory entry allocation against validator" in { _ =>
+    val aliceUser = auth0Users.get("alice-validator").value
+
+    // Generate new random CNS names to avoid conflicts between multiple preflight check runs
+    val entryId = (new scala.util.Random).nextInt().toHexString
+    val cnsName = s"alice_${entryId}.unverified.cns"
+
+    withFrontEnd("alice-validator") { implicit webDriver =>
+      loginAndOnboardToWalletUi(aliceUser)
+
+      tapCoins(100)
+
+      reserveDirectoryNameFor(
+        () =>
+          auth0Login(
+            aliceUser,
+            directoryUiUrl,
+            () => find(id("entry-name-field")) should not be empty,
+          ),
+        cnsName,
+        "1.0",
+        "USD",
+        "90 days",
+      )
+    }
+  }
+
+  "can dump participant identities of validator" in { _ =>
+    validatorClient.dumpParticipantIdentities()
+  }
+
+  private def auth0Login(
+      user: Auth0User,
+      url: String,
+      assertCompleted: () => org.scalatest.Assertion,
+  )(implicit
+      webDriver: WebDriverType
+  ) = {
+    clue(s"Auth0 user login as: ${user.id} (${user.email})") {
+      completeAuth0LoginWithAuthorization(
+        url,
+        user.email,
+        user.password,
+        assertCompleted,
+      )
+    }
+  }
+
+  private def loginAndOnboardToWalletUi(
+      user: Auth0User
+  )(implicit webDriver: WebDriverType): String = {
+    loginAndOnboardToUiViaAuth0(user, walletUiUrl, onboardUserToWallet = true)
+  }
+
+  private def loginToSplitwellUi(
+      user: Auth0User
+  )(implicit webDriver: WebDriverType) = {
+    splitwellUiUrl match {
+      case Some(url) =>
+        clue(s"Logging in to splitwell UI at: ${url}") {
+          auth0Login(
+            user,
+            url,
+            () => find(id("group-id-field")) should not be empty,
+          )
+          waitForQuery(id("logged-in-user"))
+        }
+      case None => fail("splitwellUiUrl not set")
+    }
+  }
+
+  private def loginAndOnboardToUiViaAuth0(
+      user: Auth0User,
+      url: String,
+      onboardUserToWallet: Boolean,
+  )(implicit webDriver: WebDriverType): String = {
+    clue(s"Logging in to wallet UI at: ${url}") {
+      auth0Login(
+        user,
+        url,
+        () => find(id("onboard-button")) should not be empty,
+      )
+
+      if (onboardUserToWallet)
+        click on "onboard-button"
+
+      eventually() {
+        findAll(className("party-id")) should have size 1
+      }
+      copyPartyId()
+    }
+  }
+
+  private def copyPartyId()(implicit webDriver: WebDriverType): String = {
+    clue(s"Copying party ID") {
+      find(className("party-id")).fold(throw new Error("Party ID display expected, but not found"))(
+        elm => seleniumText(elm)
+      )
+    }
+  }
+}

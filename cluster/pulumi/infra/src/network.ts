@@ -2,12 +2,9 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as certmanager from '@pulumi/kubernetes-cert-manager';
 import * as pulumi from '@pulumi/pulumi';
-import { config } from 'cn-pulumi-common';
+import { config, btoa } from 'cn-pulumi-common';
 
 const DNS01_SA_KEY_JSON = config.require('DNS01_SA_KEY_JSON');
-
-// btoa is only available in DOM so inline the definition here.
-const btoa = (s: string) => Buffer.from(s).toString('base64');
 
 function ipAddress(addressName: string): gcp.compute.Address {
   return new gcp.compute.Address(addressName, {
@@ -134,6 +131,7 @@ function clusterCertificate(
         dnsNames: [
           `${dnsName}`,
           `*.${dnsName}`,
+          `*.validator.${dnsName}`,
           `*.validator1.${dnsName}`,
           `*.splitwell.${dnsName}`,
           `*.svc.${dnsName}`,

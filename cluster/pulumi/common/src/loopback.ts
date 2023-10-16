@@ -1,7 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
-import { ExactNamespace } from 'cn-pulumi-common';
 
 import { installCNSVHelmChart } from './helm';
+import { ExactNamespace } from './utils';
 
 export function installLoopback(
   namespace: ExactNamespace,

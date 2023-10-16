@@ -1,0 +1,251 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-ledger-api-auth",
+        "namespace": "validator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://ledger_api.example.com",
+          "client-id": "cznBUeB70fnpfjaq9TzblwiwjkVyvh5z",
+          "client-secret": "***",
+          "ledger-api-user": "cznBUeB70fnpfjaq9TzblwiwjkVyvh5z@clients",
+          "url": "https://canton-network-validator-test.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-validator-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-directory-ui-auth",
+        "namespace": "validator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "jSDSTJu00KQNwYw7XLhJfHYxgDotDXrr",
+          "url": "https://canton-network-validator-test.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-validator-directory",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-wallet-ui-auth",
+        "namespace": "validator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "6wB6EGLJBEwaA1CfVYhRmsQG9OPcmJtj",
+          "url": "https://canton-network-validator-test.us.auth0.com"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-validator-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
+      "compat": "true",
+      "name": "cluster-ingress-validator",
+      "namespace": "cn-namespace",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "hostPrefix": "",
+          "hostname": "validatorrun.network.canton.global",
+          "svNamespace": "validator"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "withDomainNode": false,
+        "withScan": false,
+        "withSv": false
+      }
+    },
+    "name": "cluster-ingress-validator",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "dmFsaWRhdG9yc2VjcmV0"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-onboarding-validator",
+        "namespace": "validator"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator-validator-onboarding-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": false,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-participant/",
+      "compat": "true",
+      "name": "participant",
+      "namespace": "validator",
+      "timeout": 480,
+      "values": {
+        "auth": {
+          "jwksUrl": "https://canton-network-validator-test.us.auth0.com/.well-known/jwks.json",
+          "targetAudience": "https://ledger_api.example.com"
+        },
+        "disableAutoInit": false,
+        "enableHealthProbes": true,
+        "globalDomain": {
+          "alias": "global",
+          "url": "http://sequencer.sv-1.svc.validatorrun.network.com.network.canton.global:5008"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "participantAdminUserNameFrom": {
+          "secretKeyRef": {
+            "key": "ledger-api-user",
+            "name": "cn-app-validator-ledger-api-auth",
+            "optional": false
+          }
+        },
+        "postgres": "postgres",
+        "postgresSchema": "sv_participant"
+      }
+    },
+    "name": "participant",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "postgres",
+      "namespace": "validator",
+      "timeout": 480,
+      "values": {
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+      }
+    },
+    "name": "postgres",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "validator-postgres-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "labels": {
+          "istio-injection": "enabled"
+        },
+        "name": "validator"
+      }
+    },
+    "name": "validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-validator/",
+      "compat": "true",
+      "name": "validator",
+      "namespace": "validator",
+      "timeout": 480,
+      "values": {
+        "auth": {
+          "audience": "https://validator.example.com/api",
+          "jwksUrl": "https://canton-network-validator-test.us.auth0.com/.well-known/jwks.json",
+          "ledgerApiAudience": "https://ledger_api.example.com"
+        },
+        "clusterUrl": "validatorrun.network.com.network.canton.global",
+        "globalDomainUrl": "http://sequencer.sv-1.svc.validatorrun.network.com.network.canton.global:5008",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "onboardingSecretFrom": {
+          "secretKeyRef": {
+            "key": "secret",
+            "name": "cn-app-validator-onboarding-validator",
+            "optional": false
+          }
+        },
+        "participantAddress": "participant",
+        "scanAddress": "https://scan.sv-1.svc.validatorrun.network.com.network.canton.global/api/v0/scan",
+        "svSponsorAddress": "http://sv-app.sv-1:5014",
+        "topup": {
+          "enabled": false,
+          "minTopupInterval": "1m",
+          "targetThroughput": 33300
+        },
+        "validatorPartyHint": "validator_validator_service_user",
+        "validatorWalletUser": "auth0|6526fab5214c99a9a8e1e3cc"
+      }
+    },
+    "name": "validator",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  }
+]

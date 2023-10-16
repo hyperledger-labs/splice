@@ -1,6 +1,6 @@
 app_charts := \
 	cn-cluster-ingress-full \
-	cn-cluster-ingress-sv \
+	cn-cluster-ingress-runbook \
 	cn-cluster-loopback-gateway \
 	cn-cometbft \
 	cn-docs \

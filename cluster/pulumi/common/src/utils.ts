@@ -248,3 +248,8 @@ export function installCNHelmChart(
 // The pulumi documentation also doesn't suggest a better type than this. ¯\_(ツ)_/¯
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ChartValues = { [key: string]: any };
+
+// base64 encoding
+
+// btoa is only available in DOM so inline the definition here.
+export const btoa: (s: string) => string = (s: string) => Buffer.from(s).toString('base64');
