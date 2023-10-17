@@ -6,6 +6,10 @@ Release Notes
 2023-10-23
 ----------
 
+* Improved BFT guarantees on SVC ledger actions and mediator verdicts. Both of these are now safe as long as less than 1/3 of SVs are faulty.
+
+* Non-SV validators now connect to all reachable sequencers in the domain and read from them in a BFT fashion (safe as long as less than 1/3 of them are faulty). Note that for now, only the sequencers operated by the Canton Foundation are reachable and considered for that quorum. We will soon provide instructions for making the sequencers of all SV nodes reachable as well.
+
 * Deployment updates
 
   * Replaced ``disableAllocateLedgerApiUserParty`` with ``svValidator``.
