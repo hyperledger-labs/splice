@@ -71,4 +71,6 @@ in pkgs.mkShell {
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
   COMETBFT_DRIVER = "${pkgs.cometbft_driver}";
   GRAFANA_DASHBOARDS = "${pkgs.da_grafana_dashboards}";
+  # Avoid sbt-assembly falling over. See https://github.com/sbt/sbt-assembly/issues/496
+  LC_ALL="C.UTF-8";
 }

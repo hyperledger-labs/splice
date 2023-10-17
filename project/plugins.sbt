@@ -24,7 +24,7 @@ libraryDependencies ++= Seq(
 ).map(_ % circeVersion)
 
 // Assembly plugin to build fat-jars
-addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.15.0")
+addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.1.3")
 
 addSbtPlugin("dev.guardrail" % "sbt-guardrail" % "0.75.1")
 
