@@ -377,6 +377,7 @@ workflows:
           - slack-context
         cluster: "devnet"
         deploy_version: "devnet-next"
+        use_published_artifacts: true
         requires:
            - wait_for_previous_pipeline
     - deploy_sv_runbook:
@@ -386,28 +387,22 @@ workflows:
           - datadog
           - slack-context
         cluster: "devnet"
+        deploy_version: "devnet-next"
         use_published_artifacts: true
         requires:
           - deploy_cluster
     - preflight_check:
-        cluster: "devnet"
         <<: *main-branch-only
         context:
           - artifactory
           - canton-network-vpn
           - datadog
           - slack-context
+        cluster: "devnet"
         # require deploy_cluster and deploy_sv_runbook for stability and reliability
         requires:
           - deploy_cluster
           - deploy_sv_runbook
-    - publish_public_release:
-        <<: *main-branch-only
-        requires:
-          - preflight_check
-        context:
-          - artifactory
-          - datadog
     - preflight_sv_check:
         <<: *main-branch-only
         context:
@@ -442,6 +437,7 @@ workflows:
         cluster: "testnet"
         deploy_version: "testnet-next"
         restore_cluster: true
+        use_published_artifacts: true
         requires:
            - wait_for_previous_pipeline
     - preflight_check:

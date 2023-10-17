@@ -188,6 +188,9 @@ jobs:
       use_published_artifacts:
         type: boolean
         default: false
+      deploy_version:
+        type: string
+        default: ""
       restore_cluster:
         type: boolean
         default: false
@@ -195,6 +198,12 @@ jobs:
       - checkout
       - record_job_start_time
       - setup_nix
+      - when:
+          condition: << parameters.deploy_version >>
+          steps:
+          - run_bash_command_in_nix:
+              cmd_name: Checkout commit << parameters.deploy_version >>
+              cmd: git checkout << parameters.deploy_version >>
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
           cluster: << parameters.cluster >>
@@ -286,6 +295,9 @@ jobs:
       deploy_version:
         type: string
         default: ""
+      use_published_artifacts:
+        type: boolean
+        default: false
       update_deployment_branch:
         type: boolean
         default: true
@@ -328,6 +340,10 @@ jobs:
               export DISABLE_COMETBFT_DRIVER=true
             fi
             cncluster activate
+            VERSION=""
+            if [[ << parameters.use_published_artifacts >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+            fi
             cncluster ci_apply
       - when:
           condition: << parameters.update_deployment_branch >>
@@ -339,7 +355,12 @@ jobs:
                 cmd: |
                   # TODO(#7554): remove this condition once all deployment tags are past the point where we introduced this script (in #7875)
                   if [ -f scripts/update-deployment-branch.sh ]; then
-                    scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
+                    # deployment/scratch* branches break our deployment, so we guard against accidentally creating those here
+                    if [[ << parameters.cluster >> != scratch* ]]; then
+                      scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
+                    else
+                      echo "NOTE: skipping deployment branch update for scratchnet cluster << parameters.cluster >>"
+                    fi
                   fi
                 cmd_retry_count: 5
       - notify-cluster-fail:
