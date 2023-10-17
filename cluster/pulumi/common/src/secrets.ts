@@ -23,11 +23,12 @@ export function svKeyFromSecret(sv: string): pulumi.Output<SvIdKey> {
   });
 }
 
+const k8sProvider = new k8s.Provider('k8s', { enableServerSideApply: true });
+
 export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
   const artifactory = 'digitalasset-canton-network-docker.jfrog.io';
   const username = requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
   const password = requireEnv('ARTIFACTORY_PASSWORD', 'Password for jfrog artifactory');
-  const k8sProvider = new k8s.Provider('k8s', { enableServerSideApply: true });
   const secret = new k8s.core.v1.Secret(ns + '-docker-reg-cred', {
     metadata: {
       name: 'docker-reg-cred',
