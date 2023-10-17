@@ -149,11 +149,13 @@ abstract class SvNodePreflightSvIntegrationTestBase
   "Dumping participant identities works" in { implicit env =>
     val auth0 = auth0UtilFromEnvVars("https://canton-network-sv-test.us.auth0.com", Some("sv"))
 
-    val token = getAuth0ClientCredential(
-      "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn",
-      "https://validator.example.com/api",
-      auth0,
-    )(noTracingLogger)
+    val token = eventuallySucceeds() {
+      getAuth0ClientCredential(
+        "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn",
+        "https://validator.example.com/api",
+        auth0,
+      )(noTracingLogger)
+    }
 
     val svValidatorClient = vc("svTestValidator").copy(token = Some(token))
     svValidatorClient.dumpParticipantIdentities()

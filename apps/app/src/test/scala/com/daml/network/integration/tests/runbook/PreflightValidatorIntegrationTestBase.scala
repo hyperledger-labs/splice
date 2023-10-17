@@ -66,11 +66,14 @@ abstract class PreflightValidatorIntegrationTestBase
 
   protected def validatorClient = {
     val env = provideEnvironment
-    val token = getAuth0ClientCredential(
-      validatorAuth0Secret,
-      validatorAuth0Audience,
-      auth0,
-    )(noTracingLogger)
+    // retry on e.g. network errors and rate limits
+    val token = eventuallySucceeds() {
+      getAuth0ClientCredential(
+        validatorAuth0Secret,
+        validatorAuth0Audience,
+        auth0,
+      )(noTracingLogger)
+    }
 
     vc(validatorName)(env).copy(token = Some(token))
   }

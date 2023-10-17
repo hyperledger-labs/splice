@@ -84,7 +84,7 @@ object K8sUtil {
           // TODO (#8039): remove try catch, logging and fallback to None (let it crash, which shouldn't happen)
           try {
             val token = secretData.parseJson.convertTo[Auth0PreflightTokenData].toAuthToken
-            if (token.expiresAt.isAfter(CantonTimestamp.now())) {
+            if (token.expiresAt.isBefore(CantonTimestamp.now())) {
               None
             } else {
               Some(token)
