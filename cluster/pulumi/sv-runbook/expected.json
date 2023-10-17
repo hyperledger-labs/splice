@@ -251,16 +251,6 @@
     "type": "kubernetes:helm.sh/v3:Release"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "enableServerSideApply": "true"
-    },
-    "name": "k8s",
-    "provider": "",
-    "type": "pulumi:providers:kubernetes"
-  },
-  {
     "custom": false,
     "id": "organization/infra/infra.mock",
     "inputs": {

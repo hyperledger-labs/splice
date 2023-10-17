@@ -561,16 +561,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "enableServerSideApply": "true"
-    },
-    "name": "k8s",
-    "provider": "",
-    "type": "pulumi:providers:kubernetes"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "logConfig": {
         "enable": true,
         "filter": "ERRORS_ONLY"
