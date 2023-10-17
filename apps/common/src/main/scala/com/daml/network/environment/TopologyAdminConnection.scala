@@ -34,7 +34,10 @@ import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
 import com.digitalasset.canton.topology.store.{StoredTopologyTransactionsX, TimeQueryX}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
-import com.daml.network.config.CNThresholds.getPartyToParticipantThreshold
+import com.daml.network.config.CNThresholds.{
+  getMediatorDomainStateThreshold,
+  getPartyToParticipantThreshold,
+}
 import com.digitalasset.canton.topology.transaction.{
   DomainParametersStateX,
   HostingParticipant,
@@ -462,11 +465,11 @@ class TopologyAdminConnection(
       serial = PositiveInt.one,
     )
 
-  // TODO(#7884): handle threshold update for sv off-boarding; remove temporary workaround to use svcRulesMemberSize
   def ensureMediatorDomainState(
       domainId: DomainId,
       newActiveMediator: MediatorId,
       signedBy: Fingerprint,
+      svcRulesMembersSize: Int,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
@@ -480,7 +483,10 @@ class TopologyAdminConnection(
         MediatorDomainStateX.create(
           previous.domain,
           previous.group,
-          previous.threshold,
+          getMediatorDomainStateThreshold(
+            svcRulesMembersSize,
+            previous.active.length,
+          ),
           newActiveMediator +: previous.active,
           previous.observers,
         ),

@@ -13,10 +13,19 @@ object CNThresholds {
     }
   }
 
-  def getMediatorDomainStateThreshold(svcSize: Int): PositiveInt = FPlus1Threshold(svcSize)
+  // TODO(#7884): update function after proper sv off-boarding
+  def getMediatorDomainStateThreshold(svcSize: Int, mediatorSize: Int): PositiveInt = {
+    // take the minimum to avoid setting a threshold which is too high in concurrent onboarding setup.
+    // add 1 to include the new sv.
+    val minSize = List(svcSize, mediatorSize).min + 1
+    FPlus1Threshold(minSize)
+  }
 
+  // TODO(#7884): update function after proper sv off-boarding
   def getPartyToParticipantThreshold(svcSize: Int, participantSize: Int): PositiveInt = {
-    val minSize = List(svcSize + 1, participantSize + 1).min
+    // take the minimum to avoid setting a threshold which is too high in concurrent onboarding setup.
+    // add 1 to include the new sv.
+    val minSize = List(svcSize, participantSize).min + 1
     FPlus1Threshold(minSize)
   }
 
