@@ -1,2 +1,1 @@
-disableAllocateLedgerApiUserParty: true
-useSequencersFromScan: false
+svValidator: true

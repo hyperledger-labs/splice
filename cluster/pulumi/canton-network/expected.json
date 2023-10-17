@@ -1585,8 +1585,8 @@
           }
         },
         "svSponsorAddress": "http://sv-app.sv-1:5014",
-        "topup": {},
-        "useSequencersFromScan": true
+        "svValidator": false,
+        "topup": {}
       }
     },
     "name": "helm-splitwell-validator-splitwell",
@@ -2520,8 +2520,8 @@
             "memory": "8Gi"
           }
         },
+        "svValidator": true,
         "topup": {},
-        "useSequencersFromScan": false,
         "validatorWalletUser": "auth0|64afbc0956a97fe9577249d7"
       }
     },
@@ -3350,8 +3350,8 @@
             "memory": "8Gi"
           }
         },
+        "svValidator": true,
         "topup": {},
-        "useSequencersFromScan": false,
         "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
       }
     },
@@ -4107,8 +4107,8 @@
             "memory": "8Gi"
           }
         },
+        "svValidator": true,
         "topup": {},
-        "useSequencersFromScan": false,
         "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
       }
     },
@@ -4864,8 +4864,8 @@
             "memory": "8Gi"
           }
         },
+        "svValidator": true,
         "topup": {},
-        "useSequencersFromScan": false,
         "validatorWalletUser": "auth0|64afbc720e20777e46fff490"
       }
     },
@@ -5352,8 +5352,8 @@
           }
         },
         "svSponsorAddress": "http://sv-app.sv-1:5014",
+        "svValidator": false,
         "topup": {},
-        "useSequencersFromScan": true,
         "validatorPartyHint": "validator1_validator_service_user",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       }

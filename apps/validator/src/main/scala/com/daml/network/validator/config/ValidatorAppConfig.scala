@@ -130,7 +130,6 @@ case class ValidatorAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CNDbConfig,
     ledgerApiUser: String,
-    allocateLedgerApiUserParty: Boolean = true,
     // If not set the ledgerApiUser name is used.
     // This can be used to give a nicer name to the validator party.
     validatorPartyHint: Option[String] = None,
@@ -151,8 +150,7 @@ case class ValidatorAppBackendConfig(
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     participantIdentitiesBackup: Option[BackupDumpConfig] = None,
     appManager: Option[AppManagerConfig] = None,
-    // TODO:(##8016) refactor `allocateLedgerApiUserParty` and `useSequencersFromScan` to a single boolean `svValidator`.
-    useSequencersFromScan: Boolean = true,
+    svValidator: Boolean = false,
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

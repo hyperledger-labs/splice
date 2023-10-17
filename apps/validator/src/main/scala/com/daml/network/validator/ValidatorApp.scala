@@ -134,7 +134,7 @@ class ValidatorApp(
                   CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
                 ),
               participantAdminConnection,
-            ) whenA config.allocateLedgerApiUserParty
+            ) whenA !config.svValidator
           } yield ()
         }
     } yield ()
@@ -400,7 +400,7 @@ class ValidatorApp(
         config.participantIdentitiesBackup,
         config.domains.global.buyExtraTraffic,
         config.appManager,
-        config.useSequencersFromScan,
+        config.svValidator,
         config.domains.global.alias,
         clock,
         walletManager,

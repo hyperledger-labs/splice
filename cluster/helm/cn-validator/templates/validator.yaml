@@ -82,13 +82,9 @@ spec:
         - name: CN_APP_VALIDATOR_AUTH_JWKS_URL
           value: {{ .Values.auth.jwksUrl | quote }}
         {{ end }}
-        {{ if .Values.disableAllocateLedgerApiUserParty }}
-        - name: CN_APP_VALIDATOR_ALLOCATE_LEDGER_API_USER_PARTY
-          value: "false"
-        {{ end }}
-        {{ if not .Values.useSequencersFromScan }}
-        - name: CN_APP_VALIDATOR_USE_SEQUENCERS_FROM_SCAN
-          value: "false"
+        {{ if .Values.svValidator }}
+        - name: CN_APP_VALIDATOR_SV_VALIDATOR
+          value: "true"
         {{ end }}
         - name: CN_APP_VALIDATOR_GLOBAL_DOMAIN_URL
           value: {{ .Values.globalDomainUrl | quote }}

@@ -73,6 +73,6 @@ export async function installValidator1(
     extraDependsOn,
     auth0AppName: 'validator1',
     participantBootstrapDump,
-    useSequencersFromScan: true,
+    svValidator: false,
   });
 }

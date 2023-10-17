@@ -87,6 +87,6 @@ export async function installSplitwell(
     svSponsorAddress: 'http://sv-app.sv-1:5014',
     auth0AppName: 'splitwell_validator',
     participantBootstrapDump,
-    useSequencersFromScan: true,
+    svValidator: false,
   });
 }

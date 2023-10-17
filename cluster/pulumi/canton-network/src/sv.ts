@@ -261,7 +261,7 @@ export function installSvNode(config: SvConfig): {
           }
         : undefined,
     extraDependsOn: [svApp],
-    useSequencersFromScan: false,
+    svValidator: true,
   });
 
   installCNHelmChart(

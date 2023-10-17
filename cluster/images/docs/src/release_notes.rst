@@ -8,7 +8,9 @@ Release Notes
 
 * Deployment updates
 
-  * Added a new value `useSequencersFromScan` in `sv-validator-values.yaml`.
+  * Replaced ``disableAllocateLedgerApiUserParty`` with ``svValidator``.
+    For validator Helm charts, ``svValidator`` should be set to ``true`` for SV nodes.
+    This value is in the ``sv-validator-values.yaml`` file.
 
 2023-10-16
 ----------

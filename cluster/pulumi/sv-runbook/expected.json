@@ -453,17 +453,16 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "svrun.network.com.network.canton.global",
-        "disableAllocateLedgerApiUserParty": true,
         "globalDomainUrl": "http://sequencer.sv-1.svc.svrun.network.com.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
         "scanAddress": "https://scan.sv-1.svc.svrun.network.com.network.canton.global/api/v0/scan",
+        "svValidator": true,
         "topup": {
           "enabled": false,
           "minTopupInterval": "1m",
           "targetThroughput": 33300
         },
-        "useSequencersFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       }
     },
