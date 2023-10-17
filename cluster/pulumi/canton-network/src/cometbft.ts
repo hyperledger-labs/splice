@@ -138,7 +138,7 @@ export function installCometBftNode(
       enable: true,
     },
     db: {
-      volumeSize: clusterLargeDisk ? '320Gi' : '80Gi',
+      volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
     },
   });
   return Service.get(

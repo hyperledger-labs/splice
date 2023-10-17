@@ -128,7 +128,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
     const pg = installCNHelmChart(xns, name, 'cn-postgres', {
       postgresPassword: this.password,
       db: {
-        volumeSize: clusterLargeDisk ? '320Gi' : '160Gi',
+        volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
       },
     });
 
