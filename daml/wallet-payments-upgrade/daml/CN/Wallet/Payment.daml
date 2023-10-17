@@ -1,0 +1,203 @@
+-- Disabled until https://github.com/digital-asset/daml/issues/16416 is fixed
+{-# OPTIONS -Wno-unused-matches #-}
+module CN.Wallet.Payment where
+
+import DA.List (dedupSort)
+import DA.Time
+
+import CN.Util.Assert
+import CC.Coin
+import CC.Expiry
+import CC.Round
+import CC.Round.Types
+
+data Currency = USD | CC deriving (Eq, Show, Ord)
+
+data PaymentAmount = PaymentAmount
+  with
+    amount : Decimal
+    currency : Currency
+  deriving (Eq, Show, Ord)
+
+data ReceiverAmount = ReceiverAmount
+ with
+   receiver : Party
+   amount : PaymentAmount
+ deriving (Show, Eq, Ord)
+
+data ReceiverCCAmount = ReceiverCCAmount
+ with
+   receiver : Party
+   ccAmount : Decimal
+ deriving (Show, Eq, Ord)
+
+paymentAmountToCC : Party -> Party -> OpenMiningRound -> PaymentAmount -> Update Decimal
+paymentAmountToCC svc submitter openMiningRound pq =
+  case pq.currency of
+    USD ->
+      do
+        require "SVC matches" (openMiningRound.svc == svc)
+        pure (pq.amount / openMiningRound.coinPrice)
+    CC ->
+      pure pq.amount
+
+receiverAmountToCCReceiverAmount : Party -> Party -> OpenMiningRound -> ReceiverAmount -> Update ReceiverCCAmount
+receiverAmountToCCReceiverAmount svc submitter openMiningRound rq =
+  do
+    cc <- paymentAmountToCC svc submitter openMiningRound rq.amount
+    pure ReceiverCCAmount with
+      receiver = rq.receiver
+      ccAmount = cc
+
+appPaymentRequest_receivers : AppPaymentRequest -> [Party]
+appPaymentRequest_receivers AppPaymentRequest{..} = map (\r -> r.receiver) receiverAmounts
+
+template AppPaymentRequest
+  with
+    sender : Party -- ^ The party that should pay.
+    receiverAmounts : [ReceiverAmount] -- ^ Pairs of (party, amount) requesting to be paid.
+    provider : Party -- ^ The app provider; receives usage rewards.
+    svc : Party -- ^ The issuer of CC that should be used to make the payment.
+    expiresAt : Time -- ^ When the payment request expires.
+    description : Text -- ^ Human readable description of the reason / good for which the payment is requested.
+  where
+
+    signatory sender, appPaymentRequest_receivers this, provider
+    ensure all (\rq -> rq.amount.amount > 0.0) receiverAmounts
+
+    choice AppPaymentRequest_Expire : ContractId TerminatedAppPayment
+      with
+        actor : Party
+      controller actor
+      do now <- getTime
+         require "Actor is a stakeholder" (actor `elem` stakeholder this)
+         require "Contract has expired" (expiresAt <= now)
+         create TerminatedAppPayment with reference = self, sender, provider, receivers = map (\a -> a.receiver) receiverAmounts
+
+    choice AppPaymentRequest_Accept
+      : (ContractId AcceptedAppPayment, Optional (ContractId Coin))
+      with
+        inputs : [TransferInput]
+        context : PaymentTransferContext
+        walletProvider : Party
+      controller sender, walletProvider
+      do now <- getTime
+         contextRound <- exercise context.context.openMiningRound (OpenMiningRound_Fetch provider)
+
+         -- Convert from USD to CC amounts
+         ccReceiverAmounts <- forA receiverAmounts $ \rq ->
+           receiverAmountToCCReceiverAmount svc sender contextRound rq
+         require "AppPaymentRequest has not expired" (now < expiresAt)
+
+         outputFees <- exerciseComputeFees context sender (map mkReceiverOutput ccReceiverAmounts)
+
+         -- We know that the contextRound (=latest Round) won't be archived before
+         -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger.
+         let expiresAt = max (addRelTime now contextRound.tickDuration) contextRound.targetClosesAt
+
+         -- lock the coin and create an accepted payment
+         let transfer = Transfer with
+              sender
+              -- this step is orchestrated by the sender's wallet, so the sender's wallet provider gets the rewards
+              provider = walletProvider
+              inputs
+              outputs =
+                [ TransferOutput with
+                    receiver = sender
+                    amount = sum outputFees + sum (map (.ccAmount) ccReceiverAmounts)
+                    lock = Some TimeLock with
+                      holders = dedupSort $ provider :: map (.receiver) receiverAmounts
+                      expiresAt = expiresAt
+                    receiverFeeRatio = 0.0
+                ]
+         result <- exercisePaymentTransfer context transfer
+         let [TransferResultLockedCoin lockedCoin] = result.createdCoins
+         let round = result.round
+         acceptedPayment <- create AcceptedAppPayment
+           with
+             svc, provider, ccReceiverAmounts, sender, lockedCoin, round, reference = self
+         return (acceptedPayment, result.senderChangeCoin)
+
+    choice AppPaymentRequest_Withdraw : ContractId TerminatedAppPayment
+      controller appPaymentRequest_receivers this
+      do create TerminatedAppPayment with reference = self, sender, provider, receivers = map (\a -> a.receiver) receiverAmounts
+
+    choice AppPaymentRequest_Reject : ContractId TerminatedAppPayment
+      controller sender
+      do create TerminatedAppPayment with reference = self, sender, provider, receivers = map (\a -> a.receiver) receiverAmounts
+
+-- | Instead of just archiving payments (e.g. when the request is accepted) we create an
+-- TerminatedAppPayment contract. This allows the coordinating workflow to archive its own contracts once the app-payment workflow terminated.
+template TerminatedAppPayment
+  with
+    sender : Party
+    provider : Party
+    receivers : [Party]
+    reference : ContractId AppPaymentRequest
+  where
+    signatory sender, provider, receivers
+
+data ReceiverCoin = ReceiverCoin with receiver : Party, lockedCoin : ContractId LockedCoin
+  deriving (Eq, Show)
+
+unzipReceiverCoins : [ReceiverCoin] -> ([Party], [ContractId LockedCoin])
+unzipReceiverCoins = foldr (\ReceiverCoin{..} (rs,cs) -> (receiver :: rs, lockedCoin :: cs)) ([], [])
+
+mkReceiverOutput : ReceiverCCAmount -> TransferOutput
+mkReceiverOutput receiverAmount =
+  TransferOutput with
+    receiver = receiverAmount.receiver
+    amount = receiverAmount.ccAmount
+    receiverFeeRatio = 0.0
+    lock = None
+
+data AcceptedAppPayment_Collect_Result = AcceptedAppPayment_Collect_Result with
+  receiverCoins: [(Party, ContractId Coin)]
+
+template AcceptedAppPayment
+  with
+    sender : Party
+    ccReceiverAmounts : [ReceiverCCAmount]
+    provider : Party
+    svc : Party
+    lockedCoin : ContractId LockedCoin
+    round : Round -- ^ The round in which the locked coin was created, added as an extra field so we can avoid ingesting locked coins.
+    reference : ContractId AppPaymentRequest -- ^ The contract id of the original payment request to correlate it. Note that the contract will no longer be active.
+  where
+    signatory sender, provider, map (\r -> r.receiver) ccReceiverAmounts
+
+    choice AcceptedAppPayment_Collect : AcceptedAppPayment_Collect_Result
+      with
+        context : AppTransferContext
+      controller signatory this
+      do
+        contextRound <- exercise context.openMiningRound (OpenMiningRound_Fetch provider)
+        require ("Round at payment acceptance " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
+        -- unlock coin and transfer the remainder to the receiver
+        ccsum <- exercise lockedCoin (LockedCoin_Unlock context.coinRules context.openMiningRound)
+        let transfer = Transfer with
+              sender
+              provider
+              inputs = [InputCoin ccsum.coin]
+              outputs = map mkReceiverOutput ccReceiverAmounts
+        result <- exerciseAppTransfer context transfer
+        require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
+        let coins = map (\(TransferResultCoin coinCid) -> coinCid) result.createdCoins
+        let receivers = map (\r -> r.receiver) ccReceiverAmounts
+        pure AcceptedAppPayment_Collect_Result with
+            receiverCoins = zip receivers coins
+
+    choice AcceptedAppPayment_Reject : CoinCreateSummary (ContractId Coin)
+      with
+        context : AppTransferContext
+      controller map (\r -> r.receiver) ccReceiverAmounts
+      do create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) ccReceiverAmounts
+         exercise lockedCoin (LockedCoin_Unlock context.coinRules context.openMiningRound)
+
+    choice AcceptedAppPayment_Expire : CoinCreateSummary (ContractId Coin)
+      with
+        context : AppTransferContext
+      controller sender
+      do -- TODO(#3152) Split out coin unlocking from payment expiry
+         create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) ccReceiverAmounts
+         exercise lockedCoin (LockedCoin_OwnerExpireLock context.coinRules context.openMiningRound)

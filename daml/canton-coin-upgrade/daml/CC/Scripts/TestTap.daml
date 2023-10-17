@@ -1,0 +1,29 @@
+module CC.Scripts.TestTap where
+
+import DA.Assert
+import Daml.Script
+import CC.Coin
+import CC.Scripts.Util
+
+testTap: Script ()
+testTap = do
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+    -- start issuing so the SVC has some coins to invite users
+    advanceToIssuanceWithPrice app 1.0
+    runCoinDepositBots app
+    cid <- tap app alice 100.0
+    Some coin <- queryContractId @Coin alice.primaryParty cid
+    coin.amount.initialAmount === 100.0
+    config <- getCoinConfig app
+    coin.amount.ratePerRound.rate === config.transferConfig.holdingFee.rate
+
+    let newPrice = 3.7 : Decimal
+    advanceToIssuanceWithPrice app newPrice
+    runCoinDepositBots app
+    cid <- tap app alice 100.0
+    Some coin <- queryContractId @Coin alice.primaryParty cid
+    coin.amount.initialAmount === 100.0
+    config <- getCoinConfig app
+    coin.amount.ratePerRound.rate === config.transferConfig.holdingFee.rate / newPrice
+    return ()

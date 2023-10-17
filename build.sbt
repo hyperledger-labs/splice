@@ -56,12 +56,18 @@ lazy val root = (project in file("."))
     `apps-frontends`,
     `cn-util-daml`,
     `canton-coin-daml`,
+    `canton-coin-upgrade-daml`,
     `canton-name-service-daml`,
+    `canton-name-service-upgrade-daml`,
     `wallet-payments-daml`,
+    `wallet-payments-upgrade-daml`,
     `wallet-daml`,
+    `wallet-upgrade-daml`,
     `directory-daml`,
+    `directory-upgrade-daml`,
     `splitwell-daml`,
     `svc-governance-daml`,
+    `svc-governance-upgrade-daml`,
     `validator-lifecycle-daml`,
     `app-manager-daml`,
     `build-tools-dar-lock-checker`,
@@ -173,6 +179,18 @@ lazy val `canton-coin-daml` =
         (`cn-util-daml` / Compile / damlBuild).value,
     )
 
+lazy val `canton-coin-upgrade-daml` =
+  project
+    .in(file("daml/canton-coin-upgrade"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cn-util-daml` / Compile / damlBuild).value,
+      // TODO(#8082) Switch to disabling code gen on the old version
+      Compile / damlEnableJavaCodegen := false,
+    )
+
 lazy val `svc-governance-daml` =
   project
     .in(file("daml/svc-governance"))
@@ -184,6 +202,21 @@ lazy val `svc-governance-daml` =
           (`canton-coin-daml` / Compile / damlBuild).value ++
           (`canton-name-service-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value,
+    )
+
+lazy val `svc-governance-upgrade-daml` =
+  project
+    .in(file("daml/svc-governance-upgrade"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cn-util-daml` / Compile / damlBuild).value ++
+          (`canton-coin-upgrade-daml` / Compile / damlBuild).value ++
+          (`canton-name-service-upgrade-daml` / Compile / damlBuild).value ++
+          (`wallet-payments-upgrade-daml` / Compile / damlBuild).value,
+      // TODO(#8082) Switch to disabling code gen on the old version
+      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `validator-lifecycle-daml` =
@@ -208,6 +241,19 @@ lazy val `wallet-payments-daml` =
           (`canton-coin-daml` / Compile / damlBuild).value,
     )
 
+lazy val `wallet-payments-upgrade-daml` =
+  project
+    .in(file("daml/wallet-payments-upgrade"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cn-util-daml` / Compile / damlBuild).value ++
+          (`canton-coin-upgrade-daml` / Compile / damlBuild).value,
+      // TODO(#8082) Switch to disabling code gen on the old version
+      Compile / damlEnableJavaCodegen := false,
+    )
+
 // This defines the Daml model that we do not expose to app devs
 // but do use internally, e.g., for batching.
 lazy val `wallet-daml` =
@@ -219,6 +265,17 @@ lazy val `wallet-daml` =
       Compile / damlDependencies := (`canton-coin-daml` / Compile / damlBuild).value ++ (`wallet-payments-daml` / Compile / damlBuild).value,
     )
 
+lazy val `wallet-upgrade-daml` =
+  project
+    .in(file("daml/wallet-upgrade"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`canton-coin-upgrade-daml` / Compile / damlBuild).value ++ (`wallet-payments-upgrade-daml` / Compile / damlBuild).value,
+      // TODO(#8082) Switch to disabling code gen on the old version
+      Compile / damlEnableJavaCodegen := false,
+    )
+
 lazy val `directory-daml` =
   project
     .in(file("daml/directory-service"))
@@ -226,6 +283,17 @@ lazy val `directory-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
+    )
+
+lazy val `directory-upgrade-daml` =
+  project
+    .in(file("daml/directory-service-upgrade"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`wallet-upgrade-daml` / Compile / damlBuild).value,
+      // TODO(#8082) Switch to disabling code gen on the old version
+      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `canton-name-service-daml` =
@@ -237,6 +305,17 @@ lazy val `canton-name-service-daml` =
       Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
     )
 
+lazy val `canton-name-service-upgrade-daml` =
+  project
+    .in(file("daml/canton-name-service-upgrade"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`wallet-upgrade-daml` / Compile / damlBuild).value,
+      // TODO(#8082) Switch to disabling code gen on the old version
+      Compile / damlEnableJavaCodegen := false,
+    )
+
 lazy val `splitwell-daml` =
   project
     .in(file("daml/splitwell"))
@@ -244,6 +323,17 @@ lazy val `splitwell-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
+    )
+
+lazy val `splitwell-upgrade-daml` =
+  project
+    .in(file("daml/splitwell-upgrade"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`wallet-upgrade-daml` / Compile / damlBuild).value,
+      // TODO(#8082) Switch to disabling code gen on the old version
+      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `app-manager-daml` =
@@ -263,14 +353,22 @@ lazy val `apps-common` =
       `canton-community-testing` % "test",
       // We include all DARs here to make sure they are available as resources.
       `app-manager-daml`,
+      `app-manager-daml`,
       `canton-coin-daml`,
+      `canton-coin-upgrade-daml`,
       `canton-name-service-daml`,
+      `canton-name-service-upgrade-daml`,
       `directory-daml`,
+      `directory-upgrade-daml`,
       `splitwell-daml`,
+      `splitwell-upgrade-daml`,
       `svc-governance-daml`,
+      `svc-governance-upgrade-daml`,
       `validator-lifecycle-daml`,
       `wallet-daml`,
+      `wallet-upgrade-daml`,
       `wallet-payments-daml`,
+      `wallet-payments-upgrade-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(
@@ -971,6 +1069,13 @@ lazy val runShellcheck = taskKey[Unit]("Check shell scripts with shellcheck")
 runShellcheck := {
   val log = streams.value.log
   runCommand(Seq("pre-commit", "run", "--all-files", "shellcheck"), log)
+}
+
+lazy val runCheckUpgradeModelDiffs =
+  taskKey[Unit]("Check that diffs for upgrade models are up2date")
+runCheckUpgradeModelDiffs := {
+  val log = streams.value.log
+  runCommand(Seq("pre-commit", "run", "check-upgrade-model-diffs"), log)
 }
 
 lazy val syncpackCheck = taskKey[Unit]("Check all apps' package.json dependency versions match")

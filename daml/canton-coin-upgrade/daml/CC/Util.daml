@@ -1,0 +1,7 @@
+module CC.Util where
+
+import CN.Util.Assert
+
+requireUnlocked : CanAssert m => Bool -> m ()
+requireUnlocked lock = do
+  require "Contract is not locked" (not lock)

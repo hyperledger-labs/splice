@@ -1,0 +1,24 @@
+module CC.Scripts.TestCoinRulesDisclosure where
+
+import Daml.Script
+
+import DA.Foldable (mapA_)
+
+import CC.Scripts.Util
+
+test : Script ()
+test = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  -- -- start issuing so the SVC has some coins to invite users
+  runNextIssuance app
+  runCoinDepositBots app
+
+  mapA_ (\_ -> do
+    runNextIssuance app
+    runCoinDepositBots app
+    pay app alice bob.primaryParty 0.01
+    ) [1,2,3,4,5]
+
+
+  pure ()

@@ -505,6 +505,16 @@ in daml/dars.lock. CI verifies that those package IDs are correct. If you intent
 changes in daml code, please run `sbt damlDarsLockFileUpdate` and commit the updated `dars.lock`
 file along with your dar changes.
 
+#### Editing Daml Upgrade Models
+
+To test Daml upgrade models, some models are duplicated with minor
+changes, e.g., canton-coin and canton-coin-upgrade. To make the
+changes easy to spot, we check in diffs in `daml/upgrade-diffs`.
+
+If you need to edit the files, modify the Daml code and then run
+`./scripts/update-upgrade-model-diff.sh` to update the diff files. CI
+enforces that those diff files are up2date.
+
 ### Bumping External Dependencies
 
 #### Bumping CometBFT

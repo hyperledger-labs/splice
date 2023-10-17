@@ -1,0 +1,47 @@
+-- TODO(#6073): move into its own .dar
+module CC.CoinImport where
+
+import CC.Coin
+import CC.Round
+import CC.ValidatorLicense
+
+import CN.Util.Assert
+
+data ImportPayload
+  = IP_Coin Coin
+  | IP_ValidatorLicense ValidatorLicense
+  deriving (Eq, Show)
+
+-- | A crate of contracts imported from another network instance upon bootstrapping this SVC.
+template ImportCrate with
+    svc : Party
+    receiver : Party
+    payload : ImportPayload
+  where
+    signatory svc
+
+    choice ImportCrate_Receive : Optional (CoinCreateSummary (ContractId Coin))
+      with
+        receiver_ : Party
+        openRoundCid : ContractId OpenMiningRound
+      controller receiver_
+      do
+        require "Receiver matches" (receiver_ == receiver)
+        case payload of
+          IP_ValidatorLicense license -> do
+            create license with
+              svc = svc
+              validator = receiver
+            pure None
+          IP_Coin coin -> do
+            openRound <- exercise openRoundCid (OpenMiningRound_Fetch receiver)
+            coinCid <- create Coin with
+              svc = svc
+              owner = receiver
+              amount = coin.amount
+              upgrade = Some ()
+            return $ Some CoinCreateSummary with
+              coin = coinCid
+              -- NOTE: this price is not the price at which the original coin was created.
+              -- We can't restore that as we don't know it, and we accept this imprecision.
+              coinPrice = openRound.coinPrice

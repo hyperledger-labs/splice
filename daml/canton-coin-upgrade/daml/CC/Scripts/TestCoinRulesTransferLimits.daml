@@ -1,0 +1,99 @@
+module CC.Scripts.TestCoinRulesTransferLimits where
+
+import DA.Action
+import DA.Text as Text
+import DA.Time
+import DA.Exception
+import Daml.Script
+import CC.Coin
+import CC.Expiry
+import CC.Scripts.Util
+import CC.Schedule
+
+template CheckError
+  with
+    actors : [Party]
+  where
+    signatory actors
+    choice Test_Transfer : ()
+      with
+        context : PaymentTransferContext
+        transfer : Transfer
+        expectedError: Text
+      controller actors
+      do
+        isThrown <-
+          try do
+            exercisePaymentTransfer context transfer
+            pure False
+          catch (e : AnyException) -> if expectedError `Text.isInfixOf` message e then pure True else abort ("UnexpectedException" <> message e)
+        unless isThrown (abort "expected exception but didn't get one")
+
+testTransferExceedsMaxInputs: Script ()
+testTransferExceedsMaxInputs = do
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+    inputCoins <- forA [1..101] $ \_ -> do
+      coin <- tap app alice 1.0
+      pure $ InputCoin coin
+    context <- getPaymentTransferContext app alice
+    -- More than the maximum number of inputs
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $
+      createAndExerciseCmd (CheckError [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
+        transfer = Transfer with
+          sender = alice.primaryParty
+          provider = alice.primaryParty
+          inputs = inputCoins
+          outputs = []
+        context = context
+        expectedError = "More than the maximum number of inputs"
+    return ()
+
+testTransferExceedsMaxOutputs: Script ()
+testTransferExceedsMaxOutputs = do
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+    coin <- tap app alice 100.0
+    let outputCoin = TransferOutput with receiver = alice.primaryParty; amount = 1.0; lock = None; receiverFeeRatio = 0.0
+        outputCoins = map (const outputCoin) [1..101]
+    context <- getPaymentTransferContext app alice
+    -- More than the maximum number of outputs
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $
+      createAndExerciseCmd (CheckError [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
+        transfer = Transfer with
+          sender = alice.primaryParty
+          provider = alice.primaryParty
+          inputs = [InputCoin coin]
+          outputs = outputCoins
+        context = context
+        expectedError = "More than the maximum number of outputs"
+    return ()
+
+testTransferExceedsMaxLockHolders: Script ()
+testTransferExceedsMaxLockHolders = do
+    DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+    [(_, coinRules)] <- query @CoinRules app.svc
+    now <- getTime
+    let config = getValueAsOf now coinRules.configSchedule
+    bobs <- forA [0..config.transferConfig.maxNumLockHolders] $ \i -> setupUser app ("bob_" <> show i) bobValidator.primaryParty
+    coin <- tap app alice 100.0
+    context <- getPaymentTransferContext app alice
+    now <- getTime
+    let bobParties = map (.primaryParty) bobs
+    -- More than the allowed number of lock holders
+    submitMulti ([alice.primaryParty, charlie.primaryParty] ++ bobParties) [app.svc] $
+      createAndExerciseCmd (CheckError ([alice.primaryParty, charlie.primaryParty] ++ bobParties)) Test_Transfer with
+      transfer = Transfer with
+        sender = alice.primaryParty
+        provider = alice.primaryParty
+        inputs = [InputCoin coin]
+        outputs =
+          [ TransferOutput with
+              receiver = alice.primaryParty
+              amount = 1.0
+              lock = Some TimeLock with
+                holders = bobParties
+                expiresAt = now `addRelTime` (minutes 1)
+              receiverFeeRatio = 0.0
+          ]
+      context = context
+      expectedError = "Fewer than the allowed number of lock holders"
+    return ()

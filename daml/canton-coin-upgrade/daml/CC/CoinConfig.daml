@@ -1,0 +1,59 @@
+module CC.CoinConfig where
+
+import CC.Fees
+import CC.GlobalDomain
+import CC.Issuance
+import CC.Schedule
+import DA.Time
+
+data CC = CC deriving (Show, Eq)
+data USD = USD deriving (Show, Eq)
+
+-- | Configuration determining the fees and limits for CC transfers granted by
+-- the CoinRules.
+--
+-- See CC.Scripts.Parameters for concrete values.
+data TransferConfig currency = TransferConfig with
+    createFee : FixedFee -- ^ Fee to create a new coin.
+    holdingFee : RatePerRound -- ^ Fee for keeping a coin around
+    transferFee : SteppedRate -- ^ Fee for transferring some amount of coin to a new owner.
+    lockHolderFee : FixedFee -- ^ Fee per lock holder of a locked coin.
+    maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
+    maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
+    maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked coin.
+  deriving (Eq, Show)
+
+-- | Configuration includes TransferConfig, issuance curve and tickDuration
+--
+-- See CC.Scripts.Parameters for concrete values.
+data CoinConfig currency = CoinConfig with
+    transferConfig : TransferConfig currency -- ^ Configuration determining the fees and limits for CC transfers
+    issuanceCurve : Schedule RelTime IssuanceConfig -- ^ Issuance curve to use.
+    globalDomain : GlobalDomainConfig -- ^ Configuration for the global domain and its fees.
+    -- TODO(M4-85): the values in here are likely quite large (several URls and long domainIds) and not required for executing transfers. Split this part of the config out into a separate contract as a performance optimization.
+    tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
+    packageConfig : PackageConfig
+      -- ^ Configuration determining the version of each package
+      -- that should be used for command submissions.
+  deriving (Eq, Show)
+
+-- Check constraints on config params on which the implementation of the choices rely.
+validCoinConfig : CoinConfig currency -> Bool
+validCoinConfig CoinConfig{..} =
+    tickDuration > days 0
+  && validIssuanceCurve issuanceCurve
+  && validGlobalDomainConfig globalDomain
+
+-- | The package config defines for each daml package (identified by name)
+-- the package version that should be used for command submissions
+-- at that point.
+data PackageConfig = PackageConfig
+  with
+    cantonCoin : Text
+    cantonNameService : Text
+    directoryService : Text
+    svcGovernance : Text
+    validatorLifecycle : Text
+    wallet : Text
+    walletPayments : Text
+  deriving (Show, Eq)

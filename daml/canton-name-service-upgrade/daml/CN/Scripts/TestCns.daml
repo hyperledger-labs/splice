@@ -1,0 +1,168 @@
+module CN.Scripts.TestCns where
+
+import DA.Assert
+import DA.Time
+import Daml.Script
+
+import CC.Coin
+import CC.Scripts.Util
+import CN.Cns
+import CN.Scripts.CnsRulesParameters
+import CN.Wallet.Subscriptions
+
+
+testWithSubscription : Script ()
+testWithSubscription = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  runNextIssuance app
+  runCoinDepositBots app
+
+  cnsRulesCid <- submitMulti [app.svc] [] $ createCmd CnsRules with
+    svc = app.svc
+    config = defaultCnsRulesConfig
+
+  -- user requests entry
+  (entryContext, subscriptionRequest) <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+    name = "cns.darth.vader"
+    url = "https://darth-vader-cns.com"
+    description = "Darth Vader's CNS Description"
+    user = alice.primaryParty
+
+  -- cc wallet selects a large enough coin
+  coin <- tap app alice 1.5
+  -- cc wallet accepts subscription and first payment and locks coin to svc
+
+  paymentContext <- getPaymentTransferContext app alice
+  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
+    inputs = [InputCoin coin]
+    context = paymentContext
+    walletProvider = app.svc
+  pure ()
+
+  (_, round) <- getLatestActiveOpenRound app
+  let transferConfigCC = transferConfigCCFromOpenRound round
+  [(acceptRewardCid, reward)] <- query @CC.Coin.AppRewardCoupon app.svc
+  reward.amount ===
+    transferConfigCC.createFee.fee +
+    transferConfigCC.lockHolderFee.fee
+  reward.featured === False
+
+  -- svc transactionally unlocks & transfer coins and creates cns entry and a subscription in return.
+  appContext <- getAppTransferContext app app.svcUser
+  (entryCid, subscriptionStateCid) <- submit app.svc $ exerciseCmd entryContext CnsEntryContext_CollectInitialEntryPayment with
+    paymentCid = initialPaymentCid
+    transferContext = appContext
+    cnsRulesCid
+
+  -- the coin received by sv is brunt
+  svcCoins <- queryFilter @Coin app.svc (\coin -> coin.owner == app.svc)
+  svcCoins === []
+
+  [(_, reward)] <- filter (\(cid, _) -> cid /= acceptRewardCid) <$> query @CC.Coin.AppRewardCoupon app.svc
+  reward.amount ===
+    transferConfigCC.createFee.fee +
+    transferConfigCC.transferFee.initialRate * defaultCnsRulesConfig.entryFee
+  reward.featured === False
+
+  Some entry <- queryContractId alice.primaryParty entryCid
+  Some subscriptionState <- queryContractId alice.primaryParty subscriptionStateCid
+
+  entry.name === "cns.darth.vader"
+  entry.user === alice.primaryParty
+  subscriptionState.nextPaymentDueAt === entry.expiresAt
+  subscriptionState.payData.paymentInterval === defaultCnsRulesConfig.entryLifetime
+
+  -- cc wallet automatically selects a large enough coin and initiates a subscription payment during the scheduled renewal period
+  passTime (days 60)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  paymentContext <- getPaymentTransferContext app alice
+  appContext <- getAppTransferContext app app.svcUser
+
+  coin <- tap app alice 1.5
+  (paymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputCoin coin]
+    context = paymentContext
+    walletProvider = app.svc
+
+  -- svc transactionally unlocks & transfer coins and renews directory entry in return
+  (entryCid, subscriptionStateCid) <- submit app.svc $ exerciseCmd entryContext CnsEntryContext_CollectEntryRenewalPayment with
+    paymentCid
+    entryCid
+    transferContext = appContext
+    cnsRulesCid
+
+  -- the coin received by sv is brunt
+  svcCoins <- queryFilter @Coin app.svc (\coin -> coin.owner == app.svc)
+  svcCoins === []
+
+  submitMustFail app.svc $ exerciseCmd entryCid (CnsEntry_Expire app.svc)
+
+  -- user can't pay earlier than `renewalDuration` from the next due date
+  coin <- tap app alice 1.5
+  submitMultiMustFail [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputCoin coin]
+    context = paymentContext
+    walletProvider = app.svc
+
+  passTime (days 90)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  paymentContext <- getPaymentTransferContext app alice
+  appContext <- getAppTransferContext app app.svcUser
+
+  -- cc wallet and svc can repeat the "payment and collect" cycle indefinitely
+  (paymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputCoin coin]
+    context = paymentContext
+    walletProvider = app.svc
+  (entryCid, subscriptionStateCid) <- submit app.svc $ exerciseCmd entryContext CnsEntryContext_CollectEntryRenewalPayment with
+    paymentCid
+    entryCid
+    transferContext = appContext
+    cnsRulesCid
+
+  -- the coin received by sv is brunt
+  svcCoins <- queryFilter @Coin app.svc (\coin -> coin.owner == app.svc)
+  svcCoins === []
+
+  submitMustFail app.svc $ exerciseCmd entryCid (CnsEntry_Expire app.svc)
+
+  -- svc can eventually expire an unfunded entry
+  passTime (days 121)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  submit app.svc $ exerciseCmd entryCid (CnsEntry_Expire app.svc)
+
+  -- svc can then also terminate the subscription
+  submit app.svc $ exerciseCmd subscriptionStateCid (SubscriptionIdleState_ExpireSubscription app.svc)
+
+  pure ()
+
+terminatedSubscriptionCanBeCleanedUp : Script ()
+terminatedSubscriptionCanBeCleanedUp = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  runNextIssuance app
+  runCoinDepositBots app
+
+  cnsRulesCid <- submitMulti [app.svc] [] $ createCmd CnsRules with
+    svc = app.svc
+    config = defaultCnsRulesConfig
+
+  (entryContext, subscriptionRequest) <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+    name = "cns.darth.vader"
+    url = "https://darth-vader-cns.com"
+    description = "Darth Vader's CNS Description"
+    user = alice.primaryParty
+
+  terminated <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_Reject
+  submit app.svc $ exerciseCmd entryContext (CnsEntryContext_Terminate app.svc terminated)
+
+  entryContexts <- query @CnsEntryContext app.svc
+  entryContexts === []
+
+  terminatedSubscriptions <- query @TerminatedSubscription app.svc
+  terminatedSubscriptions === []
+  pure ()

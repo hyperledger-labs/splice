@@ -1,0 +1,152 @@
+module CC.Scripts.Parameters where
+
+import qualified DA.Set as Set
+import DA.Time
+
+import CC.CoinConfig
+import CC.Fees
+import CC.GlobalDomain
+import CC.Issuance
+import CC.Schedule
+
+-- | Default proposal for cost-competitive fees.
+--
+-- TODO(M3-90): it looks like we need to lower these fees a bit further
+-- to be competitive with ETH and BTC: https://ycharts.com/indicators/ethereum_average_transaction_fee
+defaultTransferConfig : TransferConfig USD
+defaultTransferConfig = TransferConfig with
+    -- Fee to create a new coin.
+    -- Set to the fixed part of the transfer fee.
+    createFee = FixedFee 0.03
+
+    -- Fee for keeping a coin around.
+    -- This is roughly equivalent to 1.05$/365 days but expressed as rounds
+    -- with one day corresponding to 24*60/2.5 rounds, i.e., one round
+    -- every 2.5 minutes.
+    -- Incentivizes users to actively merge their coins.
+    holdingFee = RatePerRound 0.000005
+
+    -- Fee per lock holder.
+    -- Chosen to match the update to cover the cost of informing lock-holders about
+    -- actions on the locked coin.
+    lockHolderFee = FixedFee 0.005
+
+    -- Fee for transferring some amount of coin to a new owner.
+    transferFee = SteppedRate with
+      initialRate = 0.01
+      steps = [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
+
+    -- These should be large enough to ensure efficient batching, but not too large
+    -- to avoid creating very large transactions.
+    maxNumInputs = 100
+    maxNumOutputs = 100
+
+    -- Maximum number of lock holders.
+    -- Chosen conservatively, but high enough to invite thinking about what's possible.
+    maxNumLockHolders = 10
+
+-- | Global domain config to use for testing.
+defaultGlobalDomainConfig : GlobalDomainConfig
+defaultGlobalDomainConfig = GlobalDomainConfig with
+  requiredDomains = Set.fromList ["global-domain-id-0"]
+  activeDomain = "global-domain-id-0"
+  fees = defaultDomainFeesConfig
+
+
+-- | Default proposal for issuance curve and tickDuration
+defaultCoinConfig : CoinConfig USD
+defaultCoinConfig = CoinConfig with
+  transferConfig = defaultTransferConfig
+
+  -- Using issuance curve defined in the CC whitepaper
+  issuanceCurve = defaultIssuanceCurve
+
+  globalDomain = defaultGlobalDomainConfig
+
+  -- Duration of one tick, which is half the target duration of one round
+  -- default: 2.5 minutes
+  tickDuration = seconds 150
+  packageConfig = PackageConfig with
+    cantonCoin = "0.1.0"
+    cantonNameService = "0.1.0"
+    directoryService = "0.1.0"
+    svcGovernance = "0.1.0"
+    validatorLifecycle = "0.1.0"
+    wallet = "0.1.0"
+    walletPayments = "0.1.0"
+
+-- | Default configuration schedule with single current coin config
+defaultCoinConfigSchedule : Schedule Time (CoinConfig USD)
+defaultCoinConfigSchedule = Schedule with
+    initialValue = defaultCoinConfig
+    futureValues = []
+
+-- Issuance curve from the whitepaper
+-------------------------------------
+
+-- See the whitepaper here: https://docs.google.com/document/d/1SmC0TBcLBqsHgRDBfxbjIbFigPWXfBEW7B9MZpyCxK4/edit#bookmark=id.75er6skh0ext
+-- note: we use the notation _<fromYear>_<toYear> whereby we abbreviate year 0.5 as 0p5 and year 1.5 as 1p5
+
+issuanceConfig_0_0p5 : IssuanceConfig
+issuanceConfig_0_0p5 = issuanceConfig_10plus with
+  coinToIssuePerYear = 40e9
+  validatorRewardPercentage = 0.05
+  appRewardPercentage = 0.15
+
+issuanceConfig_0p5_1p5 : IssuanceConfig
+issuanceConfig_0p5_1p5 = issuanceConfig_10plus with
+  coinToIssuePerYear = 20e9
+  validatorRewardPercentage = 0.12
+  appRewardPercentage = 0.40
+
+issuanceConfig_1p5_5 : IssuanceConfig
+issuanceConfig_1p5_5 = issuanceConfig_10plus with
+  coinToIssuePerYear = 10e9
+  validatorRewardPercentage = 0.18
+  appRewardPercentage = 0.62
+
+issuanceConfig_5_10 : IssuanceConfig
+issuanceConfig_5_10 = issuanceConfig_10plus with
+  coinToIssuePerYear = 5e9
+  validatorRewardPercentage = 0.21
+  appRewardPercentage = 0.69
+
+issuanceConfig_10plus : IssuanceConfig
+issuanceConfig_10plus = IssuanceConfig with
+  coinToIssuePerYear = 2.5e9
+  validatorRewardPercentage = 0.2
+  appRewardPercentage = 0.75
+  validatorRewardCap = 0.2
+  featuredAppRewardCap = 100.0
+  unfeaturedAppRewardCap = 0.6
+
+
+defaultIssuanceCurve : Schedule RelTime IssuanceConfig
+defaultIssuanceCurve =
+    Schedule with
+      initialValue = issuanceConfig_0_0p5
+      futureValues =
+        [ (hours hoursPerHalfYear, issuanceConfig_0p5_1p5)
+        , (hours (3 * hoursPerHalfYear) , issuanceConfig_1p5_5)
+        , (hours (5 * hoursPerYear), issuanceConfig_5_10)
+        , (hours (10 * hoursPerYear), issuanceConfig_10plus)
+        ]
+  where
+    hoursPerHalfYear = 12 * 365
+    hoursPerYear = 24 * 365
+
+
+-- | Default domain fees configuration
+
+defaultBaseRateTrafficLimits : BaseRateTrafficLimits
+defaultBaseRateTrafficLimits = BaseRateTrafficLimits with
+    -- 10txs of 20kB each within 10 minutes
+    rate = 333.0
+    burstWindow = minutes 10
+
+defaultDomainFeesConfig : DomainFeesConfig
+defaultDomainFeesConfig = DomainFeesConfig with
+    baseRateTrafficLimits = defaultBaseRateTrafficLimits
+    minTopupAmount = 1_000_000 -- 1MB
+    extraTrafficPrice = 1.0
+    readScalingFactor = 0.02 -- charge 2% of write cost for every read

@@ -1,0 +1,484 @@
+module CN.Scripts.TestDecentralizedAutomation where
+
+import DA.Action
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.List
+import qualified DA.Map as Map
+import qualified DA.Set as Set
+import Daml.Script
+import DA.Time
+
+import CC.Round
+import CC.Round.Types
+import CC.Coin
+
+import CN.SvcRules
+import CN.Util.Assert
+
+import CC.Scripts.Parameters
+import CC.Scripts.Util
+import CN.Scripts.SvcTestUtils
+import CN.Cns
+import CN.Scripts.CnsRulesParameters
+import CN.Wallet.Subscriptions
+
+
+-- Automation leader election
+-----------------------------
+
+unitTestLeaderElectionVoting : Script ()
+unitTestLeaderElectionVoting = do
+  let rankings =
+        [ ("A",   ["A",   "D", "B", "bad"])
+        , ("B",   ["B",   "D", "A", "bad"])
+        , ("bad", ["bad", "D", "A", "B"  ])
+        ]
+  let votes = tallyVotes (map snd rankings) (VotingState Map.empty Set.empty)
+  let candidates = sortOn snd
+        [ (p, length remainingRankins) | (p, remainingRankins) <- Map.toList votes.rankings ]
+  let winner = instantRunOffVoting 2 2 rankings
+  trace (votes, candidates, winner) $
+    instantRunOffVoting 2 2 rankings === "B"
+
+
+testLeaderElection : Script ()
+testLeaderElection = do
+
+  (app, svc, (mallory, sv2, sv3, sv4)) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1, and mallory is the leader
+
+  -- run an issuance
+  runNextIssuanceD app 1.0
+
+  -- mallory stops acting, which the others detect; they thus request a re-election
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  req1 <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+    requester = sv2
+    ranking = [sv2, sv3, sv4, mallory]
+    reason = ERR_LeaderUnavailable
+  req2 <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+    requester = sv3
+    ranking = [sv3, sv4, sv2, mallory]
+    reason = ERR_LeaderUnavailable
+  req3 <- submitMulti [sv4] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+    requester = sv4
+    ranking = [sv4, sv3, sv2, mallory]
+    reason = ERR_LeaderUnavailable
+  -- mallory tries to get himself re-elected
+  req4 <- submitMulti [mallory] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+    requester = mallory
+    ranking = [mallory, sv2, sv3, sv4]
+    reason = ERR_LeaderUnavailable
+  -- mallory does not get re-elected, as sv1 reaches a weak majority first
+  _ <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_ElectLeader with
+    actor = sv3
+    requestCids = [req1, req2, req3, req4]
+
+  [(_, svcRules)] <- query @SvcRules svc
+  require "SV2 got elected" (svcRules.leader == sv2)
+
+  -- run a few more issuances
+  runNextIssuanceD app 1.1
+  runNextIssuanceD app 1.2
+
+  openRounds <- map snd <$> query @OpenMiningRound app.svc
+
+  -- wow! stuff works :D
+  trace openRounds $ return ()
+
+
+testUnclaimedRewardsMerging : Script ()
+testUnclaimedRewardsMerging = do
+  (app, _, _) <- initDevNetCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- onboard a validator
+  validator1 <- setupValidator app "validator1"
+  provider1 <- setupUser app "provider1" validator1
+
+  forA_ [1..6] do \_ -> generateUnclaimedReward app provider1
+
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  unclaimedRewards <- query @UnclaimedReward app.svc
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_MergeUnclaimedRewards with
+      coinRulesCid
+      unclaimedRewardCids = (fmap fst unclaimedRewards)
+
+  unclaimedRewards <- query @UnclaimedReward app.svc
+  length unclaimedRewards === 1
+
+  pure ()
+
+
+
+-- Testing confirmations
+------------------------
+
+testRequiredNumOfConfirmationInDevNet : Script ()
+testRequiredNumOfConfirmationInDevNet = do
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
+
+  coinConfig <- getCoinConfig app
+  let domainId = coinConfig.globalDomain.activeDomain
+
+  -- add 3 phamton SVs
+  forA_ [5 .. 7] $ \i -> do
+    [(svcRulesCid, _)] <- query @SvcRules svc
+    let svName = "sv" <> show i
+    phamtonSv <- allocateParty $ svName
+    submit svc $ exerciseCmd svcRulesCid $
+      SvcRules_AddMember phamtonSv svName (svName <> "-participant-id") (Round 3) domainId
+
+  [(coinRulesCid, _)] <- query @CoinRules svc
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+
+  Map.size svcRules.members === 7
+
+  svX <- allocateParty "svX"
+
+  -- create 4 confirmations
+  let action = ARC_SvcRules with
+        svcAction = SRARC_AddMember $ SvcRules_AddMember with
+          newMemberParty = svX
+          newMemberName = "svX"
+          newMemberParticipantId = "svX-participant-id"
+          joinedAsOfRound = (Round 3)
+          domainId
+  confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
+    submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = svParty
+      action
+
+  confirmations <- query @Confirmation svc
+  length confirmations === 4
+
+  -- There are 7 SVC members in total, which implies f = 2 and thus 5 confirmations are required in a non-DevNet.
+  -- However, in DevNet only 4 confirmations are required to run a confirmed action
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
+    SvcRules_ExecuteConfirmedAction with
+      action
+      coinRulesCid = Some coinRulesCid
+      confirmationCids
+
+  -- check that the `action` was executed
+  [(_, svcRules)] <- query @SvcRules svc
+  require "svX is a member" (svX `Map.member` svcRules.members)
+
+  pure ()
+
+testConfirmationExpiry : Script ()
+testConfirmationExpiry = do
+  (app, svc, (sv1, _, _, _)) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1, and sv1 is the leader
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  coinConfig <- getCoinConfig app
+  let domainId = coinConfig.globalDomain.activeDomain
+
+  -- create a single confirmation which will not suffice to initiate an action
+  svConfirmationCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+    confirmer = sv1
+    action = ARC_SvcRules with
+      svcAction = SRARC_AddMember $ SvcRules_AddMember with
+        newMemberParty = svX
+        newMemberName = "svX"
+        newMemberParticipantId = "svX-participant-id"
+        joinedAsOfRound = (Round 3)
+        domainId
+
+  -- leader tries to expire the confirmation, but it's too early
+  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireStaleConfirmation svConfirmationCid
+
+  -- wait for the confirmation TTL to pass
+  passTime (minutes 5)
+
+  -- leader expires the confirmation
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireStaleConfirmation svConfirmationCid
+
+
+-- Testing the SVC activity lock
+--------------------------------
+
+testActivityLockingOnSvcRulesCoinRulesChoices: Script ()
+testActivityLockingOnSvcRulesCoinRulesChoices = do
+  (app, svc, (_, sv2, _, _)) <- initDevNetCollective
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  [(coinRulesCid, _)] <- query @CoinRules svc
+
+  -- lock choices in svcRules and coinRules
+  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_Lock with
+    sv = sv2
+    coinRulesCid
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  svX <- allocateParty "svX"
+  coinConfig <- getCoinConfig app
+  let domainId = coinConfig.globalDomain.activeDomain
+  submitMultiMustFail [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" "sv2-participant-id" (Round 3) domainId)
+
+  [(coinRulesCid, _)] <- query @CoinRules svc
+  (round, _) <- getLatestOpenRound app
+  submitMultiMustFail [svc] [svc] $ exerciseCmd coinRulesCid (CoinRules_Mint svc 5.0 round)
+
+  -- unlock choices in svcRules and coinRules
+  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_Unlock with
+    sv = sv2
+    coinRulesCid
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  svX <- allocateParty "svX"
+  submitMulti [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" "sv2-participant-id" (Round 3) domainId)
+
+  [(coinRulesCid, _)] <- query @CoinRules svc
+  (round, _) <- getLatestOpenRound app
+  submitMulti [svc] [svc] $ exerciseCmd coinRulesCid (CoinRules_Mint svc 5.0 round)
+
+  pure ()
+
+testActivityLockOnLockedCoinChoices: Script ()
+testActivityLockOnLockedCoinChoices = do
+  (app, _, (sv1, _, _, _)) <- initDevNetCollective
+
+  alice <- setupUser app "alice" app.svc
+  bob <- setupUser app "bob" app.svc
+
+  cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
+  roundCid <- fst <$> getLatestOpenRound app
+  ensureHonorsActivityLock app sv1 [bob.primaryParty, alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd cid (LockedCoin_Unlock coinRules roundCid)
+
+  cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
+  passTime (minutes 6)
+  roundCid <- fst <$> getLatestOpenRound app
+  ensureHonorsActivityLock app sv1 [alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd cid (LockedCoin_OwnerExpireLock coinRules roundCid)
+
+  cid <- getLockedCoin app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (minutes 1)
+  replicateA_ 4 $ runNextIssuance app
+  (round, _) <- getLatestOpenRound app
+  ensureHonorsActivityLock app sv1 [app.svc] [app.svc] $ \coinRules ->
+    exerciseCmd cid (LockedCoin_ExpireCoin round coinRules)
+  pure ()
+
+testActivityLockOnCoinChoices : Script ()
+testActivityLockOnCoinChoices = do
+  (app, _, (sv1, _, _, _)) <- initDevNetCollective
+  alice <- setupUser app "alice" app.svc
+
+  cid <- tap app alice defaultTransferConfig.holdingFee.rate
+  replicateA_ 3 $ runNextIssuance app
+  (round, _) <- getLatestOpenRound app
+  ensureHonorsActivityLock app sv1 [app.svc] [app.svc] $ \coinRules ->
+    exerciseCmd cid (Coin_Expire round coinRules)
+  pure ()
+
+
+
+testLockControllers : Script ()
+testLockControllers = script do
+  (app, svc, (sv1, _, _, _)) <- initDevNetCollective
+  nonSv <- allocateParty "nonSv"
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  [(coinRulesCid, _)] <- query @CoinRules svc
+  submitMultiMustFail [nonSv] [app.svc] $ exerciseCmd svcRulesCid (SvcRules_Lock nonSv coinRulesCid)
+  submitMulti [sv1] [app.svc] $ exerciseCmd svcRulesCid (SvcRules_Lock sv1 coinRulesCid)
+  pure ()
+
+ensureHonorsActivityLock : CCApp -> Party -> [Party] -> [Party] -> (ContractId CoinRules -> Commands a) -> Script ()
+ensureHonorsActivityLock app sv actAs readAs buildCommand = do
+  lockSvcRules app sv
+  Some (coinRules, _) <- queryCoinRulesByKey app.svc
+  submitMultiMustFail actAs readAs (buildCommand coinRules)
+
+  unlockSvcRules app sv
+  Some (coinRules, _) <- queryCoinRulesByKey app.svc
+  submitMulti actAs readAs (buildCommand coinRules)
+  pure ()
+
+lockSvcRules : CCApp -> Party -> Script ()
+lockSvcRules app sv = do
+  [(svcRulesCid, _)] <- query @SvcRules app.svc
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  submitMulti [sv] [app.svc] $ exerciseCmd svcRulesCid SvcRules_Lock with
+    sv
+    coinRulesCid
+  pure ()
+
+unlockSvcRules : CCApp -> Party -> Script ()
+unlockSvcRules app sv = do
+  [(svcRulesCid, _)] <- query @SvcRules app.svc
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  submitMulti [sv] [app.svc] $ exerciseCmd svcRulesCid SvcRules_Unlock with
+    sv
+    coinRulesCid
+  pure ()
+
+getLockedCoin : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (ContractId LockedCoin)
+getLockedCoin app owner lockHolder amount lockDuration =  do
+-- tap amount + 1 to account for fees
+  _ <- tap app owner (amount + 1.0)
+  lockTo1 app owner lockHolder amount lockDuration
+  [(cid, _)] <- query @LockedCoin lockHolder
+  pure cid
+
+
+-- Testing CNS decentralization
+-------------------------------
+
+testDecentralizedCns : Script ()
+testDecentralizedCns = do
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
+
+  alice <- setupUser app "alice" app.svc
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  [(cnsRulesCid, _)] <- query @CnsRules svc
+
+  (entryContext, subscriptionRequest) <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+    name = "cns.darth.vader"
+    url = "https://darth-vader-cns.com"
+    description = "Darth Vader's CNS Description"
+    user = alice.primaryParty
+
+  coin <- tap app alice 1.5
+
+  paymentContext <- getPaymentTransferContext app alice
+  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
+    inputs = [InputCoin coin]
+    context = paymentContext
+    walletProvider = app.svc
+
+  -- SVs create confirmations for SVC to collect initial payment of the requested cns entry.
+  appContext <- getAppTransferContext app app.svcUser
+  let collectInitialPaymentAction = ARC_CnsEntryContext with
+        cnsEntryContextCid = entryContext
+        cnsEntryContextAction = CNSRARC_CollectInitialEntryPayment $ CnsEntryContext_CollectInitialEntryPayment with
+          paymentCid = initialPaymentCid
+          transferContext = appContext
+          cnsRulesCid
+
+  confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
+    submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = svParty
+      action = collectInitialPaymentAction
+
+  confirmations <- query @Confirmation svc
+  length confirmations === 4
+
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
+    SvcRules_ExecuteConfirmedAction with
+      action = collectInitialPaymentAction
+      coinRulesCid = None
+      confirmationCids
+
+  [(entryCid, entry)] <- queryFilter @CnsEntry app.svc (\entry -> entry.user == alice.primaryParty && entry.name == "cns.darth.vader")
+  [(subscriptionStateCid, subscriptionState)] <- queryFilter @SubscriptionIdleState app.svc (\state -> state.subscriptionData.sender == alice.primaryParty)
+
+  subscriptionState.nextPaymentDueAt === entry.expiresAt
+
+  passTime (days 60)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  paymentContext <- getPaymentTransferContext app alice
+  appContext <- getAppTransferContext app app.svcUser
+
+  coin <- tap app alice 1.5
+  (paymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputCoin coin]
+    context = paymentContext
+    walletProvider = app.svc
+
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
+    SvcRules_CollectEntryRenewalPayment with
+      cnsEntryContextCid = entryContext
+      choiceArg = CnsEntryContext_CollectEntryRenewalPayment with
+        paymentCid
+        entryCid
+        transferContext = appContext
+        cnsRulesCid
+
+  [(_, renewedEntry)] <- queryFilter @CnsEntry app.svc (\entry -> entry.user == alice.primaryParty && entry.name == "cns.darth.vader")
+  [(_, renewedSubscriptionState)] <- queryFilter @SubscriptionIdleState app.svc (\state -> state.subscriptionData.sender == alice.primaryParty)
+
+  renewedEntry.expiresAt === addRelTime entry.expiresAt defaultCnsRulesConfig.entryLifetime
+  renewedSubscriptionState.nextPaymentDueAt === renewedEntry.expiresAt
+
+  -- SVs confirm to reject invalid entry payment of CNS request.
+
+  (entryContextToReject, subscriptionRequestToReject) <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+    name = "reject.darth.vader"
+    url = "invalid url which will be rejected by SVs by creating confirmations."
+    description = "CNS Description"
+    user = alice.primaryParty
+
+  coin <- tap app alice 1.5
+
+  paymentContext <- getPaymentTransferContext app alice
+  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequestToReject SubscriptionRequest_AcceptAndMakePayment with
+    inputs = [InputCoin coin]
+    context = paymentContext
+    walletProvider = app.svc
+
+  -- SVs create confirmations for SVC to reject initial payment of the requested cns entry.
+  appContext <- getAppTransferContext app app.svcUser
+  let rejectInitialPaymentAction = ARC_CnsEntryContext with
+        cnsEntryContextCid = entryContextToReject
+        cnsEntryContextAction = CNSRARC_RejectEntryInitialPayment $ CnsEntryContext_RejectEntryInitialPayment with
+          paymentCid = initialPaymentCid
+          transferContext = appContext
+          cnsRulesCid
+
+  confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
+    submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = svParty
+      action = rejectInitialPaymentAction
+
+  confirmations <- query @Confirmation svc
+  length confirmations === 4
+
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
+    SvcRules_ExecuteConfirmedAction with
+      action = rejectInitialPaymentAction
+      coinRulesCid = None
+      confirmationCids
+
+  -- entry is not created
+  [] <- queryFilter @CnsEntry app.svc (\entry -> entry.user == alice.primaryParty && entry.name == "reject.darth.vader")
+  -- initial paynment is archived
+  None <- queryContractId @SubscriptionInitialPayment app.svc initialPaymentCid
+
+  pure ()
+
+
+terminatedSubscriptionCanBeCleanedUp : Script ()
+terminatedSubscriptionCanBeCleanedUp = script do
+  (app, svc, (sv1, _, _, _)) <- initDevNetCollective
+
+  alice <- setupUser app "alice" app.svc
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  [(cnsRulesCid, _)] <- query @CnsRules svc
+
+  (entryContext, subscriptionRequest) <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+    name = "cns.darth.vader"
+    url = "https://darth-vader-cns.com"
+    description = "Darth Vader's CNS Description"
+    user = alice.primaryParty
+
+  aborted <- submit alice.primaryParty $ exerciseCmd subscriptionRequest SubscriptionRequest_Reject
+
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid (SvcRules_TerminateSubscription entryContext aborted)
+
+  entryContexts <- query @CnsEntryContext app.svc
+  entryContexts === []
+
+  terminatedSubscriptions <- query @TerminatedSubscription app.svc
+  terminatedSubscriptions === []
+  pure ()

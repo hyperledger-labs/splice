@@ -1,0 +1,74 @@
+module CC.Scripts.TestCoinImport where
+
+import DA.Assert
+import Daml.Script
+
+import CC.Coin
+import CC.CoinImport
+import CC.ValidatorLicense
+import CC.Scripts.Util
+
+testImportCrates: Script ()
+testImportCrates = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  coin1Cid <- tap app alice 33.0
+  coins <- query @Coin app.svc
+  let [(_, coin1)] = filter (\(cid, _) -> cid == coin1Cid) coins
+
+  -- create a fresh SVC party with its coinRules and user party
+  newApp <- genericSetupApp "new"
+  (newOpenRoundCid, _) <- getLatestActiveOpenRound newApp
+
+  alice <- allocateParty "alice"
+  wrongAlice <- allocateParty "wrongAlice"
+
+  coinCrate <- submit newApp.svc $ createCmd ImportCrate with
+    svc = newApp.svc
+    receiver = alice
+    payload = IP_Coin coin1
+
+  let license = ValidatorLicense with
+        svc = app.svc
+        validator = alice
+        sponsor = app.svc
+  licenseCrate <- submit newApp.svc $ createCmd ImportCrate with
+    svc = newApp.svc
+    receiver = alice
+    payload = IP_ValidatorLicense license
+
+  submitMultiMustFail [wrongAlice] [newApp.svc] $ exerciseCmd coinCrate ImportCrate_Receive with
+    receiver_ = wrongAlice
+    openRoundCid = newOpenRoundCid
+
+  submitMultiMustFail [alice] [newApp.svc] $ exerciseCmd coinCrate ImportCrate_Receive with
+    receiver_ = wrongAlice
+    openRoundCid = newOpenRoundCid
+
+  submitMultiMustFail [wrongAlice] [newApp.svc] $ exerciseCmd coinCrate ImportCrate_Receive with
+    receiver_ = alice
+    openRoundCid = newOpenRoundCid
+
+  submitMulti [alice] [newApp.svc] $ exerciseCmd coinCrate ImportCrate_Receive with
+    receiver_ = alice
+    openRoundCid = newOpenRoundCid
+
+  -- receive a validator license crate
+  submitMulti [alice] [newApp.svc] $ exerciseCmd licenseCrate ImportCrate_Receive with
+    receiver_ = alice
+    openRoundCid = newOpenRoundCid
+
+  -- the new coin has been created
+  let newCoin = Coin with svc = newApp.svc; owner = alice; amount = coin1.amount; upgrade = Some ()
+  newCoins <- query @Coin newApp.svc
+  map snd newCoins === [newCoin]
+
+  -- alice has exactly one validator license
+  [(_, actuaLicense)] <- query @ValidatorLicense alice
+  actuaLicense === license with svc = newApp.svc
+
+  -- there are no left-over import crates
+  pkgs <- query @ImportCrate newApp.svc
+  pkgs === []
+
+  pure ()

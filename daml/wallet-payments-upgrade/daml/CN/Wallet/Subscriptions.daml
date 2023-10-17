@@ -1,0 +1,363 @@
+-- Disabled until https://github.com/digital-asset/daml/issues/16416 is fixed
+{-# OPTIONS -Wno-unused-matches #-}
+module CN.Wallet.Subscriptions where
+
+import DA.Time
+import DA.List (dedupSort)
+
+import CC.Coin
+import CC.Expiry
+import CC.Round.Types
+import CC.Round
+import CN.Wallet.Payment
+import CN.Util.Assert
+
+-- Subscriptions flow (happy path) for reference;
+-- solid arrows represent state transitions via exercising a choice,
+-- dashed arrows represent a "references" relationship:
+--
+--       ┌─────────────────────┐
+--       │ SubscriptionRequest │
+--       └──────────┬──────────┘
+--                  │AcceptAndMakePayment (sender)
+--                  │
+--    ┌─────────────▼──────────────┐
+--    │ SubscriptionInitialPayment │
+--    └─────────────┬──────────────┘
+--                  │Collect (receiver)
+--                  ├────────────────────────────────────┐
+--                  │                                    │
+--                  │                                    │
+--    ┌─────────────▼──────────────┐             ┌───────▼────────┐
+--    │   SubscriptionIdleState    │------------>│  Subscription  │
+--    └┬──────────────────────▲────┘             └────────────────┘
+--     │MakePayment (sender)  │                          ^
+--     │                      │Collect (receiver)        '
+--    ┌▼──────────────────────┴────┐                     '
+--    │   SubscriptionPayment      │---------------------'
+--    └────────────────────────────┘
+
+data SubscriptionData = SubscriptionData
+  with
+    sender : Party -- ^ The party that pays.
+    receiver : Party -- ^ The party that receives payment.
+    provider : Party -- ^ The app provider.
+    svc : Party
+    description : Text
+  deriving (Show, Eq)
+
+subscriptionSignatories : SubscriptionData -> [Party]
+subscriptionSignatories SubscriptionData{sender, receiver, provider} = [sender, receiver, provider]
+
+-- | Main subscription object.
+--   Usually created in `SubscriptionInitialPayment_Collect`.
+--   Immutable per subscription and passed around from state to state for convenience.
+--   Can be nicely expired via the `SubscriptionIdleState`.
+--   Can be used as a stable reference to a subscription.
+
+template Subscription
+  with
+    subscriptionData : SubscriptionData
+    reference : ContractId SubscriptionRequest -- ^ Reference to the subscription request, note that the contract will no longer be active so this just acts as a tracking id.
+  where
+    signatory subscriptionSignatories subscriptionData
+
+    choice Subscription_Archive : ContractId TerminatedSubscription
+      controller signatory this
+      do create TerminatedSubscription with ..
+
+-- | An aborted subscription. Subscriptions should usually be archived together with
+-- the context contract of the app that makes the subscription, e.g., CnsEntryContext.
+-- To achieve that, we don't archive subscriptions directly but instead create TerminatedSubscription contracts
+-- that are then archived as part of the surrounding workflows.
+template TerminatedSubscription
+  with
+    subscriptionData : SubscriptionData
+    reference : ContractId SubscriptionRequest
+  where
+    signatory subscriptionSignatories subscriptionData
+
+assertSubscriptionMatches: ContractId Subscription -> SubscriptionData -> Update ()
+assertSubscriptionMatches subscription subscriptionData = do
+  actualSubscriptionData <- fetch subscription
+  require "Subscription data matches referenced subscription" (actualSubscriptionData.subscriptionData == subscriptionData)
+  pure ()
+
+-- | Payment-related properties. Expected to be mutated rarely.
+data SubscriptionPayData = SubscriptionPayData
+  with
+    paymentAmount : PaymentAmount -- ^ What amount of coin is due on each interval.
+    paymentInterval : RelTime -- ^ At which intervals payments should be made.
+    paymentDuration : RelTime -- ^ The time available to the sender to initiate a payment; they can initiate the payment this much before the end of the current interval.
+  deriving (Eq, Show)
+
+-- for ensure assertions
+payDataIsValid: SubscriptionPayData -> Bool
+payDataIsValid payData =
+  payData.paymentAmount.amount > 0.0 && payData.paymentInterval > aunit && payData.paymentDuration > aunit
+
+
+-- | A request for establishing a subscription.
+template SubscriptionRequest
+  with
+    subscriptionData : SubscriptionData
+    payData : SubscriptionPayData
+  where
+    signatory subscriptionSignatories subscriptionData
+    ensure payDataIsValid payData
+
+    choice SubscriptionRequest_AcceptAndMakePayment
+      : (ContractId SubscriptionInitialPayment, Optional (ContractId Coin))
+      with
+        inputs : [TransferInput]
+        context : PaymentTransferContext
+        walletProvider : Party
+      controller subscriptionData.sender, walletProvider
+      do
+        now <- getTime
+        (lockedCoin, senderChange, targetAmount, round) <- lockAndMakeChange context subscriptionData payData inputs now walletProvider
+
+        subscriptionPayment <- create SubscriptionInitialPayment with reference = self, ..
+
+        return (subscriptionPayment, senderChange)
+
+    choice SubscriptionRequest_Withdraw : ContractId TerminatedSubscription
+      controller subscriptionData.receiver
+      do create TerminatedSubscription with reference = self, subscriptionData
+
+    choice SubscriptionRequest_Reject : ContractId TerminatedSubscription
+      controller subscriptionData.sender
+      do create TerminatedSubscription with reference = self, subscriptionData
+
+
+-- | The initial payment on a subscription.
+--   Implicitly, this is also the "accept" of the preceding `SubscriptionRequest`.
+--   Collecting this payments creates the subscription and thereby enables all follow-up payments.
+template SubscriptionInitialPayment
+  with
+    subscriptionData : SubscriptionData
+    payData : SubscriptionPayData
+    targetAmount : Decimal -- ^ Exact amount in CC that the receiver will get.
+    lockedCoin : ContractId LockedCoin
+    round : Round -- ^ The round in which the locked coin was created, added as an extra field so we can avoid ingesting locked coins.
+    reference : ContractId SubscriptionRequest -- ^ Reference to the subscription request, note that the contract will no longer be active so this just acts as a tracking id.
+  where
+    signatory subscriptionSignatories subscriptionData
+    ensure payDataIsValid payData
+
+    choice SubscriptionInitialPayment_Collect : (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
+      with
+        transferContext : AppTransferContext
+      controller signatory this
+      do
+        contextRound <- exercise transferContext.openMiningRound (OpenMiningRound_Fetch subscriptionData.provider)
+        require ("Round at subscription request " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
+
+        now <- getTime
+        subscription <- create Subscription with subscriptionData, reference
+        state <- create SubscriptionIdleState with
+          nextPaymentDueAt = now `addRelTime` payData.paymentInterval
+          ..
+
+        coin <- unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin
+
+        pure (subscription, state, coin)
+
+    choice SubscriptionInitialPayment_Reject : CoinCreateSummary (ContractId Coin)
+      with
+        transferContext : AppTransferContext
+      controller subscriptionData.receiver
+      do
+        _ <- create TerminatedSubscription with ..
+        exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules transferContext.openMiningRound)
+
+    choice SubscriptionInitialPayment_Expire : CoinCreateSummary (ContractId Coin)
+      with
+        actor : Party
+        transferContext : AppTransferContext
+      controller actor
+      do
+        -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedCoin, and the AcceptedAppPayment in #3152
+        require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+        _ <- create TerminatedSubscription with ..
+        exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.coinRules transferContext.openMiningRound) -- would fail if we can't expire yet
+
+
+-- | The base state in our subscription flow.
+-- Here, we are typically waiting for the time for the next payment to arrive.
+-- If that time has passed, we are waiting for someone to expire the subscription.
+template SubscriptionIdleState
+  with
+    subscription : ContractId Subscription -- ^ The subscription this belongs to.
+    subscriptionData : SubscriptionData -- ^ Copy of the subscription contract for easier access to its field.
+    payData : SubscriptionPayData -- ^ Payment-related properties.
+    nextPaymentDueAt : Time -- ^ After which time the next payment can and should be paid.
+    reference : ContractId SubscriptionRequest
+  where
+    signatory subscriptionSignatories subscriptionData
+    ensure payDataIsValid payData
+
+    choice SubscriptionIdleState_MakePayment
+      : (ContractId SubscriptionPayment, Optional (ContractId Coin))
+      with
+        inputs : [TransferInput]
+        context : PaymentTransferContext
+        walletProvider : Party
+      controller subscriptionData.sender, walletProvider
+      do
+        assertSubscriptionMatches subscription subscriptionData
+
+        now <- getTime
+        require "The next due date is close enough to make the next payment." (now `addRelTime` payData.paymentDuration >= nextPaymentDueAt)
+        -- We deliberately don't check whether it's "too late" to pay. In this way, providers can implement a "grace period".
+
+        (lockedCoin, senderChange, targetAmount, round) <- lockAndMakeChange context subscriptionData payData inputs now walletProvider
+
+        payment <- create SubscriptionPayment with
+          thisPaymentDueAt = nextPaymentDueAt
+          ..
+
+        return (payment, senderChange)
+
+    -- Any of the signatories can expire a subscription if one or more due payments is missing.
+    choice SubscriptionIdleState_ExpireSubscription : ContractId TerminatedSubscription
+      with
+        actor : Party
+      controller actor
+      do
+        time <- getTime
+        require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+        assertSubscriptionMatches subscription subscriptionData
+        require "Last subscription payment was missed" (nextPaymentDueAt < time)
+        exercise subscription Subscription_Archive
+
+    -- The sender can cancel a subscription at any time (unless there is an in-flight payment).
+    choice SubscriptionIdleState_CancelSubscription : ContractId TerminatedSubscription
+      controller subscriptionData.sender
+      do
+        assertSubscriptionMatches subscription subscriptionData
+        exercise subscription Subscription_Archive
+
+
+-- | An in-flight (yet to be collected) payment on an existing subscription.
+--   Doubles as a "payment in progress" state.
+template SubscriptionPayment
+  with
+    subscription : ContractId Subscription -- ^ The subscription this belongs to.
+    subscriptionData : SubscriptionData -- ^ Copy of the base subscription properties; for convenience.
+    payData : SubscriptionPayData -- ^ Payment-related properties.
+    thisPaymentDueAt : Time -- ^ After which time the next payment can and should be paid.
+    targetAmount : Decimal
+    lockedCoin : ContractId LockedCoin
+    round : Round -- ^ The round in which the locked coin was created, added as an extra field so we can avoid ingesting locked coins.
+    reference : ContractId SubscriptionRequest
+  where
+    signatory subscriptionSignatories subscriptionData
+    ensure payDataIsValid payData
+
+    choice SubscriptionPayment_Collect : (ContractId SubscriptionIdleState, ContractId Coin)
+      with
+        transferContext : AppTransferContext
+      controller signatory this
+      do
+        contextRound <- exercise transferContext.openMiningRound (OpenMiningRound_Fetch subscriptionData.provider)
+        require ("Round at subscription payment " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
+        assertSubscriptionMatches subscription subscriptionData
+        state <- create SubscriptionIdleState with
+          nextPaymentDueAt = thisPaymentDueAt `addRelTime` payData.paymentInterval
+          ..
+        coin <- unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin
+        pure (state, coin)
+
+    choice SubscriptionPayment_Reject : (ContractId SubscriptionIdleState, CoinCreateSummary (ContractId Coin))
+      with
+        transferContext : AppTransferContext
+      controller subscriptionData.receiver
+      do
+        assertSubscriptionMatches subscription subscriptionData
+        state <- create SubscriptionIdleState with
+          nextPaymentDueAt = thisPaymentDueAt
+          ..
+        ccsum <- exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules transferContext.openMiningRound)
+        pure (state, ccsum)
+
+    choice SubscriptionPayment_Expire : (ContractId SubscriptionIdleState, CoinCreateSummary (ContractId Coin))
+      with
+        actor : Party
+        transferContext : AppTransferContext
+      controller actor
+      do
+        -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedCoin, and the AcceptedAppPayment in #3152
+        require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+        assertSubscriptionMatches subscription subscriptionData
+        state <- create SubscriptionIdleState with
+          nextPaymentDueAt = thisPaymentDueAt
+          ..
+        ccsum <- exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.coinRules transferContext.openMiningRound) -- would fail if we can't expire yet
+        pure (state, ccsum)
+
+
+lockAndMakeChange
+  : PaymentTransferContext -> SubscriptionData -> SubscriptionPayData -> [TransferInput] -> Time -> Party
+  -> Update (ContractId LockedCoin, Optional (ContractId Coin), Decimal, Round)
+lockAndMakeChange context subscriptionData payData inputs now walletProvider = do
+  let SubscriptionData { sender; receiver; provider; svc } = subscriptionData
+  let SubscriptionPayData { paymentAmount; .. } = payData
+
+
+  contextRound <- exercise @OpenMiningRound context.context.openMiningRound (OpenMiningRound_Fetch sender)
+
+  targetAmount <- paymentAmountToCC svc subscriptionData.sender contextRound paymentAmount
+
+  outputFees <- exerciseComputeFees context sender [mkTransferOutput receiver targetAmount]
+  let lockAmount = targetAmount + sum outputFees
+  -- We know that the contextRound (=latest Round) won't be archived before
+  -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger.
+  let expiresAt = max (addRelTime now contextRound.tickDuration) contextRound.targetClosesAt
+
+
+  let transfer = Transfer with
+       sender
+       -- this step is orchestrated by the sender's wallet, so the sender's wallet provider gets the rewards
+       provider = walletProvider
+       inputs
+       outputs =
+         [ TransferOutput with
+             receiver = sender
+             amount = lockAmount
+             lock = Some TimeLock with
+               holders = dedupSort [provider, receiver]
+               expiresAt = expiresAt
+             receiverFeeRatio = 0.0
+         ]
+
+  result <- exercisePaymentTransfer context transfer
+  let [TransferResultLockedCoin lockedCoin] = result.createdCoins
+
+  pure(lockedCoin, result.senderChangeCoin, targetAmount, result.round)
+
+
+unlockAndTransfer: AppTransferContext -> SubscriptionData -> Decimal -> ContractId LockedCoin -> Update (ContractId Coin)
+unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin = do
+  let SubscriptionData { sender; receiver; provider } = subscriptionData
+
+  -- unlock coin and transfer the remainder to the receiver
+  ccsum <- exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules transferContext.openMiningRound)
+  let transfer = Transfer with
+        sender
+        provider
+        inputs = [InputCoin ccsum.coin]
+        outputs = [mkTransferOutput receiver targetAmount]
+  result <- exerciseAppTransfer transferContext transfer
+  require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
+  let [TransferResultCoin coinCid] = result.createdCoins
+
+  pure coinCid
+
+mkTransferOutput : Party -> Decimal -> TransferOutput
+mkTransferOutput receiver amount =
+  TransferOutput with
+    receiver
+    amount
+    lock = None
+    receiverFeeRatio = 0.0

@@ -1,0 +1,98 @@
+module CC.Scripts.TestUnclaimedRewards where
+
+import DA.Action (when, void)
+import DA.Assert
+
+import Daml.Script
+
+import CC.Coin
+import CC.Round
+import CC.Round.Types
+import CC.Scripts.Util
+import CC.Scripts.TestIssuance
+import CC.Scripts.Parameters
+
+testUnclaimedRewards : Script ()
+testUnclaimedRewards = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  -- bare-create all three kinds of rewards
+  appCoupon1 <- submitMulti [app.svc, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+    svc = app.svc
+    provider = provider1.primaryParty
+    amount = 5.7
+    round = Round 0
+    featured = True
+
+  appCoupon2 <- submitMulti [app.svc, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+    svc = app.svc
+    provider = provider1.primaryParty
+    amount = 3.3
+    round = Round 0
+    featured = False
+
+  validatorCoupon1 <- submitMulti [app.svc, alice.primaryParty] [] $ createCmd ValidatorRewardCoupon with
+    svc = app.svc
+    user = alice.primaryParty
+    amount = 2.3
+    round = Round 0
+
+  -- -- start issuing so the SVC has some coins to invite users
+  runNextIssuance app
+  runCoinDepositBots app
+
+  -- check size of unclaimed reward issuance
+  let totalAppAndValidatorRewardsPerRound =
+        expectedParameters_NoActivity_0_0p5.unclaimedAppRewards +
+        expectedParameters_NoActivity_0_0p5.unclaimedValidatorRewards
+      allocatedRewards =
+        5.7 * issuanceConfig_0_0p5.featuredAppRewardCap +
+        3.3 * issuanceConfig_0_0p5.unfeaturedAppRewardCap +
+        2.3 * issuanceConfig_0_0p5.validatorRewardCap
+  mergeAndCheckUnclaimedRewardAmount app (totalAppAndValidatorRewardsPerRound - allocatedRewards)
+
+  -- run another two issuances
+  runNextIssuance app
+  runNextIssuance app
+
+  let numIssuingRoundsToDate = 3.0
+  mergeAndCheckUnclaimedRewardAmount app (numIssuingRoundsToDate * totalAppAndValidatorRewardsPerRound - allocatedRewards)
+
+  -- run another two issuance such that round 0 becomes closed
+  runNextIssuance app
+  runNextIssuance app
+
+  -- collect the reward coupons
+  [(closedRoundCid, _)] <- query @ClosedMiningRound app.svc
+  let collect = CoinRules_ClaimExpiredRewards with
+        closedRoundCid
+        validatorCouponCids = [validatorCoupon1]
+        appCouponCids = [appCoupon1, appCoupon2]
+  submitExerciseCoinRulesByKey app [app.svc] [] collect
+
+  -- check that the addition is done correctly
+  let numIssuingRoundsToDate = 5.0
+  -- note that now the reward coupons have been collected as well, and we thus
+  -- don't have to subtract the allocatedRewards anymore. They've been merged back
+  -- into the `UnclaimedReward`s fund.
+  mergeAndCheckUnclaimedRewardAmount app (numIssuingRoundsToDate * totalAppAndValidatorRewardsPerRound)
+  pure ()
+
+mergeAndCheckUnclaimedRewardAmount : CCApp -> Decimal -> Script ()
+mergeAndCheckUnclaimedRewardAmount app expectedAmount = do
+  mergeUnclaimedRewards app
+  -- check target amount
+  [(_, unclaimed)] <- query @UnclaimedReward app.svc
+  unclaimed === UnclaimedReward with
+    svc = app.svc
+    amount = expectedAmount
+
+
+-- | Merge all unclaimed reward contracts.
+mergeUnclaimedRewards : CCApp -> Script ()
+mergeUnclaimedRewards app  = do
+  unclaimedRewards <- query @UnclaimedReward app.svc
+  when (length unclaimedRewards > 1) $
+    void $ submitExerciseCoinRulesByKey app [app.svc] []
+      CoinRules_MergeUnclaimedRewards with
+        unclaimedRewardCids = map fst unclaimedRewards

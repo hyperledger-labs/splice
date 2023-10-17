@@ -1,0 +1,12 @@
+module CN.Scripts.CnsRulesParameters where
+
+import DA.Time
+
+import CN.Cns
+
+-- | Default proposal for CNS config
+defaultCnsRulesConfig : CnsRulesConfig
+defaultCnsRulesConfig = CnsRulesConfig with
+  renewalDuration = days 30
+  entryLifetime = days 90
+  entryFee = 1.0

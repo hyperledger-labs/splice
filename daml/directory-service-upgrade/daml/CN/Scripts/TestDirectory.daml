@@ -1,0 +1,147 @@
+module CN.Scripts.TestDirectory where
+
+import DA.Assert
+import DA.Time
+import Daml.Script
+
+import CC.Coin
+import CN.Directory
+import CN.Wallet.Subscriptions
+
+import CC.Scripts.Util
+
+testWithSubscription : Script ()
+testWithSubscription = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  runNextIssuance app
+  runCoinDepositBots app
+
+  --provider <- setupUser app "provider" app.svc
+  --user <- setupUser app "user" app.svc
+
+  featureApp app provider1
+
+  -- provider creates directory rules
+  -- how: up to app provider
+  directoryInstallRequest <- submit alice.primaryParty $ createCmd DirectoryInstallRequest with
+    provider = provider1.primaryParty
+    user = alice.primaryParty
+
+  let entryFee = 1.0
+
+  directoryInstall <- submit provider1.primaryParty $ exerciseCmd directoryInstallRequest DirectoryInstallRequest_Accept with
+    svc = app.svc
+    entryFee = entryFee
+    renewalDuration = days 30
+    entryLifetime = days 90
+
+  -- user requests entry via app install
+  -- how: UI of directory service via write-delegation on app manager & call to
+  -- user’s participant.
+  (entryContext, subscriptionRequest) <- submit alice.primaryParty $ exerciseCmd directoryInstall DirectoryInstall_RequestEntry with
+    name = "cns.darth.vader"
+    url = "https://darth-vader-cns.com"
+    description = "Darth Vader's CNS Description"
+
+  -- cc wallet selects a large enough coin
+  -- how: cc wallet
+  -- note: privacy is no concern here as coin holdings are public
+  coin <- tap app alice 1.5
+  -- cc wallet accepts sbuscription and first payment and locks coin to provider
+  -- how: cc wallet
+
+  paymentContext <- getPaymentTransferContext app alice
+  appContext <- getAppTransferContext app provider1
+  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
+    inputs = [InputCoin coin]
+    context = paymentContext
+    walletProvider = app.svc
+
+  (_, round) <- getLatestActiveOpenRound app
+  let transferConfigCC = transferConfigCCFromOpenRound round
+  [(_, reward)] <- query @CC.Coin.AppRewardCoupon app.svc
+  reward.amount ===
+    transferConfigCC.createFee.fee +
+    transferConfigCC.lockHolderFee.fee
+  reward.featured === False
+
+  -- directory provider transactionally unlocks & transfer coins and creates directory entry and a subscription in return.
+  -- how: provider on their own participant
+  (entryCid, subscriptionStateCid, _) <- submitUser provider1.userId $ exerciseCmd entryContext DirectoryEntryContext_CollectInitialEntryPayment with
+    paymentCid = initialPaymentCid
+    transferContext = appContext
+
+  [(_, reward)] <- query @CC.Coin.AppRewardCoupon provider1.primaryParty
+  reward.amount ===
+    transferConfigCC.createFee.fee +
+    transferConfigCC.transferFee.initialRate * entryFee
+  reward.featured === True
+
+  Some entry <- queryContractId alice.primaryParty entryCid
+  Some subscriptionState <- queryContractId alice.primaryParty subscriptionStateCid
+  Some install <- queryContractId alice.primaryParty directoryInstall
+
+  entry.name === "cns.darth.vader"
+  entry.user === alice.primaryParty
+  subscriptionState.nextPaymentDueAt === entry.expiresAt
+  subscriptionState.payData.paymentInterval === install.entryLifetime
+
+  -- cc wallet automatically selects a large enough coin and initiates a subscription payment during the scheduled renewal period
+  -- how: cc wallet
+  passTime (days 60)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  paymentContext <- getPaymentTransferContext app alice
+  appContext <- getAppTransferContext app provider1
+
+  coin <- tap app alice 1.5
+  (paymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputCoin coin]
+    context = paymentContext
+    walletProvider = app.svc
+
+  -- directory provider transactionally unlocks & transfer coins and renews directory entry in return
+  -- how: provider on their own participant
+  (entryCid, subscriptionStateCid, _) <- submitUser provider1.userId $ exerciseCmd entryContext DirectoryEntryContext_CollectEntryRenewalPayment with
+    paymentCid
+    entryCid
+    transferContext = appContext
+
+  submitMustFail provider1.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider1.primaryParty)
+
+  -- user can't pay earlier than `renewalDuration` from the next due date
+  coin <- tap app alice 1.5
+  submitMultiMustFail [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputCoin coin]
+    context = paymentContext
+    walletProvider = app.svc
+
+  passTime (days 90)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  paymentContext <- getPaymentTransferContext app alice
+  appContext <- getAppTransferContext app provider1
+
+  -- cc wallet and provider can repeat the "payment and collect" cycle indefinitely
+  (paymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputCoin coin]
+    context = paymentContext
+    walletProvider = app.svc
+  (entryCid, subscriptionStateCid, _) <- submitUser provider1.userId $ exerciseCmd entryContext DirectoryEntryContext_CollectEntryRenewalPayment with
+    paymentCid
+    entryCid
+    transferContext = appContext
+
+  submitMustFail provider1.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider1.primaryParty)
+
+  -- directory provider can eventually expire an unfunded entry
+  passTime (days 121)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  submit provider1.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider1.primaryParty)
+
+  -- directory provider can then also terminate the subscription
+  submit provider1.primaryParty $ exerciseCmd subscriptionStateCid (SubscriptionIdleState_ExpireSubscription provider1.primaryParty)
+
+  pure ()

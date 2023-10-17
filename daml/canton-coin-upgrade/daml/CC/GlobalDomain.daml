@@ -1,0 +1,75 @@
+-- | Types and contracts for managing domain fees
+module CC.GlobalDomain where
+
+import qualified DA.Set as Set
+import DA.Time
+
+
+-- Global domain configuration
+-------------------------------
+
+-- | The configuration of the logical concept of a global domain, which consists over its lifetime
+-- of a series of actual Canton domains, which are introduced for handling the (rare) occasions of switching
+-- to a new Canton domain protocol version.
+data GlobalDomainConfig = GlobalDomainConfig with
+    requiredDomains : Set.Set Text -- ^ The domain-ids of all domains that CC and CNS users should be connected to.
+    activeDomain : Text -- ^ The domain-id of the domain on which the SVC accepts transactions involving the
+                        -- CoinRules and related contracts, which must be one of the `requiredDomains`.
+    fees : DomainFeesConfig -- ^ The fees charged for using the global domain. We use the same fees across all active global domains.
+  deriving (Eq, Show)
+
+-- | The limits defining the free base rate delivered by the domain.
+-- It defines the base rate as allowing at most (rate * burstWindow) of sequencing traffic within a window of burstWindow seconds.
+data BaseRateTrafficLimits = BaseRateTrafficLimits with
+    rate: Decimal -- ^ The base domain traffic rate in bytes/s
+    burstWindow: RelTime -- ^ Time window within base rate must not be exceeded
+  deriving (Eq, Show)
+
+-- | Domain fees related configuration to be tracked on the SvcRules contract
+data DomainFeesConfig = DomainFeesConfig with
+    baseRateTrafficLimits: BaseRateTrafficLimits -- ^ Configuration limits for base rate traffic
+    extraTrafficPrice: Decimal -- ^ The price of extra traffic denominated in $/MB
+    readScalingFactor: Decimal -- ^ How much the sending of a message to its recipient costs in terms of bytes written to the domain.
+    -- We charge for sending messages depending on the number of recipients,
+    -- as delivering the message incurs a cost as well, albeit usually a much
+    -- smaller one than the cost of a write.
+    minTopupAmount: Int -- ^ The minimum amount of extra traffic (in bytes) that must be bought when buying extra traffic.
+    -- This ensures that the SVC can amortize the cost of executing that transaction.
+  deriving (Eq, Show)
+
+
+validGlobalDomainConfig : GlobalDomainConfig -> Bool
+validGlobalDomainConfig config =
+  config.activeDomain `Set.member` config.requiredDomains
+
+
+-- Per sequencer member domain traffic tracking
+------------------------------------------------
+
+-- | The state of the extra domain traffic purchases of a sequencer member.
+template MemberTraffic with
+    svc : Party
+    memberId : Text -- ^ The id of the sequencer member (participant or mediator) for which traffic has been purchased
+    domainId : Text -- ^ The id of the domain for which this contract tracks purchased extra traffic.
+    totalPurchased : Int -- ^ The number of bytes of extra traffic purchased
+    numPurchases : Int -- ^ Number of times extra traffic has been purchased
+    ccSpent : Decimal -- ^ Total CC spent on extra traffic
+    usdSpent : Decimal -- ^ Total USD spent on extra traffic
+  where
+    signatory svc
+
+    ensure totalPurchased >= 0
+      && numPurchases >= 0
+      && ccSpent >= 0.0
+      && usdSpent >= 0.0
+
+
+initialMemberTraffic : Party -> Text -> Text -> Int -> MemberTraffic
+initialMemberTraffic svc memberId domainId amount = MemberTraffic with
+    svc = svc
+    memberId = memberId
+    domainId
+    totalPurchased = amount
+    numPurchases = 0
+    ccSpent = 0.0
+    usdSpent = 0.0

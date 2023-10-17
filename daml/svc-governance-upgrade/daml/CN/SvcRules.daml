@@ -1,0 +1,1289 @@
+module CN.SvcRules where
+
+import DA.Action (void, when, unless)
+import DA.Foldable (forA_)
+import DA.List as List
+import DA.Optional (fromSome, isSome)
+import qualified DA.Map as Map
+import qualified DA.Set as Set
+import qualified DA.Text as T
+import DA.Time
+
+import CC.Coin
+
+import CC.Round
+import CC.Round.Types
+import CC.Util
+import CC.ValidatorLicense
+import CN.Wallet.Subscriptions
+import CC.GlobalDomain (initialMemberTraffic, MemberTraffic)
+
+import qualified CN.CometBft as CometBft
+import CN.Cns
+import CN.SvOnboarding
+import CN.SVC.CoinPrice
+import CN.SVC.GlobalDomain
+import CN.Util.Assert
+import CC.Schedule (getValueAsOf)
+
+
+-- Types
+---------
+
+-- | Actions that require confirmation from SV nodes before they can be executed.
+--
+-- There are two processes for executing such actions:
+-- 1. Any SV can request a vote to execute such an action upon which the other SV's
+--    can respond with their votes for whether they accept the execution or not.
+--    This process requires 2 * f + 1 votes* for the action to be considered definitive
+--    and it can be used for all actions that require confirmation.
+-- 2. Some of the actions that require confirmations should be executed automatically
+--    once the ledger and the wall-clocks of the SV nodes are in a particular state.
+--    These actions are confirmed by each SV node automatically once the action's precondition is met.
+--    Once 2 * f + 1 confirmations* are visible to the leader it executes them.
+--
+-- * Simplified for clarity; see `requiredNumVotes` for exact formula.
+--
+-- Process 2 is an optimization of Process 1 for the case where no disagreement to the
+-- action is expected. It avoids the extra round-trip and the complications of having
+-- the leader to reliably initiate the vote when it is time to execute an automated action
+-- that requires confirmation.
+--
+-- We expect honest SV nodes to only create confirmations for actions
+-- whose preconditions are met. We also rely on the execution of these actions to be
+-- idempotent, as more than the required number of confirmations can be created and the leader could
+-- thus in principle execute the corresponding action multiple times.
+--
+-- Note also that having these two processes also aids in distinguishing between manually initiated
+-- ad-hoc votes and the regular confirmations that need to happen for the SVC to
+-- perform its duties.
+data ActionRequiringConfirmation
+  = ARC_SvcRules with
+      svcAction : SvcRules_ActionRequiringConfirmation
+  | ARC_CoinRules with
+      coinRulesAction : CoinRules_ActionRequiringConfirmation
+  | ARC_CnsEntryContext with
+      cnsEntryContextCid : ContractId CnsEntryContext
+      cnsEntryContextAction : CnsEntryContext_ActionRequiringConfirmation
+  deriving (Eq, Show)
+
+data CoinRules_ActionRequiringConfirmation
+  = CRARC_MiningRound_StartIssuing CoinRules_MiningRound_StartIssuing
+    -- ^ Automated action to start an issuing round once the summary of the reward coupons have been computed.
+  | CRARC_MiningRound_Archive CoinRules_MiningRound_Archive
+    -- ^ Automated action to archive a closed mining round once no expired reward coupons are left.
+  | CRARC_AddFutureCoinConfigSchedule CoinRules_AddFutureCoinConfigSchedule
+    -- ^ Voted action to add a config schedule to the `CoinRules`.
+  | CRARC_RemoveFutureCoinConfigSchedule CoinRules_RemoveFutureCoinConfigSchedule
+    -- ^ Voted action to remove a config schedule from the `CoinRules`.
+  | CRARC_UpdateFutureCoinConfigSchedule CoinRules_UpdateFutureCoinConfigSchedule
+    -- ^ Voted action to update a config schedule in the `CoinRules`.
+  deriving (Eq, Show)
+
+data SvcRules_ActionRequiringConfirmation
+  = SRARC_AddMember SvcRules_AddMember
+    -- ^ Voted action to directly add a member to the SVC.
+  | SRARC_RemoveMember SvcRules_RemoveMember
+    -- ^ Voted action to remove a member from the SVC.
+  | SRARC_ConfirmSvOnboarding SvcRules_ConfirmSvOnboarding
+    -- ^ Automated action to confirm that a party can become an SV member.
+  | SRARC_GrantFeaturedAppRight SvcRules_GrantFeaturedAppRight
+    -- ^ Voted action to grant a featured app right. Not idempotent.
+  | SRARC_RevokeFeaturedAppRight SvcRules_RevokeFeaturedAppRight
+    -- ^ Revoke a specific featured app right.
+  | SRARC_SetConfig SvcRules_SetConfig
+    -- ^ Voted action to change the `SvcRulesConfig`. Not idempotent.
+  deriving (Eq, Show)
+
+data CnsEntryContext_ActionRequiringConfirmation
+  = CNSRARC_CollectInitialEntryPayment CnsEntryContext_CollectInitialEntryPayment
+    -- ^ Automated action to collect initial payment of an cns entry.
+  | CNSRARC_RejectEntryInitialPayment CnsEntryContext_RejectEntryInitialPayment
+    -- ^ Automated action to reject initial payment of an cns entry.
+  deriving (Eq, Show)
+
+-- | Information about members relevant to collective governance.
+data MemberInfo = MemberInfo with
+    name : Text -- ^ Human-readable name; must be unique.
+    joinedAsOfRound : Round
+    domainNodes : DomainNodeConfigMap
+    -- ^ This is the config for the CometBFT nodes under control of this member.
+    -- We expect the SvApp to run a reconciliation loop that applies all changes to this
+    -- config to the actual CometBFT network config using the service defined here:
+    -- https://github.com/DACH-NY/canton-network-node/pull/3896/files.
+  deriving (Eq, Show)
+
+data CollectiveSummary = CollectiveSummary with
+    leader : Party
+    numMembers : Int
+    requiredNumVotes : Int
+    -- | The number of votes required for considering a confirmation, a request for a vote, or
+    -- a leader election definitive.
+  deriving (Eq, Show)
+
+
+-- Workflow templates
+---------------------
+
+data ElectionRequestReason
+  = ERR_LeaderUnavailable
+  -- TODO(M3-46): add case for leader asking to be relieved for a graceful shutdown
+  | ERR_OtherReason Text
+  deriving (Eq, Ord, Show)
+
+-- | A request to elect a new leader for the SVC.
+template ElectionRequest with
+    svc : Party
+    requester : Party
+    epoch : Int  -- current epoch whose leader should be replaced
+    reason : ElectionRequestReason -- reason for electing a new leader
+    ranking : [Party] -- preference ranking for new leaders
+  where
+    -- NOTE: we expect the requester to observe this contract through being
+    -- a backing member of the 'svc' collective party. The requester can in
+    -- particular not be a signatory, as otherwise fetching and archiving of
+    -- the request would require the requesters confirmation instead of only
+    -- the confirmation of the 'svc'.
+    signatory svc
+
+-- | A challenge from one SV to another to prove that they are online and can submit
+template FirstSvChallenge with
+    svc : Party
+    challenged : Party
+    firstChallenger : Party
+    deadline : Time
+    -- ^ Earliest time after which another SVC member can second the challenge
+  where
+    signatory svc
+
+    choice SvChallenge_Answer : ()
+      controller challenged
+      do
+        pure ()
+
+-- | A challenge that has reached the second stage, where a second SV joins the challenge.
+-- We use a two-step approach for challenging SVs as a safety measure, to guarantee that the challenged
+-- SV has a fair chance of answering. If the second SV succeeded in reading the first challenge
+-- and writing the second challenge, that guarantees that both reads and writes are functional,
+-- and the challenged SV should also be able to answer the challenge.
+template SecondSvChallenge with
+    svc : Party
+    challenged : Party
+    deadline : Time
+  where
+    signatory svc
+
+    choice SecondSvChallenge_Answer : ()
+      controller challenged
+      do
+        pure ()
+
+-- | A note that an SV was issued part of the SvcReward in a specific round.
+template SvReward with
+    svc : Party
+    sv : Party
+    round : Round
+    amount : Decimal
+  where
+    signatory svc
+
+
+-- | A confirmation for the leader to take an action in the name of the SVC.
+-- Used for executing automated actions in a shortened process.
+-- See the comments on `ActionRequiringConfirmation` for details.
+template Confirmation with
+    svc : Party
+    confirmer : Party
+    action : ActionRequiringConfirmation
+    expiresAt : Time
+  where
+    -- As for 'ElectionRequest' we only make the 'svc' a signatory.
+    signatory svc
+
+    choice Confirmation_Expire : ()
+      controller svc
+      do now <- getTime
+         require "Contract has expired" (expiresAt <= now)
+
+-- | A request for the other members to vote on the execution of an action requiring confirmation.
+-- We use this for implementing on-ledger governance actions triggered by SV operators in a uniform way.
+--
+-- See the comments on `ActionRequiringConfirmation` for details.
+template VoteRequest
+  with
+    svc : Party
+    requester : Party
+    -- ^ The SV member that requested to execute the action.
+    action : ActionRequiringConfirmation
+    -- ^ The action whose confirmation is required.
+    reason : Reason
+    -- ^ The reason for requesting the execution of the action. Typically a reference to some off-ledger justification.
+    expiresAt : Time
+    -- ^ When this request and its corresponding votes expire.
+  where
+    signatory svc
+
+    choice VoteRequest_Expire : ()
+      controller svc
+      do now <- getTime
+         require "Contract has expired" (expiresAt <= now)
+
+-- | A `Vote` created by an SV operator in response to a specific `VoteRequest`.
+template Vote
+  with
+    svc : Party
+    requestCid : ContractId VoteRequest
+    -- ^ The request being responded to.
+    voter : Party
+    accept : Bool
+    -- ^ Whether the responder accepted the request to execute the action or not.
+    reason : Reason
+    -- ^ The reason for voting this way.
+    expiresAt : Time
+    -- ^ When this response expires, which is always set equal to the expiry time of the `VoteRequest`.
+  where
+    signatory svc
+
+    choice Vote_Expire : ()
+      controller svc
+      do now <- getTime
+         require "Contract has expired" (expiresAt <= now)
+
+data Reason = Reason with
+    url : Text -- ^ Url pointing to additional background on the reason, ideally using a https://w3c-ccg.github.io/hashlink/
+    body : Text -- ^ Freeform text intended for human consumption.
+  deriving (Eq, Show)
+
+data VoteResult = VoteResult with
+    action : ActionRequiringConfirmation
+    executed : Bool
+    requester: Party
+    effectiveAt: Time
+    votedAt: Time
+    acceptedBy : [Party]
+    rejectedBy : [Party]
+  deriving (Eq, Show)
+
+
+-- SV Collective rules
+----------------------
+
+data SvcRulesConfig = SvcRulesConfig with
+    numUnclaimedRewardsThreshold : Int -- ^ The minimum number of unclaimed rewards required for merging
+    numMemberTrafficContractsThreshold : Int -- ^ The minimum number of member traffic contracts required for merging
+    actionConfirmationTimeout : RelTime -- ^ The TTL for contracts representing a confirmation
+    svOnboardingRequestTimeout : RelTime -- ^ The TTL for contracts representing an incomplete onboarding
+    svOnboardingConfirmedTimeout : RelTime -- ^ The TTL for contracts representing a SV confirmation
+    voteRequestTimeout : RelTime  -- ^ The TTL for a `VoteRequest` and its associated `Vote`s.
+    leaderInactiveTimeout: RelTime -- ^ The amount of time given to the leader to complete an action it should take care of
+    domainNodeConfigLimits : DomainNodeConfigLimits  -- ^ Limits to enforce on the members' `DomainNodeConfig`
+    maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
+    initialTrafficGrant: Int -- ^ Extra traffic granted to SVs at the time of joining
+    svChallengeDeadline : RelTime -- ^ Deadline for each stage of the two-stage SV challenging protocol
+    globalDomain : GlobalDomainConfig
+  deriving (Eq, Show)
+
+data TrafficState = TrafficState with
+    consumedTraffic: Int -- ^ Bytes of extra traffic consumed before the SVC was founded.
+  deriving (Eq, Show)
+
+-- | Rules governing the collective.
+template SvcRules with
+    svc : Party        -- ^ The collective party representing this collective
+    epoch : Int        -- ^ The number of leaders that have already been elected.
+    members : Map.Map Party MemberInfo
+    leader : Party
+    config : SvcRulesConfig
+    initialTrafficState: Map.Map Text TrafficState -- ^ Map from participant/mediator ID to its traffic state at the time of SVC founding. Used for testing, empty in prod.
+    isDevNet : Bool
+    lock : Bool -- ^ If it is true, all choices are disabled. TODO(#3933) We should remove this as it is a workaround to protect participants from crashing due to #3933
+  where
+    ensure
+      leader `Map.member` members &&
+        unique (map (.name) (Map.values members)) &&
+        config.numUnclaimedRewardsThreshold > 0
+
+    -- NOTE: the members are not direct signatories as that would not give us the right fault-tolerance wrt
+    -- validating choices on this contract. Instead, the members are indirect signatories by being backing
+    -- members of the 'svc' collective party.
+    signatory svc
+
+
+    -- Membership management
+    ------------------------
+
+    choice SvcRules_AddMember : ContractId SvcRules
+      with
+        newMemberParty : Party
+        newMemberName : Text
+        newMemberParticipantId : Text
+        joinedAsOfRound : Round
+        domainId : Text
+      controller svc
+      do
+        requireUnlocked lock
+        require "Member party is new" (not $ newMemberParty `Map.member` members)
+        unless isDevNet $ do
+          require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
+        let info = MemberInfo with
+              name = newMemberName
+              joinedAsOfRound = joinedAsOfRound
+              domainNodes = noDomainNodes
+        let membersNotMatchingNewMemberName = Map.filter (\m -> m.name /= newMemberName) members
+        now <- getTime
+        create CoinPriceVote with
+          svc
+          sv = newMemberParty
+          coinPrice = None
+          lastUpdatedAt = now
+        -- create traffic contracts for the initial traffic grant to the SV
+        create (initialMemberTraffic svc newMemberParticipantId domainId config.initialTrafficGrant)
+        create SvcRules with
+          svc
+          epoch
+          leader
+          -- existing entry of member with same name as the new member will be overwritten by the new member info
+          -- this should only happen if it is in devnet
+          members = Map.insert newMemberParty info membersNotMatchingNewMemberName
+          config
+          initialTrafficState
+          isDevNet
+          lock
+
+    choice SvcRules_RemoveMember : ContractId SvcRules
+      with
+        member : Party
+      controller svc
+      do
+        requireUnlocked lock
+        require "Member exists" (member `Map.member` members)
+        require "There is more than one member" (Map.size members > 1)
+        -- NOTE: this immediate deletion also slashes that member's share of the current round's issuance
+        -- and drops their CommetBFT config, which will in turn lead to the SV apps of the remaining members
+        -- revoking that member's rights in the CometBFT network.
+        let newMembers = Map.delete member members
+        -- We optimize for prompt removal of a member if the vote said so. We can thus not wait for a leader-election
+        -- and instead just choose the member with the lexicographically smallest name.
+        let (newLeader, newEpoch)
+              | member == leader = (head (Map.keys newMembers), epoch + 1)
+              | otherwise        = (leader, epoch)
+        -- create the new rules contract
+        create SvcRules with
+          svc
+          epoch = newEpoch
+          leader = newLeader
+          members = newMembers
+          config
+          initialTrafficState
+          isDevNet
+          lock
+
+    -- Challenge an SV member that seems to be non-responsive.
+    -- The challenge will need to be seconded by another member after the deadine timer has elapsed before being executed.
+    -- The member itself can archive the challenge if it is functional.
+    nonconsuming choice SvcRules_ChallengeMember : ContractId FirstSvChallenge
+      with
+        challenged : Party
+        firstChallenger : Party
+      controller firstChallenger
+      do
+        requireUnlocked lock
+        require "IsDevnet is true" isDevNet
+        require "Challenger is a collective member" (firstChallenger `Map.member` members)
+        require "Challenged is a collective member" (challenged `Map.member` members)
+        now <- getTime
+        let deadline = now `addRelTime` config.svChallengeDeadline
+        create FirstSvChallenge with
+          ..
+
+    -- Second an SV challenge.
+    -- If by the time the deadline elapses, the challenged SV does not archive this,
+    -- then any member can use this to immediately remove the non-responsive challenged member.
+    nonconsuming choice SvcRules_SecondChallengeMember : ContractId SecondSvChallenge
+      with
+        firstChallengeCid : ContractId FirstSvChallenge
+        secondChallenger : Party
+      controller secondChallenger
+      do
+        requireUnlocked lock
+        require "Second challenger is a collective member" (secondChallenger `Map.member` members)
+        firstChallenge <- fetch firstChallengeCid
+        require "The two challengers are different" (secondChallenger /= firstChallenge.firstChallenger)
+        now <- getTime
+        require "Deadline elapsed" (now > firstChallenge.deadline)
+        let deadline = now `addRelTime` config.svChallengeDeadline
+        archive firstChallengeCid
+        create SecondSvChallenge with
+          challenged = firstChallenge.challenged
+          ..
+
+    nonconsuming choice SvcRules_RemoveChallengedMember : ContractId SvcRules
+      with
+        secondChallengeCid : ContractId SecondSvChallenge
+        executer : Party
+      controller executer
+      do
+        require "Executor is a collective member" (executer `Map.member` members)
+        secondChallenge <- fetch secondChallengeCid
+        now <- getTime
+        require "Deadline elapsed" (now > secondChallenge.deadline)
+        archive secondChallengeCid
+        if (secondChallenge.challenged `Map.member` members)
+          then
+            exercise self SvcRules_RemoveMember with
+              member = secondChallenge.challenged
+          else pure self
+
+    -- Called by SV candidates to add themselves to the SvcRules once they are confirmed and ready.
+    -- We use the passed rounds for reliably determining the earliest open round, which will be
+    -- the first round in which the new SV will receive rewards. We make the SV receive rewards
+    -- early so they can start to pay domain fees early.
+    nonconsuming choice SvcRules_AddConfirmedMember : ContractId SvcRules
+      with
+        sv : Party
+        svOnboardingConfirmedCid : ContractId SvOnboardingConfirmed
+        earliestRoundCid : ContractId OpenMiningRound
+        middleRoundCid : ContractId OpenMiningRound
+        latestRoundCid : ContractId OpenMiningRound
+        coinRulesCid: ContractId CoinRules
+        svParticipantId : Text
+      controller sv
+      do
+        requireUnlocked lock
+
+        svOnboardingConfirmed <- fetch svOnboardingConfirmedCid
+        archive svOnboardingConfirmedCid
+
+        require "SVC matches" (svOnboardingConfirmed.svc == svc)
+        require "SV matches" (svOnboardingConfirmed.svParty == sv)
+
+        earliestRound <- fetch earliestRoundCid
+        middleRound <- fetch middleRoundCid
+        latestRound <- fetch latestRoundCid
+        require "middleRound is one after earliestRound" (middleRound.round.number == earliestRound.round.number + 1)
+        require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
+        require "rounds belong to SVC" (earliestRound.svc == svc && middleRound.svc == svc && latestRound.svc == svc)
+
+        coinRules <- fetch coinRulesCid
+        now <- getTime
+        let coinConfig = getValueAsOf now coinRules.configSchedule
+        exercise self SvcRules_AddMember with
+          newMemberParty = sv
+          newMemberName = svOnboardingConfirmed.svName
+          newMemberParticipantId = svParticipantId
+          joinedAsOfRound = earliestRound.round
+          domainId = coinConfig.globalDomain.activeDomain
+
+
+    -- Global domain config management
+    -----------------------------------
+
+    -- Every SV can change their own domain node's config within the configured limits.
+    choice SvcRules_SetDomainNodeConfig : ContractId SvcRules
+      with
+        sv : Party
+        domainId : Text
+        newNodeConfig : DomainNodeConfig
+      controller sv
+      do
+        requireUnlocked lock
+        require "Domain with this id is configured" (domainId `Map.member` config.globalDomain.domains)
+        case Map.lookup sv members of
+          None -> error "SV is not a collective member"
+          Some info -> do
+            -- check validity of config and constraint on voting power
+            require "Valid configuration" (validDomainNodeConfig config.domainNodeConfigLimits newNodeConfig)
+            unless isDevNet $
+              require "CometBft voting power <= 1" (CometBft.totalVotingPower newNodeConfig.cometBft <= 1)
+            -- update member info
+            let newInfo = info with domainNodes = Map.insert domainId newNodeConfig info.domainNodes
+            create this with members = Map.insert sv newInfo this.members
+
+    -- Automation leader election
+    ------------------------------
+    nonconsuming choice SvcRules_RequestElection : ContractId ElectionRequest
+      with
+        requester : Party
+        reason: ElectionRequestReason
+        ranking : [Party]
+      controller requester
+      do
+        requireUnlocked lock
+        -- TODO(M3-46): consider interaction with concurrent membership changes
+        require "Requester is a collective member" (requester `Map.member` members)
+        require "All members are ranked exactly once" (sort ranking == sort (Map.keys members))
+        create ElectionRequest with
+          ..
+
+    choice SvcRules_ElectLeader : SvcRules
+      with
+        actor : Party
+        requestCids : [ContractId ElectionRequest]
+      controller actor
+      do
+        requireUnlocked lock
+        let summary = summarizeCollective this
+        -- fetch, check, and archive all requests
+        reqs <- forA requestCids $ \requestCid -> do
+          req <- fetch requestCid
+          archive requestCid
+          require "Request is for this epoch" (req.epoch == epoch)
+          require "Requestor is a collective member" (req.requester `Map.member` members)
+          pure req
+        let numVotes = length reqs
+            numVoters = numVotes
+            -- TODO(M3-46): consider whether that is the right number of votes to require
+            -- as there might be more votes being taken into consideration
+            numVotesForMajority = (summary.requiredNumVotes + 1) / 2
+        require "Requests are from different members" (unique $ map (.requester) reqs)
+        require "There are enough requests" (numVotes >= summary.requiredNumVotes)
+        let rankings = [ (req.requester, req.ranking) | req <- reqs ]
+            newLeader = instantRunOffVoting numVotesForMajority (numVoters - 1) rankings
+        let newSvcRules = SvcRules with epoch = epoch + 1, leader = newLeader, ..
+        create newSvcRules
+        pure newSvcRules
+
+    nonconsuming choice SvcRules_ArchiveOutdatedElectionRequest : ()
+      with
+        requestCid : ContractId ElectionRequest
+      controller leader
+      do
+        requireUnlocked lock
+        request <- fetch requestCid
+        archive requestCid
+        require "Election request is outdated" (request.epoch < epoch)
+
+
+    -- Executing actions with confirmation
+    --------------------------------------
+
+    nonconsuming choice SvcRules_ConfirmAction : ContractId Confirmation
+      with
+        confirmer : Party
+        action : ActionRequiringConfirmation
+      controller confirmer
+      do
+        requireUnlocked lock
+        require "Confirmer is a collective member" (confirmer `Map.member` members)
+        now <- getTime
+        let expiresAt = now `addRelTime` config.actionConfirmationTimeout
+        create Confirmation with
+          svc
+          confirmer
+          action
+          expiresAt
+
+    nonconsuming choice SvcRules_ExecuteConfirmedAction : ()
+      with
+        action : ActionRequiringConfirmation
+        coinRulesCid : Optional( ContractId CoinRules )
+        confirmationCids : [ContractId Confirmation]
+      controller leader
+      do
+        requireUnlocked lock
+        let s = summarizeCollective this
+        require "Enough confirmations" (length confirmationCids >= s.requiredNumVotes)
+        confirmers <- forA confirmationCids $ \confirmationCid -> do
+          confirmation <- fetch confirmationCid
+          archive confirmationCid
+          require "SVC matches" (confirmation.svc == svc)
+          require "Confirmer is a collective member" (confirmation.confirmer `Map.member` members)
+          require "Confirmed action matches" (confirmation.action == action)
+          pure confirmation.confirmer
+        require "No duplicate confirmers" (unique confirmers)
+        executeActionRequiringConfirmation self coinRulesCid action
+
+
+    -- Voting as part of on-ledger governance
+    -----------------------------------------
+
+    nonconsuming choice SvcRules_RequestVote : ContractId VoteRequest
+      with
+        requester : Party
+        action : ActionRequiringConfirmation
+        reason : Reason
+        voteRequestTimeout : Optional RelTime
+      controller requester
+      do
+        requireUnlocked lock
+        require "Initiator is a collective member" (requester `Map.member` members)
+        requireWellformedReason config reason
+        now <- getTime
+        let expiresAt = case voteRequestTimeout of
+              Some value ->
+                now `addRelTime` value
+              None ->
+                now `addRelTime` config.voteRequestTimeout
+        requestCid <- create VoteRequest with
+          svc
+          requester
+          action
+          reason
+          expiresAt
+        -- auto-accept as the requester
+        void $ create Vote with
+          svc
+          requestCid
+          voter = requester
+          accept = True
+          reason = Reason with url = ""; body = "I accept, as I requested the vote."
+          expiresAt
+        pure requestCid
+
+    nonconsuming choice SvcRules_CastVote : ContractId Vote
+      with
+        requestCid : ContractId VoteRequest
+        voter : Party
+        accept : Bool
+        reason : Reason
+      controller voter
+      do
+        requireUnlocked lock
+        -- validate vote parameters
+        requireWellformedReason config reason
+        require "Voter is a collective member" (voter `Map.member` members)
+        -- validate request
+        request <- fetch requestCid
+        require "SVC matches" (request.svc == svc)
+        ensureNotExpired request.expiresAt
+        -- create vote
+        create Vote with
+          svc
+          requestCid
+          voter
+          accept
+          reason
+          expiresAt = request.expiresAt
+
+    -- | Votes can be updated, which also allows the requester of a `VoteRequest` to update their vote.
+    -- We do not allow `VoteRequest`s to be withdrawn to ensure requests that
+    -- were created are always visible to all SV's for their lifetime.
+    nonconsuming choice SvcRules_UpdateVote : ContractId Vote
+      with
+        voteCid : ContractId Vote
+        voter : Party
+        accept : Bool
+        reason : Reason
+      controller voter
+      do
+        requireUnlocked lock
+        -- validate response
+        requireWellformedReason config reason
+        require "Voter is a collective member" (voter `Map.member` members)
+        -- fetch and archive current vote
+        vote <- fetch voteCid
+        archive voteCid
+        require "SVC matches" (vote.svc == svc)
+        require "Voter matches" (vote.voter == voter)
+        ensureNotExpired vote.expiresAt
+        -- create new vote
+        create Vote with
+          svc
+          requestCid = vote.requestCid
+          voter
+          accept
+          reason
+          expiresAt = vote.expiresAt
+
+    nonconsuming choice SvcRules_ExecuteDefiniteVote : VoteResult
+      with
+        requestCid : ContractId VoteRequest
+        coinRulesCid : Optional( ContractId CoinRules )
+        voteCids : [ContractId Vote]
+      controller leader
+      do
+        requireUnlocked lock
+        -- validate and archive request
+        request <- fetch requestCid
+        archive requestCid
+        require "SVC matches" (request.svc == svc)
+        ensureNotExpired request.expiresAt
+        -- validate and archive votes
+        let s = summarizeCollective this
+        let numVotes = length voteCids
+        require "Enough votes" (numVotes >= s.requiredNumVotes)
+        votes <- forA voteCids $ \voteCid -> do
+          vote <- fetch voteCid
+          archive voteCid
+          require "SVC matches" (vote.svc == svc)
+          require "Request matches" (vote.requestCid == requestCid)
+          require "Confirmer is (still) a collective member" (vote.voter `Map.member` members)
+          ensureNotExpired vote.expiresAt
+          pure vote
+        -- we expect honest voters to cast at most one vote,
+        -- and we expect the leader to pick at most one vote in case there are multiple
+        require "No duplicate voters" (unique $ map (.voter) votes)
+        -- determine outcome and execute action if required
+        let numYays = length $ filter (.accept) votes
+        let execute = numYays > numVotes - numYays
+        when execute $
+          executeActionRequiringConfirmation self coinRulesCid request.action
+        -- store the result of this vote on the return value of the choice
+        -- for display in a transaction history
+        now <- getTime
+        pure $ VoteResult with
+          action = request.action
+          executed = execute
+          requester = request.requester
+          effectiveAt = case request.action of
+                  ARC_CoinRules with .. ->
+                    case coinRulesAction of
+                      CRARC_AddFutureCoinConfigSchedule choiceArg -> choiceArg.newScheduleItem._1
+                      CRARC_RemoveFutureCoinConfigSchedule choiceArg -> choiceArg.scheduleTime
+                      CRARC_UpdateFutureCoinConfigSchedule choiceArg -> choiceArg.scheduleItem._1
+                      CRARC_MiningRound_Archive _ -> now
+                      CRARC_MiningRound_StartIssuing _ -> now
+                  ARC_SvcRules with .. -> now
+                  ARC_CnsEntryContext with .. -> now
+          votedAt = now
+          acceptedBy = map (.voter) $ filter (.accept) votes
+          rejectedBy = map (.voter) $ filter (\vote -> not vote.accept) votes
+
+
+    nonconsuming choice SvcRules_VoteRequest_Expire : ()
+      with
+        cid : ContractId VoteRequest
+        choiceArg : VoteRequest_Expire
+      controller leader
+      do
+        requireUnlocked lock
+        exercise cid choiceArg
+
+
+    -- Voting on the coin price
+    ---------------------------
+
+    nonconsuming choice SvcRules_UpdateCoinPriceVote : ContractId CoinPriceVote
+      with
+        sv : Party
+        voteCid : ContractId CoinPriceVote
+        coinPrice : Decimal
+      controller sv
+      do
+        requireUnlocked lock
+        -- validate and archive existing vote
+        vote <- fetch voteCid
+        archive voteCid
+        require "SVC matches" (vote.svc == svc)
+        require "SV matches" (vote.sv == sv)
+        now <- getTime
+        -- create new vote
+        create CoinPriceVote with
+          svc
+          sv
+          coinPrice = Some coinPrice
+          lastUpdatedAt = now
+
+    -- | Garbage-collect CoinPriceVotes from removed members and duplicate ones that might
+    -- happen due to a too quick removal and re-addition of a member.
+    -- We expect this to be run as an OnAssignedContractTrigger for the SvcRules contract.
+    --
+    -- Note: we do not archive the CoinPriceVote of a member on its removal from the collective,
+    -- as that would allow that member to block the removal via updating its CoinPriceVote at the right time.
+    -- Actions that require confirmation via ad-hoc voting must not become stale while the voting
+    -- process runs.
+    nonconsuming choice SvcRules_GarbageCollectCoinPriceVotes : ()
+      with
+        nonMemberVoteCids : [ContractId CoinPriceVote]
+        duplicateVoteCids : [[ContractId CoinPriceVote]]
+      controller leader
+      do
+        requireUnlocked lock
+        -- validate and archive non-member votes
+        forA_ nonMemberVoteCids $ \voteCid -> do
+          vote <- fetch voteCid
+          archive voteCid
+          require "SVC matches" (vote.svc == svc)
+          require "SV is no member" (not $ vote.sv `Map.member` members)
+        -- validate and archive duplicates
+        forA_ duplicateVoteCids $ \voteCids -> do
+          require "Unique references to duplicates" (unique voteCids)
+          votes <- forA voteCids $ \voteCid -> do
+            vote <- fetch voteCid
+            pure (voteCid, vote)
+          -- keep the most recently updated vote to avoid UI glitches
+          case sortOn (\(_, vote) -> Down (vote.lastUpdatedAt)) votes of
+            [] -> fail "empty list of duplicate votes"
+            [_] -> fail "singleton list of duplicate votes"
+            ((_, vote)::duplicates) -> do
+              require "SVC matches" (vote.svc == svc)
+              require "SV is a member" (vote.sv `Map.member` members)
+              forA_ duplicates $ \(duplicateCid, duplicate) -> do
+                archive duplicateCid
+                require "SVC matches" (duplicate.svc == svc)
+                require "SV of duplicate matches" (duplicate.sv == vote.sv)
+
+
+    -- SVC rules config management
+    ------------------------------
+
+    choice SvcRules_SetConfig : ContractId SvcRules
+      with
+        newConfig : SvcRulesConfig
+      controller svc
+      do
+        requireUnlocked lock
+        -- TODO(M3-57): sanity check the newConfig to avoid locking up the consortium, e.g., by setting `maxTextLength = -1`
+        create this with config = newConfig
+
+
+    -- App rights management
+    ------------------------
+
+    nonconsuming choice SvcRules_GrantFeaturedAppRight : ContractId FeaturedAppRight
+      with
+        provider : Party
+      controller svc
+      do
+        requireUnlocked lock
+        create FeaturedAppRight with
+          svc
+          provider
+
+    nonconsuming choice SvcRules_RevokeFeaturedAppRight : ()
+      with
+        rightCid : ContractId FeaturedAppRight
+      controller svc
+      do
+        requireUnlocked lock
+        right <- fetch rightCid
+        require "SVC matches" (right.svc == svc)
+        archive rightCid
+
+
+    -- Validator onboarding
+    -----------------------
+
+    nonconsuming choice SvcRules_OnboardValidator : ContractId ValidatorLicense
+      with
+        sponsor : Party
+        validator : Party
+      controller sponsor
+      do
+        requireUnlocked lock
+        require "Sponsor is a collective member" (sponsor `Map.member` members)
+        -- create license that records in particular which SV sponsored the onboarding of the validator
+        create ValidatorLicense with ..
+
+
+
+    -- SV onboarding
+    ----------------
+
+    nonconsuming choice SvcRules_StartSvOnboarding : ContractId SvOnboardingRequest
+      with
+        candidateName : Text
+        candidateParty : Party
+        token : Text
+        sponsor : Party
+      controller sponsor
+      do
+        requireUnlocked lock
+        require "Sponsor is a collective member" (sponsor `Map.member` members)
+        now <- getTime
+        let expiresAt = now `addRelTime` config.svOnboardingRequestTimeout
+        create SvOnboardingRequest with ..
+
+    nonconsuming choice SvcRules_ExpireSvOnboardingRequest : ()
+      with
+        cid: ContractId SvOnboardingRequest
+      controller leader
+      do
+        requireUnlocked lock
+        exercise cid SvOnboardingRequest_Expire
+
+    nonconsuming choice SvcRules_ArchiveSvOnboardingRequest : ()
+      with
+        svOnboardingRequestCid: ContractId SvOnboardingRequest
+      controller leader
+      do
+        requireUnlocked lock
+        -- require that the member is already added to the SVC
+        -- TODO(#3756) Enable archiving also before the member is added, after a matching `SvOnboardingConfirmed` contract is created.
+        svOnboardingRequest <- fetch svOnboardingRequestCid
+        let maybeMember = Map.lookup svOnboardingRequest.candidateParty members
+        require "member party is already added to the SVC collective" (isSome maybeMember)
+        require "member name matches" ((fromSome maybeMember).name == svOnboardingRequest.candidateName)
+        archive svOnboardingRequestCid
+
+    nonconsuming choice SvcRules_ConfirmSvOnboarding : ContractId SvOnboardingConfirmed
+      with
+        newMemberParty : Party
+        newMemberName : Text
+        reason : Text
+      controller svc
+      do
+        requireUnlocked lock
+        require "Member party is new" (not $ newMemberParty `Map.member` members)
+        if (not isDevNet)
+          then
+            require "Member name is expected to be new unless in devnet" (newMemberName `notElem` (map (.name) (Map.values members)))
+          else pure ()
+        now <- getTime
+        let expiresAt = now `addRelTime` config.svOnboardingConfirmedTimeout
+        create SvOnboardingConfirmed with
+          svParty = newMemberParty
+          svName = newMemberName
+          reason
+          svc
+          expiresAt
+
+    nonconsuming choice SvcRules_ExpireSvOnboardingConfirmed : ()
+      with
+        cid: ContractId SvOnboardingConfirmed
+      controller leader
+      do
+        requireUnlocked lock
+        exercise cid SvOnboardingConfirmed_Expire
+
+
+    -- Coin management driven directly by the leader
+    --------------------------------------------------
+
+    nonconsuming choice SvcRules_Coin_Expire : CoinExpireSummary
+      with
+        cid : ContractId Coin
+        choiceArg : Coin_Expire
+      controller leader
+      do
+        requireUnlocked lock
+        exercise cid choiceArg
+
+    nonconsuming choice SvcRules_LockedCoin_ExpireCoin : CoinExpireSummary
+      with
+        cid : ContractId LockedCoin
+        choiceArg : LockedCoin_ExpireCoin
+      controller leader
+      do
+        requireUnlocked lock
+        exercise cid choiceArg
+
+
+    -- Round management driven directly by the leader
+    -------------------------------------------------
+
+    nonconsuming choice SvcRules_AdvanceOpenMiningRounds
+      : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)
+      with
+        coinRulesCid : ContractId CoinRules
+        roundToArchiveCid : ContractId OpenMiningRound
+        middleRoundCid : ContractId OpenMiningRound
+        latestRoundCid : ContractId OpenMiningRound
+        coinPriceVoteCids : [ContractId CoinPriceVote]
+      controller leader
+      do
+        requireUnlocked lock
+        coinPrice <- fetchMedianCoinPrice svc (Map.keys members) coinPriceVoteCids
+        exercise coinRulesCid CoinRules_AdvanceOpenMiningRounds with ..
+
+
+    -- CNS entry and payment management driven directly by the leader
+    -----------------------------------------------
+
+    nonconsuming choice SvcRules_CollectEntryRenewalPayment : (ContractId CnsEntry, ContractId SubscriptionIdleState)
+      with
+        cnsEntryContextCid : ContractId CnsEntryContext
+        choiceArg : CnsEntryContext_CollectEntryRenewalPayment
+      controller leader
+      do
+        requireUnlocked lock
+        exercise cnsEntryContextCid choiceArg
+
+    nonconsuming choice SvcRules_ExpireCnsEntry : ()
+      with
+        cnsEntryCid : ContractId CnsEntry
+        choiceArg : CnsEntry_Expire
+      controller leader
+      do
+        requireUnlocked lock
+        exercise cnsEntryCid choiceArg
+
+    nonconsuming choice SvcRules_ExpireSubscription : ()
+      with
+        cnsEntryContextCid : ContractId CnsEntryContext
+        subscriptionIdleStateCid: ContractId SubscriptionIdleState
+        choiceArg : SubscriptionIdleState_ExpireSubscription
+      controller leader
+      do
+        requireUnlocked lock
+        aborted <- exercise subscriptionIdleStateCid choiceArg
+        exercise cnsEntryContextCid (CnsEntryContext_Terminate svc aborted)
+
+    nonconsuming choice SvcRules_TerminateSubscription : ()
+      with
+        cnsEntryContextCid : ContractId CnsEntryContext
+        terminatedSubscriptionCid : ContractId TerminatedSubscription
+      controller leader
+      do
+        requireUnlocked lock
+        exercise cnsEntryContextCid (CnsEntryContext_Terminate svc terminatedSubscriptionCid)
+
+
+    -- Reward management driven directly by the leader
+    --------------------------------------------------
+
+    nonconsuming choice SvcRules_CollectSvcReward : ()
+      with
+        rewardCid : ContractId SvcReward
+      controller leader
+      do
+        requireUnlocked lock
+        reward <- fetch rewardCid
+        archive rewardCid
+        require "SVC matches" (reward.svc == svc)
+        let eligibleSVs =
+              [ member | (member, info) <- Map.toList members, info.joinedAsOfRound <= reward.round]
+            -- TODO(M3-90): review rounding of SV issuance
+            issuancePerSV = reward.amount / intToDecimal (length eligibleSVs)
+        -- NOTE: we are not directly creating coin's for the SV's here, as otherwise
+        -- we'd require their participants to confirm this tx, which is not fault-tolerant
+        -- against some SVs being offline. Instead, we create separate reward contracts
+        -- signed by the SVC only, which can then be collected by the individual SVs.
+        forA_ eligibleSVs $ \sv ->
+          create SvReward with
+            svc
+            sv
+            round = reward.round
+            amount = issuancePerSV
+
+    nonconsuming choice SvcRules_CollectSvReward : CoinCreateSummary (ContractId Coin)
+      with
+        sv : Party
+        rewardCid : ContractId SvReward
+        coinRulesCid : ContractId CoinRules
+        openRoundCid : ContractId OpenMiningRound
+      controller sv
+      do
+        requireUnlocked lock
+        reward <- fetch rewardCid
+        archive rewardCid
+        require "SVC matches" (reward.svc == svc)
+        require "SV matches" (reward.sv == sv)
+        openRound <- fetch openRoundCid
+        -- TODO(M3-57): make collection delay configurable
+        require "Reward is not too old" (openRound.round.number <= reward.round.number + 10)
+        exercise coinRulesCid CoinRules_Mint with
+          receiver = sv
+          amount = reward.amount
+          openRound = openRoundCid
+
+    -- Batch expiry of unclaimed rewards for a specific claimed round
+    nonconsuming choice SvcRules_ClaimExpiredRewards
+      : Optional (ContractId UnclaimedReward)
+      with
+        coinRulesCid : ContractId CoinRules
+        choiceArg : CoinRules_ClaimExpiredRewards
+      controller leader
+      do
+        requireUnlocked lock
+        exercise coinRulesCid choiceArg
+
+    -- Batch merge of unclaimed rewards
+    nonconsuming choice SvcRules_MergeUnclaimedRewards
+      : ContractId UnclaimedReward
+      with
+        coinRulesCid : ContractId CoinRules
+        unclaimedRewardCids : [ContractId UnclaimedReward]
+      controller leader
+      do
+        requireUnlocked lock
+        require "Number of unclaimed rewards is above the configured threshold" $ length unclaimedRewardCids > config.numUnclaimedRewardsThreshold
+        exercise coinRulesCid CoinRules_MergeUnclaimedRewards with ..
+
+    nonconsuming choice SvcRules_MiningRound_Close
+      : ContractId ClosedMiningRound
+      with
+        coinRulesCid : ContractId CoinRules
+        issuingRoundCid : ContractId IssuingMiningRound
+      controller leader
+      do
+        requireUnlocked lock
+        exercise coinRulesCid CoinRules_MiningRound_Close with ..
+
+
+    -- Contract Expiry
+    ------------------
+
+    -- TODO(M3-57): generalize this to `ExpiringContract` and use it for all expiring contracts in `CN.SvcRules`
+    nonconsuming choice SvcRules_ExpireStaleConfirmation : ()
+      with
+        staleConfirmationCid : ContractId Confirmation
+      controller leader
+      do
+        now <- getTime
+        staleConfirmation <- fetch staleConfirmationCid
+        require "staleConfirmation is past expiresAt" (staleConfirmation.expiresAt <= now)
+        archive staleConfirmationCid
+
+    -- Batch merge of member traffic contracts
+    -------------------------------------------
+    nonconsuming choice SvcRules_MergeMemberTrafficContracts
+      : ContractId MemberTraffic
+      with
+        coinRulesCid : ContractId CoinRules
+        trafficCids : [ContractId MemberTraffic]
+      controller leader
+      do
+        requireUnlocked lock
+        require "Number of member traffic contracts is above the configured threshold" $ length trafficCids > config.numMemberTrafficContractsThreshold
+        exercise coinRulesCid CoinRules_MergeMemberTrafficContracts with ..
+
+    -- Lock or Unlock Choices that could be observed by SVC
+    -------------------------------------------------------
+
+    -- TODO(#3933) remove these once they are no longer needed for preventing participant crashes during svc party migration
+    choice SvcRules_Lock : ContractId SvcRules
+      with
+        sv : Party
+        coinRulesCid : ContractId CoinRules
+      controller sv
+      do
+        require "SV is a collective member" (sv `Map.member` members)
+        require "it is currently not locked" (not lock)
+        exercise coinRulesCid CoinRules_Lock
+        create SvcRules with
+          lock = True
+          ..
+
+    -- TODO(#3933) remove these once they are no longer needed for preventing participant crashes during svc party migration
+    choice SvcRules_Unlock : ContractId SvcRules
+      with
+        sv : Party
+        coinRulesCid : ContractId CoinRules
+      controller sv
+      do
+        require "SV is a collective member" (sv `Map.member` members)
+        require "It is currently locked" lock
+        exercise coinRulesCid CoinRules_Unlock
+        create SvcRules with
+          lock = False
+          ..
+
+-- Utility functions
+--------------------
+
+summarizeCollective : SvcRules -> CollectiveSummary
+summarizeCollective svcRules = CollectiveSummary with
+    leader = svcRules.leader
+    numMembers
+    requiredNumVotes =
+      -- NOTE:
+      --   * We require at least majority of votes to ensure that every definite
+      --     vote or confirmed action can be executed at most once. Otherwise, we'd fail
+      --     to properly propagate the command-deduplication done by SV's when they submit
+      --     confirmations.
+      --     This adjustment is only relevant for the cases where `f == 0` (i.e., numMembers \in {2,3})
+      --     or when we adjust the requiredNumVotes for DevNet and `numMembers >= 8`
+      --   * We require `2 * f + 1` confirmations instead of only `f + 1` confirmations, as otherwise
+      --     the confirmations for adding members can be abused by an `f + 1` minority to change the
+      --     consortium composition to onboard fake SVs that boost the votes of that minority.
+      max (numMembers / 2 + 1) (adjustForDevNet (2 * f + 1))
+  where
+    numMembers = Map.size svcRules.members
+    f = (numMembers - 1) / 3
+    -- TODO(M3-57): remove the adjustment for dev-net once the SVs have proven to be operationally stable
+    adjustForDevNet = if svcRules.isDevNet then min 4 else identity
+
+-- | Execute an action which requires certain number of confirmations from SVs.
+-- Each confirmed action can at most be executed once.
+executeActionRequiringConfirmation: ContractId SvcRules -> Optional( ContractId CoinRules ) -> ActionRequiringConfirmation -> Update ()
+executeActionRequiringConfirmation svcRulesCid coinRulesCid act = case act of
+  ARC_CoinRules with .. ->
+    case coinRulesCid of
+      None -> error "coinRulesCid was not defined."
+      Some coinRulesCid -> do
+        case coinRulesAction of
+          CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise coinRulesCid choiceArg
+          CRARC_MiningRound_Archive choiceArg -> void $ exercise coinRulesCid choiceArg
+          CRARC_AddFutureCoinConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
+          CRARC_RemoveFutureCoinConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
+          CRARC_UpdateFutureCoinConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
+  ARC_SvcRules with .. ->
+    case svcAction of
+      SRARC_AddMember choiceArg -> void $ exercise svcRulesCid choiceArg
+      SRARC_RemoveMember choiceArg -> void $ exercise svcRulesCid choiceArg
+      SRARC_ConfirmSvOnboarding choiceArg -> void $ exercise svcRulesCid choiceArg
+      SRARC_GrantFeaturedAppRight choiceArg -> void $ exercise svcRulesCid choiceArg
+      SRARC_RevokeFeaturedAppRight choiceArg -> void $ exercise svcRulesCid choiceArg
+      SRARC_SetConfig choiceArg -> void $ exercise svcRulesCid choiceArg
+  ARC_CnsEntryContext with .. ->
+    case cnsEntryContextAction of
+      CNSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise cnsEntryContextCid choiceArg
+      CNSRARC_RejectEntryInitialPayment choiceArg -> void $ exercise cnsEntryContextCid choiceArg
+
+-- Functions implementing instant-runoff voting
+-----------------------------------------------
+
+data VotingState a = VotingState with
+    rankings : Map.Map a [[a]]
+    -- ^ Candidate and the remaining rankings in case that candidate is eliminated.
+    loosers : Set.Set a
+    -- ^ Loosers are tracked explicitly and removed lazily to avoid the cubic runtime
+    -- that would result from filtering the remaining rankings eagerly.
+  deriving (Eq, Show)
+
+instantRunOffVoting : Ord a => Int -> Int -> [(a, [a])] -> a
+instantRunOffVoting requiredNumVotes remainingVotingRounds rankings0 =
+    determineWinner requiredNumVotes remainingVotingRounds st
+  where
+    -- Only consider candidates that confirmed their readiness by voting themselves,
+    -- as a prudent engineering measure. These candidates have very recently shown to
+    -- be able to submit transactions.
+    voters = Set.fromList $ map fst rankings0
+    rankings = map (filter (`Set.member` voters) . snd) rankings0
+    st = tallyVotes rankings (VotingState Map.empty Set.empty)
+
+-- | Determine the winner of a preference voting election using Instant-RunOff voting
+-- https://en.wikipedia.org/wiki/Instant-runoff_voting
+determineWinner : Ord a => Int -> Int -> VotingState a -> a
+determineWinner requiredNumVotes remainingVotingRounds st
+  | remainingVotingRounds <= 0 = winner
+  | requiredNumVotes <= numWinnerVotes = winner
+  | otherwise =
+      let (looser, _) = head candidates
+          updatedVotes = distributeVotes looser st
+      in  determineWinner requiredNumVotes (remainingVotingRounds - 1) updatedVotes
+  where
+    candidates = sortOn snd
+      [ (p, length remainingRankins) | (p, remainingRankins) <- Map.toList st.rankings ]
+    (winner, numWinnerVotes) = last candidates
+
+
+distributeVotes : forall a. Ord a => a -> VotingState a -> VotingState a
+distributeVotes looser st =
+  case Map.lookup looser st.rankings of
+    None -> error "deletion of non-existent candidate"
+    Some remainingRankings ->
+      tallyVotes remainingRankings VotingState with
+        rankings = st.rankings
+        loosers = Set.insert looser st.loosers
+
+tallyVotes : Ord a => [[a]] -> VotingState a -> VotingState a
+tallyVotes rankings votes = foldl tallyVote votes rankings
+
+tallyVote : forall a. Ord a => VotingState a -> [a] -> VotingState a
+tallyVote st [] = st
+tallyVote st (p :: ps)
+  -- loosers cannot become candidates again
+  | p `Set.member` st.loosers = tallyVote st ps
+  | otherwise = VotingState with
+      rankings = Map.alter tally p st.rankings
+      loosers = st.loosers
+  where
+    tally : Optional [[a]] -> Optional [[a]]
+    tally None = Some [ps]
+    tally (Some rankings) = Some (ps :: rankings)
+
+
+-- Wellformedness checks
+------------------------
+
+requireWellformedReason : SvcRulesConfig -> Reason -> Update ()
+requireWellformedReason config reason = do
+  require "Reason URL is not too long" (T.length reason.url <= config.maxTextLength)
+  require "Reason body is not too long" (T.length reason.body <= config.maxTextLength)
+
+ensureNotExpired : Time -> Update ()
+ensureNotExpired expiresAt = do
+  now <- getTime
+  require "Contract has not yet expired" (now < expiresAt)

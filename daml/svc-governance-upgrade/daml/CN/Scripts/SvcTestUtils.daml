@@ -1,0 +1,341 @@
+module CN.Scripts.SvcTestUtils where
+
+
+import DA.Action (unless, when, void)
+import DA.Foldable (forA_)
+import DA.List
+import qualified DA.Map as Map
+import qualified DA.Text as T
+import Daml.Script
+import DA.Time
+
+import CC.Coin
+import CC.Issuance
+import CC.Round
+import CC.Round.Types
+
+import CC.Scripts.Util
+import CC.Scripts.Parameters
+
+import CN.CometBft
+import CN.SvcRules
+import CN.SvcBootstrap
+import CN.SVC.CoinPrice
+import CN.SVC.GlobalDomain
+import CN.Scripts.CnsRulesParameters
+
+initMainNetCollective : Script (CCApp, Party, (Party, Party, Party, Party))
+initMainNetCollective = initCollective None False
+
+initDevNetCollective : Script (CCApp, Party, (Party, Party, Party, Party))
+initDevNetCollective = initCollective None True
+
+initCollective : Optional [OpenMiningRound] -> Bool -> Script (CCApp, Party, (Party, Party, Party, Party))
+initCollective initialOpenRounds isDevNet = do
+  -- allocate users for the four founding members
+  [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
+
+  -- the founding SV allocates the collective party as part of its initialization
+  -- TODO(M3-46): make this a real collective party
+  svc <- allocateParty "svc"
+
+  -- We expect the founding node to create a proper single-node domain that can then be used
+  -- for driving all Daml workflows
+  let initialDomainConfig = DomainConfig with
+        state = DS_Operational
+        cometBftGenesisJson = "<genesis-json-injected-by-founding-member>"
+  let initialGlobalDomainConfig =  GlobalDomainConfig with
+        domains = Map.fromList [("domain-id", initialDomainConfig)]
+        lastDomainId = "domain-id"
+        activeDomainId = "domain-id"
+
+  let config = SvcRulesConfig with
+        numUnclaimedRewardsThreshold = 5
+        numMemberTrafficContractsThreshold = 5
+        actionConfirmationTimeout = minutes 5
+        svOnboardingRequestTimeout = hours 1
+        svOnboardingConfirmedTimeout = hours 1
+        voteRequestTimeout = days 7
+        leaderInactiveTimeout = seconds 70
+        domainNodeConfigLimits = defaultDomainNodeConfigLimits
+        maxTextLength = 1024
+        initialTrafficGrant = 1_000_000
+        svChallengeDeadline = minutes 30
+        globalDomain = initialGlobalDomainConfig
+  let coinConfig = defaultCoinConfig
+  let cnsRulesConfig = defaultCnsRulesConfig
+
+  now <- getTime
+  -- have sv1 bootstrap the collective
+  submit svc $ createAndExerciseCmd
+    SvcBootstrap with
+      svc
+      founderParty = sv1
+      founderName = "sv1"
+      founderParticipantId = "sv1-participant-id"
+      founderDomainNodes = Map.fromList
+        -- NOTE: the Canton domain and CometBft keys and config need to be allocated before bootstrapping the SvcRules
+        -- as we need a working domain to create and exercise Daml contracts.
+        [("domain-id",  DomainNodeConfig with
+                cometBft = CometBftConfig with
+                  nodes = Map.fromList
+                    [("node-id-1", CometBftNodeConfig "validatorPubKey" 1)]
+                  sequencingKeys = map SequencingKeyConfig ["initial-sequencer-key"]
+                  governanceKeys = map GovernanceKeyConfig ["initial-governance-key"]
+                sequencer = Some SequencerConfig with
+                  sequencerId = "sequencer-id"
+                  url = "sequencer.address:1234"
+                  availableAfter = now
+                mediator = Some MediatorConfig with
+                  mediatorId = "mediator-id"
+        )]
+      coinConfig
+      coinPrice = 1.0
+      cnsRulesConfig
+      config
+      initialTrafficState = Map.empty
+      initialOpenRounds
+      isDevNet
+    SvcBootstrap_Bootstrap
+
+  svcUserId <- validateUserId "svc-user"
+  let app = CCApp with
+        svc
+        svcUser = CCUser with
+          userId = svcUserId
+          primaryParty = svc
+
+  -- add more sv nodes
+  forA_ (zip [sv2, sv3, sv4] ["sv2", "sv3", "sv4"]) $ \(svParty, svName) -> do
+    [(svcRulesCid, _)] <- query @SvcRules svc
+    submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid $ SvcRules_OnboardValidator with
+      sponsor = sv1
+      validator = svParty
+    (_, earliestOpenRound) <- head <$> getOpenRoundsSorted app
+    submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember with
+      newMemberParty = svParty
+      newMemberName = svName
+      newMemberParticipantId = svName <> "-participant-id"
+      joinedAsOfRound = earliestOpenRound.round
+      domainId = coinConfig.globalDomain.activeDomain
+
+  pure (app, svc, (sv1, sv2, sv3, sv4))
+
+
+generateUnclaimedReward : CCApp -> CCUser -> Script ()
+generateUnclaimedReward app provider1 = do
+  submitMulti [app.svc, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+    svc = app.svc
+    provider = provider1.primaryParty
+    amount = 5.7
+    round = Round 0
+    featured = True
+
+  runNextIssuanceD app 1.0
+
+  pure ()
+
+
+leaderSubmits : CCApp -> (ContractId SvcRules -> Commands a) -> Script a
+leaderSubmits app mkCommands = do
+  [(collectiveCid, collective)] <- query @SvcRules app.svc
+  submitMulti [collective.leader] [app.svc] $ mkCommands collectiveCid
+
+leaderSubmitsMustFail : CCApp -> (ContractId SvcRules -> Commands a) -> Script ()
+leaderSubmitsMustFail app mkCommands = do
+  [(collectiveCid, collective)] <- query @SvcRules app.svc
+  submitMultiMustFail [collective.leader] [app.svc] $ mkCommands collectiveCid
+
+svSubmits : CCApp -> Party -> (ContractId SvcRules -> Commands a) -> Script a
+svSubmits app sv mkCommands = do
+  [(collectiveCid, _)] <- query @SvcRules app.svc
+  submitMulti [sv] [app.svc] $ mkCommands collectiveCid
+
+onboardValidator : CCApp -> Party -> Party -> Script ()
+onboardValidator app sponsor validator = do
+  svSubmits app sponsor $ \cid -> exerciseCmd cid $
+    SvcRules_OnboardValidator sponsor validator
+  pure ()
+
+
+-- | Run the next issuance.
+-- TODO(M3-46): convert the whole script to use confirmations once rewards issuance has been finalized
+runNextIssuanceD : CCApp -> Decimal -> Script ()
+runNextIssuanceD app coinPrice = do
+    now <- getTime
+    setTime (addRelTime now defaultCoinConfig.tickDuration)
+    -- expire rewards for closed rounds
+    closedRounds <- query @ClosedMiningRound app.svc
+    [(coinRulesCid, _)] <- query @CoinRules app.svc
+    forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
+
+      -- collect all unclaimed rewards into the unclaimed rewards fund
+      validatorRewards <- (queryFilter @ValidatorRewardCoupon app.svc (\r -> r.round == miningRound.round))
+      appRewards <- queryFilter @AppRewardCoupon app.svc (\r -> r.round == miningRound.round)
+      leaderSubmits app $ \cid -> exerciseCmd cid $
+        SvcRules_ClaimExpiredRewards with
+          coinRulesCid = coinRulesCid
+          choiceArg = CoinRules_ClaimExpiredRewards with
+            closedRoundCid = miningRoundCid
+            validatorCouponCids = map fst validatorRewards
+            appCouponCids = map fst appRewards
+
+      -- the closed round
+      confirmAWC_MiningRound_Archive app
+      executeAllConfirmedActions app
+
+    -- TODO(M3-46): collect SvcRewards via SvRewards into per-SV coins
+
+    -- close current issuing rounds if there are any
+    imcs <- queryFilter @IssuingMiningRound app.svc (\r -> r.targetClosesAt <= now)
+    forA_ imcs $ \(issuingRoundCid, _) ->
+      submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Close with
+        issuingRoundCid
+
+    -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
+    -- create a new OpenMiningRound
+    [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getOpenRoundsSorted app
+
+    -- set the new agreed price. This should be done with confirmation
+    coinPriceVoteCids <- updateAgreedCoinPrice app.svc coinPrice
+
+    (summarizingRoundCid, _) <- leaderSubmits app $ \cid -> exerciseCmd cid $
+        SvcRules_AdvanceOpenMiningRounds with
+          coinRulesCid
+          roundToArchiveCid
+          middleRoundCid = r2Cid
+          latestRoundCid = r3Cid
+          coinPriceVoteCids
+
+    -- compute total burn
+    appRewardCoupons <- queryFilter @AppRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
+    validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
+
+    let summary = OpenMiningRoundSummary with
+          totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
+          totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
+          totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
+
+    -- create issuing mining round
+    submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with
+      miningRoundCid = summarizingRoundCid
+      summary
+
+    pure ()
+
+
+confirmAWC_MiningRound_Archive : CCApp -> Script ()
+confirmAWC_MiningRound_Archive app = do
+  -- get rules contracts
+  [(svcRulesCid, rules)] <- query @SvcRules app.svc
+  -- query closed mining rounds and collective members
+  rounds <- query @ClosedMiningRound app.svc
+  -- confirm the archival of all closed rounds
+  forA_ rounds $ \round ->
+    forA_ (Map.keys rules.members) $ \member -> do
+      -- mallory does not act
+      unless ("mallory" `T.isPrefixOf` partyToText member) $ do
+        -- TODO(M3-46): skip if there are left-over rewards for that round
+        -- TODO(M3-46): skip if there already exists a confirmation
+        submitMulti [member] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+          action = ARC_CoinRules with
+            coinRulesAction = CRARC_MiningRound_Archive $
+              CoinRules_MiningRound_Archive with
+                closedRoundCid = round._1
+          confirmer = member
+        pure ()
+
+executeAllConfirmedActions : CCApp -> Script ()
+executeAllConfirmedActions app = do
+  -- get rules and collective summary
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  [(svcRulesCid, rules)] <- query @SvcRules app.svc
+  let s = summarizeCollective rules
+  -- query all confirmations visible to svc
+  confirmations0 <- query @Confirmation app.svc
+  -- execute the actions for which there are enough confirmations
+  let executableConfirmations =
+          filter (const True) -- (\cs -> s.requiredNumConfirmations <= length cs)
+        $ groupEqualOn (\c -> c._2.action) confirmations0
+  forA_ executableConfirmations $ \cs -> do
+    submitMulti [s.leader] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ExecuteConfirmedAction with
+      action = (head cs)._2.action
+      coinRulesCid = Some coinRulesCid
+      confirmationCids = map fst cs
+
+executeAllDefinitiveVotes : CCApp -> Script ()
+executeAllDefinitiveVotes app = do
+  -- get rules and collective summary
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  [(svcRulesCid, rules)] <- query @SvcRules app.svc
+  let s = summarizeCollective rules
+  -- query all voting requests visible to svc
+  requests <- query @VoteRequest app.svc
+  forA_ requests $ \(requestCid, _) -> do
+    -- fetch the corresponding votes
+    votes <- queryFilter @Vote app.svc (\vote -> vote.requestCid == requestCid)
+    when (length votes >= s.requiredNumVotes) $
+      void $ submitMulti [s.leader] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ExecuteDefiniteVote with
+        requestCid
+        coinRulesCid = Some coinRulesCid
+        voteCids = map fst votes
+
+initateAndAcceptVote : CCApp -> [Party] -> ActionRequiringConfirmation -> Script ()
+initateAndAcceptVote _ [] _ = error "initiateAndAcceptVote: require at least one party"
+initateAndAcceptVote app (initiator::others) action = do
+  [(svcRulesCid, _)] <- query @SvcRules app.svc
+
+  requestCid <- submitMulti [initiator] [app.svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
+    requester = initiator
+    action
+    reason = Reason with url = ""; body = "let's get it done"
+    voteRequestTimeout = None
+
+  forA_ others $ \sv ->
+    submitMulti [sv] [app.svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
+        voter = sv
+        requestCid
+        accept = True
+        reason = Reason with url = ""; body = "✓"
+
+  executeAllDefinitiveVotes app
+
+expireAllExpiredContracts : Party -> Script ()
+expireAllExpiredContracts actor = do
+  now <- getTime
+  votes <- query @Vote actor
+  forA_ votes $ \(cid, vote) ->
+    when (vote.expiresAt <= now) $
+      submit actor $ exerciseCmd cid Vote_Expire
+  voteRequests <- query @VoteRequest actor
+  forA_ voteRequests $ \(cid, voteRequest) ->
+    when (voteRequest.expiresAt <= now) $
+      submit actor $ exerciseCmd cid VoteRequest_Expire
+  confirmation <- query @Confirmation actor
+  forA_ confirmation $ \(cid, confirmation) ->
+    when (confirmation.expiresAt <= now) $
+      submit actor $ exerciseCmd cid Confirmation_Expire
+
+-- | Update all currently desired prices to the target price
+updateAgreedCoinPrice : Party -> Decimal -> Script [ContractId CoinPriceVote]
+updateAgreedCoinPrice svc coinPrice = do
+  votes <- query @CoinPriceVote svc
+  forA votes $ \(voteCid, vote) ->
+    if (vote.coinPrice == Some coinPrice)
+      then pure voteCid
+      else do
+        submit svc $ archiveCmd voteCid
+        submit svc $ createCmd $ vote with coinPrice = Some coinPrice
+
+
+-- Pure utility functions
+-------------------------
+
+-- | O(n^2): group all elements whose projection is equal.
+groupEqualOn : Eq b => (a -> b) -> [a] -> [[a]]
+groupEqualOn _ [] = []
+groupEqualOn proj (x :: xs) =
+    (x :: equal) :: groupEqualOn proj rest
+  where
+    xp = proj x
+    (equal, rest) = partition (\y -> proj y == xp) xs

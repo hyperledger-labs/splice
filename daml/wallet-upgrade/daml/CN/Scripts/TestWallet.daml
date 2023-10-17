@@ -1,0 +1,758 @@
+module CN.Scripts.TestWallet where
+
+import DA.Action
+import DA.Assert
+import DA.Time
+import Daml.Script
+import DA.List
+
+import CC.Coin
+import CC.Round.Types
+import CC.Schedule
+import CC.GlobalDomain
+import CN.Wallet.Install
+import CN.Wallet.Payment
+import CN.Wallet.Subscriptions
+import CN.Wallet.TopUpState
+import CN.Scripts.Wallet.TestSubscriptions
+
+import CC.Fees
+import CC.Scripts.Util
+
+createPaymentRequest : CCApp -> Party -> Party -> [(Party, PaymentAmount)] -> Script (ContractId AppPaymentRequest)
+createPaymentRequest app provider sender receiverAmounts = do
+  t <- getTime
+  let description = "multi, sender: " <> show sender <> ", amount: " <> show receiverAmounts
+  -- multi-party submit to simplify test
+  submitMulti (sender :: provider :: map fst receiverAmounts) [] $ createCmd AppPaymentRequest with
+    sender
+    provider
+    svc = app.svc
+    receiverAmounts = map (uncurry ReceiverAmount) receiverAmounts
+    expiresAt = t `addRelTime` minutes 5
+    description
+
+createSingleReceiverPaymentRequest : CCApp -> Party -> Party -> Party -> PaymentAmount -> Script (ContractId AppPaymentRequest)
+createSingleReceiverPaymentRequest app provider sender receiver amount = do
+  createPaymentRequest app provider sender [(receiver, amount)]
+
+acceptPaymentRequest : CCApp -> CCUser -> Party -> Optional(ContractId FeaturedAppRight) -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
+acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transferRequest coin = do
+  context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
+  -- TODO(#2957): remove read-as SVC.
+  (accept, _change) <- submitMulti [sender.primaryParty, walletProvider] [app.svc] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
+    inputs = [InputCoin coin]
+    context
+    walletProvider
+  return accept
+
+collectAcceptedPayment : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_Collect_Result
+collectAcceptedPayment app provider acceptedAppPayment = do
+  (_, round) <- getLatestOpenRound app
+  collectAcceptedPaymentInRound app round.round provider acceptedAppPayment
+
+collectAcceptedPaymentInRound : CCApp -> Round -> CCUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_Collect_Result
+collectAcceptedPaymentInRound app round provider acceptedAppPayment = do
+  Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
+  context <- getAppTransferContextForRound app provider round
+  -- multi party submit to simplify test
+  submitMulti (signatory acceptedPayment) [app.svc] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
+
+collectAcceptedPaymentMustFail : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script ()
+collectAcceptedPaymentMustFail app provider acceptedAppPayment = do
+  Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
+  context <- getAppTransferContext app provider
+  -- multi party submit to simplify test
+  _ <- submitMultiMustFail (signatory acceptedPayment) [app.svc] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
+  pure ()
+
+checkCoinPositions : CCUser -> [Decimal] -> Script ()
+checkCoinPositions owner expectedAmounts = do
+    let ownerParty = owner.primaryParty
+    actualCoins <- queryFilter @Coin ownerParty (\c -> c.owner == ownerParty)
+    sort (map (._2.amount.initialAmount) actualCoins) === sort expectedAmounts
+
+testSingleReceiverCCPaymentRequest : Script ()
+testSingleReceiverCCPaymentRequest = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runCoinDepositBots app
+
+  featureApp app provider1
+
+  aliceInitialCoins <- query @Coin alice.primaryParty
+
+  let paymentAmount = 41.5 -- chosen to not return sender change
+  coin <- tap app alice 42.0
+  transferRequest <- createSingleReceiverPaymentRequest app
+    provider1.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentAmount paymentAmount CC)
+
+  acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest coin
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+  [(lockedCoinCid, lockedCoin)] <- query @LockedCoin alice.primaryParty
+  -- all of Alice's tapped coin is used up
+  aliceCoins <- query @Coin alice.primaryParty
+  aliceCoins === aliceInitialCoins
+  acceptedPayment === AcceptedAppPayment with
+    sender = alice.primaryParty
+    provider = provider1.primaryParty
+    svc = app.svc
+    lockedCoin = lockedCoinCid
+    ccReceiverAmounts = [
+      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = paymentAmount)
+      ]
+    round = lockedCoin.coin.amount.createdAt
+    reference = transferRequest
+
+  AcceptedAppPayment_Collect_Result [(receiver, coinCid)] <- collectAcceptedPayment app provider1 acceptedPaymentCid
+  receiver === bob.primaryParty
+
+  Some coin <- queryContractId bob.primaryParty coinCid
+  coin.amount.initialAmount === paymentAmount
+
+  pure ()
+
+testExpiringCCPaymentRequest : Script ()
+testExpiringCCPaymentRequest = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runCoinDepositBots app
+
+  transferRequest <- createSingleReceiverPaymentRequest app
+    provider1.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentAmount 30.0 CC)
+
+  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+    endUserParty = alice.primaryParty
+    endUserName = "alice"
+    svcParty = app.svc
+    validatorParty = aliceValidator.primaryParty
+
+  -- Try expiring too early
+  submitMultiMustFail [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd install
+        WalletAppInstall_AppPaymentRequest_Expire with
+          cid = transferRequest
+
+  passTime (minutes 6)
+
+  submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd install
+        WalletAppInstall_AppPaymentRequest_Expire with
+          cid = transferRequest
+
+  pure ()
+
+testSingleReceiverUSDPaymentRequest : Script ()
+testSingleReceiverUSDPaymentRequest = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  advanceToIssuanceWithPrice app 0.5
+  runCoinDepositBots app
+
+  coin <- tap app alice 62.0 -- Need to cover a 30USD payment with 1USD=2CC
+  transferRequest <- createSingleReceiverPaymentRequest app
+    provider1.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentAmount 30.0 USD)
+
+  acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest coin
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+  [(lockedCoinCid, lockedCoin)] <- query @LockedCoin alice.primaryParty
+  [_, _] <- query @Coin alice.primaryParty
+  acceptedPayment === AcceptedAppPayment with
+    sender = alice.primaryParty
+    provider = provider1.primaryParty
+    svc = app.svc
+    lockedCoin = lockedCoinCid
+    ccReceiverAmounts = [
+      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 60.0)
+      ]
+    round = lockedCoin.coin.amount.createdAt
+    reference = transferRequest
+
+  pure ()
+
+testCCPaymentRequest : Script ()
+testCCPaymentRequest = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  advanceToIssuanceWithPrice app 1.0
+  runCoinDepositBots app
+
+  validatorUserId <- validateUserId "alice_validator"
+  featuredValidator <- featureApp app (CCUser validatorUserId aliceValidator.primaryParty)
+
+  -- retrieve the config
+  config <- getCoinConfig app
+  let transferConfig = config.transferConfig
+  coin <- tap app alice 27.0
+  transferRequest <-
+    createPaymentRequest app provider1.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentAmount 15.0 CC),
+      (charlie.primaryParty, PaymentAmount 10.0 CC)]
+  acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty (Some featuredValidator) transferRequest coin
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+  [(lockedCoin, lockedCoinPayload)] <- query @LockedCoin alice.primaryParty
+  lockedCoinPayload.coin.amount.initialAmount ===
+    15.0 +
+    10.0 +
+    transferConfig.createFee.fee + chargeSteppedRate transferConfig.transferFee 15.0 +
+    transferConfig.createFee.fee + chargeSteppedRate transferConfig.transferFee 10.0
+  lockedCoinPayload.lock.holders === map (.primaryParty) [bob, charlie, provider1]
+  acceptedPayment === AcceptedAppPayment with
+    sender = alice.primaryParty
+    ccReceiverAmounts = [
+      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 15.0),
+      (ReceiverCCAmount with receiver = charlie.primaryParty, ccAmount = 10.0)
+      ]
+    provider = provider1.primaryParty
+    svc = app.svc
+    lockedCoin = lockedCoin
+    round = lockedCoinPayload.coin.amount.createdAt
+    reference = transferRequest
+
+  checkCoinPositions alice [1.0, 1.615]
+  checkCoinPositions bob [1.0]
+  checkCoinPositions charlie [1.0]
+
+  -- Check that the locked-coin is visible to charlie
+  [(charlieLockedCoinCid, _)] <- query @LockedCoin charlie.primaryParty
+  charlieLockedCoinCid === lockedCoin
+
+
+  result <- collectAcceptedPayment app alice acceptedPaymentCid
+
+  case sortOn (._1) result.receiverCoins of
+    [(bob', bobCoin), (charlie', charlieCoin)] ->  do
+      bob' === bob.primaryParty
+      charlie' === charlie.primaryParty
+      Some coin <- queryContractId bob' bobCoin
+      coin.amount.initialAmount === 15.0
+      Some coin <- queryContractId charlie' charlieCoin
+      coin.amount.initialAmount === 10.0
+    _ -> abort $ "Expected exactly two coins but got " <> show result.receiverCoins
+
+  checkCoinPositions alice [1.0, 1.615]
+  checkCoinPositions bob [1.0, 15.0]
+  checkCoinPositions charlie [1.0, 10.0]
+
+  (_, round) <- getLatestActiveOpenRound app
+
+  [(_, coupon)] <- query @AppRewardCoupon provider1.primaryParty
+  let transferConfigCC = transferConfigCCFromOpenRound round
+  coupon.amount ===
+    transferConfigCC.transferFee.initialRate * (15.0 + 10.0) +
+    transferConfigCC.createFee.fee * 2.0
+  coupon.featured === False
+
+  [(_, coupon)] <- query @AppRewardCoupon aliceValidator.primaryParty
+  coupon.amount ===
+    transferConfigCC.createFee.fee + -- for one locked coin
+    transferConfigCC.lockHolderFee.fee * 3.0
+  coupon.provider === aliceValidator.primaryParty
+  coupon.featured === True
+
+  pure ()
+
+testCCPaymentCollectionRoundInLatestRoundMustFail : Script ()
+testCCPaymentCollectionRoundInLatestRoundMustFail = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  advanceToIssuanceWithPrice app 1.0
+  runCoinDepositBots app
+
+  coin <- tap app alice 27.0
+  transferRequest <-
+    createPaymentRequest app provider1.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentAmount 15.0 CC),
+      (charlie.primaryParty, PaymentAmount 10.0 CC)]
+
+
+  acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest coin
+
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+
+  runNextIssuance app
+
+  collectAcceptedPaymentMustFail app alice acceptedPaymentCid
+
+  collectAcceptedPaymentInRound app acceptedPayment.round alice acceptedPaymentCid
+
+  pure ()
+
+testUSDPaymentRequest : Script ()
+testUSDPaymentRequest = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  advanceToIssuanceWithPrice app 0.5
+  runCoinDepositBots app
+
+  coin <- tap app alice 52.0
+  transferRequest <-
+    createPaymentRequest app provider1.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentAmount 10.0 USD),
+      (charlie.primaryParty, PaymentAmount 15.0 USD)]
+  acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest coin
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+  [(lockedCoinCid, lockedCoin)] <- query @LockedCoin alice.primaryParty
+  acceptedPayment === AcceptedAppPayment with
+    sender = alice.primaryParty
+    provider = provider1.primaryParty
+    svc = app.svc
+    lockedCoin = lockedCoinCid
+    ccReceiverAmounts = [
+      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 20.0),
+      (ReceiverCCAmount with receiver = charlie.primaryParty, ccAmount = 30.0)
+      ]
+    round = lockedCoin.coin.amount.createdAt
+    reference = transferRequest
+
+  pure ()
+
+testMixedPaymentRequest : Script ()
+testMixedPaymentRequest = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  advanceToIssuanceWithPrice app 0.5
+  runCoinDepositBots app
+
+  coin <- tap app alice 32.0
+  transferRequest <-
+    createPaymentRequest app provider1.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentAmount 10.0 CC),
+      (charlie.primaryParty, PaymentAmount 10.0 USD)]
+  acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest coin
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+  [(lockedCoinCid, lockedCoin)] <- query @LockedCoin alice.primaryParty
+  acceptedPayment === AcceptedAppPayment with
+    sender = alice.primaryParty
+    provider = provider1.primaryParty
+    svc = app.svc
+    lockedCoin = lockedCoinCid
+    ccReceiverAmounts = [
+      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 10.0),
+      (ReceiverCCAmount with receiver = charlie.primaryParty, ccAmount = 20.0)
+      ]
+    round = lockedCoin.coin.amount.createdAt
+    reference = transferRequest
+
+  pure ()
+
+assertTerminatedPayment : Party -> ContractId AppPaymentRequest -> Script ()
+assertTerminatedPayment p reference = do
+  terminated <- queryFilter @TerminatedAppPayment p (\c -> c.reference == reference)
+  unless (length terminated == 1) $ abort ("Expected one TerminatedAppPayment for " <> show reference <> " but got " <> show terminated)
+
+testTerminatedPayments : Script ()
+testTerminatedPayments = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runCoinDepositBots app
+
+  featureApp app provider1
+
+  let paymentAmount = 41.5
+
+  let createPaymentRequest = createSingleReceiverPaymentRequest app
+        provider1.primaryParty alice.primaryParty bob.primaryParty
+        (PaymentAmount paymentAmount CC)
+
+  paymentRequest <- createPaymentRequest
+  submit alice.primaryParty $ exerciseCmd paymentRequest AppPaymentRequest_Reject
+  assertTerminatedPayment alice.primaryParty paymentRequest
+
+  paymentRequest <- createPaymentRequest
+  submit bob.primaryParty $ exerciseCmd paymentRequest AppPaymentRequest_Withdraw
+  assertTerminatedPayment alice.primaryParty paymentRequest
+
+  let createAcceptedPayment = do
+        coin <- tap app alice 42.0
+        paymentRequest <- createPaymentRequest
+        accepted <- acceptPaymentRequest app alice aliceValidator.primaryParty None paymentRequest coin
+        pure (paymentRequest, accepted)
+
+  (paymentRequest, acceptedPayment) <- createAcceptedPayment
+  context <- getAppTransferContext app alice
+  submitMulti [bob.primaryParty] [app.svc] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Reject context)
+  assertTerminatedPayment alice.primaryParty paymentRequest
+
+  (paymentRequest, acceptedPayment) <- createAcceptedPayment
+  context <- getAppTransferContext app alice
+  passTime (minutes 10)
+  submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Expire context)
+  assertTerminatedPayment alice.primaryParty paymentRequest
+
+  pure ()
+
+testSuccessfulBatchCCPaymentRequests : Script ()
+testSuccessfulBatchCCPaymentRequests = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runCoinDepositBots app
+
+  coin <- tap app alice 42.0
+  transferRequest <- createSingleReceiverPaymentRequest app
+    provider1.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentAmount 1.0 CC)
+  transferRequest2 <-
+    createPaymentRequest app provider1.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentAmount 2.0 CC),
+      (alice.primaryParty, PaymentAmount 2.0 CC)]
+
+  let endUserName = "wallet_service_participant_user"
+  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+    endUserParty = alice.primaryParty
+    endUserName = endUserName
+    svcParty = app.svc
+    validatorParty = aliceValidator.primaryParty
+
+  context <- getPaymentTransferContext app alice
+  executeBatchResult <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    context
+    inputs = [InputCoin coin]
+    operations = [CO_AppPayment transferRequest, CO_AppPayment transferRequest2]
+
+  let [COO_AcceptedAppPayment payment1Cid, COO_AcceptedAppPayment payment2Cid] = executeBatchResult.outcomes
+  Some acceptedPayment <- queryContractId alice.primaryParty payment1Cid
+  Some acceptedPayment2 <- queryContractId alice.primaryParty payment2Cid
+  lockedCoins <- query @LockedCoin alice.primaryParty
+  let [(lockedCoinCid, lockedCoin), (lockedCoinCid2, lockedCoin2)] = sortOn (\(_, lockedCoin) -> lockedCoin.coin.amount.initialAmount) lockedCoins
+  [_, _] <- query @Coin alice.primaryParty
+
+  -- check results
+  executeBatchResult.endUserName === endUserName
+  acceptedPayment === AcceptedAppPayment with
+    sender = alice.primaryParty
+    provider = provider1.primaryParty
+    svc = app.svc
+    lockedCoin = lockedCoinCid
+    ccReceiverAmounts = [
+      ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 1.0 ]
+    round = lockedCoin.coin.amount.createdAt
+    reference = transferRequest
+
+  acceptedPayment2 === AcceptedAppPayment with
+    sender = alice.primaryParty
+    ccReceiverAmounts = [
+      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 2.0),
+      (ReceiverCCAmount with receiver = alice.primaryParty, ccAmount = 2.0)
+      ]
+    provider = provider1.primaryParty
+    svc = app.svc
+    lockedCoin = lockedCoinCid2
+    round = lockedCoin2.coin.amount.createdAt
+    reference = transferRequest2
+
+  pure ()
+
+
+testInsufficientFundsBatchCCPaymentRequests : Script ()
+testInsufficientFundsBatchCCPaymentRequests = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runCoinDepositBots app
+  coin <- tap app alice 42.0
+
+  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+    endUserParty = alice.primaryParty
+    endUserName = "wallet_service_participant_user"
+    svcParty = app.svc
+    validatorParty = aliceValidator.primaryParty
+
+  transferRequest3 <- createSingleReceiverPaymentRequest app
+    provider1.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentAmount 10000.0 CC)
+  transferRequest4 <-
+    createPaymentRequest app provider1.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentAmount 3.0 CC),
+      (alice.primaryParty, PaymentAmount 3.0 CC)]
+  -- trying to fulfill the request for 10,000 CC will fail
+  context <- getPaymentTransferContext app alice
+  ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [InputCoin coin]
+    operations = [CO_AppPayment transferRequest3, CO_AppPayment transferRequest4]
+    context
+
+  -- first command errors, second command is still executed
+  let [COO_Error _, COO_AcceptedAppPayment payment3Cid] = outcomes
+  Some acceptedPayment4 <- queryContractId alice.primaryParty payment3Cid
+
+  -- Only one command executed, so there's only one locked coin
+  lockedCoins <- query @LockedCoin alice.primaryParty
+  let [(lockedCoinCid4, lockedCoin4)] = lockedCoins
+
+  acceptedPayment4 === AcceptedAppPayment with
+    sender = alice.primaryParty
+    ccReceiverAmounts = [
+      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 3.0),
+      (ReceiverCCAmount with receiver = alice.primaryParty, ccAmount = 3.0)
+      ]
+    provider = provider1.primaryParty
+    svc = app.svc
+    lockedCoin = lockedCoinCid4
+    round = lockedCoin4.coin.amount.createdAt
+    reference = transferRequest4
+
+  pure ()
+
+
+-- Smoke test - this functionality is tested more extensively in the WalletIntegrationTests
+testCO_MergeTransferInputs : Script ()
+testCO_MergeTransferInputs = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runCoinDepositBots app
+
+  coin <- tap app alice 42.0
+  coin2 <- tap app alice 43.0
+
+  install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
+    endUserParty = alice.primaryParty
+    endUserName = "wallet_service_participant_user"
+    svcParty = app.svc
+    validatorParty = aliceValidator.primaryParty
+
+
+  context <- getPaymentTransferContext app alice
+
+  ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [InputCoin coin, InputCoin coin2]
+    operations = [CO_MergeTransferInputs]
+    context
+
+  let [COO_MergeTransferInputs (Some resultCoin)] = outcomes
+  aliceCoins <- query @Coin alice.primaryParty
+  let [_, (mergedCoinCid, _)] = sortOn (\(_, p) -> p.amount.initialAmount) aliceCoins
+  resultCoin === mergedCoinCid
+
+  pure ()
+
+
+-- Test to sanity check that buying member traffic works
+testBuyMemberTraffic : Script ()
+testBuyMemberTraffic = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  runNextIssuance app
+  runCoinDepositBots app
+  (_, openRound) <- getLatestOpenRound app
+
+  now <- getTime
+  [(coinRulesCid, coinRules)] <- query @CoinRules app.svc
+  let globalDomainConfig = (CC.Schedule.getValueAsOf now coinRules.configSchedule).globalDomain
+  let extraTrafficPrice = globalDomainConfig.fees.extraTrafficPrice
+  let domainId = globalDomainConfig.activeDomain
+  let testParticipantId = "alice_validator_participant_id"
+
+  -- Test that self top-ups work
+
+  -- set the validator up with some coin and its own wallet install contract
+  submit aliceValidator.primaryParty $ createCmd $ WalletAppInstall with
+    endUserParty = aliceValidator.primaryParty
+    endUserName = "alice_validator_wallet_user"
+    svcParty = app.svc
+    validatorParty = aliceValidator.primaryParty
+
+  -- create initial validator top-up state contract
+  topupStateCid <- submit aliceValidator.primaryParty $
+    createCmd (initialValidatorTopUpState aliceValidator.primaryParty testParticipantId domainId)
+
+  -- test that buying less extra traffic than the configured min topup amount fails
+  let minTopupAmount = globalDomainConfig.fees.minTopupAmount
+  outcome <- executeCoinOperation app aliceValidator $
+    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId domainId (minutes 1) (Some topupStateCid)
+  let errorMsg = "The requirement 'trafficAmount " <> show (minTopupAmount-1) <> " is at least as much as the configured minTopupAmount " <> show minTopupAmount <> "' was not met."
+  outcome === COO_Error (ITR_Other errorMsg)
+
+  -- test that providing an invalid global domain ID fails
+  let invalidDomainId = domainId <> "_invalid"
+  invalidTopupStateCid <- submit aliceValidator.primaryParty $
+    createCmd (initialValidatorTopUpState aliceValidator.primaryParty testParticipantId invalidDomainId)
+  outcome <- executeCoinOperation app aliceValidator $
+    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId invalidDomainId (minutes 1) (Some invalidTopupStateCid)
+  outcome === COO_Error (ITR_Other ("The requirement 'Known domain-id' was not met."))
+  submit aliceValidator.primaryParty $ archiveCmd invalidTopupStateCid
+
+  -- test that creating the initial traffic contract works
+  COO_BuyMemberTraffic trafficCid1 <- executeCoinOperation app aliceValidator $
+    CO_BuyMemberTraffic minTopupAmount testParticipantId domainId (minutes 1) (Some topupStateCid)
+
+  -- validate the state of the member traffic contract
+  Some traffic1 <- queryContractId @MemberTraffic app.svc trafficCid1
+  let totalPurchased = minTopupAmount
+  let usdSpent = intToDecimal totalPurchased / 1e6 * extraTrafficPrice
+  let ccSpent = usdSpent / openRound.coinPrice
+  traffic1.totalPurchased === totalPurchased
+  traffic1.numPurchases === 1
+  traffic1.ccSpent === ccSpent
+  traffic1.usdSpent === usdSpent
+
+  -- validate that the topup state got updated
+  [(topupStateCid2, topupState2)] <- query @ValidatorTopUpState aliceValidator.primaryParty
+  topupStateCid2 =/= topupStateCid
+  topupState2.lastPurchasedAt === now
+
+  -- check that the app reward coupons were issued to aliceValidator
+  [(coupon1Cid, coupon1)] <- query @AppRewardCoupon app.svc
+  coupon1.provider === aliceValidator.primaryParty
+  coupon1.round === openRound.round
+
+  -- topping up too soon fails
+  outcome <- executeCoinOperation app aliceValidator $
+    CO_BuyMemberTraffic minTopupAmount testParticipantId domainId (minutes 1) (Some topupStateCid2)
+  outcome === COO_Error (ITR_Other ("The requirement 'enough time has elapsed since the last topup' was not met."))
+
+  -- once a minute has passed, the same topup succeeds
+  passTime (minutes 1)
+  COO_BuyMemberTraffic trafficCid2 <- executeCoinOperation app aliceValidator $
+    CO_BuyMemberTraffic minTopupAmount testParticipantId domainId (minutes 1) (Some topupStateCid2)
+  Some traffic2 <- queryContractId @MemberTraffic app.svc trafficCid2
+
+  -- check the app reward coupons once more
+  [(coupon2Cid, coupon2), (coupon1Cid_, coupon1_)] <- query @AppRewardCoupon app.svc
+  (coupon1Cid_, coupon1_) === (coupon1Cid, coupon1_)
+  coupon2Cid =/= coupon1Cid
+  coupon2.provider === aliceValidator.primaryParty
+  coupon2.round === openRound.round
+
+  -- Test that third-party top-ups work
+
+  -- advance rounds to ensure that reward coupons issued have a different round number
+  runNextIssuance app
+  (_, openRound2) <- getLatestOpenRound app
+  openRound2.round.number === openRound.round.number + 1
+
+  -- create a wallet install contract and tap some coins for provider1 validator
+  submit provider1Validator.primaryParty $ createCmd $ WalletAppInstall with
+    endUserParty = provider1Validator.primaryParty
+    endUserName = "provider1_validator_wallet_user"
+    svcParty = app.svc
+    validatorParty = provider1Validator.primaryParty
+  _ <- tap app provider1Validator 10.0
+
+  -- provider1 purchases extra traffic for the same participant
+  COO_BuyMemberTraffic providerTrafficCid <- executeCoinOperation app provider1Validator $
+    CO_BuyMemberTraffic (minTopupAmount + 1) testParticipantId domainId (minutes 1) None
+
+  -- validate the state of the member traffic contract
+  Some providerTraffic <- queryContractId @MemberTraffic app.svc providerTrafficCid
+  let totalPurchased = minTopupAmount + 1
+  let usdSpent = intToDecimal totalPurchased / 1e6 * extraTrafficPrice
+  let ccSpent = usdSpent / openRound2.coinPrice
+  providerTraffic.totalPurchased === totalPurchased
+  providerTraffic.numPurchases === 1
+  providerTraffic.ccSpent === ccSpent
+  providerTraffic.usdSpent === usdSpent
+
+  -- check that the app reward coupons were issued to the provider
+  [(providerCouponCid, providerCoupon)] <- query @AppRewardCoupon provider1Validator.primaryParty
+  providerCouponCid =/= coupon1Cid
+  providerCouponCid =/= coupon2Cid
+  providerCoupon.provider === provider1Validator.primaryParty
+  providerCoupon.round === openRound2.round
+
+  -- test that the SVC can merge multiple member traffic contracts
+  let trafficCids = [trafficCid1, trafficCid2, providerTrafficCid]
+  submit app.svc $ exerciseCmd coinRulesCid CoinRules_MergeMemberTrafficContracts with trafficCids
+  [(mergedTrafficCid, mergedTraffic)] <- queryFilter @MemberTraffic app.svc (\t -> t.memberId == testParticipantId)
+  assert $ notElem mergedTrafficCid trafficCids
+  mergedTraffic.totalPurchased === 3 * minTopupAmount + 1
+  mergedTraffic.numPurchases === 3
+  mergedTraffic.usdSpent === traffic1.usdSpent + traffic2.usdSpent + providerTraffic.usdSpent
+  mergedTraffic.ccSpent === traffic1.ccSpent + traffic2.ccSpent + providerTraffic.ccSpent
+
+  -- at least 1 contract must be provided to merge
+  submitMustFail app.svc $ exerciseCmd coinRulesCid CoinRules_MergeMemberTrafficContracts with
+    trafficCids = []
+
+  pure ()
+
+
+testInsufficientFundsBatchSubscriptions : Script ()
+testInsufficientFundsBatchSubscriptions = script do
+  app <- setupApp
+  runNextIssuance app
+  runCoinDepositBots app
+
+  validator <- setupValidator app "validator1"
+  alice <- setupUser app "alice" validator
+  pizzeria <- setupUser app "pizzeria" validator
+  provider <- setupUser app "la_famiglia" validator
+
+  install <- submitMulti [alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
+    endUserParty = alice.primaryParty
+    endUserName = "wallet_service_participant_user"
+    svcParty = app.svc
+    validatorParty = validator
+
+  let payData = SubscriptionPayData with
+        paymentInterval = days 28
+        paymentDuration = days 1
+        paymentAmount = PaymentAmount 10.0 USD
+
+  let subscriptionData = SubscriptionData with
+        sender = alice.primaryParty
+        receiver = pizzeria.primaryParty
+        provider = provider.primaryParty
+        svc = app.svc
+        description = "test subscription"
+
+  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+
+  context <- getPaymentTransferContext app alice
+  coin <- tap  app alice 5.0
+  -- TODO(#2957): remove read-as SVC.
+  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [InputCoin coin]
+    operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
+    context
+
+  outcomes === [COO_Error (ITR_InsufficientFunds (5.17))]
+
+  coin <- tap app alice 15.0
+  -- TODO(#2957): remove read-as SVC.
+  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [InputCoin coin]
+    operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
+    context
+  initialPaymentCid <- case outcomes of
+    [COO_SubscriptionInitialPayment cid] -> pure cid
+    _ -> abort $ "Expected initial subscription payment to succeed but got " <> show outcomes
+
+  (_, subscriptionIdleStateCid, _) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
+
+  passTime (days 27)
+  runNextIssuance app
+  passTimeToRoundOpen app
+  context <- getPaymentTransferContext app alice
+
+  coin <- tap app alice 5.0
+  -- TODO(#2957): remove read-as SVC.
+  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [InputCoin coin]
+    operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
+    context
+  outcomes === [COO_Error (ITR_InsufficientFunds (5.17))]
+
+  coin <- tap app alice 15.0
+  -- TODO(#2957): remove read-as SVC.
+  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [InputCoin coin]
+    operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
+    context
+  case outcomes of
+    [COO_SubscriptionPayment _] -> pure ()
+    _ -> abort $ "Expected subscription payment to succeed but got " <> show outcomes
+  pure ()
+
+-- Utilities
+------------
+
+withError : CanAbort m => [CoinOperationOutcome] -> (InvalidTransferReason -> m a) -> m a
+withError outcomes f = case outcomes of
+  [COO_Error e] -> f e
+  _ -> abort $ "Expected COO_Error but got " <> show outcomes
+
+executeCoinOperation : CCApp -> CCUser -> CoinOperation -> Script CoinOperationOutcome
+executeCoinOperation app user op = do
+  [(installCid, _)] <- query @WalletAppInstall user.primaryParty
+  context <- getPaymentTransferContext app user
+  coins <- queryFilter @Coin user.primaryParty (\coin -> coin.owner == user.primaryParty)
+  result <- submitUser user.userId $ exerciseCmd installCid WalletAppInstall_ExecuteBatch with
+    inputs = [InputCoin coin._1 | coin <- coins]
+    operations = [op]
+    context
+  let [outcome] = result.outcomes
+  pure outcome

@@ -86,4 +86,8 @@ stderr: Finishing shakeRun .*exception: AsyncCancelled
 .*\[.*info.*\].*Compiled with warnings.*
 .*\[.*info.*\].*Search for the keywords to learn more about each warning.*
 
+# We set LC_ALL=C.UTF-8 to make sbt-assembly happy which seems to make damlc
+# (proxied through sbt) issue this warning sometimes.
+sh: warning: setlocale: LC_ALL: cannot change locale \(C\.UTF-8\)
+
 # Make sure to have a trailing newline

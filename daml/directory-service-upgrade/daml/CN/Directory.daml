@@ -1,0 +1,182 @@
+module CN.Directory where
+
+import DA.Time
+
+import CC.Coin
+import CN.Util.Assert
+import CN.Wallet.Payment
+import CN.Wallet.Subscriptions
+
+
+-- | Context to be referenced in a `Subscription` contract.
+-- Archived by the wallet models once a subscription is archived.
+-- Can be used as a stable reference.
+template DirectoryEntryContext
+  with
+    svc : Party
+    provider : Party
+    user : Party
+    name : Text
+    url : Text
+    description : Text
+    reference : ContractId SubscriptionRequest
+  where
+    signatory provider, user
+
+    choice DirectoryEntryContext_Terminate : ()
+      with
+        actor : Party
+        terminatedSubscriptionCid : ContractId TerminatedSubscription
+      controller actor
+      do aborted <- fetch terminatedSubscriptionCid
+         require "Reference matches" (aborted.reference == reference)
+         archive terminatedSubscriptionCid
+         pure ()
+
+        -- Collect a user's initial payment for a directory entry allocation.
+    -- By collecting the initial payment, the directory service provider ultimately agrees to both
+    -- the creation of the directory entry and the establishment of subscription payments for renewing it.
+    nonconsuming choice DirectoryEntryContext_CollectInitialEntryPayment : (ContractId DirectoryEntry, ContractId SubscriptionIdleState, ContractId Coin)
+      with
+        paymentCid : ContractId SubscriptionInitialPayment
+        transferContext : AppTransferContext
+      controller provider
+      do
+        payment <- fetch paymentCid
+        require "Reference matches" (reference == payment.reference)
+        -- accept payment which creates the subscription
+        (_, subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionInitialPayment_Collect with
+          transferContext
+        subscriptionState <- fetch subscriptionStateCid
+        -- deliver the promised good: create the directory entry
+        entryCid <- create DirectoryEntry with
+            expiresAt = subscriptionState.nextPaymentDueAt
+            description
+            ..
+        -- return the created contracts
+        pure (entryCid, subscriptionStateCid, coinCid)
+
+    -- Collect a recurring entry renewal payment, renewing the entry.
+    nonconsuming choice DirectoryEntryContext_CollectEntryRenewalPayment : (ContractId DirectoryEntry, ContractId SubscriptionIdleState, ContractId Coin)
+      with
+        paymentCid : ContractId SubscriptionPayment
+        entryCid : ContractId DirectoryEntry -- ^ The currently active entry.
+        transferContext : AppTransferContext
+      controller provider
+      do
+        payment <- fetch paymentCid
+        subscription <- fetch payment.subscription
+        require "Reference matches" (reference == subscription.reference)
+        entry <- fetch entryCid
+        -- sanity checks
+        require "Current entry matches subscription context"
+          ((DirectoryEntryContext svc entry.provider entry.user entry.name entry.url entry.description reference) == this)
+        require "Subscription entry renewal times are in sync"
+          (payment.thisPaymentDueAt == entry.expiresAt)
+        -- accept payment
+        (subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionPayment_Collect with
+          transferContext
+        -- renew the entry
+        entryCid <- exercise entryCid DirectoryEntry_Renew with
+          extension = payment.payData.paymentInterval
+        -- return the created contracts
+        pure (entryCid, subscriptionStateCid, coinCid)
+
+
+-- | A directory entry that needs to be renewed continuously.
+-- Renewal recreates this contract with an updated `expiresAt` field.
+template DirectoryEntry
+  with
+    user : Party
+    provider : Party
+    name : Text
+    url : Text -- either empty or contains a valid http/https url
+    description : Text -- can be empty
+    expiresAt : Time
+  where
+    signatory user, provider
+
+    choice DirectoryEntry_Expire : ()
+      with
+        actor : Party
+      controller actor
+      do time <- getTime
+         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+         require "Contract expired" (expiresAt < time)
+
+    choice DirectoryEntry_Renew : ContractId DirectoryEntry
+      with
+        extension : RelTime
+      controller user, provider
+      do require "Extension positive" (extension > aunit)
+         create this with
+           expiresAt = this.expiresAt `addRelTime` extension
+
+
+template DirectoryInstall with
+    provider : Party
+    user : Party
+    svc : Party
+    entryFee : Decimal
+    renewalDuration : RelTime -- Length of interval within which user can renew. At the end the entry expires
+    entryLifetime : RelTime -- Duration until an entry expires
+  where
+    signatory provider, user
+
+    choice DirectoryInstall_Cancel : ()
+      with
+        actor : Party
+      controller actor
+      do require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+
+    -- Request a directory entry, to be paid and renewed via subscription payments.
+    -- The request is answered by requesting from the user to agree on establishing subscription payments.
+    -- The SubscriptionRequest is accepted (or rejected) via the user's wallet by offering the initial payment.
+    nonconsuming choice DirectoryInstall_RequestEntry : (ContractId DirectoryEntryContext, ContractId SubscriptionRequest)
+      with
+        name : Text
+        url : Text
+        description : Text
+      controller user
+      do
+        let subscriptionData = SubscriptionData with
+              sender = user
+              receiver = provider
+              description = "Directory entry: " <> show name
+              ..
+        let payData = SubscriptionPayData with
+              paymentAmount = PaymentAmount entryFee USD
+              paymentInterval = entryLifetime
+              paymentDuration = renewalDuration
+        request <- create SubscriptionRequest with
+          subscriptionData
+          payData
+        context <- create DirectoryEntryContext with reference = request, ..
+        pure (context, request)
+
+-- | A request from a user to a directory service provider for an installation.
+-- Used to mock the actuall installation process until we have
+-- 1. explicit disclosure
+-- 2. app architecture defined
+-- 3. app manager built
+--
+template DirectoryInstallRequest with
+    provider : Party
+    user : Party
+  where
+    signatory user
+    observer provider
+
+    choice DirectoryInstallRequest_Accept : ContractId DirectoryInstall
+      with
+        svc : Party
+        entryFee : Decimal
+        renewalDuration : RelTime -- Time user has available to make a renewal payment, before the entry expires.
+        entryLifetime : RelTime -- Duration until an entry expires
+      controller provider
+      do
+        create DirectoryInstall with ..
+
+    choice DirectoryInstallRequest_Reject : ()
+      controller provider
+      do pure ()

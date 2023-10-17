@@ -177,13 +177,13 @@ object BuildCommon {
         ) ++
         addCommandAlias(
           "lint",
-          "; damlDarsLockFileCheck ; cantonDarsLockFileCheck ; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; runShellcheck ; syncpackCheck",
+          "; damlDarsLockFileCheck ; cantonDarsLockFileCheck ; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; runShellcheck ; syncpackCheck ; runCheckUpgradeModelDiffs",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all CN DARs here, just in case
         addCommandAlias(
           "clean-cn",
-          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-sv/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean; cn-util-daml/clean; canton-coin-daml/clean; svc-governance-daml/clean; wallet-daml/clean; wallet-payments-daml/clean; directory-daml/clean; splitwell-daml/clean; validator-lifecycle-daml/clean; app-manager-daml/clean; canton-name-service-daml/clean; apps-frontends/clean; cleanCnDars",
+          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-sv/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean; cn-util-daml/clean; canton-coin-daml/clean; canton-coin-upgrade-daml/clean; svc-governance-daml/clean; svc-governance-upgrade-daml/clean; wallet-daml/clean; wallet-upgrade-daml/clean; wallet-payments-daml/clean; wallet-payments-upgrade-daml/clean; directory-daml/clean; directory-upgrade-daml/clean; canton-name-service-daml/clean; canton-name-service-upgrade-daml/clean; splitwell-daml/clean; splitwell-upgrade-daml/clean; validator-lifecycle-daml/clean; app-manager-daml/clean; apps-frontends/clean; cleanCnDars",
         ) ++
         addCommandAlias("cn-clean", "; clean-cn")
     val buildSettings = inThisBuild(

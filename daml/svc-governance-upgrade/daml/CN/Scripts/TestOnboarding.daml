@@ -1,0 +1,396 @@
+module CN.Scripts.TestOnboarding where
+
+import DA.Assert
+import DA.Foldable (forA_)
+import DA.List (sort)
+import DA.Optional (fromSome)
+import qualified DA.Map as Map
+import Daml.Script
+import DA.Time
+
+import CC.ValidatorLicense
+
+import CN.CometBft
+import CN.SvcRules
+import CN.SVC.GlobalDomain
+import CN.SvOnboarding
+
+import CC.Scripts.Util
+import CC.Scripts.Parameters
+import CN.Scripts.SvcTestUtils
+import CC.GlobalDomain (MemberTraffic, initialMemberTraffic)
+import CC.Coin (CoinRules, Coin)
+import CC.Round
+import CC.Round.Types
+import CC.Schedule
+
+
+testOnboardValidator : Script ()
+testOnboardValidator = do
+  (app, svc, (_, sv2, _, _)) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- a new validator prepares his participant
+  v1 <- allocateParty "v1"
+
+  -- sv2 (not the leader) onboards the new validator
+  onboardValidator app sv2 v1
+
+  -- v1 received a validator license
+  [(_, validatorLicense)] <- queryFilter @ValidatorLicense svc (\license -> license.validator == v1)
+  validatorLicense === ValidatorLicense with
+    validator = v1
+    sponsor = sv2
+    svc
+
+  -- so v1 is onboarded!
+  pure ()
+
+testInitialTrafficGrant : Script ()
+testInitialTrafficGrant = do
+  (app, svc, _) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1
+
+  [(_, svcRules)] <- query @SvcRules svc
+  coinConfig <- getCoinConfig app
+
+  -- check that the initial traffic contract with the initial grant amount is created for each SV
+  let domainId = coinConfig.globalDomain.activeDomain
+  let initialTrafficGrant = svcRules.config.initialTrafficGrant
+  forA_ ["sv1", "sv2", "sv3", "sv4"] $ \svName -> do
+    let svParticipantId = svName <> "-participant-id"
+    [(_, initialParticipantTraffic)] <- queryFilter @MemberTraffic svc (\r -> r.memberId == svParticipantId)
+    initialParticipantTraffic === initialMemberTraffic svc svParticipantId domainId initialTrafficGrant
+    pure ()
+
+testSvOnboarding : Script ()
+testSvOnboarding = do
+  (app, svc, (_, sv2, sv3, sv4)) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- we can't test token validity in Daml (it's a JWT)
+  let token = "mock-token"
+
+  -- sv2 (not the leader) initiates the onboarding of the new sv
+  svSubmits app sv2 $ \cid -> exerciseCmd cid $
+    SvcRules_StartSvOnboarding "svX" svX token sv2
+
+  -- an onboarding request for svX has been created
+  [(_, svOnboardingRequest)] <- query @SvOnboardingRequest svc
+  svOnboardingRequest === SvOnboardingRequest with
+    candidateName = "svX"
+    candidateParty = svX
+    token
+    sponsor = sv2
+    svc
+    expiresAt = svOnboardingRequest.expiresAt
+
+  -- svX collects three confirmations which is enough to onboard him
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  forA_ [sv2, sv3, sv4] $ \sv ->
+    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_SvcRules with
+        svcAction = SRARC_ConfirmSvOnboarding $ SvcRules_ConfirmSvOnboarding with
+          newMemberParty = svX
+          newMemberName = "svX"
+          reason = "because"
+  executeAllConfirmedActions app
+
+  -- svX is now a confirmed SV
+  [(svOnboardingConfirmedCid, svOnboardingConfirmed)] <- query @SvOnboardingConfirmed svc
+  svOnboardingConfirmed === SvOnboardingConfirmed with
+    svParty = svX
+    svName = "svX"
+    reason = "because"
+    svc
+    expiresAt = svOnboardingConfirmed.expiresAt
+
+  -- once svX becomes able to read as svc (e.g., after party migration to svX's participant)...
+  [(svcRulesCid, _)] <- query @SvcRules svc
+
+  -- run one issuance so we svX joins in a round after round 0
+  runNextIssuance app
+
+  -- it gets the open mining rounds, so that it can set it's own `joinedAsOfRound` in a cheat-resistant way
+  [(earliestRoundCid, earliestRound), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app
+
+  [(coinRulesCid, _)] <- query @CoinRules svc
+
+  -- the rounds need to be passed in the correct order
+  submitMultiMustFail [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
+    sv = svX
+    svOnboardingConfirmedCid
+    earliestRoundCid = latestRoundCid
+    middleRoundCid
+    latestRoundCid = earliestRoundCid
+    coinRulesCid
+    svParticipantId = "svX-participant-id"
+  submitMultiMustFail [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
+    sv = svX
+    svOnboardingConfirmedCid
+    earliestRoundCid
+    middleRoundCid = earliestRoundCid
+    latestRoundCid = earliestRoundCid
+    coinRulesCid
+    svParticipantId = "svX-participant-id"
+
+  -- svX completes its own onboarding by adding itself to the SvcRules
+  submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
+    sv = svX
+    svOnboardingConfirmedCid
+    earliestRoundCid
+    middleRoundCid
+    latestRoundCid
+    coinRulesCid
+    svParticipantId = "svX-participant-id"
+
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+  case Map.lookup svX svcRules.members of
+    None -> fail "svX is not a member of the SVC"
+    Some info ->
+      -- the new member joined in the earliest open round
+      info.joinedAsOfRound === earliestRound.round
+  now <- getTime
+  -- now that svX is a member it can set its CometBFT config to become a CometBFT  validator
+  -- TODO(M3-59): add negative tests for limits enforced on config values (manual testing showed they work)
+  let cometBftConfig = CometBftConfig with
+        nodes = Map.fromList
+          [ ( "svX-node-id-1"
+            , CometBftNodeConfig with
+                validatorPubKey = "==base-64-validator-pub-key-1"
+                votingPower = 0
+            )
+          , ( "svX-node-id-2"
+            , CometBftNodeConfig with
+                validatorPubKey = "==base-64-validator-pub-key-1"
+                votingPower = 1
+            )
+          ]
+        governanceKeys = [GovernanceKeyConfig with pubKey = "==base-64-pubKey-1"]
+        sequencingKeys = []
+
+  let sequencerConfig = Some SequencerConfig with
+        sequencerId = "sequencer-id"
+        url = "sequencer.address:1234"
+        availableAfter = now
+
+  let mediatorConfig = Some MediatorConfig with
+        mediatorId = "mediator-id"
+
+  let newNodeConfig = DomainNodeConfig with
+        cometBft = cometBftConfig
+        sequencer = sequencerConfig
+        mediator = mediatorConfig
+
+  submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_SetDomainNodeConfig with
+    sv = svX
+    domainId = svcRules.config.globalDomain.lastDomainId
+    newNodeConfig
+
+  -- check that the config was actually set
+  [(_, svcRules)] <- query @SvcRules svc
+  let actualConfig = do
+        info <- Map.lookup svX svcRules.members
+        config <- Map.lookup svcRules.config.globalDomain.lastDomainId info.domainNodes
+        pure config
+  actualConfig === Some newNodeConfig
+
+  pure ()
+
+
+testSvOnboardingRequestExpiry : Script ()
+testSvOnboardingRequestExpiry = do
+  (app, _, (_, sv2, _, _)) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- we can't test token validity in Daml (it's a JWT)
+  let token = "mock-token"
+
+  -- sv2 (not the leader) initiates the onboarding of the new sv
+  svOnboardingRequestCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
+    SvcRules_StartSvOnboarding "svX" svX token sv2
+
+  -- leader tries to expire the onboarding, but it's too early
+  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireSvOnboardingRequest svOnboardingRequestCid
+
+  -- wait for the onboarding to expire
+  passTime (hours 25)
+
+  -- leader expires the onboarding
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireSvOnboardingRequest svOnboardingRequestCid
+
+
+testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember : Script ()
+testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
+  (app, svc, (_, sv2, _, _)) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- we can't test token validity in Daml (it's a JWT)
+  let token = "mock-token"
+
+  -- sv2 (not the leader) initiates the onboarding of the new sv
+  svOnboardingRequestCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
+    SvcRules_StartSvOnboarding "svX" svX token sv2
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+
+  -- leader cannot archive the onboarding as svX is not yet added as member
+  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    SvcRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
+
+  coinConfig <- getCoinConfig app
+  let domainId = coinConfig.globalDomain.activeDomain
+
+  -- create a SvOnboardingConfirmed contract
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "svX" "svX-participant-id" (Round 3) domainId
+
+  -- leader can archive the onboarding as svX is added as member
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
+
+
+testSvOnboardingConfirmedExpiry : Script ()
+testSvOnboardingConfirmedExpiry = do
+  (app, svc, (_, sv2, sv3, sv4)) <- initMainNetCollective
+  -- we now have a collective with BFT for f = 1
+
+  -- a new sv prepares his participant
+  svX <- allocateParty "svX"
+
+  -- svX collects three confirmations which is enough to onboard him
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  forA_ [sv2, sv3, sv4] $ \sv ->
+    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_SvcRules with
+        svcAction = SRARC_ConfirmSvOnboarding $ SvcRules_ConfirmSvOnboarding with
+          newMemberParty = svX
+          newMemberName = "svX"
+          reason = "because"
+
+  executeAllConfirmedActions app
+
+  [(svOnboardingConfirmedCid, _)] <- query @SvOnboardingConfirmed svc
+
+  -- leader tries to expire the confirmation but it's too early
+  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireSvOnboardingConfirmed svOnboardingConfirmedCid
+
+  -- wait for the confirmation to expire
+  passTime (hours 25)
+
+  -- leader expires the confirmation
+  leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireSvOnboardingConfirmed svOnboardingConfirmedCid
+
+
+testSvNameUniquenessNotInDevNet : Script ()
+testSvNameUniquenessNotInDevNet = do
+  -- When it is not in devnet, new member cannot be added to SVC if its name is already used by any existing member.
+  (app, svc, (_, sv2, _, _)) <- initMainNetCollective
+
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+
+  (fromSome (Map.lookup sv2 svcRules.members)).name === "sv2"
+
+  coinConfig <- getCoinConfig app
+  let domainId = coinConfig.globalDomain.activeDomain
+
+  svX <- allocateParty "svX"
+  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" "sv2-participant-id" (Round 3) domainId
+
+
+testSvMemberOverwriteInDevNet : Script ()
+testSvMemberOverwriteInDevNet = do
+  (app, svc, (sv1, sv2, _, _)) <- initDevNetCollective
+
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+
+  (fromSome (Map.lookup sv1 svcRules.members)).name === "sv1"
+  (fromSome (Map.lookup sv2 svcRules.members)).name === "sv2"
+  svX <- allocateParty "svX"
+
+  coinConfig <- getCoinConfig app
+  let domainId = coinConfig.globalDomain.activeDomain
+
+  -- Failing the template precondition check if the existing member being overwritten is the current leader.
+  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv1" "sv1-participant-id" (Round 3) domainId
+
+  -- overwriting existing member successfuly
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" "sv2-participant-id" (Round 3) domainId
+
+  pure ()
+
+testTapAfterRestoringOpenRounds : Script ()
+testTapAfterRestoringOpenRounds = do
+  now <- getTime
+  -- copied from `CoinRules_BootstrapRounds`: not a perfect approximation for importing rounds but good enough
+  let Some svc = partyFromText "svc"
+  let configUsd = getValueAsOf now defaultCoinConfigSchedule
+  let tickDuration = configUsd.tickDuration
+  let opensAt0 = now
+  let opensAt1 = now
+  let opensAt2 = addRelTime now tickDuration
+
+  let targetClosesAt0 = addRelTime now tickDuration
+  let targetClosesAt1 = addRelTime targetClosesAt0 tickDuration
+  let targetClosesAt2 = addRelTime targetClosesAt1 tickDuration
+
+  -- We accept that round 0 will only be open for one tickDuration in contrast to all other ones.
+  -- Its SVC rewards are compensation for the extra effort of bootstrapping.
+  let issuingFor0 = days 0
+  let issuingFor1 = issuingFor0 + tickDuration
+  let issuingFor2 = issuingFor1 + tickDuration
+
+  let issuanceConfig0 = getValueAsOf issuingFor0 configUsd.issuanceCurve
+  let issuanceConfig1 = getValueAsOf issuingFor1 configUsd.issuanceCurve
+  let issuanceConfig2 = getValueAsOf issuingFor2 configUsd.issuanceCurve
+
+  let transferConfigUsd = configUsd.transferConfig
+  let coinPrice = 2.0
+
+  let initialOpenRounds =
+        [ OpenMiningRound with
+            -- rounds shifted by 10 to check that the new numbers get picked up
+            svc; round = Round 10; coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
+        , OpenMiningRound with
+            svc; round = Round 12; coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
+        -- moved after Round 12 on purpose to see that init works with sorting rounds
+        , OpenMiningRound with
+            svc; round = Round 11; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
+        ]
+
+
+  (app, _, _) <- initCollective (Some initialOpenRounds) True
+  -- all members are onboarded in the earliest open round, which is required as
+  -- they all were members of that round when the data export happened
+  -- NOTE: members that join later after a data import will though miss some SvRewards. We're OK with this.
+  [(_, svcRules)] <- query @SvcRules app.svc
+  sort (map (.joinedAsOfRound) $ Map.values (svcRules.members)) ===
+    replicate 4 (Round 10)
+
+
+  (alice, _) <- setupSelfHostedUser app "alice"
+
+  -- the user setup taps 1.0 coin, which gets tapped at the most recent open round, which is round 11
+  [(_, coin)] <- query @Coin alice.primaryParty
+  (coin.amount.createdAt, coin.amount.initialAmount) === (Round 11, 1.0)
+
+  -- next issuance runs successfully and creates IssuingRound 10
+  runNextIssuanceD app 3.0
+  [(_, issuingRound)] <- query @IssuingMiningRound app.svc
+  issuingRound.round === Round 10
+
+  pure ()
