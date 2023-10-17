@@ -11,6 +11,7 @@ Release Notes
   * Replaced ``disableAllocateLedgerApiUserParty`` with ``svValidator``.
     For validator Helm charts, ``svValidator`` should be set to ``true`` for SV nodes.
     This value is in the ``sv-validator-values.yaml`` file.
+  * Default volume sizes for `cn-cometbft` and `cn-postgres` increased to `240Gi` each (from, respectively, `80Gi` and `160Gi`), as a conservative precaution.
 
 * Domain fees (and traffic top-ups) are now enabled on DevNet as well. This implies that explicitly setting `topup.enabled` in `validator-values.yaml` is no longer required (it defaults to `true`).
 

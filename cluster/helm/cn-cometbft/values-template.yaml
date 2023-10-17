@@ -62,7 +62,7 @@ genesis:
   chainId: ""
 
 db:
-  volumeSize: 80Gi
+  volumeSize: 240Gi
   volumeStorageClass: standard-rwo
 
 resources:
