@@ -20,9 +20,16 @@ abstract class DirectoryExternalAppReference(
       entryName: String,
       url: String,
       description: String,
-  ): definitions.CreateDirectoryEntryResponse = {
+  ): HttpDirectoryAppClient.CreateDirectoryEntryResponse = {
     consoleEnvironment.run {
       httpCommand(HttpDirectoryAppClient.CreateDirectoryEntry(entryName, url, description))
+    }
+  }
+
+  @Help.Summary("List Directory Entries")
+  def listDirectoryEntries(): definitions.ListDirectoryEntriesResponse = {
+    consoleEnvironment.run {
+      httpCommand(HttpDirectoryAppClient.ListDirectoryEntries())
     }
   }
 }

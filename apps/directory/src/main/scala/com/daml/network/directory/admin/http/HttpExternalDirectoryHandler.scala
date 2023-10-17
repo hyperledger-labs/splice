@@ -47,9 +47,11 @@ class HttpExternalDirectoryHandler(
         update <- Future.successful {
           installContractId
             .exerciseDirectoryInstall_RequestEntry(body.name, body.url, body.description)
-            .map { _ =>
+            .map { e =>
               r0.CreateDirectoryEntryResponse.OK(
                 d0.CreateDirectoryEntryResponse(
+                  e.exerciseResult._1.contractId,
+                  e.exerciseResult._2.contractId,
                   body.name,
                   body.url,
                   body.description,
@@ -62,6 +64,36 @@ class HttpExternalDirectoryHandler(
           .withDomainId(domainId)
           .noDedup
           .yieldResult()
+      } yield res
+    }
+  }
+
+  override def listDirectoryEntries(
+      respond: r0.ListDirectoryEntriesResponse.type
+  )()(tuser: TracedUser): Future[r0.ListDirectoryEntriesResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    withSpan(s"$workflowId.listDirectoryEntries") { implicit traceContext => _ =>
+      for {
+        entriesWithPayData <- getUserStore(user).flatMap(_.listDirectoryEntries())
+        res <- Future.successful {
+          r0.ListDirectoryEntriesResponse.OK(
+            d0.ListDirectoryEntriesResponse(entries =
+              entriesWithPayData
+                .map(e =>
+                  d0.DirectoryEntryResponse(
+                    contractId = e.contractId,
+                    name = e.entryName,
+                    amount = e.amount,
+                    currency = e.currency,
+                    expiresAt = e.expiresAt,
+                    paymentInterval = e.paymentInterval,
+                    paymentDuration = e.paymentDuration,
+                  )
+                )
+                .toVector
+            )
+          )
+        }
       } yield res
     }
   }

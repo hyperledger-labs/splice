@@ -283,6 +283,74 @@ trait UserWalletStore
       limit: Int,
   )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TransactionHistoryTxLogEntry]]
 
+  def listDirectoryEntries()(implicit tc: TraceContext): Future[
+    Seq[UserWalletStore.DirectoryEntryWithPayData]
+  ] = {
+    import UserWalletStore.{
+      EntryWithSubscriptionContext,
+      DirectoryEntryWithPayData,
+      SubscriptionPayData,
+      SubscriptionIdleState,
+      SubscriptionPaymentState,
+    }
+    for {
+      // NOTE: entries and entry contexts are sometimes out of sync so we just filter out entries in such cases
+      entries <- multiDomainAcsStore.listContracts(
+        directoryCodegen.DirectoryEntry.COMPANION
+      )
+      entryContexts <- multiDomainAcsStore.listContracts(
+        directoryCodegen.DirectoryEntryContext.COMPANION
+      )
+      subscriptions <- listSubscriptions()
+    } yield {
+      val entriesWithSubs = entries.foldLeft(Seq.empty[EntryWithSubscriptionContext]) {
+        (acc, entry) =>
+          val context = entryContexts.find(_.payload.name == entry.payload.name)
+          context match {
+            case Some(c) =>
+              acc :+ EntryWithSubscriptionContext(entry.contract, c.payload.reference)
+            case _ => acc
+          }
+      }
+
+      val subscriptionsPayData = subscriptions.map { s =>
+        s.state match {
+          case SubscriptionIdleState(contract) =>
+            SubscriptionPayData(
+              contract.payload.subscription,
+              s.subscription.payload.reference,
+              contract.payload.payData,
+            )
+          case SubscriptionPaymentState(contract) =>
+            SubscriptionPayData(
+              contract.payload.subscription,
+              s.subscription.payload.reference,
+              contract.payload.payData,
+            )
+        }
+      }
+
+      val subRefToPayData =
+        subscriptionsPayData.map(spd => spd.subscriptionReference -> spd.payData).toMap
+
+      entriesWithSubs.flatMap { es =>
+        subRefToPayData
+          .get(es.subscriptionReference)
+          .map(subPayData =>
+            DirectoryEntryWithPayData(
+              contractId = es.entry.contractId.contractId,
+              expiresAt = es.entry.payload.expiresAt.toEpochMilli().toString(),
+              entryName = es.entry.payload.name,
+              amount = subPayData.paymentAmount.amount.toString(),
+              currency = subPayData.paymentAmount.currency.toString(),
+              paymentInterval = subPayData.paymentInterval.microseconds.toString(),
+              paymentDuration = subPayData.paymentDuration.microseconds.toString(),
+            )
+          )
+      }
+    }
+  }
+
   override protected def txLogParser =
     new UserWalletTxLogParser(
       loggerFactory,
@@ -346,6 +414,25 @@ object UserWalletStore {
         subsCodegen.Subscription,
       ],
       state: SubscriptionState,
+  )
+
+  final case class SubscriptionPayData(
+      subscription: subsCodegen.Subscription.ContractId,
+      subscriptionReference: subsCodegen.SubscriptionRequest.ContractId,
+      payData: subsCodegen.SubscriptionPayData,
+  )
+  final case class DirectoryEntryWithPayData(
+      contractId: String,
+      expiresAt: String,
+      entryName: String,
+      amount: String,
+      currency: String,
+      paymentInterval: String,
+      paymentDuration: String,
+  )
+  final case class EntryWithSubscriptionContext(
+      entry: Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry],
+      subscriptionReference: subsCodegen.SubscriptionRequest.ContractId,
   )
 
   type TxLogIndexRecord = UserWalletTxLogParser.WalletTxLogIndexRecord
@@ -486,6 +573,9 @@ object UserWalletStore {
         mkFilter(coinCodegen.FeaturedAppRight.COMPANION)(co =>
           co.payload.svc == svc && co.payload.provider == endUser
         ),
+        // Directory entry
+        mkFilter(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.user == endUser),
+        mkFilter(directoryCodegen.DirectoryEntryContext.COMPANION)(co => co.payload.user == endUser),
       ),
     )
   }

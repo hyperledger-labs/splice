@@ -40,6 +40,22 @@ paths:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /entry/all:
+    get:
+      tags: [ directory ]
+      x-jvm-package: external.directory
+      operationId: "listDirectoryEntries"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListDirectoryEntriesResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
 components:
   schemas:
@@ -62,11 +78,50 @@ components:
         - name
         - url
         - description
+        - entryContextCid
+        - subscriptionRequestCid
       properties:
+        entryContextCid:
+          type: string
+        subscriptionRequestCid:
+          type: string
         name:
           type: string
         url:
           type: string
         description:
           type: string
-
+    ListDirectoryEntriesResponse:
+      type: object
+      required:
+        - entries
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/DirectoryEntryResponse"
+    DirectoryEntryResponse:
+      type: object
+      required:
+        - contractId
+        - name
+        - amount
+        - currency
+        - expiresAt
+        - paymentInterval
+        - paymentDuration
+      properties:
+        contractId:
+          type: string
+        name:
+          type: string
+        amount:
+          type: string
+        currency:
+          type: string
+        expiresAt:
+          type: string
+        paymentInterval:
+          type: string
+        paymentDuration:
+          type: string

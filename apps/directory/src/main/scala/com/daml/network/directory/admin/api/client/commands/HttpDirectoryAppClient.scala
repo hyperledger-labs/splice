@@ -15,6 +15,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future}
 import cats.data.EitherT
 import com.daml.network.http.v0.definitions
+import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionRequest
 
 object HttpDirectoryAppClient {
 
@@ -44,10 +45,17 @@ object HttpDirectoryAppClient {
     ): Client = externalHttp.DirectoryClient.httpClient(HttpClientBuilder().buildClient, host)
   }
 
+  case class CreateDirectoryEntryResponse(
+      entryContextCid: codegen.DirectoryEntryContext.ContractId,
+      subscriptionRequestCid: SubscriptionRequest.ContractId,
+      name: String,
+      url: String,
+      description: String,
+  )
   case class CreateDirectoryEntry(name: String, url: String, description: String)
       extends ExternalBaseCommand[
         externalHttp.CreateDirectoryEntryResponse,
-        definitions.CreateDirectoryEntryResponse,
+        CreateDirectoryEntryResponse,
       ] {
 
     def submitRequest(client: externalHttp.DirectoryClient, headers: List[HttpHeader]): EitherT[
@@ -66,6 +74,42 @@ object HttpDirectoryAppClient {
     protected def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case externalHttp.CreateDirectoryEntryResponse.OK(res) =>
+      for {
+        entryContextCid <- Codec.decodeJavaContractId(codegen.DirectoryEntryContext.COMPANION)(
+          res.entryContextCid
+        )
+        subscriptionRequestCid <- Codec.decodeJavaContractId(SubscriptionRequest.COMPANION)(
+          res.subscriptionRequestCid
+        )
+        response = CreateDirectoryEntryResponse(
+          entryContextCid,
+          subscriptionRequestCid,
+          res.name,
+          res.url,
+          res.description,
+        )
+      } yield response
+    }
+  }
+
+  case class ListDirectoryEntries()
+      extends ExternalBaseCommand[
+        externalHttp.ListDirectoryEntriesResponse,
+        definitions.ListDirectoryEntriesResponse,
+      ] {
+
+    override def submitRequest(
+        client: externalHttp.DirectoryClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], externalHttp.ListDirectoryEntriesResponse] =
+      client.listDirectoryEntries(headers = headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[externalHttp.ListDirectoryEntriesResponse, Either[
+      String,
+      definitions.ListDirectoryEntriesResponse,
+    ]] = { case externalHttp.ListDirectoryEntriesResponse.OK(res) =>
       Right(res)
     }
   }
