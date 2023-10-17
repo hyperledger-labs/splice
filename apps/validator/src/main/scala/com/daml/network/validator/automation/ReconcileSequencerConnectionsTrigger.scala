@@ -1,12 +1,12 @@
 package com.daml.network.validator.automation
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
+import com.daml.network.config.CNThresholds
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequencer
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.{
@@ -82,8 +82,7 @@ class ReconcileSequencerConnectionsTrigger(
   private def getSequencersConnections(
       connections: NonEmpty[Seq[SequencerConnection]]
   ): SequencerConnections = {
-    // TODO: (#5093) threshold should be calculated from the size of newValidConnections
-    val threshold = PositiveInt.one
+    val threshold = CNThresholds.getSequencerConnectionsSizeThreshold(connections.size)
     SequencerConnections.many(connections, threshold)
   }
 

@@ -29,4 +29,8 @@ object CNThresholds {
     FPlus1Threshold(minSize)
   }
 
+  def getSequencerConnectionsSizeThreshold(sequencersSize: Int): PositiveInt = FPlus1Threshold(
+    sequencersSize
+  )
+
 }

@@ -80,8 +80,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
         .sequencerConnections
 
       sequencerConnections.connections.size shouldBe 4
-      // TODO: (#5093) threshold should be calculated from the size of newValidConnections instead of 1
-      sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
+      sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(2)
     }
   }
 
