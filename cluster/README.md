@@ -339,6 +339,19 @@ On Wednesday night, another trigger marks the version running on `DevNet`
 at that point in time with a `testnet-next` tag. That version will then be
 deployed on TestNet in the following TestNet upgrade (usually the following Monday morning).
 
+#### Testing deploy-devnet and deploy-testnet changes
+
+Changes to the `deploy-devnet` and `deploy-testnet` CircleCI workflows are dangerous, as they affect our coming production deployments.
+On the other hand, they are somewhat non-trivial to test directly. To test changes to these workflows, one can temporarily:
+
+1. Lock a scratchnet cluster
+2. In `.circleci/config/workflows.yaml`, locate the workflow to be tested, and:
+   a. Modify all "cluster" arguments to the different jobs to the required scratchnet. This is an important step!
+      Make sure you do not miss any job, in order not to accidentally make any changes to the running production clusters.
+   b. Comment out the `main-branch-only` guards on all jobs in the workflow.
+3. In `.circleci/config/prelude.yaml`, change the default value of `run-job` to the required value, e.g. `deploy-devnet` or `deploy-testnet`.
+4. Commit, push and create a draft PR to trigger CI against your changes.
+
 ### Manually Deploying via CI
 
 If necessary, it is possible to manually trigger CI/CD deployments to
