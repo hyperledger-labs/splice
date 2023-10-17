@@ -72,5 +72,5 @@ in pkgs.mkShell {
   COMETBFT_DRIVER = "${pkgs.cometbft_driver}";
   GRAFANA_DASHBOARDS = "${pkgs.da_grafana_dashboards}";
   # Avoid sbt-assembly falling over. See https://github.com/sbt/sbt-assembly/issues/496
-  LC_ALL="C.UTF-8";
+  LC_ALL = if stdenv.isDarwin then "" else "C.UTF-8";
 }
