@@ -11,10 +11,7 @@
     "hours-of-day": [
       1
     ],
-    "days-of-week": [
-      "TUE",
-      "THU"
-    ],
+    "days-of-week": ["THU"],
     "days-of-month": [],
     "months": ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
   }
