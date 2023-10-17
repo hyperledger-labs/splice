@@ -30,17 +30,10 @@ import {
 } from 'cn-pulumi-common';
 
 import { auth0Cfg } from './auth0cfg';
+import { SvAppConfig, ValidatorAppConfig } from './config';
 import { includesCometBftGlobalDomainNode, installGlobalDomainNode } from './globalDomain';
 import { walletUIClientId, directoryClientId, svUIClientId } from './secrets';
-import {
-  CLUSTER_BASENAME,
-  localCharts,
-  SV_NAME,
-  SV_NAMESPACE as RUNBOOK_NAMESPACE,
-  TARGET_CLUSTER,
-  version,
-  withDomainFees,
-} from './utils';
+import { CLUSTER_BASENAME, localCharts, TARGET_CLUSTER, version, withDomainFees } from './utils';
 
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');
@@ -67,26 +60,28 @@ const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
 
 const participantIdentitiesFile = process.env.PARTICIPANT_IDENTITIES_FILE;
 
-const SV_WALLET_USER_ID =
-  process.env.SV_WALLET_USER_ID ||
-  (isDevNet ? 'auth0|64b16b9ff7a0dfd00ea3704e' : 'auth0|64553aa683015a9687d9cc2e'); // Default to admin@sv-dev.com (devnet) or admin@sv.com (non devnet) at the sv-test tenant by default
 const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
-export async function installNode(auth0Client: Auth0Client): Promise<void> {
+export async function installNode(
+  auth0Client: Auth0Client,
+  svNamespaceStr: string,
+  svAppConfig: SvAppConfig,
+  validatorAppConfig: ValidatorAppConfig
+): Promise<void> {
   console.error(
     localCharts
       ? 'Using locally built charts'
       : `Using charts from the artifactory, version ${version}`
   );
   console.error(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
-  console.error(`Installing SV node in namespace: ${RUNBOOK_NAMESPACE}`);
+  console.error(`Installing SV node in namespace: ${svNamespaceStr}`);
 
-  const xns = exactNamespace(RUNBOOK_NAMESPACE, true);
+  const xns = exactNamespace(svNamespaceStr, true);
 
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
       xns,
-      RUNBOOK_NAMESPACE,
+      RUNBOOK_NAMESPACE: svNamespaceStr,
       CLUSTER_BASENAME,
       participantIdentitiesFile,
       bootstrappingConfig,
@@ -117,6 +112,9 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     backupConfigSecret,
     backupConfig,
     svKey,
+    onboardingName: svAppConfig.onboardingName,
+    cometBftConnectionUri: svAppConfig.cometBftConnectionUri,
+    validatorWalletUserName: validatorAppConfig.walletUserName,
   });
 
   const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
@@ -127,7 +125,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     {
       cluster: {
         hostname: `${CLUSTER_BASENAME}.network.canton.global`,
-        svNamespace: RUNBOOK_NAMESPACE,
+        svNamespace: svNamespaceStr,
       },
     },
     localCharts,
@@ -147,6 +145,9 @@ type SvConfig = {
   loopback: k8s.helm.v3.Release | null;
   backupConfigSecret?: pulumi.Resource;
   svKey: pulumi.Input<SvIdKey>;
+  onboardingName: string;
+  cometBftConnectionUri: string;
+  validatorWalletUserName: string;
 };
 
 async function installSvAndValidator(config: SvConfig) {
@@ -160,6 +161,9 @@ async function installSvAndValidator(config: SvConfig) {
     backupConfigSecret,
     backupConfig,
     svKey,
+    onboardingName,
+    cometBftConnectionUri,
+    validatorWalletUserName,
   } = config;
 
   const postgres = installCNSVHelmChart(
@@ -173,7 +177,12 @@ async function installSvAndValidator(config: SvConfig) {
     version
   );
 
-  const globalDomain = installGlobalDomainNode(xns, password, imagePullDeps.concat([postgres]));
+  const globalDomain = installGlobalDomainNode(
+    xns,
+    password,
+    onboardingName,
+    imagePullDeps.concat([postgres])
+  );
 
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
@@ -233,7 +242,7 @@ async function installSvAndValidator(config: SvConfig) {
   const svValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
-      YOUR_SV_NAME: SV_NAME,
+      YOUR_SV_NAME: onboardingName,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
     }),
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
@@ -243,6 +252,10 @@ async function installSvAndValidator(config: SvConfig) {
     domain: {
       enable: includesCometBftGlobalDomainNode,
       sequencerPublicUrl: `http://sequencer.sv.svc.${CLUSTER_BASENAME}.network.canton.global:5008`,
+    },
+    cometBFT: {
+      enabled: true,
+      connectionUri: cometBftConnectionUri,
     },
   };
 
@@ -297,7 +310,7 @@ async function installSvAndValidator(config: SvConfig) {
   const validatorValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
-      SV_WALLET_USER_ID: SV_WALLET_USER_ID,
+      SV_WALLET_USER_ID: validatorWalletUserName,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
     }),
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),

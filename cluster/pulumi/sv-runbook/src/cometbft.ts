@@ -10,17 +10,7 @@ import {
   REPO_ROOT,
 } from 'cn-pulumi-common';
 
-import { CLUSTER_BASENAME, localCharts, SV_NAME, TARGET_CLUSTER, version } from './utils';
-
-const cometBftValues = loadYamlFromFile(
-  `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/cometbft-values.yaml`,
-  {
-    TARGET_CLUSTER: TARGET_CLUSTER,
-    YOUR_SV_NAME: SV_NAME,
-    YOUR_COMETBFT_NODE_ID: '9116f5faed79dcf98fa79a2a40865ad9b493f463',
-    YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
-  }
-);
+import { CLUSTER_BASENAME, localCharts, TARGET_CLUSTER, version } from './utils';
 
 const nodeKeyContent = fs.readFileSync(
   `${REPO_ROOT}/cluster/pulumi/sv-runbook/cometbft/node_key.json`,
@@ -33,8 +23,19 @@ const privValidatorKeyContent = fs.readFileSync(
 
 export function installCometBftNode(
   xns: ExactNamespace,
+  svName: string,
   dependencies: Input<Resource>[]
 ): k8s.helm.v3.Release {
+  const cometBftValues = loadYamlFromFile(
+    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/cometbft-values.yaml`,
+    {
+      TARGET_CLUSTER: TARGET_CLUSTER,
+      YOUR_SV_NAME: svName,
+      YOUR_COMETBFT_NODE_ID: '9116f5faed79dcf98fa79a2a40865ad9b493f463',
+      YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
+    }
+  );
+
   new k8s.core.v1.Secret(
     'cometbft-keys',
     {

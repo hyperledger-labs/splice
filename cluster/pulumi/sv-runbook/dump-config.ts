@@ -2,6 +2,8 @@
 // initialized when we don't want it to (to avoid pulumi configs trying to being read here)
 import { SecretsFixtureMap, initDumpConfig } from '../common/src/dump-config-common';
 
+import {SV_NAME, SV_NAMESPACE} from "./src/utils";
+
 initDumpConfig();
 
 async function main() {
@@ -14,15 +16,30 @@ async function main() {
 
   const installNode = await import('./src/installNode');
   const auth0Cfg = await import('./src/auth0cfg');
+  const utils = await import('./src/utils');
   const secrets = new SecretsFixtureMap();
 
-  installNode.installNode({
+  const authOClient = {
     getSecrets: () => Promise.resolve(secrets),
     /* eslint-disable @typescript-eslint/no-unused-vars */
     getClientAccessToken: (clientId: string, clientSecret: string, audience?: string) =>
       Promise.resolve('access_token'),
     getCfg: () => auth0Cfg.auth0Cfg,
-  });
+  };
+  const svAppConfig = {
+    onboardingName: utils.SV_NAME,
+    cometBftConnectionUri: 'http://cometbft-cometbft-rpc:26657',
+  };
+  const validatorAppConfig = {
+    walletUserName: utils.validatorWalletUserName
+  }
+
+  installNode.installNode(
+    authOClient,
+    utils.SV_NAMESPACE,
+    svAppConfig,
+    validatorAppConfig,
+  );
 }
 
 main();

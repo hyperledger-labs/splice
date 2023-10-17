@@ -18,9 +18,10 @@ export const includesCometBftGlobalDomainNode = globalDomainSequencerDriver == '
 export function installGlobalDomainNode(
   svNamespace: ExactNamespace,
   postgresPassword: Output<string>,
+  svName: string,
   dependencies: Input<Resource>[]
 ): k8s.helm.v3.Release {
-  const cometbft = installCometBftNode(svNamespace, dependencies);
+  const cometbft = installCometBftNode(svNamespace, svName, dependencies);
 
   if (includesCometBftGlobalDomainNode) {
     const globalDomainValues: ChartValues = {
