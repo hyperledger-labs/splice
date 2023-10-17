@@ -39,7 +39,7 @@ object Dependencies {
     "com.daml" %% "daml-lf-archive-reader" % CantonDependencies.daml_libraries_version
 
   lazy val daml_bindings_java =
-    "com.daml" % "bindings-java" % CantonDependencies.daml_libraries_version
+    "com.daml" % "bindings-java" % CantonDependencies.daml_java_codegen_version
 
   lazy val daml_lf_validation =
     "com.daml" %% "daml-lf-validation" % CantonDependencies.daml_libraries_version

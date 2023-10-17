@@ -38,7 +38,9 @@ object DamlPlugin extends AutoPlugin {
     val damlJavaCodegenOutput =
       settingKey[File]("Directory to put Java sources generated from DARs")
     val damlCompilerVersion =
-      settingKey[String]("The Daml version to use for DAR and code generation")
+      settingKey[String]("Daml compiler version")
+    val damlJavaCodegenVersion =
+      settingKey[String]("Java codegen version")
     val damlLanguageVersions =
       settingKey[Seq[String]]("The Daml-lf language versions supported by canton")
     val damlFixedDars = settingKey[Seq[String]](
@@ -106,6 +108,7 @@ object DamlPlugin extends AutoPlugin {
                   codegen,
                   outputDirectory,
                   damlCompilerVersion.value,
+                  damlJavaCodegenVersion.value,
                 )
               }
           }.toSet
@@ -256,6 +259,7 @@ object DamlPlugin extends AutoPlugin {
 
   override lazy val globalSettings: Seq[Def.Setting[_]] = Seq(
     damlCompilerVersion := CantonDependencies.daml_compiler_version,
+    damlJavaCodegenVersion := CantonDependencies.daml_java_codegen_version,
     damlLanguageVersions := CantonDependencies.daml_language_versions,
     damlCodeGeneration := Seq(),
     damlFixedDars := Seq(),
@@ -500,33 +504,37 @@ object DamlPlugin extends AutoPlugin {
       language: Codegen,
       managedSourceDir: File,
       damlVersion: String,
+      damlJavaCodegenVersion: String,
   ): Seq[File] = {
     if (!darFile.exists())
       throw new MessageOnlyException(
         s"Codegen asked to generate code from nonexistent file: $darFile"
       )
 
-    val (url, artifact, suffix) = language match {
+    val (codegenJarPath, suffix) = language match {
       case Codegen.Java =>
         (
-          s"https://repo.maven.apache.org/maven2/com/daml/codegen-jvm-main/${damlVersion}/",
-          s"codegen-jvm-main-${damlVersion}.jar",
+          ensureArtifactAvailable(
+            url =
+              s"https://repo.maven.apache.org/maven2/com/daml/codegen-jvm-main/${damlJavaCodegenVersion}/",
+            artifactFilename = s"codegen-jvm-main-${damlJavaCodegenVersion}.jar",
+            damlVersion = damlJavaCodegenVersion,
+            log = log,
+          ).getAbsolutePath,
           "java",
         )
       case Codegen.Scala =>
         (
-          s"https://repo.maven.apache.org/maven2/com/daml/codegen-scala-main/${damlVersion}/",
-          s"codegen-scala-main-${damlVersion}.jar",
+          ensureArtifactAvailable(
+            url =
+              s"https://repo.maven.apache.org/maven2/com/daml/codegen-scala-main/${damlVersion}/",
+            artifactFilename = s"codegen-scala-main-${damlVersion}.jar",
+            damlVersion = damlVersion,
+            log = log,
+          ).getAbsolutePath,
           "scala",
         )
     }
-
-    val codegenJarPath = ensureArtifactAvailable(
-      url = url,
-      artifactFilename = artifact,
-      damlVersion = damlVersion,
-      log = log,
-    ).getAbsolutePath
 
     log.debug(
       s"Running $language-codegen for ${darFile} into ${managedSourceDir}, project directory: $projectDir"
