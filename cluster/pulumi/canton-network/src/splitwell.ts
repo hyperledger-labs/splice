@@ -6,6 +6,7 @@ import {
   exactNamespace,
   installCNHelmChart,
   CLUSTER_BASENAME,
+  ValidatorTopupConfig,
   ValidatorOnboarding,
 } from 'cn-pulumi-common';
 import type { Auth0Client, BackupConfig, BootstrappingDumpConfig } from 'cn-pulumi-common';
@@ -19,9 +20,9 @@ export async function installSplitwell(
   svc: pulumi.Resource,
   providerWalletUser: string,
   onboarding: ValidatorOnboarding,
-  withDomainFees = false,
   backupConfig?: BackupConfig,
-  participantBootstrapDump?: BootstrappingDumpConfig
+  participantBootstrapDump?: BootstrappingDumpConfig,
+  topupConfig?: ValidatorTopupConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace('splitwell', true);
 
@@ -67,7 +68,6 @@ export async function installSplitwell(
   return installValidatorApp({
     auth0Client,
     xns,
-    withDomainFees,
     extraDependsOn,
     participant,
     additionalUsers: [
@@ -87,6 +87,7 @@ export async function installSplitwell(
     svSponsorAddress: 'http://sv-app.sv-1:5014',
     auth0AppName: 'splitwell_validator',
     participantBootstrapDump,
+    topupConfig: topupConfig,
     svValidator: false,
   });
 }

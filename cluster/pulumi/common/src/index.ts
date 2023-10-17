@@ -5,6 +5,7 @@ export * from './ingress';
 export * from './helm';
 export * from './loopback';
 export * from './onboarding';
+export * from './domainFees';
 export * from './runbook-backup';
 export * from './utils';
 export * from './backup';

@@ -239,7 +239,11 @@
           "port": 26657,
           "type": "cometbft"
         },
-        "trafficControl": {}
+        "trafficControl": {
+          "baseRate": 3333,
+          "enabled": true,
+          "maxBurstDuration": "10m"
+        }
       }
     },
     "name": "global-domain",
@@ -459,9 +463,9 @@
         "scanAddress": "https://scan.sv-1.svc.svrun.network.com.network.canton.global/api/v0/scan",
         "svValidator": true,
         "topup": {
-          "enabled": false,
+          "enabled": true,
           "minTopupInterval": "1m",
-          "targetThroughput": 33300
+          "targetThroughput": 33330
         },
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"
       }

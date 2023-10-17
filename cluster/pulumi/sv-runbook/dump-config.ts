@@ -2,8 +2,6 @@
 // initialized when we don't want it to (to avoid pulumi configs trying to being read here)
 import { SecretsFixtureMap, initDumpConfig } from '../common/src/dump-config-common';
 
-import {SV_NAME, SV_NAMESPACE} from "./src/utils";
-
 initDumpConfig();
 
 async function main() {
@@ -31,15 +29,10 @@ async function main() {
     cometBftConnectionUri: 'http://cometbft-cometbft-rpc:26657',
   };
   const validatorAppConfig = {
-    walletUserName: utils.validatorWalletUserName
-  }
+    walletUserName: utils.validatorWalletUserName,
+  };
 
-  installNode.installNode(
-    authOClient,
-    utils.SV_NAMESPACE,
-    svAppConfig,
-    validatorAppConfig,
-  );
+  installNode.installNode(authOClient, utils.SV_NAMESPACE, svAppConfig, validatorAppConfig);
 }
 
 main();

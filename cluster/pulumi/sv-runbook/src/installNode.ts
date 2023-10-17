@@ -18,6 +18,8 @@ import {
   isDevNet,
   loadYamlFromFile,
   participantBootstrapDumpSecretName,
+  domainFeesConfig,
+  ValidatorTopupConfig,
   REPO_ROOT,
   svAppSecrets,
   svKeySecret,
@@ -33,7 +35,7 @@ import { auth0Cfg } from './auth0cfg';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { includesCometBftGlobalDomainNode, installGlobalDomainNode } from './globalDomain';
 import { walletUIClientId, directoryClientId, svUIClientId } from './secrets';
-import { CLUSTER_BASENAME, localCharts, TARGET_CLUSTER, version, withDomainFees } from './utils';
+import { CLUSTER_BASENAME, localCharts, TARGET_CLUSTER, version } from './utils';
 
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');
@@ -102,6 +104,11 @@ export async function installNode(
 
   const svKey = svKeyFromSecret('sv');
 
+  const topupConfig: ValidatorTopupConfig = {
+    targetThroughput: domainFeesConfig.targetThroughput,
+    minTopupInterval: domainFeesConfig.minTopupInterval,
+  };
+
   const { sv, validator } = await installSvAndValidator({
     xns,
     password,
@@ -111,6 +118,7 @@ export async function installNode(
     loopback,
     backupConfigSecret,
     backupConfig,
+    topupConfig,
     svKey,
     onboardingName: svAppConfig.onboardingName,
     cometBftConnectionUri: svAppConfig.cometBftConnectionUri,
@@ -140,6 +148,7 @@ type SvConfig = {
   onboarding?: ValidatorOnboarding;
   backupConfig?: BackupConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
+  topupConfig?: ValidatorTopupConfig;
   password: pulumi.Output<string>;
   imagePullDeps: pulumi.Input<pulumi.Resource>[];
   loopback: k8s.helm.v3.Release | null;
@@ -155,6 +164,7 @@ async function installSvAndValidator(config: SvConfig) {
     xns,
     password,
     participantBootstrapDumpSecret,
+    topupConfig,
     auth0Client,
     imagePullDeps,
     loopback,
@@ -331,16 +341,16 @@ async function installSvAndValidator(config: SvConfig) {
     ...(fixedTokens() ? fixedTokensValue : {}),
   };
 
-  const validatorValuesWithMaybeDomainFees = validatorValuesWithMaybeFixedTokens;
-  if (!withDomainFees) {
-    validatorValuesWithMaybeDomainFees['topup']['enabled'] = false;
-  }
+  const validatorValuesWithMaybeTopups: ChartValues = {
+    ...validatorValuesWithMaybeFixedTokens,
+    topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
+  };
 
   const validator = installCNSVHelmChart(
     xns,
     'validator',
     'cn-validator',
-    validatorValuesWithMaybeDomainFees,
+    validatorValuesWithMaybeTopups,
     localCharts,
     version,
     imagePullDeps

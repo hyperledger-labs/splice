@@ -6,12 +6,12 @@ import {
   REPO_ROOT,
   installCNSVHelmChart,
   loadYamlFromFile,
+  domainFeesConfig,
 } from 'cn-pulumi-common';
-import { domainFeesConfig } from 'cn-pulumi-common/src/domainFeesCfg';
 import { globalDomainSequencerDriver } from 'cn-pulumi-common/src/global-domain';
 
 import { installCometBftNode } from './cometbft';
-import { localCharts, version, withDomainFees } from './utils';
+import { localCharts, version } from './utils';
 
 export const includesCometBftGlobalDomainNode = globalDomainSequencerDriver == 'cometbft';
 
@@ -30,13 +30,11 @@ export function installGlobalDomainNode(
         {}
       ),
       postgresPassword: postgresPassword,
-      trafficControl: withDomainFees
-        ? {
-            enabled: true,
-            baseRate: domainFeesConfig.baseRate,
-            maxBurstDuration: domainFeesConfig.maxBurstDuration,
-          }
-        : {},
+      trafficControl: {
+        enabled: true,
+        baseRate: domainFeesConfig.baseRate,
+        maxBurstDuration: domainFeesConfig.maxBurstDuration,
+      },
     };
     return installCNSVHelmChart(
       svNamespace,

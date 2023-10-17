@@ -5,6 +5,7 @@ import {
   Auth0Client,
   BackupConfig,
   BootstrappingDumpConfig,
+  ValidatorTopupConfig,
   CLUSTER_BASENAME,
   ExactNamespace,
   fetchAndInstallParticipantBootstrapDump,
@@ -14,7 +15,6 @@ import {
   installValidatorOnboardingSecret,
   validatorOnboardingSecretName,
 } from 'cn-pulumi-common';
-import { domainFeesConfig } from 'cn-pulumi-common/src/domainFeesCfg';
 
 export type ExtraDomain = {
   alias: string;
@@ -32,7 +32,7 @@ export type ValidatorConfig = {
   xns: ExactNamespace;
   auth0AppName: string;
   onboarding?: ValidatorOnboarding;
-  withDomainFees: boolean;
+  topupConfig?: ValidatorTopupConfig;
   validatorWalletUser?: string;
   disableAllocateLedgerApiUserParty?: boolean;
   participant: pulumi.Resource;
@@ -104,13 +104,7 @@ export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
             },
           }
         : undefined,
-      topup: config.withDomainFees
-        ? {
-            enabled: true,
-            targetThroughput: domainFeesConfig.targetThroughput,
-            minTopupInterval: domainFeesConfig.minTopupInterval,
-          }
-        : {},
+      topup: config.topupConfig ? { enabled: true, ...config.topupConfig } : { enabled: false },
       disableAllocateLedgerApiUserParty: config.disableAllocateLedgerApiUserParty,
       participantIdentitiesDumpPeriodicBackup: backupConfig,
       additionalConfig: config.additionalConfig,

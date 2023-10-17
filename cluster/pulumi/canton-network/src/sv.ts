@@ -5,6 +5,7 @@ import {
   btoa,
   BackupConfig,
   BootstrappingDumpConfig,
+  ValidatorTopupConfig,
   ChartValues,
   CLUSTER_BASENAME,
   ExactNamespace,
@@ -74,7 +75,6 @@ export type SvConfig = {
   onboardingName: string;
   validatorWalletUser: string;
   onboarding: SvOnboarding;
-  withDomainFees: boolean;
   approvedSvIdentities: ApprovedSvIdentity[];
   withScan: boolean;
   withDirectoryBackend: boolean;
@@ -82,6 +82,7 @@ export type SvConfig = {
   isDevNet: boolean;
   backupConfig?: BackupConfig;
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
+  topupConfig?: ValidatorTopupConfig;
   withDomainNode: boolean;
   auth0ValidatorAppName: string;
   sequencerDriver: 'cometbft' | 'postgres';
@@ -158,7 +159,6 @@ export function installSvNode(config: SvConfig): {
     installGlobalDomain(
       xns,
       'global-domain',
-      config.withDomainFees,
       postgresDb,
       config.sequencerDriver === 'cometbft'
         ? {
@@ -247,12 +247,12 @@ export function installSvNode(config: SvConfig): {
 
   installValidatorApp({
     auth0Client: config.auth0Client,
-    withDomainFees: config.withDomainFees,
     xns,
     validatorWalletUser: config.validatorWalletUser,
     participant,
     disableAllocateLedgerApiUserParty: true,
     auth0AppName: config.auth0ValidatorAppName,
+    topupConfig: config.topupConfig,
     backupConfig:
       backupConfig && backupConfigSecret
         ? {

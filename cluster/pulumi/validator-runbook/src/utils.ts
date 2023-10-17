@@ -1,4 +1,4 @@
-import { envFlag, requireEnv } from 'cn-pulumi-common';
+import { requireEnv } from 'cn-pulumi-common';
 
 export const CLUSTER_BASENAME = requireEnv(
   'GCP_CLUSTER_BASENAME',
@@ -11,5 +11,4 @@ export const TARGET_CLUSTER = requireEnv(
 
 export const version = process.env.CHARTS_VERSION;
 export const localCharts = version == '' || version == undefined; // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)
-export const withDomainFees = envFlag('DOMAIN_FEES');
 export const VALIDATOR_NAMESPACE = process.env.VALIDATOR_NAMESPACE || 'validator';

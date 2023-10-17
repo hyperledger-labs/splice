@@ -3,6 +3,8 @@ import {
   Auth0Client,
   BackupConfig,
   BootstrappingDumpConfig,
+  ValidatorTopupConfig,
+  domainFeesConfig,
   envFlag,
   InfrastructureOutputs,
   REPO_ROOT,
@@ -14,7 +16,6 @@ import {
   SvIdKey,
 } from 'cn-pulumi-common';
 import { globalDomainSequencerDriver } from 'cn-pulumi-common/src/global-domain';
-import { exit } from 'process';
 
 import { installDocs } from './docs';
 import { configureForwardAll } from './gateway';
@@ -39,14 +40,6 @@ if (approveSvRunbook) {
 const singleSv = envFlag('SINGLE_SV') || !isDevNet;
 if (singleSv) {
   console.error('Launching with a single SV');
-}
-
-const withDomainFees = envFlag('DOMAIN_FEES') || !isDevNet;
-if (withDomainFees && !singleSv) {
-  console.error(
-    `Currently, you cannot enable domain fees with more than one SV, please also set SINGLE_SV to 1 and rerun (${singleSv})`
-  );
-  exit(1);
 }
 
 type BootstrapCliConfig = {
@@ -136,6 +129,11 @@ if (!isDevNet) {
   backupConfig = { backupInterval: '10m', bucket: bootstrapBucketSpec };
 }
 
+const topupConfig: ValidatorTopupConfig = {
+  targetThroughput: domainFeesConfig.targetThroughput,
+  minTopupInterval: domainFeesConfig.minTopupInterval,
+};
+
 if (bootstrappingConfig) {
   const end = new Date(Date.parse(bootstrappingConfig.date));
   // We search within an interval of 2 hours. Given that we usually backups every 10min, this gives us
@@ -163,7 +161,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       ? 'auth0|64afbc0956a97fe9577249d7'
       : 'auth0|64529b128448ded6aa68048f',
     onboarding: { type: 'found-collective' },
-    withDomainFees,
     approvedSvIdentities,
     withScan: true,
     withDirectoryBackend: true,
@@ -175,6 +172,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     isDevNet,
     backupConfig,
     bootstrappingDumpConfig,
+    topupConfig,
     withDomainNode: true,
     auth0ValidatorAppName: 'sv1_validator',
     sequencerDriver: globalDomainSequencerDriver,
@@ -187,7 +185,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       onboardingName: 'Canton-Foundation-2',
       validatorWalletUser: 'auth0|64afbc353bbc7ca776e27bf4',
       onboarding: joinViaSv1(sv1, sv2Key, postgresDB1),
-      withDomainFees,
       approvedSvIdentities,
       withScan: true,
       withDirectoryBackend: false,
@@ -197,6 +194,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       withDomainNode: isDevNet,
       auth0ValidatorAppName: 'sv2_validator',
       bootstrappingDumpConfig,
+      topupConfig,
       sequencerDriver: globalDomainSequencerDriver,
     });
     installSvNode({
@@ -205,7 +203,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       onboardingName: 'Canton-Foundation-3',
       validatorWalletUser: 'auth0|64afbc4431b562edb8995da6',
       onboarding: joinViaSv1(sv1, sv3Key, postgresDB1),
-      withDomainFees,
       approvedSvIdentities,
       withScan: false,
       withDirectoryBackend: false,
@@ -215,6 +212,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       withDomainNode: isDevNet,
       auth0ValidatorAppName: 'sv3_validator',
       bootstrappingDumpConfig,
+      topupConfig,
       sequencerDriver: globalDomainSequencerDriver,
     });
     installSvNode({
@@ -223,7 +221,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       onboardingName: 'Canton-Foundation-4',
       validatorWalletUser: 'auth0|64afbc720e20777e46fff490',
       onboarding: joinViaSv1(sv1, sv4Key, postgresDB1),
-      withDomainFees,
       approvedSvIdentities,
       withScan: false,
       withDirectoryBackend: false,
@@ -233,6 +230,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       withDomainNode: isDevNet,
       auth0ValidatorAppName: 'sv4_validator',
       bootstrappingDumpConfig,
+      topupConfig,
       sequencerDriver: globalDomainSequencerDriver,
     });
   }
@@ -242,12 +240,12 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     sv1,
     'validator1',
     validator1Onboarding,
-    // TODO(#8004) - enable topups for validator1
-    false,
     isDevNet,
     'auth0|63e3d75ff4114d87a2c1e4f5',
     backupConfig,
     bootstrappingDumpConfig
+    // TODO(#8004) - enable topups for validator1
+    // topupConfig,
   );
 
   const splitwell = await installSplitwell(
@@ -255,10 +253,10 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     sv1,
     'auth0|63e12e0415ad881ffe914e61',
     splitwellOnboarding,
-    // TODO(#8004) - enable topups for splitwell validator
-    false,
     backupConfig,
     bootstrappingDumpConfig
+    // TODO(#8004) - enable topups for splitwell validator
+    // topupConfig,
   );
 
   const docs = installDocs();

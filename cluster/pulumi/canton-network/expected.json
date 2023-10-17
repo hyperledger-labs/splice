@@ -1586,7 +1586,9 @@
         },
         "svSponsorAddress": "http://sv-app.sv-1:5014",
         "svValidator": false,
-        "topup": {}
+        "topup": {
+          "enabled": false
+        }
       }
     },
     "name": "helm-splitwell-validator-splitwell",
@@ -1878,7 +1880,11 @@
           "port": 26657,
           "type": "cometbft"
         },
-        "trafficControl": {}
+        "trafficControl": {
+          "baseRate": 3333,
+          "enabled": true,
+          "maxBurstDuration": "10m"
+        }
       }
     },
     "name": "helm-sv-1-global-domain",
@@ -2521,7 +2527,11 @@
           }
         },
         "svValidator": true,
-        "topup": {},
+        "topup": {
+          "enabled": true,
+          "minTopupInterval": "1m",
+          "targetThroughput": 33330
+        },
         "validatorWalletUser": "auth0|64afbc0956a97fe9577249d7"
       }
     },
@@ -2736,7 +2746,11 @@
           "port": 26657,
           "type": "cometbft"
         },
-        "trafficControl": {}
+        "trafficControl": {
+          "baseRate": 3333,
+          "enabled": true,
+          "maxBurstDuration": "10m"
+        }
       }
     },
     "name": "helm-sv-2-global-domain",
@@ -3351,7 +3365,11 @@
           }
         },
         "svValidator": true,
-        "topup": {},
+        "topup": {
+          "enabled": true,
+          "minTopupInterval": "1m",
+          "targetThroughput": 33330
+        },
         "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
       }
     },
@@ -3566,7 +3584,11 @@
           "port": 26657,
           "type": "cometbft"
         },
-        "trafficControl": {}
+        "trafficControl": {
+          "baseRate": 3333,
+          "enabled": true,
+          "maxBurstDuration": "10m"
+        }
       }
     },
     "name": "helm-sv-3-global-domain",
@@ -4108,7 +4130,11 @@
           }
         },
         "svValidator": true,
-        "topup": {},
+        "topup": {
+          "enabled": true,
+          "minTopupInterval": "1m",
+          "targetThroughput": 33330
+        },
         "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
       }
     },
@@ -4323,7 +4349,11 @@
           "port": 26657,
           "type": "cometbft"
         },
-        "trafficControl": {}
+        "trafficControl": {
+          "baseRate": 3333,
+          "enabled": true,
+          "maxBurstDuration": "10m"
+        }
       }
     },
     "name": "helm-sv-4-global-domain",
@@ -4865,7 +4895,11 @@
           }
         },
         "svValidator": true,
-        "topup": {},
+        "topup": {
+          "enabled": true,
+          "minTopupInterval": "1m",
+          "targetThroughput": 33330
+        },
         "validatorWalletUser": "auth0|64afbc720e20777e46fff490"
       }
     },
@@ -5353,7 +5387,9 @@
         },
         "svSponsorAddress": "http://sv-app.sv-1:5014",
         "svValidator": false,
-        "topup": {},
+        "topup": {
+          "enabled": false
+        },
         "validatorPartyHint": "validator1_validator_service_user",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       }

@@ -1,3 +1,8 @@
+export type ValidatorTopupConfig = {
+  targetThroughput: number;
+  minTopupInterval: string;
+};
+
 // TODO(#6032): determine the best defaults here
 
 // Please keep these values in sync with

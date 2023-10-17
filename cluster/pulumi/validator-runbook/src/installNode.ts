@@ -19,6 +19,8 @@ import {
   isDevNet,
   loadYamlFromFile,
   ValidatorOnboarding,
+  domainFeesConfig,
+  ValidatorTopupConfig,
   validatorOnboardingSecretName,
   validatorSecrets,
   installValidatorOnboardingSecret,
@@ -35,7 +37,6 @@ import {
   TARGET_CLUSTER,
   localCharts,
   version,
-  withDomainFees,
 } from './utils';
 
 if (!isDevNet) {
@@ -97,6 +98,11 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     special: true,
   }).result;
 
+  const topupConfig: ValidatorTopupConfig = {
+    targetThroughput: domainFeesConfig.targetThroughput,
+    minTopupInterval: domainFeesConfig.minTopupInterval,
+  };
+
   const validator = await installValidator({
     xns,
     onboarding,
@@ -107,6 +113,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     loopback,
     backupConfigSecret,
     backupConfig,
+    topupConfig,
   });
 
   const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
@@ -136,6 +143,7 @@ type ValidatorConfig = {
   onboarding: ValidatorOnboarding;
   backupConfig?: BackupConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
+  topupConfig?: ValidatorTopupConfig;
   password: pulumi.Output<string>;
   imagePullDeps: pulumi.Input<pulumi.Resource>[];
   loopback: k8s.helm.v3.Release | null;
@@ -153,6 +161,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     loopback,
     backupConfigSecret,
     backupConfig,
+    topupConfig,
   } = config;
 
   const postgres = installCNSVHelmChart(
@@ -240,10 +249,10 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     ...(fixedTokens() ? fixedTokensValue : {}),
   };
 
-  const validatorValuesWithMaybeDomainFees = validatorValuesWithMaybeFixedTokens;
-  if (!withDomainFees) {
-    validatorValuesWithMaybeDomainFees['topup']['enabled'] = false;
-  }
+  const validatorValuesWithMaybeTopups: ChartValues = {
+    ...validatorValuesWithMaybeFixedTokens,
+    topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
+  };
 
   const dependsOn = imagePullDeps
     .concat([participant])
@@ -257,7 +266,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     xns,
     'validator',
     'cn-validator',
-    validatorValuesWithMaybeDomainFees,
+    validatorValuesWithMaybeTopups,
     localCharts,
     version,
     dependsOn

@@ -1,8 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { Service } from '@pulumi/kubernetes/core/v1';
-import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
-import { domainFeesConfig } from 'cn-pulumi-common/src/domainFeesCfg';
+import { ExactNamespace, installCNHelmChart, domainFeesConfig } from 'cn-pulumi-common';
 
 import { Postgres } from './postgres';
 
@@ -20,13 +19,9 @@ export function installDomain(
 export function installGlobalDomain(
   xns: ExactNamespace,
   name: string,
-  withDomainFees: boolean,
   postgres: Postgres,
   sequencer: PostgresSequencer | CometBftSequencer
 ): pulumi.Resource {
-  if (withDomainFees) {
-    console.error('Running with domain fees');
-  }
   return installCNHelmChart(xns, name, 'cn-global-domain', {
     postgres: postgres.address,
     postgresPassword: postgres.password,
@@ -42,13 +37,11 @@ export function installGlobalDomain(
             address: sequencer.postgres.address,
             password: sequencer.postgres.password,
           },
-    trafficControl: withDomainFees
-      ? {
-          enabled: true,
-          baseRate: domainFeesConfig.baseRate,
-          maxBurstDuration: domainFeesConfig.maxBurstDuration,
-        }
-      : {},
+    trafficControl: {
+      enabled: true,
+      baseRate: domainFeesConfig.baseRate,
+      maxBurstDuration: domainFeesConfig.maxBurstDuration,
+    },
     metrics: {
       enable: true,
     },

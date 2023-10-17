@@ -6,6 +6,7 @@ import {
   installCNHelmChart,
   BackupConfig,
   BootstrappingDumpConfig,
+  ValidatorTopupConfig,
   CLUSTER_BASENAME,
   ValidatorOnboarding,
 } from 'cn-pulumi-common';
@@ -20,11 +21,11 @@ export async function installValidator1(
   svc: pulumi.Resource,
   name: string,
   onboarding: ValidatorOnboarding,
-  withDomainFees = false,
   isDevNet: boolean,
   validatorWalletUser: string,
   backupConfig?: BackupConfig,
-  participantBootstrapDump?: BootstrappingDumpConfig
+  participantBootstrapDump?: BootstrappingDumpConfig,
+  topupConfig?: ValidatorTopupConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name, true);
 
@@ -60,7 +61,6 @@ export async function installValidator1(
 
   return installValidatorApp({
     auth0Client,
-    withDomainFees,
     validatorWalletUser,
     xns,
     participant,
@@ -73,6 +73,7 @@ export async function installValidator1(
     extraDependsOn,
     auth0AppName: 'validator1',
     participantBootstrapDump,
+    topupConfig,
     svValidator: false,
   });
 }

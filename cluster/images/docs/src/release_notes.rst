@@ -12,6 +12,8 @@ Release Notes
     For validator Helm charts, ``svValidator`` should be set to ``true`` for SV nodes.
     This value is in the ``sv-validator-values.yaml`` file.
 
+* Domain fees (and traffic top-ups) are now enabled on DevNet as well. This implies that explicitly setting `topup.enabled` in `validator-values.yaml` is no longer required (it defaults to `true`).
+
 2023-10-16
 ----------
 

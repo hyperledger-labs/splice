@@ -455,7 +455,6 @@ that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator
 - If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
 - Replace ``SV_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
-- **For DevNet only** Domain fees are currently disabled on DevNet. This implies that on DevNet, traffic top-ups must also be disabled at present. To do so, set `topup.enabled` to false.
 
 The private and public key for your SV are defined in a K8s secret.
 If you haven't done so yet, please first follow the instructions in

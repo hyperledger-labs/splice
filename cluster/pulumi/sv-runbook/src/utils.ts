@@ -1,4 +1,4 @@
-import { envFlag, isDevNet, requireEnv } from 'cn-pulumi-common';
+import { isDevNet, requireEnv } from 'cn-pulumi-common';
 
 export const CLUSTER_BASENAME = requireEnv(
   'GCP_CLUSTER_BASENAME',
@@ -13,7 +13,6 @@ export const SV_NAMESPACE = 'sv';
 
 export const version = process.env.CHARTS_VERSION;
 export const localCharts = version == '' || version == undefined; // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)
-export const withDomainFees = envFlag('DOMAIN_FEES');
 
 // Default to admin@sv-dev.com (devnet) or admin@sv.com (non devnet) at the sv-test tenant by default
 export const validatorWalletUserName = isDevNet
