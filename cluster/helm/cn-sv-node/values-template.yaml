@@ -12,3 +12,6 @@ resources:
   requests:
     cpu: 1
     memory: 4096Mi
+
+domain:
+  enable: true

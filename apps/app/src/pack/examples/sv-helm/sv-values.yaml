@@ -13,9 +13,6 @@ auth:
 cometBFT:
   enabled: true
   connectionUri: "http://cometbft-cometbft-rpc:26657"
-domain:
-  # Set to true for devnet
-  enable: false
 # PARTICIPANT_BOOTSTRAP_START
 # Uncomment the two lines below if you are bootstrapping from an existing participant
 # identities dump.
