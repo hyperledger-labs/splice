@@ -2306,17 +2306,20 @@ workflows:
     jobs:
     - docker_images_push:
         <<: *notify-fail
+        <<: *main-branch-only
         context:
           - artifactory
           - datadog
           - slack-context
     - wait_for_previous_pipeline:
         <<: *notify-fail
+        <<: *main-branch-only
         context:
           - artifactory
           - slack-context
         workflow_names: "deploy_cidaily cidaily_health_check redeploy_sv_runbook_cidaily"
     - deploy_cluster:
+        <<: *main-branch-only
         context:
           - artifactory
           - datadog
@@ -2327,6 +2330,7 @@ workflows:
            - wait_for_previous_pipeline
     - preflight_check:
         cluster: "cidaily"
+        <<: *main-branch-only
         context:
           - artifactory
           - canton-network-vpn
@@ -2338,12 +2342,14 @@ workflows:
           - docker_images_push
           - deploy_cluster
     - publish_public_release:
+        <<: *main-branch-only
         context:
           - artifactory
           - datadog
         requires:
           - preflight_check
     - deploy_sv_runbook:
+        <<: *main-branch-only
         context:
           - artifactory
           - datadog
@@ -2354,6 +2360,7 @@ workflows:
           - deploy_cluster
           - publish_public_release
     - preflight_sv_check:
+        <<: *main-branch-only
         context:
           - artifactory
           - canton-network-vpn
