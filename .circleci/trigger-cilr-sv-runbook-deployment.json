@@ -1,15 +1,15 @@
 {
-    "name": "CIDaily SV Runbook Redeployment",
-    "description": "CIDaily SV Runbook Redeployment every 4 hours",
+    "name": "CILR SV Runbook Redeployment",
+    "description": "Daily CILR SV Runbook Redeployment",
     "attribution-actor": "system",
     "parameters" : {
       "branch" : "main",
-      "run-job": "redeploy-sv-runbook-cidaily"
+      "run-job": "redeploy-sv-runbook-cilr"
     },
     "timetable" : {
       "per-hour" : 1,
       "hours-of-day": [
-        0, 4, 8, 12, 16, 20
+        4
       ],
       "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
       "days-of-month" : [ ],
