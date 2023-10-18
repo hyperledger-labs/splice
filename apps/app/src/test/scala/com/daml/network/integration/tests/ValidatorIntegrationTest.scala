@@ -84,33 +84,6 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     }
   }
 
-  // TODO(M3-46) clean up once every validator uses this onboarding flow
-  "onboard validator via onboarding config" in { implicit env =>
-    initSvcWithSv1Only()
-
-    clue("Start Bob’s validator, who is configured with a `ValidatorOnboardingConfig`") {
-      bobValidatorBackend.startSync()
-    }
-    val bobValidatorParty = bobValidatorBackend.getValidatorPartyId()
-
-    clue("Bob's validator can see its own ValidatorLicense") {
-      inside(
-        bobValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cc.validatorlicense.ValidatorLicense.COMPANION)(
-            bobValidatorParty
-          )
-      ) {
-        case Seq(license) => {
-          license.data.validator shouldBe bobValidatorParty.toProtoPrimitive
-        }
-      }
-    }
-    clue("Bob's validator can restart cleanly.") {
-      bobValidatorBackend.stop()
-      bobValidatorBackend.startSync()
-    }
-  }
-
   "onboard users with party hint sanitizer" in { implicit env =>
     initSvcWithSv1Only()
     aliceValidatorBackend.startSync()

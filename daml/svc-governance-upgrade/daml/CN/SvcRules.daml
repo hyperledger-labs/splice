@@ -125,13 +125,15 @@ data CollectiveSummary = CollectiveSummary with
 -- Workflow templates
 ---------------------
 
+-- TODO(#7649) revise and/or remove
 data ElectionRequestReason
   = ERR_LeaderUnavailable
-  -- TODO(M3-46): add case for leader asking to be relieved for a graceful shutdown
+  -- TODO(#7649): add case for leader asking to be relieved for a graceful shutdown
   | ERR_OtherReason Text
   deriving (Eq, Ord, Show)
 
 -- | A request to elect a new leader for the SVC.
+-- TODO(#7649) revise and/or remove
 template ElectionRequest with
     svc : Party
     requester : Party
@@ -501,6 +503,7 @@ template SvcRules with
 
     -- Automation leader election
     ------------------------------
+    -- TODO(#7649) revise and/or remove
     nonconsuming choice SvcRules_RequestElection : ContractId ElectionRequest
       with
         requester : Party
@@ -509,12 +512,13 @@ template SvcRules with
       controller requester
       do
         requireUnlocked lock
-        -- TODO(M3-46): consider interaction with concurrent membership changes
+        -- TODO(#7649): consider interaction with concurrent membership changes
         require "Requester is a collective member" (requester `Map.member` members)
         require "All members are ranked exactly once" (sort ranking == sort (Map.keys members))
         create ElectionRequest with
           ..
 
+    -- TODO(#7649) revise and/or remove
     choice SvcRules_ElectLeader : SvcRules
       with
         actor : Party
@@ -532,7 +536,7 @@ template SvcRules with
           pure req
         let numVotes = length reqs
             numVoters = numVotes
-            -- TODO(M3-46): consider whether that is the right number of votes to require
+            -- TODO(#7649): consider whether that is the right number of votes to require
             -- as there might be more votes being taken into consideration
             numVotesForMajority = (summary.requiredNumVotes + 1) / 2
         require "Requests are from different members" (unique $ map (.requester) reqs)
