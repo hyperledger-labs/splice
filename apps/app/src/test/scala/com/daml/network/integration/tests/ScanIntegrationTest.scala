@@ -23,7 +23,7 @@ class ScanIntegrationTest
     with ConfigScheduleUtil
     with WalletTestUtil
     with TimeTestUtil {
-
+  val defaultPageSize = 10000
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
@@ -368,7 +368,7 @@ class ScanIntegrationTest
 
       eventually() {
         val svRewardsCollected = sv1ScanBackend
-          .listActivity(None, 10000)
+          .listActivity(None, defaultPageSize)
           .flatMap(_.svRewardCollected)
         svRewardsCollected should have size (1)
         val svRewardCollected = svRewardsCollected(0)
@@ -396,7 +396,7 @@ class ScanIntegrationTest
 
         val zero = BigDecimal(0)
         val bobTransfers = sv1ScanBackend
-          .listActivity(None, 10000)
+          .listActivity(None, defaultPageSize)
           .flatMap(_.transfer)
           .filter(_.sender.party == bobValidatorParty)
 
@@ -416,6 +416,40 @@ class ScanIntegrationTest
         val inputValidatorAmount = inputValidatorAmounts(0)
         inputValidatorAmount shouldBe validatorRewardAmount
       }
+    }
+  }
+
+  "list minted coins" in { implicit env =>
+    val sv1UserParty = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
+    val mintAmount = 47.0
+    clue("Mint to get some coins") {
+      actAndCheck(
+        "sv1 mints coins", {
+          mintCoin(
+            sv1ValidatorBackend.participantClientWithAdminToken,
+            sv1UserParty,
+            mintAmount,
+          )
+        },
+      )(
+        "Coins should appear in sv1's wallet",
+        _ => {
+          sv1WalletClient.list().coins should have length 1
+          sv1WalletClient.list().coins.loneElement.effectiveAmount should be(BigDecimal(mintAmount))
+        },
+      )
+    }
+    eventually() {
+      val sv1Mints = sv1ScanBackend
+        .listActivity(None, defaultPageSize)
+        .flatMap(_.mint)
+        .filter(_.coinOwner == sv1UserParty.toProtoPrimitive)
+      BigDecimal(sv1Mints.loneElement.coinAmount) shouldBe BigDecimal(mintAmount)
+      val sv1MintsFromHistory = sv1ScanBackend
+        .listTransactions(None, TransactionHistoryRequest.SortOrder.Desc, defaultPageSize)
+        .flatMap(_.mint)
+        .filter(_.coinOwner == sv1UserParty.toProtoPrimitive)
+      BigDecimal(sv1MintsFromHistory.loneElement.coinAmount) shouldBe BigDecimal(mintAmount)
     }
   }
 }
