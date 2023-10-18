@@ -12,7 +12,7 @@
         1. [`sbt` Tips\&Tricks](#sbt-tipstricks)
 1. [Contributing Changes](#contributing-changes)
     1. [Contributing as a New Joiner](#contributing-as-a-new-joiner)
-    1. [The Flake Rotation](#the-flake-rotation)
+    1. [The Support Rotation](#the-support-rotation)
     1. [Contribution Guide](#contribution-guide)
     1. [Branch naming](#branch-naming)
     1. [Unused Import Warnings](#unused-import-warnings)
@@ -338,24 +338,27 @@ Things sometimes go wrong with `sbt` in ways that are hard to debug. This sectio
 For your first issue, you can take a look at [issues labelled with the `starter` tag](https://github.com/DACH-NY/canton-network-node/issues?q=is%3Aissue+label%3Astarter). Else, please ask your onboarding
 buddy for help with getting started on the code base.
 
-### The Flake Rotation
+### The Support Rotation
 
-The Canton Network team has a formal support rotation in the form of
-our flake process.  Each of our weekly sprints has a pair of engineers
+(AKA "Flake Rotation", "Flaky Test Duty")
+
+The Canton Network team has a formal support rotation.
+Each of our weekly sprints has a pair of engineers
 assigned to be responsible during the sprint for driving the
-resolution of test failures that occur in our test environments
-(`Staging`, `DevNet`, and `TestNet`) during that sprint.  For the
-engineers on flake duty, this work is their priority over any other
-issues on which they may be working.
+resolution of test and cluster failures that occur in our test environments
+(`cimain`, `devnet`, `testnet` and others) during that sprint.  For the
+engineers on support duty, this work is their priority over any other
+issues on which they may be working,
+with failures of partner-facing clusters (`testnet` and `devnet`) taking priority over other types of failures.
 
-The job of an engineer on flake duty is to _drive the resolution_ of
-failures. This does not mean these engineers are responsible for
-fixing all problems themselves, nor does it even mean everything
+The job of an engineer on support duty is to _drive the resolution_ of
+failures. This does not mean that these engineers must
+fix all problems themselves, nor does it mean that everything
 should be fixed. Driving the resolution means clearly communicating
 status of the issue as it progresses from beginning to end,
 marshalling any other staff on the team needed for a resolution, and
 then helping organize the work to fix. Canton Network is a team
-effort, and the team should be brought in to resolve flakes as it is
+effort, and the team should be brought in to resolve failures and flakes as it is
 helpful. The team may also decide based on priorities and future plans
 that a specific failure isn't worth the time to fix. This is fine, as
 long as there is consensus on the decision and it is clearly
@@ -369,23 +372,25 @@ way to be intentional about addressing the current 'least stable'
 parts of our code base, with an idea of improving reliability for our
 customers.
 
-Flake duty is assigneed based on the [team holiday calendar](https://docs.google.com/spreadsheets/d/1Sp12aNj-bPAuPD9aEnH_xk031dADiGHdQdJlCGxhW3k/edit#gid=1174224054).
+Support duty is assigneed based on the [team holiday calendar](https://docs.google.com/spreadsheets/d/1Sp12aNj-bPAuPD9aEnH_xk031dADiGHdQdJlCGxhW3k/edit#gid=1174224054).
 Please consult this spreadsheet to understand when you are on duty. There are
-pairs of weeks highlighted to indicate the schedule - flake duty
+pairs of weeks highlighted to indicate the schedule - support duty
 begins with the sprint starting on the Wednesday of the first week and
 ends with the sprint on Wednesday of the second week. At each boundary,
-the outgoing and incoming engineers on flake duty rotation must
+the outgoing and incoming engineers on support duty rotation must
 have a brief touchpoint meeting to go over any issues still under resolution.
 
-Important: we rely on there always being two engineers available on flake duty.
-Thus, engineers on flake duty that have a day off are required to
+Important: we rely on there always being two engineers available on support duty.
+Thus, engineers on support duty that have a day off are required to
 ask another engineer to substitute for them.
 
-For engineers on flake duty, the resolution process is as follows.
+For engineers on support duty, the resolution process is as follows.
 
-* When there is a Slack message indicating a test failure, investigate
-  and assess if it's a new or existing failure. For new failures, create
-  a new tracking issue in the [Flaky Test](https://github.com/DACH-NY/canton-network-node/milestone/19)
+* When there is a Slack message on [#team-canton-network-internal-ci](https://daholdings.slack.com/archives/C05DT77QF5M)
+  indicating a failure, investigate
+  and assess if it's a new or existing failure. For new failures
+  (for which the resolution is not immediately clear and involves a PR that can be submitted right away),
+  create a new tracking issue in the [Flaky Test](https://github.com/DACH-NY/canton-network-node/milestone/19)
   GitHub milestone.  The issue for a given failure should be linked in the Slack
   thread for the failure itself.
 * All relevent information should be tracked to the extent possible in the
@@ -400,10 +405,20 @@ For engineers on flake duty, the resolution process is as follows.
 * For failures that are not frequent enough to warrant a fix, the
   issue in Github should be labeled "infrequent/no repo".
 
-
 We will periodically review the flaky test log in the Github milestone
 to look for systemic issues that might be underlying more than one
 flaky test and can be more holistically resolved.
+
+In addition to driving the elimination of flakes in our test setup,
+the engineers on support duty are also the first line of defence when it comes to keeping our cluster deployments healthy.
+The `DevNet` and `TestNet` clusters are especially noteworthy in this context, as they are used by our external partners.
+**At least one engineer on support rotation that resides in the European timezone must be online at 9:00 AM CET/CEST
+on Mondays**,
+to be available to respond in case the weekly redeployment of one of these clusters failed.
+As above, "respond" does not have to mean "resolve themselves".
+To the contrary - given the more sensitive nature of partner-facing clusters, engineers are encouraged to seek out help and additional pairs of eyes.
+All engineers on the Canton Network team are advised to familiarize themselves with the [cluster README](cluster/README.md),
+for advice and best-practices around recovering a failed deployment of one of these clusters.
 
 ### Contribution Guide
 
