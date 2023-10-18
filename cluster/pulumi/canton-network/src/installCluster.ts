@@ -136,10 +136,10 @@ const topupConfig: ValidatorTopupConfig = {
 
 if (bootstrappingConfig) {
   const end = new Date(Date.parse(bootstrappingConfig.date));
-  // We search within an interval of 2 hours. Given that we usually backups every 10min, this gives us
+  // We search within an interval of 24 hours. Given that we usually backups every 10min, this gives us
   // more than enough of a threshold to make sure each node has one backup in that interval
   // while also having sufficiently few backups that the bucket query is fast.
-  const start = new Date(end.valueOf() - 2 * 60 * 60 * 1000);
+  const start = new Date(end.valueOf() - 24 * 60 * 60 * 1000);
   bootstrappingDumpConfig = {
     bucket: bootstrapBucketSpec,
     cluster: bootstrappingConfig.cluster,

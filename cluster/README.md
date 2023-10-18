@@ -1379,9 +1379,9 @@ export BOOTSTRAPPING_CONFIG='{"cluster": "test-preview", "date": "2023-07-05T12:
 ```
 
 The most recent backup before the specified date will be used to bootstrap from.
-We only search for backups within an interval of 2 hours though,
+We only search for backups within an interval of 24 hours though,
 so if no backup exists on [Google Cloud Storage](https://console.cloud.google.com/storage/browser/da-cn-data-dumps)
-that is timestamped (as per its file name) at at most 2 hours before the specified date, your deployment attempt will fail.
+that is timestamped (as per its file name) at at most 24 hours before the specified date, your deployment attempt will fail.
 
 When [deploying via CI](#manually-deploying-via-ci), you can use the `bootstrapping-config` parameter (in addition to `run-job`) to set the bootstrapping config (same format as above).
 
