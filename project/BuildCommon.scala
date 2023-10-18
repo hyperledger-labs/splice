@@ -1,16 +1,17 @@
 import BuildUtil.runCommand
 import scalafix.sbt.ScalafixPlugin
-import sbt.Keys._
-import sbt._
-import Dependencies._
+import sbt.Keys.*
+import sbt.*
+import Dependencies.*
 import org.scalafmt.sbt.ScalafmtPlugin
-import sbt.nio.Keys._
+import sbt.nio.Keys.*
 import sbtbuildinfo.BuildInfoPlugin
-import sbtbuildinfo.BuildInfoPlugin.autoImport._
+import sbtbuildinfo.BuildInfoPlugin.autoImport.*
 import wartremover.WartRemover
-import wartremover.WartRemover.autoImport._
+import wartremover.WartRemover.autoImport.*
 import sbtprotoc.ProtocPlugin.autoImport.PB
-import DamlPlugin.autoImport._
+import DamlPlugin.autoImport.*
+import Wartremover.cnWarts
 import sbt.internal.util.ManagedLogger
 import xsbti.compile.CompileAnalysis
 
@@ -85,7 +86,7 @@ object BuildCommon {
   val pbTsDirectory = SettingKey[File]("output directory for ts protobuf definitions")
 
   lazy val sharedAppSettings: Seq[Def.Setting[_]] =
-    sharedSettings ++ cantonWarts ++ protobufLintSettings ++ unusedImportsSetting ++
+    sharedSettings ++ cantonWarts ++ cnWarts ++ protobufLintSettings ++ unusedImportsSetting ++
       Seq(
         Compile / PB.deleteTargetDirectory := false,
         // ^^ do not let protocGenerate delete the entire target directory, otherwise the different apps

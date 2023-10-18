@@ -58,6 +58,7 @@ object AuthUtil {
     }
   }
 
+  @SuppressWarnings(Array("com.daml.network.wart.Println"))
   def main(args: Array[String]): Unit = {
     println(testToken(args(0), args(1), testSecret))
   }

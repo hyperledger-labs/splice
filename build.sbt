@@ -1,7 +1,7 @@
 import BuildUtil.runCommand
-import Dependencies._
-import DamlPlugin.autoImport._
-import BuildCommon.defs._
+import Dependencies.*
+import DamlPlugin.autoImport.*
+import BuildCommon.defs.*
 import sbtassembly.{MergeStrategy, PathList}
 
 /*
@@ -30,6 +30,8 @@ lazy val `canton-ledger-common` = BuildCommon.`canton-ledger-common`
 lazy val `canton-ledger-api-core` = BuildCommon.`canton-ledger-api-core`
 lazy val `canton-ledger-json-api` = BuildCommon.`canton-ledger-json-api`
 lazy val `canton-daml-errors` = BuildCommon.`canton-daml-errors`
+
+lazy val `cn-wartremover-extension` = Wartremover.`cn-wartremover-extension`
 
 inThisBuild(
   List(
@@ -86,6 +88,7 @@ lazy val root = (project in file("."))
     `canton-ledger-api-core`,
     pulumi,
     tools,
+    `cn-wartremover-extension`,
   )
   .settings(
     BuildCommon.sharedSettings,
@@ -352,6 +355,7 @@ lazy val `apps-common` =
       `canton-community-common`,
       `canton-community-app` % "compile->compile;test->test",
       `canton-community-testing` % "test",
+      `cn-wartremover-extension` % "compile->compile;test->test",
       // We include all DARs here to make sure they are available as resources.
       `app-manager-daml`,
       `app-manager-daml`,
