@@ -315,7 +315,6 @@ Note that the entire command must be quoted in this case, especially if it has s
 - `formatFix`: apply `scalafmt`, `sbt scalafixAll`, and `sbt apps-frontends/npmFix` to format source files
 - `lint`: lint-check. Does not apply any fixes. Checks enforcement of `scalafmt`, `buf`, `scalafix`, `apps-frontends/npmLint`, and `shellcheck` rules
 - `damlBuild`: create `.dar` files for all Daml projects
-- `protobufLint`: to lint our protobuf files using `buf`
 - `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `coin` to call it.
 - `checkErrors`: check test log for errors and fail if there is one. Note that if you haven't deleted your local log file in a long time, this may find very old errors.
 
@@ -483,14 +482,6 @@ and from `string`s should occur via `com.daml.network.util.Proto.encode/tryDecod
 When interacting with the Ledger API, we convert the Scala BigDecimals to Java BigDecimals.
 
 Overall, please refer to the `wallet.tap` command implementation for the canonical handling of Daml Numerics.
-
-### Protobuf and GRPC Guidelines
-
-Generally endeavor to model your [GRPC and Protobuf definitions using Google's guidelines](https://cloud.google.com/apis/design/naming_convention).
-We use [`buf`](https://docs.buf.build/tour/lint-your-api)'s `DEFAULT` linting rules to enforce many of these guidelines in CI using the `protobufLint` `sbt` task.
-See [their documentation](https://docs.buf.build/lint/rules#default) for what these are and why they are beneficial.
-
-Below we list additional rules specific to our project:
 
 ### Editing Daml
 

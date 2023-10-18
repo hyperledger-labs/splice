@@ -44,27 +44,6 @@ object BuildCommon {
       taskKey[Set[File]]("common frontend bundle task to run before the app frontend bundle")
   }
 
-  val grpcWebGen = {
-    // While the error claims that being in PATH is sufficient, the error is lying. It really
-    // needs to be an absolute path. Since some people also like starting
-    // SBT outside of the nix develop we query nix directly for the PATH.
-    val processLogger = new BuildUtil.BufferedLogger
-    val exitCode = scala.sys.process
-      .Process(
-        Seq("nix", "build", "path:nix#protoc-gen-grpc-web", "--no-link", "--print-out-paths"),
-        None,
-      ) ! processLogger
-    if (exitCode != 0) {
-      val errorMsg =
-        s"Running command returned non-zero exit code: $exitCode ${processLogger.output()}}"
-      throw new IllegalStateException(errorMsg)
-    }
-    PB.gens.plugin(
-      name = "grpc-web",
-      path = s"${processLogger.outputStdout()}/bin/protoc-gen-grpc-web",
-    )
-  }
-
   lazy val sharedSettings: Seq[Def.Setting[_]] = Seq(
     libraryDependencies ++= Seq(
       scalatest % Test,
@@ -86,7 +65,7 @@ object BuildCommon {
   val pbTsDirectory = SettingKey[File]("output directory for ts protobuf definitions")
 
   lazy val sharedAppSettings: Seq[Def.Setting[_]] =
-    sharedSettings ++ cantonWarts ++ cnWarts ++ protobufLintSettings ++ unusedImportsSetting ++
+    sharedSettings ++ cantonWarts ++ cnWarts ++ unusedImportsSetting ++
       Seq(
         Compile / PB.deleteTargetDirectory := false,
         // ^^ do not let protocGenerate delete the entire target directory, otherwise the different apps
@@ -178,7 +157,7 @@ object BuildCommon {
         ) ++
         addCommandAlias(
           "lint",
-          "; damlDarsLockFileCheck ; cantonDarsLockFileCheck ; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; runShellcheck ; syncpackCheck ; runCheckUpgradeModelDiffs",
+          "; damlDarsLockFileCheck ; cantonDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; runShellcheck ; syncpackCheck ; runCheckUpgradeModelDiffs",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all CN DARs here, just in case
@@ -218,66 +197,6 @@ object BuildCommon {
         scalacOptions += "-Wconf:cat=unused-imports:is,cat=unused-locals:is,cat=unused-params:is,cat=unused-pat-vars:is,cat=unused-privates:is,cat=unused-params:is"
       )
     else Seq.empty
-
-  lazy val protobufLint = taskKey[Unit](
-    "Lint protobuf sources using the `buf` tool."
-  )
-
-  val protobufLintSettings = List(
-    Compile / PB.includePaths += file("3rdparty/protobuf"),
-    protobufLint := {
-      val targetSourceDir = target.value / "protobuf_merged_sources"
-      val includeDirs = (Compile / PB.includePaths).value
-      // trigger PB.generate to ensure includeDirs are populated with external deps
-      val _ = (Compile / PB.generate).value
-      // delete source dir first to avoid problems with renamed files lingering around
-      IO.delete(targetSourceDir)
-      // merge all sources *assuming* proto paths are unique, which
-      // should hold as otherwise `protoc` will complain during dependency resolution
-      includeDirs.foreach(includeDir =>
-        IO.copyDirectory(
-          includeDir,
-          targetSourceDir,
-          CopyOptions(overwrite = true, preserveLastModified = true, preserveExecutable = false),
-        )
-      )
-      // create buf file reflecting our policy
-      IO.write(
-        targetSourceDir / "buf.yaml",
-        """
-          |version: v1
-          |lint:
-          |  use:
-          |    # Using DEFAULT as ...
-          |    - DEFAULT
-          |    - PACKAGE_NO_IMPORT_CYCLE
-          |    # Disallow as we want to consciously decide whether we want to use streaming endpoints.
-          |    # We'll probably use server-side streaming, but not client-side streaming as it is not
-          |    # supported by grpc-web.
-          |    - RPC_NO_CLIENT_STREAMING
-          |    - RPC_NO_SERVER_STREAMING
-          |  rpc_allow_google_protobuf_empty_requests: true
-          |  rpc_allow_google_protobuf_empty_responses: true
-          |  except:
-          |    # TODO(tech-debt): enable this by changing our v0 prefix to v1
-          |    - PACKAGE_VERSION_SUFFIX
-          |  ignore:
-          |    # Ignoring proto packages with these prefixes as they are external dependencies
-          |    - com/daml/ledger/api/v1
-          |    - com/daml/ledger/api/v2
-          |    - grpc
-          |    - google
-          |    - scalapb
-          |    - com/digitalasset/canton
-          |    - daml/platform
-          |    # TODO(tech-debt): ignore also the non-external project dependencies
-          |""".stripMargin,
-      )
-      // call buf tool
-      BuildUtil.runCommand(Seq("buf", "lint"), streams.value.log, optCwd = Some(targetSourceDir))
-      ()
-    },
-  )
 
   // Settings to avoid compiling test sources, applicable to canton projects
   lazy val removeTestSources = Seq(

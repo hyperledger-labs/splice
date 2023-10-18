@@ -14,7 +14,6 @@ in pkgs.mkShell {
     # NOTE: please keep this list sorted for an easy overview and to avoid merge noise.
 
     ammonite
-    buf
     cabal2nix
     canton
     circleci-cli
@@ -44,7 +43,6 @@ in pkgs.mkShell {
     postgresql_11
     pre-commit
     procps
-    protobuf3_19
     ps
     pulumi-bin
     python3

@@ -20,7 +20,6 @@
         {
           packages = {
             # Forwarded so we can get the path from sbt.
-            protoc-gen-grpc-web = pkgs.protoc-gen-grpc-web;
             reredirects = pkgs.python3.pkgs.sphinx-reredirects;
           };
           devShells.default = import ./shell.nix { inherit pkgs x86Pkgs npmPkgs; };
