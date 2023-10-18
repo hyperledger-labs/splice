@@ -447,6 +447,10 @@ Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-val
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
 - Optionally, you might want to modify the `postgresPassword` entry setting it to a secure value. If you do that, remember to change it in ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values.yaml`` too.
 
+Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/scan-values.yaml`` as follows:
+
+- Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+
 An SV node includes a validator app so you also need to configure
 that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
 
@@ -462,7 +466,7 @@ the :ref:`Generating an SV Identity<sv-identity>` section to obtain
 and register a name and keypair for your SV. Replace
 ``YOUR_PUBLIC_KEY`` and ``YOUR_PRIVATE_KEY`` with the ``public-key``
 and ``private-key`` values obtained as part of generating your SV
-idenitty.
+identity.
 
 .. code-block:: bash
 
@@ -531,7 +535,7 @@ reaches a stable state prior to moving on to the next step.
     helm install participant canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml --wait
     helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml -f ${SV-IDENTITIES-FILE} --wait
     helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-validator-values.yaml --wait
-    helm install scan canton-network-helm/cn-scan -n sv --version ${CHART_VERSION} --wait
+    helm install scan canton-network-helm/cn-scan -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/scan-values.yaml --wait
 
 Once this is running, you should be able to inspect the state of the
 cluster and observe pods running in each of the three new

@@ -96,9 +96,8 @@ abstract class SvNodePreflightSvIntegrationTestBase
     }
   }
 
+  val scanUrl = s"https://scan.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
   "The Scan UI is working" in { _ =>
-    val scanUrl = s"https://scan.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
-
     withFrontEnd("sv") { implicit webDriver =>
       go to scanUrl
       eventually(3.minutes) {
@@ -141,8 +140,15 @@ abstract class SvNodePreflightSvIntegrationTestBase
           "USD",
           "90 days",
         )
+        clue(s"Reserved directory name is shown in scan ui at ${scanUrl}") {
+          go to scanUrl
+          eventually(3.minutes) {
+            val cnsEntryNames =
+              findAll(className("directory-entry")).map(elm => seleniumText(elm)).toList.distinct
+            cnsEntryNames.exists(_.startsWith(cnsName)) should be(true)
+          }
+        }
       }
-
     }
   }
 

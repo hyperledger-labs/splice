@@ -239,7 +239,12 @@ export function installSvNode(config: SvConfig): {
   }
 
   if (config.withScan) {
-    const scanApp = installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', {}, [svApp]);
+    const scanValues = {
+      clusterUrl: `${CLUSTER_BASENAME}.network.canton.global`,
+    };
+    const scanApp = installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, [
+      svApp,
+    ]);
     if (config.onboarding.type == 'found-collective') {
       installCNHelmChart(xns, 'directory-' + xns.logicalName, 'cn-directory', {}, [scanApp]);
     }

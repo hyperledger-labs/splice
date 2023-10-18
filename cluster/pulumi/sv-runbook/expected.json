@@ -316,6 +316,7 @@
       "namespace": "sv",
       "timeout": 480,
       "values": {
+        "clusterUrl": "svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
       }
     },
@@ -391,7 +392,6 @@
           "audience": "https://sv.example.com/api",
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
         },
-        "clusterUrl": "svrun.network.com.network.canton.global",
         "cometBFT": {
           "connectionUri": "http://cometbft-cometbft-rpc:26657",
           "enabled": true

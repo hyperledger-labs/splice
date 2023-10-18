@@ -284,6 +284,8 @@ subcommands. A few highlights include the following:
         `CNCLUSTER_SKIP_DOCKER_CHECK` environment variable to 1. This
         can also be added to `.envrc.private`.
       * One can skip redeploying the `infra` stack by supplying the `--skip-infra` flag.
+* `cncluster apply_sv` - Apply the sv-runbook Pulumi stack. 
+      * You need to provide a `target-domain-cluster` argument, for instance `scratcha` for scratchneta.
 * `cncluster pdown` - Take down any installed resources populated with
   the `canton-network` Pulumi stack.
 * `cncluster create` - Create a new instance of the CN cluster in GCE,
@@ -296,7 +298,9 @@ subcommands. A few highlights include the following:
   in the cluster. This will attempt to apply JSON log formatting,
   unless you specify `--raw`.
 * `cncluster preflight` - Run the preflight check against the cluster.
-* `cncluster preflight_sv` - Run the SV preflight check against the cluster.
+  If canton network is not installed yet on the cluster, run `cncluster apply` first.
+* `cncluster preflight_sv` - Run the SV preflight check against the cluster. 
+  If the sv-runbook is not installed yet on the cluster, run `cncluster apply_sv` first.
 * `cncluster push` - Rebuild and push one or more modules into a
   cluster. This command takes care to ensure that the specified modules
   within the cluster are updated to match your local working copy. (It

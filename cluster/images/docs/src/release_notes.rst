@@ -19,7 +19,7 @@ Release Notes
   * The global domain now uses CometBFT instead of a Postgres-backed domain on TestNet.
   * Each global domain node now deploys both a sequencer and mediator on both DevNet and TestNet.
     The `domain.enable` flag in ``sv-values.yaml`` no longer needs to be explicitly set for DevNet (it is `true` by default).
-
+  * Added `scan-values.yaml`, please use that when deploying the `cn-scan` Helm chart. The `clusterUrl` value is used for looking up directory entries in the scan UI.
 
 * Domain fees (and traffic top-ups) are now enabled on DevNet as well. This implies that explicitly setting `topup.enabled` in `validator-values.yaml` is no longer required (it defaults to `true`).
 

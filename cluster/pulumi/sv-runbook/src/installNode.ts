@@ -307,11 +307,22 @@ async function installSvAndValidator(config: SvConfig) {
       .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
   );
 
+  const scanValues: ChartValues = {
+    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
+      TARGET_CLUSTER: TARGET_CLUSTER,
+    }),
+  };
+
+  const scanValuesWithFixedTokens = {
+    ...scanValues,
+    ...fixedTokensValue,
+  };
+
   installCNSVHelmChart(
     xns,
     'scan',
     'cn-scan',
-    fixedTokens() ? fixedTokensValue : {},
+    fixedTokens() ? scanValuesWithFixedTokens : scanValues,
     localCharts,
     version,
     imagePullDeps.concat([sv, participant]).concat(svAppSecret)
