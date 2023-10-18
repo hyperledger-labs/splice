@@ -50,8 +50,10 @@ spec:
               value: "{{ $.Values.stateSync.enable }}"
             - name: STATE_SYNC_RPC_SERVERS
               value: "{{ $.Values.stateSync.rpcServers }}"
-            - name: STATE_SYNC_MIN_CATCHUP_BLOCKS
-              value: "{{ $.Values.stateSync.minCatchupBlocks }}"
+            - name: STATE_SYNC_MIN_TRUST_HEIGHT_AGE
+              value: "{{ $.Values.stateSync.minTrustHeightAge }}"
+            - name: STATE_SYNC_TRUST_PERIOD
+              value: "{{ $.Values.stateSync.trustPeriod }}"
         - name: {{ $fullName }}
           image: "{{ $.Values.imageRepo }}/{{ $.Values.imageName }}:{{ $.Values.cluster.imageTag }}"
           imagePullPolicy: Always

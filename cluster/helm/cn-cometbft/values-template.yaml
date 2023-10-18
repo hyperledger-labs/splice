@@ -13,10 +13,10 @@ stateSync:
   enable: false
   # at least 2 not necessarily unique comma-separated entries must be provided for rpc_servers if enable is true
   rpcServers: ""
-  # number of blocks to catch up using regular block sync after state sync is complete.
-  # setting this to a higher value reduces the likelihood that we'll end up with an invalid config due to the
-  # target block becoming invalid in an unstable network at the cost of increasing initialization time.
-  minCatchupBlocks: 100
+  # the trust height will be set to these many blocks earlier than the latest block height
+  minTrustHeightAge: 100
+  # trust all snapshots from the trust height onwards for a period of 1 week
+  trustPeriod: "168h0m0s"
 
 founder:
   # The CometBFT node ID of the founding node

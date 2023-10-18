@@ -14,6 +14,7 @@ function _set_state_sync_disabled() {
   trust_height=0
   rpc_servers=""
   trust_hash=""
+  trust_period="0h0m0s"
 }
 
 function _configure_state_sync() {
@@ -24,6 +25,7 @@ function _configure_state_sync() {
   echo "  rpc_servers = \"$rpc_servers\""
   echo "  trust_height = $trust_height"
   echo "  trust_hash = \"$trust_hash\""
+  echo "  trust_period = \"$trust_period\""
 
   # Update CometBFT config
   cp "${config_file}" "${config_file}.orig"  # copy config before making changes for later comparison
@@ -31,6 +33,7 @@ function _configure_state_sync() {
   sed -i "s|STATE_SYNC_RPC_SERVERS|\"${rpc_servers}\"|" "${config_file}"
   sed -i "s|STATE_SYNC_TRUST_HEIGHT|${trust_height}|" "${config_file}"
   sed -i "s|STATE_SYNC_TRUST_HASH|\"${trust_hash}\"|" "${config_file}"
+  sed -i "s|STATE_SYNC_TRUST_PERIOD|\"${trust_period}\"|" "${config_file}"
 
   # Log config diff after update (to aid debugging)
   echo
@@ -52,18 +55,16 @@ else
   IFS=',' read -ra _servers <<< "$rpc_servers"
   base_url="${_servers[0]%/}"
 
-  min_catchup_blocks=${STATE_SYNC_MIN_CATCHUP_BLOCKS:-100}
-  # We skip the last min_catchup_blocks blocks for state sync ie. we only use sync upto the (latest_block_height-min_catchup_blocks)th block.
-  # Syncing upto the latest block height can cause hash verification to fail, particularly when there is only a small number of blocks eg.
-  # when setting up a new deployment from scratch on CI or during local development on scratchnet.
+  min_trust_height_age=${STATE_SYNC_MIN_TRUST_HEIGHT_AGE:-100}
+  trust_period=${STATE_SYNC_TRUST_PERIOD:-"168h0m0s"}  # trust period defaults to 1 week
   latest_block_height=$( curl -sL --fail -X GET "${base_url}/status" | jq -r '.result.sync_info.latest_block_height' )
   echo "Latest block height: $latest_block_height"
-  # Disable state sync entirely if latest_block_height is less than min_catchup_blocks
-  if [ "$latest_block_height" -le "$min_catchup_blocks" ]; then
+  # Disable state sync entirely if latest_block_height is less than min_trust_height_age
+  if [ "$latest_block_height" -le "$min_trust_height_age" ]; then
     _set_state_sync_disabled
   else
     enable=true
-    trust_height=$(( latest_block_height - min_catchup_blocks ))
+    trust_height=$(( latest_block_height - min_trust_height_age ))
     trust_hash=$( curl -sL --fail -X GET "${base_url}/block?height=${trust_height}" | jq -r '.result.block_id.hash' )
   fi
 fi

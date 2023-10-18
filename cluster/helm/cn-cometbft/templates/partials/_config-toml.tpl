@@ -361,7 +361,7 @@ enable = STATE_SYNC_ENABLE
 rpc_servers = STATE_SYNC_RPC_SERVERS
 trust_height = STATE_SYNC_TRUST_HEIGHT
 trust_hash = STATE_SYNC_TRUST_HASH
-trust_period = "168h0m0s"
+trust_period = STATE_SYNC_TRUST_PERIOD
 
 # Time to spend discovering snapshots before initiating a restore.
 discovery_time = "15s"
