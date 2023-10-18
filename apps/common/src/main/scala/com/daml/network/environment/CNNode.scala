@@ -50,7 +50,10 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
   // waiting for the primary party. This can be used for things like
   // domain connections and allocation of the primary party.
   @nowarn("cat=unused")
-  protected def preInitializeAfterLedgerConnection(connection: CNLedgerConnection): Future[Unit] =
+  protected def preInitializeAfterLedgerConnection(
+      connection: CNLedgerConnection,
+      ledgerClient: CNLedgerClient,
+  ): Future[Unit] =
     Future.unit
 
   def initialize(
@@ -68,7 +71,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
       loggerFactory,
       PackageIdResolver.NO_COMMAND_SUBMISSION,
     )
-    _ <- preInitializeAfterLedgerConnection(initConnection)
+    _ <- preInitializeAfterLedgerConnection(initConnection, ledgerClient)
     serviceParty <-
       retryProvider.getValueWithRetries[PartyId](
         s"primary party of service user $serviceUser",

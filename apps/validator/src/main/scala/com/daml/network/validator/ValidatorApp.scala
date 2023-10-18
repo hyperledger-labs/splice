@@ -16,7 +16,7 @@ import com.daml.network.auth.*
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
-import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
+import com.daml.network.config.{CNThresholds, NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
 import com.daml.network.http.v0.app_manager.AppManagerResource
 import com.daml.network.http.v0.app_manager_admin.AppManagerAdminResource
@@ -47,7 +47,7 @@ import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorSt
 import com.daml.network.validator.util.{OAuth2Manager, ValidatorUtil}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -64,9 +64,11 @@ import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.daml.network.directory.admin.http.HttpExternalDirectoryHandler
 import com.daml.network.http.v0.external.directory.DirectoryResource
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequencer
+import com.daml.nonempty.NonEmpty
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -109,7 +111,10 @@ class ValidatorApp(
     )
   } yield ()
 
-  override def preInitializeAfterLedgerConnection(connection: CNLedgerConnection) =
+  override def preInitializeAfterLedgerConnection(
+      connection: CNLedgerConnection,
+      ledgerClient: CNLedgerClient,
+  ) =
     for {
       _ <- config.appManager.traverse_ { appManagerConfig =>
         connection.ensureIdentityProviderConfig(
@@ -122,8 +127,14 @@ class ValidatorApp(
       _ <-
         withParticipantAdminConnection { participantAdminConnection =>
           for {
-            // TODO: (#8014) For regular validator, Instead of using ensureGlobalDomainRegistered, connect global domain with the sequencer list from scan.
-            _ <- ensureGlobalDomainRegistered(participantAdminConnection)
+            scanConnection <- ScanConnection(
+              ledgerClient,
+              config.scanClient,
+              clock,
+              retryProvider,
+              loggerFactory,
+            )
+            _ <- ensureGlobalDomainRegistered(participantAdminConnection, scanConnection)
             _ <- ensureExtraDomainsRegistered(participantAdminConnection)
             // Note that for the validator of an SV app, the user will be created by the SV app with a
             // primary party set to the SV app already so this is a noop.
@@ -246,6 +257,27 @@ class ValidatorApp(
     )
   }
 
+  private def waitForSequencerConnectionsFromScan(
+      scanConnection: ScanConnection,
+      clock: Clock,
+      logger: TracedLogger,
+      retryProvider: RetryProvider,
+  ) = {
+    retryProvider.waitUntil(
+      "valid sequencer connections from scan is non empty",
+      ValidatorApp.getSequencerConnectionsFromScan(scanConnection, clock, logger).map {
+        connections =>
+          if (connections.isEmpty)
+            throw Status.NOT_FOUND
+              .withDescription(
+                s"sequencer connections is empty"
+              )
+              .asRuntimeException()
+      },
+      logger,
+    )
+  }
+
   private def ensureVersionMatch(scanClient: ScanAppClientConfig): Future[Unit] =
     retryProvider.waitUntil(
       "version checked via scan",
@@ -292,12 +324,22 @@ class ValidatorApp(
   }
 
   private def ensureGlobalDomainRegistered(
-      participantAdminConnection: ParticipantAdminConnection
-  ): Future[Unit] = ensureDomainRegistered(
-    config.domains.global.alias,
-    config.domains.global.url,
-    participantAdminConnection,
-  )
+      participantAdminConnection: ParticipantAdminConnection,
+      scanConnection: ScanConnection,
+  ): Future[Unit] = {
+    if (config.svValidator)
+      ensureDomainRegistered(
+        config.domains.global.alias,
+        config.domains.global.url,
+        participantAdminConnection,
+      )
+    else
+      ensureDomainRegisteredFromScan(
+        config.domains.global.alias,
+        participantAdminConnection,
+        scanConnection,
+      )
+  }
 
   private def ensureExtraDomainsRegistered(
       participantAdminConnection: ParticipantAdminConnection
@@ -316,6 +358,34 @@ class ValidatorApp(
       SequencerConnections.single(GrpcSequencerConnection.tryCreate(url)),
     )
     participantAdminConnection.ensureDomainRegistered(domainConfig)
+  }
+
+  private def ensureDomainRegisteredFromScan(
+      alias: DomainAlias,
+      participantAdminConnection: ParticipantAdminConnection,
+      scanConnection: ScanConnection,
+  ): Future[Unit] = {
+    for {
+      _ <- waitForSequencerConnectionsFromScan(scanConnection, clock, logger, retryProvider)
+      sequencerConnections <- ValidatorApp.getSequencerConnectionsFromScan(
+        scanConnection,
+        clock,
+        logger,
+      )
+      domainConfig = NonEmpty.from(sequencerConnections) match {
+        case None =>
+          sys.error("sequencer connections from scan is not expected to be empty.")
+        case Some(nonEmptyConnections) =>
+          DomainConnectionConfig(
+            alias,
+            SequencerConnections.many(
+              nonEmptyConnections,
+              CNThresholds.getSequencerConnectionsSizeThreshold(nonEmptyConnections.size),
+            ),
+          )
+      }
+      _ <- participantAdminConnection.ensureDomainRegistered(domainConfig)
+    } yield ()
   }
 
   private def newTrafficBalanceService(
@@ -709,5 +779,49 @@ object ValidatorApp {
         scanConnection,
         participantAdminConnection,
       )(logger)
+  }
+
+  def getSequencerConnectionsFromScan(
+      scanConnection: ScanConnection,
+      clock: Clock,
+      logger: TracedLogger,
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): Future[Seq[GrpcSequencerConnection]] = {
+    for {
+      globalDomainId <- scanConnection.getCoinRulesDomain()(traceContext)
+      domainSequencers <- scanConnection.listSvcSequencers()
+      maybeSequencers = domainSequencers.find(_.domainId == globalDomainId)
+    } yield maybeSequencers.fold {
+      logger.warn("global domain sequencer list not found.")
+      Seq.empty[GrpcSequencerConnection]
+    } { domainSequencer =>
+      extractValidConnections(domainSequencer.sequencers, clock)
+    }
+  }
+
+  private def extractValidConnections(
+      sequencers: Seq[SvcSequencer],
+      clock: Clock,
+  ): Seq[GrpcSequencerConnection] = {
+    // sequencer connections will be ignore if they are with a invalid Alias, url or not yet available (`before availableAfter`)
+    val validConnections = sequencers
+      .collect {
+        case SvcSequencer(_, url, svName, availableAfter)
+            if !clock.now.toInstant.isBefore(availableAfter) =>
+          for {
+            sequencerAlias <- SequencerAlias.create(svName)
+            grpcSequencerConnection <- GrpcSequencerConnection.create(
+              url,
+              None,
+              sequencerAlias,
+            )
+          } yield grpcSequencerConnection
+      }
+      .collect { case Right(conn) =>
+        conn
+      }
+    validConnections
   }
 }

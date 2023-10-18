@@ -4,10 +4,9 @@ import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequencer
+import com.daml.network.validator.ValidatorApp
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.{DomainAlias, SequencerAlias}
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
@@ -25,7 +24,6 @@ class ReconcileSequencerConnectionsTrigger(
     participantAdminConnection: ParticipantAdminConnection,
     scanConnection: ScanConnection,
     clock: Clock,
-    getCoinRulesDomain: GetCoinRulesDomain,
     globalDomainAlias: DomainAlias,
 )(implicit
     override val ec: ExecutionContext,
@@ -33,28 +31,24 @@ class ReconcileSequencerConnectionsTrigger(
 ) extends PollingTrigger {
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      domainSequencers <- scanConnection.listSvcSequencers()
-      globalDomainId <- getCoinRulesDomain()(traceContext)
-      maybeSequencers = domainSequencers.find(_.domainId == globalDomainId)
-      _ <- maybeSequencers.fold {
-        logger.warn("global domain sequencer list not found.")
-        Future.unit
-      } { domainSequencer =>
-        participantAdminConnection.modifyDomainConnectionConfig(
-          globalDomainAlias,
-          modifySequencerConnections(domainSequencer.sequencers),
-        )
-      }
+      sequencerConnections <- ValidatorApp.getSequencerConnectionsFromScan(
+        scanConnection,
+        clock,
+        logger,
+      )
+      _ <- participantAdminConnection.modifyDomainConnectionConfig(
+        globalDomainAlias,
+        modifySequencerConnections(sequencerConnections),
+      )
     } yield false
   }
 
   private def modifySequencerConnections(
-      sequencers: Seq[SvcSequencer]
+      sequencerConnections: Seq[GrpcSequencerConnection]
   )(implicit traceContext: TraceContext): DomainConnectionConfig => Option[DomainConnectionConfig] =
     conf => {
-      val connections = extractValidConnections(sequencers)
-      if (differentEndpointSet(connections, conf.sequencerConnections.connections)) {
-        NonEmpty.from(connections) match {
+      if (differentEndpointSet(sequencerConnections, conf.sequencerConnections.connections)) {
+        NonEmpty.from(sequencerConnections) match {
           case None =>
             // TODO: (#8015) remove the domain in this case
             logger.warn(
@@ -63,11 +57,14 @@ class ReconcileSequencerConnectionsTrigger(
             None
           case Some(nonEmptyConnections) =>
             logger.info(
-              s"modifying sequencers connections"
+              s"modifying sequencers connections to $nonEmptyConnections"
             )
             Some(
               conf.copy(
-                sequencerConnections = getSequencersConnections(nonEmptyConnections)
+                sequencerConnections = SequencerConnections.many(
+                  nonEmptyConnections,
+                  CNThresholds.getSequencerConnectionsSizeThreshold(nonEmptyConnections.size),
+                )
               )
             )
         }
@@ -78,36 +75,6 @@ class ReconcileSequencerConnectionsTrigger(
         None
       }
     }
-
-  private def getSequencersConnections(
-      connections: NonEmpty[Seq[SequencerConnection]]
-  ): SequencerConnections = {
-    val threshold = CNThresholds.getSequencerConnectionsSizeThreshold(connections.size)
-    SequencerConnections.many(connections, threshold)
-  }
-
-  private def extractValidConnections(
-      sequencers: Seq[SvcSequencer]
-  ): Seq[GrpcSequencerConnection] = {
-    // sequencer connections will be ignore if they are with a invalid Alias, url or not yet available (`before availableAfter`)
-    val validConnections = sequencers
-      .collect {
-        case SvcSequencer(_, url, svName, availableAfter)
-            if !clock.now.toInstant.isBefore(availableAfter) =>
-          for {
-            sequencerAlias <- SequencerAlias.create(svName)
-            grpcSequencerConnection <- GrpcSequencerConnection.create(
-              url,
-              None,
-              sequencerAlias,
-            )
-          } yield grpcSequencerConnection
-      }
-      .collect { case Right(conn) =>
-        conn
-      }
-    validConnections
-  }
 
   private def differentEndpointSet(
       sequencerConnections: Seq[GrpcSequencerConnection],

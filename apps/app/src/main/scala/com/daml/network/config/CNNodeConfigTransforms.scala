@@ -349,6 +349,15 @@ object CNNodeConfigTransforms {
     updateAllSvAppConfigs_(
       _.focus(_.domains.global.url)
         .modify(bumpUrl(_))
+        .focus(_.localDomainNode)
+        .modify(
+          _.map(d =>
+            d.copy(
+              sequencer =
+                d.sequencer.copy(externalPublicApiUrl = bumpUrl(d.sequencer.externalPublicApiUrl))
+            )
+          )
+        )
     )
   }
 

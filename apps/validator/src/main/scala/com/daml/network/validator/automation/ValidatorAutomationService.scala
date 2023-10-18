@@ -135,7 +135,6 @@ class ValidatorAutomationService(
         participantAdminConnection,
         scanConnection,
         clock,
-        scanConnection.getCoinRulesDomain,
         globalDomainAlias,
       )
     )
