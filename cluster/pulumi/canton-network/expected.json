@@ -1719,7 +1719,7 @@
         },
         "stateSync": {
           "enable": false,
-          "minTrustHeightAge": 100,
+          "minTrustHeightAge": 1100,
           "rpcServers": "",
           "trustPeriod": "168h0m0s"
         }
@@ -2660,7 +2660,7 @@
         },
         "stateSync": {
           "enable": true,
-          "minTrustHeightAge": 100,
+          "minTrustHeightAge": 1100,
           "rpcServers": "http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657",
           "trustPeriod": "168h0m0s"
         }
@@ -3499,7 +3499,7 @@
         },
         "stateSync": {
           "enable": true,
-          "minTrustHeightAge": 100,
+          "minTrustHeightAge": 1100,
           "rpcServers": "http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657",
           "trustPeriod": "168h0m0s"
         }
@@ -4265,7 +4265,7 @@
         },
         "stateSync": {
           "enable": true,
-          "minTrustHeightAge": 100,
+          "minTrustHeightAge": 1100,
           "rpcServers": "http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657",
           "trustPeriod": "168h0m0s"
         }
