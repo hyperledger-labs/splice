@@ -25,6 +25,9 @@ case class UseToxiproxy(
   val client = new ToxiproxyClient()
   val proxies = Map[String, Proxy]()
 
+  // based on apps/app/src/test/resources/README.md
+  val portBump = 20000
+
   private def addProxy(name: String, listenAddress: String, upstreamAddress: String) = {
     logger.info(s"Setting up proxy: ${name}: ${listenAddress} -> ${upstreamAddress}")
     val proxy = client.createProxy(name, listenAddress, upstreamAddress)
@@ -37,7 +40,7 @@ case class UseToxiproxy(
         participantClient: CNParticipantClientConfig,
         extraPortBump: Int,
     ): CNParticipantClientConfig = {
-      val bump = 20000 + extraPortBump
+      val bump = portBump + extraPortBump
       val lapiHost = participantClient.ledgerApi.clientConfig.address
       val lapiPort = participantClient.ledgerApi.clientConfig.port
       val upstream = s"${lapiHost}:${lapiPort}"
@@ -51,7 +54,7 @@ case class UseToxiproxy(
         remoteScanApp: ScanAppClientConfig,
         extraPortBump: Int,
     ): ScanAppClientConfig = {
-      val bump = 20000 + extraPortBump
+      val bump = portBump + extraPortBump
 
       val originalPort = remoteScanApp.adminApi.url.effectivePort
 

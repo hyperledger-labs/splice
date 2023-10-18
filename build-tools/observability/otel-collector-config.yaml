@@ -14,7 +14,7 @@ receivers:
         - job_name: 'canton'
           scrape_interval: 15s
           static_configs:
-            - targets: [ 'localhost:12340' ]
+            - targets: [ 'localhost:5000' ]
           metric_relabel_configs:
             - source_labels: [ application_id ]
               regex: .*
@@ -23,7 +23,7 @@ receivers:
         - job_name: 'canton_sim'
           scrape_interval: 15s
           static_configs:
-            - targets: [ 'localhost:12341' ]
+            - targets: [ 'localhost:15000' ]
           metric_relabel_configs:
             - source_labels: [ application_id ]
               regex: .*
