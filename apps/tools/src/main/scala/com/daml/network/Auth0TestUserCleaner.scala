@@ -7,6 +7,8 @@ import java.time.format.DateTimeFormatter
 import java.time.Duration
 
 import com.daml.network.util.Auth0Util
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.tracing.TraceContext
 
 object Auth0TestUserCleaner {
   val maxUserAge = 2L
@@ -27,7 +29,7 @@ object Auth0TestUserCleaner {
       .withTotals(true)
   }
 
-  def removeTestUsers(util: Auth0Util): Unit = {
+  def removeTestUsers(util: Auth0Util)(implicit tc: TraceContext): Unit = {
     // set up a global timeout in case there are silent issues with user deletion that prevent the user.length from ever reaching 0
     val startTime = ZonedDateTime.now();
     val timeout = 30; // seconds
@@ -87,8 +89,13 @@ object Auth0TestUserCleaner {
     }
   }
 
-  def run(domain: String, clientId: String, clientSecret: String) = {
-    val auth0Util = retryAuth0Calls(new Auth0Util(domain, clientId, clientSecret))
+  def run(
+      domain: String,
+      clientId: String,
+      clientSecret: String,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit tc: TraceContext) = {
+    val auth0Util = retryAuth0Calls(new Auth0Util(domain, clientId, clientSecret, loggerFactory))
 
     println(s"Deleting auth0 test users older than $maxUserAge day(s)...")
     removeTestUsers(auth0Util)

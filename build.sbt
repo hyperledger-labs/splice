@@ -85,6 +85,7 @@ lazy val root = (project in file("."))
     `canton-ledger-common`,
     `canton-ledger-api-core`,
     pulumi,
+    tools,
   )
   .settings(
     BuildCommon.sharedSettings,
