@@ -805,11 +805,11 @@ object ValidatorApp {
       sequencers: Seq[SvcSequencer],
       clock: Clock,
   ): Seq[GrpcSequencerConnection] = {
-    // sequencer connections will be ignore if they are with a invalid Alias, url or not yet available (`before availableAfter`)
+    // sequencer connections will be ignore if they are with a invalid Alias, empty url or not yet available (`before availableAfter`)
     val validConnections = sequencers
       .collect {
         case SvcSequencer(_, url, svName, availableAfter)
-            if !clock.now.toInstant.isBefore(availableAfter) =>
+            if url.nonEmpty && !clock.now.toInstant.isBefore(availableAfter) =>
           for {
             sequencerAlias <- SequencerAlias.create(svName)
             grpcSequencerConnection <- GrpcSequencerConnection.create(
