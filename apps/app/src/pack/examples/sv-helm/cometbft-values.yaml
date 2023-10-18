@@ -1,4 +1,6 @@
 nodeName: "YOUR_SV_NAME"
+
+# Set this flag to true on DevNet
 isDevNet: false
 
 founder:

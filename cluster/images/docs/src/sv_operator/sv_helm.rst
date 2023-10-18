@@ -431,6 +431,7 @@ that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-
 - Replace ``YOUR_COMETBFT_NODE_ID`` with the id obtained when generating the config for the CometBft node
 - Replace ``YOUR_HOSTNAME`` with the hostname that will be used for the ingress
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
+- **For DevNet only** Set `isDevNet` to `true`. This value is required to generate the proper CometBFT genesis file on DevNet.
 
 .. _helm-configure-global-domain:
 
