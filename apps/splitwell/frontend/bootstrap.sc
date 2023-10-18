@@ -3,12 +3,17 @@ import com.daml.network.codegen.java.cn.{directory => codegen}
 import com.daml.network.codegen.java.cn.{splitwell => splitwellCodegen}
 import com.daml.network.console.{DirectoryAppClientReference, WalletAppClientReference}
 import com.daml.network.console.LedgerApiExtensions._
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
 
+import scala.concurrent.duration._
+
 println("Waiting for SVC initialization...")
 // We need to do this at the beginning, otherwise later commands can fail because CoinRules is locked.n
-Seq(sv1, sv2, sv3, sv4).foreach(_.waitForInitialization())
+Seq(sv1, sv2, sv3, sv4).foreach(
+  _.waitForInitialization(NonNegativeDuration.tryFromDuration(5.minute))
+)
 
 println("Waiting for validator initialization...")
 aliceValidator.waitForInitialization()
@@ -59,14 +64,14 @@ def ensureDirectoryEntry(
   } catch {
     case e: CommandFailure => {
       println(s"Requesting CNS name \"$name\" for user \"$user\".")
-      directory.requestDirectoryEntry(name)
+      directory.requestDirectoryEntry(name, url, description)
       println("Waiting for wallet initialization to complete")
       wallet.waitForInitialization()
       println("Wallet initialization complete, tapping coin")
       wallet.tap(5.0)
       utils.retry_until_true { wallet.listSubscriptionRequests().length == 1 }
       wallet.acceptSubscriptionRequest(
-        wallet.listSubscriptionRequests()(0).subscriptionRequest.contractId
+        wallet.listSubscriptionRequests()(0).contractId
       )
     }
   }

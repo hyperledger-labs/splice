@@ -73,14 +73,15 @@ function start_test() {
 function usage() {
   echo "Usage: ./start-frontends.sh <flags>"
   echo "Flags:"
-  echo "  -h   display this help message"
-  echo "  -d   start in detached mode"
-  echo "  -a   run all frontends with canton-network-test auth0 tenant and no test auth"
-  echo "  -p   run the frontends needed for the preflight self-hosted directory UI test"
-  echo "  -v   run frontends with a shared validator for all users"
-  echo "  -s   run frontends with multiple super validators for Sv*IntegrationTest in CI"
-  echo "  -m   run frontends with app manager frontends"
-  echo "  -t   start interactive/live vitest suites for frontends"
+  echo "  -h        display this help message"
+  echo "  -d        start in detached mode"
+  echo "  -a        run all frontends with canton-network-test auth0 tenant and no test auth"
+  echo "  -p        run the frontends needed for the preflight self-hosted directory UI test"
+  echo "  -v        run frontends with a shared validator for all users"
+  echo "  -s        run frontends with two super validators for Sv*IntegrationTest in CI"
+  echo "  -l        run frontends with four super validators for local testing"
+  echo "  -m        run frontends with app manager frontends"
+  echo "  -t        start interactive/live vitest suites for frontends"
 }
 
 # default values
@@ -88,11 +89,12 @@ daemon=0
 enable_test_auth="true"
 use_preflight_frontends=0
 shared_validator_for_users=0
-multiple_svs=0
+two_svs=0
+four_svs=0
 app_manager=0
 run_tests=0
 
-while getopts "hdapvsmt" arg; do
+while getopts "hdapvsmtl" arg; do
   case ${arg} in
     h)
       usage
@@ -111,13 +113,16 @@ while getopts "hdapvsmt" arg; do
       shared_validator_for_users=1
       ;;
     s)
-      multiple_svs=1
+      two_svs=1
       ;;
     m)
       app_manager=1
       ;;
     t)
       run_tests=1
+      ;;
+    l)
+      four_svs=1
       ;;
     ?)
       usage
@@ -179,8 +184,15 @@ function start_local_frontends() {
 
   # SV
   start_frontend   sv        3211 sv1     "sv1"                $enable_test_auth
-  if [ $multiple_svs -eq 1 ]; then
+
+  if [ $two_svs -eq 1 ]; then
     start_frontend sv 3212 sv2 "sv2" $enable_test_auth
+  fi
+
+  if [ $four_svs -eq 1 ]; then
+    start_frontend sv 3212 sv2 "sv2" $enable_test_auth
+    start_frontend sv 3213 sv3 "sv3" $enable_test_auth
+    start_frontend sv 3214 sv4 "sv4" $enable_test_auth
   fi
 
   # Scan

@@ -53,6 +53,9 @@ Seq(
 println(s"Allocating users for local testing...")
 Seq(
   (sv1Participant, "sv1"),
+  (sv2Participant, "sv2"),
+  (sv3Participant, "sv3"),
+  (sv4Participant, "sv4"),
   (aliceParticipant, "alice_validator_user"),
   (bobParticipant, "bob_validator_user"),
   (splitwellParticipant, "splitwell_validator_user"),

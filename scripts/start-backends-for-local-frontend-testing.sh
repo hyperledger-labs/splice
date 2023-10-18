@@ -7,11 +7,14 @@ function usage() {
   echo "Flags:"
   echo "  -h          display this help message"
   echo "  -s          skip bundle"
+  echo "  -l          start backend with four super validators for local testing"
 }
 
 skip_bundle=0
+topology="minimal-topology.conf"
+bootstrapScript="bootstrap-minimal.sc"
 
-while getopts "hdap:c:wsbtfg" arg; do
+while getopts "hdap:c:wsbtfgl" arg; do
   case ${arg} in
     h)
       usage
@@ -21,6 +24,11 @@ while getopts "hdap:c:wsbtfg" arg; do
       skip_bundle=1
       echo "skip sbt --batch bundle"
       ;;
+    l)
+      topology="simple-topology.conf"
+      bootstrapScript="bootstrap.sc"
+      echo "deploying backend for sv2, sv3, and sv4"
+      ;;
     ?)
       usage
       exit 1
@@ -29,7 +37,7 @@ while getopts "hdap:c:wsbtfg" arg; do
 done
 
 
-INPUT_CONFIG="./apps/app/src/test/resources/minimal-topology.conf"
+INPUT_CONFIG="./apps/app/src/test/resources/$topology"
 OUTPUT_CONFIG=$(mktemp)
 trap 'rm -f "${OUTPUT_CONFIG}"' 0 2 3 15
 
@@ -42,4 +50,4 @@ echo "Generating config file ${OUTPUT_CONFIG} with self-signed tokens"
 scala -classpath "$BUNDLE/lib/cn-node-0.1.0-SNAPSHOT.jar" ./scripts/transform-config.sc "useSelfSignedTokensForLedgerApiAuth" "${INPUT_CONFIG}" "${OUTPUT_CONFIG}"
 
 echo "Starting Canton Network apps for local frontend testing"
-cn-node --config "${OUTPUT_CONFIG}" --bootstrap ./apps/splitwell/frontend/bootstrap-minimal.sc --log-level-canton=DEBUG --log-encoder json --log-file-name log/cn-node_local_frontend_testing.clog
+cn-node --config "${OUTPUT_CONFIG}" --bootstrap ./apps/splitwell/frontend/$bootstrapScript --log-level-canton=DEBUG --log-encoder json --log-file-name log/cn-node_local_frontend_testing.clog
