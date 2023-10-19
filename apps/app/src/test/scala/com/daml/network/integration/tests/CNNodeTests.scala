@@ -11,7 +11,7 @@ import com.daml.network.console.*
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.WaitForPorts
-import com.daml.network.sv.config.SvOnboardingConfig
+import com.daml.network.sv.config.{SvOnboardingConfig, TrafficControlConfig}
 import com.daml.network.util.{Auth0Util, CommonCNNodeAppInstanceReferences}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -196,11 +196,21 @@ object CNNodeTests {
         case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
           foundCollective.initialTickDuration.asJava
         case Some(_: SvOnboardingConfig.JoinWithKey) | None =>
-          fail("Failed to retrieve defaultTickDuration from sv1. sv1 is not part of the SVC.")
+          fail("Failed to retrieve defaultTickDuration from sv1.")
       }).toSeconds)
 
     def tickDurationWithBuffer(implicit env: CNNodeTestConsoleEnvironment) =
       defaultTickDuration.asJava.plus(java.time.Duration.ofSeconds(10))
+
+    def defaultTrafficControlConfig(implicit
+        env: CNNodeTestConsoleEnvironment
+    ): TrafficControlConfig =
+      sv1Backend.config.onboarding match {
+        case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
+          foundCollective.initialTrafficControlConfig
+        case Some(_: SvOnboardingConfig.JoinWithKey) | None =>
+          fail("Failed to retrieve defaultTrafficControlConfig from sv1.")
+      }
 
     def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {
       value should (be >= range._1 and be <= range._2)

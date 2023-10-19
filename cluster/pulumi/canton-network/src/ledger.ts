@@ -1,7 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { Service } from '@pulumi/kubernetes/core/v1';
-import { ExactNamespace, installCNHelmChart, domainFeesConfig } from 'cn-pulumi-common';
+import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 
 import { Postgres } from './postgres';
 
@@ -37,11 +37,6 @@ export function installGlobalDomain(
             address: sequencer.postgres.address,
             password: sequencer.postgres.password,
           },
-    trafficControl: {
-      enabled: true,
-      baseRate: domainFeesConfig.baseRate,
-      maxBurstDuration: domainFeesConfig.maxBurstDuration,
-    },
     metrics: {
       enable: true,
     },

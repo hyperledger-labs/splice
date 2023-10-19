@@ -238,11 +238,6 @@
           "host": "cometbft-cometbft-rpc",
           "port": 26657,
           "type": "cometbft"
-        },
-        "trafficControl": {
-          "baseRate": 3333,
-          "enabled": true,
-          "maxBurstDuration": "10m"
         }
       }
     },

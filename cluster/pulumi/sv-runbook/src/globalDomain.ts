@@ -6,7 +6,6 @@ import {
   REPO_ROOT,
   installCNSVHelmChart,
   loadYamlFromFile,
-  domainFeesConfig,
 } from 'cn-pulumi-common';
 import { globalDomainSequencerDriver } from 'cn-pulumi-common/src/global-domain';
 
@@ -30,11 +29,6 @@ export function installGlobalDomainNode(
         {}
       ),
       postgresPassword: postgresPassword,
-      trafficControl: {
-        enabled: true,
-        baseRate: domainFeesConfig.baseRate,
-        maxBurstDuration: domainFeesConfig.maxBurstDuration,
-      },
     };
     return installCNSVHelmChart(
       svNamespace,

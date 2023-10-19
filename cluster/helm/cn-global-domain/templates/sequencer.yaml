@@ -48,12 +48,6 @@ spec:
             - name: SEQUENCER_DRIVER_COMETBFT_PORT
               value: "{{ .Values.sequencerDriver.port }}"
         {{- end}}
-        {{- if (.Values.trafficControl).enabled }}
-            - name: ADDITIONAL_CONFIG_TRAFFIC_CONTROL
-              value: |
-                canton.sequencers-x.sequencer.traffic-control.base-rate = {{ (.Values.trafficControl).baseRate }}
-                canton.sequencers-x.sequencer.traffic-control.max-burst-duration = {{ (.Values.trafficControl).maxBurstDuration }}
-        {{- end }}
           imagePullPolicy: Always
           ports:
             - containerPort: 5008

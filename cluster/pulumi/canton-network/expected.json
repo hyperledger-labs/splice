@@ -1880,11 +1880,6 @@
           "host": "undefined.undefined.svc.cluster.local",
           "port": 26657,
           "type": "cometbft"
-        },
-        "trafficControl": {
-          "baseRate": 3333,
-          "enabled": true,
-          "maxBurstDuration": "10m"
         }
       }
     },
@@ -2747,11 +2742,6 @@
           "host": "undefined.undefined.svc.cluster.local",
           "port": 26657,
           "type": "cometbft"
-        },
-        "trafficControl": {
-          "baseRate": 3333,
-          "enabled": true,
-          "maxBurstDuration": "10m"
         }
       }
     },
@@ -3586,11 +3576,6 @@
           "host": "undefined.undefined.svc.cluster.local",
           "port": 26657,
           "type": "cometbft"
-        },
-        "trafficControl": {
-          "baseRate": 3333,
-          "enabled": true,
-          "maxBurstDuration": "10m"
         }
       }
     },
@@ -4352,11 +4337,6 @@
           "host": "undefined.undefined.svc.cluster.local",
           "port": 26657,
           "type": "cometbft"
-        },
-        "trafficControl": {
-          "baseRate": 3333,
-          "enabled": true,
-          "maxBurstDuration": "10m"
         }
       }
     },

@@ -24,14 +24,18 @@ import com.daml.network.sv.util.{SvUtil, SvcRulesLock}
 import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
 import com.daml.network.util.{AssignedContract, GcpBucket, TemplateJsonDecoder, UploadablePackage}
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
+import com.digitalasset.canton.sequencing.{
+  GrpcSequencerConnection,
+  SequencerConnections,
+  TrafficControlParameters,
+}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
@@ -195,6 +199,21 @@ class FoundingNodeInitializer(
       )
     } yield svc
 
+  private def initialTrafficControlParameters: TrafficControlParameters = {
+    TrafficControlParameters(
+      NonNegativeLong.tryCreate(
+        (foundingConfig.initialTrafficControlConfig.baseRate.value * foundingConfig.initialTrafficControlConfig.baseRateBurstWindow.duration.toSeconds).toLong
+      ),
+      // readVsWriteScalingFactor is set in units of per 10 mille
+      PositiveInt.tryCreate(
+        (foundingConfig.initialTrafficControlConfig.readVsWriteScalingFactor.value * 10_000).toInt
+      ),
+      NonNegativeFiniteDuration.tryOfMillis(
+        foundingConfig.initialTrafficControlConfig.baseRateBurstWindow.duration.toMillis
+      ),
+    )
+  }
+
   private def bootstrapDomain(domainNode: LocalDomainNode): Future[Namespace] = {
     logger.info("Bootstrapping the domain as the founding node")
 
@@ -213,7 +232,8 @@ class FoundingNodeInitializer(
       val initialValues = DynamicDomainParameters.initialXValues(clock, ProtocolVersion.dev)
       val values = initialValues.copy(
         // TODO(#6055) Consider increasing topology change delay again
-        topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0)
+        topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
+        trafficControlParameters = Some(initialTrafficControlParameters),
       )(initialValues.representativeProtocolVersion)
       for {
         domainId <- retryProvider.ensureThatO(
@@ -495,6 +515,9 @@ class FoundingNodeInitializer(
                           foundingConfig.initialTickDuration,
                           foundingConfig.initialMaxNumInputs,
                           domainId,
+                          foundingConfig.initialTrafficControlConfig.baseRate.value,
+                          foundingConfig.initialTrafficControlConfig.baseRateBurstWindow,
+                          foundingConfig.initialTrafficControlConfig.readVsWriteScalingFactor.value,
                         ),
                         foundingConfig.initialCoinPrice.bigDecimal,
                         defaultCnsConfig(

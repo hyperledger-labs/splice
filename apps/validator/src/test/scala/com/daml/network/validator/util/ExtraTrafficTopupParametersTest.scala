@@ -37,7 +37,11 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
       targetRate: BigDecimal = defaultTargetRate,
   ) = {
     ExtraTrafficTopupParameters(
-      domainFeesConfig(defaultBaseRate, defaultBaseRateBurstWindow, minTopupAmount),
+      domainFeesConfig(
+        baseRate = defaultBaseRate,
+        baseRateBurstWindow = defaultBaseRateBurstWindow,
+        minTopupAmount = minTopupAmount,
+      ),
       BuyExtraTrafficConfig(NonNegativeNumeric.tryCreate(targetRate), minTopupInterval),
       triggerPollingInterval,
     )

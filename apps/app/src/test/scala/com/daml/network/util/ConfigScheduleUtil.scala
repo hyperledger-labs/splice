@@ -47,10 +47,14 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
         .getConfigAsOf(env.environment.clock.now)
         .globalDomain
         .activeDomain
+    val trafficControlConfig = defaultTrafficControlConfig
     defaultCoinConfig(
       tickDuration,
       maxNumInputs,
       DomainId.tryFromString(activeDomainId),
+      trafficControlConfig.baseRate.value,
+      trafficControlConfig.baseRateBurstWindow,
+      trafficControlConfig.readVsWriteScalingFactor.value,
       holdingFee,
       nextDomainId = nextDomainId,
     )

@@ -13,7 +13,7 @@ import com.daml.network.config.{
 }
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeNumeric, PositiveNumeric}
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 
@@ -65,6 +65,7 @@ object SvOnboardingConfig {
       initialMaxNumInputs: Int = 100,
       initialCoinPrice: BigDecimal = 1.0,
       initialCnsConfig: InitialCnsConfig = InitialCnsConfig(),
+      initialTrafficControlConfig: TrafficControlConfig = TrafficControlConfig(),
       isDevNet: Boolean = false,
       bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
   ) extends SvOnboardingConfig
@@ -92,6 +93,15 @@ final case class InitialCnsConfig(
     renewalDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(30),
     entryLifetime: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(90),
     entryFee: Double = 1.0,
+)
+
+final case class TrafficControlConfig(
+    baseRate: NonNegativeNumeric[BigDecimal] = NonNegativeNumeric.tryCreate(
+      BigDecimal(3333.0)
+    ), // 100 txs of 20KB each (over the burst window)
+    baseRateBurstWindow: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
+    readVsWriteScalingFactor: PositiveNumeric[BigDecimal] =
+      PositiveNumeric.tryCreate(BigDecimal(0.02)), // charge 2% of write cost for every read
 )
 
 final case class SvGlobalDomainConfig(

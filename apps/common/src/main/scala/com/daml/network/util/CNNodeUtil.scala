@@ -15,7 +15,7 @@ import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
 import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.codegen.java.da.set.types.{Set as DamlSet}
+import com.daml.network.codegen.java.da.set.types.Set as DamlSet
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -183,18 +183,15 @@ object CNNodeUtil {
 
   val defaultLockHolderFee = new cc.fees.FixedFee(damlDecimal(0.005))
 
-  val defaultExtraTrafficPrice = damlDecimal(1.0) // extraTrafficPrice (in $/MB)
-  val defaultReadScalingFactor = damlDecimal(0.02) // charge 2% of write cost for every read
-  val defaultDomainFeesConfig = domainFeesConfig(
-    // Please keep these values in sync with
-    //   - domain-fees-overrides.conf
-    //   - domainFeesCfg.ts
-    // TODO(#6322): configure these values in at most one place
-    damlDecimal(3333.0),
-    NonNegativeFiniteDuration.ofMinutes(10),
-    // TODO(#6032): determine the best defaults here
-    1_000, // minTopupAmount = 1KB
-  )
+  // TODO(#6032): determine the best defaults here
+  val defaultExtraTrafficPrice = BigDecimal(1.0) // extraTrafficPrice (in $/MB)
+  val defaultMinTopupAmount = 1_000L // minTopupAmount = 1KB
+
+  // These are dummy values only made use of by some unit tests.
+  // The traffic control parameters are provided in the founding SV App config with the defaults in TrafficControlConfig
+  private val dummyBaseRate = BigDecimal(3333.0)
+  private val dummyBaseRateBurstWindow = NonNegativeFiniteDuration.ofMinutes(10)
+  private val dummyReadScalingFactor = BigDecimal(0.02)
 
   // TODO(tech-debt) revisit naming here. "default" and "initial" are two things that are no longer accurate (these are used for other things as well), and consider adding more default values to methods here
 
@@ -202,9 +199,20 @@ object CNNodeUtil {
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
       initialDomainId: DomainId,
+      initialBaseRate: BigDecimal = dummyBaseRate,
+      initialBaseRateBurstWindow: NonNegativeFiniteDuration = dummyBaseRateBurstWindow,
+      initialReadVsWriteScalingFactor: BigDecimal = dummyReadScalingFactor,
       holdingFee: BigDecimal = defaultHoldingFee.rate,
   ) = new cc.schedule.Schedule[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]](
-    defaultCoinConfig(initialTickDuration, initialMaxNumInputs, initialDomainId, holdingFee),
+    defaultCoinConfig(
+      initialTickDuration,
+      initialMaxNumInputs,
+      initialDomainId,
+      initialBaseRate,
+      initialBaseRateBurstWindow,
+      initialReadVsWriteScalingFactor,
+      holdingFee,
+    ),
     List.empty[Tuple2[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]]].asJava,
   )
 
@@ -212,6 +220,9 @@ object CNNodeUtil {
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
       initialDomainId: DomainId,
+      initialBaseRate: BigDecimal = dummyBaseRate,
+      initialBaseRateBurstWindow: NonNegativeFiniteDuration = dummyBaseRateBurstWindow,
+      initialReadVsWriteScalingFactor: BigDecimal = dummyReadScalingFactor,
       holdingFee: BigDecimal = defaultHoldingFee.rate,
       nextDomainId: Option[DomainId] = None,
   ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = new cc.coinconfig.CoinConfig(
@@ -221,8 +232,14 @@ object CNNodeUtil {
     // issuance curve from whitepaper
     defaultIssuanceCurve,
 
-    // domainFeesConfig
-    defaultGlobalDomainConfig(initialDomainId, nextDomainId),
+    // global domain config
+    defaultGlobalDomainConfig(
+      initialDomainId,
+      nextDomainId,
+      initialBaseRate,
+      initialBaseRateBurstWindow,
+      initialReadVsWriteScalingFactor,
+    ),
 
     // tick duration
     new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
@@ -251,6 +268,9 @@ object CNNodeUtil {
   private def defaultGlobalDomainConfig(
       initialDomainId: DomainId,
       nextDomainId: Option[DomainId],
+      initialBaseRate: BigDecimal,
+      initialBaseRateBurstWindow: NonNegativeFiniteDuration,
+      initialReadVsWriteScalingFactor: BigDecimal,
   ): GlobalDomainConfig = {
     val domainId = initialDomainId.toProtoPrimitive
     val next = nextDomainId.map(_.toProtoPrimitive)
@@ -264,7 +284,11 @@ object CNNodeUtil {
       // activeDomain
       next getOrElse domainId,
       // fees
-      defaultDomainFeesConfig,
+      domainFeesConfig(
+        baseRate = initialBaseRate,
+        baseRateBurstWindow = initialBaseRateBurstWindow,
+        readVsWriteScalingFactor = initialReadVsWriteScalingFactor,
+      ),
     )
   }
 
@@ -306,7 +330,7 @@ object CNNodeUtil {
 
   def baseRateLimits(baseRate: BigDecimal, baseRateBurstWindow: NonNegativeFiniteDuration) = {
     new BaseRateTrafficLimits(
-      baseRate.bigDecimal,
+      damlDecimal(baseRate.toDouble),
       new RelTime(TimeUnit.NANOSECONDS.toMicros(baseRateBurstWindow.duration.toNanos)),
     )
   }
@@ -314,14 +338,14 @@ object CNNodeUtil {
   def domainFeesConfig(
       baseRate: BigDecimal,
       baseRateBurstWindow: NonNegativeFiniteDuration,
-      minTopupAmount: Long,
+      readVsWriteScalingFactor: BigDecimal = dummyReadScalingFactor,
+      minTopupAmount: Long = defaultMinTopupAmount,
       extraTrafficPrice: BigDecimal = defaultExtraTrafficPrice,
-      readScalingFactor: BigDecimal = defaultReadScalingFactor,
   ) = {
     new DomainFeesConfig(
       baseRateLimits(baseRate, baseRateBurstWindow),
-      extraTrafficPrice.bigDecimal,
-      readScalingFactor.bigDecimal,
+      damlDecimal(extraTrafficPrice.toDouble),
+      damlDecimal(readVsWriteScalingFactor.toDouble),
       minTopupAmount,
     )
   }

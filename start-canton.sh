@@ -174,10 +174,6 @@ JAVA_TOOL_OPTIONS="-Xms6g -Xmx6g -Dlogback.configurationFile=./scripts/canton-lo
 config_overrides=""
 config_overrides_simtime=""
 
-# Enable traffic QoS
-config_overrides="$config_overrides -c ./apps/app/src/test/resources/domain-fees-overrides.conf"
-config_overrides_simtime="$config_overrides -c ./apps/app/src/test/resources/domain-fees-overrides-simtime.conf"
-
 if [[ $global_cometbft -eq 1 ]]; then
   config_overrides="$config_overrides -c ./apps/app/src/test/resources/cometbft-sequencer-global-domain-overrides.conf"
 fi;
