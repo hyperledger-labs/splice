@@ -21,7 +21,7 @@ class AdvanceOpenMiningRoundTrigger(
     tracer: Tracer,
 ) extends ScheduledTaskTrigger[AdvanceOpenMiningRoundTrigger.Task]
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]] {
-  override protected def enableLeaderVoting: Boolean = true
+  override protected def enableAutomaticLeaderElection: Boolean = true
   private val store = svTaskContext.svcStore
 
   /** Retrieve a batch of tasks that are ready for execution now. */

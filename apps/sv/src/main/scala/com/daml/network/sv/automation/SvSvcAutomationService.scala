@@ -110,7 +110,7 @@ class SvSvcAutomationService(
     )
   )
 
-  if (config.automation.enableLeaderReplacement) {
+  if (config.automation.enableLeaderReplacementTrigger) {
     registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
   }
 

@@ -2,7 +2,7 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy, useSvClient } from 'common-frontend';
 
 import { CoinRules } from '@daml.js/canton-coin-0.1.0/lib/CC/Coin';
-import { SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { ElectionRequest, SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules';
 
 import { useSvAdminClient } from './SvAdminServiceContext';
 
@@ -36,15 +36,17 @@ export const useSvcInfos = (): UseQueryResult<SvUiState> => {
   });
 };
 
-export const useElectionContext = (): UseQueryResult<{ exists: boolean }> | undefined => {
+export const useElectionContext = ():
+  | UseQueryResult<{ ranking: Contract<ElectionRequest>[] }>
+  | undefined => {
   const { getElectionRequest } = useSvAdminClient();
   return useQuery({
     refetchInterval: PollingStrategy.FIXED,
     queryKey: ['getElectionRequest'],
     queryFn: async () => {
-      const resp = await getElectionRequest();
+      const { ranking } = await getElectionRequest();
       return {
-        exists: resp.exists,
+        ranking: ranking.map(c => Contract.decodeOpenAPI(c, ElectionRequest)),
       };
     },
   });

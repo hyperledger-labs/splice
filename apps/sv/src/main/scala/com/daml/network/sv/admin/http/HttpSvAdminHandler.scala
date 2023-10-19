@@ -242,10 +242,10 @@ class HttpSvAdminHandler(
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getElectionRequest") { _ => _ =>
       for {
-        electionRequestExists <- SvApp.getElectionRequest(svcStoreWithIngestion)
+        electionRequests <- SvApp.getElectionRequest(svcStoreWithIngestion)
       } yield {
         definitions.GetElectionRequestResponse(
-          electionRequestExists
+          electionRequests.map(_.toHttp).toVector
         )
       }
     }

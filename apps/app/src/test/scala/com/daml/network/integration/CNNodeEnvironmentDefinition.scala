@@ -133,7 +133,7 @@ case class CNNodeEnvironmentDefinition(
   def withoutLeaderReplacement: CNNodeEnvironmentDefinition =
     addConfigTransform((_, config) =>
       CNNodeConfigTransforms.updateAllAutomationConfigs(
-        _.focus(_.enableLeaderReplacement).replace(false)
+        _.focus(_.enableLeaderReplacementTrigger).replace(false)
       )(config)
     )
 

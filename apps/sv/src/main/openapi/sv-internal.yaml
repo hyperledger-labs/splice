@@ -951,8 +951,10 @@ components:
     GetElectionRequestResponse:
       type: object
       required:
-        - exists
+        - ranking
       properties:
-        exists:
-          type: boolean
-          description: "Whether the election already exists for that epoch."
+        ranking:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+

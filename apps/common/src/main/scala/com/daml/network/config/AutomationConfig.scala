@@ -30,7 +30,7 @@ case class AutomationConfig(
     enableExpireCoin: Boolean = false,
     /** Only intended for testing. Allows disabling leader elections based on inactivity detection for simtime tests so elections are not triggered unexpectedly.
       */
-    enableLeaderReplacement: Boolean = true,
+    enableLeaderReplacementTrigger: Boolean = true,
     /** Only intended for testing. Allows disabling governance automation.
       */
     enableSvcGovernance: Boolean = true,

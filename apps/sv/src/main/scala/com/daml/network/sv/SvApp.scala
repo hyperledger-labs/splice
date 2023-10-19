@@ -756,17 +756,12 @@ object SvApp {
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): Future[Boolean] = {
+  ): Future[Seq[Contract[ElectionRequest.ContractId, ElectionRequest]]] = {
     val store = svcStoreWithIngestion.store
     for {
       svcRules <- store.getSvcRules()
-      queryResult <- store
-        .lookupElectionRequestByRequesterWithOffset(
-          store.key.svParty,
-          svcRules.payload.epoch,
-        )
-    } yield queryResult.value.isDefined;;
-  }
+    } yield store.listElectionRequests(svcRules)
+  }.flatten
 
   def createElectionRequest(
       requester: String,

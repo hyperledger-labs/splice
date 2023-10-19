@@ -1,10 +1,13 @@
 import { useMutation } from '@tanstack/react-query';
 import { Loading, SvClientProvider } from 'common-frontend';
+import { Contract } from 'common-frontend';
 import React, { useEffect, useState } from 'react';
 
 import { Button, Stack, Table, TableBody, Typography } from '@mui/material';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
+
+import { ElectionRequest } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 import { useElectionContext, useSvcInfos } from '../contexts/SvContext';
@@ -12,7 +15,28 @@ import { config } from '../utils';
 import { Alerting, AlertState } from '../utils/Alerting';
 import RankingForm, { User } from '../utils/RankingForm';
 
-const ElectionRequest: React.FC = () => {
+interface ListRankingsProps {
+  electionRequest: Contract<ElectionRequest>[];
+}
+
+const ListRankings: React.FC<ListRankingsProps> = ({ electionRequest }) => {
+  return (
+    <Table>
+      <TableBody>
+        {electionRequest.map((e, key) => (
+          <TableRow key={key}>
+            <TableCell id={'requester-table-row'}>{e.payload.requester.split('::')[0]}</TableCell>
+            <TableCell id={'ranking-table-row'}>
+              {e.payload.ranking.map((e, index) => `${index + 1}: ${e.split('::')[0]}`).join(', ')}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+};
+
+const ElectionRequests: React.FC = () => {
   const [ranking, setRanking] = useState<User[]>();
   const svcInfosQuery = useSvcInfos();
   const { createElectionRequest } = useSvAdminClient();
@@ -64,35 +88,52 @@ const ElectionRequest: React.FC = () => {
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
       <Typography mt={4} variant="h4">
-        Ranking of your Leader Preferences for next epoch
+        Current Configuration
       </Typography>
       <Table>
         <TableBody>
           <TableRow>
-            <TableCell>Current Epoch:</TableCell>
+            <TableCell>Epoch:</TableCell>
             <TableCell id={'leader-election-epoch'}>
               {svcInfosQuery.data?.svcRules.payload.epoch}
             </TableCell>
           </TableRow>
           <TableRow>
-            <TableCell>Current Leader:</TableCell>
+            <TableCell>Leader:</TableCell>
             <TableCell id={'leader-election-current-leader'}>
               {svcInfosQuery.data?.svcRules.payload.leader}
             </TableCell>
           </TableRow>
         </TableBody>
       </Table>
+      <Typography mt={4} variant="h4">
+        Configuration for Epoch {parseInt(svcInfosQuery.data?.svcRules.payload.epoch!) + 1}
+      </Typography>
+      {electionContextQuery.data.ranking.length > 0 && (
+        <Typography mt={4} variant="h5">
+          In-flight Election Requests:
+        </Typography>
+      )}
+      {electionContextQuery.data.ranking && (
+        <ListRankings electionRequest={electionContextQuery.data!.ranking} />
+      )}
+      <Typography mt={4} variant="h5">
+        Your Ranking:
+      </Typography>
       <RankingForm users={ranking} updateRanking={setRanking} />
       <Alerting alertState={alertState} />
       <Button
         id={'submit-ranking-leader-election'}
-        fullWidth
         type={'submit'}
         size="large"
         onClick={() => {
           createElectionRequestMutation.mutate();
         }}
-        disabled={electionContextQuery.data?.exists}
+        disabled={
+          electionContextQuery.data!.ranking.find(
+            e => e.payload.requester === svcInfosQuery.data?.svPartyId!
+          ) !== undefined
+        }
       >
         Submit Ranking
       </Button>
@@ -101,10 +142,9 @@ const ElectionRequest: React.FC = () => {
 };
 
 const ElectionRequestWithContexts: React.FC = () => {
-  // TODO(#7134) List in-flight election requests
   return (
     <SvClientProvider url={config.services.sv.url}>
-      <ElectionRequest />
+      <ElectionRequests />
     </SvClientProvider>
   );
 };
