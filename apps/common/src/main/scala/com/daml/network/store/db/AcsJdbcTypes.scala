@@ -5,7 +5,7 @@ import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.lf.data.Ref.HexString
 import com.daml.lf.data.Time.Timestamp
 import com.daml.lf.value.Value as LfValue
-import com.daml.lf.value.json.ApiCodecCompressed
+import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.util.Contract
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.QualifiedName

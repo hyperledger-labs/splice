@@ -5,6 +5,7 @@ package com.digitalasset.canton.participant.sync
 
 import com.daml.daml_lf_dev.DamlLf
 import com.daml.error.GrpcStatuses
+import com.daml.lf.CantonOnly
 import com.daml.lf.data.{Bytes, ImmArray}
 import com.daml.lf.transaction.{BlindingInfo, CommittedTransaction}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -23,7 +24,9 @@ import com.digitalasset.canton.protocol.{
   LfCommittedTransaction,
   LfContractId,
   LfHash,
+  LfNode,
   LfNodeCreate,
+  LfNodeExercises,
   LfNodeId,
   LfTemplateId,
   LfVersionedTransaction,
@@ -73,6 +76,8 @@ sealed trait LedgerSyncEvent extends Product with Serializable with PrettyPrinti
       case ev: LedgerSyncEvent.ConfigurationChangeRejected => ev.copy(recordTime = timestamp)
       case ev: LedgerSyncEvent.TransferredOut => ev.updateRecordTime(newRecordTime = timestamp)
       case ev: LedgerSyncEvent.TransferredIn => ev.copy(recordTime = timestamp)
+      case ev: LedgerSyncEvent.ContractsAdded => ev.copy(recordTime = timestamp)
+      case ev: LedgerSyncEvent.ContractsPurged => ev.copy(recordTime = timestamp)
     }
 }
 
@@ -243,12 +248,121 @@ object LedgerSyncEvent {
         paramWithoutValue("transaction"),
         paramWithoutValue("divulgedContracts"),
         paramWithoutValue("blindingInfo"),
+        paramWithoutValue("hostedWitnesses"),
+        paramWithoutValue("contractMetadata"),
       )
     def toDamlUpdate(populateTransfers: Boolean = false): Option[Update] = Some(
       this.transformInto[Update.TransactionAccepted]
     )
 
     override def domainId: Option[DomainId] = transactionMeta.optDomainId
+  }
+
+  // TODO(i12964) once the Ledger API moves away from fake transactions, remove this
+  private def mkTx(nodes: Iterable[LfNode]): LfCommittedTransaction = {
+    val nodeIds = LazyList.from(0).map(LfNodeId)
+    val txNodes = nodeIds.zip(nodes).toMap
+    LfCommittedTransaction(
+      CantonOnly.lfVersionedTransaction(
+        nodes = txNodes,
+        roots = ImmArray.from(nodeIds.take(txNodes.size)),
+      )
+    )
+  }
+
+  // TODO(i12964) once the Ledger API moves away from fake transactions, re-evaluate what data can be removed
+  final case class ContractsAdded(
+      transactionId: LedgerTransactionId,
+      contracts: Seq[LfNodeCreate],
+      domainId: DomainId,
+      ledgerTime: LfTimestamp,
+      recordTime: LfTimestamp,
+      hostedWitnesses: Seq[LfPartyId],
+      contractMetadata: Map[LfContractId, Bytes],
+  ) extends LedgerSyncEvent {
+    override def description: String = s"Contracts added $transactionId"
+
+    // TODO(i12964) expose the migration event as its own type of event (not as a transaction)
+    override def toDamlUpdate(populateTransfers: Boolean = false): Option[Update] =
+      Option(
+        Update.TransactionAccepted(
+          completionInfoO = None,
+          transactionMeta = TransactionMeta(
+            ledgerEffectiveTime = ledgerTime,
+            workflowId = None,
+            submissionTime = recordTime,
+            submissionSeed = LedgerSyncEvent.noOpSeed,
+            optUsedPackages = None,
+            optNodeSeeds = None,
+            optByKeyNodes = None,
+            optDomainId = Option(domainId),
+          ),
+          transaction = mkTx(contracts),
+          transactionId = transactionId,
+          recordTime = recordTime,
+          divulgedContracts = List.empty,
+          blindingInfoO = None,
+          hostedWitnesses = hostedWitnesses.toList,
+          contractMetadata = contractMetadata,
+        )
+      )
+
+    override def pretty: Pretty[ContractsAdded] =
+      prettyOfClass(
+        param("transactionId", _.transactionId),
+        param("contracts", _.contracts.map(_.coid)),
+        param("domainId", _.domainId),
+        param("recordTime", _.recordTime),
+        param("ledgerTime", _.ledgerTime),
+        paramWithoutValue("hostedWitnesses"),
+        paramWithoutValue("contractMetadata"),
+      )
+  }
+
+  // TODO(i12964) once the Ledger API moves away from fake transactions, re-evaluate what data can be removed
+  final case class ContractsPurged(
+      transactionId: LedgerTransactionId,
+      contracts: Seq[LfNodeExercises],
+      domainId: DomainId,
+      recordTime: LfTimestamp,
+      hostedWitnesses: Seq[LfPartyId],
+  ) extends LedgerSyncEvent {
+    override def description: String = s"Contracts purged $transactionId"
+
+    // TODO(i12964) expose the migration event as its own type of event (not as a transaction)
+    override def toDamlUpdate(populateTransfers: Boolean = false): Option[Update] =
+      Option(
+        Update.TransactionAccepted(
+          completionInfoO = None,
+          transactionMeta = TransactionMeta(
+            ledgerEffectiveTime = recordTime,
+            workflowId = None,
+            submissionTime = recordTime,
+            submissionSeed = LedgerSyncEvent.noOpSeed,
+            optUsedPackages = None,
+            optNodeSeeds = None,
+            optByKeyNodes = None,
+            optDomainId = Option(domainId),
+          ),
+          transaction = mkTx(contracts),
+          transactionId = transactionId,
+          recordTime = recordTime,
+          divulgedContracts = List.empty,
+          blindingInfoO = None,
+          hostedWitnesses = hostedWitnesses.toList,
+          contractMetadata = Map.empty,
+        )
+      )
+
+    override def pretty: Pretty[ContractsPurged] =
+      prettyOfClass(
+        param("transactionId", _.transactionId),
+        paramWithoutValue("contractIds"),
+        param("domainId", _.domainId),
+        param("recordTime", _.recordTime),
+        paramWithoutValue("hostedWitnesses"),
+        paramWithoutValue("contractMetadata"),
+      )
   }
 
   final case class CommandRejected(
@@ -312,7 +426,6 @@ object LedgerSyncEvent {
       s"transferred-$kind $contractId from $sourceDomain to $targetDomain"
   }
 
-  // TODO(#12373) Adapt when releasing BFT
   /** Signal the transfer-out of a contract from source to target domain.
     *
     * @param updateId              Uniquely identifies the update.
@@ -328,7 +441,7 @@ object LedgerSyncEvent {
     * @param isTransferringParticipant True if the participant is transferring.
     *                                  Note: false if the data comes from an old serialized event
     * @param transferCounter        The [[com.digitalasset.canton.TransferCounter]] of the contract.
-    *                               For protocol version earlier than [[com.digitalasset.canton.version.ProtocolVersion.dev]],
+    *                               For protocol version earlier than [[com.digitalasset.canton.version.ProtocolVersion.CNTestNet]],
     *                               its value is Long.MinValue
     */
   final case class TransferredOut(
@@ -398,7 +511,6 @@ object LedgerSyncEvent {
       }
   }
 
-  // TODO(#12373) Adapt when releasing BFT
   /**  Signal the transfer-in of a contract from the source domain to the target domain.
     *
     * @param updateId                  Uniquely identifies the update.
@@ -416,7 +528,7 @@ object LedgerSyncEvent {
     * @param isTransferringParticipant True if the participant is transferring.
     *                                  Note: false if the data comes from an old serialized event
     * @param transferCounter The [[com.digitalasset.canton.TransferCounter]] of the contract.
-    *                        For protocol version earlier than [[com.digitalasset.canton.version.ProtocolVersion.dev]],
+    *                        For protocol version earlier than [[com.digitalasset.canton.version.ProtocolVersion.CNTestNet]],
     *                        its value is Long.MinValue
     */
   final case class TransferredIn(

@@ -127,8 +127,7 @@ trait BaseTest
 
   import scala.language.implicitConversions
 
-  // TODO(#12373) Adapt when releasing BFT
-  protected val testTrafficState: Boolean = testedProtocolVersion >= ProtocolVersion.dev
+  protected val testTrafficState: Boolean = testedProtocolVersion >= ProtocolVersion.CNTestNet
 
   protected def whenTestTrafficState[K, V](m: Map[K, V]): Map[K, V] =
     if (testTrafficState) m else Map.empty
@@ -409,6 +408,7 @@ object BaseTest {
   lazy val CantonLfDev: String = getResourcePath("CantonLfDev.dar")
   lazy val CantonLfV15: String = getResourcePath("CantonLfV15.dar")
   lazy val PerformanceTestPath: String = getResourcePath("PerformanceTest.dar")
+  lazy val DamlScript3TestFilesPath: String = getResourcePath("DamlScript3TestFiles.dar")
   lazy val DamlTestFilesPath: String = getResourcePath("DamlTestFiles.dar")
   lazy val DamlTestLfV15FilesPath: String = getResourcePath("DamlTestLfV15Files.dar")
   lazy val UpgradeV1: String = getResourcePath("upgrade-v1.dar")

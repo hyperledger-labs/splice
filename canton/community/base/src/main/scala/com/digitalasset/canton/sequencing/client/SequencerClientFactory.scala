@@ -7,7 +7,6 @@ import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.common.domain.ServiceAgreementId
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
@@ -40,6 +39,7 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.DomainTopologyClient
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.{SequencerAlias, SequencerCounter}
 import io.grpc.{CallOptions, ManagedChannel}
 import io.opentelemetry.api.trace.Tracer
 
@@ -148,9 +148,7 @@ object SequencerClientFactory {
                 unauthenticated: Boolean
             )(implicit loggingContext: NamedLoggingContext): SequencedEventValidator =
               if (config.skipSequencedEventValidation) {
-                SequencedEventValidator.noValidation(domainId, processingTimeout)(
-                  NamedLoggingContext(loggerFactory, TraceContext.empty)
-                )
+                SequencedEventValidator.noValidation(domainId)
               } else {
                 new SequencedEventValidatorImpl(
                   unauthenticated,
@@ -184,6 +182,7 @@ object SequencerClientFactory {
           loggingConfig,
           loggerFactory,
           futureSupervisor,
+          SequencerCounter.Genesis,
         )
       }
 
@@ -313,7 +312,9 @@ object SequencerClientFactory {
       }
 
       private def grpcTransport(connection: GrpcSequencerConnection, member: Member)(implicit
-          executionContext: ExecutionContextExecutor
+          executionContext: ExecutionContextExecutor,
+          executionSequencerFactory: ExecutionSequencerFactory,
+          materializer: Materializer,
       ): SequencerClientTransport = {
         val channel = createChannel(connection)
         val auth = grpcSequencerClientAuth(connection, member)
@@ -332,6 +333,7 @@ object SequencerClientFactory {
       private def grpcTransportAkka(connection: GrpcSequencerConnection, member: Member)(implicit
           executionContext: ExecutionContextExecutor,
           executionSequencerFactory: ExecutionSequencerFactory,
+          materializer: Materializer,
       ): GrpcSequencerClientTransportAkka = {
         val channel = createChannel(connection)
         val auth = grpcSequencerClientAuth(connection, member)

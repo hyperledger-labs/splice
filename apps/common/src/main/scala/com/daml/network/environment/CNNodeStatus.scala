@@ -6,7 +6,7 @@ import cats.syntax.traverse.*
 import com.daml.network.http.v0.{definitions as jsonV0}
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.health.HealthReporting.ComponentStatus
+import com.digitalasset.canton.health.ComponentStatus
 import com.digitalasset.canton.health.admin.{v0 as protoV0}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.pretty.Pretty

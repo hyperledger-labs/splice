@@ -43,6 +43,7 @@ import scala.collection.concurrent.TrieMap
 final case class MetricsConfig(
     reporters: Seq[MetricsReporterConfig] = Seq.empty,
     reportJvmMetrics: Boolean = false,
+    reportExecutionContextMetrics: Boolean = false,
     histograms: Seq[HistogramDefinition] = Seq.empty,
 )
 
@@ -121,12 +122,13 @@ object MetricsConfig {
   }
 }
 
-class MetricsFactory(
+final case class MetricsFactory(
     val reporters: Seq[metrics.Reporter],
     val registry: metrics.MetricRegistry,
     val reportJVMMetrics: Boolean,
     val meter: Meter,
     val factoryType: MetricsFactoryType,
+    val reportExecutionContextMetrics: Boolean,
 ) extends AutoCloseable {
 
   @deprecated("Use LabeledMetricsFactory", since = "2.7.0")
@@ -179,6 +181,7 @@ class MetricsFactory(
             participantMetricsContext
           ),
           participantRegistry,
+          reportExecutionContextMetrics,
         )
       },
     )
@@ -321,6 +324,7 @@ object MetricsFactory extends LazyLogging {
       config.reportJvmMetrics,
       openTelemetry.meterBuilder("canton").build(),
       metricsFactoryType,
+      config.reportExecutionContextMetrics,
     )
   }
 

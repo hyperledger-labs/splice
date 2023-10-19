@@ -139,7 +139,6 @@ class ParticipantAdminConnection(
         parties,
         filterDomainId,
         timestamp,
-        None,
         observer,
         Map.empty,
       )

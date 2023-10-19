@@ -1,4 +1,4 @@
-canton/community/common/.daml/dist/CantonExamples-2.8.0.dar 4e9663ce346e5cad95cec508f6657091b72283a88ca79220af46ca7887e7414c
-canton/community/ledger/ledger-json-api/.daml/dist/JsonEncodingTest-2.8.0.dar 3dac5538e38252cd92108f13f35fe45ce6a8c5e7162fa937a48be0a57d6c3395
-canton/community/participant/src/main/.daml/dist/AdminWorkflows-2.8.0.dar d6c18b5746c7fd072f48a0864473b56651b2b60235fb166d7a0c24025043750f
-canton/community/participant/src/main/.daml/dist/AdminWorkflowsWithVacuuming-2.8.0.dar 6a42ad6c3f548ea3f35e443caf7bc7d8f6dcfa7bc0ff1396318ec23bf8440ecf
+canton/community/common/.daml/dist/CantonExamples-2.8.0.dar f1a8fc881f0e86b074fd6d1b9110ee49b61022fb364e6085864bf4511269c878
+canton/community/ledger/ledger-json-api/.daml/dist/JsonEncodingTest-2.8.0.dar e8b7ba8b46a9cf6edd34f45af910d81ab8ad57a4d302345e569ef2cd6f9ebc9d
+canton/community/participant/src/main/.daml/dist/AdminWorkflows-2.8.0.dar 7c17ab8fa9f12398032da3640bd4923dde0df0d0961e6e6268a9143dfc826082
+canton/community/participant/src/main/.daml/dist/AdminWorkflowsWithVacuuming-2.8.0.dar 3e5669feea76bd316985b716902bd4875a3fc8c9016c733bf4f39c8bbad6e7df

@@ -11,8 +11,7 @@ import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.SequencerSubscriptionErrorGroup
-import com.digitalasset.canton.health.ComponentHealthState
-import com.digitalasset.canton.health.HealthReporting.HealthComponent
+import com.digitalasset.canton.health.{ComponentHealthState, HealthComponent}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.SerializedEventHandler
@@ -163,9 +162,8 @@ class ResilientSequencerSubscription[HandlerError](
   private def delayAndRestartSubscription(hasReceivedEvent: Boolean, delay: FiniteDuration)(implicit
       traceContext: TraceContext
   ): Unit = {
-    val newDelay = retryDelayRule.nextDelay(delay, hasReceivedEvent)
-    val logMessage = s"Waiting ${LoggerUtil.roundDurationForHumans(newDelay)} before reconnecting"
-    if (newDelay < retryDelayRule.warnDelayDuration) {
+    val logMessage = s"Waiting ${LoggerUtil.roundDurationForHumans(delay)} before reconnecting"
+    if (delay < retryDelayRule.warnDelayDuration) {
       logger.debug(logMessage)
     } else if (isFailed && getState != ComponentHealthState.NotInitializedState) {
       logger.info(logMessage)
@@ -181,6 +179,7 @@ class ResilientSequencerSubscription[HandlerError](
     // we effectively throwing away the future here so add some logging in case it fails
     FutureUtil.doNotAwait(
       DelayUtil.delay(functionFullName, delay, this) map { _ =>
+        val newDelay = retryDelayRule.nextDelay(delay, hasReceivedEvent)
         setupNewSubscription(newDelay)
       },
       "Delaying setup of new sequencer subscription failed",

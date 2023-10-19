@@ -17,7 +17,7 @@ import com.daml.ledger.javaapi.data.codegen.{
 }
 import com.daml.lf.value as lf
 import com.daml.lf.data.Ref.Identifier as LfIdentifier
-import com.daml.lf.value.json.ApiCodecCompressed
+import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.http.v0.definitions.MaybeCachedContract
 import com.daml.network.util.JavaDecodeUtil

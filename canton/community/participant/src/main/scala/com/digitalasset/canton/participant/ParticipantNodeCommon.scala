@@ -9,9 +9,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.option.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.http.metrics.HttpApiMetrics
 import com.daml.lf.engine.Engine
-import com.daml.metrics.Metrics as LedgerApiServerMetrics
 import com.digitalasset.canton.LedgerParticipantId
 import com.digitalasset.canton.common.domain.grpc.SequencerInfoLoader
 import com.digitalasset.canton.concurrent.{
@@ -23,12 +21,11 @@ import com.digitalasset.canton.config.{DbConfig, H2DbConfig}
 import com.digitalasset.canton.crypto.{Crypto, SyncCryptoApiProvider}
 import com.digitalasset.canton.domain.api.v0.DomainTimeServiceGrpc
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrapCommon}
-import com.digitalasset.canton.health.HealthReporting.{
-  BaseMutableHealthComponent,
-  MutableHealthComponent,
-}
+import com.digitalasset.canton.health.{BaseMutableHealthComponent, MutableHealthComponent}
+import com.digitalasset.canton.http.metrics.HttpApiMetrics
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.metrics.Metrics as LedgerApiServerMetrics
 import com.digitalasset.canton.participant.admin.grpc.*
 import com.digitalasset.canton.participant.admin.v0.*
 import com.digitalasset.canton.participant.admin.{

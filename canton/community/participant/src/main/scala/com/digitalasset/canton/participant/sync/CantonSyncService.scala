@@ -35,10 +35,7 @@ import com.digitalasset.canton.data.{
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.SyncServiceErrorGroup
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.InjectionErrorGroup
 import com.digitalasset.canton.error.*
-import com.digitalasset.canton.health.HealthReporting.{
-  BaseMutableHealthComponent,
-  MutableHealthComponent,
-}
+import com.digitalasset.canton.health.{BaseMutableHealthComponent, MutableHealthComponent}
 import com.digitalasset.canton.ledger.api.health.HealthStatus
 import com.digitalasset.canton.ledger.configuration.*
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
@@ -466,7 +463,7 @@ class CantonSyncService(
       case Left(err) =>
         logger.warn(s"Internal error while pruning: $err")
         Left(PruningServiceError.InternalServerError.Error(err.message))
-      case Right(_unit) => Right(())
+      case Right(()) => Right(())
     }
 
   private def submitTransactionF(
@@ -573,7 +570,7 @@ class CantonSyncService(
       logger.debug(s"Subscribing to stateUpdates from $beginAfterOffset")
       // Plus one since dispatchers use inclusive offsets.
       beginAfterOffset
-        .traverse(after => UpstreamOffsetConvert.toGlobalOffset(after).map(_ + 1L))
+        .traverse(after => UpstreamOffsetConvert.toGlobalOffset(after).map(_.increment))
         .fold(
           e => Source.failed(new IllegalArgumentException(e)),
           beginStartingAt =>

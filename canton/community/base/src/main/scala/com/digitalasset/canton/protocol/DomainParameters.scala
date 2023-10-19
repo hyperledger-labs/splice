@@ -522,10 +522,9 @@ final case class DynamicDomainParameters(
   )
 
   override def pretty: Pretty[DynamicDomainParameters] = {
-    // TODO(#12373) change when releasing BFT Domain
     if (
       representativeProtocolVersion >= companionObj.protocolVersionRepresentativeFor(
-        ProtocolVersion.dev
+        ProtocolVersion.CNTestNet
       )
     ) {
       prettyOfClass(
@@ -534,6 +533,7 @@ final case class DynamicDomainParameters(
         param("transfer exclusivity timeout", _.transferExclusivityTimeout),
         param("topology change delay", _.topologyChangeDelay),
         param("ledger time record time tolerance", _.ledgerTimeRecordTimeTolerance),
+        param("mediator deduplication timeout", _.mediatorDeduplicationTimeout),
         param("reconciliation interval", _.reconciliationInterval),
         param("max rate per participant", _.maxRatePerParticipant),
         param("max request size", _.maxRequestSize.value),
@@ -551,6 +551,7 @@ final case class DynamicDomainParameters(
         param("transfer exclusivity timeout", _.transferExclusivityTimeout),
         param("topology change delay", _.topologyChangeDelay),
         param("ledger time record time tolerance", _.ledgerTimeRecordTimeTolerance),
+        param("mediator deduplication timeout", _.mediatorDeduplicationTimeout),
         param("reconciliation interval", _.reconciliationInterval),
         param("max rate per participant", _.maxRatePerParticipant),
         param("max request size", _.maxRequestSize.value),
@@ -588,8 +589,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
 
   private lazy val rpv4 = protocolVersionRepresentativeFor(ProtocolVersion.v4)
 
-  // TODO(#12373): Adjust when releasing BFT
-  private lazy val rpvDev = protocolVersionRepresentativeFor(ProtocolVersion.dev)
+  private lazy val rpvCNTestNet = protocolVersionRepresentativeFor(ProtocolVersion.CNTestNet)
 
   override lazy val invariants = Seq(
     defaultReconciliationIntervalUntil,
@@ -629,7 +629,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
   lazy val defaultSequencerAggregateSubmissionTimeoutUntilExclusive = DefaultValueUntilExclusive(
     _.sequencerAggregateSubmissionTimeout,
     "sequencerAggregateSubmissionTimeout",
-    rpvDev,
+    rpvCNTestNet,
     defaultSequencerAggregateSubmissionTimeout,
   )
 

@@ -5,7 +5,7 @@ import akka.stream.Materializer
 import cats.data.EitherT
 import cats.implicits.toTraverseOps
 import cats.syntax.either.*
-import com.daml.lf.value.json.ApiCodecCompressed
+import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote

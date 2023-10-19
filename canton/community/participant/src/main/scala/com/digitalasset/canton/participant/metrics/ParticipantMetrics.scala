@@ -4,19 +4,20 @@
 package com.digitalasset.canton.participant.metrics
 
 import com.codahale.metrics.MetricRegistry
-import com.daml.http.metrics.HttpApiMetrics
+import com.daml.metrics.HealthMetrics
 import com.daml.metrics.api.MetricDoc.MetricQualification.{Debug, Traffic}
 import com.daml.metrics.api.MetricHandle.Gauge.CloseableGauge
 import com.daml.metrics.api.MetricHandle.{Counter, Gauge, Meter}
 import com.daml.metrics.api.noop.NoOpGauge
 import com.daml.metrics.api.{MetricDoc, MetricName, MetricsContext}
 import com.daml.metrics.grpc.GrpcServerMetrics
-import com.daml.metrics.{HealthMetrics, Metrics as LedgerApiServerMetrics}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.data.TaskSchedulerMetrics
 import com.digitalasset.canton.environment.BaseMetrics
+import com.digitalasset.canton.http.metrics.HttpApiMetrics
 import com.digitalasset.canton.metrics.MetricHandle.{LabeledMetricsFactory, MetricsFactory}
-import com.digitalasset.canton.metrics.*
+import com.digitalasset.canton.metrics.{Metrics as LedgerApiServerMetrics, *}
+import com.digitalasset.canton.participant.metrics.PruningMetrics as ParticipantPruningMetrics
 
 import scala.annotation.nowarn
 import scala.collection.concurrent.TrieMap
@@ -30,6 +31,7 @@ class ParticipantMetrics(
     ) val metricsFactory: MetricsFactory,
     val labeledMetricsFactory: LabeledMetricsFactory,
     registry: MetricRegistry,
+    reportExecutionContextMetrics: Boolean,
 ) extends BaseMetrics {
 
   override def grpcMetrics: GrpcServerMetrics = ledgerApiServer.daml.grpc
@@ -43,7 +45,12 @@ class ParticipantMetrics(
 
   @nowarn("cat=deprecation")
   val ledgerApiServer: LedgerApiServerMetrics =
-    new LedgerApiServerMetrics(metricsFactory, labeledMetricsFactory, registry)
+    new LedgerApiServerMetrics(
+      metricsFactory,
+      labeledMetricsFactory,
+      registry,
+      reportExecutionContextMetrics,
+    )
 
   @nowarn("cat=deprecation")
   val httpApiServer: HttpApiMetrics =
@@ -52,7 +59,7 @@ class ParticipantMetrics(
   private val clients = TrieMap[DomainAlias, SyncDomainMetrics]()
 
   @nowarn("cat=deprecation")
-  object pruning extends PruningMetrics(prefix, metricsFactory)
+  object pruning extends ParticipantPruningMetrics(prefix, metricsFactory)
 
   @nowarn("cat=deprecation")
   def domainMetrics(alias: DomainAlias): SyncDomainMetrics = {

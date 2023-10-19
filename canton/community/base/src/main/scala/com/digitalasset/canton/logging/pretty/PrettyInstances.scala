@@ -11,9 +11,13 @@ import com.daml.ledger.client.binding.Primitive
 import com.daml.lf.data.Ref
 import com.daml.lf.data.Ref.{DottedName, PackageId, QualifiedName}
 import com.daml.lf.transaction.ContractStateMachine.ActiveLedgerState
-import com.daml.lf.transaction.Transaction.{
+import com.daml.lf.transaction.TransactionErrors.{
+  DuplicateContractId,
+  DuplicateContractIdKIError,
   DuplicateContractKey,
+  DuplicateContractKeyKIError,
   InconsistentContractKey,
+  InconsistentContractKeyKIError,
   KeyInputError,
 }
 import com.daml.lf.value.Value
@@ -30,6 +34,7 @@ import com.digitalasset.canton.util.{ErrorUtil, HexString}
 import com.digitalasset.canton.{LedgerApplicationId, LfPartyId, LfTimestamp}
 import com.google.protobuf.ByteString
 import io.grpc.Status
+import io.grpc.health.v1.HealthCheckResponse.ServingStatus
 import pprint.Tree
 import slick.util.{DumpInfo, Dumpable}
 
@@ -113,7 +118,6 @@ trait PrettyInstances {
   implicit def prettyInstant: Pretty[Instant] = prettyOfString(_.toString)
 
   implicit val prettyUuid: Pretty[UUID] = prettyOfString(_.toString.readableHash.toString)
-
   // There is deliberately no instance for `String` to force clients
   // use ShowUtil.ShowStringSyntax instead.
   def prettyString: Pretty[String] = prettyOfString(identity)
@@ -302,10 +306,12 @@ trait PrettyInstances {
   )
 
   implicit val prettyKeyInputError: Pretty[KeyInputError] = {
-    case Left(e: InconsistentContractKey) =>
+    case InconsistentContractKeyKIError(e: InconsistentContractKey) =>
       prettyOfClass[InconsistentContractKey](unnamedParam(_.key)).treeOf(e)
-    case Right(e: DuplicateContractKey) =>
+    case DuplicateContractKeyKIError(e: DuplicateContractKey) =>
       prettyOfClass[DuplicateContractKey](unnamedParam(_.key)).treeOf(e)
+    case DuplicateContractIdKIError(e: DuplicateContractId) =>
+      prettyOfClass[DuplicateContractId](unnamedParam(_.contractId)).treeOf(e)
   }
 
   implicit def prettyActiveLedgerState[T: Pretty]: Pretty[ActiveLedgerState[T]] =
@@ -318,6 +324,10 @@ trait PrettyInstances {
   implicit val prettyPort: Pretty[Port] = prettyOfString(_.unwrap.toString)
 
   implicit val prettyRefinedNumeric: Pretty[RefinedNumeric[_]] = prettyOfString(_.unwrap.toString)
+
+  implicit val prettyServingStatus: Pretty[ServingStatus] = prettyOfClass(
+    param("status", _.name().singleQuoted)
+  )
 }
 
 object PrettyInstances extends PrettyInstances

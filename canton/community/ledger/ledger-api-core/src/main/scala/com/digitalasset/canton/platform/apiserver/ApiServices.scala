@@ -10,7 +10,6 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.resources.{Resource, ResourceContext, ResourceOwner}
 import com.daml.lf.data.Ref
 import com.daml.lf.engine.*
-import com.daml.metrics.Metrics
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.ledger.api.SubmissionIdGenerator
 import com.digitalasset.canton.ledger.api.auth.Authorizer
@@ -29,10 +28,12 @@ import com.digitalasset.canton.ledger.participant.state.index.v2.*
 import com.digitalasset.canton.ledger.participant.state.v2.ReadService
 import com.digitalasset.canton.ledger.participant.state.v2 as state
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.metrics.Metrics
 import com.digitalasset.canton.platform.apiserver.configuration.{
   LedgerConfigurationInitializer,
   LedgerConfigurationSubscription,
 }
+import com.digitalasset.canton.platform.apiserver.execution.StoreBackedCommandExecutor.AuthenticateContract
 import com.digitalasset.canton.platform.apiserver.execution.*
 import com.digitalasset.canton.platform.apiserver.meteringreport.MeteringReportKey
 import com.digitalasset.canton.platform.apiserver.services.*
@@ -109,6 +110,7 @@ object ApiServices {
       apiStreamShutdownTimeout: FiniteDuration,
       meteringReportKey: MeteringReportKey,
       explicitDisclosureUnsafeEnabled: Boolean,
+      authenticateContract: AuthenticateContract,
       telemetry: Telemetry,
       val loggerFactory: NamedLoggerFactory,
       multiDomainEnabled: Boolean,
@@ -390,6 +392,7 @@ object ApiServices {
               packagesService,
               contractStore,
               authorityResolver,
+              authenticateContract,
               metrics,
               loggerFactory,
             ),
@@ -430,7 +433,7 @@ object ApiServices {
           submissionTracker = submissionTracker,
           // Using local services skips the gRPC layer, improving performance.
           submit = apiSubmissionService.submitWithTraceContext,
-          defaultTrackingTimeout = commandConfig.defaultTrackingTimeout.asJava,
+          defaultTrackingTimeout = commandConfig.defaultTrackingTimeout,
           transactionServices = new CommandServiceImpl.TransactionServices(
             getTransactionById = apiTransactionService.getTransactionById,
             getFlatTransactionById = apiTransactionService.getFlatTransactionById,
@@ -507,7 +510,7 @@ object ApiServices {
             ),
             submissionTracker = submissionTracker,
             submit = apiSubmissionServiceV2.submitWithTraceContext,
-            defaultTrackingTimeout = commandConfig.defaultTrackingTimeout.asJava,
+            defaultTrackingTimeout = commandConfig.defaultTrackingTimeout,
             currentLedgerTime = () => timeProvider.getCurrentTime,
             currentUtcTime = () => Instant.now,
             maxDeduplicationDuration = () =>
