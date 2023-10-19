@@ -599,6 +599,7 @@ Current Canton commit: `4f2d4f1673035f013c3a2cbd4d73aba486d59aa8`
 8. Run `sbt cantonDarsLockFileUpdate` and commit the changes to `canton/dars.lock`.
 9. Make a PR with your changes, so CI starts churning.
 10. If there are any, remove all `*.rej` files.
+11. Once complete, close your "bump canton fork" issue, create a new one, and assign the new issue to a random person in the team (ideally on a different squad from you).
 
 You can refer to https://github.com/DACH-NY/canton-network-node/pull/446/commits for an example of how the update PR should look like.
 
