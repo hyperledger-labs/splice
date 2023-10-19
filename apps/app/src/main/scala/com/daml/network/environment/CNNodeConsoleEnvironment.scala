@@ -10,6 +10,7 @@ import com.daml.network.validator.config.ValidatorAppClientConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{
   CantonHealthAdministration,
   CommunityCantonHealthAdministration,
@@ -28,6 +29,8 @@ import com.digitalasset.canton.console.{
   NodeReferences,
   StandardConsoleOutput,
 }
+import com.digitalasset.canton.lifecycle.RunOnShutdown
+import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 
 class CNNodeConsoleEnvironment(
     val environment: CNNodeEnvironmentImpl,
@@ -168,11 +171,55 @@ class CNNodeConsoleEnvironment(
       environment.config.scanAppClients.toSeq.map(createRemoteScanReference),
     )
 
-  lazy val svs: NodeReferences[CNNodeAppReference, SvAppClientReference, SvAppBackendReference] =
-    NodeReferences(
-      environment.config.svsByString.keys.map(createSvBackendReference).toSeq,
-      environment.config.svAppClients.toSeq.map(createSvAppClientReference),
-    )
+  lazy val svs: NodeReferences[CNNodeAppReference, SvAppClientReference, SvAppBackendReference] = {
+    val references
+        : NodeReferences[CNNodeAppReference, SvAppClientReference, SvAppBackendReference] =
+      NodeReferences(
+        environment.config.svsByString.keys.map(createSvBackendReference).toSeq,
+        environment.config.svAppClients.toSeq.map(createSvAppClientReference),
+      )
+
+    /** The unionspace is reset to contain only sv1 after each env is used
+      * When onboarding SVs their participant namespace is added to the unionspace, so for a "clean" test we have to remove them
+      * We cannot just drop the unionspace because the global domain is owned by it
+      */
+    runOnShutdown_(new RunOnShutdown {
+      override def name: String = "reset unionspace"
+
+      override def done: Boolean = false
+
+      override def run(): Unit = {
+        logger.info("Resetting unionspace to contain only sv1")
+        // reset only if sv1 was started
+        val activeSv = references.local
+          .filter(_.is_running)
+        activeSv
+          .find(_.name == "sv1")
+          .foreach { sv1 =>
+            val svcInfo = sv1.getSvcInfo()
+            val unionspace = svcInfo.svcParty.uid.namespace
+            val svParty = svcInfo.svParty.uid.namespace
+            val existingUnionspace = sv1.participantClientWithAdminToken.topology.unionspaces
+              .list(
+                AuthorizedStore.filterName,
+                filterNamespace = unionspace.toProtoPrimitive,
+              )
+              .headOption
+              .getOrElse(throw new IllegalArgumentException("Unionspace not found"))
+            if (existingUnionspace.item.owners.exists(_ != svParty))
+              sv1.participantClientWithAdminToken.topology.unionspaces
+                .propose(
+                  Set(svParty.fingerprint),
+                  PositiveInt.one,
+                  AuthorizedStore.filterName,
+                  serial = Some(existingUnionspace.context.serial + PositiveInt.one),
+                )
+                .discard
+          }
+      }
+    })
+    references
+  }
 
   lazy val wallets: Seq[WalletAppClientReference] =
     environment.config.walletAppClients.toSeq.map(createWalletAppClientReference)
@@ -474,4 +521,5 @@ class CNNodeConsoleEnvironment(
 
   override protected def createRemoteDomainReference(name: String): CommunityRemoteDomainReference =
     new CommunityRemoteDomainReference(this, name)
+
 }
