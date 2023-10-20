@@ -18,7 +18,6 @@ import com.daml.network.environment.*
 import com.daml.network.http.v0.app_manager.AppManagerResource
 import com.daml.network.http.v0.app_manager_admin.AppManagerAdminResource
 import com.daml.network.http.v0.app_manager_public.AppManagerPublicResource
-import com.daml.network.http.v0.json_api_public.JsonApiPublicResource
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.external.wallet.WalletResource as ExternalWalletResource
 import com.daml.network.http.v0.validator.ValidatorResource
@@ -620,16 +619,7 @@ class ValidatorApp(
               oauth2Manager,
               loggerFactory,
             )
-            val jsonApiPublicHandler = new HttpJsonApiPublicHandler(
-              config,
-              loggerFactory,
-            )
-            (
-              appManagerAdminHandler,
-              appManagerHandler,
-              appManagerPublicHandler,
-              jsonApiPublicHandler,
-            )
+            (appManagerAdminHandler, appManagerHandler, appManagerPublicHandler)
           }
         }
 
@@ -683,7 +673,7 @@ class ValidatorApp(
                   CommonAdminResource.routes(commonAdminHandler, _ => provide(traceContext)),
                 ) ++
                   appManagerHandlersO.toList.flatMap {
-                    case (adminHandler, handler, publicHandler, jsonApiHandler) =>
+                    case (adminHandler, handler, publicHandler) =>
                       Seq(
                         AppManagerAdminResource.routes(
                           adminHandler,
@@ -704,10 +694,6 @@ class ValidatorApp(
                         ),
                         AppManagerPublicResource.routes(
                           publicHandler,
-                          _ => provide(()),
-                        ),
-                        JsonApiPublicResource.routes(
-                          jsonApiHandler,
                           _ => provide(()),
                         ),
                       )

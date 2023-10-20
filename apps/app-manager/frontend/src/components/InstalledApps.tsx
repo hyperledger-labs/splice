@@ -104,8 +104,8 @@ const UnapprovedReleaseConfiguration: React.FC<{
 const InstalledApp: React.FC<{ app: openapi.InstalledApp }> = ({ app }) => {
   const redirectUri = appLaunchUrl(
     {
-      oidcAuthority: `${config.services.validator.url}/v0/app-manager/oauth2/`,
-      jsonApi: `${config.services.validator.url}/jsonApiProxy/`,
+      oidcAuthority: `${config.services.validator.url}/app-manager/oauth2/`,
+      jsonApi: `${config.services.validator.url}/`,
       wallet: config.services.wallet.uiUrl,
       clientId: app.provider,
     },

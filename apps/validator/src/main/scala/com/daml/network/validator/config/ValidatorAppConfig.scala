@@ -59,10 +59,10 @@ final case class AppManagerConfig(
 ) {
   def authorizationEndpoint: Uri = appManagerUiUrl.withPath(appManagerUiUrl.path / "authorize")
   def tokenEndpoint: Uri =
-    appManagerApiUrl.withPath(appManagerApiUrl.path / "v0" / "app-manager" / "oauth2" / "token")
+    appManagerApiUrl.withPath(appManagerApiUrl.path / "app-manager" / "oauth2" / "token")
   def jwksUri: Uri =
     appManagerApiUrl.withPath(
-      appManagerApiUrl.path / "v0" / "app-manager" / "oauth2" / ".well-known" / "jwks.json"
+      appManagerApiUrl.path / "app-manager" / "oauth2" / ".well-known" / "jwks.json"
     )
 }
 

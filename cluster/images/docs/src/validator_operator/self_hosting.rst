@@ -474,7 +474,7 @@ Once you obtained the token, obtaining the data can be done as follows:
     curl -H "Authorization: Bearer <YOUR_TOKEN>" <YOUR_VALIDATOR_API_URL>/admin/participant/identities > participant-dump.json
 
 If your are following this runbook, you can replace ``YOUR_VALIDATOR_API_URL`` with ``http://localhost:5003``.
-If you are following the :ref:`Kubernetes-based SV runbook <sv-helm>`, you can replace it with ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator``.
+If you are following the :ref:`Kubernetes-based SV runbook <sv-helm>`, you can replace it with ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator``.
 
 Please store the resulting ``participant-identities-dump.json`` in a safe location.
 We recommend performing a fresh participant identities dump (on your "old" network validator) just before re-initializing your participant and validator on a freshly reset ("new") network.
