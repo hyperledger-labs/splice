@@ -3,7 +3,7 @@
     "description": "CIDaily SV Runbook Redeployment every 4 hours",
     "attribution-actor": "system",
     "parameters" : {
-      "branch" : "main",
+      "branch" : "deployment/cidaily",
       "run-job": "redeploy-sv-runbook-cidaily"
     },
     "timetable" : {

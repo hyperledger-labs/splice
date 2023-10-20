@@ -1014,65 +1014,6 @@ commands:
             . cluster/deployment/<< parameters.cluster >>/.envrc.vars
             /tmp/vpn-scripts/setup-vpn-routes.sh
 
-  checkout_cluster_version:
-    parameters:
-      <<: *cluster-parameter
-    steps:
-      - run:
-          name: Checkout cluster version
-          command: |
-           set +e
-
-           . .envrc.vars
-           . $REPO_ROOT/cluster/deployment/<< parameters.cluster >>/.envrc.vars
-
-           echo "Retrieving Cluster Version of Source"
-
-           count=0
-           success=42
-           while [ ${count} -lt 10 ]; do
-
-             if cluster_version=$(curl -L http://${GCP_CLUSTER_BASENAME}.network.canton.global/version --connect-timeout 2); then
-               if [[ -n $cluster_version ]]; then
-                 echo "Cluster version: ${cluster_version}"
-                 success=0
-                 break
-               else
-                 echo "Empty cluster version retrieved. Retry count $count"
-               fi
-             else
-               echo "Failed to retrieve cluster version. Retry count $count"
-             fi
-
-             (( count++ ))
-             sleep 3
-
-           done
-
-           if [ ${success} -ne 0 ]; then
-               echo "Could not retrieve cluster version."
-               exit 1
-           fi
-
-
-           if [[ ${cluster_version:0:4} == "git-" ]]; then
-              # Deprecated cluster version format
-              cluster_git_commit="${cluster_version:4}"
-           elif [[ ${cluster_version} =~ ^[0-9.]*-snapshot[0-9.]*v[0-9a-z]* ]]; then
-              cluster_git_commit="$(echo "${cluster_version}" | sed 's/.*v//')"
-           else
-              echo "Unexpected cluster version format: ${cluster_version}."
-              exit 2
-           fi
-
-           echo "Checking out: ${cluster_git_commit}"
-           if ! git checkout ${cluster_git_commit}; then
-              echo "Cannot checkout cluster version: ${cluster_git_commit}."
-              exit 3
-           fi
-
-           exit $success
-
   run_todo_script:
     steps:
       - run_bash_command_in_nix:
@@ -1437,55 +1378,11 @@ jobs:
               fi
             fi
             cncluster activate
-            VERSION=""
-            if [[ << parameters.use_published_artifacts >> == true ]]; then
-              VERSION=$(get-snapshot-version)
-            fi
-            cncluster ci_apply_sv $VERSION
-      - notify-cluster-fail:
-          cluster: << parameters.cluster >>
-      - collect_test_timings_and_send_to_datadog
-
-  # TODO(#7554): Once we no longer need a VPN connection to do this, combine the deploy_sv_runbook and redeploy_sv_runbook jobs into 1.
-  redeploy_sv_runbook:
-    machine:
-      image: ubuntu-2004:2023.04.2
-    environment:
-      <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
-    parameters:
-      <<: *cluster-parameter
-      use_published_artifacts:
-        type: boolean
-        default: false
-    steps:
-      - checkout
-      - record_job_start_time
-      # Needs to occur before setup_vpn_routes
-      - setup_nix
-      - setup_vpn
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
-      - checkout_cluster_version:
-          cluster: <<parameters.cluster>>
-      - run_bash_command_in_nix:
-          cmd_name: Build Helm & Pulumi artifacts
-          cluster: << parameters.cluster >>
-          cmd: |
-            make cluster/build
-      - run_bash_command_in_nix:
-          cmd_name: Apply SV-runbook Kubernetes manifest to cluster
-          cluster: << parameters.cluster >>
-          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
-          gce_authenticate: true
-          cmd: |
-            cncluster activate
-            VERSION=""
-            if [[ << parameters.use_published_artifacts >> == true ]]; then
-              VERSION=$(get-snapshot-version)
-            fi
             cncluster ci_pdown_sv
+            VERSION=""
+            if [[ << parameters.use_published_artifacts >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+            fi
             cncluster ci_apply_sv $VERSION
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
@@ -1564,14 +1461,12 @@ jobs:
                 cluster: << parameters.cluster >>
                 additional_nix_args: "--keep GITHUB_TOKEN"
                 cmd: |
-                  # TODO(#7554): remove this condition once all deployment tags are past the point where we introduced this script (in #7875)
-                  if [ -f scripts/update-deployment-branch.sh ]; then
-                    # deployment/scratch* branches break our deployment, so we guard against accidentally creating those here
-                    if [[ << parameters.cluster >> != scratch* ]]; then
-                      scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
-                    else
-                      echo "NOTE: skipping deployment branch update for scratchnet cluster << parameters.cluster >>"
-                    fi
+                  # deployment/scratch* branches break our Github workflows, so we guard against accidentally creating those here.
+                  # This is a safeguard against people manually running e.g. deploy_devnet on a scratchnet.
+                  if [[ << parameters.cluster >> != scratch* ]]; then
+                    scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
+                  else
+                    echo "NOTE: skipping deployment branch update for scratchnet cluster << parameters.cluster >>"
                   fi
                 cmd_retry_count: 5
       - notify-cluster-fail:
@@ -1591,11 +1486,6 @@ jobs:
       parallelism:
         type: integer
         default: 3
-      # If sync_with_cluster_version is true, then before building the tests, we will wait for the cluster to be up
-      # and checkout the corresponding git commit
-      sync_with_cluster_version:
-        type: boolean
-        default: true
       wait_for_sv:
         type: boolean
         default: true
@@ -1629,34 +1519,6 @@ jobs:
           gce_authenticate: true
           cmd: cncluster activate
           cmd_retry_count: 5
-      - when:
-          condition: << parameters.sync_with_cluster_version >>
-          steps:
-            - run_bash_command_in_nix:
-                cmd_name: wait for cluster to be ready
-                cluster: << parameters.cluster >>
-                gce_authenticate: true
-                cmd: |
-                  # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
-                  cncluster wait validator1 validator-app
-                  cncluster wait splitwell validator-app
-                  cncluster wait sv-1 validator-app
-                  # note that ["${IS_DEVNET-}" = true] is not equivalent when IS_DEVNET is not defined
-                  if [[ "${IS_DEVNET-}" != false ]]; then
-                    cncluster wait sv-2 validator-app
-                    cncluster wait sv-3 validator-app
-                    cncluster wait sv-4 validator-app
-                  fi
-                  if [[ << parameters.wait_for_sv >> == true && ( "${APPROVE_SV_RUNBOOK-}" = true || "${IS_DEVNET-}" = true ) ]]; then
-                    cncluster wait sv validator-app
-                  fi
-                  echo "Done waiting. All pods in the cluster are:"
-                  kubectl get pods -A
-                cmd_retry_count: 5
-            - checkout_cluster_version:
-                cluster: <<parameters.cluster>>
-      # Needs to occur after `checkout_cluster_version` so we hit the right cache because sbt
-      # sucks at cache invalidation
       # TODO(#6630): bundle all these restores into a command, consider merging with setup_sbt_test_job
       - restore_sbt_cache
       - restore_precompiled_classes
@@ -1669,31 +1531,27 @@ jobs:
           no_output_timeout: "20m"
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
-      - when:
-          condition:
-            not: << parameters.sync_with_cluster_version >>
-          steps:
-            - run_bash_command_in_nix:
-                cmd_name: wait for deployment to finish
-                cluster: << parameters.cluster >>
-                cmd: |
-                  VERSION=$(get-snapshot-version)
-                  cncluster wait_version $VERSION
-                  # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
-                  cncluster wait validator1 validator-app
-                  cncluster wait splitwell validator-app
-                  cncluster wait sv-1 validator-app
-                  # note that ["${IS_DEVNET-}" = true] is not equivalent when IS_DEVNET is not defined
-                  if [[ "${IS_DEVNET-}" != false ]]; then
-                    cncluster wait sv-2 validator-app
-                    cncluster wait sv-3 validator-app
-                    cncluster wait sv-4 validator-app
-                  fi
-                  if [[ << parameters.wait_for_sv >> == true && ( "${APPROVE_SV_RUNBOOK-}" = true || "${IS_DEVNET-}" = true ) ]]; then
-                    cncluster wait sv validator-app
-                  fi
-                  echo "Done waiting. All pods in the cluster are:"
-                  kubectl get pods -A
+      - run_bash_command_in_nix:
+          cmd_name: wait for deployment to finish
+          cluster: << parameters.cluster >>
+          cmd: |
+            VERSION=$(get-snapshot-version)
+            cncluster wait_version $VERSION
+            # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
+            cncluster wait validator1 validator-app
+            cncluster wait splitwell validator-app
+            cncluster wait sv-1 validator-app
+            # note that ["${IS_DEVNET-}" = true] is not equivalent when IS_DEVNET is not defined
+            if [[ "${IS_DEVNET-}" != false ]]; then
+              cncluster wait sv-2 validator-app
+              cncluster wait sv-3 validator-app
+              cncluster wait sv-4 validator-app
+            fi
+            if [[ << parameters.wait_for_sv >> == true && ( "${APPROVE_SV_RUNBOOK-}" == true || "${IS_DEVNET-}" != false ) ]]; then
+              cncluster wait sv validator-app
+            fi
+            echo "Done waiting. All pods in the cluster are:"
+            kubectl get pods -A
       - execute_sbt_command:
           pre_sbt_cmd: |
             set -eou pipefail
@@ -1741,7 +1599,6 @@ jobs:
           name: Upload vpn log
           path: /var/log/vpn.log
 
-
   preflight_sv_check:
     parameters:
       <<: *cluster-parameter
@@ -1749,11 +1606,6 @@ jobs:
         type: string
         # #team-canton-network-internal-ci
         default: C05DT77QF5M
-      # If sync_with_cluster_version is true, then before building the tests, we will wait for the cluster to be up
-      # and checkout the corresponding git commit
-      sync_with_cluster_version:
-        type: boolean
-        default: true
     machine:
       image: ubuntu-2004:2023.04.2
     environment:
@@ -1774,44 +1626,22 @@ jobs:
           gce_authenticate: true
           cmd: cncluster activate
           cmd_retry_count: 5
-      - when:
-          condition: << parameters.sync_with_cluster_version >>
-          steps:
-          - run_bash_command_in_nix:
-              cmd_name: wait for cluster to be ready
-              cluster: << parameters.cluster >>
-              gce_authenticate: true
-              cmd: |
-                # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
-                cncluster wait sv validator-app
-                echo "Done waiting. All pods in the cluster are:"
-                kubectl get pods -A
-              cmd_retry_count: 5
-          - checkout_cluster_version:
-              cluster: <<parameters.cluster>>
-      # Needs to occur after `checkout_cluster_version` so we hit the right cache because sbt
-      # sucks at cache invalidation
       - restore_sbt_cache
       - restore_precompiled_classes
       - restore_frontend_node_modules
       - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
-      - when:
-          condition:
-            not: << parameters.sync_with_cluster_version >>
-          steps:
-          - run_bash_command_in_nix:
-              cmd_name: wait for sv-runbook deployment to finish
-              cluster: << parameters.cluster >>
-              cmd: |
-                VERSION=$(get-snapshot-version)
-                cncluster wait_version $VERSION
-                # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
-                cncluster wait sv validator-app
-                echo "Done waiting. All pods in the cluster are:"
-                kubectl get pods -A
-
+      - run_bash_command_in_nix:
+          cmd_name: wait for sv-runbook deployment to finish
+          cluster: << parameters.cluster >>
+          cmd: |
+            VERSION=$(get-snapshot-version)
+            cncluster wait_version $VERSION
+            # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
+            cncluster wait sv validator-app
+            echo "Done waiting. All pods in the cluster are:"
+            kubectl get pods -A
       - run_bash_command_in_nix:
           cmd_name: Run SV preflight tests
           additional_nix_args: "--keep SV_DEV_NET_WEB_UI_PASSWORD \
@@ -2288,6 +2118,7 @@ workflows:
           - datadog
           - slack-context
         cluster: "cimain"
+        update_deployment_branch: false  # No need to create a deployment branch for cimain
         requires:
            - docker_images_push
            - wait_for_previous_pipeline
@@ -2308,7 +2139,6 @@ workflows:
           - canton-network-vpn
           - datadog
           - slack-context
-        sync_with_cluster_version: false
         requires:
           - wait_for_previous_pipeline
     - preflight_sv_check:
@@ -2319,7 +2149,6 @@ workflows:
           - canton-network-vpn
           - datadog
           - slack-context
-        sync_with_cluster_version: false
         requires:
           - wait_for_previous_pipeline
 
@@ -2626,15 +2455,21 @@ workflows:
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
-          <<: *main-branch-only
+          filters:
+            branches:
+              only:
+                - deployment/testnet
           context:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
           workflow_names: "deploy_testnet"
       - preflight_check:
-          <<: *main-branch-only
           <<: *non_devnet_preflight_params
+          filters:
+            branches:
+              only:
+                - deployment/testnet
           cluster: "testnet"
           context:
             - artifactory
@@ -2650,14 +2485,20 @@ workflows:
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
-          <<: *main-branch-only
+          filters:
+            branches:
+              only:
+                - deployment/devnet
           context:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
           workflow_names: "deploy_devnet"
       - preflight_check:
-          <<: *main-branch-only
+          filters:
+            branches:
+              only:
+                - deployment/devnet
           cluster: "devnet"
           context:
             - artifactory
@@ -2673,14 +2514,20 @@ workflows:
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
-          <<: *main-branch-only
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
           context:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
           workflow_names: "deploy_cidaily redeploy_sv_runbook_cidaily"
       - preflight_check:
-          <<: *main-branch-only
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
           cluster: "cidaily"
           context:
             - artifactory
@@ -2696,14 +2543,20 @@ workflows:
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
-          <<: *main-branch-only
+          filters:
+            branches:
+              only:
+                - deployment/cilr
           context:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
           workflow_names: "deploy_cilr redeploy_sv_runbook_cilr"
       - preflight_check:
-          <<: *main-branch-only
+          filters:
+            branches:
+              only:
+                - deployment/cilr
           cluster: "cilr"
           context:
             - artifactory
@@ -2719,14 +2572,20 @@ workflows:
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
-          # <<: *main-branch-only
+          filters:
+            branches:
+              only:
+                - deployment/cidaily-testnet
           context:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
           workflow_names: "deploy_cidaily_testnet"
       - preflight_check:
-          # <<: *main-branch-only
+          filters:
+            branches:
+              only:
+                - deployment/cidaily-testnet
           cluster: "cidaily-testnet"
           <<: *non_devnet_preflight_params
           context:
@@ -2743,16 +2602,21 @@ workflows:
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
-          <<: *main-branch-only
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
           context:
             - artifactory
             - slack-context
           workflow_names: "deploy_cidaily redeploy_sv_runbook_cidaily cidaily_health_check"
-      - redeploy_sv_runbook:
-          <<: *main-branch-only
+      - deploy_sv_runbook:
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
           context:
             - artifactory
-            - canton-network-vpn
             - datadog
             - slack-context
           cluster: "cidaily"
@@ -2760,16 +2624,18 @@ workflows:
           requires:
             - wait_for_previous_pipeline
       - preflight_sv_check:
-          <<: *main-branch-only
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
           context:
             - artifactory
             - canton-network-vpn
             - datadog
             - slack-context
           cluster: "cidaily"
-          sync_with_cluster_version: true
           requires:
-            - redeploy_sv_runbook
+            - deploy_sv_runbook
 
   redeploy_sv_runbook_cilr:
     when:
@@ -2777,16 +2643,21 @@ workflows:
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
-          <<: *main-branch-only
+          filters:
+            branches:
+              only:
+                - deployment/cilr
           context:
             - artifactory
             - slack-context
           workflow_names: "deploy_cilr redeploy_sv_runbook_cilr cilr_health_check"
-      - redeploy_sv_runbook:
-          <<: *main-branch-only
+      - deploy_sv_runbook:
+          filters:
+            branches:
+              only:
+                - deployment/cilr
           context:
             - artifactory
-            - canton-network-vpn
             - datadog
             - slack-context
           cluster: "cilr"
@@ -2794,16 +2665,18 @@ workflows:
           requires:
             - wait_for_previous_pipeline
       - preflight_sv_check:
-          <<: *main-branch-only
+          filters:
+            branches:
+              only:
+                - deployment/cilr
           context:
             - artifactory
             - canton-network-vpn
             - datadog
             - slack-context
           cluster: "cilr"
-          sync_with_cluster_version: true
           requires:
-            - redeploy_sv_runbook
+            - deploy_sv_runbook
 
   auth0_user_cleanup:
     when:
@@ -2865,6 +2738,8 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchneta"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
           update_deployment_branch: false
           requires:
             - deployment_test
@@ -2886,7 +2761,6 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchneta"
-          sync_with_cluster_version: false
           requires:
             - hold
       - preflight_sv_check:
@@ -2897,7 +2771,6 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchneta"
-          sync_with_cluster_version: false
           requires:
             - hold
       - reset_cluster:
@@ -2941,6 +2814,8 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetb"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
           update_deployment_branch: false
           requires:
             - deployment_test
@@ -2962,7 +2837,6 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetb"
-          sync_with_cluster_version: false
           requires:
             - hold
       - preflight_sv_check:
@@ -2973,7 +2847,6 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetb"
-          sync_with_cluster_version: false
           requires:
             - hold
       - reset_cluster:
@@ -3017,6 +2890,8 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetc"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
           update_deployment_branch: false
           requires:
             - deployment_test
@@ -3038,7 +2913,6 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetc"
-          sync_with_cluster_version: false
           requires:
             - hold
       - preflight_sv_check:
@@ -3049,7 +2923,6 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetc"
-          sync_with_cluster_version: false
           requires:
             - hold
       - reset_cluster:
@@ -3093,6 +2966,8 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetd"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
           update_deployment_branch: false
           requires:
             - deployment_test
@@ -3114,7 +2989,6 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetd"
-          sync_with_cluster_version: false
           requires:
             - hold
       - preflight_sv_check:
@@ -3125,7 +2999,6 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetd"
-          sync_with_cluster_version: false
           requires:
             - hold
       - reset_cluster:
@@ -3169,6 +3042,8 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnete"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
           update_deployment_branch: false
           requires:
             - deployment_test
@@ -3190,7 +3065,6 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnete"
-          sync_with_cluster_version: false
           requires:
             - hold
       - preflight_sv_check:
@@ -3201,7 +3075,6 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnete"
-          sync_with_cluster_version: false
           requires:
             - hold
       - reset_cluster:

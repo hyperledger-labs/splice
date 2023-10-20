@@ -30,6 +30,8 @@
             - datadog
             - slack-context
           cluster: "_CLUSTERNAME_"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
           update_deployment_branch: false
           requires:
             - deployment_test
@@ -51,7 +53,6 @@
             - datadog
             - slack-context
           cluster: "_CLUSTERNAME_"
-          sync_with_cluster_version: false
           requires:
             - hold
       - preflight_sv_check:
@@ -62,7 +63,6 @@
             - datadog
             - slack-context
           cluster: "_CLUSTERNAME_"
-          sync_with_cluster_version: false
           requires:
             - hold
       - reset_cluster:

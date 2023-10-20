@@ -3,7 +3,7 @@
     "description" : "10-min Preflight of TestNet",
     "attribution-actor": "system",
     "parameters" : {
-      "branch" : "main",
+      "branch" : "deployment/testnet",
       "run-job": "healthcheck-testnet"
     },
     "timetable" : {

@@ -3,7 +3,7 @@
     "description" : "15-min Preflight of CIDaily",
     "attribution-actor": "system",
     "parameters" : {
-      "branch" : "main",
+      "branch" : "deployment/cidaily",
       "run-job": "healthcheck-cidaily"
     },
     "timetable" : {

@@ -3,7 +3,7 @@
     "description": "Daily CILR SV Runbook Redeployment",
     "attribution-actor": "system",
     "parameters" : {
-      "branch" : "main",
+      "branch" : "deployment/cilr",
       "run-job": "redeploy-sv-runbook-cilr"
     },
     "timetable" : {
