@@ -17,8 +17,10 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardingStatus
 import com.daml.network.sv.util.SvOnboardingToken
 import com.digitalasset.canton.console.CommandFailure
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.PartyId
+import org.slf4j.event.Level
 
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -602,6 +604,70 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
           svOnboardingConfirmed.data.svName shouldBe "Canton-Foundation-X"
         },
     )
+  }
+
+  "The election request succeeds if one SV is onboarded in the middle of an election request" in {
+    implicit env =>
+      clue("Initialize SVC with 2 SVs") {
+        startAllSync(
+          sv1ScanBackend,
+          sv1Backend,
+          sv2Backend,
+          sv1ValidatorBackend,
+          sv2ValidatorBackend,
+        )
+        sv1Backend.getSvcInfo().svcRules.payload.members should have size 2
+      }
+
+      val currentLeader = sv1Backend.getSvcInfo().svParty.toProtoPrimitive
+      val newLeader = sv2Backend.getSvcInfo().svParty.toProtoPrimitive
+      val newRanking: Vector[String] = Seq(newLeader, currentLeader).toVector
+
+      // note that the new leader has to vote for himself to prove readiness
+      actAndCheck(
+        "sv2 creates a new election request for epoch 1", {
+          sv2Backend
+            .createElectionRequest(newLeader, newRanking)
+        },
+      )(
+        "the epoch stays the same",
+        _ => {
+          sv1Backend.getSvcInfo().svcRules.payload.leader shouldBe currentLeader
+        },
+      )
+
+      clue("SV3 gets onboarded") {
+        startAllSync(
+          sv3Backend,
+          sv3ValidatorBackend,
+        )
+        sv1Backend.getSvcInfo().svcRules.payload.members should have size 3
+        sv1Backend.getSvcInfo().svcRules.payload.epoch shouldBe 0
+      }
+
+      loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
+        actAndCheck(
+          "sv3 creates a new election request for epoch 1", {
+            val sv3 = sv3Backend.getSvcInfo().svParty.toProtoPrimitive
+            sv3Backend
+              .createElectionRequest(sv3, newRanking.appended(sv3))
+          },
+        )(
+          "the epoch increased and sv2 is the new leader",
+          _ => {
+            sv1Backend.getSvcInfo().svcRules.payload.epoch shouldBe 1
+            sv1Backend.getSvcInfo().svcRules.payload.leader shouldBe newLeader
+          },
+        ),
+        logEntries => {
+          forAtLeast(1, logEntries)(logEntry => {
+            logEntry.message should startWith(
+              "Noticed an SvcRules epoch change"
+            )
+          })
+        },
+      )
+
   }
 
   private def createSvOnboardingConfirmation(

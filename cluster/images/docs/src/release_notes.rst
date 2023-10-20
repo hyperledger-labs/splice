@@ -3,6 +3,11 @@
 Release Notes
 =============
 
+2023-10-30
+----------
+
+* Add a hidden page to the SV UI (``/leader``) that allows SVs to manually trigger a reelection of the SvcRules leader, as an additional safety mechanism and measure of last resort.
+
 2023-10-23
 ----------
 
