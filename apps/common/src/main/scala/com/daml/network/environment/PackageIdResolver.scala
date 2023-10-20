@@ -117,6 +117,7 @@ object PackageIdResolver {
           case None =>
             templateId.moduleName match {
               case "CN.Splitwell" => DarResources.splitwell
+              case "CN.AppManager.Store" => DarResources.appManager
               case _ => throw new IllegalArgumentException(s"Unknown template $templateId")
             }
           case Some(pkg) =>
