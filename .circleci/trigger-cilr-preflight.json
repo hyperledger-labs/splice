@@ -3,7 +3,7 @@
   "description": "Hourly Preflight of CILR",
   "attribution-actor": "system",
   "parameters": {
-    "branch": "deployment/cilr",
+    "branch": "main",
     "run-job": "healthcheck-cilr"
   },
   "timetable" : {

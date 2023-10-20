@@ -53,6 +53,7 @@
             - datadog
             - slack-context
           cluster: "_CLUSTERNAME_"
+          sync_with_cluster_version: false
           requires:
             - hold
       - preflight_sv_check:
@@ -63,6 +64,7 @@
             - datadog
             - slack-context
           cluster: "_CLUSTERNAME_"
+          sync_with_cluster_version: false
           requires:
             - hold
       - reset_cluster:

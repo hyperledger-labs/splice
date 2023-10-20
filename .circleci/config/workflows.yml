@@ -206,6 +206,7 @@ workflows:
           - canton-network-vpn
           - datadog
           - slack-context
+        sync_with_cluster_version: false
         requires:
           - wait_for_previous_pipeline
     - preflight_sv_check:
@@ -216,6 +217,7 @@ workflows:
           - canton-network-vpn
           - datadog
           - slack-context
+        sync_with_cluster_version: false
         requires:
           - wait_for_previous_pipeline
 
@@ -525,6 +527,7 @@ workflows:
           filters:
             branches:
               only:
+                - main
                 - deployment/testnet
           context:
             - artifactory
@@ -536,6 +539,7 @@ workflows:
           filters:
             branches:
               only:
+                - main
                 - deployment/testnet
           cluster: "testnet"
           context:
@@ -555,6 +559,7 @@ workflows:
           filters:
             branches:
               only:
+                - main
                 - deployment/devnet
           context:
             - artifactory
@@ -565,6 +570,7 @@ workflows:
           filters:
             branches:
               only:
+                - main
                 - deployment/devnet
           cluster: "devnet"
           context:
@@ -584,8 +590,8 @@ workflows:
           filters:
             branches:
               only:
-                # Testing if providing branch name this way works
-                - /deployment\/cidaily/
+                - main
+                - deployment/cidaily
           context:
             - artifactory
             - slack-context
@@ -595,8 +601,8 @@ workflows:
           filters:
             branches:
               only:
-                # Testing if providing branch name this way works
-                - /deployment\/cidaily/
+                - main
+                - deployment/cidaily
           cluster: "cidaily"
           context:
             - artifactory
@@ -615,8 +621,8 @@ workflows:
           filters:
             branches:
               only:
-                # Testing if providing branch name this way works
-                - "deployment/cilr"
+                - main
+                - deployment/cilr
           context:
             - artifactory
             - slack-context
@@ -626,8 +632,8 @@ workflows:
           filters:
             branches:
               only:
-                # Testing if providing branch name this way works
-                - "deployment/cilr"
+                - main
+                - deployment/cilr
           cluster: "cilr"
           context:
             - artifactory
@@ -643,20 +649,14 @@ workflows:
     jobs:
       - wait_for_previous_pipeline:
           <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/cidaily-testnet
+          # <<: *main-branch-only
           context:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
           workflow_names: "deploy_cidaily_testnet"
       - preflight_check:
-          filters:
-            branches:
-              only:
-                - deployment/cidaily-testnet
+          # <<: *main-branch-only
           cluster: "cidaily-testnet"
           <<: *non_devnet_preflight_params
           context:
@@ -676,18 +676,21 @@ workflows:
           filters:
             branches:
               only:
+                - main
                 - deployment/cidaily
           context:
             - artifactory
             - slack-context
           workflow_names: "deploy_cidaily redeploy_sv_runbook_cidaily cidaily_health_check"
-      - deploy_sv_runbook:
+      - redeploy_sv_runbook:
           filters:
             branches:
               only:
+                - main
                 - deployment/cidaily
           context:
             - artifactory
+            - canton-network-vpn
             - datadog
             - slack-context
           cluster: "cidaily"
@@ -698,6 +701,7 @@ workflows:
           filters:
             branches:
               only:
+                - main
                 - deployment/cidaily
           context:
             - artifactory
@@ -705,8 +709,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "cidaily"
+          sync_with_cluster_version: true
           requires:
-            - deploy_sv_runbook
+            - redeploy_sv_runbook
 
   redeploy_sv_runbook_cilr:
     when:
@@ -717,18 +722,21 @@ workflows:
           filters:
             branches:
               only:
+                - main
                 - deployment/cilr
           context:
             - artifactory
             - slack-context
           workflow_names: "deploy_cilr redeploy_sv_runbook_cilr cilr_health_check"
-      - deploy_sv_runbook:
+      - redeploy_sv_runbook:
           filters:
             branches:
               only:
+                - main
                 - deployment/cilr
           context:
             - artifactory
+            - canton-network-vpn
             - datadog
             - slack-context
           cluster: "cilr"
@@ -739,6 +747,7 @@ workflows:
           filters:
             branches:
               only:
+                - main
                 - deployment/cilr
           context:
             - artifactory
@@ -746,8 +755,9 @@ workflows:
             - datadog
             - slack-context
           cluster: "cilr"
+          sync_with_cluster_version: true
           requires:
-            - deploy_sv_runbook
+            - redeploy_sv_runbook
 
   auth0_user_cleanup:
     when:

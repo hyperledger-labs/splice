@@ -3,7 +3,7 @@
   "description" : "15-min Preflight of CIDaily TestNet",
   "attribution-actor": "system",
   "parameters" : {
-    "branch" : "deployment/cidaily-testnet",
+    "branch" : "main",
     "run-job": "healthcheck-cidaily-testnet"
   },
   "timetable" : {
