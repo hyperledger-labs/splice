@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.store.db.AcsTables
 import com.daml.network.sv.store.SvcTxLogParser
-import com.daml.network.util.{CNNodeUtil, Contract}
+import com.daml.network.util.{CNNodeUtil, Contract, QualifiedName}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
@@ -54,15 +54,16 @@ object SvcTables extends AcsTables with NamedLogging {
     def fromCreatedEvent(
         createdEvent: CreatedEvent
     )(implicit elc: ErrorLoggingContext): Either[String, SvcAcsStoreRowData] = {
-      createdEvent.getTemplateId match {
-        case cn.svc.coinprice.CoinPriceVote.TEMPLATE_ID =>
+      // TODO(#8125) Switch to map lookups instead
+      QualifiedName(createdEvent.getTemplateId) match {
+        case t if t == QualifiedName(cn.svc.coinprice.CoinPriceVote.TEMPLATE_ID) =>
           tryToDecode(cn.svc.coinprice.CoinPriceVote.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
               voter = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
             )
           }
-        case cn.svcrules.Confirmation.TEMPLATE_ID =>
+        case t if t == QualifiedName(cn.svcrules.Confirmation.TEMPLATE_ID) =>
           tryToDecode(cn.svcrules.Confirmation.COMPANION, createdEvent) { contract =>
             val (
               actionCnsEntryContextCid,
@@ -100,7 +101,7 @@ object SvcTables extends AcsTables with NamedLogging {
               actionCnsEntryContextArcType = actionCnsEntryContextArcType,
             )
           }
-        case cn.svcrules.ElectionRequest.TEMPLATE_ID =>
+        case t if t == QualifiedName(cn.svcrules.ElectionRequest.TEMPLATE_ID) =>
           tryToDecode(cn.svcrules.ElectionRequest.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
@@ -108,7 +109,7 @@ object SvcTables extends AcsTables with NamedLogging {
               electionRequestEpoch = Some(contract.payload.epoch),
             )
           }
-        case cn.svcrules.VoteRequest.TEMPLATE_ID =>
+        case t if t == QualifiedName(cn.svcrules.VoteRequest.TEMPLATE_ID) =>
           tryToDecode(cn.svcrules.VoteRequest.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
@@ -118,7 +119,7 @@ object SvcTables extends AcsTables with NamedLogging {
               requester = Some(PartyId.tryFromProtoPrimitive(contract.payload.requester)),
             )
           }
-        case cn.svcrules.Vote.TEMPLATE_ID =>
+        case t if t == QualifiedName(cn.svcrules.Vote.TEMPLATE_ID) =>
           tryToDecode(cn.svcrules.Vote.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
@@ -126,11 +127,11 @@ object SvcTables extends AcsTables with NamedLogging {
               voteRequestCid = Some(contract.payload.requestCid),
             )
           }
-        case cn.svcrules.SvcRules.TEMPLATE_ID =>
+        case t if t == QualifiedName(cn.svcrules.SvcRules.TEMPLATE_ID) =>
           tryToDecode(cn.svcrules.SvcRules.COMPANION, createdEvent)(SvcAcsStoreRowData(_))
-        case cn.svcrules.SvReward.TEMPLATE_ID =>
+        case t if t == QualifiedName(cn.svcrules.SvReward.TEMPLATE_ID) =>
           tryToDecode(cn.svcrules.SvReward.COMPANION, createdEvent)(SvcAcsStoreRowData(_))
-        case so.SvOnboardingRequest.TEMPLATE_ID =>
+        case t if t == QualifiedName(so.SvOnboardingRequest.TEMPLATE_ID) =>
           tryToDecode(so.SvOnboardingRequest.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
@@ -141,7 +142,7 @@ object SvcTables extends AcsTables with NamedLogging {
               svCandidateName = Some(contract.payload.candidateName),
             )
           }
-        case so.SvOnboardingConfirmed.TEMPLATE_ID =>
+        case t if t == QualifiedName(so.SvOnboardingConfirmed.TEMPLATE_ID) =>
           tryToDecode(so.SvOnboardingConfirmed.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
@@ -150,16 +151,16 @@ object SvcTables extends AcsTables with NamedLogging {
               svCandidateName = Some(contract.payload.svName),
             )
           }
-        case cc.coin.CoinRules.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.coin.CoinRules.TEMPLATE_ID) =>
           tryToDecode(cc.coin.CoinRules.COMPANION, createdEvent)(SvcAcsStoreRowData(_))
-        case cc.coin.Coin.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.coin.Coin.TEMPLATE_ID) =>
           tryToDecode(cc.coin.Coin.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
               coinRoundOfExpiry = Some(CNNodeUtil.coinExpiresAt(contract.payload).number),
             )
           }
-        case cc.coin.FeaturedAppRight.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.coin.FeaturedAppRight.TEMPLATE_ID) =>
           tryToDecode(cc.coin.FeaturedAppRight.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
@@ -167,23 +168,23 @@ object SvcTables extends AcsTables with NamedLogging {
                 Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
             )
           }
-        case cc.coin.LockedCoin.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.coin.LockedCoin.TEMPLATE_ID) =>
           tryToDecode(cc.coin.LockedCoin.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
               coinRoundOfExpiry = Some(CNNodeUtil.coinExpiresAt(contract.payload.coin).number),
             )
           }
-        case cc.coinimport.ImportCrate.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.coinimport.ImportCrate.TEMPLATE_ID) =>
           tryToDecode(cc.coinimport.ImportCrate.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
               importCrateReceiver = Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
             )
           }
-        case cc.coin.SvcReward.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.coin.SvcReward.TEMPLATE_ID) =>
           tryToDecode(cc.coin.SvcReward.COMPANION, createdEvent)(SvcAcsStoreRowData(_))
-        case cc.coin.AppRewardCoupon.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.coin.AppRewardCoupon.TEMPLATE_ID) =>
           tryToDecode(cc.coin.AppRewardCoupon.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
@@ -191,7 +192,7 @@ object SvcTables extends AcsTables with NamedLogging {
               rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
             )
           }
-        case cc.coin.ValidatorRewardCoupon.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.coin.ValidatorRewardCoupon.TEMPLATE_ID) =>
           tryToDecode(cc.coin.ValidatorRewardCoupon.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
@@ -199,14 +200,14 @@ object SvcTables extends AcsTables with NamedLogging {
               rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
             )
           }
-        case cc.round.OpenMiningRound.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.round.OpenMiningRound.TEMPLATE_ID) =>
           tryToDecode(cc.round.OpenMiningRound.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
               miningRound = Some(contract.payload.round.number),
             )
           }
-        case cc.round.IssuingMiningRound.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.round.IssuingMiningRound.TEMPLATE_ID) =>
           tryToDecode(cc.round.IssuingMiningRound.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
@@ -215,48 +216,48 @@ object SvcTables extends AcsTables with NamedLogging {
               miningRound = Some(contract.payload.round.number),
             )
           }
-        case cc.round.SummarizingMiningRound.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.round.SummarizingMiningRound.TEMPLATE_ID) =>
           tryToDecode(cc.round.SummarizingMiningRound.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
               miningRound = Some(contract.payload.round.number),
             )
           }
-        case cc.round.ClosedMiningRound.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.round.ClosedMiningRound.TEMPLATE_ID) =>
           tryToDecode(cc.round.ClosedMiningRound.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
               miningRound = Some(contract.payload.round.number),
             )
           }
-        case cc.coin.UnclaimedReward.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.coin.UnclaimedReward.TEMPLATE_ID) =>
           tryToDecode(cc.coin.UnclaimedReward.COMPANION, createdEvent)(SvcAcsStoreRowData(_))
-        case vl.ValidatorLicense.TEMPLATE_ID =>
+        case t if t == QualifiedName(vl.ValidatorLicense.TEMPLATE_ID) =>
           tryToDecode(vl.ValidatorLicense.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
               validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
             )
           }
-        case cc.globaldomain.MemberTraffic.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.globaldomain.MemberTraffic.TEMPLATE_ID) =>
           tryToDecode(cc.globaldomain.MemberTraffic.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
               memberTrafficMember = Some(Member.tryFromProtoPrimitive(contract.payload.memberId)),
             )
           }
-        case cn.cns.CnsRules.TEMPLATE_ID =>
+        case t if t == QualifiedName(cn.cns.CnsRules.TEMPLATE_ID) =>
           tryToDecode(cn.cns.CnsRules.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(contract)
           }
-        case cn.cns.CnsEntry.TEMPLATE_ID =>
+        case t if t == QualifiedName(cn.cns.CnsEntry.TEMPLATE_ID) =>
           tryToDecode(cn.cns.CnsEntry.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
               cnsEntryName = Some(contract.payload.name),
             )
           }
-        case cn.cns.CnsEntryContext.TEMPLATE_ID =>
+        case t if t == QualifiedName(cn.cns.CnsEntryContext.TEMPLATE_ID) =>
           tryToDecode(cn.cns.CnsEntryContext.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
@@ -264,21 +265,21 @@ object SvcTables extends AcsTables with NamedLogging {
               subscriptionReferenceContractId = Some(contract.payload.reference),
             )
           }
-        case sub.SubscriptionInitialPayment.TEMPLATE_ID =>
+        case t if t == QualifiedName(sub.SubscriptionInitialPayment.TEMPLATE_ID) =>
           tryToDecode(sub.SubscriptionInitialPayment.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
               subscriptionReferenceContractId = Some(contract.payload.reference),
             )
           }
-        case sub.SubscriptionPayment.TEMPLATE_ID =>
+        case t if t == QualifiedName(sub.SubscriptionPayment.TEMPLATE_ID) =>
           tryToDecode(sub.SubscriptionPayment.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,
               subscriptionReferenceContractId = Some(contract.payload.reference),
             )
           }
-        case sub.SubscriptionIdleState.TEMPLATE_ID =>
+        case t if t == QualifiedName(sub.SubscriptionIdleState.TEMPLATE_ID) =>
           tryToDecode(sub.SubscriptionIdleState.COMPANION, createdEvent) { contract =>
             SvcAcsStoreRowData(
               contract,

@@ -47,6 +47,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.protocol.LfContractId
 
 import java.time.{Duration, Instant}
+import java.util.Optional
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -92,6 +93,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       schedule,
       false,
       false,
+      Optional.empty(),
     )
     contract(
       identifier = templateId,
@@ -170,6 +172,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         new Round(createdAtRound),
         new feesCodegen.RatePerRound(numeric(ratePerRound)),
       ),
+      Optional.empty(),
     )
     contract(
       identifier = templateId,

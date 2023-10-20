@@ -2,7 +2,6 @@ package com.daml.network.sv.store
 
 import cats.implicits.toTraverseOps
 import com.daml.ledger.javaapi.data as javab
-import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
@@ -46,6 +45,7 @@ import com.daml.network.util.{
   CNNodeUtil,
   Contract,
   ContractWithState,
+  QualifiedName,
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.String3
@@ -857,12 +857,12 @@ object SvSvcStore {
     }
   }
 
-  val ignoredContractsForAcsDump: Set[Identifier] = Set(
+  val ignoredContractsForAcsDump: Set[QualifiedName] = Set(
     // Note: these three kinds of contracts are not included in an ACS dump due to the ExpireUnclaimedRewards trigger
     // being disabled, which leads to a too high growth of the ACS export per hour.
-    cc.coin.AppRewardCoupon.COMPANION.TEMPLATE_ID,
-    cc.coin.ValidatorRewardCoupon.COMPANION.TEMPLATE_ID,
-    cc.round.ClosedMiningRound.COMPANION.TEMPLATE_ID,
+    QualifiedName(cc.coin.AppRewardCoupon.COMPANION.TEMPLATE_ID),
+    QualifiedName(cc.coin.ValidatorRewardCoupon.COMPANION.TEMPLATE_ID),
+    QualifiedName(cc.round.ClosedMiningRound.COMPANION.TEMPLATE_ID),
   )
 
   private val svcRulesFollowers: Seq[ConstrainedTemplate] = {

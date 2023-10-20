@@ -8,14 +8,19 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
-import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.directory.admin.http.HttpDirectoryHandler
 import com.daml.network.directory.automation.DirectoryAutomationService
 import com.daml.network.directory.config.DirectoryAppBackendConfig
 import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus, PackageIdResolver}
+import com.daml.network.environment.{
+  CNLedgerClient,
+  CNNode,
+  CNNodeStatus,
+  DarResources,
+  PackageIdResolver,
+}
 import com.daml.network.http.v0.directory.DirectoryResource
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -64,7 +69,8 @@ class DirectoryApp(
       metrics,
     ) {
 
-  override def packages = super.packages ++ Seq("dar/directory-service-0.1.0.dar")
+  override def packages =
+    super.packages ++ DarResources.directoryService.all
 
   override def initialize(
       ledgerClient: CNLedgerClient,
@@ -152,7 +158,9 @@ class DirectoryApp(
   override lazy val ports =
     Map("admin" -> config.adminApi.port)
 
-  override lazy val requiredTemplates = Set(directoryCodegen.DirectoryInstall.TEMPLATE_ID)
+  override lazy val requiredPackageIds = Set(
+    DarResources.directoryService.bootstrap.packageId
+  )
 }
 
 object DirectoryApp {

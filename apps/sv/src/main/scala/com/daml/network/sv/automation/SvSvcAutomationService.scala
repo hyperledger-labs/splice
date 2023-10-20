@@ -8,6 +8,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.environment.{
   CNLedgerClient,
+  DarResources,
   PackageIdResolver,
   ParticipantAdminConnection,
   RetryProvider,
@@ -168,11 +169,11 @@ object SvSvcAutomationService {
     template.moduleName match {
       // SvcBootstrap is how we create CoinRules in the first place so we cannot infer the package id for that from CoinRules.
       case "CN.SvcBootstrap" =>
-        Some(com.daml.network.codegen.java.cn.svcbootstrap.SvcBootstrap.TEMPLATE_ID.getPackageId)
+        Some(DarResources.svcGovernance.bootstrap.packageId)
       // ImportCrates are created before CoinRules. Given that this is only a hack until we have upgrading
       // we can hardcode this.
       case "CC.CoinImport" =>
-        Some(com.daml.network.codegen.java.cc.coinimport.ImportCrate.TEMPLATE_ID.getPackageId)
+        Some(DarResources.cantonCoin.bootstrap.packageId)
       case _ => None
     }
 }

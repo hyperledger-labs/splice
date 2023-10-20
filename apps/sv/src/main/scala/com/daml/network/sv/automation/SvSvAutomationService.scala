@@ -2,7 +2,7 @@ package com.daml.network.sv.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{AssignTrigger, CNNodeAppAutomationService}
-import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{CNLedgerClient, DarResources, PackageIdResolver, RetryProvider}
 import com.daml.network.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
@@ -48,6 +48,6 @@ object SvSvAutomationService {
     // ApprovedSvIdentity is created before the SVC party is migrated so we cannot read it from our store.
     // TODO(#8019) Fix package id inferenece for this.
     Option.when(template == QualifiedName("CN.SvOnboarding", "ApprovedSvIdentity"))(
-      com.daml.network.codegen.java.cn.svonboarding.ApprovedSvIdentity.TEMPLATE_ID.getPackageId
+      DarResources.svcGovernance.bootstrap.packageId
     )
 }

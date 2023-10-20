@@ -14,6 +14,7 @@ import com.daml.lf.data.Ref
 import com.daml.lf.data.Ref.{DottedName, ModuleName, PackageId, QualifiedName}
 import com.daml.lf.typesig
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
+import com.daml.network.environment.DarResource
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.platform.participant.util.LfEngineToApi
 import com.digitalasset.canton.tracing.TraceContext
@@ -125,21 +126,21 @@ class ResourceTemplateDecoder(
 object ResourceTemplateDecoder {
 
   def loadPackageSignaturesFromResource(
-      resourcePath: String
+      resource: DarResource
   ): Map[PackageId, typesig.PackageSignature] = {
-    val inputStream = getClass.getClassLoader.getResourceAsStream(resourcePath)
+    val inputStream = getClass.getClassLoader.getResourceAsStream(resource.path)
     val dar: Dar[ArchivePayload] = DarReader
-      .readArchive(resourcePath, new ZipInputStream(inputStream))
+      .readArchive(resource.path, new ZipInputStream(inputStream))
       .valueOr(e =>
-        throw new IllegalArgumentException(s"Failed to read DAR at path $resourcePath: $e")
+        throw new IllegalArgumentException(s"Failed to read DAR at path ${resource.path}: $e")
       )
     dar.all.map(a => a.pkgId -> typesig.reader.SignatureReader.readPackageSignature(a)._2).toMap
   }
 
   def loadPackageSignaturesFromResources(
-      resourcePaths: Seq[String]
+      resources: Seq[DarResource]
   ): Map[PackageId, typesig.PackageSignature] =
-    resourcePaths.foldLeft(Map.empty[PackageId, typesig.PackageSignature]) { case (acc, p) =>
+    resources.foldLeft(Map.empty[PackageId, typesig.PackageSignature]) { case (acc, p) =>
       acc ++ loadPackageSignaturesFromResource(p)
     }
 

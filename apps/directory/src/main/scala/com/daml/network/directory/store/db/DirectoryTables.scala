@@ -6,7 +6,7 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.store.db.AcsTables
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, QualifiedName}
 import com.digitalasset.canton.topology.PartyId
 
 object DirectoryTables extends AcsTables {
@@ -23,8 +23,9 @@ object DirectoryTables extends AcsTables {
 
   object DirectoryAcsStoreRowData {
     def fromCreatedEvent(createdEvent: CreatedEvent): Either[String, DirectoryAcsStoreRowData] = {
-      createdEvent.getTemplateId match {
-        case directoryCodegen.DirectoryInstall.TEMPLATE_ID =>
+      // TODO(#8125) Switch to map lookups instead
+      QualifiedName(createdEvent.getTemplateId) match {
+        case t if t == QualifiedName(directoryCodegen.DirectoryInstall.TEMPLATE_ID) =>
           tryToDecode(directoryCodegen.DirectoryInstall.COMPANION, createdEvent) { contract =>
             DirectoryAcsStoreRowData(
               contract = contract,
@@ -36,7 +37,7 @@ object DirectoryTables extends AcsTables {
               subscriptionNextPaymentDueAt = None,
             )
           }
-        case directoryCodegen.DirectoryInstallRequest.TEMPLATE_ID =>
+        case t if t == QualifiedName(directoryCodegen.DirectoryInstallRequest.TEMPLATE_ID) =>
           tryToDecode(directoryCodegen.DirectoryInstallRequest.COMPANION, createdEvent) {
             contract =>
               DirectoryAcsStoreRowData(
@@ -49,7 +50,7 @@ object DirectoryTables extends AcsTables {
                 subscriptionNextPaymentDueAt = None,
               )
           }
-        case directoryCodegen.DirectoryEntry.TEMPLATE_ID =>
+        case t if t == QualifiedName(directoryCodegen.DirectoryEntry.TEMPLATE_ID) =>
           tryToDecode(directoryCodegen.DirectoryEntry.COMPANION, createdEvent) { contract =>
             DirectoryAcsStoreRowData(
               contract = contract,
@@ -61,7 +62,7 @@ object DirectoryTables extends AcsTables {
               subscriptionNextPaymentDueAt = None,
             )
           }
-        case directoryCodegen.DirectoryEntryContext.TEMPLATE_ID =>
+        case t if t == QualifiedName(directoryCodegen.DirectoryEntryContext.TEMPLATE_ID) =>
           tryToDecode(directoryCodegen.DirectoryEntryContext.COMPANION, createdEvent) { contract =>
             DirectoryAcsStoreRowData(
               contract = contract,
@@ -73,7 +74,7 @@ object DirectoryTables extends AcsTables {
               subscriptionNextPaymentDueAt = None,
             )
           }
-        case subsCodegen.SubscriptionIdleState.TEMPLATE_ID =>
+        case t if t == QualifiedName(subsCodegen.SubscriptionIdleState.TEMPLATE_ID) =>
           tryToDecode(subsCodegen.SubscriptionIdleState.COMPANION, createdEvent) { contract =>
             DirectoryAcsStoreRowData(
               contract = contract,
@@ -86,7 +87,7 @@ object DirectoryTables extends AcsTables {
                 Some(Timestamp.assertFromInstant(contract.payload.nextPaymentDueAt)),
             )
           }
-        case subsCodegen.SubscriptionInitialPayment.TEMPLATE_ID =>
+        case t if t == QualifiedName(subsCodegen.SubscriptionInitialPayment.TEMPLATE_ID) =>
           tryToDecode(subsCodegen.SubscriptionInitialPayment.COMPANION, createdEvent) { contract =>
             DirectoryAcsStoreRowData(
               contract = contract,
@@ -98,7 +99,7 @@ object DirectoryTables extends AcsTables {
               subscriptionNextPaymentDueAt = None,
             )
           }
-        case subsCodegen.SubscriptionPayment.TEMPLATE_ID =>
+        case t if t == QualifiedName(subsCodegen.SubscriptionPayment.TEMPLATE_ID) =>
           tryToDecode(subsCodegen.SubscriptionPayment.COMPANION, createdEvent) { contract =>
             DirectoryAcsStoreRowData(
               contract = contract,
@@ -110,7 +111,7 @@ object DirectoryTables extends AcsTables {
               subscriptionNextPaymentDueAt = None,
             )
           }
-        case subsCodegen.TerminatedSubscription.TEMPLATE_ID =>
+        case t if t == QualifiedName(subsCodegen.TerminatedSubscription.TEMPLATE_ID) =>
           tryToDecode(subsCodegen.TerminatedSubscription.COMPANION, createdEvent) { contract =>
             DirectoryAcsStoreRowData(
               contract = contract,

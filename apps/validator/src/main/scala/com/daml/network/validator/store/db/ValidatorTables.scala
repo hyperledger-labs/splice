@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.store.db.AcsTables
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, QualifiedName}
 import com.daml.network.http.v0.definitions
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import cats.syntax.either.*
@@ -40,9 +40,9 @@ object ValidatorTables extends AcsTables {
           contract = contract,
           contractExpiresAt = None,
         )
-
-      createdEvent.getTemplateId match {
-        case walletCodegen.WalletAppInstall.TEMPLATE_ID =>
+      // TODO(#8125) Switch to map lookups instead
+      QualifiedName(createdEvent.getTemplateId) match {
+        case t if t == QualifiedName(walletCodegen.WalletAppInstall.TEMPLATE_ID) =>
           tryToDecode(walletCodegen.WalletAppInstall.COMPANION, createdEvent)(contract =>
             ValidatorAcsStoreRowData(
               contract = contract,
@@ -51,11 +51,11 @@ object ValidatorTables extends AcsTables {
               userName = Some(contract.payload.endUserName),
             )
           )
-        case coinCodegen.CoinRules.TEMPLATE_ID =>
+        case t if t == QualifiedName(coinCodegen.CoinRules.TEMPLATE_ID) =>
           tryToDecode(coinCodegen.CoinRules.COMPANION, createdEvent)(noIndex)
-        case coinCodegen.Coin.COMPANION.TEMPLATE_ID =>
+        case t if t == QualifiedName(coinCodegen.Coin.COMPANION.TEMPLATE_ID) =>
           tryToDecode(coinCodegen.Coin.COMPANION, createdEvent)(noIndex)
-        case validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID =>
+        case t if t == QualifiedName(validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID) =>
           tryToDecode(validatorLicenseCodegen.ValidatorLicense.COMPANION, createdEvent)(contract =>
             ValidatorAcsStoreRowData(
               contract = contract,
@@ -63,7 +63,7 @@ object ValidatorTables extends AcsTables {
               validatorParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
             )
           )
-        case coinCodegen.ValidatorRight.TEMPLATE_ID =>
+        case t if t == QualifiedName(coinCodegen.ValidatorRight.TEMPLATE_ID) =>
           tryToDecode(coinCodegen.ValidatorRight.COMPANION, createdEvent)(contract =>
             ValidatorAcsStoreRowData(
               contract = contract,
@@ -72,7 +72,7 @@ object ValidatorTables extends AcsTables {
               validatorParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
             )
           )
-        case coinCodegen.FeaturedAppRight.TEMPLATE_ID =>
+        case t if t == QualifiedName(coinCodegen.FeaturedAppRight.TEMPLATE_ID) =>
           tryToDecode(coinCodegen.FeaturedAppRight.COMPANION, createdEvent)(contract =>
             ValidatorAcsStoreRowData(
               contract = contract,
@@ -80,7 +80,7 @@ object ValidatorTables extends AcsTables {
               providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
             )
           )
-        case appManagerCodegen.AppConfiguration.TEMPLATE_ID =>
+        case t if t == QualifiedName(appManagerCodegen.AppConfiguration.TEMPLATE_ID) =>
           for {
             contract <- tryToDecode(appManagerCodegen.AppConfiguration.COMPANION, createdEvent)(
               identity
@@ -96,7 +96,7 @@ object ValidatorTables extends AcsTables {
             appConfigurationVersion = Some(contract.payload.version),
             appConfigurationName = Some(name),
           )
-        case appManagerCodegen.AppRelease.TEMPLATE_ID =>
+        case t if t == QualifiedName(appManagerCodegen.AppRelease.TEMPLATE_ID) =>
           tryToDecode(appManagerCodegen.AppRelease.COMPANION, createdEvent)(contract =>
             ValidatorAcsStoreRowData(
               contract = contract,
@@ -105,7 +105,7 @@ object ValidatorTables extends AcsTables {
               appReleaseVersion = Some(contract.payload.version),
             )
           )
-        case appManagerCodegen.RegisteredApp.TEMPLATE_ID =>
+        case t if t == QualifiedName(appManagerCodegen.RegisteredApp.TEMPLATE_ID) =>
           tryToDecode(appManagerCodegen.RegisteredApp.COMPANION, createdEvent)(contract =>
             ValidatorAcsStoreRowData(
               contract = contract,
@@ -113,7 +113,7 @@ object ValidatorTables extends AcsTables {
               providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
             )
           )
-        case appManagerCodegen.InstalledApp.TEMPLATE_ID =>
+        case t if t == QualifiedName(appManagerCodegen.InstalledApp.TEMPLATE_ID) =>
           tryToDecode(appManagerCodegen.InstalledApp.COMPANION, createdEvent)(contract =>
             ValidatorAcsStoreRowData(
               contract = contract,
@@ -121,7 +121,7 @@ object ValidatorTables extends AcsTables {
               providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
             )
           )
-        case appManagerCodegen.ApprovedReleaseConfiguration.TEMPLATE_ID =>
+        case t if t == QualifiedName(appManagerCodegen.ApprovedReleaseConfiguration.TEMPLATE_ID) =>
           tryToDecode(appManagerCodegen.ApprovedReleaseConfiguration.COMPANION, createdEvent)(
             contract =>
               ValidatorAcsStoreRowData(
@@ -131,7 +131,7 @@ object ValidatorTables extends AcsTables {
                 jsonHash = Some(contract.payload.jsonHash),
               )
           )
-        case topUpCodegen.ValidatorTopUpState.TEMPLATE_ID =>
+        case t if t == QualifiedName(topUpCodegen.ValidatorTopUpState.TEMPLATE_ID) =>
           tryToDecode(topUpCodegen.ValidatorTopUpState.COMPANION, createdEvent)(contract =>
             ValidatorAcsStoreRowData(
               contract = contract,

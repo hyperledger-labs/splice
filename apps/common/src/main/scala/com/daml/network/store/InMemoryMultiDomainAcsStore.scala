@@ -3,17 +3,11 @@ package com.daml.network.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.ledger.javaapi.data.{
-  CreatedEvent,
-  ExercisedEvent,
-  Template,
-  TransactionTree,
-  Identifier,
-}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.*
-import com.daml.network.util.{Contract, ContractWithState, AssignedContract, Trees}
+import com.daml.network.util.{Contract, ContractWithState, AssignedContract, QualifiedName, Trees}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.topology.DomainId
@@ -568,7 +562,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
   override def close(): Unit = ()
 
-  override def getJsonAcsSnapshot(ignoredContracts: Set[Identifier]): Future[JsonAcsSnapshot] =
+  override def getJsonAcsSnapshot(ignoredContracts: Set[QualifiedName]): Future[JsonAcsSnapshot] =
     Future {
       val state = stateVar
       state.offset match {
@@ -582,7 +576,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
             state.createEvents.values
               .collect(
                 Function.unlift(ev => {
-                  if (ignoredContracts.contains(ev.getTemplateId))
+                  if (ignoredContracts.contains(QualifiedName(ev.getTemplateId)))
                     None
                   else
                     contractFilter.decodeMatchingContract(ev)

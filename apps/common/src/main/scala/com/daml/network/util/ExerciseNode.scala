@@ -66,7 +66,9 @@ object ExerciseNode {
   }
 
   private def isChoice(companion: ExerciseNodeCompanion)(event: ExercisedEvent) = {
-    companion.template.TEMPLATE_ID == event.getTemplateId && event.getChoice == companion.choice.name
+    QualifiedName(companion.template.TEMPLATE_ID) == QualifiedName(
+      event.getTemplateId
+    ) && event.getChoice == companion.choice.name
   }
 
   def decodeExerciseEvent(companion: ExerciseNodeCompanion)(

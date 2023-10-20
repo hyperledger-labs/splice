@@ -47,7 +47,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   SubscriptionRequest,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{Limit, StoreTest, TxLogStore}
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
@@ -1404,11 +1404,9 @@ class DbSvSvcStoreTest
   override protected def mkStore(): Future[DbSvSvcStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        Seq(
-          "dar/canton-coin-0.1.0.dar",
-          "dar/validator-lifecycle-0.1.0.dar",
-          "dar/svc-governance-0.1.0.dar",
-        )
+        DarResources.cantonCoin.all ++
+          DarResources.validatorLifecycle.all ++
+          DarResources.svcGovernance.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)

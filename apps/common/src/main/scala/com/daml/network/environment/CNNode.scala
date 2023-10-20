@@ -2,7 +2,6 @@ package com.daml.network.environment
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.CNNodeMetrics
 import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.util.HasHealth
@@ -40,11 +39,9 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     ) {
   val name: InstanceName
 
-  /** Templates whose packages must be available before init will run.
-    * It it save to omit a template if there is another template in the same
-    * package in the set.
+  /** Packages that must be available before init will run.
     */
-  protected def requiredTemplates: Set[Identifier] = Set.empty
+  protected def requiredPackageIds: Set[String] = Set.empty
 
   // Code that is run after a ledger connection becomes available but before
   // waiting for the primary party. This can be used for things like
@@ -83,8 +80,8 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
         // Since this is the first ledger API call in the app, we additionally retry on auth errors here.
         additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
       )
-    _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates}")
-    _ <- initConnection.waitForPackages(requiredTemplates)
+    _ = logger.info(s"Waiting for packages to be uploaded: ${requiredPackageIds}")
+    _ <- initConnection.waitForPackages(requiredPackageIds)
     _ = logger.info(s"Packages available, running app-specific init")
     state <- initialize(ledgerClient, serviceParty)
   } yield state

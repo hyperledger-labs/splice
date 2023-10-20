@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.daml.network.wallet.store.db.DbUserWalletStore
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.StoreTest
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
@@ -1196,10 +1196,8 @@ class DbUserWalletStoreTest
   ): Future[DbUserWalletStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        Seq(
-          "dar/canton-coin-0.1.0.dar",
-          "dar/wallet-0.1.0.dar",
-        )
+        DarResources.cantonCoin.all ++
+          DarResources.wallet.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)

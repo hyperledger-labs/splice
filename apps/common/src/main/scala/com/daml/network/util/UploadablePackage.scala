@@ -1,8 +1,10 @@
 package com.daml.network.util
 
+import com.daml.network.environment.DarResource
+import com.google.protobuf.ByteString
 import java.io.InputStream
 
-trait UploadablePackage {
+sealed trait UploadablePackage {
   def packageId: String
   def resourcePath: String
 
@@ -14,5 +16,24 @@ trait UploadablePackage {
       throw new IllegalStateException(
         s"Failed to load [$resourcePath] from classpath"
       )
+  }
+}
+
+object UploadablePackage {
+  def fromResource(resource: DarResource): UploadablePackage = {
+    new UploadablePackage {
+      override val packageId = resource.packageId
+      override val resourcePath = resource.path
+    }
+  }
+  def fromByteString(name: String, bs: ByteString): UploadablePackage = {
+    val pkgId = DarUtil.readPackageId(name, bs.newInput)
+    (
+      new UploadablePackage {
+        override def packageId = pkgId
+        override def resourcePath = name
+        override def inputStream() = bs.newInput
+      }
+    )
   }
 }

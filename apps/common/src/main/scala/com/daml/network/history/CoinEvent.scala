@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRoun
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionIdleState
 import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
+import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion, QualifiedName}
 import com.digitalasset.canton.logging.ErrorLoggingContext
 
 import java.util.Optional
@@ -235,7 +235,11 @@ object CnsRules_CollectEntryRenewalPayment extends ExerciseNodeCompanion {
 object CoinArchive {
   // Matches on any consuming exercise on a coin
   def unapply(event: ExercisedEvent): Option[ExercisedEvent] =
-    if (event.getTemplateId == coinCodegen.Coin.COMPANION.TEMPLATE_ID && event.isConsuming) {
+    if (
+      QualifiedName(event.getTemplateId) == QualifiedName(
+        coinCodegen.Coin.COMPANION.TEMPLATE_ID
+      ) && event.isConsuming
+    ) {
       Some(event)
     } else None
 }

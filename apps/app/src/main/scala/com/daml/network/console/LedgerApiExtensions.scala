@@ -8,8 +8,8 @@ import com.daml.ledger.api.v1.transaction.TransactionTree
 import com.daml.ledger.javaapi
 import com.daml.ledger.javaapi.data.TransactionTree as JavaTransactionTree
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
-import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.util.Contract
+import com.daml.network.environment.{CNLedgerConnection, PackageIdResolver}
+import com.daml.network.util.{Contract, JavaDecodeUtil}
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeDuration
@@ -22,17 +22,23 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.ledger.api.DeduplicationPeriod
-import com.daml.network.util.JavaDecodeUtil
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.Await
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 trait LedgerApiExtensions {
   implicit class LedgerApiSyntax(
       private val ledgerApi: BaseLedgerApiAdministration with LedgerApiCommandRunner
   ) {
+    private val packageIdResolver: PackageIdResolver = PackageIdResolver.staticTesting(
+      ledgerApi.consoleEnvironment.environment.executionContext
+    )
+
     object ledger_api_extensions {
       object commands {
         @Help.Summary(
@@ -63,12 +69,15 @@ trait LedgerApiExtensions {
             applicationId: String = LedgerApiCommands.defaultApplicationId,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
         ): JavaTransactionTree = {
+          val cmds = commands.map(cmd =>
+            Await.result(packageIdResolver.resolvePackageId(cmd)(TraceContext.empty), 1.second)
+          )
           val tx = ledgerApi.consoleEnvironment.run {
             ledgerApi.ledgerApiCommand(
               LedgerApiCommands.CommandService.SubmitAndWaitTransactionTree(
                 actAs.map(_.toLf),
                 readAs.map(_.toLf),
-                commands.map(c => Command.fromJavaProto(c.toProtoCommand)),
+                cmds.map(c => Command.fromJavaProto(c.toProtoCommand)),
                 applicationId,
                 workflowId,
                 commandId,
@@ -240,7 +249,7 @@ trait LedgerApiExtensions {
         ): Seq[TC] = {
           val javaTemplateId = templateCompanion.TEMPLATE_ID
           val templateId = TemplateId(
-            javaTemplateId.getPackageId,
+            "",
             javaTemplateId.getModuleName,
             javaTemplateId.getEntityName,
           )

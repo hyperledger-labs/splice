@@ -1,6 +1,6 @@
 package com.daml.network.util
 
-import com.daml.ledger.javaapi.data.ExercisedEvent
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.fees as feesCodegen
@@ -14,6 +14,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{ValidatorAppBackendReference, *}
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
@@ -25,7 +26,7 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
-import java.util.UUID
+import java.util.{Optional, UUID}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
@@ -837,27 +838,30 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): coinCodegen.Coin.ContractId = {
-    val coin = new coinCodegen.Coin(
-      svcParty.toProtoPrimitive,
-      owner.toProtoPrimitive,
-      new feesCodegen.ExpiringAmount(
-        amount.bigDecimal,
-        new Round(round),
-        new feesCodegen.RatePerRound(holdingFee.bigDecimal),
-      ),
+    val coin = UpgradeUtil.downgradeCoinCreate(
+      new coinCodegen.Coin(
+        svcParty.toProtoPrimitive,
+        owner.toProtoPrimitive,
+        new feesCodegen.ExpiringAmount(
+          amount.bigDecimal,
+          new Round(round),
+          new feesCodegen.RatePerRound(holdingFee.bigDecimal),
+        ),
+        Optional.empty(),
+      )
     )
-    new coinCodegen.Coin.ContractId(
-      participantClient.ledger_api_extensions.commands
-        .submitWithResult(
-          userId = userId,
-          actAs = Seq(svcParty, owner),
-          readAs = Seq.empty,
-          update = coin.create(),
-          domainId = domainId,
-        )
-        .contractId
-        .contractId
-    )
+    val tx = participantClient.ledger_api_extensions.commands
+      .submitJava(
+        applicationId = userId,
+        actAs = Seq(svcParty, owner),
+        readAs = Seq.empty,
+        commands = coin,
+        workflowId = domainId.fold("")(CNLedgerConnection.domainIdToWorkflowId(_)),
+        optTimeout = None,
+      )
+    val cid =
+      tx.getEventsById.get(tx.getRootEventIds.get(0)).asInstanceOf[CreatedEvent].getContractId
+    new coinCodegen.Coin.ContractId(cid)
   }
 
   /* Directly archives the given coin. */

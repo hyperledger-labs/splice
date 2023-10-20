@@ -181,6 +181,8 @@ lazy val `canton-coin-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value,
+      // We generate code for the latest version
+      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `canton-coin-upgrade-daml` =
@@ -191,8 +193,6 @@ lazy val `canton-coin-upgrade-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value,
-      // TODO(#8082) Switch to disabling code gen on the old version
-      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `svc-governance-daml` =
@@ -206,6 +206,8 @@ lazy val `svc-governance-daml` =
           (`canton-coin-daml` / Compile / damlBuild).value ++
           (`canton-name-service-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value,
+      // We generate code for the latest version
+      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `svc-governance-upgrade-daml` =
@@ -219,8 +221,6 @@ lazy val `svc-governance-upgrade-daml` =
           (`canton-coin-upgrade-daml` / Compile / damlBuild).value ++
           (`canton-name-service-upgrade-daml` / Compile / damlBuild).value ++
           (`wallet-payments-upgrade-daml` / Compile / damlBuild).value,
-      // TODO(#8082) Switch to disabling code gen on the old version
-      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `validator-lifecycle-daml` =
@@ -243,6 +243,8 @@ lazy val `wallet-payments-daml` =
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value ++
           (`canton-coin-daml` / Compile / damlBuild).value,
+      // We generate code for the latest version
+      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `wallet-payments-upgrade-daml` =
@@ -254,8 +256,6 @@ lazy val `wallet-payments-upgrade-daml` =
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value ++
           (`canton-coin-upgrade-daml` / Compile / damlBuild).value,
-      // TODO(#8082) Switch to disabling code gen on the old version
-      Compile / damlEnableJavaCodegen := false,
     )
 
 // This defines the Daml model that we do not expose to app devs
@@ -267,6 +267,8 @@ lazy val `wallet-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`canton-coin-daml` / Compile / damlBuild).value ++ (`wallet-payments-daml` / Compile / damlBuild).value,
+      // We generate code for the latest version
+      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `wallet-upgrade-daml` =
@@ -276,8 +278,6 @@ lazy val `wallet-upgrade-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`canton-coin-upgrade-daml` / Compile / damlBuild).value ++ (`wallet-payments-upgrade-daml` / Compile / damlBuild).value,
-      // TODO(#8082) Switch to disabling code gen on the old version
-      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `directory-daml` =
@@ -287,6 +287,8 @@ lazy val `directory-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
+      // We generate code for the latest version
+      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `directory-upgrade-daml` =
@@ -296,8 +298,6 @@ lazy val `directory-upgrade-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`wallet-upgrade-daml` / Compile / damlBuild).value,
-      // TODO(#8082) Switch to disabling code gen on the old version
-      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `canton-name-service-daml` =
@@ -307,6 +307,8 @@ lazy val `canton-name-service-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
+      // We generate code for the latest version
+      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `canton-name-service-upgrade-daml` =
@@ -316,8 +318,6 @@ lazy val `canton-name-service-upgrade-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`wallet-upgrade-daml` / Compile / damlBuild).value,
-      // TODO(#8082) Switch to disabling code gen on the old version
-      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `splitwell-daml` =
@@ -327,6 +327,8 @@ lazy val `splitwell-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
+      // We generate code for the latest version
+      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `splitwell-upgrade-daml` =
@@ -336,8 +338,6 @@ lazy val `splitwell-upgrade-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`wallet-upgrade-daml` / Compile / damlBuild).value,
-      // TODO(#8082) Switch to disabling code gen on the old version
-      Compile / damlEnableJavaCodegen := false,
     )
 
 lazy val `app-manager-daml` =

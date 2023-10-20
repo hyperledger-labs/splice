@@ -15,6 +15,7 @@ import com.daml.network.util.{
   ContractWithState,
   DisclosedContracts,
   TemplateJsonDecoder,
+  UpgradeUtil,
 }
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.TracedLogger
@@ -66,7 +67,7 @@ object AcsStoreDump {
       contracts: Seq[http.Contract]
   )(implicit
       templateDecoder: TemplateJsonDecoder
-  ): Seq[data.codegen.Update[data.codegen.Created[cc.coinimport.ImportCrate.ContractId]]] = {
+  ): Seq[data.Command] = {
 
     def extractCoin(co: http.Contract): Seq[cc.coin.Coin] =
       // attempt to decode as a: Coin
@@ -85,7 +86,7 @@ object AcsStoreDump {
       new cc.coinimport.importpayload.IP_Coin(
         coin
       ),
-    ).create()
+    )
 
     val validatorLicenseCommands = for {
       httpCo <- contracts
@@ -96,7 +97,7 @@ object AcsStoreDump {
       svcParty.toProtoPrimitive,
       license.payload.validator,
       new IP_ValidatorLicense(license.payload),
-    ).create()
+    )
 
     val importCrateCommands = for {
       httpCo <- contracts
@@ -105,9 +106,11 @@ object AcsStoreDump {
       svcParty.toProtoPrimitive, // override the svc party to the current one
       crate.payload.receiver, // keep as-is
       crate.payload.payload, // keep as-is
-    ).create()
+    )
 
-    Seq(coinCommands, validatorLicenseCommands, importCrateCommands).flatten
+    (coinCommands ++ validatorLicenseCommands ++ importCrateCommands).flatMap(
+      UpgradeUtil.downgradeImportCrateCreate(_)
+    )
   }
 
   def receiveCratesFor(

@@ -6,7 +6,7 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn
 import com.daml.network.store.db.AcsTables
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, QualifiedName}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.daml.network.scan.store.TxLogIndexRecord
 import com.digitalasset.canton.config.CantonRequireTypes.String3
@@ -28,8 +28,9 @@ object ScanTables extends AcsTables {
     def fromCreatedEvent(
         createdEvent: CreatedEvent
     ): Either[String, ScanAcsStoreRowData] = {
-      createdEvent.getTemplateId match {
-        case cc.coin.CoinRules.TEMPLATE_ID =>
+      // TODO(#8125) Switch to map lookups instead
+      QualifiedName(createdEvent.getTemplateId) match {
+        case t if t == QualifiedName(cc.coin.CoinRules.TEMPLATE_ID) =>
           tryToDecode(cc.coin.CoinRules.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
@@ -41,7 +42,7 @@ object ScanTables extends AcsTables {
               featuredAppRightProvider = None,
             )
           }
-        case cn.cns.CnsRules.TEMPLATE_ID =>
+        case t if t == QualifiedName(cn.cns.CnsRules.TEMPLATE_ID) =>
           tryToDecode(cn.cns.CnsRules.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
@@ -53,7 +54,7 @@ object ScanTables extends AcsTables {
               featuredAppRightProvider = None,
             )
           }
-        case cn.svcrules.SvcRules.TEMPLATE_ID =>
+        case t if t == QualifiedName(cn.svcrules.SvcRules.TEMPLATE_ID) =>
           tryToDecode(cn.svcrules.SvcRules.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
@@ -65,7 +66,7 @@ object ScanTables extends AcsTables {
               featuredAppRightProvider = None,
             )
           }
-        case cc.round.OpenMiningRound.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.round.OpenMiningRound.TEMPLATE_ID) =>
           tryToDecode(cc.round.OpenMiningRound.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
@@ -78,7 +79,7 @@ object ScanTables extends AcsTables {
               featuredAppRightProvider = None,
             )
           }
-        case cc.round.ClosedMiningRound.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.round.ClosedMiningRound.TEMPLATE_ID) =>
           tryToDecode(cc.round.ClosedMiningRound.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
@@ -90,7 +91,7 @@ object ScanTables extends AcsTables {
               featuredAppRightProvider = None,
             )
           }
-        case cc.round.IssuingMiningRound.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.round.IssuingMiningRound.TEMPLATE_ID) =>
           tryToDecode(cc.round.IssuingMiningRound.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
@@ -103,7 +104,7 @@ object ScanTables extends AcsTables {
               featuredAppRightProvider = None,
             )
           }
-        case cc.round.SummarizingMiningRound.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.round.SummarizingMiningRound.TEMPLATE_ID) =>
           tryToDecode(cc.round.SummarizingMiningRound.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
@@ -115,7 +116,7 @@ object ScanTables extends AcsTables {
               featuredAppRightProvider = None,
             )
           }
-        case cc.coin.FeaturedAppRight.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.coin.FeaturedAppRight.TEMPLATE_ID) =>
           tryToDecode(cc.coin.FeaturedAppRight.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
@@ -128,7 +129,7 @@ object ScanTables extends AcsTables {
                 Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
             )
           }
-        case cc.coin.Coin.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.coin.Coin.TEMPLATE_ID) =>
           tryToDecode(cc.coin.Coin.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
@@ -140,7 +141,7 @@ object ScanTables extends AcsTables {
               featuredAppRightProvider = None,
             )
           }
-        case cc.coin.LockedCoin.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.coin.LockedCoin.TEMPLATE_ID) =>
           tryToDecode(cc.coin.LockedCoin.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
@@ -153,7 +154,7 @@ object ScanTables extends AcsTables {
               featuredAppRightProvider = None,
             )
           }
-        case cc.coinimport.ImportCrate.TEMPLATE_ID =>
+        case t if t == QualifiedName(cc.coinimport.ImportCrate.TEMPLATE_ID) =>
           tryToDecode(cc.coinimport.ImportCrate.COMPANION, createdEvent) { contract =>
             ScanAcsStoreRowData(
               contract = contract,

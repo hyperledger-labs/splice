@@ -22,7 +22,7 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
 }
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.codegen.java.cn
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
@@ -104,7 +104,8 @@ class SvApp(
   private val cometBftConfig = config.cometBftConfig
     .filter(_.enabled)
 
-  override def packages = super.packages ++ Seq("dar/svc-governance-0.1.0.dar")
+  override def packages =
+    super.packages ++ DarResources.svcGovernance.all
 
   override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
@@ -1258,23 +1259,12 @@ object SvApp {
     } yield ()
   }
 
-  val coinPackage: UploadablePackage = new UploadablePackage {
-    lazy val packageId: String = cc.coin.Coin.COMPANION.TEMPLATE_ID.getPackageId
-
-    // See `Compile / resourceGenerators` in build.sbt
-    lazy val resourcePath: String = "dar/canton-coin-0.1.0.dar"
-  }
-  val svcGovernancePackage: UploadablePackage = new UploadablePackage {
-    lazy val packageId: String = cn.svcrules.SvcRules.COMPANION.TEMPLATE_ID.getPackageId
-    lazy val resourcePath: String = "dar/svc-governance-0.1.0.dar"
-  }
-  val validatorLifecyclePackage: UploadablePackage = new UploadablePackage {
-    lazy val packageId: String =
-      cn.validatoronboarding.ValidatorOnboarding.COMPANION.TEMPLATE_ID.getPackageId
-    lazy val resourcePath: String = "dar/validator-lifecycle-0.1.0.dar"
-  }
-  val directoryPackage: UploadablePackage = new UploadablePackage {
-    lazy val packageId: String = cn.directory.DirectoryInstall.TEMPLATE_ID.getPackageId
-    lazy val resourcePath: String = "dar/directory-service-0.1.0.dar"
-  }
+  val coinPackage: UploadablePackage =
+    UploadablePackage.fromResource(DarResources.cantonCoin.bootstrap)
+  val svcGovernancePackage: UploadablePackage =
+    UploadablePackage.fromResource(DarResources.svcGovernance.bootstrap)
+  val validatorLifecyclePackage: UploadablePackage =
+    UploadablePackage.fromResource(DarResources.validatorLifecycle.bootstrap)
+  val directoryPackage: UploadablePackage =
+    UploadablePackage.fromResource(DarResources.directoryService.bootstrap)
 }

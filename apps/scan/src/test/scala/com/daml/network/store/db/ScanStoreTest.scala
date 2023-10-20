@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCode
 import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, svcrules as svcrulesCodegen}
 import com.daml.network.codegen.java.cn.svc.globaldomain as globaldomainCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.history.{
   CoinExpire,
   CoinRules_BuyMemberTraffic,
@@ -1061,6 +1061,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       svcParty.toProtoPrimitive,
       owner.toProtoPrimitive,
       expiringAmount(amount),
+      Optional.empty(),
     )
   }
 
@@ -1142,11 +1143,9 @@ class DbScanStoreTest
   override protected def mkStore(endUserParty: PartyId): Future[DbScanStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        Seq(
-          "dar/canton-coin-0.1.0.dar",
-          "dar/canton-name-service-0.1.0.dar",
-          "dar/svc-governance-0.1.0.dar",
-        )
+        DarResources.cantonCoin.all ++
+          DarResources.cantonNameService.all ++
+          DarResources.svcGovernance.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)

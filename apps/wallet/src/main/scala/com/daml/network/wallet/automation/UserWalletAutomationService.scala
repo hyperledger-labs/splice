@@ -5,7 +5,7 @@ import com.daml.network.automation.{AssignTrigger, CNNodeAppAutomationService, U
 import UnassignTrigger.GetTargetDomain
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{DarResources, CNLedgerClient, PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.QualifiedName
 import com.daml.network.wallet.store.UserWalletStore
@@ -80,6 +80,6 @@ object UserWalletAutomationService {
     // ImportCrates are created before CoinRules. Given that this is only a hack until we have upgrading
     // we can hardcode this.
     Option.when(template.moduleName == "CC.CoinImport")(
-      com.daml.network.codegen.java.cc.coinimport.ImportCrate.TEMPLATE_ID.getPackageId
+      DarResources.cantonCoin.bootstrap.packageId
     )
 }

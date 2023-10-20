@@ -16,7 +16,6 @@ import com.daml.ledger.javaapi.data.{
   Transaction,
   TransactionTree,
   User,
-  Identifier as LapiIdentifier,
 }
 import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
 import com.daml.network.environment.ledger.api.{
@@ -685,20 +684,20 @@ class CNLedgerConnection(
     client.listPackages().map(_.toSet)
 
   def waitForPackages(
-      requiredTemplates: Set[LapiIdentifier]
+      requiredPackageIds: Set[String]
   )(implicit traceContext: TraceContext): Future[Unit] = {
     import com.daml.network.util.PrettyInstances.*
 
-    if (requiredTemplates.isEmpty) {
+    if (requiredPackageIds.isEmpty) {
       logger.debug("Skipping waiting for required packages to be uploaded, as there are none.")
       Future.unit
     } else
       retryProvider.waitUntil(
-        show"packages for $requiredTemplates are uploaded",
+        show"packages for $requiredPackageIds are uploaded",
         for {
           actual <- (listPackages(): Future[Set[String]])
         } yield {
-          val missing = requiredTemplates.filter(t => !actual.contains(t.getPackageId))
+          val missing = requiredPackageIds.filter(pkgId => !actual.contains(pkgId))
           if (missing.isEmpty) {
             ()
           } else {

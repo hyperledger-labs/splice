@@ -1,7 +1,7 @@
 package com.daml.network.util
 
 import cats.syntax.either.*
-import com.daml.lf.archive.{Dar, DarDecoder}
+import com.daml.lf.archive.{Dar, DarDecoder, DarParser}
 import com.daml.lf.data.Ref.PackageId
 import com.daml.lf.language.Ast.{Package, PackageMetadata}
 
@@ -33,6 +33,18 @@ object DarUtil {
       DarDecoder
         .readArchive(name, zipStream)
         .valueOr(err => throw new IllegalArgumentException(s"Failed to decode dar: $err"))
+    }
+  }
+
+  def readPackageId(resourcePath: String): String =
+    readPackageId(resourcePath, getClass.getClassLoader.getResourceAsStream(resourcePath))
+
+  def readPackageId(name: String, stream: InputStream): String = {
+    Using.resource(new ZipInputStream(stream)) { zipStream =>
+      val dar = DarParser
+        .readArchive(name, zipStream)
+        .valueOr(err => throw new IllegalArgumentException(s"Failed to read dar: $err"))
+      dar.main.getHash
     }
   }
 }

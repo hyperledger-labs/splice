@@ -13,9 +13,6 @@ import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.*
-import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
-import com.daml.network.codegen.java.cn.directory as directoryCodegen
-import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.{CNThresholds, NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
 import com.daml.network.http.v0.app_manager.AppManagerResource
@@ -97,7 +94,7 @@ class ValidatorApp(
     )
     with BasicDirectives {
 
-  override def packages = super.packages ++ Seq("dar/wallet-0.1.0.dar")
+  override def packages = super.packages ++ DarResources.wallet.all
 
   override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
@@ -155,17 +152,8 @@ class ValidatorApp(
   ): Future[Unit] = {
     logger.info(s"Attempting to setup wallet...")
     val darFiles = Seq(
-      new UploadablePackage {
-        lazy val packageId: String =
-          installCodegen.WalletAppInstall.TEMPLATE_ID.getPackageId
-
-        // See `Compile / resourceGenerators` in build.sbt
-        lazy val resourcePath: String = "dar/wallet-0.1.0.dar"
-      },
-      new UploadablePackage {
-        lazy val packageId: String = directoryCodegen.DirectoryInstall.TEMPLATE_ID.getPackageId
-        lazy val resourcePath: String = "dar/directory-service-0.1.0.dar"
-      },
+      UploadablePackage.fromResource(DarResources.wallet.bootstrap),
+      UploadablePackage.fromResource(DarResources.directoryService.bootstrap),
     )
     for {
       _ <- participantAdminConnection.uploadDarFiles(darFiles)
@@ -589,10 +577,7 @@ class ValidatorApp(
 
       appManagerHandlersO <-
         config.appManager.traverse { config =>
-          val dar = new UploadablePackage {
-            lazy val packageId: String = appManagerCodegen.RegisteredApp.TEMPLATE_ID.getPackageId
-            lazy val resourcePath: String = "dar/app-manager-0.1.0.dar"
-          }
+          val dar = UploadablePackage.fromResource(DarResources.appManager.bootstrap)
           for {
             _ <- participantAdminConnection.uploadDarFiles(Seq(dar))
             service = new AppManagerService(
@@ -744,9 +729,6 @@ class ValidatorApp(
     }
 
   override lazy val ports = Map("admin" -> config.adminApi.port)
-
-  // Validator actually uploads packages so no dep.
-  override lazy val requiredTemplates = Set.empty
 }
 
 object ValidatorApp {

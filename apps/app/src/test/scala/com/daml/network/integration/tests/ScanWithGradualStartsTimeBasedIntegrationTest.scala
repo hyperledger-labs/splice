@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.util.TimeTestUtil
+import com.daml.network.util.UpgradeUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -37,15 +38,18 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
     clue("Create an importCrate for alice with the same value as her existing coin") {
       val aliceCoin = aliceValidatorBackend.participantClient.ledger_api_extensions.acs
         .awaitJava(cc.coin.Coin.COMPANION)(aliceUserParty)
-      sv1Backend.participantClient.ledger_api_extensions.commands.submitWithResult(
-        userId = sv1Backend.config.ledgerApiUser,
-        actAs = Seq(svcParty),
-        readAs = Seq.empty,
-        update = new cc.coinimport.ImportCrate(
+      val cmds = UpgradeUtil.downgradeImportCrateCreate(
+        new cc.coinimport.ImportCrate(
           svcParty.toProtoPrimitive,
           aliceUserParty.toProtoPrimitive,
           new cc.coinimport.importpayload.IP_Coin(aliceCoin.data),
-        ).create,
+        )
+      )
+      sv1Backend.participantClient.ledger_api_extensions.commands.submitJava(
+        applicationId = sv1Backend.config.ledgerApiUser,
+        actAs = Seq(svcParty),
+        commands = cmds,
+        optTimeout = None,
       )
     }
 

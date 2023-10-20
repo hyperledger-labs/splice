@@ -10,7 +10,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{CNLedgerClient, DarResources, PackageIdResolver, RetryProvider}
 import com.daml.network.util.QualifiedName
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
@@ -115,6 +115,6 @@ class SplitwellAutomationService(
 object SplitwellAutomationService {
   private[automation] def extraPackageIdResolver(template: QualifiedName): Option[String] =
     Option.when(template.moduleName == "CN.Splitwell")(
-      com.daml.network.codegen.java.cn.splitwell.SplitwellRules.TEMPLATE_ID.getPackageId
+      DarResources.splitwell.bootstrap.packageId
     )
 }

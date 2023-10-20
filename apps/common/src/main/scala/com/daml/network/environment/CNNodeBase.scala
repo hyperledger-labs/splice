@@ -71,7 +71,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
 
   protected def isInitialized = isInitializedVar.get()
 
-  protected def packages = Seq("dar/canton-coin-0.1.0.dar")
+  protected def packages = DarResources.cantonCoin.all
 
   lazy private val packageSignatures = {
     ResourceTemplateDecoder.loadPackageSignaturesFromResources(packages)

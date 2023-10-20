@@ -4,7 +4,7 @@ import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.store.db.AcsTables
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, QualifiedName}
 
 object SvTables extends AcsTables {
 
@@ -17,8 +17,9 @@ object SvTables extends AcsTables {
 
   object SvAcsStoreRowData {
     def fromCreatedEvent(createdEvent: CreatedEvent): Either[String, SvAcsStoreRowData] = {
-      createdEvent.getTemplateId match {
-        case vo.ValidatorOnboarding.TEMPLATE_ID =>
+      // TODO(#8125) Switch to map lookups instead
+      QualifiedName(createdEvent.getTemplateId) match {
+        case t if t == QualifiedName(vo.ValidatorOnboarding.TEMPLATE_ID) =>
           tryToDecode(vo.ValidatorOnboarding.COMPANION, createdEvent) { contract =>
             SvAcsStoreRowData(
               contract,
@@ -27,7 +28,7 @@ object SvTables extends AcsTables {
               svCandidateName = None,
             )
           }
-        case vo.UsedSecret.TEMPLATE_ID =>
+        case t if t == QualifiedName(vo.UsedSecret.TEMPLATE_ID) =>
           tryToDecode(vo.UsedSecret.COMPANION, createdEvent) { contract =>
             SvAcsStoreRowData(
               contract,
@@ -36,7 +37,7 @@ object SvTables extends AcsTables {
               svCandidateName = None,
             )
           }
-        case so.ApprovedSvIdentity.TEMPLATE_ID =>
+        case t if t == QualifiedName(so.ApprovedSvIdentity.TEMPLATE_ID) =>
           tryToDecode(so.ApprovedSvIdentity.COMPANION, createdEvent) { contract =>
             SvAcsStoreRowData(
               contract,
@@ -45,7 +46,7 @@ object SvTables extends AcsTables {
               svCandidateName = Some(contract.payload.candidateName),
             )
           }
-        case so.SvOnboardingConfirmed.TEMPLATE_ID =>
+        case t if t == QualifiedName(so.SvOnboardingConfirmed.TEMPLATE_ID) =>
           tryToDecode(so.SvOnboardingConfirmed.COMPANION, createdEvent) { contract =>
             SvAcsStoreRowData(
               contract,

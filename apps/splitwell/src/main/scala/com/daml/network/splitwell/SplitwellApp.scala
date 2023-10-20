@@ -16,6 +16,7 @@ import com.daml.network.environment.{
   CNLedgerConnection,
   CNNode,
   CNNodeStatus,
+  DarResources,
   ParticipantAdminConnection,
 }
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
@@ -194,7 +195,7 @@ class SplitwellApp(
       case QueryResult(_, Some(_)) => Future.unit
     }
 
-  override lazy val requiredTemplates = Set(splitwellCodegen.SplitwellInstall.TEMPLATE_ID)
+  override lazy val requiredPackageIds = Set(DarResources.splitwell.bootstrap.packageId)
 }
 
 object SplitwellApp {

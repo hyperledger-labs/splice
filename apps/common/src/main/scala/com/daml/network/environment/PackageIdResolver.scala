@@ -100,6 +100,38 @@ object PackageIdResolver {
         )
     }
 
+  /** Package id resolver for direct command submissions in tests.
+    * This statically picks a package id.
+    */
+  def staticTesting(implicit ec: ExecutionContext): PackageIdResolver =
+    new PackageIdResolver {
+      override def resolvePackageId(
+          templateId: QualifiedName
+      )(implicit tc: TraceContext): Future[String] =
+        Future {
+          resolvePackageResource(templateId).bootstrap.packageId
+        }
+
+      def resolvePackageResource(templateId: QualifiedName): PackageResource =
+        modulePackages.get(templateId.moduleName) match {
+          case None =>
+            templateId.moduleName match {
+              case "CN.Splitwell" => DarResources.splitwell
+              case _ => throw new IllegalArgumentException(s"Unknown template $templateId")
+            }
+          case Some(pkg) =>
+            pkg match {
+              case Package.CantonCoin => DarResources.cantonCoin
+              case Package.CantonNameService => DarResources.cantonNameService
+              case Package.DirectoryService => DarResources.directoryService
+              case Package.SvcGovernance => DarResources.svcGovernance
+              case Package.ValidatorLifecycle => DarResources.validatorLifecycle
+              case Package.Wallet => DarResources.wallet
+              case Package.WalletPayments => DarResources.walletPayments
+            }
+        }
+    }
+
   /** Infer the package ids based on the current config in CoinRules.
     * Templates not covered by CoinRules can be specified in `extraPackageIdResolver`
     * which takes precedence over CoinRules.
@@ -196,6 +228,7 @@ object PackageIdResolver {
   // Map from module name to package containing that module
   private val modulePackages: Map[String, Package] = Map(
     "CC.Coin" -> Package.CantonCoin,
+    "CC.CoinImport" -> Package.CantonCoin,
     "CC.GlobalDomain" -> Package.CantonCoin,
     "CC.ValidatorLicense" -> Package.CantonCoin,
     "CC.Round" -> Package.CantonCoin,
@@ -203,6 +236,7 @@ object PackageIdResolver {
     "CN.Directory" -> Package.DirectoryService,
     "CN.SvcBootstrap" -> Package.SvcGovernance,
     "CN.SvcRules" -> Package.SvcGovernance,
+    "CN.SVC.CoinPrice" -> Package.SvcGovernance,
     "CN.SvOnboarding" -> Package.SvcGovernance,
     "CN.ValidatorOnboarding" -> Package.ValidatorLifecycle,
     "CN.Wallet.Install" -> Package.Wallet,

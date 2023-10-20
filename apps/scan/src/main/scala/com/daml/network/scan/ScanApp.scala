@@ -7,9 +7,15 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
-import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus, PackageIdResolver}
+import com.daml.network.environment.{
+  CNLedgerClient,
+  CNNode,
+  CNNodeStatus,
+  DarResources,
+  PackageIdResolver,
+}
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.admin.http.HttpScanHandler
@@ -64,7 +70,7 @@ class ScanApp(
     ) {
 
   override def packages =
-    super.packages ++ Seq("dar/canton-name-service-0.1.0.dar", "dar/svc-governance-0.1.0.dar")
+    super.packages ++ DarResources.cantonNameService.all ++ DarResources.svcGovernance.all
 
   override def initialize(
       ledgerClient: CNLedgerClient,
@@ -167,7 +173,7 @@ class ScanApp(
   }
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
-  override lazy val requiredTemplates = Set(coinCodegen.Coin.TEMPLATE_ID)
+  override lazy val requiredPackageIds = Set(DarResources.cantonCoin.bootstrap.packageId)
 }
 
 object ScanApp {

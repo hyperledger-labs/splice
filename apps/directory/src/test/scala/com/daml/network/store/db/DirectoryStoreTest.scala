@@ -20,7 +20,7 @@ import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.directory.store.DirectoryStore.IdleDirectorySubscription
 import com.daml.network.directory.store.db.DbDirectoryStore
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.StoreTest
 import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
@@ -319,10 +319,8 @@ class DbDirectoryStoreTest
   override protected def mkStore(): Future[DbDirectoryStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        Seq(
-          "dar/canton-coin-0.1.0.dar",
-          "dar/directory-service-0.1.0.dar",
-        )
+        DarResources.cantonCoin.all ++
+          DarResources.directoryService.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)

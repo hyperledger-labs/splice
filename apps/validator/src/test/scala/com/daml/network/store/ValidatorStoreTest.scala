@@ -12,7 +12,7 @@ import java.time.Instant
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, CNPostgresTest}
 import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
@@ -586,11 +586,9 @@ class DbValidatorStoreTest
   override protected def mkStore(): Future[DbValidatorStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        Seq(
-          "dar/canton-coin-0.1.0.dar",
-          "dar/wallet-0.1.0.dar",
-          "dar/app-manager-0.1.0.dar",
-        )
+        DarResources.cantonCoin.all ++
+          DarResources.wallet.all ++
+          DarResources.appManager.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)

@@ -9,7 +9,8 @@ object CantonDependencies {
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
   val daml_libraries_version = version
   val daml_compiler_version = version
-  val daml_java_codegen_version = version
+  // TODO(#8069) Revert this back to daml_libraries_version.
+  val daml_java_codegen_version = "2.8.0-snapshot.20231016.12209.0.v28eadc6e"
   val use_custom_daml_version = false
 
   lazy val osClassifier: String =

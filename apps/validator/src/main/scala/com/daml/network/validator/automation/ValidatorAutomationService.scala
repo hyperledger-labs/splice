@@ -11,6 +11,7 @@ import TransferFollowTrigger.Task as FollowTask
 import com.daml.network.config.{AutomationConfig, BackupDumpConfig}
 import com.daml.network.environment.{
   CNLedgerClient,
+  DarResources,
   PackageIdResolver,
   ParticipantAdminConnection,
   RetryProvider,
@@ -144,14 +145,10 @@ object ValidatorAutomationService {
   private[automation] def extraPackageIdResolver(template: QualifiedName): Option[String] =
     template.moduleName match {
       // App manager storage is participant local so we can freely choose the package id.
-      case "CN.AppManager.Store" =>
-        Some(
-          com.daml.network.codegen.java.cn.appmanager.store.AppConfiguration.TEMPLATE_ID.getPackageId
-        )
+      case "CN.AppManager.Store" => Some(DarResources.appManager.bootstrap.packageId)
       // ImportCrates are created before CoinRules. Given that this is only a hack until we have upgrading
       // we can hardcode this.
-      case "CC.CoinImport" =>
-        Some(com.daml.network.codegen.java.cc.coinimport.ImportCrate.TEMPLATE_ID.getPackageId)
+      case "CC.CoinImport" => Some(DarResources.cantonCoin.bootstrap.packageId)
       case _ => None
     }
 }

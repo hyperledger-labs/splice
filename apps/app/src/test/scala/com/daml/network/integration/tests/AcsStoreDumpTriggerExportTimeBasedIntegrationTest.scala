@@ -1,9 +1,10 @@
 package com.daml.network.integration.tests
 
+import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.{BackupDumpConfig, CNNodeConfigTransforms, GcpBucketConfig}
-import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.environment.{CNNodeEnvironmentImpl, DarResources}
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -18,6 +19,7 @@ import com.daml.network.util.{
   ResourceTemplateDecoder,
   TemplateJsonDecoder,
   TimeTestUtil,
+  UpgradeUtil,
   WalletTestUtil,
 }
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -35,7 +37,9 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
 
   private val packageSignatures = {
     // Note: the directory-service.dar suffices as it transitively references canton-coin.dar as well.
-    ResourceTemplateDecoder.loadPackageSignaturesFromResource("dar/directory-service-0.1.0.dar")
+    ResourceTemplateDecoder.loadPackageSignaturesFromResources(
+      DarResources.directoryService.all
+    )
   }
   implicit val templateJsonDecoder: TemplateJsonDecoder =
     new ResourceTemplateDecoder(packageSignatures, loggerFactory)
@@ -110,17 +114,20 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
         .awaitJava(cc.coin.Coin.COMPANION)(
           charlieUserParty
         )
-      val created = sv1Backend.participantClient.ledger_api_extensions.commands.submitWithResult(
-        userId = sv1Backend.config.ledgerApiUser,
+      val tx = sv1Backend.participantClient.ledger_api_extensions.commands.submitJava(
+        applicationId = sv1Backend.config.ledgerApiUser,
         actAs = Seq(svcParty),
         readAs = Seq.empty,
-        update = new cc.coinimport.ImportCrate(
-          svcParty.toProtoPrimitive,
-          charlieUserParty.toProtoPrimitive,
-          new cc.coinimport.importpayload.IP_Coin(charlieCoin.data),
-        ).create,
+        commands = UpgradeUtil.downgradeImportCrateCreate(
+          new cc.coinimport.ImportCrate(
+            svcParty.toProtoPrimitive,
+            charlieUserParty.toProtoPrimitive,
+            new cc.coinimport.importpayload.IP_Coin(charlieCoin.data),
+          )
+        ),
+        optTimeout = None,
       )
-      created.contractId.contractId
+      tx.getEventsById.get(tx.getRootEventIds.get(0)).asInstanceOf[CreatedEvent].getContractId
     }
 
     val aliceUnlockedIds = aliceValidatorBackend.participantClient.ledger_api_extensions.acs

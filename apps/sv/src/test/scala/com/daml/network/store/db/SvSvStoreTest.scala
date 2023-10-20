@@ -4,7 +4,7 @@ import com.daml.ledger.javaapi.data.ContractMetadata
 import com.daml.network.codegen.java.cn.svonboarding.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.codegen.java.cn.validatoronboarding.UsedSecret
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.StoreTest
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
@@ -198,11 +198,9 @@ class DbSvSvStoreTest
   override protected def mkStore(): Future[DbSvSvStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        Seq(
-          "dar/canton-coin-0.1.0.dar",
-          "dar/validator-lifecycle-0.1.0.dar",
-          "dar/svc-governance-0.1.0.dar",
-        )
+        DarResources.cantonCoin.all ++
+          DarResources.validatorLifecycle.all ++
+          DarResources.svcGovernance.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)

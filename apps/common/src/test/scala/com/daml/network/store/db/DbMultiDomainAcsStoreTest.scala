@@ -4,7 +4,7 @@ import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
 import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.store.{MultiDomainAcsStoreTest, StoreTest}
@@ -55,7 +55,7 @@ class DbMultiDomainAcsStoreTest
 
   override def mkStore(id: Int) = {
     val packageSignatures =
-      ResourceTemplateDecoder.loadPackageSignaturesFromResource("dar/canton-coin-0.1.0.dar")
+      ResourceTemplateDecoder.loadPackageSignaturesFromResources(DarResources.cantonCoin.all)
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 

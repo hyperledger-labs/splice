@@ -16,7 +16,7 @@ import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.codegen.java.da.set.types.Set as DamlSet
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.{CNLedgerConnection, DarResource, DarResources, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
@@ -32,18 +32,18 @@ import scala.jdk.CollectionConverters.*
 
 object CNNodeUtil {
 
-  private def readDarVersion(resourcePath: String): String =
-    DarUtil.readDarMetadata(resourcePath).version
+  private def readDarVersion(resource: DarResource): String =
+    DarUtil.readDarMetadata(resource.path).version
 
   private def readPackageConfig(): cc.coinconfig.PackageConfig = {
     new cc.coinconfig.PackageConfig(
-      readDarVersion("dar/canton-coin-0.1.0.dar"),
-      readDarVersion("dar/canton-name-service-0.1.0.dar"),
-      readDarVersion("dar/directory-service-0.1.0.dar"),
-      readDarVersion("dar/svc-governance-0.1.0.dar"),
-      readDarVersion("dar/validator-lifecycle-0.1.0.dar"),
-      readDarVersion("dar/wallet-0.1.0.dar"),
-      readDarVersion("dar/wallet-payments-0.1.0.dar"),
+      readDarVersion(DarResources.cantonCoin.bootstrap),
+      readDarVersion(DarResources.cantonNameService.bootstrap),
+      readDarVersion(DarResources.directoryService.bootstrap),
+      readDarVersion(DarResources.svcGovernance.bootstrap),
+      readDarVersion(DarResources.validatorLifecycle.bootstrap),
+      readDarVersion(DarResources.wallet.bootstrap),
+      readDarVersion(DarResources.walletPayments.bootstrap),
     )
   }
 

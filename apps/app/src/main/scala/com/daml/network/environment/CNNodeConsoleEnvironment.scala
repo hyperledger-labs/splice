@@ -41,14 +41,12 @@ class CNNodeConsoleEnvironment(
     {
 
   val packageSignatures = ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-    Seq(
-      "dar/directory-service-0.1.0.dar",
-      "dar/splitwell-0.1.0.dar",
-      "dar/validator-lifecycle-0.1.0.dar",
-      "dar/wallet-0.1.0.dar",
-      "dar/canton-coin-0.1.0.dar",
-      "dar/svc-governance-0.1.0.dar",
-    )
+    DarResources.directoryService.all ++
+      DarResources.splitwell.all ++
+      DarResources.validatorLifecycle.all ++
+      DarResources.wallet.all ++
+      DarResources.cantonCoin.all ++
+      DarResources.svcGovernance.all
   )
   implicit val actorSystem = environment.actorSystem
   val templateDecoder = new ResourceTemplateDecoder(packageSignatures, environment.loggerFactory)
