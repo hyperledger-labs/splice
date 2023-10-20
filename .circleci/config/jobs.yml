@@ -437,7 +437,7 @@ jobs:
                     cncluster wait sv-3 validator-app
                     cncluster wait sv-4 validator-app
                   fi
-                  if [[ << parameters.wait_for_sv >> == true && ( "${APPROVE_SV_RUNBOOK-}" = true || "${IS_DEVNET-}" = true ) ]]; then
+                  if [[ << parameters.wait_for_sv >> == true && ( "${APPROVE_SV_RUNBOOK-}" = true || "${IS_DEVNET-}" != false ) ]]; then
                     cncluster wait sv validator-app
                   fi
                   echo "Done waiting. All pods in the cluster are:"
