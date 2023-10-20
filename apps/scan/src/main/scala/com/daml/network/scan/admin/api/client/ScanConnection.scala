@@ -20,6 +20,7 @@ import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.store.AcsStoreDump
 import com.daml.network.util.{
   CNNodeUtil,
+  CoinConfigSchedule,
   Contract,
   ContractWithState,
   DisclosedContracts,
@@ -60,6 +61,8 @@ final class ScanConnection private (
 
   // register the callback to potentially invalidate the CoinRules cache.
   coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedCoinRulesCache)
+  // and the rounds cache
+  coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedRoundsCache)
 
   override def serviceName: String = "scan"
 
@@ -78,6 +81,16 @@ final class ScanConnection private (
         coinRulesCache.set(None)
       case _ => ()
     }
+
+  private def signalPossiblyOutdatedRoundsCache(inactiveContract: String): Unit = {
+    val rounds = cachedRounds.get()
+    if (rounds containsContractId inactiveContract) {
+      logger.debug(
+        show"Invalidating the rounds cache at ${rounds.describeRounds}"
+      )(TraceContext.empty)
+      cachedRounds.set(CachedMiningRounds())
+    } else ()
+  }
 
   // cached SVC reference.
   private val svcRef: AtomicReference[Option[PartyId]] = new AtomicReference(None)
@@ -134,7 +147,7 @@ final class ScanConnection private (
   ): Future[ContractWithState[CoinRules.ContractId, CoinRules]] = {
     val now = clock.now
     coinRulesCache.get() match {
-      case Some(CachedCoinRules(cacheValidUntil, coinRules)) if now.isBefore(cacheValidUntil) =>
+      case Some(ccr @ CachedCoinRules(_, coinRules)) if ccr validAsOf now =>
         Future.successful(coinRules)
       case cacheO =>
         // Note that here and at other caches in this class, multiple concurrent cache misses result in multiple
@@ -205,37 +218,36 @@ final class ScanConnection private (
   ] = {
     val now = clock.now
     val cache = cachedRounds.get()
-    if (cache.cacheValidUntil.exists(validUntil => now.isBefore(validUntil))) {
-      val rounds = cache.getRoundTuple
-      logger.info(
-        s"Using the client-cache (validUntil ${cache.cacheValidUntil}) to load following issuing rounds: ${rounds._1
-            .map(_.payload.round.number)}, and following open rounds: ${rounds._2
-            .map(_.payload.round.number)}."
-      )
-      Future.successful(rounds)
-    } else {
-      logger.debug(
-        s"querying the scan app for the latest round information because the cache expired at ${cache.cacheValidUntil}"
-      )
-      for {
-        (openRounds, issuingRounds, ttlInMicros) <- runHttpCmd(
-          config.adminApi.url,
-          HttpScanAppClient.GetSortedOpenAndIssuingMiningRounds(
-            cache.sortedOpenMiningRounds,
-            cache.sortedIssuingMiningRounds,
-          ),
+    getCoinRules().flatMap { coinRules =>
+      if (cache.validAsOf(now, coinRules)) {
+        logger.info(
+          s"Using the client-cache (validUntil ${cache.cacheValidUntil}) to load ${cache.describeRounds}."
         )
+        Future.successful(cache.getRoundTuple)
+      } else {
+        logger.debug(
+          s"querying the scan app for the latest round information because the cache expired at ${cache.cacheValidUntil}"
+        )
+        for {
+          (openRounds, issuingRounds, ttlInMicros) <- runHttpCmd(
+            config.adminApi.url,
+            HttpScanAppClient.GetSortedOpenAndIssuingMiningRounds(
+              cache.sortedOpenMiningRounds,
+              cache.sortedIssuingMiningRounds,
+            ),
+          )
 
-      } yield {
-        val newValidUntil = now.add(Duration.ofNanos(ttlInMicros.longValue * 1000))
-        val newRoundsCache = CachedMiningRounds(
-          Some(newValidUntil),
-          openRounds,
-          issuingRounds,
-        )
-        logger.info(s"New rounds-cache is $newRoundsCache.")
-        cachedRounds.set(newRoundsCache)
-        cachedRounds.get().getRoundTuple
+        } yield {
+          val newValidUntil = now.add(Duration.ofNanos(ttlInMicros.longValue * 1000))
+          val newRoundsCache = CachedMiningRounds(
+            Some(newValidUntil),
+            openRounds,
+            issuingRounds,
+          )
+          logger.info(s"New rounds-cache is $newRoundsCache.")
+          cachedRounds.set(newRoundsCache)
+          cachedRounds.get().getRoundTuple
+        }
       }
     }
   }
@@ -358,7 +370,17 @@ object ScanConnection {
   private case class CachedCoinRules(
       cacheValidUntil: CantonTimestamp,
       coinRules: ContractWithState[CoinRules.ContractId, CoinRules],
-  ) {}
+  ) {
+    def validAsOf(now: CantonTimestamp): Boolean =
+      now.isBefore(cacheValidUntil) && coinRules.state.fold(
+        assignment =>
+          CoinConfigSchedule(coinRules)
+            .getConfigAsOf(now)
+            .globalDomain
+            .activeDomain == assignment.toProtoPrimitive,
+        false,
+      )
+  }
 
   private case class CachedMiningRounds(
       cacheValidUntil: Option[CantonTimestamp] = None,
@@ -368,11 +390,34 @@ object ScanConnection {
         ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]
       ] = Seq(),
   ) {
+    def validAsOf(now: CantonTimestamp, coinRules: ContractWithState[?, CoinRules]): Boolean =
+      cacheValidUntil.exists(validUntil => now.isBefore(validUntil)) && {
+        val states = (sortedOpenMiningRounds.view ++ sortedIssuingMiningRounds).map(_.state).toSet
+        states.sizeIs <= 1 && states.forall(
+          _.fold(
+            assignment =>
+              CoinConfigSchedule(coinRules)
+                .getConfigAsOf(now)
+                .globalDomain
+                .activeDomain == assignment.toProtoPrimitive,
+            false,
+          )
+        )
+      }
+
     def getRoundTuple: (
         Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
         Seq[ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]],
     ) =
       (sortedOpenMiningRounds, sortedIssuingMiningRounds)
+
+    def containsContractId(contractId: String): Boolean =
+      (sortedOpenMiningRounds.view ++ sortedIssuingMiningRounds).exists { c =>
+        (c.contractId.contractId: String) == contractId
+      }
+
+    def describeRounds = s"following issuing rounds: ${sortedIssuingMiningRounds
+        .map(_.payload.round.number)}, and following open rounds: ${sortedOpenMiningRounds.map(_.payload.round.number)}"
   }
 
   type GetCoinRulesDomain = () => TraceContext => Future[DomainId]

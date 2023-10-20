@@ -14,6 +14,7 @@ import com.daml.network.config.CNNodeConfigTransforms.updateAllAutomationConfigs
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.util.{
   AssignedContract,
+  Contract,
   CoinConfigSchedule,
   ConfigScheduleUtil,
   ContractWithState,
@@ -30,22 +31,35 @@ import scala.jdk.CollectionConverters.*
 class GlobalDomainUpgradeTimeBasedIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
     with ConfigScheduleUtil {
+  private val appManagerDarPath = "daml/app-manager/.daml/dist/app-manager-0.1.0.dar"
+
   override def environmentDefinition =
-    super.environmentDefinition.addConfigTransforms { (_, config) =>
-      updateAllAutomationConfigs(c =>
-        c.copy(
-          // Need to disable triggers so workflows stay open
-          enableSvcGovernance = false,
-          enableClosedRoundArchival = false,
-          enableSvRewards = false,
-        )
-      )(config)
-    }
+    super.environmentDefinition
+      .addConfigTransforms { (_, config) =>
+        updateAllAutomationConfigs(c =>
+          c.copy(
+            // Need to disable triggers so workflows stay open
+            enableSvcGovernance = false,
+            enableClosedRoundArchival = false,
+            enableSvRewards = false,
+          )
+        )(config)
+      }
+      .withAdditionalSetup { implicit env =>
+        // without this addition:
+        //  com.digitalasset.canton.console.CommandFailure: Command execution
+        //      failed. Request failed for remote participant for `sv1`, with admin token.
+        //  GrpcRequestRefusedByServer: NOT_FOUND/PACKAGE_NOT_FOUND(11,e47bfb78):
+        //      Couldn't find package 07537a7db6... while looking for template
+        //      or interface 07537a7d...:CN.AppManager.Store:AppRelease
+        sv1Backend.participantClient.upload_dar_unless_exists(appManagerDarPath)
+      }
 
   private[this] val globalUpgradeDomain = DomainAlias.tryCreate("global-upgrade")
 
   "scheduled global domain upgrade happens" in { implicit env =>
     initSvcWithSv1Only() withClue "spin up Svc"
+    onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
 
     val timeUntilNewRule = defaultTickDuration
     val timeToWaitForNewRule = tickDurationWithBuffer
@@ -90,13 +104,21 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       }
     }
 
+    clue("trigger CoinRules cache invalidation right after config change") {
+      eventually() {
+        try sv1WalletClient.tap(1)
+        catch {
+          case e: com.digitalasset.canton.console.CommandFailure => fail(e)
+        }
+      }
+    }
+
     val svcRulesCid = sv1Backend.getSvcInfo().svcRules.contractId
 
     def nonEmptyOnSv1[
-        TC <: CodegenContract[TCid, T],
         TCid <: ContractId[T],
         T <: Template,
-    ](companion: TemplateCompanion[TC, TCid, T]) =
+    ](companion: Contract.Companion.Template[TCid, T]) =
       sv1Backend.participantClient.ledger_api_extensions.acs
         .filterJava(companion)(svcParty)
         .nonEmpty
@@ -270,6 +292,70 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       )("ensure UnclaimedReward is there", _ => nonEmptyOnSv1(cc.coin.UnclaimedReward.COMPANION))
     }
 
+    def createSampleAndEnsurePresence[
+        TCid <: ContractId[T],
+        T <: Template,
+    ](companion: Contract.Companion.Template[TCid, T])(payload: T) =
+      actAndCheck(
+        s"create sample ${companion.TEMPLATE_ID.getEntityName}",
+        exerciseSvc(payload.create()),
+      )(s"ensure ${companion.TEMPLATE_ID.getEntityName} is there", _ => nonEmptyOnSv1(companion))
+
+    clue("create app-manager contracts of various kinds") {
+      import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
+      import com.daml.network.http.v0.definitions as httpdefs
+      import io.circe.syntax.*
+      val validator = sv1ValidatorBackend.getValidatorPartyId()
+      val provider = validator
+      val version = "0"
+
+      createSampleAndEnsurePresence(appManagerCodegen.AppRelease.COMPANION)(
+        new appManagerCodegen.AppRelease(
+          validator.toProtoPrimitive,
+          provider.toProtoPrimitive,
+          version,
+          httpdefs.AppRelease(version, Vector.empty).asJson.noSpaces,
+        )
+      )
+
+      createSampleAndEnsurePresence(appManagerCodegen.AppConfiguration.COMPANION)(
+        new appManagerCodegen.AppConfiguration(
+          validator.toProtoPrimitive,
+          provider.toProtoPrimitive,
+          0,
+          httpdefs
+            .AppConfiguration(0, "foo", "urn:example.com", Vector.empty, Vector.empty)
+            .asJson
+            .noSpaces,
+        )
+      )
+
+      createSampleAndEnsurePresence(appManagerCodegen.RegisteredApp.COMPANION)(
+        new appManagerCodegen.RegisteredApp(
+          validator.toProtoPrimitive,
+          provider.toProtoPrimitive,
+        )
+      )
+
+      createSampleAndEnsurePresence(appManagerCodegen.InstalledApp.COMPANION)(
+        new appManagerCodegen.InstalledApp(
+          validator.toProtoPrimitive,
+          provider.toProtoPrimitive,
+          "https://example.com",
+        )
+      )
+
+      createSampleAndEnsurePresence(appManagerCodegen.ApprovedReleaseConfiguration.COMPANION)(
+        new appManagerCodegen.ApprovedReleaseConfiguration(
+          validator.toProtoPrimitive,
+          provider.toProtoPrimitive,
+          0,
+          httpdefs.ReleaseConfiguration(Vector.empty, version, httpdefs.Timespan()).asJson.noSpaces,
+          "00000000",
+        )
+      )
+    }
+
     advanceTime(timeToWaitForNewRule) withClue "advance time"
 
     clue("see whether the svcrules moves") {
@@ -351,8 +437,24 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       )
     }
 
+    clue(
+      "wait for scan to yield transferred CoinRules. "
+        + "This does not mean the cache was invalidated, though"
+    ) {
+      eventually() {
+        sv1ScanBackend.getCoinRules().state shouldBe Assigned(globalUpgradeId)
+      }
+    }
+
+    // TODO (#8135) tap here instead to check improved cache invalidation
+
+    clue("see whether coin/wallet contracts signed by validator follow coinrules") {
+      val sv1ValidatorParty = sv1ValidatorBackend.getValidatorPartyId()
+      import com.daml.network.validator.store.ValidatorStore.templatesMovedByMyAutomation as templatesMovedByValidatorAutomation
+      allContractsMigrated(templatesMovedByValidatorAutomation map (c(_, sv1ValidatorParty)): _*)
+    }
+
   // check scan for other contracts' transfer:
-  // TODO (#7468) check coin and wallet contracts
   // TODO (#5959) check directory contracts
   }
 

@@ -26,14 +26,7 @@ case class CoinConfigSchedule(
 object CoinConfigSchedule {
 
   /** Convenience constructor to get a CoinRules' config schedule. */
-  def apply(
-      cr: AssignedContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
-  ): CoinConfigSchedule =
-    CoinConfigSchedule(cr.payload)
-
-  def apply(
-      cr: ContractWithState[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
-  ): CoinConfigSchedule =
+  def apply(cr: Contract.Has[?, cc.coin.CoinRules]): CoinConfigSchedule =
     CoinConfigSchedule(cr.payload)
 
   def apply(

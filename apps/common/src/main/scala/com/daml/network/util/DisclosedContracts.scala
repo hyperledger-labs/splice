@@ -40,6 +40,7 @@ sealed abstract class DisclosedContracts {
     this match {
       case Empty | NE(_, `domainId`) => this
       case NE(contracts, otherDomainId) =>
+        // TODO (#8135) invalidate contracts
         retryableError(
           show"disclosed contracts are not on expected domain $domainId, but on $otherDomainId: $contracts"
         )
@@ -56,6 +57,7 @@ object DisclosedContracts {
       case Singleton(ContractState.Assigned(onlyDomain)) =>
         NE(contracts.map(_.contract), onlyDomain)
       case variousStates =>
+        // TODO (#8135) invalidate contracts
         retryableError(
           show"contracts must be assigned to a single domain to be disclosed, not $variousStates: $contracts"
         )
@@ -92,7 +94,7 @@ object DisclosedContracts {
         case _ => true
       }
       if (inOtherStates.isEmpty) NE(contracts ++ other.map(_.contract), assignedDomain)
-      else
+      else // TODO (#8135) invalidate contracts and other
         retryableError(
           show"contracts must match the domain of other disclosed contracts, $assignedDomain, to be disclosed: $other"
         )

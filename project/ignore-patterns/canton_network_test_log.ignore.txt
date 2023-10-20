@@ -56,6 +56,8 @@ Invalid Status code=405 text=Method Not Allowed","logger_name":"o.o.s.remote.htt
 # TODO(#7696) revisit after migration of tests to vitest
 Trying to re-register template.*
 
+# TODO (#8140) remove when trigger detects reassignment properly
+Unexpected duplicate on-boarding of wallet end-user
 
 # Ignoring console.warn
 .*Auth0 login error.*
