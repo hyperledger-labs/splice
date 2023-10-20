@@ -183,13 +183,13 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                       'global-domain::1220af85fa0c58e7f551de289be22793993ce7672cb0751afa2f2de397ce4a695677',
                     fees: {
                       baseRateTrafficLimits: {
-                        rate: '3333.0',
+                        burstAmount: '2000000',
                         burstWindow: {
                           microseconds: '600000000',
                         },
                       },
                       extraTrafficPrice: '1.0',
-                      readScalingFactor: '0.02',
+                      readVsWriteScalingFactor: '200',
                       minTopupAmount: '1000',
                     },
                   },

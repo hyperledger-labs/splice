@@ -141,7 +141,7 @@ defaultIssuanceCurve =
 defaultBaseRateTrafficLimits : BaseRateTrafficLimits
 defaultBaseRateTrafficLimits = BaseRateTrafficLimits with
     -- 10txs of 20kB each within 10 minutes
-    rate = 333.0
+    burstAmount = 10 * 20 * 1000
     burstWindow = minutes 10
 
 defaultDomainFeesConfig : DomainFeesConfig
@@ -149,4 +149,4 @@ defaultDomainFeesConfig = DomainFeesConfig with
     baseRateTrafficLimits = defaultBaseRateTrafficLimits
     minTopupAmount = 1_000_000 -- 1MB
     extraTrafficPrice = 1.0
-    readScalingFactor = 0.02 -- charge 2% of write cost for every read
+    readVsWriteScalingFactor = 200 -- charge 200 per 10,000, i.e., 2% of write cost for every read

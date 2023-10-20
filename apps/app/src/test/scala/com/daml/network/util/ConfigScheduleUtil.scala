@@ -52,7 +52,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
       tickDuration,
       maxNumInputs,
       DomainId.tryFromString(activeDomainId),
-      trafficControlConfig.baseRate.value,
+      trafficControlConfig.baseRateBurstAmount.value,
       trafficControlConfig.baseRateBurstWindow,
       trafficControlConfig.readVsWriteScalingFactor.value,
       holdingFee,

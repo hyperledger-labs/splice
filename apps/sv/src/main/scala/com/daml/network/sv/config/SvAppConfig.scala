@@ -13,7 +13,11 @@ import com.daml.network.config.{
 }
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeNumeric, PositiveNumeric}
+import com.digitalasset.canton.config.RequireTypes.{
+  NonNegativeLong,
+  NonNegativeNumeric,
+  PositiveNumeric,
+}
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 
@@ -96,12 +100,11 @@ final case class InitialCnsConfig(
 )
 
 final case class TrafficControlConfig(
-    baseRate: NonNegativeNumeric[BigDecimal] = NonNegativeNumeric.tryCreate(
-      BigDecimal(3333.0)
-    ), // 100 txs of 20KB each (over the burst window)
+    baseRateBurstAmount: NonNegativeLong =
+      NonNegativeLong.tryCreate(100 * 20 * 1000L), // 100 txs of 20KB each (over the burst window)
     baseRateBurstWindow: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
-    readVsWriteScalingFactor: PositiveNumeric[BigDecimal] =
-      PositiveNumeric.tryCreate(BigDecimal(0.02)), // charge 2% of write cost for every read
+    readVsWriteScalingFactor: PositiveNumeric[Int] =
+      PositiveNumeric.tryCreate(200), // charge 200 per 10,000, i.e., 2% of write cost for every read
 )
 
 final case class SvGlobalDomainConfig(

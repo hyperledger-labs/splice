@@ -189,9 +189,9 @@ object CNNodeUtil {
 
   // These are dummy values only made use of by some unit tests.
   // The traffic control parameters are provided in the founding SV App config with the defaults in TrafficControlConfig
-  private val dummyBaseRate = BigDecimal(3333.0)
+  private val dummyBaseRateBurstAmount = 10 * 20 * 1000L
   private val dummyBaseRateBurstWindow = NonNegativeFiniteDuration.ofMinutes(10)
-  private val dummyReadScalingFactor = BigDecimal(0.02)
+  private val dummyReadVsWriteScalingFactor = 200
 
   // TODO(tech-debt) revisit naming here. "default" and "initial" are two things that are no longer accurate (these are used for other things as well), and consider adding more default values to methods here
 
@@ -199,16 +199,16 @@ object CNNodeUtil {
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
       initialDomainId: DomainId,
-      initialBaseRate: BigDecimal = dummyBaseRate,
+      initialBaseRateBurstAmount: Long = dummyBaseRateBurstAmount,
       initialBaseRateBurstWindow: NonNegativeFiniteDuration = dummyBaseRateBurstWindow,
-      initialReadVsWriteScalingFactor: BigDecimal = dummyReadScalingFactor,
+      initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       holdingFee: BigDecimal = defaultHoldingFee.rate,
   ) = new cc.schedule.Schedule[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]](
     defaultCoinConfig(
       initialTickDuration,
       initialMaxNumInputs,
       initialDomainId,
-      initialBaseRate,
+      initialBaseRateBurstAmount,
       initialBaseRateBurstWindow,
       initialReadVsWriteScalingFactor,
       holdingFee,
@@ -220,9 +220,9 @@ object CNNodeUtil {
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
       initialDomainId: DomainId,
-      initialBaseRate: BigDecimal = dummyBaseRate,
+      initialBaseRateBurstAmount: Long = dummyBaseRateBurstAmount,
       initialBaseRateBurstWindow: NonNegativeFiniteDuration = dummyBaseRateBurstWindow,
-      initialReadVsWriteScalingFactor: BigDecimal = dummyReadScalingFactor,
+      initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       holdingFee: BigDecimal = defaultHoldingFee.rate,
       nextDomainId: Option[DomainId] = None,
   ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = new cc.coinconfig.CoinConfig(
@@ -236,7 +236,7 @@ object CNNodeUtil {
     defaultGlobalDomainConfig(
       initialDomainId,
       nextDomainId,
-      initialBaseRate,
+      initialBaseRateBurstAmount,
       initialBaseRateBurstWindow,
       initialReadVsWriteScalingFactor,
     ),
@@ -268,9 +268,9 @@ object CNNodeUtil {
   private def defaultGlobalDomainConfig(
       initialDomainId: DomainId,
       nextDomainId: Option[DomainId],
-      initialBaseRate: BigDecimal,
+      initialBaseRateBurstAmount: Long,
       initialBaseRateBurstWindow: NonNegativeFiniteDuration,
-      initialReadVsWriteScalingFactor: BigDecimal,
+      initialReadVsWriteScalingFactor: Int,
   ): GlobalDomainConfig = {
     val domainId = initialDomainId.toProtoPrimitive
     val next = nextDomainId.map(_.toProtoPrimitive)
@@ -285,7 +285,7 @@ object CNNodeUtil {
       next getOrElse domainId,
       // fees
       domainFeesConfig(
-        baseRate = initialBaseRate,
+        baseRateBurstAmount = initialBaseRateBurstAmount,
         baseRateBurstWindow = initialBaseRateBurstWindow,
         readVsWriteScalingFactor = initialReadVsWriteScalingFactor,
       ),
@@ -328,24 +328,24 @@ object CNNodeUtil {
     // 2.5 min default duration
   )
 
-  def baseRateLimits(baseRate: BigDecimal, baseRateBurstWindow: NonNegativeFiniteDuration) = {
+  def baseRateLimits(baseRateBurstAmount: Long, baseRateBurstWindow: NonNegativeFiniteDuration) = {
     new BaseRateTrafficLimits(
-      damlDecimal(baseRate.toDouble),
+      baseRateBurstAmount,
       new RelTime(TimeUnit.NANOSECONDS.toMicros(baseRateBurstWindow.duration.toNanos)),
     )
   }
 
   def domainFeesConfig(
-      baseRate: BigDecimal,
+      baseRateBurstAmount: Long,
       baseRateBurstWindow: NonNegativeFiniteDuration,
-      readVsWriteScalingFactor: BigDecimal = dummyReadScalingFactor,
+      readVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       minTopupAmount: Long = defaultMinTopupAmount,
       extraTrafficPrice: BigDecimal = defaultExtraTrafficPrice,
   ) = {
     new DomainFeesConfig(
-      baseRateLimits(baseRate, baseRateBurstWindow),
+      baseRateLimits(baseRateBurstAmount, baseRateBurstWindow),
       damlDecimal(extraTrafficPrice.toDouble),
-      damlDecimal(readVsWriteScalingFactor.toDouble),
+      readVsWriteScalingFactor,
       minTopupAmount,
     )
   }

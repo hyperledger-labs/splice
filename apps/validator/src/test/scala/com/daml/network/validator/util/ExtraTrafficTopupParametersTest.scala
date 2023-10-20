@@ -10,7 +10,7 @@ import org.scalatest.prop.TableFor2
 import scala.math.BigDecimal.RoundingMode
 
 class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
-  private lazy val defaultBaseRate = BigDecimal(333)
+  private lazy val defaultBaseRateBurstAmount = 10 * 20 * 1000L
   private lazy val defaultBaseRateBurstWindow = NonNegativeFiniteDuration.ofMinutes(10)
   private lazy val defaultMinTopupAmount = 1_000_000L
   private lazy val defaultTargetRate = BigDecimal(20_000)
@@ -38,7 +38,7 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
   ) = {
     ExtraTrafficTopupParameters(
       domainFeesConfig(
-        baseRate = defaultBaseRate,
+        baseRateBurstAmount = defaultBaseRateBurstAmount,
         baseRateBurstWindow = defaultBaseRateBurstWindow,
         minTopupAmount = minTopupAmount,
       ),

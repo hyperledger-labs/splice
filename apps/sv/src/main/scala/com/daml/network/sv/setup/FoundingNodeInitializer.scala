@@ -24,7 +24,7 @@ import com.daml.network.sv.util.{SvUtil, SvcRulesLock}
 import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
 import com.daml.network.util.{AssignedContract, GcpBucket, TemplateJsonDecoder, UploadablePackage}
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -201,13 +201,9 @@ class FoundingNodeInitializer(
 
   private def initialTrafficControlParameters: TrafficControlParameters = {
     TrafficControlParameters(
-      NonNegativeLong.tryCreate(
-        (foundingConfig.initialTrafficControlConfig.baseRate.value * foundingConfig.initialTrafficControlConfig.baseRateBurstWindow.duration.toSeconds).toLong
-      ),
-      // readVsWriteScalingFactor is set in units of per 10 mille
-      PositiveInt.tryCreate(
-        (foundingConfig.initialTrafficControlConfig.readVsWriteScalingFactor.value * 10_000).toInt
-      ),
+      foundingConfig.initialTrafficControlConfig.baseRateBurstAmount,
+      foundingConfig.initialTrafficControlConfig.readVsWriteScalingFactor,
+      // have to convert canton.config.NonNegativeDuration to canton.time.NonNegativeDuration
       NonNegativeFiniteDuration.tryOfMillis(
         foundingConfig.initialTrafficControlConfig.baseRateBurstWindow.duration.toMillis
       ),
@@ -515,7 +511,7 @@ class FoundingNodeInitializer(
                           foundingConfig.initialTickDuration,
                           foundingConfig.initialMaxNumInputs,
                           domainId,
-                          foundingConfig.initialTrafficControlConfig.baseRate.value,
+                          foundingConfig.initialTrafficControlConfig.baseRateBurstAmount.value,
                           foundingConfig.initialTrafficControlConfig.baseRateBurstWindow,
                           foundingConfig.initialTrafficControlConfig.readVsWriteScalingFactor.value,
                         ),
