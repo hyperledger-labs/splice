@@ -2517,7 +2517,8 @@ workflows:
           filters:
             branches:
               only:
-                - deployment/cidaily
+                # Testing if providing branch name this way works
+                - /deployment\/cidaily/
           context:
             - artifactory
             - slack-context
@@ -2527,7 +2528,8 @@ workflows:
           filters:
             branches:
               only:
-                - deployment/cidaily
+                # Testing if providing branch name this way works
+                - /deployment\/cidaily/
           cluster: "cidaily"
           context:
             - artifactory
@@ -2546,7 +2548,8 @@ workflows:
           filters:
             branches:
               only:
-                - deployment/cilr
+                # Testing if providing branch name this way works
+                - "deployment/cilr"
           context:
             - artifactory
             - slack-context
@@ -2556,7 +2559,8 @@ workflows:
           filters:
             branches:
               only:
-                - deployment/cilr
+                # Testing if providing branch name this way works
+                - "deployment/cilr"
           cluster: "cilr"
           context:
             - artifactory
