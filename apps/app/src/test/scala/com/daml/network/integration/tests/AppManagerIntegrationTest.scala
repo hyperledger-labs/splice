@@ -117,7 +117,9 @@ class AppManagerIntegrationTest
           provider.toProtoPrimitive,
           splitwellValidatorBackend.config.appManager.value.appManagerApiUrl
             .withPath(
-              Uri.Path(s"/app-manager/apps/registered/${provider.toProtoPrimitive}")
+              Uri.Path(
+                s"/api/validator/v0/app-manager/apps/registered/${provider.toProtoPrimitive}"
+              )
             )
             .toString,
           configuration1_0,
@@ -299,7 +301,7 @@ class AppManagerIntegrationTest
       // jwks from that url.
       val jwkProvider = new UrlJwkProvider(
         aliceValidatorBackend.config.appManager.value.appManagerApiUrl
-          .withPath(Uri.Path("/app-manager/oauth2"))
+          .withPath(Uri.Path("/api/validator/v0/app-manager/oauth2"))
           .toString
       )
       val jwk = jwkProvider.get(jwt.getKeyId())
@@ -331,7 +333,9 @@ class AppManagerIntegrationTest
       registerHttpConnectionPoolsCleanup(env)
 
       val preflight =
-        Options(s"${aliceValidatorBackend.config.appManager.value.appManagerApiUrl}/v1/user")
+        Options(
+          s"${aliceValidatorBackend.config.appManager.value.appManagerApiUrl}/api/validator/jsonApiProxy/v1/user"
+        )
           .withHeaders(
             headers.Origin("http://example.com"),
             headers.`Access-Control-Request-Method`(HttpMethods.POST),
@@ -361,7 +365,7 @@ class AppManagerIntegrationTest
       registerHttpConnectionPoolsCleanup(env)
 
       val getUser =
-        Post(s"${aliceValidatorBackend.config.appManager.value.appManagerApiUrl}/v1/user")
+        Post(s"${aliceValidatorBackend.config.appManager.value.jsonApiUrl}/v1/user")
           .withEntity(
             HttpEntity(
               ContentTypes.`application/json`,
@@ -392,7 +396,9 @@ class AppManagerIntegrationTest
       registerHttpConnectionPoolsCleanup(env)
 
       val splitwell = splitwellValidatorBackend.listRegisteredApps().loneElement
-      val request = Post(s"${aliceValidatorBackend.httpClientConfig.url}/app-manager/apps/install")
+      val request = Post(
+        s"${aliceValidatorBackend.httpClientConfig.url}/api/validator/v0/app-manager/apps/install"
+      )
         .withEntity(
           HttpEntity(
             ContentTypes.`application/json`,
@@ -434,7 +440,7 @@ class AppManagerIntegrationTest
       val splitwell = splitwellValidatorBackend.listRegisteredApps().loneElement
       aliceValidatorBackend.installApp(splitwell.appUrl)
       val request = Post(
-        s"${aliceValidatorBackend.httpClientConfig.url}/app-manager/apps/installed/${splitwell.provider}/authorize"
+        s"${aliceValidatorBackend.httpClientConfig.url}/api/validator/v0/app-manager/apps/installed/${splitwell.provider}/authorize"
       )
       def tokenHeader(token: String) = Seq(headers.Authorization(headers.OAuth2BearerToken(token)))
       val nonAdminJwt = JWT

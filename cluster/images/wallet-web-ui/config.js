@@ -9,7 +9,7 @@ window.canton_network_config = {
   },
   services: {
     validator: {
-      url: "https://" + window.location.hostname + "/api/v0/validator",
+      url: "https://" + window.location.hostname + "/api/validator",
     },
     directory: {
       // URL of the directory backend.

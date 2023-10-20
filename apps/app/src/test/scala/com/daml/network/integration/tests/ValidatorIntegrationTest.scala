@@ -123,7 +123,8 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     implicit val sys = env.actorSystem
     registerHttpConnectionPoolsCleanup(env)
 
-    val registerPost = Post(s"${aliceValidatorBackend.httpClientConfig.url}/register")
+    val registerPost =
+      Post(s"${aliceValidatorBackend.httpClientConfig.url}/api/validator/v0/register")
     def tokenHeader(token: String) = Seq(Authorization(OAuth2BearerToken(token)))
 
     val invalidSignatureToken = JWT
@@ -162,7 +163,8 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     implicit val sys = env.actorSystem
     registerHttpConnectionPoolsCleanup(env)
 
-    val listUsersGet = Get(s"${aliceValidatorBackend.httpClientConfig.url}/admin/users")
+    val listUsersGet =
+      Get(s"${aliceValidatorBackend.httpClientConfig.url}/api/validator/v0/admin/users")
 
     def tokenHeader(token: String) = Seq(Authorization(OAuth2BearerToken(token)))
 

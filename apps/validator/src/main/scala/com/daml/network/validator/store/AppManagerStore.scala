@@ -339,7 +339,7 @@ object AppManagerStore {
         provider.toProtoPrimitive,
         appManagerApiUrl
           .withPath(
-            appManagerApiUrl.path / "app-manager" / "apps" / "registered" / provider.toProtoPrimitive
+            appManagerApiUrl.path / "v0" / "app-manager" / "apps" / "registered" / provider.toProtoPrimitive
           )
           .toString,
         configuration,

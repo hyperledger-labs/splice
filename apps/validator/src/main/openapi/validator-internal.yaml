@@ -4,12 +4,14 @@ info:
   version: 0.0.1
 tags:
   - name: validator
+servers:
+  - url: https://example.com/api/validator
 paths:
   /readyz:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
   /livez:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
-  /validator-user:
+  /v0/validator-user:
     get:
       tags: [validator_public]
       x-jvm-package: validator_public
@@ -21,7 +23,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetValidatorUserInfoResponse"
-  /register:
+  /v0/register:
     post:
       tags: [validator]
       x-jvm-package: validator
@@ -39,7 +41,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RegistrationResponse"
 
-  /admin/users:
+  /v0/admin/users:
     post:
       tags: [validator]
       x-jvm-package: validator_admin
@@ -70,7 +72,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/ListUsersResponse"
 
-  /admin/users/offboard:
+  /v0/admin/users/offboard:
     post:
       tags: [validator]
       x-jvm-package: validator_admin
@@ -87,7 +89,7 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
-  /admin/participant/identities:
+  /v0/admin/participant/identities:
     get:
       tags: [validator]
       x-jvm-package: validator_admin
@@ -100,7 +102,7 @@ paths:
               schema:
                 "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantIdentitiesDump"
 
-  /app-manager/apps/installed/{provider}/authorize:
+  /v0/app-manager/apps/installed/{provider}/authorize:
     post:
       tags: [app_manager]
       x-jvm-package: app_manager
@@ -117,7 +119,7 @@ paths:
         404:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
-  /app-manager/apps/installed/{provider}/check-authorizization:
+  /v0/app-manager/apps/installed/{provider}/check-authorizization:
     post:
       tags: [app_manager]
       x-jvm-package: app_manager
@@ -152,7 +154,7 @@ paths:
         403:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/403"
 
-  /app-manager/apps/installed/{provider}/approve-release-config:
+  /v0/app-manager/apps/installed/{provider}/approve-release-config:
     post:
       tags: [app_manager_admin]
       x-jvm-package: app_manager_admin
@@ -177,7 +179,7 @@ paths:
         500:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
-  /app-manager/oauth2/.well-known/openid-configuration:
+  /v0/app-manager/oauth2/.well-known/openid-configuration:
     get:
       tags: [app_manager_public]
       x-jvm-package: app_manager_public
@@ -189,7 +191,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/OpenIDConfigurationResponse"
-  /app-manager/oauth2/.well-known/jwks.json:
+  /v0/app-manager/oauth2/.well-known/jwks.json:
     get:
       tags: [app_manager_public]
       x-jvm-package: app_manager_public
@@ -201,7 +203,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/JwksResponse"
-  /app-manager/oauth2/token:
+  /v0/app-manager/oauth2/token:
     post:
       tags: [app_manager_public]
       x-jvm-package: app_manager_public
@@ -236,7 +238,7 @@ paths:
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
 
-  /app-manager/apps/installed:
+  /v0/app-manager/apps/installed:
     get:
       tags: [app_manager]
       x-jvm-package: app_manager
@@ -248,7 +250,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListInstalledAppsResponse"
-  /app-manager/apps/install:
+  /v0/app-manager/apps/install:
     post:
       tags: [app_manager_admin]
       x-jvm-package: app_manager_admin
@@ -265,7 +267,7 @@ paths:
         "409":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
 
-  /app-manager/apps/registered:
+  /v0/app-manager/apps/registered:
     get:
       tags: [app_manager]
       x-jvm-package: app_manager
@@ -278,7 +280,7 @@ paths:
               schema:
                 "$ref": "#/components/schemas/ListRegisteredAppsResponse"
 
-  /app-manager/apps/registered/name/{name}/configuration/latest/configuration.json:
+  /v0/app-manager/apps/registered/name/{name}/configuration/latest/configuration.json:
     get:
       tags: [ app_manager_public ]
       x-jvm-package: app_manager_public
@@ -299,7 +301,7 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
-  /app-manager/apps/registered/{provider}/configuration/latest/configuration.json:
+  /v0/app-manager/apps/registered/{provider}/configuration/latest/configuration.json:
     get:
       tags: [app_manager_public]
       x-jvm-package: app_manager_public
@@ -319,7 +321,7 @@ paths:
                 "$ref": "#/components/schemas/GetAppConfigurationResult"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /app-manager/apps/registered/{provider}/release/{version}/release.json:
+  /v0/app-manager/apps/registered/{provider}/release/{version}/release.json:
     get:
       tags: [app_manager_public]
       x-jvm-package: app_manager_public
@@ -344,7 +346,7 @@ paths:
                 "$ref": "#/components/schemas/AppRelease"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /app-manager/apps/registered/{provider}/publish-release:
+  /v0/app-manager/apps/registered/{provider}/publish-release:
     post:
       tags: [app_manager_admin]
       x-jvm-package: app_manager_admin
@@ -373,7 +375,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "409":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
-  /app-manager/apps/registered/{provider}/update-configuration:
+  /v0/app-manager/apps/registered/{provider}/update-configuration:
     post:
       tags: [app_manager_admin]
       x-jvm-package: app_manager_admin
@@ -399,7 +401,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "409":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
-  /app-manager/dars/{dar_hash}:
+  /v0/app-manager/dars/{dar_hash}:
     get:
       tags: [app_manager_public]
       x-jvm-package: app_manager_public
@@ -419,7 +421,7 @@ paths:
                 "$ref": "#/components/schemas/DarFile"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /app-manager/apps/register:
+  /v0/app-manager/apps/register:
     post:
       tags: [app_manager_admin]
       x-jvm-package: app_manager_admin
@@ -453,105 +455,6 @@ paths:
         "409":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/409"
 
-  # We proxy the JSON API here to set CORS headers.
-  # TODO(#6839) Consider exposing these as /app-manager/v1 instead.This would make it a bit
-  # harder to build the proxy because we need to do a URL rewrite.
-  /v1/user:
-    post:
-      tags: [app_manager_public]
-      x-jvm-package: app_manager_public
-      operationId: "jsonApiUser"
-      parameters:
-        - in: header
-          name: authorization
-          schema:
-            type: string
-          required: true
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                type: object
-  /v1/query:
-    post:
-      tags: [app_manager_public]
-      x-jvm-package: app_manager_public
-      operationId: "jsonApiQuery"
-      parameters:
-        - in: header
-          name: authorization
-          schema:
-            type: string
-          required: true
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                type: object
-  /v1/create:
-    post:
-      tags: [app_manager_public]
-      x-jvm-package: app_manager_public
-      operationId: "jsonApiCreate"
-      parameters:
-        - in: header
-          name: authorization
-          schema:
-            type: string
-          required: true
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                type: object
-  /v1/exercise:
-    post:
-      tags: [app_manager_public]
-      x-jvm-package: app_manager_public
-      operationId: "jsonApiExercise"
-      parameters:
-        - in: header
-          name: authorization
-          schema:
-            type: string
-          required: true
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                type: object
 
 components:
   schemas:

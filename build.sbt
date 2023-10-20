@@ -441,19 +441,26 @@ lazy val `apps-validator` =
         npmName = "validator-openapi",
         openApiSpec = "validator-internal.yaml",
       ),
+      BuildCommon.TS.openApiSettings(
+        npmName = "jsonapi-proxy-openapi",
+        openApiSpec = "json-api-proxy-internal.yaml",
+        directory = "jsonapi-proxy-ts-client",
+      ),
       Compile / guardrailTasks :=
-        List(
-          ScalaServer(
-            new File("apps/validator/src/main/openapi/validator-internal.yaml"),
-            pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
-            customExtraction = true,
-          ),
-          ScalaClient(
-            new File("apps/validator/src/main/openapi/validator-internal.yaml"),
-            pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
-          ),
+        List("validator-internal", "json-api-proxy-internal").flatMap(api =>
+          List(
+            ScalaServer(
+              new File(s"apps/validator/src/main/openapi/${api}.yaml"),
+              pkg = "com.daml.network.http.v0",
+              framework = "akka-http",
+              customExtraction = true,
+            ),
+            ScalaClient(
+              new File(s"apps/validator/src/main/openapi/${api}.yaml"),
+              pkg = "com.daml.network.http.v0",
+              framework = "akka-http",
+            ),
+          )
         ),
     )
 
@@ -617,6 +624,12 @@ lazy val `apps-common-frontend` = {
               npmRootDir.value,
               "build",
               "validator/openapi-ts-client",
+              log,
+            )
+            BuildCommon.TS.runWorkspaceCommand(
+              npmRootDir.value,
+              "build",
+              "validator/jsonapi-proxy-ts-client",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(

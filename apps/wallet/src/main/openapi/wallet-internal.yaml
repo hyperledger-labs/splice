@@ -4,8 +4,10 @@ info:
   version: 0.0.1
 tags:
   - name: wallet
+servers:
+  - url: https://example.com/api/validator
 paths:
-  /wallet/user-status:
+  /v0/wallet/user-status:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -21,7 +23,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/coins:
+  /v0/wallet/coins:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -37,7 +39,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/tap:
+  /v0/wallet/tap:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -66,7 +68,7 @@ paths:
         "503":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/503"
 
-  /wallet/self-grant-feature-app-right:
+  /v0/wallet/self-grant-feature-app-right:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -87,7 +89,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/balance:
+  /v0/wallet/balance:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -103,7 +105,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/app-payment-requests:
+  /v0/wallet/app-payment-requests:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -119,7 +121,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/app-payment-requests/{contract_id}:
+  /v0/wallet/app-payment-requests/{contract_id}:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -141,7 +143,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/app-payment-requests/{contract_id}/accept:
+  /v0/wallet/app-payment-requests/{contract_id}/accept:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -169,7 +171,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
         "503":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/503"
-  /wallet/app-payment-requests/{contract_id}/reject:
+  /v0/wallet/app-payment-requests/{contract_id}/reject:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -187,7 +189,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/accepted-app-payments:
+  /v0/wallet/accepted-app-payments:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -203,7 +205,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/subscription-requests:
+  /v0/wallet/subscription-requests:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -219,7 +221,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/subscription-initial-payments:
+  /v0/wallet/subscription-initial-payments:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -235,7 +237,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/subscriptions:
+  /v0/wallet/subscriptions:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -251,7 +253,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/subscription-requests/{contract_id}/accept:
+  /v0/wallet/subscription-requests/{contract_id}/accept:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -279,7 +281,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
         "503":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/503"
-  /wallet/subscription-requests/{contract_id}/reject:
+  /v0/wallet/subscription-requests/{contract_id}/reject:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -297,7 +299,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/subscription-requests/{contract_id}:
+  /v0/wallet/subscription-requests/{contract_id}:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -336,7 +338,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/transfer-offers/{contract_id}/reject:
+  /v0/wallet/transfer-offers/{contract_id}/reject:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -354,7 +356,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/transfer-offers/{contract_id}/accept:
+  /v0/wallet/transfer-offers/{contract_id}/accept:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -376,7 +378,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/transfer-offers/{contract_id}/withdraw:
+  /v0/wallet/transfer-offers/{contract_id}/withdraw:
     post:
       tags: [wallet]
       x-jvm-package: wallet
@@ -394,7 +396,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/accepted-transfer-offers:
+  /v0/wallet/accepted-transfer-offers:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -410,7 +412,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/app-reward-coupons:
+  /v0/wallet/app-reward-coupons:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -426,7 +428,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/validator-reward-coupons:
+  /v0/wallet/validator-reward-coupons:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -442,7 +444,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/cancel-featured-app-rights:
+  /v0/wallet/cancel-featured-app-rights:
     delete:
       tags: [wallet]
       x-jvm-package: wallet
@@ -452,7 +454,7 @@ paths:
           description: ok
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/transactions:
+  /v0/wallet/transactions:
     post:
       tags: [wallet]
       x-jvm-package: wallet
