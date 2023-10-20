@@ -240,6 +240,7 @@ workflows:
           - slack-context
         workflow_names: "deploy_cidaily cidaily_health_check redeploy_sv_runbook_cidaily"
     - deploy_cluster:
+        name: deploy_cluster_cidaily
         <<: *main-branch-only
         context:
           - artifactory
@@ -249,7 +250,20 @@ workflows:
         requires:
            - docker_images_push
            - wait_for_previous_pipeline
+    - deploy_cluster:
+        name: deploy_cluster_cidaily_testnet
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "cidaily-testnet"
+        restore_cluster: true
+        requires:
+          - docker_images_push
+          - wait_for_previous_pipeline
     - preflight_check:
+        name: preflight_check_devnet
         cluster: "cidaily"
         <<: *main-branch-only
         context:
@@ -261,15 +275,31 @@ workflows:
         # Order: deploy_cluster->preflight_check->publish_public_release->deploy_sv_runbook->preflight_sv_check
         requires:
           - docker_images_push
-          - deploy_cluster
+          - deploy_cluster_cidaily
+    - preflight_check:
+        name: preflight_check_testnet
+        cluster: "cidaily-testnet"
+        <<: *non_devnet_preflight_params
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        # require deploy_cluster and deploy_sv_runbook for stability and reliability
+        requires:
+          - docker_images_push
+          - deploy_cluster_cidaily_testnet
     - publish_public_release:
         <<: *main-branch-only
         context:
           - artifactory
           - datadog
         requires:
-          - preflight_check
+          - preflight_check_devnet
+          - preflight_check_testnet
     - deploy_sv_runbook:
+        name: deploy_sv_runbook_devnet
         <<: *main-branch-only
         context:
           - artifactory
@@ -278,9 +308,21 @@ workflows:
         cluster: "cidaily"
         use_published_artifacts: true
         requires:
-          - deploy_cluster
+          - deploy_cluster_cidaily
           - publish_public_release
+    - deploy_sv_runbook:
+        name: deploy_sv_runbook_testnet
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "cidaily-testnet"
+        restore_cluster: true
+        requires:
+          - deploy_cluster_cidaily_testnet
     - preflight_sv_check:
+        name: preflight_sv_check_devnet
         <<: *main-branch-only
         context:
           - artifactory
@@ -289,7 +331,18 @@ workflows:
           - slack-context
         cluster: "cidaily"
         requires:
-          - deploy_sv_runbook
+          - deploy_sv_runbook_devnet
+    - preflight_sv_check:
+        name: preflight_sv_check_testnet
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        cluster: "cidaily-testnet"
+        requires:
+          - deploy_sv_runbook_testnet
 
   deploy_cilr:
     when:
@@ -453,71 +506,6 @@ workflows:
         requires:
           - deploy_cluster
 
-  deploy_cidaily_testnet:
-    when:
-      equal: [ deploy-cidaily-testnet, << pipeline.parameters.run-job >> ]
-    jobs:
-    - docker_images_push:
-        <<: *notify-fail
-        context:
-          - artifactory
-          - datadog
-          - slack-context
-    - wait_for_previous_pipeline:
-        <<: *notify-fail
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - datadog
-          - slack-context
-        workflow_names: "deploy_cidaily_testnet cidaily_testnet_health_check"
-    - deploy_cluster:
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - datadog
-          - slack-context
-        cluster: "cidaily-testnet"
-        restore_cluster: true
-        requires:
-           - docker_images_push
-           - wait_for_previous_pipeline
-    - deploy_sv_runbook:
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - datadog
-          - slack-context
-        cluster: "cidaily-testnet"
-        restore_cluster: true
-        requires:
-          - deploy_cluster
-    - preflight_check:
-        cluster: "cidaily-testnet"
-        <<: *non_devnet_preflight_params
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - canton-network-vpn
-          - datadog
-          - slack-context
-        # require deploy_cluster and deploy_sv_runbook for stability and reliability
-        requires:
-          - docker_images_push
-          - deploy_cluster
-          - deploy_sv_runbook
-    - preflight_sv_check:
-        <<: *main-branch-only
-        context:
-          - artifactory
-          - canton-network-vpn
-          - datadog
-          - slack-context
-        cluster: "cidaily-testnet"
-        requires:
-          - deploy_sv_runbook
-
-
   testnet_health_check:
     when:
       equal: [ healthcheck-testnet, << pipeline.parameters.run-job >> ]
@@ -610,7 +598,31 @@ workflows:
             - datadog
             - slack-context
           requires:
-             - wait_for_previous_pipeline
+            - wait_for_previous_pipeline
+
+  cidaily_testnet_health_check:
+    when:
+      equal: [ healthcheck-cidaily-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          # <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for deployments, concurrent preflight checks are fine.
+          workflow_names: "deploy_cidaily"
+      - preflight_check:
+          # <<: *main-branch-only
+          cluster: "cidaily-testnet"
+          <<: *non_devnet_preflight_params
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
 
   cilr_health_check:
     when:
@@ -635,30 +647,6 @@ workflows:
                 - main
                 - deployment/cilr
           cluster: "cilr"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          requires:
-             - wait_for_previous_pipeline
-
-  cidaily_testnet_health_check:
-    when:
-      equal: [ healthcheck-cidaily-testnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          # <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "deploy_cidaily_testnet"
-      - preflight_check:
-          # <<: *main-branch-only
-          cluster: "cidaily-testnet"
-          <<: *non_devnet_preflight_params
           context:
             - artifactory
             - canton-network-vpn

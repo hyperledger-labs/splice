@@ -23,7 +23,7 @@ parameters:
     default: "20"
   run-job:
     type: enum
-    enum: [build, deploy-cidaily, deploy-cidaily-testnet, deploy-cilr, deploy-devnet, deploy-testnet,
+    enum: [build, deploy-cidaily, deploy-cilr, deploy-devnet, deploy-testnet,
            healthcheck-cidaily, healthcheck-cidaily-testnet, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet,
            redeploy-sv-runbook-cidaily, redeploy-sv-runbook-cilr, publish-public-artifacts, auth0-user-cleanup,
            cluster-lock-reaper, mark-for-testnet]
