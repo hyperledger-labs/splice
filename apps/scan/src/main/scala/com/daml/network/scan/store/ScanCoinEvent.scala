@@ -9,7 +9,7 @@ object SvcRules_CollectSvReward extends ExerciseNodeCompanion {
   override type Arg = svcCodegen.SvcRules_CollectSvReward
   override type Res = cc.coin.CoinCreateSummary[cc.coin.Coin.ContractId]
 
-  override val templateOrInterface = Left(svcCodegen.SvcRules.COMPANION)
+  override val template = svcCodegen.SvcRules.COMPANION
   override val choice = svcCodegen.SvcRules.CHOICE_SvcRules_CollectSvReward
 
   override val argDecoder = svcCodegen.SvcRules_CollectSvReward.valueDecoder()

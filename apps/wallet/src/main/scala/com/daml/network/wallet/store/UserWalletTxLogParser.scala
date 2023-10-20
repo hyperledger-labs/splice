@@ -789,10 +789,7 @@ object UserWalletTxLogParser {
         val companion: ExerciseNodeCompanion,
         coinOperation: Option[String],
     ) {
-      val templateId: Identifier = companion.templateOrInterface match {
-        case Left(value) => value.TEMPLATE_ID
-        case Right(value) => value.TEMPLATE_ID
-      }
+      val templateId: Identifier = companion.template.TEMPLATE_ID
       val choice: Choice[companion.Tpl, companion.Arg, companion.Res] = companion.choice
 
       def toResponseItem: httpDef.TransactionSubtype = httpDef.TransactionSubtype(

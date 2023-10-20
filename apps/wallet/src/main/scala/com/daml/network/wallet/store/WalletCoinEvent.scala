@@ -20,7 +20,7 @@ object WalletAppInstall_ExecuteBatch extends ExerciseNodeCompanion {
   override type Arg = installCodegen.WalletAppInstall_ExecuteBatch
   override type Res = installCodegen.ExecuteBatchResult
 
-  override val templateOrInterface = Left(installCodegen.WalletAppInstall.COMPANION)
+  override val template = installCodegen.WalletAppInstall.COMPANION
   override val choice = installCodegen.WalletAppInstall.CHOICE_WalletAppInstall_ExecuteBatch
 
   override val argDecoder = installCodegen.WalletAppInstall_ExecuteBatch.valueDecoder()
@@ -35,7 +35,7 @@ object WalletAppInstall_CreateTransferOffer extends ExerciseNodeCompanion {
   override type Arg = installCodegen.WalletAppInstall_CreateTransferOffer
   override type Res = transferCodegen.TransferOffer.ContractId
 
-  override val templateOrInterface = Left(installCodegen.WalletAppInstall.COMPANION)
+  override val template = installCodegen.WalletAppInstall.COMPANION
   override val choice = installCodegen.WalletAppInstall.CHOICE_WalletAppInstall_CreateTransferOffer
 
   override val argDecoder = installCodegen.WalletAppInstall_CreateTransferOffer.valueDecoder()
@@ -51,7 +51,7 @@ case object TransferOffer_Accept extends ExerciseNodeCompanion {
   override type Arg = transferCodegen.TransferOffer_Accept
   override type Res = transferCodegen.AcceptedTransferOffer.ContractId
 
-  override val templateOrInterface = Left(transferCodegen.TransferOffer.COMPANION)
+  override val template = transferCodegen.TransferOffer.COMPANION
   override val choice = transferCodegen.TransferOffer.CHOICE_TransferOffer_Accept
 
   override val argDecoder = transferCodegen.TransferOffer_Accept.valueDecoder()
@@ -69,7 +69,7 @@ case object TransferOffer_Reject extends ExerciseNodeCompanion {
   override type Arg = transferCodegen.TransferOffer_Reject
   override type Res = transferCodegen.TransferOfferTrackingInfo
 
-  override val templateOrInterface = Left(transferCodegen.TransferOffer.COMPANION)
+  override val template = transferCodegen.TransferOffer.COMPANION
   override val choice = transferCodegen.TransferOffer.CHOICE_TransferOffer_Reject
 
   override val argDecoder = transferCodegen.TransferOffer_Reject.valueDecoder()
@@ -85,7 +85,7 @@ case object TransferOffer_Withdraw extends ExerciseNodeCompanion {
   override type Arg = transferCodegen.TransferOffer_Withdraw
   override type Res = transferCodegen.TransferOfferTrackingInfo
 
-  override val templateOrInterface = Left(transferCodegen.TransferOffer.COMPANION)
+  override val template = transferCodegen.TransferOffer.COMPANION
   override val choice = transferCodegen.TransferOffer.CHOICE_TransferOffer_Withdraw
 
   override val argDecoder = transferCodegen.TransferOffer_Withdraw.valueDecoder()
@@ -101,7 +101,7 @@ case object TransferOffer_Expire extends ExerciseNodeCompanion {
   override type Arg = transferCodegen.TransferOffer_Expire
   override type Res = transferCodegen.TransferOfferTrackingInfo
 
-  override val templateOrInterface = Left(transferCodegen.TransferOffer.COMPANION)
+  override val template = transferCodegen.TransferOffer.COMPANION
   override val choice = transferCodegen.TransferOffer.CHOICE_TransferOffer_Expire
 
   override val argDecoder = transferCodegen.TransferOffer_Expire.valueDecoder()
@@ -122,7 +122,7 @@ object AcceptedTransferOffer_Complete extends ExerciseNodeCompanion {
     ],
   ]
 
-  override val templateOrInterface = Left(transferCodegen.AcceptedTransferOffer.COMPANION)
+  override val template = transferCodegen.AcceptedTransferOffer.COMPANION
   override val choice = transferCodegen.AcceptedTransferOffer.CHOICE_AcceptedTransferOffer_Complete
 
   override val argDecoder = transferCodegen.AcceptedTransferOffer_Complete.valueDecoder()
@@ -148,7 +148,7 @@ case object AcceptedTransferOffer_Expire extends ExerciseNodeCompanion {
   override type Arg = transferCodegen.AcceptedTransferOffer_Expire
   override type Res = transferCodegen.TransferOfferTrackingInfo
 
-  override val templateOrInterface = Left(transferCodegen.AcceptedTransferOffer.COMPANION)
+  override val template = transferCodegen.AcceptedTransferOffer.COMPANION
   override val choice = transferCodegen.AcceptedTransferOffer.CHOICE_AcceptedTransferOffer_Expire
 
   override val argDecoder = transferCodegen.AcceptedTransferOffer_Expire.valueDecoder()
@@ -164,7 +164,7 @@ case object AcceptedTransferOffer_Abort extends ExerciseNodeCompanion {
   override type Arg = transferCodegen.AcceptedTransferOffer_Abort
   override type Res = transferCodegen.TransferOfferTrackingInfo
 
-  override val templateOrInterface = Left(transferCodegen.AcceptedTransferOffer.COMPANION)
+  override val template = transferCodegen.AcceptedTransferOffer.COMPANION
   override val choice = transferCodegen.AcceptedTransferOffer.CHOICE_AcceptedTransferOffer_Abort
 
   override val argDecoder = transferCodegen.AcceptedTransferOffer_Abort.valueDecoder()
@@ -181,7 +181,7 @@ case object AcceptedTransferOffer_Withdraw extends ExerciseNodeCompanion {
   override type Arg = transferCodegen.AcceptedTransferOffer_Withdraw
   override type Res = transferCodegen.TransferOfferTrackingInfo
 
-  override val templateOrInterface = Left(transferCodegen.AcceptedTransferOffer.COMPANION)
+  override val template = transferCodegen.AcceptedTransferOffer.COMPANION
   override val choice = transferCodegen.AcceptedTransferOffer.CHOICE_AcceptedTransferOffer_Withdraw
 
   override val argDecoder = transferCodegen.AcceptedTransferOffer_Withdraw.valueDecoder()
@@ -200,7 +200,7 @@ object AppPaymentRequest_Accept extends ExerciseNodeCompanion {
       coinCodegen.Coin.ContractId
     ]]
 
-  override val templateOrInterface = Left(paymentCodegen.AppPaymentRequest.COMPANION)
+  override val template = paymentCodegen.AppPaymentRequest.COMPANION
   override val choice = paymentCodegen.AppPaymentRequest.CHOICE_AppPaymentRequest_Accept
 
   override val argDecoder = paymentCodegen.AppPaymentRequest_Accept.valueDecoder()
@@ -225,7 +225,7 @@ object AcceptedAppPayment_Collect extends ExerciseNodeCompanion {
   override type Arg = paymentCodegen.AcceptedAppPayment_Collect
   override type Res = paymentCodegen.AcceptedAppPayment_Collect_Result
 
-  override val templateOrInterface = Left(paymentCodegen.AcceptedAppPayment.COMPANION)
+  override val template = paymentCodegen.AcceptedAppPayment.COMPANION
   override val choice = paymentCodegen.AcceptedAppPayment.CHOICE_AcceptedAppPayment_Collect
 
   override val argDecoder = paymentCodegen.AcceptedAppPayment_Collect.valueDecoder()
@@ -240,7 +240,7 @@ object AcceptedAppPayment_Reject extends ExerciseNodeCompanion {
   override type Arg = paymentCodegen.AcceptedAppPayment_Reject
   override type Res = coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
-  override val templateOrInterface = Left(paymentCodegen.AcceptedAppPayment.COMPANION)
+  override val template = paymentCodegen.AcceptedAppPayment.COMPANION
   override val choice = paymentCodegen.AcceptedAppPayment.CHOICE_AcceptedAppPayment_Reject
 
   override val argDecoder = paymentCodegen.AcceptedAppPayment_Reject.valueDecoder()
@@ -258,7 +258,7 @@ object AcceptedAppPayment_Expire extends ExerciseNodeCompanion {
   override type Arg = paymentCodegen.AcceptedAppPayment_Expire
   override type Res = coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
-  override val templateOrInterface = Left(paymentCodegen.AcceptedAppPayment.COMPANION)
+  override val template = paymentCodegen.AcceptedAppPayment.COMPANION
   override val choice = paymentCodegen.AcceptedAppPayment.CHOICE_AcceptedAppPayment_Expire
 
   override val argDecoder = paymentCodegen.AcceptedAppPayment_Expire.valueDecoder()
@@ -279,7 +279,7 @@ object SubscriptionRequest_AcceptAndMakePayment extends ExerciseNodeCompanion {
       coinCodegen.Coin.ContractId
     ]]
 
-  override val templateOrInterface = Left(subsCodegen.SubscriptionRequest.COMPANION)
+  override val template = subsCodegen.SubscriptionRequest.COMPANION
   override val choice =
     subsCodegen.SubscriptionRequest.CHOICE_SubscriptionRequest_AcceptAndMakePayment
 
@@ -306,7 +306,7 @@ object SubscriptionInitialPayment_Collect extends ExerciseNodeCompanion {
     coinCodegen.Coin.ContractId,
   ]
 
-  override val templateOrInterface = Left(subsCodegen.SubscriptionInitialPayment.COMPANION)
+  override val template = subsCodegen.SubscriptionInitialPayment.COMPANION
   override val choice =
     subsCodegen.SubscriptionInitialPayment.CHOICE_SubscriptionInitialPayment_Collect
 
@@ -331,7 +331,7 @@ object SubscriptionInitialPayment_Reject extends ExerciseNodeCompanion {
   override type Arg = subsCodegen.SubscriptionInitialPayment_Reject
   override type Res = coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
-  override val templateOrInterface = Left(subsCodegen.SubscriptionInitialPayment.COMPANION)
+  override val template = subsCodegen.SubscriptionInitialPayment.COMPANION
   override val choice =
     subsCodegen.SubscriptionInitialPayment.CHOICE_SubscriptionInitialPayment_Reject
 
@@ -350,7 +350,7 @@ object SubscriptionInitialPayment_Expire extends ExerciseNodeCompanion {
   override type Arg = subsCodegen.SubscriptionInitialPayment_Expire
   override type Res = coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
-  override val templateOrInterface = Left(subsCodegen.SubscriptionInitialPayment.COMPANION)
+  override val template = subsCodegen.SubscriptionInitialPayment.COMPANION
   override val choice =
     subsCodegen.SubscriptionInitialPayment.CHOICE_SubscriptionInitialPayment_Expire
 
@@ -371,7 +371,7 @@ object SubscriptionIdleState_MakePayment extends ExerciseNodeCompanion {
     coinCodegen.Coin.ContractId
   ]]
 
-  override val templateOrInterface = Left(subsCodegen.SubscriptionIdleState.COMPANION)
+  override val template = subsCodegen.SubscriptionIdleState.COMPANION
   override val choice = subsCodegen.SubscriptionIdleState.CHOICE_SubscriptionIdleState_MakePayment
 
   override val argDecoder = subsCodegen.SubscriptionIdleState_MakePayment.valueDecoder()
@@ -393,7 +393,7 @@ object SubscriptionIdleState_ExpireSubscription extends ExerciseNodeCompanion {
   override type Arg = subsCodegen.SubscriptionIdleState_ExpireSubscription
   override type Res = subsCodegen.TerminatedSubscription.ContractId
 
-  override val templateOrInterface = Left(subsCodegen.SubscriptionIdleState.COMPANION)
+  override val template = subsCodegen.SubscriptionIdleState.COMPANION
   override val choice =
     subsCodegen.SubscriptionIdleState.CHOICE_SubscriptionIdleState_ExpireSubscription
 
@@ -413,7 +413,7 @@ object SubscriptionPayment_Collect extends ExerciseNodeCompanion {
     coinCodegen.Coin.ContractId,
   ]
 
-  override val templateOrInterface = Left(subsCodegen.SubscriptionPayment.COMPANION)
+  override val template = subsCodegen.SubscriptionPayment.COMPANION
   override val choice = subsCodegen.SubscriptionPayment.CHOICE_SubscriptionPayment_Collect
 
   override val argDecoder = subsCodegen.SubscriptionPayment_Collect.valueDecoder()
@@ -438,7 +438,7 @@ object SubscriptionPayment_Reject extends ExerciseNodeCompanion {
     coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId],
   ]
 
-  override val templateOrInterface = Left(subsCodegen.SubscriptionPayment.COMPANION)
+  override val template = subsCodegen.SubscriptionPayment.COMPANION
   override val choice = subsCodegen.SubscriptionPayment.CHOICE_SubscriptionPayment_Reject
 
   override val argDecoder = subsCodegen.SubscriptionPayment_Reject.valueDecoder()
@@ -465,7 +465,7 @@ object SubscriptionPayment_Expire extends ExerciseNodeCompanion {
     coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId],
   ]
 
-  override val templateOrInterface = Left(subsCodegen.SubscriptionPayment.COMPANION)
+  override val template = subsCodegen.SubscriptionPayment.COMPANION
   override val choice = subsCodegen.SubscriptionPayment.CHOICE_SubscriptionPayment_Expire
 
   override val argDecoder = subsCodegen.SubscriptionPayment_Expire.valueDecoder()
@@ -489,7 +489,7 @@ object SvcRules_CollectSvReward extends ExerciseNodeCompanion {
   override type Arg = svcCodegen.SvcRules_CollectSvReward
   override type Res = coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
-  override val templateOrInterface = Left(svcCodegen.SvcRules.COMPANION)
+  override val template = svcCodegen.SvcRules.COMPANION
   override val choice = svcCodegen.SvcRules.CHOICE_SvcRules_CollectSvReward
 
   override val argDecoder = svcCodegen.SvcRules_CollectSvReward.valueDecoder()

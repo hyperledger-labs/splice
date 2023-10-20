@@ -28,7 +28,7 @@ object Transfer extends ExerciseNodeCompanion {
   override type Arg = cc.coin.CoinRules_Transfer
   override type Res = cc.coin.TransferResult
 
-  override val templateOrInterface = Left(cc.coin.CoinRules.COMPANION)
+  override val template = cc.coin.CoinRules.COMPANION
   override val choice = cc.coin.CoinRules.CHOICE_CoinRules_Transfer
 
   override val argDecoder = cc.coin.CoinRules_Transfer.valueDecoder()
@@ -45,7 +45,7 @@ object Tap extends ExerciseNodeCompanion {
   override type Arg = coinCodegen.CoinRules_DevNet_Tap
   override type Res = cc.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
-  override val templateOrInterface = Left(coinCodegen.CoinRules.COMPANION)
+  override val template = coinCodegen.CoinRules.COMPANION
   override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_DevNet_Tap
 
   override val argDecoder = coinCodegen.CoinRules_DevNet_Tap.valueDecoder()
@@ -63,7 +63,7 @@ object Mint extends ExerciseNodeCompanion {
   override type Arg = coinCodegen.CoinRules_Mint
   override type Res = cc.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
-  override val templateOrInterface = Left(coinCodegen.CoinRules.COMPANION)
+  override val template = coinCodegen.CoinRules.COMPANION
   override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_Mint
 
   override val argDecoder = coinCodegen.CoinRules_Mint.valueDecoder()
@@ -81,7 +81,7 @@ object ImportCrate_Receive extends ExerciseNodeCompanion {
   override type Arg = cc.coinimport.ImportCrate_Receive
   override type Res = Optional[cc.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]]
 
-  override val templateOrInterface = Left(cc.coinimport.ImportCrate.COMPANION)
+  override val template = cc.coinimport.ImportCrate.COMPANION
   override val choice = cc.coinimport.ImportCrate.CHOICE_ImportCrate_Receive
 
   override val argDecoder = cc.coinimport.ImportCrate_Receive.valueDecoder()
@@ -124,7 +124,7 @@ object LockedCoinUnlock extends ExerciseNodeCompanion {
   override type Arg = cc.coin.LockedCoin_Unlock
   override type Res = cc.coin.CoinCreateSummary[cc.coin.Coin.ContractId]
 
-  override val templateOrInterface = Left(cc.coin.LockedCoin.COMPANION)
+  override val template = cc.coin.LockedCoin.COMPANION
   override val choice = cc.coin.LockedCoin.CHOICE_LockedCoin_Unlock
 
   override val argDecoder = cc.coin.LockedCoin_Unlock.valueDecoder()
@@ -142,7 +142,7 @@ object LockedCoinOwnerExpireLock extends ExerciseNodeCompanion {
   override type Arg = cc.coin.LockedCoin_OwnerExpireLock
   override type Res = cc.coin.CoinCreateSummary[cc.coin.Coin.ContractId]
 
-  override val templateOrInterface = Left(cc.coin.LockedCoin.COMPANION)
+  override val template = cc.coin.LockedCoin.COMPANION
   override val choice = cc.coin.LockedCoin.CHOICE_LockedCoin_OwnerExpireLock
 
   override val argDecoder = cc.coin.LockedCoin_OwnerExpireLock.valueDecoder()
@@ -160,7 +160,7 @@ object LockedCoinExpireCoin extends ExerciseNodeCompanion {
   override type Arg = coinCodegen.LockedCoin_ExpireCoin
   override type Res = cc.coin.CoinExpireSummary
 
-  override val templateOrInterface = Left(coinCodegen.LockedCoin.COMPANION)
+  override val template = coinCodegen.LockedCoin.COMPANION
   override val choice = coinCodegen.LockedCoin.CHOICE_LockedCoin_ExpireCoin
 
   override val argDecoder = coinCodegen.LockedCoin_ExpireCoin.valueDecoder()
@@ -176,7 +176,7 @@ object CoinRules_BuyMemberTraffic extends ExerciseNodeCompanion {
   override type Res =
     Tuple2[MemberTraffic.ContractId, Optional[cc.coin.Coin.ContractId]]
   override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_BuyMemberTraffic
-  override val templateOrInterface = Left(coinCodegen.CoinRules.COMPANION)
+  override val template = coinCodegen.CoinRules.COMPANION
   override val argDecoder = coinCodegen.CoinRules_BuyMemberTraffic.valueDecoder()
 
   override def argToValue(arg: Arg): Value = arg.toValue
@@ -200,7 +200,7 @@ object CnsRules_CollectInitialEntryPayment extends ExerciseNodeCompanion {
   override type Res =
     Tuple2[cnsCodegen.CnsEntry.ContractId, SubscriptionIdleState.ContractId]
   override val choice = cnsCodegen.CnsRules.CHOICE_CnsRules_CollectInitialEntryPayment
-  override val templateOrInterface = Left(cnsCodegen.CnsRules.COMPANION)
+  override val template = cnsCodegen.CnsRules.COMPANION
   override val argDecoder = cnsCodegen.CnsRules_CollectInitialEntryPayment.valueDecoder()
 
   override def argToValue(arg: Arg): Value = arg.toValue
@@ -219,7 +219,7 @@ object CnsRules_CollectEntryRenewalPayment extends ExerciseNodeCompanion {
   override type Res =
     Tuple2[cnsCodegen.CnsEntry.ContractId, SubscriptionIdleState.ContractId]
   override val choice = cnsCodegen.CnsRules.CHOICE_CnsRules_CollectEntryRenewalPayment
-  override val templateOrInterface = Left(cnsCodegen.CnsRules.COMPANION)
+  override val template = cnsCodegen.CnsRules.COMPANION
   override val argDecoder = cnsCodegen.CnsRules_CollectEntryRenewalPayment.valueDecoder()
 
   override def argToValue(arg: Arg): Value = arg.toValue
@@ -299,7 +299,7 @@ object CoinExpire extends ExerciseNodeCompanion {
   override type Arg = coinCodegen.Coin_Expire
   override type Res = cc.coin.CoinExpireSummary
 
-  override val templateOrInterface = Left(coinCodegen.Coin.COMPANION)
+  override val template = coinCodegen.Coin.COMPANION
   override val choice = coinCodegen.Coin.CHOICE_Coin_Expire
 
   override val argDecoder = coinCodegen.Coin_Expire.valueDecoder()

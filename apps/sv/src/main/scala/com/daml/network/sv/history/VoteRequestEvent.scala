@@ -13,7 +13,7 @@ object SvcRulesExecuteDefiniteVote extends ExerciseNodeCompanion {
   override type Arg = SvcRules_ExecuteDefiniteVote
   override type Res = VoteResult
 
-  override val templateOrInterface = Left(SvcRules.COMPANION)
+  override val template = SvcRules.COMPANION
 
   override val choice = SvcRules.CHOICE_SvcRules_ExecuteDefiniteVote
 
