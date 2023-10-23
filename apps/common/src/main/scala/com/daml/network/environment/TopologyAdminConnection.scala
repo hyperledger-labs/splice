@@ -1,10 +1,9 @@
 package com.daml.network.environment
 
-import cats.data.OptionT
+import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.config.CNThresholds
-import com.daml.network.environment.RetryProvider.{CheckReset, ConditionNotSatisfied}
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommandsX
@@ -28,6 +27,8 @@ import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.Generi
 import com.digitalasset.canton.topology.store.{TimeQueryX, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.*
 import com.daml.network.config.CNThresholds.getPartyToParticipantThreshold
+import com.daml.network.environment.RetryProvider.QuietNonRetryableException
+import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
   IdentifierDelegationX,
@@ -339,49 +340,72 @@ class TopologyAdminConnection(
   private def ensureTopologyProposal[M <: TopologyMappingX: ClassTag](
       store: TopologyStoreId,
       description: String,
-      check: Boolean => Future[Either[TopologyResult[M], TopologyResult[M]]],
+      check: TopologyTransactionType => EitherT[Future, TopologyResult[M], TopologyResult[M]],
       update: M => Either[String, M],
       signedBy: Fingerprint,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[M]] =
-    retryProvider.ensureThatWithReset[TopologyResult[M], TopologyResult[M]](
+  )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
+    def propose(state: TopologyResult[M]) = {
+      val updatedMapping = update(state.mapping)
+      proposeMapping(
+        store,
+        updatedMapping,
+        signedBy,
+        serial = state.base.serial + PositiveInt.one,
+        isProposal = true,
+      )
+    }
+
+    retryProvider.retryForAutomation(
       description,
-      // Check accepted state
-      // If not valid yet, check proposals
-      // If no valid proposal then return accepted state
-      check(false).flatMap {
-        case Left(acceptedResult) =>
-          check(true)
-            .map {
-              case Left(_) => Left(acceptedResult)
-              case success @ Right(_) => success
-            }
-            .recover {
-              case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
-                Left(acceptedResult)
-            }
-        case success @ Right(_) => Future.successful(success)
-      },
-      establishedState =>
-        check(false).flatMap {
-          case Left(currentState)
-              if currentState.base.serial == establishedState.lastEstablishState.base.serial =>
-            check(true).map(_.leftMap(ConditionNotSatisfied(_)))
-          case Left(newerAcceptedState) =>
-            Future.successful(Left(CheckReset(newerAcceptedState)))
-          case Right(success) => Future.successful(Right(success))
-        },
-      establish = { case TopologyResult(baseResult, mapping) =>
-        val updatedMapping = update(mapping)
-        proposeMapping(
-          store,
-          updatedMapping,
-          signedBy,
-          serial = baseResult.serial + PositiveInt.one,
-          isProposal = true,
-        ).map(_ => ())
-      },
+      check(TopologyTransactionType.AuthorizedState)
+        .leftFlatMap { authorizedState =>
+          EitherT(
+            check(TopologyTransactionType.ProposalsOnly)
+              .leftMap(_ => authorizedState)
+              .value
+              .recover {
+                case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
+                  Left(authorizedState)
+              }
+          )
+        }
+        .foldF(
+          beforeProposalAuthorizedState =>
+            propose(beforeProposalAuthorizedState)
+              .flatMap { _ =>
+                retryProvider.retryForAutomation(
+                  s"check established proposal $description",
+                  check(TopologyTransactionType.AuthorizedState)
+                    .leftFlatMap[TopologyResult[M], RuntimeException] { currentAuthorizedState =>
+                      if (
+                        currentAuthorizedState.base.serial == beforeProposalAuthorizedState.base.serial
+                      ) {
+                        check(TopologyTransactionType.ProposalsOnly)
+                          .leftMap(_ =>
+                            Status.FAILED_PRECONDITION
+                              .withDescription("Proposal is not yet observed.")
+                              .asRuntimeException()
+                          )
+                      } else {
+                        EitherT.leftT(
+                          new QuietNonRetryableException(
+                            "Proposal base authorized state has changed, must be re-created."
+                          )
+                        )
+                      }
+                    }
+                    .rethrowT,
+                  logger,
+                )
+              }
+              .recover { case ex: QuietNonRetryableException =>
+                throw Status.FAILED_PRECONDITION.withDescription(ex.getMessage).asRuntimeException()
+              },
+          Future.successful,
+        ),
       logger,
     )
+  }
 
   private def ensureTopologyMapping[M <: TopologyMappingX: ClassTag](
       store: TopologyStoreId,
@@ -456,7 +480,7 @@ class TopologyAdminConnection(
       svcRulesMembersSize: Int,
       signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] = {
-    def findPartyToParticipant(proposal: Boolean) = {
+    def findPartyToParticipant(proposal: Boolean) = EitherT {
       if (proposal) {
         listPartyToParticipant(
           filterStore = domainId.filterString,
@@ -496,7 +520,7 @@ class TopologyAdminConnection(
     ensureTopologyProposal[PartyToParticipantX](
       TopologyStoreId.DomainStore(domainId),
       show"Party $party is proposed on $newParticipant",
-      proposal => findPartyToParticipant(proposal = proposal),
+      queryType => findPartyToParticipant(proposal = queryType.proposals),
       previous =>
         Right(
           previous.copy(
@@ -705,23 +729,28 @@ class TopologyAdminConnection(
     ensureTopologyProposal[UnionspaceDefinitionX](
       TopologyStoreId.DomainStore(domainId),
       show"Namespace $newOwner is proposed in owners of UnionspaceDefinition",
-      proposals =>
-        if (proposals)
-          listUnionspaceDefinition(domainId, unionspace, proposals).map(
-            _.find(_.mapping.owners.contains(newOwner))
-              .getOrElse(
-                throw Status.NOT_FOUND
-                  .withDescription(
-                    s"No unionspace proposal found for unionspace $unionspace for new owner $newOwner on domain $domainId"
-                  )
-                  .asRuntimeException()
-              )
-              .asRight
+      {
+        case proposals @ TopologyTransactionType.ProposalsOnly =>
+          EitherT(
+            listUnionspaceDefinition(domainId, unionspace, proposals.proposals).map(
+              _.find(_.mapping.owners.contains(newOwner))
+                .getOrElse(
+                  throw Status.NOT_FOUND
+                    .withDescription(
+                      s"No unionspace proposal found for unionspace $unionspace for new owner $newOwner on domain $domainId"
+                    )
+                    .asRuntimeException()
+                )
+                .asRight
+            )
           )
-        else
-          getUnionspaceDefinition(domainId, unionspace).map(result =>
-            Either.cond(result.mapping.owners.contains(newOwner), result, result)
-          ),
+        case TopologyTransactionType.AuthorizedState =>
+          EitherT(
+            getUnionspaceDefinition(domainId, unionspace).map(result =>
+              Either.cond(result.mapping.owners.contains(newOwner), result, result)
+            )
+          )
+      },
       previous =>
         // constructor is not exposed so no copy
         UnionspaceDefinitionX.create(
@@ -866,6 +895,22 @@ class TopologyAdminConnection(
 
 object TopologyAdminConnection {
   private val TOPOLOGY_CHANGE_SKEW: Duration = Duration.ofMillis(100)
+
+  sealed trait TopologyTransactionType {
+    def proposals: Boolean
+  }
+
+  object TopologyTransactionType {
+
+    case object ProposalsOnly extends TopologyTransactionType {
+      override def proposals: Boolean = true
+    }
+
+    case object AuthorizedState extends TopologyTransactionType {
+      override def proposals: Boolean = false
+    }
+
+  }
 
   def proposeCollectively[T <: TopologyMappingX](
       connections: NonEmpty[List[TopologyAdminConnection]]

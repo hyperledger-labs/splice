@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.cc.coin.CoinRules
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
-import com.daml.network.environment.RetryProvider.NonRetryableException
+import com.daml.network.environment.RetryProvider.QuietNonRetryableException
 import com.daml.network.http.v0.definitions.CometBftNodeStatusResponse
 import com.daml.network.http.v0.sv.{GetCometBftNodeStatusResponse, SvClient}
 import com.daml.network.http.v0.{definitions, sv as http}
@@ -237,7 +237,7 @@ object HttpSvAppClient {
   case class OnboardSvPartyMigrationAuthorizeProposalNotFound(
       partyToParticipantMappingSerial: PositiveInt,
       unionspaceDefinitionSerial: PositiveInt,
-  ) extends NonRetryableException(
+  ) extends QuietNonRetryableException(
         s"Party migration failed as required proposals were not found. Found base mappings: PartyToParticipant($partyToParticipantMappingSerial), UnionspaceDefinition($unionspaceDefinitionSerial)"
       )
   case class OnboardSvPartyMigrationAuthorizeResponse(

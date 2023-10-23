@@ -3,18 +3,11 @@ package com.daml.network.environment
 import akka.Done
 import akka.stream.StreamTcpException
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import cats.implicits.toBifunctorOps
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.metrics.api.MetricsContext
 import com.daml.network.admin.api.client.commands.HttpCommandException
-import com.daml.network.environment.RetryProvider.{
-  CheckReset,
-  CheckResult,
-  ConditionNotSatisfied,
-  EnsureState,
-}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.ErrorCodeUtils
@@ -40,7 +33,6 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
 import io.grpc.Status
 import io.grpc.protobuf.StatusProto
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.*
 import scala.util.{Failure, Try}
@@ -148,7 +140,7 @@ class RetryProvider(
       additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit ec: ExecutionContext): Future[Unit] =
     TraceContext.withNewTraceContext(tc0 => {
-      implicit val tc: TraceContext = tc0;
+      implicit val tc: TraceContext = tc0
       logger.info(s"Waiting until $conditionDescription")
       retryForAutomation(
         s"Check whether $conditionDescription",
@@ -196,7 +188,7 @@ class RetryProvider(
       additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit ec: ExecutionContext, pp: Pretty[T]): Future[T] =
     TraceContext.withNewTraceContext(tc0 => {
-      implicit val tc: TraceContext = tc0;
+      implicit val tc: TraceContext = tc0
       val valueDescQuoted = s"'$valueDescription'"
       logger.info(s"Attempting to get $valueDescQuoted")
       retryForAutomation(s"Get $valueDescription", getValue, logger, additionalCodes)
@@ -273,31 +265,6 @@ class RetryProvider(
       establish: A => Future[Unit],
       logger: TracedLogger,
       additionalCodes: Seq[Status.Code] = Seq.empty,
-  )(implicit ec: ExecutionContext, pa: Pretty[A], pb: Pretty[B]): Future[B] = {
-    ensureThatWithReset(
-      conditionDesc,
-      initialCheck,
-      (_: EnsureState[A]) => establishedCheck.map(_.leftMap(ConditionNotSatisfied(_))),
-      establish,
-      logger,
-      additionalCodes,
-    )
-  }
-
-  /** Ensure that a particular condition holds as part of an init-like process.
-    *
-    * Checks the condition and establishes it if it does not hold; and waits
-    * until the condition holds after establishing it.
-    *
-    * The post-establish check can trigger a new attempt at establishing the desired condition, potentially altering the desired condition by changing the input to the establish function.
-    */
-  def ensureThatWithReset[A, B](
-      conditionDesc: String,
-      initialCheck: => Future[Either[A, B]],
-      establishedCheck: EnsureState[A] => Future[Either[CheckResult[A], B]],
-      establish: A => Future[Unit],
-      logger: TracedLogger,
-      additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit ec: ExecutionContext, pa: Pretty[A], pb: Pretty[B]): Future[B] =
     TraceContext.withNewTraceContext(tc0 => {
       implicit val tc: TraceContext = tc0;
@@ -307,43 +274,24 @@ class RetryProvider(
         initialCheck.flatMap {
           case Right(result) => Future.successful(Right(result))
           case Left(error) =>
-            establish(error).map(_ => Left(error))
+            establish(error).map(Left(_))
         },
         logger,
         additionalCodes,
       ).flatMap {
         case Right(result) => Future.successful(result)
-        case Left(state) =>
+        case Left(_) =>
           logger.debug(s"Established that $conditionDesc, waiting until it is observable")
-          val lastEstablishState = new AtomicReference(state)
           retryForAutomation(
             s"Wait until observing $conditionDesc",
-            establishedCheck(EnsureState(lastEstablishState.get())).flatMap {
-              def failedPrecondition(error: A) = {
+            establishedCheck.map {
+              case Right(result) => result
+              case Left(error) =>
                 throw Status.FAILED_PRECONDITION
                   .withDescription(
                     show"Condition $conditionDesc is not (yet) observable; check failed with $error"
                   )
                   .asRuntimeException()
-              }
-
-              {
-                case Right(result) => Future.successful(result)
-                case Left(CheckReset(result)) =>
-                  logger.info(
-                    s"Re-establishing $conditionDesc and waiting until it is observable."
-                  )
-                  establish(result).flatMap { _ =>
-                    lastEstablishState.set(result)
-                    establishedCheck(EnsureState(result)).map {
-                      case Right(result) => result
-                      case Left(err) =>
-                        failedPrecondition(err.result)
-                    }
-                  }
-                case Left(ConditionNotSatisfied(err)) =>
-                  failedPrecondition(err)
-              }
             },
             logger,
             additionalCodes,
@@ -507,7 +455,7 @@ class RetryProvider(
 }
 
 object RetryProvider {
-  case class RetryConfig(
+  private case class RetryConfig(
       maxRetries: Int,
       initialDelay: FiniteDuration,
       maxDelay: Duration,
@@ -625,8 +573,7 @@ object RetryProvider {
                         case ed: ErrorDetails.ErrorInfoDetail =>
                           ed.metadata
                             .get("reason")
-                            .map(_.contains("ContractConsistencyError"))
-                            .getOrElse(false)
+                            .exists(_.contains("ContractConsistencyError"))
                         case _ => false
                       }
                       ||
@@ -711,7 +658,7 @@ object RetryProvider {
             s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
           logger.info(msg)
           TransientErrorKind
-        case Failure(ex: NonRetryableException) =>
+        case Failure(ex: QuietNonRetryableException) =>
           logger.info(
             s"The operation ${operationName.singleQuoted} failed with a non retryable error, $fatalBehavior",
             ex,
@@ -747,21 +694,10 @@ object RetryProvider {
     override protected final def timeouts: ProcessingTimeout = retryProvider.timeouts
   }
 
-  final case class EnsureState[A](
-      lastEstablishState: A
-  )
-
-  sealed trait CheckResult[A] {
-    def result: A
-  }
-
-  final case class ConditionNotSatisfied[A](result: A) extends CheckResult[A]
-  final case class CheckReset[A](result: A) extends CheckResult[A]
-
   /** Errors that must not be retried by the retry provider
     * These errors can be used to represent errors that can be retried by the client after altering the request
     *  These errors will not log a warning message on failure
     */
-  class NonRetryableException(msg: String) extends RuntimeException(msg)
+  class QuietNonRetryableException(msg: String) extends RuntimeException(msg)
 
 }
