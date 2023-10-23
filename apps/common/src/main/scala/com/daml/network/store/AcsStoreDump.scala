@@ -15,7 +15,6 @@ import com.daml.network.util.{
   ContractWithState,
   DisclosedContracts,
   TemplateJsonDecoder,
-  UpgradeUtil,
 }
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.TracedLogger
@@ -24,6 +23,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 object AcsStoreDump {
 
@@ -109,7 +109,7 @@ object AcsStoreDump {
     )
 
     (coinCommands ++ validatorLicenseCommands ++ importCrateCommands).flatMap(
-      UpgradeUtil.downgradeImportCrateCreate(_)
+      _.create.commands.asScala
     )
   }
 

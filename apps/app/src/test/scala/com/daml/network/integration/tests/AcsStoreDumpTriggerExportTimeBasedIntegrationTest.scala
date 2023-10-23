@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.config.{BackupDumpConfig, CNNodeConfigTransforms, GcpBucketConfig}
@@ -19,7 +18,6 @@ import com.daml.network.util.{
   ResourceTemplateDecoder,
   TemplateJsonDecoder,
   TimeTestUtil,
-  UpgradeUtil,
   WalletTestUtil,
 }
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -114,20 +112,17 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
         .awaitJava(cc.coin.Coin.COMPANION)(
           charlieUserParty
         )
-      val tx = sv1Backend.participantClient.ledger_api_extensions.commands.submitJava(
-        applicationId = sv1Backend.config.ledgerApiUser,
+      val created = sv1Backend.participantClient.ledger_api_extensions.commands.submitWithResult(
+        userId = sv1Backend.config.ledgerApiUser,
         actAs = Seq(svcParty),
         readAs = Seq.empty,
-        commands = UpgradeUtil.downgradeImportCrateCreate(
-          new cc.coinimport.ImportCrate(
-            svcParty.toProtoPrimitive,
-            charlieUserParty.toProtoPrimitive,
-            new cc.coinimport.importpayload.IP_Coin(charlieCoin.data),
-          )
-        ),
-        optTimeout = None,
+        update = new cc.coinimport.ImportCrate(
+          svcParty.toProtoPrimitive,
+          charlieUserParty.toProtoPrimitive,
+          new cc.coinimport.importpayload.IP_Coin(charlieCoin.data),
+        ).create,
       )
-      tx.getEventsById.get(tx.getRootEventIds.get(0)).asInstanceOf[CreatedEvent].getContractId
+      created.contractId.contractId
     }
 
     val aliceUnlockedIds = aliceValidatorBackend.participantClient.ledger_api_extensions.acs

@@ -3,7 +3,6 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.console.CNParticipantClientReference
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.UpgradeUtil
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.TopologyChangeOpX
@@ -192,12 +191,11 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
       {
-        participant.ledger_api_extensions.commands.submitJava(
-          applicationId = sv1Backend.config.ledgerApiUser,
+        participant.ledger_api_extensions.commands.submitWithResult(
+          userId = sv1Backend.config.ledgerApiUser,
           actAs = Seq(svcParty),
           readAs = Seq.empty,
-          commands = UpgradeUtil.downgradeCoinCreate(coin(amount, svcParty)),
-          optTimeout = None,
+          update = coin(amount, svcParty).create,
         )
       },
       logs =>

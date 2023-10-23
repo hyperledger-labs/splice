@@ -1,6 +1,6 @@
 package com.daml.network.util
 
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
+import com.daml.ledger.javaapi.data.ExercisedEvent
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.fees as feesCodegen
@@ -14,7 +14,6 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{ValidatorAppBackendReference, *}
-import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
@@ -838,7 +837,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): coinCodegen.Coin.ContractId = {
-    val coin = UpgradeUtil.downgradeCoinCreate(
+    val coin =
       new coinCodegen.Coin(
         svcParty.toProtoPrimitive,
         owner.toProtoPrimitive,
@@ -848,20 +847,16 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
           new feesCodegen.RatePerRound(holdingFee.bigDecimal),
         ),
         Optional.empty(),
-      )
-    )
-    val tx = participantClient.ledger_api_extensions.commands
-      .submitJava(
-        applicationId = userId,
+      ).create
+    val created = participantClient.ledger_api_extensions.commands
+      .submitWithResult(
+        userId = userId,
         actAs = Seq(svcParty, owner),
         readAs = Seq.empty,
-        commands = coin,
-        workflowId = domainId.fold("")(CNLedgerConnection.domainIdToWorkflowId(_)),
-        optTimeout = None,
+        update = coin,
+        domainId = domainId,
       )
-    val cid =
-      tx.getEventsById.get(tx.getRootEventIds.get(0)).asInstanceOf[CreatedEvent].getContractId
-    new coinCodegen.Coin.ContractId(cid)
+    created.contractId
   }
 
   /* Directly archives the given coin. */
