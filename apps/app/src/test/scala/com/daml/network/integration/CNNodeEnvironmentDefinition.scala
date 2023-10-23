@@ -11,7 +11,7 @@ import com.daml.network.environment.{
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.CommonCNNodeAppInstanceReferences
 import com.digitalasset.canton.admin.api.client.data.User
-import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeNumeric, PositiveInt}
 import com.digitalasset.canton.config.{
   ClockConfig,
   NonNegativeFiniteDuration,
@@ -24,13 +24,13 @@ import com.digitalasset.canton.integration.{
   TestConsoleEnvironment,
   TestEnvironment,
 }
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, SuppressingLogger}
+import com.digitalasset.canton.topology.transaction.UnionspaceDefinitionX
+import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens.*
-import org.scalatest.{Inside, Inspectors, OptionValues}
 import org.scalatest.matchers.should.Matchers
-import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.logging.SuppressingLogger
+import org.scalatest.{Inside, Inspectors, OptionValues}
 
 /** Analogue to Canton's CommunityEnvironmentDefinition. */
 case class CNNodeEnvironmentDefinition(
@@ -88,6 +88,59 @@ case class CNNodeEnvironmentDefinition(
         }
       })
     })
+
+  def withResettedUnionspace(): CNNodeEnvironmentDefinition = {
+    copy(preSetup = env => {
+      import env.*
+      this.preSetup(env)
+
+      /** The unionspace is reset to contain only sv1 after each env is used
+        * When onboarding SVs their participant namespace is added to the unionspace, so for a "clean" test we have to remove them
+        * We cannot just drop the unionspace because the global domain is owned by it
+        */
+      svs.local
+        .find(_.name == "sv1")
+        .foreach { sv1 =>
+          val participantNamespace = sv1.participantClientWithAdminToken.id.uid.namespace
+          val unionspace = UnionspaceDefinitionX.computeNamespace(Set(participantNamespace))
+          val svParty = participantNamespace
+          sv1.participantClientWithAdminToken.domains
+            .list_connected()
+            .find(_.domainAlias == sv1.config.domains.global.alias)
+            .fold(
+              logger.info("Not resetting unionspace as the domain is not connected")(
+                TraceContext.empty
+              )
+            ) { domainId =>
+              val store = domainId.domainId.filterString
+              sv1.participantClientWithAdminToken.topology.unionspaces
+                .list(
+                  store,
+                  filterNamespace = unionspace.toProtoPrimitive,
+                )
+                .headOption
+                .fold(
+                  logger.info("Not resetting unionspace as it doesn't exist yet")(
+                    TraceContext.empty
+                  )
+                ) { existingUnionspace =>
+                  logger.info("Resetting unionspace to contain only sv1")(
+                    TraceContext.empty
+                  )
+                  if (existingUnionspace.item.owners.exists(_ != svParty))
+                    sv1.participantClientWithAdminToken.topology.unionspaces
+                      .propose(
+                        Set(svParty.fingerprint),
+                        PositiveInt.one,
+                        store,
+                        serial = Some(existingUnionspace.context.serial + PositiveInt.one),
+                      )
+                      .discard
+                }
+            }
+        }
+    })
+  }
 
   def withInitializedNodes(): CNNodeEnvironmentDefinition =
     copy(setup = implicit env => {
@@ -258,6 +311,7 @@ case class CNNodeEnvironmentDefinition(
     ) with TestEnvironment[CNNodeEnvironmentImpl] {
       override val actorSystem = super[TestEnvironment].actorSystem
       override val actualConfig: CNNodeConfig = environment.config
+
     }
 }
 
@@ -268,6 +322,7 @@ object CNNodeEnvironmentDefinition extends CommonCNNodeAppInstanceReferences {
       .withAllocatedUsers()
       .withInitializedNodes()
       .withTrafficTopupsEnabled
+      .withResettedUnionspace()
 
   def simpleTopologyWithSimTime(testName: String): CNNodeEnvironmentDefinition =
     simpleTopology(testName).withSimTime

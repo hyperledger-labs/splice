@@ -5,11 +5,11 @@ import com.daml.network.directory.config.DirectoryAppExternalClientConfig
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvAppClientConfig
 import com.daml.network.util.ResourceTemplateDecoder
-import com.daml.network.validator.config.{AppManagerAppClientConfig, ValidatorAppClientConfig}
+import com.daml.network.validator.config.AppManagerAppClientConfig
+import com.daml.network.validator.config.ValidatorAppClientConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{
   CantonHealthAdministration,
   CommunityCantonHealthAdministration,
@@ -473,40 +473,4 @@ class CNNodeConsoleEnvironment(
   override protected def createRemoteDomainReference(name: String): CommunityRemoteDomainReference =
     new CommunityRemoteDomainReference(this, name)
 
-  /** The unionspace is reset to contain only sv1 after each env is used
-    * When onboarding SVs their participant namespace is added to the unionspace, so for a "clean" test we have to remove them
-    * We cannot just drop the unionspace because the global domain is owned by it
-    * We're resetting it as late as possible so that any background task run by the sv app doesn't fail
-    */
-  override def onClosed(): Unit = {
-    logger.info("Resetting unionspace to contain only sv1")
-    // reset only if sv1 was started
-    val activeSv = svs.local
-      .filter(_.is_running)
-    activeSv
-      .find(_.name == "sv1")
-      .foreach { sv1 =>
-        val svcInfo = sv1.getSvcInfo()
-        val unionspace = svcInfo.svcParty.uid.namespace
-        val svParty = svcInfo.svParty.uid.namespace
-        val domainId = sv1.participantClient.domains.id_of(sv1.config.domains.global.alias)
-        val existingUnionspace = sv1.participantClientWithAdminToken.topology.unionspaces
-          .list(
-            domainId.filterString,
-            filterNamespace = unionspace.toProtoPrimitive,
-          )
-          .headOption
-          .getOrElse(throw new IllegalArgumentException("Unionspace not found"))
-        if (existingUnionspace.item.owners.exists(_ != svParty))
-          sv1.participantClientWithAdminToken.topology.unionspaces
-            .propose(
-              Set(svParty.fingerprint),
-              PositiveInt.one,
-              domainId.filterString,
-              serial = Some(existingUnionspace.context.serial + PositiveInt.one),
-            )
-            .discard
-      }
-    super.onClosed()
-  }
 }
