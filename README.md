@@ -417,7 +417,7 @@ to be available to respond in case the weekly redeployment of one of these clust
 As above, "respond" does not have to mean "resolve themselves".
 To the contrary - given the more sensitive nature of partner-facing clusters, engineers are encouraged to seek out help and additional pairs of eyes.
 All engineers on the Canton Network team are advised to familiarize themselves with the [cluster README](cluster/README.md),
-for advice and best-practices around recovering a failed deployment of one of these clusters.
+for [advice and best practices around recovering from a failed deployment](cluster/README.md#strategies-for-reacting-to-a-failed-testnet-or-devnet-deployment) of a `TestNet` or `DevNet` cluster.
 
 ### Contribution Guide
 

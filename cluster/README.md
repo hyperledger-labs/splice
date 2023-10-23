@@ -12,6 +12,8 @@
     - [Docker Image Hosting](#docker-image-hosting)
     - [Cluster Management Operations](#cluster-management-operations)
     - [DevNet and TestNet](#devnet-and-testnet)
+      - [Strategies for reacting to a failed TestNet or DevNet deployment](#strategies-for-reacting-to-a-failed-testnet-or-devnet-deployment)
+      - [Testing deploy-devnet and deploy-testnet changes](#testing-deploy-devnet-and-deploy-testnet-changes)
     - [Manually Deploying via CI](#manually-deploying-via-ci)
       - [Optional deployment settings](#optional-deployment-settings)
       - [Confirming the Deployment](#confirming-the-deployment)
@@ -284,7 +286,7 @@ subcommands. A few highlights include the following:
         `CNCLUSTER_SKIP_DOCKER_CHECK` environment variable to 1. This
         can also be added to `.envrc.private`.
       * One can skip redeploying the `infra` stack by supplying the `--skip-infra` flag.
-* `cncluster apply_sv` - Apply the sv-runbook Pulumi stack. 
+* `cncluster apply_sv` - Apply the sv-runbook Pulumi stack.
       * You need to provide a `target-domain-cluster` argument, for instance `scratcha` for scratchneta.
 * `cncluster pdown` - Take down any installed resources populated with
   the `canton-network` Pulumi stack.
@@ -299,7 +301,7 @@ subcommands. A few highlights include the following:
   unless you specify `--raw`.
 * `cncluster preflight` - Run the preflight check against the cluster.
   If canton network is not installed yet on the cluster, run `cncluster apply` first.
-* `cncluster preflight_sv` - Run the SV preflight check against the cluster. 
+* `cncluster preflight_sv` - Run the SV preflight check against the cluster.
   If the sv-runbook is not installed yet on the cluster, run `cncluster apply_sv` first.
 * `cncluster push` - Rebuild and push one or more modules into a
   cluster. This command takes care to ensure that the specified modules
@@ -342,6 +344,62 @@ Note that if the next `CIDaily` deployment fails, the next `DevNet` deployment w
 On Wednesday night, another trigger marks the version running on `DevNet`
 at that point in time with a `testnet-next` tag. That version will then be
 deployed on TestNet in the following TestNet upgrade (usually the following Monday morning).
+
+#### Strategies for reacting to a failed TestNet or DevNet deployment
+
+Failures of scheduled deployments of `TestNet` and `DevNet` cause disturbances for our external SV partners, and hence also reputation harm for us.
+Recovering from a failed deployment of any of those networks has very high priority, especially for people on [support rotation](../README.md#the-support-rotation).
+Here are a few strategies and techniques that can be useful for speeding up the recovery of a failed `TestNet`/`DevNet` deployment:
+
+- If the deployment problem looks like a flake,
+  i.e., if it looks as if the deployment has a high chance of succeeding without any further changes,
+  the CirlceCI deployment workflow can simply be "Rerun from failed" (see the "Rerun" button on the top right).
+  Please still follow up on the flake and make sure it can't happen at all in future deployments.
+  Example [postmortem](https://docs.google.com/document/d/1WYQgZ6PZC1ZcIIo5CSQtuCg7zNdXPyGYAKx96vVe-Jc).
+- If if looks as if the deployment failed due to a bug in our CircleCI configuration,
+  the CircleCI configuration must be fixed on the current main branch first.
+  Once the fix has been merged, [start a new deployment](#manually-deploying-via-ci) of the target cluster.
+  Note that you can't "Rerun from failed" in this case as this will not pick up you fix.
+  Example [postmortem](https://docs.google.com/document/d/1kfkbmUVCFOARcDLBbIivyRyaLJgjY6ejqE9VePxcDtU)
+  (see the `DevNet` failure there and note that moving the tag for `devnet-next` was *not* necessary in this case).
+- If it looks as if the deployment fails for another reason and you have reason to believe that the last version that was deployed
+  would (still) work, consider redeploying that older version.
+  Especially for `TestNet`, it is more important that *a* stable deployment is running than that it is of the latest version.
+  To quickly move the release tag (either `devnet-next` or `testnet-next`), you can use standard git commands:
+  ```
+  git tag --force devnet-next TARGET_COMMIT
+  git push --force origin devnet-next
+  ```
+  Following that you can trigger a redeploy by whatever means is most convenient.
+  Make sure that `TARGET_COMMIT` is a commit that was actually used previously in a `TestNet` or (for `DevNet`) `DevNet` deployment.
+  If this is not the case, you need to ensure that public artifacts for this version have been published first (see below).
+- If you have reason to believe that you can fix the underlying (not CI-related) deployment problem quickly by merging an appropriate PR,
+  or that a fix already exists on the `main` branch for a commit that is younger than the deployed version,
+  you need to bump the version of the failed deployment so your fix will be included in the redeployment attempt.
+  Note that we generally discourage jumping forward in versioning like this
+  as it sidesteps the regular testing time that our releases go through before being marked for `DevNet` or `TestNet`.
+  If you have reason to believe that the associated risks (of including new failure sources) are justifiable,
+  we recommend that you follow the `scripts/unmark-for-devnet.sh` route described above
+  and trigger a new CIDaily deployment manually to let CI move the tag after some testing.
+  If instead you have decided to move the tag manually using git commands,
+  you need to make sure that public artifacts have been published for the version you will be deploying (see below).
+  Example [postmortem](https://docs.google.com/document/d/1kfkbmUVCFOARcDLBbIivyRyaLJgjY6ejqE9VePxcDtU)
+  (see the `TestNet` failures there).
+- Versions you deploy to `DevNet` and `TestNet` must have been published as public releases to Artifactory first,
+  otherwise their deployment will fail.
+  A quick way to check if the commit you are planning to deploy is safe in this respect is to check whether it has a git tag
+  such as `0.1.1-snapshot.20231016.3949.0.vf820dd0f`.
+  This is normally true for all CN versions that have been successfully deployed to `DevNet`, `TestNet`, or `CIDaily` at least once.
+  If you suspect that no public artifacts have been published for the version you plan to deploy, you need to trigger this manually.
+  Follow the steps on [manually deploying via CI](#manually-deploying-via-ci), with the following modifications:
+  1. Instead of `main`, select a branch that corresponds to the commit you need published artifacts for.
+  Please make sure that the branch refers to an actual commit on `main`, for example by creating a new branch at the target commit.
+  2. As an argument for `run-job`, use `publish-public-artifacts`.
+
+Once you have successfully recovered from a `TestNet` or `DevNet` deployment failure,
+please make sure that our SV partners are informed about your resolution as well,
+via a message on the [#svc-ops](https://daholdings.slack.com/archives/C05E70BCSDA) Slack channel.
+Also consider initiating the writing of a [postmortem](https://drive.google.com/drive/folders/10xogcO7_y_gYdEfbUkQLamD8-PTwPmqW) about what happened.
 
 #### Testing deploy-devnet and deploy-testnet changes
 
