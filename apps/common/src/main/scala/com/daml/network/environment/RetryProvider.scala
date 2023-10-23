@@ -711,6 +711,12 @@ object RetryProvider {
             s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
           logger.info(msg)
           TransientErrorKind
+        case Failure(ex: NonRetryableException) =>
+          logger.info(
+            s"The operation ${operationName.singleQuoted} failed with a non retryable error, $fatalBehavior",
+            ex,
+          )
+          FatalErrorKind
         case Failure(ex) =>
           logger.warn(s"$operationName failed with an unknown exception, $fatalBehavior", ex)
           FatalErrorKind
@@ -751,4 +757,11 @@ object RetryProvider {
 
   final case class ConditionNotSatisfied[A](result: A) extends CheckResult[A]
   final case class CheckReset[A](result: A) extends CheckResult[A]
+
+  /** Errors that must not be retried by the retry provider
+    * These errors can be used to represent errors that can be retried by the client after altering the request
+    *  These errors will not log a warning message on failure
+    */
+  class NonRetryableException(msg: String) extends RuntimeException(msg)
+
 }

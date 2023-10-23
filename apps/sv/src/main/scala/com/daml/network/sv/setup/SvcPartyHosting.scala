@@ -3,6 +3,7 @@ package com.daml.network.sv.setup
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.OptionT
+import com.daml.network.environment.RetryProvider.NonRetryableException
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.sv.admin.api.client.SvConnection
@@ -310,5 +311,5 @@ object SvcPartyHosting {
   ) extends SvcPartyMigrationFailure
 
   case class PartyToParticipantProposalThresholdMismatch()
-      extends RuntimeException("Proposal must be recreated because the threshold has changed.")
+      extends NonRetryableException("Proposal must be recreated because the threshold has changed.")
 }

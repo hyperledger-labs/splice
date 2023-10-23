@@ -62,8 +62,4 @@ Unexpected duplicate on-boarding of wallet end-user
 # Ignoring console.warn
 .*Auth0 login error.*
 
-# Ignore party migration retries
-Party migration failed as required proposals were not found.
-Proposal must be recreated because the threshold has changed.
-
 # Make sure to have a trailing newline
