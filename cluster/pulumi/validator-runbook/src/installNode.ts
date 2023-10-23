@@ -129,7 +129,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       },
       withSv: false,
       withScan: false,
-      withDomainNode: false,
+      withDomainNode: true,
     },
     localCharts,
     version,

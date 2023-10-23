@@ -5,4 +5,5 @@ cluster:
 withSv: true
 withScan: true
 withDirectoryBackend: false
+withDomainNode: true
 defaultJvmOptions: -Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4

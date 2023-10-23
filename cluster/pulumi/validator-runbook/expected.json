@@ -84,7 +84,7 @@
           "svNamespace": "validator"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "withDomainNode": false,
+        "withDomainNode": true,
         "withScan": false,
         "withSv": false
       }
