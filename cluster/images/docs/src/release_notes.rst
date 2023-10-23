@@ -4,9 +4,17 @@ Release Notes
 =============
 
 2023-10-30
-----------
 
 * Add a hidden page to the SV UI (``/leader``) that allows SVs to manually trigger a reelection of the SvcRules leader, as an additional safety mechanism and measure of last resort.
+
+* Deployment updates
+
+  * The requirement for url rewriting in one of the rules has been removed:
+    ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator`` no longer requires rewriting
+    (and also has been modified from `/api/v0/validator` to `/api/validator`.
+    For example, ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator/foobar`` should be forwarded to
+    ``http://validator-app:5003/api/validator/foobar``. In the future, the other rewrite requirements
+    will also be removed.
 
 2023-10-23
 ----------

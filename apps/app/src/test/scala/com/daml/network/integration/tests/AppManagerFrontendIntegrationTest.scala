@@ -104,7 +104,10 @@ class AppManagerFrontendIntegrationTest
               .toSeq should have size 1
           },
         )
-        actAndCheck("Launch app", click on splitwell.childElement(className("installed-app-link")))(
+        actAndCheck(
+          "Launch app",
+          click on splitwell.childElement(className("installed-app-link")),
+        )(
           "splitwell UI shows up",
           _ =>
             // This also implies the install contract has been created

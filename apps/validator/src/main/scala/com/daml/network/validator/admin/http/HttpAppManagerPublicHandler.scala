@@ -1,12 +1,7 @@
 package com.daml.network.validator.admin.http
 
-import akka.stream.Materializer
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
-import cats.data.EitherT
-import com.daml.network.admin.api.client.commands.HttpClientBuilder
-import com.daml.network.environment.{BaseAppConnection, ParticipantAdminConnection}
-import com.daml.network.http.v0.app_manager_public.AppManagerPublicResource
-import com.daml.network.http.v0.{definitions, app_manager_public as v0}
+import com.daml.network.environment.{ParticipantAdminConnection}
+import com.daml.network.http.v0.{app_manager_public as v0, definitions}
 import com.daml.network.validator.config.AppManagerConfig
 import com.daml.network.validator.store.AppManagerStore
 import com.daml.network.validator.util.OAuth2Manager
@@ -14,13 +9,10 @@ import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
-import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import io.circe.Json
-
 import java.util.Base64
 
 class HttpAppManagerPublicHandler(
@@ -32,8 +24,6 @@ class HttpAppManagerPublicHandler(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-    httpClient: HttpRequest => Future[HttpResponse],
-    mat: Materializer,
 ) extends v0.AppManagerPublicHandler[Unit]
     with Spanning
     with NamedLogging {
@@ -117,20 +107,22 @@ class HttpAppManagerPublicHandler(
     }
 
   override def getLatestAppConfigurationByName(
-      respond: AppManagerPublicResource.GetLatestAppConfigurationByNameResponse.type
+      respond: v0.AppManagerPublicResource.GetLatestAppConfigurationByNameResponse.type
   )(
       name: String
-  )(extracted: Unit): Future[AppManagerPublicResource.GetLatestAppConfigurationByNameResponse] = {
+  )(
+      extracted: Unit
+  ): Future[v0.AppManagerPublicResource.GetLatestAppConfigurationByNameResponse] = {
     withNewTrace(workflowId) { implicit tc => _ =>
       store
         .lookupLatestAppConfigurationByName(name)
         .map(
-          _.fold[AppManagerPublicResource.GetLatestAppConfigurationByNameResponse](
-            AppManagerPublicResource.GetLatestAppConfigurationByNameResponseNotFound(
+          _.fold[v0.AppManagerPublicResource.GetLatestAppConfigurationByNameResponse](
+            v0.AppManagerPublicResource.GetLatestAppConfigurationByNameResponseNotFound(
               definitions.ErrorResponse(s"Could not found AppConfiguration with name $name")
             )
           )(config =>
-            AppManagerPublicResource.GetLatestAppConfigurationByNameResponseOK(config.toHttp)
+            v0.AppManagerPublicResource.GetLatestAppConfigurationByNameResponseOK(config.toHttp)
           )
         )
     }
@@ -143,63 +135,4 @@ class HttpAppManagerPublicHandler(
     withNewTrace(workflowId) { implicit tc => _ =>
       store.getAppRelease(PartyId.tryFromProtoPrimitive(provider), version).map(_.toHttp)
     }
-
-  // Reverse proxy for JSON API to add CORS headers.
-  // The endpoints here are public as the underlying participant does the actual JWT check.
-
-  val jsonApiClient = v0.AppManagerPublicClient.httpClient(
-    HttpClientBuilder().buildClient(),
-    config.jsonApiUrl.toString,
-  )
-
-  def handleResponse[R](response: EitherT[Future, Either[Throwable, HttpResponse], R]): Future[R] =
-    EitherTUtil.toFuture(response.leftMap[Throwable] {
-      case Left(throwable) => throwable
-      case Right(response) => new BaseAppConnection.UnexpectedHttpResponse(response)
-    })
-
-  def jsonApiCreate(
-      respond: v0.AppManagerPublicResource.JsonApiCreateResponse.type
-  )(body: Json, authorization: String)(
-      extracted: Unit
-  ): Future[v0.AppManagerPublicResource.JsonApiCreateResponse] =
-    handleResponse(
-      jsonApiClient.jsonApiCreate(
-        body,
-        authorization,
-      )
-    ).map(_.fold(v0.AppManagerPublicResource.JsonApiCreateResponse.OK(_)))
-  def jsonApiExercise(
-      respond: v0.AppManagerPublicResource.JsonApiExerciseResponse.type
-  )(body: Json, authorization: String)(
-      extracted: Unit
-  ): Future[v0.AppManagerPublicResource.JsonApiExerciseResponse] =
-    handleResponse(
-      jsonApiClient.jsonApiExercise(
-        body,
-        authorization,
-      )
-    ).map(_.fold(v0.AppManagerPublicResource.JsonApiExerciseResponse.OK(_)))
-  def jsonApiQuery(
-      respond: v0.AppManagerPublicResource.JsonApiQueryResponse.type
-  )(body: Json, authorization: String)(
-      extracted: Unit
-  ): Future[v0.AppManagerPublicResource.JsonApiQueryResponse] =
-    handleResponse(
-      jsonApiClient.jsonApiQuery(
-        body,
-        authorization,
-      )
-    ).map(_.fold(v0.AppManagerPublicResource.JsonApiQueryResponse.OK(_)))
-  def jsonApiUser(
-      respond: v0.AppManagerPublicResource.JsonApiUserResponse.type
-  )(body: Json, authorization: String)(
-      extracted: Unit
-  ): Future[v0.AppManagerPublicResource.JsonApiUserResponse] =
-    handleResponse(
-      jsonApiClient.jsonApiUser(
-        body,
-        authorization,
-      )
-    ).map(_.fold(v0.AppManagerPublicResource.JsonApiUserResponse.OK(_)))
 }

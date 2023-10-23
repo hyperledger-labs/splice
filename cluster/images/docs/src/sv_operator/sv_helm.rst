@@ -572,13 +572,17 @@ Configuring the Cluster Ingress
 -------------------------------
 
 The following routes should be configured in your cluster ingress
-controller. Note that the path should be stripped and only the suffix
+controller. Note that most of the paths should be stripped and only the suffix
 under ``*`` should end up at the pod. So for example
-``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/foobar`` should get routed to
-``http://validator-app.sv:5003/foobar``.
+``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/sv/foobar`` should get routed to
+``http://sv-app.sv:5014/foobar``. Currently the only exception to that rule is
+``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator``, which no longer require rewriting,
+and ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator/foobar`` should be forwarded to
+``http://validator-app:5003/api/validator/foobar``. In the future, the other rewrite requirements
+will also be removed.
 
 * ``https://wallet.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``sv`` namespace
-* ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/validator/*`` should be routed to port 5003 of service ``validator-app`` in the ``sv`` namespace
+* ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to port 5003 of service ``validator-app`` in the ``sv`` namespace. As mentioned above, no url rewrite is required for this rule.
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``sv-web-ui`` in the ``sv`` namespace
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/v0/sv/*`` should be routed to port 5014 of service ``sv-app`` in the ``sv`` namespace
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``scan-web-ui`` in the ``sv`` namespace

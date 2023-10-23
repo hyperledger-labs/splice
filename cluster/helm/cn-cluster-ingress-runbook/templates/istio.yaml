@@ -12,9 +12,7 @@ spec:
   - match:
     - port: 443
       uri:
-        prefix: "/api/v0/validator/"
-    rewrite:
-      uri: "/"
+        prefix: "/api/validator/"
     route:
     - destination:
         port:

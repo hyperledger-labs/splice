@@ -4,8 +4,10 @@ info:
   version: 0.0.1
 tags:
   - name: wallet
+servers:
+  - url: https://example.com/api/validator
 paths:
-  /wallet/transfer-offers:
+  /v0/wallet/transfer-offers:
     post:
       tags: [ wallet ]
       x-jvm-package: external.wallet
@@ -71,7 +73,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /wallet/transfer-offers/{tracking_id}/status:
+  /v0/wallet/transfer-offers/{tracking_id}/status:
     post:
       tags: [ wallet ]
       x-jvm-package: external.wallet
@@ -98,7 +100,7 @@ paths:
             application/json:
               schema:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
-  /wallet/buy-traffic-requests:
+  /v0/wallet/buy-traffic-requests:
     post:
       description:
         Create a request to buy traffic. Note that this only creates the request
@@ -145,7 +147,7 @@ paths:
             application/json:
               schema:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
-  /wallet/buy-traffic-requests/{tracking_id}/status:
+  /v0/wallet/buy-traffic-requests/{tracking_id}/status:
     post:
       tags: [ wallet ]
       x-jvm-package: external.wallet
