@@ -30,6 +30,8 @@ We build docker images for all applications as part of the `build` workflow, and
 
 The `deploy` workflow is used to trigger a deployment from CircleCI.
 
+Note there is a script `search-ci-deployment.sh -n <WORKFLOW_NAME>` to search for the latest deployment in the workflow. This is quite useful as it avoids scrolling forever in the Circle-CI GUI, for example to get the link of the latest `deploy_testnet` workflow deployment.
+
 ### VPN Access
 
 As our cluster management APIs are protected behind an IP whitelist, we make use of the `circleci_ip_ranges: true` configuration key to ensure the deployment job runs from behind a set of static, well-known CircleCI IP addresses ([ref](https://circleci.com/docs/ip-ranges)).
