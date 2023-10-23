@@ -81,14 +81,16 @@ abstract class SvAppReference(
       participantId: ParticipantId,
       candidateParty: PartyId,
   ): HttpSvAppClient.OnboardSvPartyMigrationAuthorizeResponse =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAppClient.OnboardSvPartyMigrationAuthorize(
-          participantId,
-          candidateParty,
+    consoleEnvironment
+      .run {
+        httpCommand(
+          HttpSvAppClient.OnboardSvPartyMigrationAuthorize(
+            participantId,
+            candidateParty,
+          )
         )
-      )
-    }
+      }
+      .fold(throw _, identity)
 
   @Help.Summary("Trigger and a dump of the ACS visible to the SVC party")
   def triggerAcsDump(): definitions.TriggerAcsDumpResponse =

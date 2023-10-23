@@ -29,7 +29,7 @@ object HttpDirectoryAppClient {
         mat: Materializer,
     ): Client =
       http.DirectoryClient.httpClient(
-        HttpClientBuilder().buildClient,
+        HttpClientBuilder().buildClient(),
         host,
       )
   }
@@ -42,7 +42,7 @@ object HttpDirectoryAppClient {
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
-    ): Client = externalHttp.DirectoryClient.httpClient(HttpClientBuilder().buildClient, host)
+    ): Client = externalHttp.DirectoryClient.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
   case class CreateDirectoryEntryResponse(

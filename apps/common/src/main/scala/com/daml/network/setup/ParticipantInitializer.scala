@@ -124,7 +124,7 @@ class ParticipantInitializer(
     // things blow up later in init if we upload the same tx multiple times ¯\_(ツ)_/¯
     _ <- {
       logger.info(s"Uploading ${missingBootstrapTxs.size} missing bootstrap transactions from dump")
-      participantAdminConnection.addTopologyTransactions(missingBootstrapTxs)
+      participantAdminConnection.addTopologyTransactions(None, missingBootstrapTxs)
     }
     _ <- {
       logger.info(s"Triggering participant initialization for participant ID ${dump.id}")

@@ -29,7 +29,7 @@ object HttpValidatorPublicAppClient {
         mat: Materializer,
     ): Client =
       http.ValidatorPublicClient.httpClient(
-        HttpClientBuilder().buildClient,
+        HttpClientBuilder().buildClient(),
         host,
       )
   }

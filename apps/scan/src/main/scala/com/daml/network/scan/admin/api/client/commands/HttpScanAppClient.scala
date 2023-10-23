@@ -38,7 +38,7 @@ object HttpScanAppClient {
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.ScanClient.httpClient(HttpClientBuilder().buildClient, host)
+      http.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
   case class GetSvcPartyId(headers: List[HttpHeader])

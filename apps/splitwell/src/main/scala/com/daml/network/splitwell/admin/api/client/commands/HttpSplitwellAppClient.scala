@@ -33,7 +33,7 @@ object HttpSplitwellAppClient {
         mat: Materializer,
     ): Client =
       http.SplitwellClient.httpClient(
-        HttpClientBuilder().buildClient,
+        HttpClientBuilder().buildClient(),
         host,
       )
   }

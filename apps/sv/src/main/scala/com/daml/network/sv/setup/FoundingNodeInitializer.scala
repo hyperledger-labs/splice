@@ -19,6 +19,7 @@ import com.daml.network.sv.automation.SvSvcAutomationService
 import com.daml.network.sv.automation.SvSvAutomationService
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, SvOnboardingConfig}
+import com.daml.network.sv.setup.FoundingNodeInitializer.bootstrapTransactionOrdering
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvUtil, SvcRulesLock}
 import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
@@ -43,8 +44,14 @@ import com.digitalasset.canton.topology.store.{
   StoredTopologyTransactionX,
   StoredTopologyTransactionsX,
 }
-import com.digitalasset.canton.topology.transaction.{TopologyChangeOpX, UnionspaceDefinitionX}
+import com.digitalasset.canton.topology.transaction.{
+  SignedTopologyTransactionX,
+  TopologyChangeOpX,
+  TopologyMappingX,
+  UnionspaceDefinitionX,
+}
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
@@ -172,7 +179,7 @@ class FoundingNodeInitializer(
       // for example if the founding SV node restarted after bootstrapping the SvcRules.
       // We only set the domain sequencer config if the existing one is different here.
       _ <- withSvcStore.reconcileSequencerConfigIfRequired(Some(localDomainNode))
-      svcRulesLock = new SvcRulesLock(svcAutomation, retryProvider, loggerFactory)
+      svcRulesLock = new SvcRulesLock(svcAutomation, loggerFactory, retryProvider)
     } yield (
       globalDomain,
       svcPartyHosting,
@@ -291,14 +298,14 @@ class FoundingNodeInitializer(
                 domainParametersState,
                 sequencerState,
                 mediatorState,
-              ) ++ identityTransactions)
+              ) ++ identityTransactions).sorted
                 .mapFilter(_.selectOp[TopologyChangeOpX.Replace])
                 .map(signed =>
                   StoredTopologyTransactionX(
                     SequencedTime(CantonTimestamp.MinValue.immediateSuccessor),
                     EffectiveTime(CantonTimestamp.MinValue.immediateSuccessor),
                     None,
-                    signed,
+                    signed.copy(isProposal = false),
                   )
                 )
             _ <- domainNode.sequencerAdminConnection.initialize(
@@ -641,5 +648,29 @@ class FoundingNodeInitializer(
     retryProvider,
     loggerFactory,
   )
+
+}
+
+object FoundingNodeInitializer {
+
+  /** Same ordering as https://github.com/DACH-NY/canton/blob/2fc1a37d815623cb68dcb4b75bc33a498065990e/enterprise/app-base/src/main/scala/com/digitalasset/canton/console/EnterpriseConsoleMacros.scala#L160
+    */
+  implicit val bootstrapTransactionOrdering
+      : Ordering[SignedTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]] =
+    (x, y) => {
+      def toOrdinal(t: SignedTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]) = {
+        t.transaction.mapping.code match {
+          case Code.NamespaceDelegationX => 1
+          case Code.OwnerToKeyMappingX => 2
+          case Code.UnionspaceDefinitionX => 3
+          case _ => 4
+        }
+      }
+
+      Ordering.Int.compare(
+        toOrdinal(x),
+        toOrdinal(y),
+      )
+    }
 
 }

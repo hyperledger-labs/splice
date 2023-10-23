@@ -38,7 +38,7 @@ object HttpWalletAppClient {
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.WalletClient.httpClient(HttpClientBuilder().buildClient, host)
+      http.WalletClient.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
   abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
@@ -50,7 +50,7 @@ object HttpWalletAppClient {
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      externalHttp.WalletClient.httpClient(HttpClientBuilder().buildClient, host)
+      externalHttp.WalletClient.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
   final case class CoinPosition(

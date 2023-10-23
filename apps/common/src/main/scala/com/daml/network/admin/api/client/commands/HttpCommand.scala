@@ -88,21 +88,32 @@ final class HttpClientBuilder()(implicit
       .map { errorMessage => HttpCommandException(request, response.status, errorMessage) }
   }
 
-  def httpClientWithErrors(nextClient: HttpRequest => Future[HttpResponse])(
+  private def httpClientWithErrors(
+      nextClient: HttpRequest => Future[HttpResponse],
+      errors: PartialFunction[StatusCode, Unit],
+  )(
       req: HttpRequest
   ) = {
     nextClient(req).flatMap { _resp =>
-      _resp.status match {
-        case StatusCodes.ServerError(_) | StatusCodes.ClientError(_) =>
+      errors
+        .andThen(_ =>
           getApiErrorFromResponse(req, _resp).flatMap { error =>
-            Future.failed(error)
+            Future.failed[HttpResponse](error)
           }
-        case _ => Future.successful(_resp)
-      }
+        )
+        .applyOrElse(_resp.status, (_: StatusCode) => Future.successful(_resp))
     }
   }
 
-  def buildClient: HttpRequest => Future[HttpResponse] = {
-    httpClientWithErrors(httpClient)
+  def buildClient(
+      nonErrorStatusCode: Set[StatusCode] = Set.empty
+  ): HttpRequest => Future[HttpResponse] = {
+    httpClientWithErrors(
+      httpClient,
+      {
+        case code @ (StatusCodes.ServerError(_) | StatusCodes.ClientError(_))
+            if !nonErrorStatusCode.contains(code) =>
+      },
+    )
   }
 }

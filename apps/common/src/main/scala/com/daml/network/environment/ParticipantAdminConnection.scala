@@ -4,7 +4,6 @@ import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.lf.archive.DarParser
 import com.daml.network.util.UploadablePackage
-import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
   StatusAdminCommands,
@@ -12,24 +11,25 @@ import com.digitalasset.canton.admin.api.client.commands.{
 }
 import com.digitalasset.canton.admin.api.client.data.ListConnectedDomainsResult
 import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.crypto.{Fingerprint, Hash, HashAlgorithm, HashOps, HashPurpose}
+import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.health.admin.data.{NodeStatus, ParticipantStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.v0.ExportAcsResponse
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.traffic.MemberTrafficStatus
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.google.protobuf.ByteString
 import io.grpc.Status
 
 import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
-import com.digitalasset.canton.health.admin.data.{NodeStatus, ParticipantStatus}
 
 /** Connection to the subset of the Canton admin API that we rely
   * on in our own applications.
@@ -352,8 +352,8 @@ class ParticipantAdminConnection(
 }
 
 object ParticipantAdminConnection {
-  import com.digitalasset.canton.participant.admin.v0.*
   import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+  import com.digitalasset.canton.participant.admin.v0.*
   import com.digitalasset.canton.participant.admin.v0.PackageServiceGrpc.PackageServiceStub
   import io.grpc.ManagedChannel
 

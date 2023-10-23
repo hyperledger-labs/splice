@@ -84,7 +84,10 @@ final class LocalDomainNode(
           Future.unit
         } else
           for {
-            _ <- participantAdminConnection.addTopologyTransactions(identityTransactions)
+            _ <- participantAdminConnection.addTopologyTransactions(
+              Some(domainId),
+              identityTransactions,
+            )
             _ <- waitForIdentityTransaction(domainId, uid, participantAdminConnection)
           } yield ()
     } yield ()
@@ -130,13 +133,17 @@ final class LocalDomainNode(
     retryProvider
       .getValueWithRetries(
         "mediator status",
-        mediatorAdminConnection.getStatus.map(statusToEither(_)),
+        mediatorAdminConnection.getStatus.map(statusToEither),
         logger,
       )
       .flatMap {
         case Left(NodeStatus.NotInitialized(_)) =>
           logger.info("Onboarding mediator")
-          onboardLocalMediator(domainId, participantAdminConnection, svConnection)
+          onboardLocalMediator(
+            domainId,
+            participantAdminConnection,
+            svConnection,
+          )
         case Right(NodeStatus.Success(_)) =>
           logger.info("Mediator is already onboarded")
           Future.unit
@@ -233,13 +240,18 @@ final class LocalDomainNode(
     retryProvider
       .getValueWithRetries(
         "sequencer status",
-        sequencerAdminConnection.getStatus.map(statusToEither(_)),
+        sequencerAdminConnection.getStatus.map(statusToEither),
         logger,
       )
       .flatMap {
         case Left(NodeStatus.NotInitialized(_)) =>
           logger.info("Onboarding sequencer")
-          onboardLocalSequencer(domainAlias, domainId, participantAdminConnection, svConnection)
+          onboardLocalSequencer(
+            domainAlias,
+            domainId,
+            participantAdminConnection,
+            svConnection,
+          )
         case Right(NodeStatus.Success(_)) =>
           logger.info("Sequencer is already onboarded")
           Future.unit
@@ -334,7 +346,7 @@ final class LocalDomainNode(
         case _ => None
       }
 
-  override protected def onClosed() = {
+  override protected def onClosed(): Unit = {
     Lifecycle.close(sequencerAdminConnection, mediatorAdminConnection)(logger)
     super.onClosed()
   }

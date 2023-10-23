@@ -24,7 +24,7 @@ object HttpAppManagerAppClient {
         mat: Materializer,
     ): Client =
       http.AppManagerClient.httpClient(
-        HttpClientBuilder().buildClient,
+        HttpClientBuilder().buildClient(),
         host,
       )
   }

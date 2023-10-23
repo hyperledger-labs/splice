@@ -40,7 +40,7 @@ object HttpSvAdminAppClient {
         mat: Materializer,
     ): Client =
       http.SvAdminClient.httpClient(
-        HttpClientBuilder().buildClient,
+        HttpClientBuilder().buildClient(),
         host,
       )
   }

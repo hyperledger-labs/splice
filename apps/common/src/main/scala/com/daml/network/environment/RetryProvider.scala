@@ -3,11 +3,18 @@ package com.daml.network.environment
 import akka.Done
 import akka.stream.StreamTcpException
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import cats.implicits.toBifunctorOps
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.metrics.api.MetricsContext
 import com.daml.network.admin.api.client.commands.HttpCommandException
+import com.daml.network.environment.RetryProvider.{
+  CheckReset,
+  CheckResult,
+  ConditionNotSatisfied,
+  EnsureState,
+}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.ErrorCodeUtils
@@ -33,6 +40,7 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
 import io.grpc.Status
 import io.grpc.protobuf.StatusProto
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.*
 import scala.util.{Failure, Try}
@@ -241,12 +249,52 @@ class RetryProvider(
 
   /** Ensure that a particular condition holds as part of an init-like process.
     *
-    * Checks the condition and establishes it, if it does not; and waits
-    * until the condition holds after establishing it.
+    * Checks the condition and establishes it, if it does not host;
+    * and waits until the condition holds after establishing it.
     */
   def ensureThat[A, B](
       conditionDesc: String,
       check: => Future[Either[A, B]],
+      establish: A => Future[Unit],
+      logger: TracedLogger,
+      additionalCodes: Seq[Status.Code] = Seq.empty,
+  )(implicit ec: ExecutionContext, pa: Pretty[A], pb: Pretty[B]): Future[B] =
+    ensureThatI(conditionDesc, check, check, establish, logger, additionalCodes)
+
+  /** Ensure that a particular condition holds as part of an init-like process.
+    *
+    * Checks the condition with [[initialCheck]] and establishes it, if it does not hold;
+    * and waits until the condition holds with [[establishedCheck]] after establishing it.
+    */
+  def ensureThatI[A, B](
+      conditionDesc: String,
+      initialCheck: => Future[Either[A, B]],
+      establishedCheck: => Future[Either[A, B]],
+      establish: A => Future[Unit],
+      logger: TracedLogger,
+      additionalCodes: Seq[Status.Code] = Seq.empty,
+  )(implicit ec: ExecutionContext, pa: Pretty[A], pb: Pretty[B]): Future[B] = {
+    ensureThatWithReset(
+      conditionDesc,
+      initialCheck,
+      (_: EnsureState[A]) => establishedCheck.map(_.leftMap(ConditionNotSatisfied(_))),
+      establish,
+      logger,
+      additionalCodes,
+    )
+  }
+
+  /** Ensure that a particular condition holds as part of an init-like process.
+    *
+    * Checks the condition and establishes it if it does not hold; and waits
+    * until the condition holds after establishing it.
+    *
+    * The post-establish check can trigger a new attempt at establishing the desired condition, potentially altering the desired condition by changing the input to the establish function.
+    */
+  def ensureThatWithReset[A, B](
+      conditionDesc: String,
+      initialCheck: => Future[Either[A, B]],
+      establishedCheck: EnsureState[A] => Future[Either[CheckResult[A], B]],
       establish: A => Future[Unit],
       logger: TracedLogger,
       additionalCodes: Seq[Status.Code] = Seq.empty,
@@ -256,27 +304,46 @@ class RetryProvider(
       logger.info(s"Ensuring that $conditionDesc")
       retryForAutomation(
         s"Check whether $conditionDesc and establish it if needed",
-        check.flatMap {
+        initialCheck.flatMap {
           case Right(result) => Future.successful(Right(result))
           case Left(error) =>
-            establish(error).map(Left(_))
+            establish(error).map(_ => Left(error))
         },
         logger,
         additionalCodes,
       ).flatMap {
         case Right(result) => Future.successful(result)
-        case Left(()) =>
+        case Left(state) =>
           logger.debug(s"Established that $conditionDesc, waiting until it is observable")
+          val lastEstablishState = new AtomicReference(state)
           retryForAutomation(
             s"Wait until observing $conditionDesc",
-            check.map {
-              case Right(result) => result
-              case Left(error) =>
+            establishedCheck(EnsureState(lastEstablishState.get())).flatMap {
+              def failedPrecondition(error: A) = {
                 throw Status.FAILED_PRECONDITION
                   .withDescription(
                     show"Condition $conditionDesc is not (yet) observable; check failed with $error"
                   )
                   .asRuntimeException()
+              }
+
+              {
+                case Right(result) => Future.successful(result)
+                case Left(CheckReset(result)) =>
+                  logger.info(
+                    s"Re-establishing $conditionDesc and waiting until it is observable."
+                  )
+                  establish(result).flatMap { _ =>
+                    lastEstablishState.set(result)
+                    establishedCheck(EnsureState(result)).map {
+                      case Right(result) => result
+                      case Left(err) =>
+                        failedPrecondition(err.result)
+                    }
+                  }
+                case Left(ConditionNotSatisfied(err)) =>
+                  failedPrecondition(err)
+              }
             },
             logger,
             additionalCodes,
@@ -673,4 +740,15 @@ object RetryProvider {
     protected[this] def retryProvider: RetryProvider
     override protected final def timeouts: ProcessingTimeout = retryProvider.timeouts
   }
+
+  final case class EnsureState[A](
+      lastEstablishState: A
+  )
+
+  sealed trait CheckResult[A] {
+    def result: A
+  }
+
+  final case class ConditionNotSatisfied[A](result: A) extends CheckResult[A]
+  final case class CheckReset[A](result: A) extends CheckResult[A]
 }

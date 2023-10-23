@@ -308,7 +308,7 @@ class TopologyAdministrationGroupX(
                   signedBy = signedBy.toList,
                   serial = serial,
                   change = TopologyChangeOpX.Replace,
-                  mustFullyAuthorize = true,
+                  mustFullyAuthorize = false,
                   store = store,
                 )
               }
@@ -720,7 +720,7 @@ class TopologyAdministrationGroupX(
             signedBy = signedBy.toList,
             serial = serial,
             change = TopologyChangeOpX.Replace,
-            mustFullyAuthorize = true,
+            mustFullyAuthorize = false,
             store = domainId.filterString,
           )
         )
@@ -890,7 +890,7 @@ class TopologyAdministrationGroupX(
             signedBy = signedBy.toList,
             serial = serial,
             change = TopologyChangeOpX.Replace,
-            mustFullyAuthorize = true,
+            mustFullyAuthorize = false,
             store = store.getOrElse(domainId.filterString),
           )
         )
@@ -942,7 +942,7 @@ class TopologyAdministrationGroupX(
             signedBy = signedBy.toList,
             serial = serial,
             change = TopologyChangeOpX.Replace,
-            mustFullyAuthorize = true,
+            mustFullyAuthorize = false,
             store = store.getOrElse(domainId.filterString),
           )
         )
@@ -995,7 +995,7 @@ class TopologyAdministrationGroupX(
             ),
             signedBy.toList,
             serial = serial,
-            mustFullyAuthorize = true,
+            mustFullyAuthorize = false,
             store = store.getOrElse(domain.filterString),
           )
         )

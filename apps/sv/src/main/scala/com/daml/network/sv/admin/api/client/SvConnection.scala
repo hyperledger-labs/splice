@@ -56,7 +56,10 @@ final class SvConnection private (
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[HttpSvAppClient.OnboardSvPartyMigrationAuthorizeResponse] =
+  ): Future[Either[
+    HttpSvAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound,
+    HttpSvAppClient.OnboardSvPartyMigrationAuthorizeResponse,
+  ]] =
     runHttpCmd(
       config.url,
       HttpSvAppClient.OnboardSvPartyMigrationAuthorize(

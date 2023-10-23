@@ -1,6 +1,6 @@
 package com.daml.network.sv.admin.api.client.commands
 
-import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, StatusCodes}
 import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
@@ -9,9 +9,10 @@ import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.http.v0.definitions.CometBftNodeStatusResponse
-import com.daml.network.http.v0.sv.GetCometBftNodeStatusResponse
+import com.daml.network.http.v0.sv.{GetCometBftNodeStatusResponse, SvClient}
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot as CantonSequencerSnapshot
 import com.digitalasset.canton.protocol.v0
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
@@ -19,6 +20,7 @@ import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.Generi
 import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
+import io.grpc.Status
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
@@ -33,7 +35,7 @@ object HttpSvAppClient {
         ec: ExecutionContext,
         mat: Materializer,
     ): Client = {
-      http.SvClient.httpClient(HttpClientBuilder().buildClient, host)
+      http.SvClient.httpClient(HttpClientBuilder().buildClient(), host)
     }
   }
 
@@ -231,6 +233,12 @@ object HttpSvAppClient {
       sequencerSnapshot: CantonSequencerSnapshot,
   )
 
+  case class OnboardSvPartyMigrationAuthorizeProposalNotFound(
+      partyToParticipantMappingSerial: PositiveInt,
+      unionspaceDefinitionSerial: PositiveInt,
+  ) extends RuntimeException(
+        s"Party migration failed as required proposals were not found. Found base mappings: PartyToParticipant($partyToParticipantMappingSerial), UnionspaceDefinition($unionspaceDefinitionSerial)"
+      )
   case class OnboardSvPartyMigrationAuthorizeResponse(
       acsSnapshot: ByteString
   )
@@ -240,8 +248,22 @@ object HttpSvAppClient {
       candidate: PartyId,
   ) extends BaseCommand[
         http.OnboardSvPartyMigrationAuthorizeResponse,
-        OnboardSvPartyMigrationAuthorizeResponse,
+        Either[
+          OnboardSvPartyMigrationAuthorizeProposalNotFound,
+          OnboardSvPartyMigrationAuthorizeResponse,
+        ],
       ] {
+
+    override def createClient(host: String)(implicit
+        httpClient: HttpRequest => Future[HttpResponse],
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): SvClient =
+      http.SvClient.httpClient(
+        HttpClientBuilder().buildClient(Set(StatusCodes.BadRequest)),
+        host,
+      )
 
     override def submitRequest(
         client: Client,
@@ -261,14 +283,49 @@ object HttpSvAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = {
+      case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(
+            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse(
+              Some(lockNotAvailable),
+              None,
+              None,
+            )
+          ) =>
+        throw Status.FAILED_PRECONDITION
+          .withDescription(lockNotAvailable.error)
+          .asRuntimeException()
+      case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(
+            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse(
+              None,
+              Some(acceptedStateNotFound),
+              None,
+            )
+          ) =>
+        Left(acceptedStateNotFound.error)
+      case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(
+            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse(
+              None,
+              None,
+              Some(proposalNotFound),
+            )
+          ) =>
+        Right(
+          Left(
+            OnboardSvPartyMigrationAuthorizeProposalNotFound(
+              PositiveInt.tryCreate(proposalNotFound.partyToParticipantBaseSerial.intValue),
+              PositiveInt.tryCreate(proposalNotFound.unionspaceBaseSerial.intValue),
+            )
+          )
+        )
       case http.OnboardSvPartyMigrationAuthorizeResponse.OK(
             definitions.OnboardSvPartyMigrationAuthorizeResponse(
               encodedAcsSnapshot
             )
           ) =>
         Right(
-          OnboardSvPartyMigrationAuthorizeResponse(
-            ByteString.copyFrom(Base64.getDecoder.decode(encodedAcsSnapshot))
+          Right(
+            OnboardSvPartyMigrationAuthorizeResponse(
+              ByteString.copyFrom(Base64.getDecoder.decode(encodedAcsSnapshot))
+            )
           )
         )
     }

@@ -1,6 +1,7 @@
 package com.daml.network.sv.admin.http
 
-import cats.data.OptionT
+import cats.data.{EitherT, OptionT}
+import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.applicative.*
 import cats.syntax.foldable.*
 import cats.syntax.option.*
@@ -10,23 +11,25 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
-import com.daml.network.environment.{
-  CNLedgerConnection,
-  ParticipantAdminConnection,
-  RetryProvider,
-  SequencerAdminConnection,
-}
+import com.daml.network.config.CNThresholds
+import com.daml.network.environment.*
 import com.daml.network.http.v0.definitions.{
   CometBftNodeStatusResponse,
   CometBftStatusOrError,
   ErrorResponse,
+  OnboardSvPartyMigrationAuthorizeErrorResponse,
 }
 import com.daml.network.http.v0.sv.SvResource
+import com.daml.network.http.v0.sv.SvResource.OnboardSvPartyMigrationAuthorizeResponseBadRequest
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.setup.SvcPartyHosting
+import com.daml.network.sv.setup.SvcPartyHosting.{
+  RequiredProposalsNotFound,
+  SvcPartyMigrationFailure,
+}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.{generateRandomOnboardingSecret, requiredNumVotes}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
@@ -37,12 +40,15 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.transaction.{PartyToParticipantX, UnionspaceDefinitionX}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
+import com.google.protobuf.ByteString
 import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
+import java.time.Instant
 import java.util.{Base64, UUID}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -145,7 +151,7 @@ class HttpSvHandler(
                 // We retry here because the SvcRules can change while attempting this.
                 retryProvider
                   .retryForClientCalls(
-                    "start SV onboarding via SvcRules",
+                    s"start SV ${token.candidateName} onboarding via SvcRules",
                     startSvOnboarding(token.candidateName, token.candidateParty, body.token),
                     logger,
                   )
@@ -409,12 +415,151 @@ class HttpSvHandler(
       .map(_.isDefined)
   }
 
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private def authorizeParticipantForHostingSvcParty(
       participantId: ParticipantId
-  )(implicit tc: TraceContext) = {
+  )(implicit tc: TraceContext): Future[SvResource.OnboardSvPartyMigrationAuthorizeResponse] = {
     logger.info(s"Sponsor SV authorizing svc party to participant $participantId")
+    // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
+    // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
+    svcRulesLock
+      .withLock(s"authorizing SVC party to participant $participantId")(
+        for {
+          svcRules <- EitherT.liftF(svcStore.getSvcRules())
+          svcMembersSize = svcRules.payload.members.size()
+          acsBytes <- validateProposalsForNewMember(participantId, svcMembersSize)
+            .semiflatMap { _ =>
+              for {
+                ourParticipant <- participantAdminConnection.getParticipantId()
+                // this will wait until the PartyToParticipant state change completed
+                authorizedAt <- svcPartyHosting
+                  .authorizeSvcPartyToParticipant(
+                    globalDomain,
+                    participantId,
+                    svcMembersSize,
+                    ourParticipant.uid.namespace.fingerprint,
+                  )
+                _ = logger.info(
+                  s"SVC party was authorized on $participantId, downloading snapshot at time $authorizedAt."
+                )
+                acsBytes <- downloadSnapshotFromTime(authorizedAt)
+                _ = logger.info(
+                  s"Adding candidate SV with participant $participantId to unionspace"
+                )
+                _ <- participantAdminConnection.ensureUnionspaceDefinition(
+                  globalDomain,
+                  svcParty.uid.namespace,
+                  participantId.uid.namespace,
+                  ourParticipant.uid.namespace.fingerprint,
+                )
+              } yield acsBytes
+            }
+        } yield { acsBytes }
+      )
+      .fold(
+        {
+          case SvcPartyHosting.LockAcquireFailure(lockReason, _) =>
+            OnboardSvPartyMigrationAuthorizeResponseBadRequest(
+              OnboardSvPartyMigrationAuthorizeErrorResponse(
+                lockNotAvailable = Some(
+                  ErrorResponse(
+                    s"Lock for $lockReason cannot be acquired"
+                  )
+                )
+              )
+            )
+          case SvcPartyHosting
+                .RequiredProposalsNotFound(partyToParticipantSerial, unionspaceDefinitionSerial) =>
+            OnboardSvPartyMigrationAuthorizeResponseBadRequest(
+              OnboardSvPartyMigrationAuthorizeErrorResponse(
+                proposalNotFound = Some(
+                  OnboardSvPartyMigrationAuthorizeErrorResponse.ProposalNotFound(
+                    BigInt(partyToParticipantSerial.value),
+                    BigInt(unionspaceDefinitionSerial.value),
+                  )
+                )
+              )
+            )
+        },
+        { acsBytes =>
+          // TODO(M3-57) consider if a more space-efficient encoding is necessary
+          val encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
+          v0.SvResource.OnboardSvPartyMigrationAuthorizeResponseOK(
+            definitions.OnboardSvPartyMigrationAuthorizeResponse(
+              encoded
+            )
+          )
+        },
+      )
+  }
 
+  private def validateProposalsForNewMember(
+      participantId: ParticipantId,
+      svcMembersSize: Int,
+  )(implicit tc: TraceContext): EitherT[
+    Future,
+    SvcPartyMigrationFailure,
+    (
+        TopologyAdminConnection.TopologyResult[PartyToParticipantX],
+        TopologyAdminConnection.TopologyResult[UnionspaceDefinitionX],
+    ),
+  ] = {
+    val partyToParticipantAcceptedState =
+      participantAdminConnection.getPartyToParticipant(globalDomain, svcParty)
+    lazy val acceptedState = (
+      partyToParticipantAcceptedState,
+      participantAdminConnection
+        .getUnionspaceDefinition(globalDomain, svcParty.uid.namespace),
+    ).tupled
+    (
+      OptionT(
+        participantAdminConnection
+          .listPartyToParticipant(
+            globalDomain.filterString,
+            filterParty = svcParty.filterString,
+            proposals = true,
+          )
+          .flatMap { proposals =>
+            partyToParticipantAcceptedState
+              .map(acceptedState =>
+                CNThresholds.getPartyToParticipantThreshold(
+                  svcMembersSize,
+                  acceptedState.mapping.participantIds.size,
+                )
+              )
+              .map { expectedThreshold =>
+                proposals.find(proposal =>
+                  proposal.mapping.participantIds
+                    .contains(participantId) && proposal.mapping.threshold == expectedThreshold
+                )
+              }
+          }
+      ),
+      participantAdminConnection.findUnionspaceDefinitionProposal(
+        globalDomain,
+        svcParty.uid.namespace,
+        participantId.uid.namespace,
+      ),
+    ).tupled
+      .orElse(OptionT.liftF(acceptedState).filter {
+        case (partyToParticipant, unionspaceDefinition) =>
+          partyToParticipant.mapping.participantIds.contains(
+            participantId
+          ) && unionspaceDefinition.mapping.owners.contains(participantId.uid.namespace)
+      })
+      .toRightF {
+        acceptedState.map { case (partyToParticipant, unionspaceDefinition) =>
+          RequiredProposalsNotFound(
+            partyToParticipant.base.serial,
+            unionspaceDefinition.base.serial,
+          )
+        }
+      }
+  }
+
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  private def downloadSnapshotFromTime(
+      authorizedAt: Instant
+  )(implicit tc: TraceContext): Future[ByteString] = {
     def submitDummyTransaction(): Future[Unit] =
       svStoreWithIngestion.connection
         .submit(
@@ -428,89 +573,59 @@ class HttpSvHandler(
         .withDomainId(globalDomain)
         .noDedup
         .yieldUnit()
+    // Acquiring the ACS snapshot is tricky due to two issues:
+    // 1. The snapshot can only be acquired at a "clean" timestamp which means there are no outstanding ACS commitments.
+    //    To ensure that the timestamp will eventually be clean we need to submit a transaction visible to the participant (submitDummyTransaction) and
+    //    retry the download afterwards. Note that due to the second issue, this transaction must not change contracts with SVC as the stakeholder.
+    // 2. Concurrent ACS pruning in Canton can prune the data for that timestamp. In that case, we need to fetch the data at a later timestamp.
+    //    Of course this is only safe if there have not been any relevant changes in between. We ensure this using the SvcRules lock.
+    //    In that case, we again need to submit a dummy transaction to ensure that the updated timestamp is clean.
     for {
-      // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
-      // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
-      acsBytes <- svcRulesLock.withLock(s"authorizing SVC party to participant $participantId")(
-        for {
-          svcRules <- svcStore.getSvcRules()
-          // this will wait until the PartyToParticipant state change completed
-          authorizedAt <- svcPartyHosting.authorizeSvcPartyToParticipant(
-            globalDomain,
-            participantId,
-            svcRules.payload.members.size(),
-          )
-          // Acquiring the ACS snapshot is tricky due to two issues:
-          // 1. The snapshot can only be acquired at a "clean" timestamp which means there are no outstanding ACS commitments.
-          //    To ensure that the timestamp will eventually be clean we need to submit a transaction visible to the participant (submitDummyTransaction) and
-          //    retry the download afterwards. Note that due to the second issue, this transaction must not change contracts with SVC as the stakeholder.
-          // 2. Concurrent ACS pruning in Canton can prune the data for that timestamp. In that case, we need to fetch the data at a later timestamp.
-          //    Of course this is only safe if there have not been any relevant changes in between. We ensure this using the SvcRules lock.
-          //    In that case, we again need to submit a dummy transaction to ensure that the updated timestamp is clean.
-          _ <- submitDummyTransaction()
-          acsBytes <- {
-            var acsOffset = authorizedAt
-            retryProvider.retryForAutomation(
-              show"Download ACS snapshot for SVC at $authorizedAt",
-              participantAdminConnection
-                .downloadAcsSnapshot(
-                  Set(svcParty),
-                  filterDomainId = Some(globalDomain),
-                  timestamp = Some(acsOffset),
-                )
-                .recoverWith { case ex: StatusRuntimeException =>
-                  val errorDetails = ErrorDetails.from(ex: StatusRuntimeException)
-                  for {
-                    _ <- errorDetails.traverse_ {
-                      case ErrorDetails.ErrorInfoDetail("UNAVAILABLE_ACS_SNAPSHOT", metadata) =>
-                        metadata.get("prunedTimestamp") match {
-                          case None =>
+      _ <- submitDummyTransaction()
+      snapshot <- {
+        var acsOffset = authorizedAt
+        retryProvider.retryForAutomation(
+          show"Download ACS snapshot for SVC at $acsOffset",
+          participantAdminConnection
+            .downloadAcsSnapshot(
+              Set(svcParty),
+              filterDomainId = Some(globalDomain),
+              timestamp = Some(acsOffset),
+            )
+            .recoverWith { case ex: StatusRuntimeException =>
+              val errorDetails = ErrorDetails.from(ex: StatusRuntimeException)
+              for {
+                _ <- errorDetails.traverse_ {
+                  case ErrorDetails.ErrorInfoDetail("UNAVAILABLE_ACS_SNAPSHOT", metadata) =>
+                    metadata.get("prunedTimestamp") match {
+                      case None =>
+                        logger.warn(
+                          s"UNAVAILABLE_ACS_SNAPSHOT has no prunedTimestamp field: $metadata"
+                        )
+                        Future.unit
+                      case Some(timestamp) =>
+                        LfTimestamp.fromString(timestamp) match {
+                          case Left(err) =>
                             logger.warn(
-                              s"UNAVAILABLE_ACS_SNAPSHOT has no prunedTimestamp field: $metadata"
+                              s"Failed to convert pruned timestamp from error details into an LfTimestamp: $err"
                             )
                             Future.unit
-                          case Some(timestamp) =>
-                            LfTimestamp.fromString(timestamp) match {
-                              case Left(err) =>
-                                logger.warn(
-                                  s"Failed to convert pruned timestamp from error details into an LfTimestamp: $err"
-                                )
-                                Future.unit
-                              case Right(timestamp) =>
-                                // The pruned timestamp is the latest timestamp that has been pruned
-                                // so we need to increase it by one
-                                acsOffset = timestamp.addMicros(1).toInstant
-                                submitDummyTransaction()
-                            }
+                          case Right(timestamp) =>
+                            // The pruned timestamp is the latest timestamp that has been pruned
+                            // so we need to increase it by one
+                            acsOffset = timestamp.addMicros(1).toInstant
+                            submitDummyTransaction()
                         }
-                      case _ => Future.unit
                     }
-                  } yield throw ex
-                },
-              logger,
-            )
-          }
-          _ = logger
-            .info(
-              s"Sponsor SV finished authorizing svc party to participant $participantId, unlocking SvcRules and CoinRules contracts"
-            )
-          ourParticipant <- participantAdminConnection.getParticipantId()
-          _ = logger.info("Adding candidate SV to unionspace")
-          _ <- participantAdminConnection.ensureUnionspaceDefinition(
-            globalDomain,
-            svcParty.uid.namespace,
-            participantId.uid.namespace,
-            ourParticipant.uid.namespace.fingerprint,
-          )
-        } yield acsBytes
-      )
-      // TODO(M3-57) consider if a more space-efficient encoding is necessary
-      encoded = Base64.getEncoder.encodeToString(acsBytes.toByteArray)
-    } yield v0.SvResource.OnboardSvPartyMigrationAuthorizeResponseOK(
-      definitions.OnboardSvPartyMigrationAuthorizeResponse(
-        encoded
-      )
-    )
+                  case _ => Future.unit
+                }
+              } yield throw ex
+            },
+          logger,
+        )
+      }
+    } yield snapshot
+
   }
 
   private def addSequencerToTopologyState(
@@ -528,7 +643,7 @@ class HttpSvHandler(
       _ <- retryProvider.waitUntil(
         "New sequencer is observed in SequencerDomainState through existing sequencer",
         sequencerAdminConnection
-          .getSequencerDomainState(globalDomain)
+          .getSequencerDomainState(globalDomain, proposals = false)
           .map(result =>
             if (!result.mapping.active.contains(sequencerId)) {
               throw Status.FAILED_PRECONDITION
@@ -586,7 +701,7 @@ class HttpSvHandler(
       // in the topology state or not. We could crash after the topology update but before this and there doesn't seem to be a good way
       // to test for this.
       _ <- dummyTopologyTransaction(sequencerAdminConnection)
-      _ = logger.info(s"Downloading toplogy and sequencer snapshot")
+      _ = logger.info(s"Downloading topology and sequencer snapshot")
       // TODO(#5339) Check if we need to be careful at which offset we query our snapshot.
       topologySnapshot <- sequencerAdminConnection.getTopologySnapshot(globalDomain)
       sequencerSnapshot <- sequencerAdminConnection.getSequencerSnapshot(
@@ -781,7 +896,7 @@ class HttpSvHandler(
           case QueryResult(_, Some(_)) =>
             logger.info("An SV onboarding contract for this token already exists.")
             Future.successful(Right(()))
-          case QueryResult(offset, None) => {
+          case QueryResult(offset, None) =>
             if (SvApp.isSvcMemberParty(candidateParty, svcRules)) {
               Future.successful(
                 Left("An SV with that party ID already exists.")
@@ -814,7 +929,6 @@ class HttpSvHandler(
                 .yieldUnit()
                 .map { _ => Right(()) }
             }
-          }
         }
       } yield outcome
     }

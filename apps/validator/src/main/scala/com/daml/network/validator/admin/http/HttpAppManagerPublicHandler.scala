@@ -148,7 +148,7 @@ class HttpAppManagerPublicHandler(
   // The endpoints here are public as the underlying participant does the actual JWT check.
 
   val jsonApiClient = v0.AppManagerPublicClient.httpClient(
-    HttpClientBuilder().buildClient,
+    HttpClientBuilder().buildClient(),
     config.jsonApiUrl.toString,
   )
 

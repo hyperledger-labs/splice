@@ -62,10 +62,8 @@ protoc-jar: caught exception, retrying: java\.io\.IOException: Cannot run progra
 .*The value \(generator's option\) must be either boolean or string. Default to `false`\..*
 .*o.o.codegen.TemplateManager - writing file .*/apps/.*/openapi-ts-client/apis/exception.ts
 .*o.o.codegen.TemplateManager - writing file .*/apps/.*/external-openapi-ts-client/apis/exception.ts
-.*o.o.codegen.TemplateManager - writing file .*/apps/.*/openapi-ts-client/models/ErrorResponse.ts
 .*o.o.codegen.TemplateManager - writing file .*/apps/.*/external-openapi-ts-client/models/ErrorResponse.ts
-.*o.o.codegen.TemplateManager - writing file .*/apps/.*/openapi-ts-client/models/CometBftNodeDumpOrErrorResponse.ts
-.*o.o.codegen.TemplateManager - writing file .*/apps/.*/openapi-ts-client/models/CometBftStatusOrError.ts
+.*o.o.codegen.TemplateManager - writing file .*/apps/.*/openapi-ts-client/models/.*Error.*.ts
 
 # Output by guardrail if the yaml file changes because we cache the previous generated code
 ^.\[31mWarning:.\[0m$
@@ -85,6 +83,9 @@ stderr: Finishing shakeRun .*exception: AsyncCancelled
 .*Error: ENOENT: no such file or directory.*
 .*\[.*info.*\].*Compiled with warnings.*
 .*\[.*info.*\].*Search for the keywords to learn more about each warning.*
+
+# Inline models
+.*InlineModelResolver - Inline schema created as.*
 
 # We set LC_ALL=C.UTF-8 to make sbt-assembly happy which seems to make damlc
 # (proxied through sbt) issue this warning sometimes.

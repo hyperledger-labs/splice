@@ -23,7 +23,7 @@ object HttpValidatorAdminAppClient {
         mat: Materializer,
     ): Client =
       http.ValidatorAdminClient.httpClient(
-        HttpClientBuilder().buildClient,
+        HttpClientBuilder().buildClient(),
         host,
       )
   }
