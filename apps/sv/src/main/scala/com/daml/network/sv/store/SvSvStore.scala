@@ -125,7 +125,11 @@ object SvSvStore {
     }
 
   private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
-    Seq[ConstrainedTemplate](so.ApprovedSvIdentity.COMPANION)
+    Seq[ConstrainedTemplate](
+      vo.UsedSecret.COMPANION,
+      vo.ValidatorOnboarding.COMPANION,
+      so.ApprovedSvIdentity.COMPANION,
+    )
 
   /** Contract filter of an sv acs store for a specific acs party. */
   def contractFilter(key: SvStore.Key): MultiDomainAcsStore.ContractFilter = {

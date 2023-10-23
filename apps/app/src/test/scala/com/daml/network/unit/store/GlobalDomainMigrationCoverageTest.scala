@@ -124,9 +124,8 @@ object GlobalDomainMigrationCoverageTest {
   // "not handled" usually means "handled by a separate automation"
   private val knownNotHandled = {
     import codegen.java.cc.{coin, coinimport, globaldomain}
-    import codegen.java.cn.{cns as cnsCodegen, directory as directoryCodegen}
+    import codegen.java.cn.{cns as cnsCodegen, directory as directoryCodegen, svc}
     import codegen.java.cn.wallet.{subscriptions as subsCodegen, topupstate as topUpCodegen}
-    import codegen.java.cn.{svc, validatoronboarding as vo}
     Seq(
       cnsCodegen.CnsEntry.COMPANION -> todoCnsDirectory,
       cnsCodegen.CnsEntryContext.COMPANION -> todoCnsDirectory,
@@ -141,8 +140,6 @@ object GlobalDomainMigrationCoverageTest {
       subsCodegen.TerminatedSubscription.COMPANION -> todoCnsDirectory,
       globaldomain.MemberTraffic.COMPANION -> "tied to a specific domainId, never migrated",
       topUpCodegen.ValidatorTopUpState.COMPANION -> "tied to a specific domainId, never migrated",
-      vo.UsedSecret.COMPANION -> "TODO (#7821) follow SvcRules in SvSv",
-      vo.ValidatorOnboarding.COMPANION -> "TODO (#7821) follow SvcRules in SvSv",
       coinimport.ImportCrate.COMPANION -> "TODO (#7822) follow CoinRules in SvSvc",
       coin.AppRewardCoupon.COMPANION -> "TODO (#7822) follow CoinRules in UserWallet",
       coin.LockedCoin.COMPANION -> "TODO (#7822) follow CoinRules in UserWallet",

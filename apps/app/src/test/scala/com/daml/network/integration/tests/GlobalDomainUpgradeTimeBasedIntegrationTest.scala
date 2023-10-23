@@ -8,7 +8,11 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion as TemplateCompanion,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cn.{svcrules as svcr, svonboarding as so}
+import com.daml.network.codegen.java.cn.{
+  svcrules as svcr,
+  svonboarding as so,
+  validatoronboarding as vo,
+}
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.config.CNNodeConfigTransforms.updateAllAutomationConfigs
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
@@ -135,6 +139,15 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           domainId = Some(previousGlobalId),
         )
 
+    def createSampleAndEnsurePresence[
+        TCid <: ContractId[T],
+        T <: Template,
+    ](companion: Contract.Companion.Template[TCid, T])(payload: T) =
+      actAndCheck(
+        s"create sample ${companion.TEMPLATE_ID.getEntityName}",
+        exerciseSvc(payload.create()),
+      )(s"ensure ${companion.TEMPLATE_ID.getEntityName} is there", _ => nonEmptyOnSv1(companion))
+
     clue("create governance contracts of various kinds") {
       actAndCheck(
         "create VoteRequest",
@@ -207,6 +220,14 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
             .create()
         ),
       )("ensure ApprovedSvIdentity is there", _ => nonEmptyOnSv1(so.ApprovedSvIdentity.COMPANION))
+
+      createSampleAndEnsurePresence(vo.UsedSecret.COMPANION)(
+        new vo.UsedSecret(
+          sv1Party.toProtoPrimitive,
+          "irrelevant secret",
+          sv1ValidatorBackend.getValidatorPartyId().toProtoPrimitive,
+        )
+      )
 
       actAndCheck(
         "create sample SvReward",
@@ -291,15 +312,6 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         ),
       )("ensure UnclaimedReward is there", _ => nonEmptyOnSv1(cc.coin.UnclaimedReward.COMPANION))
     }
-
-    def createSampleAndEnsurePresence[
-        TCid <: ContractId[T],
-        T <: Template,
-    ](companion: Contract.Companion.Template[TCid, T])(payload: T) =
-      actAndCheck(
-        s"create sample ${companion.TEMPLATE_ID.getEntityName}",
-        exerciseSvc(payload.create()),
-      )(s"ensure ${companion.TEMPLATE_ID.getEntityName} is there", _ => nonEmptyOnSv1(companion))
 
     clue("create app-manager contracts of various kinds") {
       import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
@@ -407,16 +419,18 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
     }
 
     clue("see whether governance contracts follow svcrules") {
+      import com.daml.network.sv.store.SvSvStore.templatesMovedByMyAutomation as templatesMovedBySvAutomation
       allContractsMigrated(
         c(svcr.Vote.COMPANION),
         c(svcr.VoteRequest.COMPANION),
         c(svcr.Confirmation.COMPANION),
         c(svcr.SvReward.COMPANION),
         c(svcr.ElectionRequest.COMPANION),
-        c(so.ApprovedSvIdentity.COMPANION, sv1Party), // only has the sv party as a stakeholder
         c(so.SvOnboardingRequest.COMPANION),
         c(so.SvOnboardingConfirmed.COMPANION),
       )
+      // only have the sv party as a stakeholder
+      allContractsMigrated(templatesMovedBySvAutomation.map(c(_, sv1Party)): _*)
     }
 
     // wait a tick for next, as below wait for CoinRules to move
