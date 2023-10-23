@@ -79,4 +79,10 @@ trait SplitwellFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
   def getGroupContractIds()(implicit driver: WebDriverType): Set[String] =
     // The element is hidden so we need to use .attribute("textContent") instead of .text
     findAll(className("data-group-contract-id")).map(_.attribute("textContent").value).toSet
+
+  def eventuallyClickOn(query: ClassNameQuery)(implicit driver: WebDriverType) = {
+    eventually() {
+      clickOn(query)
+    }
+  }
 }

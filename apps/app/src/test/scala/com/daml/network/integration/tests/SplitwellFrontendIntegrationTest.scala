@@ -72,7 +72,7 @@ class SplitwellFrontendIntegrationTest
       }
 
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
-        click on className("add-user-link")
+        eventuallyClickOn(className("add-user-link"))
       }
 
       withFrontEnd("charlieSplitwell") { implicit webDriver =>
@@ -81,7 +81,7 @@ class SplitwellFrontendIntegrationTest
       }
 
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
-        click on className("add-user-link")
+        eventuallyClickOn(className("add-user-link"))
 
         inside(find(className("enter-payment-amount-field"))) { case Some(field) =>
           field.underlying.click()
@@ -91,7 +91,7 @@ class SplitwellFrontendIntegrationTest
           field.underlying.click()
           reactTextInput(field).value = "Team lunch"
         }
-        click on className("enter-payment-link")
+        eventuallyClickOn(className("enter-payment-link"))
       }
 
       withFrontEnd("charlieSplitwell") { implicit webDriver =>
@@ -103,7 +103,7 @@ class SplitwellFrontendIntegrationTest
           field.underlying.click()
           reactTextInput(field).value = "Digestivs"
         }
-        click on className("enter-payment-link")
+        eventuallyClickOn(className("enter-payment-link"))
       }
 
       withFrontEnd("bobSplitwell") { implicit webDriver =>
@@ -121,12 +121,12 @@ class SplitwellFrontendIntegrationTest
               )(r2)
           }
         }
-        click on className("settle-my-debts-link")
+        eventuallyClickOn(className("settle-my-debts-link"))
 
         // Bob is redirected to wallet ..
         loginOnCurrentPage(3001, bobDamlUser)
 
-        click on className("payment-accept")
+        eventuallyClickOn(className("payment-accept"))
 
         // And then back to splitwell, where he is already logged in
         eventually() {
@@ -210,7 +210,7 @@ class SplitwellFrontendIntegrationTest
       }
 
       withFrontEnd("aliceSplitwell") { implicit webDriver =>
-        click on className("add-user-link")
+        eventuallyClickOn(className("add-user-link"))
         addTeamLunch(1000)
       }
 
@@ -220,7 +220,7 @@ class SplitwellFrontendIntegrationTest
         // Bob is redirected to wallet ..
         loginOnCurrentPage(bobWalletUIPort, bobDamlUser)
 
-        click on className("payment-accept")
+        eventuallyClickOn(className("payment-accept"))
 
         // And then back to splitwell, where he is already logged in
         eventually(scaled(5 seconds)) {
