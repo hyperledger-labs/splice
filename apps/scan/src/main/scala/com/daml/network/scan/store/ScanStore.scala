@@ -43,6 +43,8 @@ trait ScanStore
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 
+  def serviceUserPrimaryParty: PartyId
+
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter =
     ScanStore.contractFilter(svcParty)
 
@@ -184,6 +186,7 @@ trait ScanStore
 
 object ScanStore {
   def apply(
+      serviceUserPrimaryParty: PartyId,
       svcParty: PartyId,
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
@@ -198,13 +201,21 @@ object ScanStore {
     storage match {
       case _: MemoryStorage =>
         new InMemoryScanStore(
+          serviceUserPrimaryParty = serviceUserPrimaryParty,
           svcParty = svcParty,
           loggerFactory,
           treeSource,
           retryProvider,
         )
       case db: DbStorage =>
-        new DbScanStore(svcParty, db, loggerFactory, treeSource, retryProvider)
+        new DbScanStore(
+          serviceUserPrimaryParty = serviceUserPrimaryParty,
+          svcParty = svcParty,
+          db,
+          loggerFactory,
+          treeSource,
+          retryProvider,
+        )
     }
   }
 

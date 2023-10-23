@@ -58,7 +58,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       "return correct total coin balance for the round where the transfer happened and for the rounds before and after" in {
         val coinAmount = 100.0
         for {
-          store <- mkStore(user1)
+          store <- mkStore()
           coinRulesContract = coinRules()
           _ <- dummyDomain.exercise(
             coinRulesContract,
@@ -84,7 +84,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         val coinRound1 = 100.0
         val changeToInitialAmountAsOfRoundZero = -50.0
         for {
-          store <- mkStore(user1)
+          store <- mkStore()
           _ <- dummyDomain.ingest(mintTransaction(user1, coinRound1, 1, holdingFee))(
             store.multiDomainAcsStore
           )
@@ -121,7 +121,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         val coinRound1 = 100.0
         val changeToInitialAmountAsOfRoundZero = -50.0
         for {
-          store <- mkStore(user1)
+          store <- mkStore()
           _ <- dummyDomain.ingest(mintTransaction(user1, coinRound1, 1, holdingFee))(
             store.multiDomainAcsStore
           )
@@ -157,7 +157,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       "return correct total coin balance for the round where the mint happened and for the rounds before and after" in {
         val mintAmount = 100.0
         for {
-          store <- mkStore(user1)
+          store <- mkStore()
           _ <- dummyDomain.ingest(mintTransaction(user1, mintAmount, 2, holdingFee))(
             store.multiDomainAcsStore
           )
@@ -185,7 +185,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           9.75,
         )
         for {
-          store <- mkStore(user1)
+          store <- mkStore()
           _ <- Future.traverse(appRewards.zip(validatorRewards).zipWithIndex) {
             case ((appAmount, validatorAmount), round) =>
               dummyDomain.exercise(
@@ -227,7 +227,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           33.3,
         )
         for {
-          store <- mkStore(user1)
+          store <- mkStore()
           _ <- Future.traverse(appRewards.zipWithIndex) { case (amount, round) =>
             dummyDomain.exercise(
               coinRules(),
@@ -788,7 +788,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     }
   }
 
-  protected def mkStore(endUserParty: PartyId = svcParty): Future[ScanStore]
+  protected def mkStore(
+      serviceUserPrimaryParty: PartyId = user1,
+      svcParty: PartyId = svcParty,
+  ): Future[ScanStore]
 
   protected lazy val transactionTreeSource = TxLogStore.TransactionTreeSource.ForTesting()
 
@@ -1013,7 +1016,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         )
           .toValue(_.toValue),
       ),
-      Seq(toCreatedEvent(coinContract)),
+      Seq(toCreatedEvent(coinContract, signatories = Seq(receiver, svcParty))),
     )
   }
 
@@ -1115,9 +1118,13 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 }
 
 class InMemoryScanStoreTest extends ScanStoreTest {
-  override protected def mkStore(endUserParty: PartyId): Future[InMemoryScanStore] = {
+  override protected def mkStore(
+      serviceUserPrimaryParty: PartyId,
+      svcParty: PartyId,
+  ): Future[ScanStore] = {
     val store = new InMemoryScanStore(
-      endUserParty,
+      serviceUserPrimaryParty = serviceUserPrimaryParty,
+      svcParty = svcParty,
       loggerFactory,
       transactionTreeSource,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
@@ -1140,7 +1147,10 @@ class DbScanStoreTest
     with AcsJdbcTypes
     with AcsTables {
 
-  override protected def mkStore(endUserParty: PartyId): Future[DbScanStore] = {
+  override protected def mkStore(
+      serviceUserPrimaryParty: PartyId,
+      svcParty: PartyId,
+  ): Future[ScanStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         DarResources.cantonCoin.all ++
@@ -1151,7 +1161,8 @@ class DbScanStoreTest
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
     val store = new DbScanStore(
-      endUserParty,
+      serviceUserPrimaryParty = serviceUserPrimaryParty,
+      svcParty = svcParty,
       storage,
       loggerFactory,
       transactionTreeSource,

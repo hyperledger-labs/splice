@@ -25,6 +25,7 @@ import com.daml.network.scan.store.SortOrder.Descending
 import com.daml.network.store.TxLogStore
 
 class InMemoryScanStore(
+    override val serviceUserPrimaryParty: PartyId,
     override val svcParty: PartyId,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val transactionTreeSource: TransactionTreeSource,

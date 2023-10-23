@@ -141,9 +141,9 @@ object TxLogIndexRecord {
       round: Long,
       changeToInitialAmountAsOfRoundZero: BigDecimal,
       changeToHoldingFeesRate: BigDecimal,
+      acsContractId: Option[codegen.ContractId[_]],
   ) extends TxLogIndexRecord {
     override val companion: TxLogIndexRecordCompanion = BalanceChangeIndexRecord
-    override def acsContractId: Option[codegen.ContractId[_]] = None
   }
 
   object BalanceChangeIndexRecord extends TxLogIndexRecordCompanion {

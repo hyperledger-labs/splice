@@ -10,6 +10,7 @@ import com.daml.network.console.{
 }
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
@@ -27,6 +28,10 @@ import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
+
+class InMemoryDirectoryIntegrationTest extends DirectoryIntegrationTest {
+  registerPlugin(new UseInMemoryStores(loggerFactory))
+}
 
 class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
 

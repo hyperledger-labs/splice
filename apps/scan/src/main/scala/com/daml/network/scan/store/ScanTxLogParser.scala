@@ -121,22 +121,36 @@ class ScanTxLogParser(
       incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
   )(implicit
       tc: TraceContext
-  ): Seq[(DomainId, TxLogEntry)] = acs.collect(ac =>
+  ): Seq[(DomainId, TxLogEntry)] = acs.flatMap { ac =>
+    // This is necessary because the CreatedEvents from the ACS might have the same eventId for different contract ids.
+    // So either:
+    // TODO (#6882): Canton fixes this, so we can just assign the eventId
+    // TODO (#8132): We end up using PQS, redesign the txlog taking this issue into account, or something else.
+    val eventId = ac.createdEvent.getContractId
     ac.createdEvent match {
       case CoinCreate(c) =>
-        (
-          ac.domainId,
-          entryFromCoin(None, ac.createdEvent.getEventId, ac.domainId, c.payload.amount),
+        val contractId = new cc.coin.Coin.ContractId(ac.createdEvent.getContractId)
+        Some(
+          (
+            ac.domainId,
+            entryFromCoin(None, eventId, ac.domainId, c.payload.amount, Some(contractId)),
+          )
         )
       case LockedCoinCreate(lc) =>
-        (
-          ac.domainId,
-          entryFromCoin(None, ac.createdEvent.getEventId, ac.domainId, lc.payload.coin.amount),
+        val contractId = new cc.coin.LockedCoin.ContractId(ac.createdEvent.getContractId)
+        Some(
+          (
+            ac.domainId,
+            entryFromCoin(None, eventId, ac.domainId, lc.payload.coin.amount, Some(contractId)),
+          )
         )
       case CoinImportCrate(ic) =>
-        (ac.domainId, entryFromCoin(None, ac.createdEvent.getEventId, ac.domainId, ic.amount))
+        val contractId = new cc.coinimport.ImportCrate.ContractId(ac.createdEvent.getContractId)
+        Some((ac.domainId, entryFromCoin(None, eventId, ac.domainId, ic.amount, Some(contractId))))
+      case _ =>
+        None
     }
-  )
+  }
 
   override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
       tc: TraceContext
@@ -221,6 +235,7 @@ object ScanTxLogParser {
             round = coin.amount.createdAt.number,
             changeToInitialAmountAsOfRoundZero = amountAsOfRoundZero(coin.amount),
             changeToHoldingFeesRate = coin.amount.ratePerRound.rate,
+            acsContractId = None,
           )
         )
       )
@@ -289,6 +304,7 @@ object ScanTxLogParser {
           event.getEventId(),
           domainId,
           coin.amount,
+          acsContractId = None,
         )
       ).append(activityEntry)
     }
@@ -357,6 +373,7 @@ object ScanTxLogParser {
             changeToInitialAmountAsOfRoundZero =
               node.result.value.summary.changeToInitialAmountAsOfRoundZero,
             changeToHoldingFeesRate = node.result.value.summary.changeToHoldingFeesRate,
+            acsContractId = None,
           )
         )
       )
@@ -386,6 +403,7 @@ object ScanTxLogParser {
             round = cxsum.round.number,
             changeToInitialAmountAsOfRoundZero = cxsum.changeToInitialAmountAsOfRoundZero,
             changeToHoldingFeesRate = cxsum.changeToHoldingFeesRate,
+            acsContractId = None,
           )
         )
       )
@@ -500,6 +518,7 @@ object ScanTxLogParser {
             // negative value for both initial amount and holding fee so that the total balance can be calculated correctly
             changeToInitialAmountAsOfRoundZero = -amountAsOfRoundZero(burntCoin.amount),
             changeToHoldingFeesRate = -burntCoin.amount.ratePerRound.rate,
+            acsContractId = None,
           )
         )
       )
@@ -557,6 +576,7 @@ object ScanTxLogParser {
       eventId: String,
       domainId: DomainId,
       amount: ExpiringAmount,
+      acsContractId: Option[com.daml.ledger.javaapi.data.codegen.ContractId[?]],
   ): TxLogEntry = {
     EmptyTxLogEntry(
       indexRecord = BalanceChangeIndexRecord(
@@ -566,6 +586,7 @@ object ScanTxLogParser {
         round = amount.createdAt.number,
         changeToInitialAmountAsOfRoundZero = amountAsOfRoundZero(amount),
         changeToHoldingFeesRate = amount.ratePerRound.rate,
+        acsContractId = acsContractId,
       )
     )
   }

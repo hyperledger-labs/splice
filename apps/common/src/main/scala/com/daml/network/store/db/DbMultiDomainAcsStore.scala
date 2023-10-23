@@ -560,8 +560,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         finishedAcsIngestion.isCompleted == false,
         s"ACS was already ingested for store $storeId",
       )
-      // TODO(#6547): Get initial txLogEntries from txLogParser.parseAcs()
-      val txLogEntries = Seq.empty[TXE]
+      val txLogEntries = txLogParser.parseAcs(acs, incompleteOut, incompleteIn).map(_._2)
 
       // Filter out all contracts we are not interested in
       val todoAcs = acs

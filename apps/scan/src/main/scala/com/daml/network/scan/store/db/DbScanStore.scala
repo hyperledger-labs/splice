@@ -32,6 +32,7 @@ import com.daml.network.scan.store.SortOrder.Ascending
 import com.daml.network.scan.store.SortOrder.Descending
 
 class DbScanStore(
+    override val serviceUserPrimaryParty: PartyId,
     override val svcParty: PartyId,
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -48,6 +49,7 @@ class DbScanStore(
       // TODO (#5544): change this to something better
       storeDescriptor = Json.obj(
         "version" -> Json.fromInt(1),
+        "service_user_primary_party" -> Json.fromString(serviceUserPrimaryParty.toProtoPrimitive),
         "svc_party" -> Json.fromString(svcParty.toProtoPrimitive),
       ),
     )
@@ -406,6 +408,7 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
     for {
+      _ <- verifyDataExistsForEndOfRound(asOfEndOfRound)
       rows <- storage.query(
         sql"""
               select rewarded_party, sum(reward_amount) as total_app_rewards
@@ -426,6 +429,7 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
     for {
+      _ <- verifyDataExistsForEndOfRound(asOfEndOfRound)
       rows <- storage.query(
         sql"""
               select rewarded_party, sum(reward_amount) as total_app_rewards

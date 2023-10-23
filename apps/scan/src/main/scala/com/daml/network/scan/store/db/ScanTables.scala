@@ -329,13 +329,14 @@ object ScanTables extends AcsTables {
               round,
               changeToInitialAmountAsOfRoundZero,
               changeToHoldingFeesRate,
+              acsContractId,
             ) =>
           ScanTxLogRowData(
             eventId = eventId,
             indexRecordType = bac.companion.dbType,
             offset = offset,
             domainId = domainId,
-            acsContractId = None,
+            acsContractId = acsContractId,
             round = Some(round),
             rewardAmount = None,
             rewardedParty = None,

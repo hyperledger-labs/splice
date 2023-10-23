@@ -90,7 +90,8 @@ class ScanApp(
         .getSvcPartyFromUserMetadata(config.svUser)
       store <- Future.successful(
         ScanStore(
-          svcParty,
+          serviceUserPrimaryParty = serviceUserPrimaryParty,
+          svcParty = svcParty,
           storage,
           loggerFactory,
           // ScanStore needs its own connection for enriching the tx history on-demand

@@ -17,6 +17,11 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
 import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem
+import com.daml.network.integration.plugins.UseInMemoryStores
+
+class InMemoryScanIntegrationTest extends ScanIntegrationTest {
+  registerPlugin(new UseInMemoryStores(loggerFactory))
+}
 
 class ScanIntegrationTest
     extends CNNodeIntegrationTest
