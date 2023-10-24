@@ -356,7 +356,7 @@ Here are a few strategies and techniques that can be useful for speeding up the 
   the CirlceCI deployment workflow can simply be "Rerun from failed" (see the "Rerun" button on the top right).
   Please still follow up on the flake and make sure it can't happen at all in future deployments.
   Example [postmortem](https://docs.google.com/document/d/1WYQgZ6PZC1ZcIIo5CSQtuCg7zNdXPyGYAKx96vVe-Jc).
-- If if looks as if the deployment failed due to a bug in our CircleCI configuration,
+- If it looks as if the deployment failed due to a bug in our CircleCI configuration,
   the CircleCI configuration must be fixed on the current main branch first.
   Once the fix has been merged, [start a new deployment](#manually-deploying-via-ci) of the target cluster.
   Note that you can't "Rerun from failed" in this case as this will not pick up you fix.
@@ -385,6 +385,15 @@ Here are a few strategies and techniques that can be useful for speeding up the 
   you need to make sure that public artifacts have been published for the version you will be deploying (see below).
   Example [postmortem](https://docs.google.com/document/d/1kfkbmUVCFOARcDLBbIivyRyaLJgjY6ejqE9VePxcDtU)
   (see the `TestNet` failures there).
+- If you know that the deployment issue can be fixed by a small modification of the kubernetes manifest (eg. updating an environment variable,
+  or changing a configuration parameter), you can consider making a direct change to the manifest itself. Usually, this is a situation where
+  all you want to do is change a specific helm chart value. Manually editing the manifest can, in these specific circumstances,
+  be a better option than jumping versions and redeploying the cluster.
+  To do so, launch `k9s`, go to the k8s deployments overview by entering `:deployments`, navigate to the correct k8s deployment and press `e`.
+  This should fire up your default editor where you can make changes. Upon saving your edits, the affected pods should get restarted and
+  the changes should take effect automatically.
+  Note, however, that any changes made in this manner will be lost on the next cluster deployment, so make sure that you also create
+  a PR to persist the corresponding change(s) in the repo.
 - Versions you deploy to `DevNet` and `TestNet` must have been published as public releases to Artifactory first,
   otherwise their deployment will fail.
   A quick way to check if the commit you are planning to deploy is safe in this respect is to check whether it has a git tag
