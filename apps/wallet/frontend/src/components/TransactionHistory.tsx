@@ -201,7 +201,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       // AppPaymentAccepted
       text = 'App Payment Accepted';
       break;
-    case 'CoinRules_BuyExtraTraffic':
+    case 'CoinRules_BuyMemberTraffic':
       // ExtraTrafficPurchase
       text = 'Extra Traffic Purchase';
       break;

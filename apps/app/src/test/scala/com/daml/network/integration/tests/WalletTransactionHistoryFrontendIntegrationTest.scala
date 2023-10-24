@@ -4,7 +4,12 @@ import com.daml.network.codegen.java.cn.wallet.payment.Currency
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
+import com.daml.network.util.{
+  DomainFeesTestUtil,
+  FrontendLoginUtil,
+  WalletFrontendTestUtil,
+  WalletTestUtil,
+}
 import com.daml.network.config.CNNodeConfigTransforms
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -16,10 +21,11 @@ import java.util.UUID
 import scala.collection.parallel.immutable.ParVector
 
 class WalletTransactionHistoryFrontendIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("alice")
+    extends FrontendIntegrationTestWithSharedEnvironment("alice", "sv1")
     with WalletTestUtil
     with WalletTxLogTestUtil
     with WalletFrontendTestUtil
+    with DomainFeesTestUtil
     with FrontendLoginUtil {
 
   private val coinPrice = 2
@@ -165,6 +171,36 @@ class WalletTransactionHistoryFrontendIntegrationTest
               expectedAmountCC = BigDecimal(5),
             )
         }
+      }
+    }
+
+    "show extra traffic purchases" in { implicit env =>
+      withFrontEnd("sv1") { implicit webDriver =>
+        val sv1WalletUser = sv1ValidatorBackend.config.validatorWalletUser.value
+        browseToSv1Wallet(sv1WalletUser)
+        val trafficAmount = 10_000_000L
+        val (_, trafficCostCc) = computeDomainFees(trafficAmount, env.environment.clock.now)
+        actAndCheck(
+          "SV1 purchases extra traffic",
+          buyMemberTraffic(sv1ValidatorBackend, trafficAmount, env.environment.clock.now),
+        )(
+          "SV1 sees the transaction",
+          _ => {
+            val txs = findAll(className("tx-row")).toSeq
+            val sv1ValidatorParty = sv1WalletClient.userStatus().party
+            val svcParty = sv1ScanBackend.getSvcPartyId()
+            forExactly(1, txs) { tx =>
+              matchTransaction(tx)(
+                coinPrice = 2,
+                expectedAction = "Sent",
+                expectedSubtype = "Extra Traffic Purchase",
+                expectedPartyDescription =
+                  Some(s"${expectedCns(svcParty, "directory.cns")} ${sv1ValidatorParty}"),
+                expectedAmountCC = -trafficCostCc,
+              )
+            }
+          },
+        )
       }
     }
 
