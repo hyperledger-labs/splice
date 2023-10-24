@@ -3,11 +3,11 @@ set -eou pipefail
 
 # Add your personal Circle CI API token to the CIRCLECI_TOKEN environment variable before running the script.
 function usage() {
-  echo "Usage: ./search-ci-deployment.sh <flags>"
+  echo "Usage: ./search-ci-deployment.sh -n <WORKFLOW_NAME> [<flags>]"
   echo "Flags:"
-  echo "  -h               Add your personal cci API token to the CIRCLECI_TOKEN environment variable before running the script"
-  echo "  -n               name of a cci workflow"
-  echo "  -l               number of latest runs to display"
+  echo "  -h                                                       display help message"
+  echo "  -n   <WORKFLOW_NAME>                                     name of a cci workflow"
+  echo "  -l   <N_LATEST_RUNS>                                     number of latest runs to display"
 }
 
 CCI_PROJECT="github/DACH-NY/canton-network-node"
@@ -32,6 +32,12 @@ while getopts "h:n:l:" arg; do
       ;;
   esac
 done
+
+if [[ -z "${WORKFLOW_NAME+x}" ]]; then
+  echo "Error: WORKFLOW_NAME environment variable is not set."
+  usage
+  exit 1
+fi
 
 recent_runs_of_workflow=$(curl -s -u "${CIRCLECI_TOKEN}": -H "Content-Type: application/json" \
     "https://circleci.com/api/v2/insights/${CCI_PROJECT}/workflows/${WORKFLOW_NAME}?all-branches=false&branch=${BRANCH_NAME}")

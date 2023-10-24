@@ -57,20 +57,29 @@ const VoteRequest: React.FC = () => {
   const svcInfosQuery = useSvcInfos();
   const listVoteRequestsQuery = useListSvcRulesVoteRequests();
 
-  const defaultExpiration: Dayjs = dayjs().add(
-    Math.floor(
-      parseInt(svcInfosQuery.data?.svcRules.payload.config.voteRequestTimeout.microseconds!) / 1000
-    ),
-    'milliseconds'
-  );
+  function getDefaultExpiration(): Dayjs {
+    switch (actionName) {
+      case 'CRARC_RemoveFutureCoinConfigSchedule':
+      case 'CRARC_UpdateFutureCoinConfigSchedule':
+      case 'CRARC_AddFutureCoinConfigSchedule': {
+        return dayjs();
+      }
+      default: {
+        const microseconds =
+          parseInt(svcInfosQuery.data?.svcRules.payload.config.voteRequestTimeout.microseconds!) /
+          1000;
+        return dayjs().add(Math.floor(microseconds), 'milliseconds');
+      }
+    }
+  }
 
   useEffect(() => {
-    setExpiration(defaultExpiration);
+    setExpiration(getDefaultExpiration);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [svcInfosQuery.isSuccess]);
 
   useEffect(() => {
-    setExpiration(defaultExpiration);
+    setExpiration(getDefaultExpiration);
     setMaxDateTimeIfAddFutureCoinConfigSchedule(undefined);
     setUrl('');
     setSummary('');
@@ -174,7 +183,7 @@ const VoteRequest: React.FC = () => {
           .then(() => setSummary(''))
           .then(() => setActionName('SRARC_RemoveMember'))
           .then(() => setAction(undefined))
-          .then(() => setExpiration(defaultExpiration))
+          .then(() => setExpiration(getDefaultExpiration))
           .then(() => setMaxDateTimeIfAddFutureCoinConfigSchedule(undefined))
           .then(() => setAlertMessage({}));
       }
@@ -256,7 +265,9 @@ const VoteRequest: React.FC = () => {
             </Box>
           </Stack>
           <Stack direction="column" mb={4} spacing={1}>
-            <Typography variant="h5">Expires At</Typography>
+            <Typography variant="h5" mt={4}>
+              Vote Request Expires At
+            </Typography>
             <DesktopDateTimePicker
               label={`Enter time in local timezone (${getUTCWithOffset()})`}
               value={expiration}

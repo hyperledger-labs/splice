@@ -59,7 +59,9 @@ const AddFutureCoinConfigSchedule: React.FC<{
 
   return (
     <Stack direction="column" mb={4} spacing={1}>
-      <Typography variant="h6">Configuration</Typography>
+      <Typography variant="h6" mt={4}>
+        Configuration Effective Date
+      </Typography>
       <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
         <DesktopDateTimePicker
           label={`Enter time in local timezone (${getUTCWithOffset()})`}
@@ -74,6 +76,9 @@ const AddFutureCoinConfigSchedule: React.FC<{
           }}
           closeOnSelect
         />
+        <Typography variant="h6" mt={4}>
+          Configuration
+        </Typography>
         <JsonEditor
           data={
             CoinConfig(USD).encode(

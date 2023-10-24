@@ -802,6 +802,8 @@ class SvFrontendIntegrationTest
                 find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
               }
 
+              setExpirationDate("sv1", "07/11/2032 12:12 AM")
+
               clue("sv1 creates the vote request") {
                 click on "create-voterequest-submit-button"
               }
@@ -854,6 +856,8 @@ class SvFrontendIntegrationTest
                 }
               })
 
+              setExpirationDate("sv1", "07/11/2032 12:12 AM")
+
               clue("sv1 creates the vote request") {
                 click on "create-voterequest-submit-button"
               }
@@ -902,19 +906,7 @@ class SvFrontendIntegrationTest
                 }
               })
 
-              val expirationDateTimePicker =
-                webDriver.findElement(By.id("datetime-picker-vote-request-expiration"))
-
-              Seq(("07/12/2034 12:12 AM", 1)).foreach(e => {
-                eventually() {
-                  clue(s"sv1 select an expiration date $e which is after the effective date") {
-                    expirationDateTimePicker.clear()
-                    expirationDateTimePicker.click()
-                    expirationDateTimePicker.sendKeys(e._1)
-                    expirationDateTimePicker.sendKeys(Keys.RETURN)
-                  }
-                }
-              })
+              setExpirationDate("sv1", "07/12/2034 12:12 AM")
 
               clue("sv1 creates the vote request") {
                 click on "create-voterequest-submit-button"
@@ -967,6 +959,8 @@ class SvFrontendIntegrationTest
                 find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
               }
 
+              setExpirationDate("sv1", "07/11/2030 12:12 AM")
+
               click on "create-voterequest-submit-button"
             },
           )(
@@ -1008,6 +1002,8 @@ class SvFrontendIntegrationTest
                 find(id("transferConfig.createFee.fee-value")).value.underlying
                   .sendKeys(requestNewTransferConfigFeeValue)
               }
+
+              setExpirationDate("sv1", "07/11/2030 12:12 AM")
 
               click on "create-voterequest-submit-button"
             },
@@ -1054,6 +1050,8 @@ class SvFrontendIntegrationTest
                 find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
               }
 
+              setExpirationDate("sv1", "07/11/2030 12:12 AM")
+
               clue("sv1 creates the vote request") {
                 click on "create-voterequest-submit-button"
               }
@@ -1091,6 +1089,8 @@ class SvFrontendIntegrationTest
               val dropDownCoinConfigDate =
                 new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
               dropDownCoinConfigDate.selectByIndex(1)
+
+              setExpirationDate("sv1", "07/11/2030 12:12 AM")
 
               clue("sv1 creates the vote request") {
                 click on "create-voterequest-submit-button"
@@ -1234,6 +1234,7 @@ class SvFrontendIntegrationTest
             clue("sv1 modifies the summary") {
               find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
             }
+            setExpirationDate("sv1", "07/11/2030 12:12 AM")
           }
         }
 
@@ -1275,6 +1276,7 @@ class SvFrontendIntegrationTest
             clue("sv2 modifies the summary") {
               find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
             }
+            setExpirationDate("sv2", "07/11/2030 12:12 AM")
           }
         }
 
@@ -1350,6 +1352,26 @@ class SvFrontendIntegrationTest
             }
           }
         }
+    }
+  }
+
+  def setExpirationDate(party: String, expirationDate: String)(implicit
+      webDriver: WebDriverType
+  ) = {
+    clue(s"$party modifies the expiration date") {
+      val expirationDateTimePicker =
+        webDriver.findElement(By.id("datetime-picker-vote-request-expiration"))
+
+      Seq((expirationDate, 1)).foreach(e => {
+        eventually() {
+          clue(s"sv1 select an expiration date") {
+            expirationDateTimePicker.clear()
+            expirationDateTimePicker.click()
+            expirationDateTimePicker.sendKeys(e._1)
+            expirationDateTimePicker.sendKeys(Keys.RETURN)
+          }
+        }
+      })
     }
   }
 
