@@ -43,7 +43,9 @@ import com.daml.network.sv.cometbft.{
 }
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.metrics.SvAppMetrics
-import com.daml.network.sv.setup.{FoundingNodeInitializer, JoiningNodeInitializer}
+import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer
+import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
+import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.LocalSequencerConfig
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
@@ -321,10 +323,18 @@ class SvApp(
         isDevNet,
         clock,
         participantAdminConnection,
-        svcRulesLock,
         localDomainNode,
         retryProvider,
-        svcPartyHosting,
+        new SvcPartyMigration(
+          globalDomain,
+          svAutomation,
+          svcAutomation,
+          participantAdminConnection,
+          svcRulesLock,
+          retryProvider,
+          svcPartyHosting,
+          loggerFactory,
+        ),
         cometBftClient,
         loggerFactory,
       )

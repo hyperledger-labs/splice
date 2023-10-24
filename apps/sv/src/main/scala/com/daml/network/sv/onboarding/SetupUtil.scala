@@ -1,4 +1,4 @@
-package com.daml.network.sv.setup
+package com.daml.network.sv.onboarding
 
 import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection}
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -7,7 +7,7 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
-private[setup] object SetupUtil {
+private[onboarding] object SetupUtil {
 
   def setupSvParty(
       connection: CNLedgerConnection,

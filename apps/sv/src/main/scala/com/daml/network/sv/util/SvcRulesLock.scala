@@ -4,7 +4,7 @@ import cats.data.EitherT
 import cats.implicits.catsSyntaxApplicativeError
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.CNNodeAppStoreWithIngestion
-import com.daml.network.sv.setup.SvcPartyHosting.{LockAcquireFailure, SvcPartyMigrationFailure}
+import com.daml.network.sv.onboarding.SvcPartyHosting.{LockAcquireFailure, SvcPartyMigrationFailure}
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}

@@ -1,6 +1,5 @@
-package com.daml.network.sv.setup
+package com.daml.network.sv.onboarding.founder
 
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.implicits.{
   catsSyntaxTuple2Semigroupal,
@@ -12,16 +11,16 @@ import cats.syntax.traverse.*
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.*
 import com.daml.network.http.v0.definitions as http
-import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.*
-import com.daml.network.sv.{LocalDomainNode, SvApp}
-import com.daml.network.sv.automation.SvSvcAutomationService
-import com.daml.network.sv.automation.SvSvAutomationService
+import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion, PageLimit}
+import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, SvOnboardingConfig}
-import com.daml.network.sv.setup.FoundingNodeInitializer.bootstrapTransactionOrdering
+import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
+import com.daml.network.sv.onboarding.{SetupUtil, SvcPartyHosting}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvUtil, SvcRulesLock}
+import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
 import com.daml.network.util.{AssignedContract, GcpBucket, TemplateJsonDecoder, UploadablePackage}
 import com.daml.nonempty.NonEmpty
@@ -37,21 +36,20 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnections,
   TrafficControlParameters,
 }
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransactionX,
   StoredTopologyTransactionsX,
 }
+import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code
 import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransactionX,
   TopologyChangeOpX,
   TopologyMappingX,
   UnionspaceDefinitionX,
 }
-import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
@@ -79,7 +77,6 @@ class FoundingNodeInitializer(
     localDomainNode: LocalDomainNode,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
     mat: Materializer,
@@ -642,7 +639,6 @@ class FoundingNodeInitializer(
       storeKey: SvStore.Key,
       participantAdminConnection: ParticipantAdminConnection,
   ) = new SvcPartyHosting(
-    config.onboarding,
     participantAdminConnection,
     storeKey.svcParty,
     retryProvider,

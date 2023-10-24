@@ -1,4 +1,4 @@
-package com.daml.network.sv.setup
+package com.daml.network.sv.onboarding.joining
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
@@ -17,6 +17,7 @@ import com.daml.network.sv.cometbft.{
   CometBftNode,
 }
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
+import com.daml.network.sv.onboarding.{SetupUtil, SvcPartyHosting}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
@@ -125,6 +126,18 @@ class JoiningNodeInitializer(
         globalDomain,
         participantId,
       )
+      withSvStore = new WithSvStore(
+        svAutomation,
+        new JoiningNodeSvcPartyHosting(
+          participantAdminConnection,
+          joiningConfig,
+          svcPartyId,
+          svcPartyHosting,
+          retryProvider,
+          loggerFactory,
+        ),
+        globalDomain,
+      )
       svcAutomation <-
         if (svcPartyIsAuthorized) {
           logger.info("SVC party is authorized to our participant.")
@@ -146,11 +159,7 @@ class JoiningNodeInitializer(
             _ <- retryProvider.ensureThatB(
               show"the SvcRules list the SV party ${svcStore.key.svParty} as a member",
               isOnboarded(svcStore), {
-                new WithSvStore(
-                  svAutomation,
-                  svcPartyHosting,
-                  globalDomain,
-                ).startOnboardingWithSvcPartyHosted(
+                withSvStore.startOnboardingWithSvcPartyHosted(
                   svcAutomation
                 )
               },
@@ -162,7 +171,7 @@ class JoiningNodeInitializer(
             "The SVC party is not authorized to our participant. " +
               "Starting onboarding with SVC party migration."
           )
-          new WithSvStore(svAutomation, svcPartyHosting, globalDomain)
+          withSvStore
             .startOnboardingWithSvcPartyMigration(initConnection, svcStore)
         }
       _ <- waitForSvcMembership(svcStore)
@@ -185,7 +194,7 @@ class JoiningNodeInitializer(
           )
         } yield ()
       }
-      _ <- new WithSvStore(svAutomation, svcPartyHosting, globalDomain)
+      _ <- withSvStore
         .setDomainNodeConfigIfRequired(svcAutomation, localDomainNode)
     } yield (
       globalDomain,
@@ -248,7 +257,7 @@ class JoiningNodeInitializer(
     */
   private class WithSvStore(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-      svcPartyHosting: SvcPartyHosting,
+      svcPartyHosting: JoiningNodeSvcPartyHosting,
       domainId: DomainId,
   ) {
 
@@ -470,7 +479,7 @@ class JoiningNodeInitializer(
     private def startHostingSvcPartyInParticipant(): Future[Unit] = {
       svcPartyHosting
         // TODO(#5364): consider inlining the relevant parts from SvcPartyHosting
-        .start(domainId, participantId, svParty)
+        .hostPartyOnOwnParticipant(domainId, participantId, svParty)
         .map(
           _.getOrElse(
             sys.error(s"Failed to host svc party on participant $participantId")
@@ -557,7 +566,6 @@ class JoiningNodeInitializer(
       storeKey: SvStore.Key,
       participantAdminConnection: ParticipantAdminConnection,
   ) = new SvcPartyHosting(
-    config.onboarding,
     participantAdminConnection,
     storeKey.svcParty,
     retryProvider,
