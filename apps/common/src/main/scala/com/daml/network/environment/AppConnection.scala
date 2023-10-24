@@ -150,6 +150,7 @@ abstract class HttpAppConnection(
 
   private def getHttpAppVersionInfo(url: Uri): Future[HttpAdminAppClient.VersionInfo] =
     retryProvider.getValueWithRetries(
+      RetryFor.WaitingOnInitDependency,
       s"app version of $url",
       runHttpCmd(url, HttpAdminAppClient.GetVersion(), List()),
       logger,

@@ -112,7 +112,8 @@ class FoundingNodeInitializer(
           ),
           manualConnect = false,
           domainId = None,
-        )
+        ),
+        RetryFor.WaitingOnInitDependency,
       )
       _ = logger.info("Participant connected to domain")
       svcParty <- setupSvcParty(initConnection, namespace)
@@ -136,6 +137,7 @@ class FoundingNodeInitializer(
       // part of deployment and the running of bootstrap scripts. Here we just check that the SVC party
       // is allocated, as a stand-in for all of these actions.
       _ <- retryProvider.waitUntil(
+        RetryFor.WaitingOnInitDependency,
         show"SVC party $svcParty is allocated on participant $participantId and domain $globalDomain",
         for {
           svcPartyIsAuthorized <- svcPartyHosting.isSvcPartyAuthorizedOn(
@@ -237,6 +239,7 @@ class FoundingNodeInitializer(
       )(initialValues.representativeProtocolVersion)
       for {
         domainId <- retryProvider.ensureThatO(
+          RetryFor.WaitingOnInitDependency,
           "sequencer is initialized",
           domainNode.sequencerAdminConnection.getStatus.map(_.successOption.map(_.domainId)),
           for {
@@ -344,9 +347,11 @@ class FoundingNodeInitializer(
       for {
         // Founder does not need to lock
         _ <- participantAdminConnection.uploadDarFiles(
-          requiredDars
+          requiredDars,
+          RetryFor.WaitingOnInitDependency,
         )
-        _ <- retryProvider.retryForAutomation(
+        _ <- retryProvider.retry(
+          RetryFor.WaitingOnInitDependency,
           "bootstrapping SVC",
           bootstrapSvc(),
           logger,

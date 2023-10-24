@@ -199,7 +199,7 @@ private[validator] object ValidatorUtil {
         logger,
         // once the validator's actAs and readAs rights have been revoked,
         // these commands could fail with PERMISSION_DENIED errors (#4425).
-        additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
+        Seq(Status.Code.PERMISSION_DENIED),
       )
     } yield {
       logger.debug(s"User $endUserParty offboarded")

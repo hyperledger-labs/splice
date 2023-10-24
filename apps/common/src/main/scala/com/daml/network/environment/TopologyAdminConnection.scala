@@ -775,6 +775,7 @@ class TopologyAdminConnection(
       signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider.ensureThat[Option[TopologyResult[TrafficControlStateX]], Unit](
+      RetryFor.WaitingOnInitDependency,
       s"Extra traffic limit for $member on domain $domainId set to $newTotalExtraTrafficLimit (or higher)",
       lookupTrafficControlState(domainId, member).map(result =>
         Either.cond(

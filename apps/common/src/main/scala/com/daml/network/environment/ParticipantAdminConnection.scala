@@ -92,10 +92,12 @@ class ParticipantAdminConnection(
     runCmd(ParticipantAdminCommands.DomainConnectivity.ConnectDomain(alias, retry = false))
 
   def ensureDomainRegistered(
-      config: DomainConnectionConfig
+      config: DomainConnectionConfig,
+      retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] = for {
     _ <- retryProvider
       .ensureThat(
+        retryFor,
         s"participant registered ${config.domain}",
         lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
         (_: Unit) => registerDomain(config),
@@ -106,6 +108,7 @@ class ParticipantAdminConnection(
     // This is particularly important, as without that later party-allocations won't get propagated properly.
     // TODO(#5784): see whether we can improve Canton so that this kind of connectivity management is less brittle
     _ <- retryProvider.waitUntil(
+      retryFor,
       s"participant is connected to ${config.domain}",
       // We're slightly abusing 'waitUntil' here, using a side-effecting condition. It's idempotent though, so all good.
       connectDomain(config.domain).map(isConnected =>
@@ -203,31 +206,37 @@ class ParticipantAdminConnection(
     } yield ()
 
   def uploadDarFiles(
-      pkgs: Seq[UploadablePackage]
+      pkgs: Seq[UploadablePackage],
+      retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] =
     // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
-    pkgs.foldLeft(Future.unit)((previous, dar) => previous.flatMap(_ => uploadDarFile(dar)))
+    pkgs.foldLeft(Future.unit)((previous, dar) =>
+      previous.flatMap(_ => uploadDarFile(dar, retryFor))
+    )
 
   def uploadDarFile(
-      pkg: UploadablePackage
+      pkg: UploadablePackage,
+      retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] =
     uploadDarFileInternal(
       pkg.packageId,
       pkg.resourcePath,
       ByteString.readFrom(pkg.inputStream()),
+      retryFor,
     )
 
   def uploadDarFile(
-      path: Path
+      path: Path,
+      retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       darFile <- Future {
         ByteString.readFrom(Files.newInputStream(path))
       }
       hash = DarParser.assertReadArchiveFromFile(path.toFile).main.getHash
-      _ <- uploadDarFileInternal(hash, path.toString, darFile)
+      _ <- uploadDarFileInternal(hash, path.toString, darFile, retryFor)
     } yield ()
 
   def lookupDar(hash: Hash)(implicit traceContext: TraceContext): Future[Option[ByteString]] =
@@ -239,6 +248,7 @@ class ParticipantAdminConnection(
       packageId: String,
       path: String,
       darFile: => ByteString,
+      retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
@@ -246,6 +256,7 @@ class ParticipantAdminConnection(
     for {
       _ <- retryProvider
         .ensureThatO(
+          retryFor,
           s"DAR file $path with hash $darHash has been uploaded.",
           // TODO(#5141) and TODO(#5755): consider if we still need a check here
           lookupDar(darHash).map(_.map(_ => ())),

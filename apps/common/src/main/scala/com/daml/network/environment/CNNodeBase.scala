@@ -217,6 +217,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
   private def waitForUser(connection: CNLedgerConnection): Future[Unit] = {
     logger.info(s"Waiting for user $serviceUser")
     retryProvider.getValueWithRetries(
+      RetryFor.WaitingOnInitDependency,
       s"user $serviceUser",
       connection.getUser(serviceUser).map(_ => ()),
       logger,

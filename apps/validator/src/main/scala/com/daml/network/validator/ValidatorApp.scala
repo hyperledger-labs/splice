@@ -157,7 +157,7 @@ class ValidatorApp(
       UploadablePackage.fromResource(DarResources.directoryService.bootstrap),
     )
     for {
-      _ <- participantAdminConnection.uploadDarFiles(darFiles)
+      _ <- participantAdminConnection.uploadDarFiles(darFiles, RetryFor.WaitingOnInitDependency)
     } yield {
       logger.info(
         s"Finished wallet setup"
@@ -177,7 +177,8 @@ class ValidatorApp(
     for {
       _ <- instance.dars.traverse_(dar =>
         participantAdminConnection.uploadDarFile(
-          dar
+          dar,
+          RetryFor.WaitingOnInitDependency,
         )
       )
       party <- storeWithIngestion.connection.getOrAllocateParty(
@@ -229,6 +230,7 @@ class ValidatorApp(
       store: ValidatorStore
   ): Future[Unit] = {
     retryProvider.waitUntil(
+      RetryFor.WaitingOnInitDependency,
       show"ValidatorLicense for ${store.key.validatorParty} is visible",
       for {
         validatorLicenseResult <- store.lookupValidatorLicenseWithOffset()
@@ -253,6 +255,7 @@ class ValidatorApp(
       retryProvider: RetryProvider,
   ) = {
     retryProvider.waitUntil(
+      RetryFor.WaitingOnInitDependency,
       "valid sequencer connections from scan is non empty",
       ValidatorApp.getSequencerConnectionsFromScan(scanConnection, clock, logger).map {
         connections =>
@@ -269,6 +272,7 @@ class ValidatorApp(
 
   private def ensureVersionMatch(scanClient: ScanAppClientConfig): Future[Unit] =
     retryProvider.waitUntil(
+      RetryFor.WaitingOnInitDependency,
       "version checked via scan",
       // we checkVersionCompatibility on every CN app connection
       withMinimalScanConnection(scanClient)(_.checkActive()),
@@ -346,7 +350,10 @@ class ValidatorApp(
       alias,
       SequencerConnections.single(GrpcSequencerConnection.tryCreate(url)),
     )
-    participantAdminConnection.ensureDomainRegistered(domainConfig)
+    participantAdminConnection.ensureDomainRegistered(
+      domainConfig,
+      RetryFor.WaitingOnInitDependency,
+    )
   }
 
   private def ensureDomainRegisteredFromScan(
@@ -373,7 +380,10 @@ class ValidatorApp(
             ),
           )
       }
-      _ <- participantAdminConnection.ensureDomainRegistered(domainConfig)
+      _ <- participantAdminConnection.ensureDomainRegistered(
+        domainConfig,
+        RetryFor.WaitingOnInitDependency,
+      )
     } yield ()
   }
 
@@ -580,7 +590,10 @@ class ValidatorApp(
         config.appManager.traverse { config =>
           val dar = UploadablePackage.fromResource(DarResources.appManager.bootstrap)
           for {
-            _ <- participantAdminConnection.uploadDarFiles(Seq(dar))
+            _ <- participantAdminConnection.uploadDarFiles(
+              Seq(dar),
+              RetryFor.WaitingOnInitDependency,
+            )
             service = new AppManagerService(
               validatorParty,
               automation.connection,
@@ -592,6 +605,7 @@ class ValidatorApp(
                 app.providerUserId,
                 app.config,
                 new java.io.File(app.releaseFile),
+                RetryFor.WaitingOnInitDependency,
               )
             }
             // TODO (#7458): use the endpoint implemented in #7516

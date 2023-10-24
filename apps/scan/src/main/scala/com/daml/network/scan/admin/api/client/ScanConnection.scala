@@ -12,6 +12,7 @@ import com.daml.network.environment.{
   HttpAppConnection,
   PackageIdResolver,
   RetryProvider,
+  RetryFor,
 }
 import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -125,7 +126,12 @@ final class ScanConnection private (
     * Intended to be used for app init.
     */
   def getSvcPartyIdWithRetries(): Future[PartyId] =
-    retryProvider.getValueWithRetries("SVC party ID from scan", getSvcPartyId(), logger)
+    retryProvider.getValueWithRetries(
+      RetryFor.WaitingOnInitDependency,
+      "SVC party ID from scan",
+      getSvcPartyId(),
+      logger,
+    )
 
   def getTransferContextWithInstances()(implicit
       ec: ExecutionContext,

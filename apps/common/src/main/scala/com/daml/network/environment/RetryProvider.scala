@@ -34,7 +34,6 @@ import io.grpc.Status
 import io.grpc.protobuf.StatusProto
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.concurrent.duration.*
 import scala.util.{Failure, Try}
 
 /** The RetryProvider class serves two purposes:
@@ -45,17 +44,14 @@ import scala.util.{Failure, Try}
   *
   *  TODO(tech-debt): the name of the class could likely be better. Find a better name and change to it.
   */
-class RetryProvider(
+final class RetryProvider(
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
     val futureSupervisor: FutureSupervisor,
     val metricsFactory: LabeledMetricsFactory,
 ) extends NamedLogging
     with FlagCloseable {
-
-  private val transientDescription = "retryable"
-  private val nonTransientDescription = "non-retryable"
-  private val fatalBehavior = "not retrying"
+  import RetryProvider.Retryable
 
   // shutdown signal as a promise so we can wait on it more easily than polling isClosing.
   // TODO(#4405) Derive from FlagCloseable isClosing state.
@@ -129,11 +125,25 @@ class RetryProvider(
       waitUnlessShutdown(waitForSignal.unwrap).onShutdown(UnlessShutdown.AbortedDueToShutdown)
     )
 
+  // @deprecated("TODO (#7244) inline", since = "2023-10-23")
+  def waitUntil(
+      conditionDescription: String,
+      checkCondition: => Future[Unit],
+      logger: TracedLogger,
+  )(implicit ec: ExecutionContext): Future[Unit] =
+    waitUntil(
+      RetryFor.WaitingOnInitDependency,
+      conditionDescription,
+      checkCondition,
+      logger,
+    )
+
   /** Wait for a condition to become true with proper logging.
     *
     * Intended to be used for one-time waits during app init or like processes.
     */
   def waitUntil(
+      retryFor: RetryFor,
       conditionDescription: String,
       checkCondition: => Future[Unit],
       logger: TracedLogger,
@@ -142,7 +152,8 @@ class RetryProvider(
     TraceContext.withNewTraceContext(tc0 => {
       implicit val tc: TraceContext = tc0
       logger.info(s"Waiting until $conditionDescription")
-      retryForAutomation(
+      retry(
+        retryFor,
         s"Check whether $conditionDescription",
         checkCondition,
         logger,
@@ -168,13 +179,14 @@ class RetryProvider(
     * Intended to be used for one-time value retrievals during app init or like processes.
     */
   def getValueWithRetriesNoPretty[T](
+      retryFor: RetryFor,
       valueDescription: String,
       getValue: => Future[T],
       logger: TracedLogger,
       additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit ec: ExecutionContext): Future[T] = {
     implicit val adHocPretty: Pretty[T] = Pretty.prettyOfString(_.toString)
-    getValueWithRetries(valueDescription, getValue, logger, additionalCodes)
+    getValueWithRetries(retryFor, valueDescription, getValue, logger, additionalCodes)
   }
 
   /** Retry getting a value and print it on success.
@@ -182,6 +194,7 @@ class RetryProvider(
     * Intended to be used for one-time value retrievals during app init or like processes.
     */
   def getValueWithRetries[T](
+      retryFor: RetryFor,
       valueDescription: String,
       getValue: => Future[T],
       logger: TracedLogger,
@@ -191,7 +204,7 @@ class RetryProvider(
       implicit val tc: TraceContext = tc0
       val valueDescQuoted = s"'$valueDescription'"
       logger.info(s"Attempting to get $valueDescQuoted")
-      retryForAutomation(s"Get $valueDescription", getValue, logger, additionalCodes)
+      retry(retryFor, s"Get $valueDescription", getValue, logger, additionalCodes)
         .transform(
           value => {
             logger.info(show"Got ${valueDescQuoted.unquoted}: $value")
@@ -207,8 +220,18 @@ class RetryProvider(
         )
     })
 
+  // @deprecated("TODO (#7244) inline", since = "2023-10-23")
+  def ensureThatB(
+      conditionDesc: String,
+      check: => Future[Boolean],
+      establish: => Future[Unit],
+      logger: TracedLogger,
+  )(implicit ec: ExecutionContext): Future[Unit] =
+    ensureThatB(RetryFor.WaitingOnInitDependency, conditionDesc, check, establish, logger)
+
   /** Variant of ensureThat where the check returns only a Boolean. */
   def ensureThatB(
+      retryFor: RetryFor,
       conditionDesc: String,
       check: => Future[Boolean],
       establish: => Future[Unit],
@@ -216,6 +239,7 @@ class RetryProvider(
       additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit ec: ExecutionContext): Future[Unit] =
     ensureThatO(
+      retryFor,
       conditionDesc,
       check.map(Option.when(_)(())),
       establish,
@@ -225,6 +249,7 @@ class RetryProvider(
 
   /** Variant of ensureThat where the check returns only a result. */
   def ensureThatO[T](
+      retryFor: RetryFor,
       conditionDesc: String,
       check: => Future[Option[T]],
       establish: => Future[Unit],
@@ -232,6 +257,7 @@ class RetryProvider(
       additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit ec: ExecutionContext, pp: Pretty[T]): Future[T] =
     ensureThat(
+      retryFor,
       conditionDesc,
       check = check.map(_.toRight(())),
       establish = (_: Unit) => establish,
@@ -245,13 +271,14 @@ class RetryProvider(
     * and waits until the condition holds after establishing it.
     */
   def ensureThat[A, B](
+      retryFor: RetryFor,
       conditionDesc: String,
       check: => Future[Either[A, B]],
       establish: A => Future[Unit],
       logger: TracedLogger,
       additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit ec: ExecutionContext, pa: Pretty[A], pb: Pretty[B]): Future[B] =
-    ensureThatI(conditionDesc, check, check, establish, logger, additionalCodes)
+    ensureThatI(retryFor, conditionDesc, check, check, establish, logger, additionalCodes)
 
   /** Ensure that a particular condition holds as part of an init-like process.
     *
@@ -259,6 +286,7 @@ class RetryProvider(
     * and waits until the condition holds with [[establishedCheck]] after establishing it.
     */
   def ensureThatI[A, B](
+      retryFor: RetryFor,
       conditionDesc: String,
       initialCheck: => Future[Either[A, B]],
       establishedCheck: => Future[Either[A, B]],
@@ -269,7 +297,8 @@ class RetryProvider(
     TraceContext.withNewTraceContext(tc0 => {
       implicit val tc: TraceContext = tc0;
       logger.info(s"Ensuring that $conditionDesc")
-      retryForAutomation(
+      retry(
+        retryFor,
         s"Check whether $conditionDesc and establish it if needed",
         initialCheck.flatMap {
           case Right(result) => Future.successful(Right(result))
@@ -311,45 +340,6 @@ class RetryProvider(
       )
     })
 
-  import RetryProvider.RetryConfig
-
-  private val retryForAutomationConfig =
-    RetryConfig(
-      // TODO(#7244) Reduce this and only bump it for initialization.
-      maxRetries = 60,
-      initialDelay = 200.millis,
-      maxDelay = 5.seconds,
-      resetRetriesAfter = None,
-    )
-
-  private val retryForLongRunningAutomationConfig =
-    RetryConfig(
-      maxRetries = Int.MaxValue,
-      initialDelay = 200.millis,
-      maxDelay = 5.seconds,
-      resetRetriesAfter = Some(1.minute),
-    )
-
-  private val retryForClientCallsConfig =
-    RetryConfig(
-      maxRetries = 12,
-      initialDelay = 100.millis,
-      maxDelay = 1.seconds,
-      resetRetriesAfter = None,
-    )
-
-  private def retryable(
-      operationName: String,
-      additionalCodes: Seq[Status.Code],
-  ): ExceptionRetryable = RetryProvider.RetryableError(
-    operationName,
-    additionalCodes,
-    transientDescription,
-    nonTransientDescription,
-    fatalBehavior,
-    metricsFactory,
-  )
-
   /** A retry intended for automation calls that are expected to succeed eventually. Retries a bounded number of times. */
   def retryForAutomation[T](
       operationName: String,
@@ -361,14 +351,11 @@ class RetryProvider(
       traceContext: TraceContext,
   ): Future[T] =
     retry(
+      RetryFor.Automation,
       operationName,
       task,
       logger,
-      retryForAutomationConfig,
-      retryable(
-        _,
-        additionalCodes,
-      ),
+      additionalCodes,
     )
 
   /** A retry intended for automation that is expected to run forever, e.g., ledger ingestion. Retries forever. */
@@ -382,63 +369,41 @@ class RetryProvider(
       traceContext: TraceContext,
   ): Future[T] =
     retry(
+      RetryFor.LongRunningAutomation,
       operationName,
       task,
       logger,
-      retryForLongRunningAutomationConfig,
-      retryable(
-        _,
-        additionalCodes,
-      ),
+      additionalCodes,
     )
 
   /** A retry intended for client calls, thus timing out relatively quickly. */
-  def retryForClientCalls[T](
+  def retryForClientCalls[T, R: Retryable](
       operationName: String,
       task: => Future[T],
       logger: TracedLogger,
-      additionalCodes: Seq[Status.Code] = Seq.empty,
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): Future[T] =
-    retryForClientCalls(
-      operationName,
-      task,
-      logger,
-      retryable(
-        _,
-        additionalCodes,
-      ),
-    )
-
-  /** A retry intended for client calls, thus timing out relatively quickly. */
-  def retryForClientCalls[T](
-      operationName: String,
-      task: => Future[T],
-      logger: TracedLogger,
-      retryable: String => ExceptionRetryable,
+      retryable: R = Seq.empty,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[T] =
     retry(
+      RetryFor.ClientCalls,
       operationName,
       task,
       logger,
-      retryForClientCallsConfig,
       retryable,
     )
 
-  private def retry[T](
+  def retry[T, R](
+      retryConfig: RetryFor,
       operationName: String,
       task: => Future[T],
       logger: TracedLogger,
-      retryConfig: RetryConfig,
-      retryable: String => ExceptionRetryable,
+      retryable: R = Seq.empty,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
+      mkRetryable: Retryable[R],
   ): Future[T] = {
     implicit val success: Success[T] = Success.always
 
@@ -450,18 +415,11 @@ class RetryProvider(
       retryConfig.maxDelay,
       operationName,
       resetRetriesAfter = retryConfig.resetRetriesAfter,
-    ).apply(task, retryable(operationName))
+    ).apply(task, mkRetryable(operationName, retryable, metricsFactory))
   }
 }
 
 object RetryProvider {
-  private case class RetryConfig(
-      maxRetries: Int,
-      initialDelay: FiniteDuration,
-      maxDelay: Duration,
-      resetRetriesAfter: Option[FiniteDuration],
-  )
-
   def apply(
       loggerFactory: NamedLoggerFactory,
       timeouts: ProcessingTimeout,
@@ -684,6 +642,40 @@ object RetryProvider {
     }
   }
 
+  sealed abstract class Retryable[-A] {
+    private[RetryProvider] def apply(
+        operationName: String,
+        a: A,
+        metricsFactory: LabeledMetricsFactory,
+    ): ExceptionRetryable
+  }
+
+  object Retryable {
+    implicit val function: Retryable[String => ExceptionRetryable] =
+      new Retryable[String => ExceptionRetryable] {
+        override def apply(
+            operationName: String,
+            a: String => ExceptionRetryable,
+            metricsFactory: LabeledMetricsFactory,
+        ) = a(operationName)
+      }
+
+    implicit val seqErrorCodes: Retryable[Seq[Status.Code]] = new Retryable[Seq[Status.Code]] {
+      override def apply(
+          operationName: String,
+          additionalCodes: Seq[Status.Code],
+          metricsFactory: LabeledMetricsFactory,
+      ) = RetryProvider.RetryableError(
+        operationName,
+        additionalCodes,
+        transientDescription,
+        nonTransientDescription,
+        fatalBehavior,
+        metricsFactory,
+      )
+    }
+  }
+
   /** A mixin that always derives `#timeouts` from `#retryProvider`, thus
     * obviating the former parameter.  If you get a scalac error "self-type...
     * Has does not conform...", then you can simply remove this mixin, as it is
@@ -700,4 +692,7 @@ object RetryProvider {
     */
   class QuietNonRetryableException(msg: String) extends RuntimeException(msg)
 
+  private val transientDescription = "retryable"
+  private val nonTransientDescription = "non-retryable"
+  private val fatalBehavior = "not retrying"
 }

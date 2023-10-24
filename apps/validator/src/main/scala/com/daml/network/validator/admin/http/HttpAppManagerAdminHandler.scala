@@ -6,7 +6,7 @@ import cats.data.EitherT
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.http.v0.{app_manager_admin as v0, definitions}
 import com.daml.network.validator.admin.AppManagerService
 import com.daml.network.validator.store.AppManagerStore
@@ -63,7 +63,7 @@ class HttpAppManagerAdminHandler(
           )
         case Right(configuration) =>
           appManagerService
-            .registerApp(providerUserId, configuration, release._1)
+            .registerApp(providerUserId, configuration, release._1, RetryFor.ClientCalls)
             .map(_ => v0.AppManagerAdminResource.RegisterAppResponse.Created)
             .recover { case _: IllegalArgumentException =>
               v0.AppManagerAdminResource.RegisterAppResponse.BadRequest(
@@ -93,7 +93,7 @@ class HttpAppManagerAdminHandler(
       val providerParty = PartyId.tryFromProtoPrimitive(provider)
       for {
         _ <- store.getLatestAppConfiguration(providerParty) // Check that app is registered
-        _ <- appManagerService.storeAppRelease(providerParty, release._1)
+        _ <- appManagerService.storeAppRelease(providerParty, release._1, RetryFor.ClientCalls)
       } yield v0.AppManagerAdminResource.PublishAppReleaseResponse.Created
     }
   }
@@ -197,11 +197,12 @@ class HttpAppManagerAdminHandler(
               // TODO(#6839) Fix the alias here, we can't assume that app providers use distinct aliases.
               DomainAlias.tryCreate(domain.alias),
               SequencerConnections.single(GrpcSequencerConnection.tryCreate(domain.url)),
-            )
+            ),
+            RetryFor.ClientCalls,
           )
         }
         appUrl <- store.getInstalledAppUrl(providerParty)
-        _ <- release.release.darHashes.traverse_(ensureDar(appUrl, _))
+        _ <- release.release.darHashes.traverse_(ensureDar(appUrl, _, RetryFor.ClientCalls))
         _ <- store.storeApprovedReleaseConfiguration(
           AppManagerStore.ApprovedReleaseConfiguration(
             providerParty,
@@ -213,23 +214,26 @@ class HttpAppManagerAdminHandler(
     }
   }
 
-  private def ensureDar(appUrl: AppManagerStore.AppUrl, darHash: String)(implicit
+  private def ensureDar(
+      appUrl: AppManagerStore.AppUrl,
+      darHash: String,
+      retryFor: RetryFor.ClientCalls.type, // TODO (#7244) remove arg if compiling
+  )(implicit
       tc: TraceContext
   ): Future[Unit] =
     retryProvider.ensureThatO(
+      retryFor,
       show"DAR $darHash is uploaded",
       participantAdminConnection.lookupDar(Hash.tryFromHexString(darHash)).map(_.map(_ => ())),
       for {
         darResponse <- HttpUtil.getHttpJson[definitions.DarFile](appUrl.darUrl(darHash))
         dar = DarUtil
           .readDar(
-            darHash.toString,
+            darHash,
             new ByteArrayInputStream(Base64.getDecoder().decode(darResponse.base64Dar)),
           )
           ._1
-        _ <- participantAdminConnection.uploadDarFiles(
-          Seq(dar)
-        )
+        _ <- participantAdminConnection.uploadDarFiles(Seq(dar), retryFor)
       } yield (),
       logger,
     )

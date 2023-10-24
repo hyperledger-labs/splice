@@ -182,6 +182,7 @@ class SvApp(
         logger,
       )
       participantId <- retryProvider.getValueWithRetries(
+        RetryFor.WaitingOnInitDependency,
         "Participant ID",
         participantAdminConnection.getParticipantId(),
         logger,
@@ -285,6 +286,7 @@ class SvApp(
       )
       _ <- approveConfiguredSvIdentities(svAutomation, globalDomain)
       isDevNet <- retryProvider.getValueWithRetriesNoPretty(
+        RetryFor.WaitingOnInitDependency,
         "get CoinRules to determine if we are in a DevNet",
         svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
         logger,
@@ -459,6 +461,7 @@ class SvApp(
         onboarding match {
           case SvOnboardingConfig.JoinWithKey(_, svClient, _, _) =>
             retryProvider.waitUntil(
+              RetryFor.WaitingOnInitDependency,
               "version checked via sponsor SV",
               // we checkVersionCompatibility on every CN app connection
               withSvConnection(svClient.adminApi)(_.checkActive()),
@@ -488,6 +491,7 @@ class SvApp(
       store: SvSvStore
   ): Future[Unit] = {
     retryProvider.waitUntil(
+      RetryFor.WaitingOnInitDependency,
       "Onboarding contracts have been created", {
         val expectedValidatorOnboardingSecrets = config.expectedValidatorOnboardings.map(_.secret)
         val approvedSvIdentities = config.approvedSvIdentities.map(_.name)

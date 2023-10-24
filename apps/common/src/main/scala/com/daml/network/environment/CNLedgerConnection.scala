@@ -432,6 +432,7 @@ class CNLedgerConnection(
       participantAdminConnection: ParticipantAdminConnection,
   )(implicit traceContext: TraceContext): Future[PartyId] =
     retryProvider.ensureThatO(
+      RetryFor.WaitingOnInitDependency,
       s"User $userId has primary party",
       check = getOptionalPrimaryParty(userId),
       establish = for {
@@ -463,6 +464,7 @@ class CNLedgerConnection(
           participantId.uid.namespace.fingerprint,
         )
       _ <- retryProvider.waitUntil(
+        RetryFor.WaitingOnInitDependency,
         s"Ledger API observers party $partyId",
         client.getParties(Seq(partyId)).map { parties =>
           if (parties.isEmpty)
@@ -478,6 +480,7 @@ class CNLedgerConnection(
       party: PartyId
   ): Future[Unit] =
     retryProvider.waitUntil(
+      RetryFor.WaitingOnInitDependency,
       show"Party $party is observed on ledger API",
       client.getParties(Seq(party)).map { result =>
         if (result.isEmpty) {
@@ -577,12 +580,13 @@ class CNLedgerConnection(
       logger,
     )
 
-  def waitForUserMetadata(
+  private def waitForUserMetadata(
       userId: String,
       key: String,
       identityProviderId: Option[String] = None,
   ): Future[String] =
     retryProvider.getValueWithRetriesNoPretty(
+      RetryFor.WaitingOnInitDependency,
       s"metadata field $key of user $userId",
       client.getUserProto(userId, identityProviderId).map { user =>
         if (user.hasMetadata) {
@@ -693,6 +697,7 @@ class CNLedgerConnection(
       Future.unit
     } else
       retryProvider.waitUntil(
+        RetryFor.WaitingOnInitDependency,
         show"packages for $requiredPackageIds are uploaded",
         for {
           actual <- (listPackages(): Future[Set[String]])

@@ -132,6 +132,7 @@ final class LocalDomainNode(
   )(implicit traceContext: TraceContext): Future[Unit] = {
     retryProvider
       .getValueWithRetries(
+        RetryFor.WaitingOnInitDependency,
         "mediator status",
         mediatorAdminConnection.getStatus.map(statusToEither),
         logger,
@@ -176,6 +177,7 @@ final class LocalDomainNode(
       )
       _ = logger.info(s"Onboarded mediator $mediatorId")
       _ <- retryProvider.waitUntil(
+        RetryFor.WaitingOnInitDependency,
         "local sequencer observes mediator as onboarded",
         // Otherwise we might fail with `PERMISSION_DENIED` during initialization
         sequencerAdminConnection
@@ -214,6 +216,7 @@ final class LocalDomainNode(
         logger,
       )
       _ <- retryProvider.waitUntil(
+        RetryFor.WaitingOnInitDependency,
         "mediator observes itself as onboarded",
         mediatorAdminConnection.getMediatorDomainState(domainId).map { state =>
           if (!state.mapping.active.contains(mediatorId)) {
@@ -239,6 +242,7 @@ final class LocalDomainNode(
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider
       .getValueWithRetries(
+        RetryFor.WaitingOnInitDependency,
         "sequencer status",
         sequencerAdminConnection.getStatus.map(statusToEither),
         logger,

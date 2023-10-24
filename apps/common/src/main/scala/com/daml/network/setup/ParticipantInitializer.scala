@@ -10,7 +10,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.daml.network.config.{CNParticipantClientConfig, ParticipantBootstrapDumpConfig}
-import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.util.ParticipantIdentitiesDump
 import io.grpc.Status
 
@@ -85,6 +85,7 @@ class ParticipantInitializer(
       case None =>
         retryProvider
           .waitUntil(
+            RetryFor.WaitingOnInitDependency,
             "participant is initialized",
             isInitialized()
               .flatMap(if (_) {

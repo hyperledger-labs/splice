@@ -71,6 +71,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     _ <- preInitializeAfterLedgerConnection(initConnection, ledgerClient)
     serviceParty <-
       retryProvider.getValueWithRetries[PartyId](
+        RetryFor.WaitingOnInitDependency,
         s"primary party of service user $serviceUser",
         initConnection.getPrimaryParty(serviceUser),
         logger,

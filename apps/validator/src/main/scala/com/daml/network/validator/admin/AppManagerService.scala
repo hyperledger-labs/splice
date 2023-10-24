@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection}
 import io.circe.parser.decode
+import com.daml.network.environment.RetryFor
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.definitions.AppConfiguration
 import com.daml.network.util.UploadablePackage
@@ -37,8 +38,13 @@ class AppManagerService(
     store: AppManagerStore,
 )(implicit ec: ExecutionContext) {
 
-  def registerApp(providerUserId: String, configuration: AppConfiguration, release: java.io.File)(
-      implicit tc: TraceContext
+  def registerApp(
+      providerUserId: String,
+      configuration: AppConfiguration,
+      release: java.io.File,
+      retryFor: RetryFor,
+  )(implicit
+      tc: TraceContext
   ): Future[Unit] = {
     if (configuration.version != 0) {
       throw new IllegalArgumentException(
@@ -62,7 +68,7 @@ class AppManagerService(
         Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
         participantAdminConnection,
       )
-      _ <- storeAppRelease(providerPartyId, release)
+      _ <- storeAppRelease(providerPartyId, release, retryFor)
       _ <- store.storeAppConfiguration(
         AppManagerStore.AppConfiguration(
           providerPartyId,
@@ -78,7 +84,7 @@ class AppManagerService(
     } yield ()
   }
 
-  def storeAppRelease(provider: PartyId, release: java.io.File)(implicit
+  def storeAppRelease(provider: PartyId, release: java.io.File, retryFor: RetryFor)(implicit
       tc: TraceContext
   ): Future[Unit] =
     for {
@@ -88,9 +94,7 @@ class AppManagerService(
       dars <- Future {
         readDars(new FileInputStream(release))
       }
-      _ <- participantAdminConnection.uploadDarFiles(
-        dars.map(_._1)
-      )
+      _ <- participantAdminConnection.uploadDarFiles(dars.map(_._1), retryFor)
       _ <- store.storeAppRelease(
         AppManagerStore.AppRelease(
           provider,

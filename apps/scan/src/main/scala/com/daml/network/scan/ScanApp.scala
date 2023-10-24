@@ -15,6 +15,7 @@ import com.daml.network.environment.{
   CNNodeStatus,
   DarResources,
   PackageIdResolver,
+  RetryFor,
 }
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.scan.ScanResource
@@ -114,6 +115,7 @@ class ScanApp(
       )
       _ <- store.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- retryProvider.waitUntil(
+        RetryFor.WaitingOnInitDependency,
         "there is an OpenMiningRound contract",
         store.multiDomainAcsStore
           .listContracts(roundCodegen.OpenMiningRound.COMPANION, limit = PageLimit(1))
