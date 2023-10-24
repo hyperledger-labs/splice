@@ -1596,7 +1596,9 @@
         "svSponsorAddress": "http://sv-app.sv-1:5014",
         "svValidator": false,
         "topup": {
-          "enabled": false
+          "enabled": true,
+          "minTopupInterval": "1m",
+          "targetThroughput": 33330
         }
       }
     },
@@ -5422,7 +5424,9 @@
         "svSponsorAddress": "http://sv-app.sv-1:5014",
         "svValidator": false,
         "topup": {
-          "enabled": false
+          "enabled": true,
+          "minTopupInterval": "1m",
+          "targetThroughput": 33330
         },
         "validatorPartyHint": "validator1_validator_service_user",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"

@@ -243,9 +243,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     isDevNet,
     'auth0|63e3d75ff4114d87a2c1e4f5',
     backupConfig,
-    bootstrappingDumpConfig
-    // TODO(#8004) - enable topups for validator1
-    // topupConfig,
+    bootstrappingDumpConfig,
+    topupConfig
   );
 
   const splitwell = await installSplitwell(
@@ -254,9 +253,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     'auth0|63e12e0415ad881ffe914e61',
     splitwellOnboarding,
     backupConfig,
-    bootstrappingDumpConfig
-    // TODO(#8004) - enable topups for splitwell validator
-    // topupConfig,
+    bootstrappingDumpConfig,
+    topupConfig
   );
 
   const docs = installDocs();
