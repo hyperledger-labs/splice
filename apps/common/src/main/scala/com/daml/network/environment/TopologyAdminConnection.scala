@@ -330,12 +330,9 @@ class TopologyAdminConnection(
       isProposal,
     )
 
-  /** Ensure that either the accepted state passes the check, a proposal exists that passes the check or a proposal is created that passes the check
-    *  - check current accepted state if the check holds
-    *  - if not check currently existing proposals if the check holds
-    *  - if not then create proposal
-    *  - run check until it holds or until the current state returned by the check has a serial that is newer than the state when we last created the proposal
-    *  - if a newer state is returned by the check then re-create the proposal with a new serial and go running the check
+  /** Version of [[ensureTopologyMapping]] that also handles proposals:
+    * - a new topology transaction is created as a proposal
+    * - checks the proposals as well to see if the check holds
     */
   private def ensureTopologyProposal[M <: TopologyMappingX: ClassTag](
       store: TopologyStoreId,
@@ -344,19 +341,9 @@ class TopologyAdminConnection(
       update: M => Either[String, M],
       signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
-    def propose(state: TopologyResult[M]) = {
-      val updatedMapping = update(state.mapping)
-      proposeMapping(
-        store,
-        updatedMapping,
-        signedBy,
-        serial = state.base.serial + PositiveInt.one,
-        isProposal = true,
-      )
-    }
-
-    retryProvider.retryForAutomation(
-      description,
+    ensureTopologyMapping(
+      store,
+      s"proposal $description",
       check(TopologyTransactionType.AuthorizedState)
         .leftFlatMap { authorizedState =>
           EitherT(
@@ -368,83 +355,71 @@ class TopologyAdminConnection(
                   Left(authorizedState)
               }
           )
-        }
-        .foldF(
-          beforeProposalAuthorizedState =>
-            propose(beforeProposalAuthorizedState)
-              .flatMap { _ =>
-                retryProvider.retryForAutomation(
-                  s"check established proposal $description",
-                  check(TopologyTransactionType.AuthorizedState)
-                    .leftFlatMap[TopologyResult[M], RuntimeException] { currentAuthorizedState =>
-                      if (
-                        currentAuthorizedState.base.serial == beforeProposalAuthorizedState.base.serial
-                      ) {
-                        check(TopologyTransactionType.ProposalsOnly)
-                          .leftMap(_ =>
-                            Status.FAILED_PRECONDITION
-                              .withDescription("Proposal is not yet observed.")
-                              .asRuntimeException()
-                          )
-                      } else {
-                        EitherT.leftT(
-                          new QuietNonRetryableException(
-                            "Proposal base authorized state has changed, must be re-created."
-                          )
-                        )
-                      }
-                    }
-                    .rethrowT,
-                  logger,
-                )
-              }
-              .recover { case ex: QuietNonRetryableException =>
-                throw Status.FAILED_PRECONDITION.withDescription(ex.getMessage).asRuntimeException()
-              },
-          Future.successful,
-        ),
-      logger,
+        },
+      update,
+      signedBy,
+      isProposal = true,
     )
   }
 
+  /** Ensure that either the accepted state passes the check, or a topology mapping is created that passes the check
+    *  - run the check to see if it holds
+    *  - if not then create transaction with the updated mapping
+    *  - run check until it holds or until the current state returned by the check has a serial that is newer than the state when we last created the new mapping
+    *  - if a newer state is returned by the check then re-create the mapping with a new serial and go to the previous step of running the check
+    *
+    *  This type of re-create of the topology transactions is required to ensure that updating the same topology state in parallel will eventually succeed for all the updates
+    */
   private def ensureTopologyMapping[M <: TopologyMappingX: ClassTag](
       store: TopologyStoreId,
       description: String,
-      check: => Future[Either[TopologyResult[M], TopologyResult[M]]],
+      check: => EitherT[Future, TopologyResult[M], TopologyResult[M]],
       update: M => Either[String, M],
       signedBy: Fingerprint,
+      isProposal: Boolean = false,
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] =
-    ensureTopologyMappingA(
-      store,
+    retryProvider.retryForAutomation(
       description,
-      check,
-      check,
-      update,
-      signedBy,
-    )
-
-  private def ensureTopologyMappingA[M <: TopologyMappingX: ClassTag](
-      store: TopologyStoreId,
-      description: String,
-      initialCheck: => Future[Either[TopologyResult[M], TopologyResult[M]]],
-      establishedCheck: => Future[Either[TopologyResult[M], TopologyResult[M]]],
-      update: M => Either[String, M],
-      signedBy: Fingerprint,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[M]] =
-    retryProvider.ensureThatI[TopologyResult[M], TopologyResult[M]](
-      description,
-      initialCheck,
-      establishedCheck,
-      establish = { case TopologyResult(baseResult, mapping) =>
-        val updatedMapping = update(mapping)
-        proposeMapping(
-          store,
-          updatedMapping,
-          signedBy,
-          serial = baseResult.serial + PositiveInt.one,
-          isProposal = false,
-        ).map(_ => ())
-      },
+      check.foldF(
+        { case TopologyResult(beforeEstablishedBaseResult, mapping) =>
+          val updatedMapping = update(mapping)
+          proposeMapping(
+            store,
+            updatedMapping,
+            signedBy,
+            serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
+            isProposal = isProposal,
+          )
+            .flatMap { _ =>
+              retryProvider.retryForAutomation(
+                s"check established $description",
+                check
+                  .leftFlatMap[TopologyResult[M], RuntimeException] { currentAuthorizedState =>
+                    if (currentAuthorizedState.base.serial == beforeEstablishedBaseResult.serial) {
+                      check
+                        .leftMap(_ =>
+                          Status.FAILED_PRECONDITION
+                            .withDescription("Condition is not yet observed.")
+                            .asRuntimeException()
+                        )
+                    } else {
+                      EitherT.leftT(
+                        new QuietNonRetryableException(
+                          "Base authorized state has changed, must be re-created."
+                        )
+                      )
+                    }
+                  }
+                  .rethrowT,
+                logger,
+              )
+            }
+            .recover { case ex: QuietNonRetryableException =>
+              throw Status.FAILED_PRECONDITION.withDescription(ex.getMessage).asRuntimeException()
+            }
+        },
+        Future.successful,
+      ),
       logger,
     )
 
@@ -549,12 +524,14 @@ class TopologyAdminConnection(
     ensureTopologyMapping[PartyToParticipantX](
       TopologyStoreId.DomainStore(domainId),
       show"Party $party is authorized on $newParticipant",
-      getPartyToParticipant(domainId, party).map(result =>
-        Either.cond(
-          result.mapping.participants
-            .exists(hosting => hosting.participantId == newParticipant),
-          result,
-          result,
+      EitherT(
+        getPartyToParticipant(domainId, party).map(result =>
+          Either.cond(
+            result.mapping.participants
+              .exists(hosting => hosting.participantId == newParticipant),
+            result,
+            result,
+          )
         )
       ),
       previous =>
@@ -621,8 +598,10 @@ class TopologyAdminConnection(
   ): Future[TopologyResult[SequencerDomainStateX]] = ensureTopologyMapping[SequencerDomainStateX](
     TopologyStoreId.DomainStore(domainId),
     show"Sequencer $newActiveSequencer is active in SequencerDomainState",
-    getSequencerDomainState(domainId).map(result =>
-      Either.cond(result.mapping.active.contains(newActiveSequencer), result, result)
+    EitherT(
+      getSequencerDomainState(domainId).map(result =>
+        Either.cond(result.mapping.active.contains(newActiveSequencer), result, result)
+      )
     ),
     previous =>
       // constructor is not exposed so no copy
@@ -669,8 +648,10 @@ class TopologyAdminConnection(
     ensureTopologyMapping[MediatorDomainStateX](
       TopologyStoreId.DomainStore(domainId),
       show"Mediator $newActiveMediator is proposed active in MediatorDomainState",
-      getMediatorDomainState(domainId).map(result =>
-        Either.cond(result.mapping.active.contains(newActiveMediator), result, result)
+      EitherT(
+        getMediatorDomainState(domainId).map(result =>
+          Either.cond(result.mapping.active.contains(newActiveMediator), result, result)
+        )
       ),
       previous =>
         // constructor is not exposed so no copy
@@ -772,8 +753,10 @@ class TopologyAdminConnection(
     ensureTopologyMapping[UnionspaceDefinitionX](
       TopologyStoreId.DomainStore(domainId),
       show"Namespace $newOwner is in owners of UnionspaceDefinition",
-      getUnionspaceDefinition(domainId, unionspace).map(result =>
-        Either.cond(result.mapping.owners.contains(newOwner), result, result)
+      EitherT(
+        getUnionspaceDefinition(domainId, unionspace).map(result =>
+          Either.cond(result.mapping.owners.contains(newOwner), result, result)
+        )
       ),
       previous =>
         // constructor is not exposed so no copy
