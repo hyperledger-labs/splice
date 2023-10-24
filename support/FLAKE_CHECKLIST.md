@@ -16,7 +16,7 @@ responsible for resolving it.
 3. Download the logs for our apps and for Canton unless you can identify the issue
    purely based on the CircleCI output.
    * The logs from our tests are in `canton_network_test.clog` in the CircleCI artifacts.
-     Note that there is ``./scripts/download-ci-artifacts.sh` to download all CircleCI artifacts
+     Note that there is ``.circleci/download-ci-artifacts.sh` to download all CircleCI artifacts
      if you prefer that over going through the UI.
    * The Canton logs are in `canton.clog` for wallclock tests, `canton-simtime.clog` for
      simtime tests and `canton-standalone-$suffix.clog` for tests that

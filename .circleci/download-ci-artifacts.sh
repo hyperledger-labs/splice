@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage: ./scripts/download-ci-artifacts.sh and enter the ~5-digit CircleCI job number when prompted
+# Usage: .circleci/download-ci-artifacts.sh and enter the ~5-digit CircleCI job number when prompted
 # Add your personal Circle CI API token to the CIRCLECI_TOKEN environment variable before running the script.
 
 set -eou pipefail
