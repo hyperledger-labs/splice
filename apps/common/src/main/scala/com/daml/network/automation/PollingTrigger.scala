@@ -2,13 +2,13 @@ package com.daml.network.automation
 
 import akka.Done
 import com.daml.network.environment.RetryProvider
-import com.digitalasset.canton.DiscardOps
+import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.retry.RetryUtil.ErrorKind
+import com.digitalasset.canton.util.retry.RetryUtil.FatalErrorKind
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{Future, Promise, blocking}
@@ -20,6 +20,10 @@ import scala.util.{Failure, Success}
   * Look at its child classes (`ctrl + h` for type hierarchy in IntelliJ) for useful specializations.
   */
 trait PollingTrigger extends Trigger with FlagCloseableAsync {
+  val triggerMetrics: PollingTriggerMetrics = new PollingTriggerMetrics(context.metricsFactory)
+  private implicit val mc: MetricsContext = MetricsContext(
+    "trigger_name" -> this.getClass.getSimpleName()
+  )
 
   /** The main body of the polling trigger
     *
@@ -115,8 +119,11 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
           // Here we tie the knot and ensure that once the previous iteration completes, we kick off another iteration.
           previousResult.transformWith {
             case Failure(ex) =>
-              // We only call this to get logging
-              (retryable.retryOK(Failure(ex), logger)).discard[ErrorKind]
+              // We call this to differentiate fatal errors for metric reporting
+              (retryable.retryOK(Failure(ex), logger)) match {
+                case FatalErrorKind => triggerMetrics.iterationsFailed.mark()
+                case _ => triggerMetrics.iterationsRetried.mark()
+              }
               loopWithDelay()
 
             case Success(workDone) =>
@@ -124,7 +131,8 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
                 exitPollingLoop()
               } else if (workDone) {
                 // If productive work was done in the previous iteration, then we loop without a delay.
-                pollingLoop(performWorkIfNotPaused())
+                triggerMetrics.iterationsCompleted.mark()
+                pollingLoop(triggerMetrics.iterationLatency.timeFuture(performWorkIfNotPaused()))
               } else {
                 logger.trace(
                   show"No work performed. Sleeping for ${context.config.pollingInterval}"

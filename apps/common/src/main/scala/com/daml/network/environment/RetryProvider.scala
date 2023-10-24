@@ -476,7 +476,8 @@ object RetryProvider {
       StatusCodes.GatewayTimeout,
     )
 
-    // TODO(M4-64) Add labels to identify the operation being run and build dashboards around it
+    // TODO(M4-64) There will be some overlap with trigger-specific error metrics. Decide whether to keep the retryCounter, and if so...
+    //  add labels to identify the operation being run and build dashboards around it
     private val retryCounter =
       metricsFactory.counter(CNMetrics.MetricsPrefix :+ "retries" :+ "failures")
 
