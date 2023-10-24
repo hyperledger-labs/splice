@@ -28,6 +28,7 @@ Canton Network Documentation
    :caption: Validator Operators
 
    validator_operator/self_hosting.rst
+   validator_operator/validator_helm.rst
 
 .. toctree::
    :maxdepth: 2

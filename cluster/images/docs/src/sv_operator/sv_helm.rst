@@ -5,13 +5,12 @@ Kubernetes-Based Deployment of a Super Validator node
 
 This section describes deploying a Super Validator (SV) node in kubernetes using Helm
 charts.  The Helm charts deploy a complete node and connect it to a
-target cluster. We currently operate two clusters: `TestNet` which is upgraded weekly with a stable release,
-and `DevNet` which is upgraded nightly with a nightly dev release. Please use `TestNet` unless you
-have a specific reason not to, as `DevNet` may be unstable, and will also introduce breaking changes on
-a daily basis.
+target cluster.
 
-Note that there is not yet data retention from release to release in
-either `DevNet` or `TestNet`. This will change as the models and API's
+Digital Asset currently operates two Canton Network clusters: `TestNet` and `DevNet`. Both upgrade weekly. `DevNet` is usually on the latest release. `TestNet` follows it on a one-week delay, and has some `DevNet`-only features disabled. Please use `DevNet` unless you have a specific reason not to.
+
+Note that there is not yet data retention from release to release in either
+`DevNet` or `TestNet`. This will change as the models and API's
 stabilize, but for now, each release should be a full release from
 scratch. No data should be retained when an environment is updated.
 
@@ -29,15 +28,12 @@ Requirements
     a. ``kubectl`` - At least v1.26.1
     b. ``helm`` - At least v3.11.1
 
-4) You should have completed the self hosted validator setup,
-   including Auth0 setup. Dedicated instructions can be found in the :ref:`Self-Hosted Validator section <self_hosted_validator>`
-
-5) Your cluster either needs to be connected to the GCP DA Canton
-   `DevNet` VPN or you need a static egress IP. In the latter case,
+4) Your cluster either needs to be connected to the GCP DA Canton
+   VPN or you need a static egress IP. In the latter case,
    please provide that IP address to your contact at Digital Asset to
    add it to the firewall rules.
 
-6) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
+5) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
 
 .. parsed-literal::
 
@@ -319,7 +315,8 @@ The following kubernetes secret will instruct the participant to create a servic
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${SV_CLIENT_ID}" \
         "--from-literal=client-secret=${SV_CLIENT_SECRET}"
-        "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}" # It is optional. uncomment it if you want to set audience for ledger API
+        # Optional. uncomment it if you want to set audience for ledger API
+        # "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
 
 The validator app backend requires the following secret.
 
@@ -330,7 +327,8 @@ The validator app backend requires the following secret.
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
         "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}"
-        "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}" # It is optional. uncomment it if you want to set audience for ledger API
+        # Optional. uncomment it if you want to set audience for ledger API
+        # "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
 
 To setup the wallet and SV UI, create the following two secrets.
 
@@ -458,7 +456,7 @@ that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator
 - Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
 - If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
-- Replace ``SV_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
+- Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
 The private and public key for your SV are defined in a K8s secret.
@@ -539,14 +537,13 @@ reaches a stable state prior to moving on to the next step.
     helm install scan canton-network-helm/cn-scan -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/scan-values.yaml --wait
 
 Once this is running, you should be able to inspect the state of the
-cluster and observe pods running in each of the three new
-namespaces. A typical query might look as follows:
+cluster and observe pods running in the new
+namespace. A typical query might look as follows:
 
 .. code-block:: bash
 
-    $ kubectl get pods --all-namespaces |grep -v kube-system
+    $ kubectl get pods -n sv
     NAMESPACE         NAME                                                       READY   STATUS    RESTARTS      AGE
-    cluster-ingress   external-proxy-998cb664c-k7dfb                             1/1     Running   0             37m
     sv                scan-app-5658d74b58-xvlmz                                  1/1     Running   0             14m
     sv                scan-web-ui-7db66d9f9d-kl9kw                               1/1     Running   0             14m
     sv                sv-app-7658c9fdd4-58xm6                                    1/1     Running   0             91m
@@ -582,7 +579,7 @@ and ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator/foobar`` should be for
 will also be removed.
 
 * ``https://wallet.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``sv`` namespace
-* ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to port 5003 of service ``validator-app`` in the ``sv`` namespace. As mentioned above, no url rewrite is required for this rule.
+* ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace. (As mentioned above, no url rewrite is required for this rule)
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``sv-web-ui`` in the ``sv`` namespace
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/v0/sv/*`` should be routed to port 5014 of service ``sv-app`` in the ``sv`` namespace
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``scan-web-ui`` in the ``sv`` namespace
@@ -607,7 +604,7 @@ In order to install the reference charts, the following must be satisfied in you
 Installation Instructions
 +++++++++++++++++++++++++
 
-Create a cluster-ingress namespace with image pull permissions from the Artifactory docker repository:
+Create a `cluster-ingress` namespace with image pull permissions from the Artifactory docker repository:
 
 .. code-block:: bash
 
@@ -667,7 +664,7 @@ And install it to your cluster:
 
 
 A reference Helm chart that installs a gateway that uses this service is also provided.
-To install it, run the following (assuming environment variable YOUR_HOSTNAME set to to your hostname):
+To install it, run the following (assuming environment variable `YOUR_HOSTNAME` set to to your hostname):
 
 .. code-block:: bash
 
@@ -764,7 +761,7 @@ This allows the public to inspect multiple Scan UIs and compare their data, so t
 Transitioning Across Network Resets
 -----------------------------------
 
-Please consult the :ref:`relevant section of the validator runbook <validator_continuity>` on how to backup the identity of your participant,
+Please consult the :ref:`relevant section of the validator runbook <old-validator-continuity>` on how to backup the identity of your participant,
 to ensure that coin balances associated with your SV's validator node (which likely includes rewards earned by your SV nodes) are preserved across a `TestNet` reset.
 Please consult the :ref:`relevant section above <sv-participant-identities-restore>` on how to restore from an existing participant identities backup.
 

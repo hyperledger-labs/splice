@@ -1,0 +1,5 @@
+participantAdminUserNameFrom:
+  secretKeyRef:
+    key: ledger-api-user
+    name: cn-app-validator-ledger-api-auth
+    optional: false

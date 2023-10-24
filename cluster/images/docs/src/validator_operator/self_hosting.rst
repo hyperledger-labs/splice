@@ -5,7 +5,7 @@ Self-Hosted Validator
 
 These pages give a step-by-step guide how to deploy your own validator node to the Canton network.
 
-.. _validator_prerequisites:
+.. _old-validator_prerequisites:
 
 Prerequisites
 -------------
@@ -432,7 +432,7 @@ NETWORK_AUTH_VALIDATOR_WALLET_USER_NAME    The user ID of the user you wish to a
 
 This user should be automatically onboarded to the wallet, so you should NOT be seeing a prompt to onboard yourself. This user will now administer the rewards earned by your validator.
 
-.. _validator_continuity:
+.. _old-validator-continuity:
 
 Transitioning Across Network Resets
 -----------------------------------
@@ -482,7 +482,7 @@ To account for cases where this is not possible, we additionally recommend setti
 
 .. TODO(#6290): Cover the config for periodic backup to GCP buckets or a directory as well
 
-.. _validator-participant-identities-restore:
+.. _old-validator-participant-identities-restore:
 
 Initialize With Existing Identities Data
 ++++++++++++++++++++++++++++++++++++++++

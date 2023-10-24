@@ -331,7 +331,7 @@ async function installSvAndValidator(config: SvConfig) {
   const validatorValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
-      SV_WALLET_USER_ID: validatorWalletUserName,
+      OPERATOR_WALLET_USER_ID: validatorWalletUserName,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
     }),
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),

@@ -218,7 +218,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
   const validatorValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
-      SV_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
+      OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
     }),
     participantIdentitiesDumpPeriodicBackup: backupConfig,

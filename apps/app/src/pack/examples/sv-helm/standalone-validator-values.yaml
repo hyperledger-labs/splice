@@ -1,0 +1,8 @@
+# URL of sponsoring SV for onboarding your validator, e.g. sv.sv-1.svc.dev.canton.network.global
+svSponsorAddress: SPONSOR_SV_URL
+onboardingSecretFrom:
+  secretKeyRef:
+    name: cn-app-validator-onboarding-validator
+    key: secret
+    optional: false
+validatorPartyHint: validator_validator_service_user
