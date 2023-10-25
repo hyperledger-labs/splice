@@ -2415,7 +2415,6 @@
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
           "enable": true,
-          "sequencerAvailabilityDelay": "0 seconds",
           "sequencerPublicUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008"
         },
         "expectedValidatorOnboardings": [
@@ -3287,7 +3286,6 @@
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
           "enable": true,
-          "sequencerAvailabilityDelay": "60 seconds",
           "sequencerPublicUrl": "http://sequencer.sv-2.svc.mock.network.canton.global:5008"
         },
         "expectedValidatorOnboardings": [],
@@ -4057,7 +4055,6 @@
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
           "enable": true,
-          "sequencerAvailabilityDelay": "60 seconds",
           "sequencerPublicUrl": "http://sequencer.sv-3.svc.mock.network.canton.global:5008"
         },
         "expectedValidatorOnboardings": [],
@@ -4827,7 +4824,6 @@
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
           "enable": true,
-          "sequencerAvailabilityDelay": "60 seconds",
           "sequencerPublicUrl": "http://sequencer.sv-4.svc.mock.network.canton.global:5008"
         },
         "expectedValidatorOnboardings": [],

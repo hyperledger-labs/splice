@@ -173,7 +173,6 @@ final case class SvSequencerConfig(
     adminApi: ClientConfig,
     internalApi: ClientConfig,
     externalPublicApiUrl: String,
-    sequencerAvailabilityDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.Zero,
 )
 
 final case class SvMediatorConfig(

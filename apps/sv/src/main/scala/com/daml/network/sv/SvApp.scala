@@ -74,7 +74,6 @@ import io.circe.Json
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
-import java.time.Duration
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -151,7 +150,6 @@ class SvApp(
             ),
           config.sequencer.internalApi,
           config.sequencer.externalPublicApiUrl,
-          config.sequencer.sequencerAvailabilityDelay.asJava,
           loggerFactory,
           retryProvider,
         )
@@ -1162,15 +1160,15 @@ object SvApp {
             Option(memberInfo.domainNodes.get(domainId.toProtoPrimitive))
               .map(_.cometBft)
               .getOrElse(SvUtil.emptyCometBftConfig),
-            localSequencerConfig.map { c =>
-              val sequencerAvailabilityDelay =
-                localDomainNode.map(_.sequencerAvailabilityDelay).getOrElse(Duration.ZERO)
+            localSequencerConfig.map(c =>
               new SequencerConfig(
                 c.sequencerId,
                 c.url,
-                clock.now.toInstant.plus(sequencerAvailabilityDelay),
+                // TODO(#7717) Don't use now here, calculate the available time as described in
+                // https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
+                clock.now.toInstant,
               )
-            },
+            ),
             localMediatorConfig.map(c =>
               new MediatorConfig(
                 c.mediatorId

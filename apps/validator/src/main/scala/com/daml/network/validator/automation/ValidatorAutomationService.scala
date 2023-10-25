@@ -135,6 +135,7 @@ class ValidatorAutomationService(
         triggerContext,
         participantAdminConnection,
         scanConnection,
+        clock,
         globalDomainAlias,
       )
     )
