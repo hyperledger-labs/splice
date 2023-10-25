@@ -393,6 +393,7 @@
         },
         "domain": {
           "enable": true,
+          "sequencerAvailabilityDelay": "60 seconds",
           "sequencerPublicUrl": "http://sequencer.sv.svc.svrun.network.canton.global:5008"
         },
         "globalDomainUrl": "http://sequencer.sv-1.svc.svrun.network.com.network.canton.global:5008",

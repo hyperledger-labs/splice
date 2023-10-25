@@ -262,6 +262,7 @@ async function installSvAndValidator(config: SvConfig) {
     domain: {
       enable: includesCometBftGlobalDomainNode,
       sequencerPublicUrl: `http://sequencer.sv.svc.${CLUSTER_BASENAME}.network.canton.global:5008`,
+      sequencerAvailabilityDelay: '60 seconds',
     },
     cometBFT: {
       enabled: true,

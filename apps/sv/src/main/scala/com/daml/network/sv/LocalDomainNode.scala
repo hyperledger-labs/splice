@@ -26,6 +26,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import io.grpc.Status
 
+import java.time.Duration
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Connections to the domain node (composed of sequencer + mediator) operated by the SV running this SV app.
@@ -38,6 +39,7 @@ final class LocalDomainNode(
     val staticDomainParameters: StaticDomainParameters,
     val sequencerInternalConfig: ClientConfig,
     val sequencerExternalPublicUrl: String,
+    val sequencerAvailabilityDelay: Duration,
     override val loggerFactory: NamedLoggerFactory,
     override protected[this] val retryProvider: RetryProvider,
 )(implicit

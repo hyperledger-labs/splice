@@ -196,6 +196,8 @@ export function installSvNode(config: SvConfig): {
       {
         enable: config.withDomainNode,
         sequencerPublicUrl: `http://sequencer.${config.nodename}.svc.${CLUSTER_BASENAME}.network.canton.global:5008`,
+        sequencerAvailabilityDelay:
+          config.onboarding.type == 'found-collective' ? '0 seconds' : '60 seconds',
       },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
       expiresIn: onboarding.expiresIn,

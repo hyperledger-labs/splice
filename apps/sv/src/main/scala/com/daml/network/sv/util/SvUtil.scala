@@ -145,8 +145,6 @@ object SvUtil {
         new SequencerConfig(
           c.sequencerId,
           c.url,
-          // TODO(#7717) Don't use now here, calculate the available time as described in
-          // https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
           clock.now.toInstant,
         )
       )

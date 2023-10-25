@@ -107,6 +107,7 @@ spec:
                       port = 5008
                     }
                     external-public-api-url = {{ .sequencerPublicUrl | default "" | quote }}
+                    sequencer-availability-delay = {{ .sequencerAvailabilityDelay | default "0 seconds" | quote }}
                   }
                   mediator {
                     admin-api {

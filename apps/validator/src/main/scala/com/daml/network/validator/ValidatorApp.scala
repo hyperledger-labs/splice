@@ -67,6 +67,7 @@ import com.daml.network.directory.admin.http.HttpExternalDirectoryHandler
 import com.daml.network.http.v0.external.directory.DirectoryResource
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequencer
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.data.CantonTimestamp
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -250,22 +251,26 @@ class ValidatorApp(
 
   private def waitForSequencerConnectionsFromScan(
       scanConnection: ScanConnection,
-      clock: Clock,
       logger: TracedLogger,
       retryProvider: RetryProvider,
   ) = {
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
       "valid sequencer connections from scan is non empty",
-      ValidatorApp.getSequencerConnectionsFromScan(scanConnection, clock, logger).map {
-        connections =>
+      ValidatorApp
+        .getSequencerConnectionsFromScan(
+          scanConnection,
+          logger,
+          clock.now,
+        )
+        .map { connections =>
           if (connections.isEmpty)
             throw Status.NOT_FOUND
               .withDescription(
                 s"sequencer connections is empty"
               )
               .asRuntimeException()
-      },
+        },
       logger,
     )
   }
@@ -362,11 +367,15 @@ class ValidatorApp(
       scanConnection: ScanConnection,
   ): Future[Unit] = {
     for {
-      _ <- waitForSequencerConnectionsFromScan(scanConnection, clock, logger, retryProvider)
+      _ <- waitForSequencerConnectionsFromScan(
+        scanConnection,
+        logger,
+        retryProvider,
+      )
       sequencerConnections <- ValidatorApp.getSequencerConnectionsFromScan(
         scanConnection,
-        clock,
         logger,
+        clock.now,
       )
       domainConfig = NonEmpty.from(sequencerConnections) match {
         case None =>
@@ -793,8 +802,8 @@ object ValidatorApp {
 
   def getSequencerConnectionsFromScan(
       scanConnection: ScanConnection,
-      clock: Clock,
       logger: TracedLogger,
+      domainTime: CantonTimestamp,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -807,19 +816,19 @@ object ValidatorApp {
       logger.warn("global domain sequencer list not found.")
       Seq.empty[GrpcSequencerConnection]
     } { domainSequencer =>
-      extractValidConnections(domainSequencer.sequencers, clock)
+      extractValidConnections(domainSequencer.sequencers, domainTime)
     }
   }
 
   private def extractValidConnections(
       sequencers: Seq[SvcSequencer],
-      clock: Clock,
+      domainTime: CantonTimestamp,
   ): Seq[GrpcSequencerConnection] = {
     // sequencer connections will be ignore if they are with a invalid Alias, empty url or not yet available (`before availableAfter`)
     val validConnections = sequencers
       .collect {
         case SvcSequencer(_, url, svName, availableAfter)
-            if url.nonEmpty && !clock.now.toInstant.isBefore(availableAfter) =>
+            if url.nonEmpty && !domainTime.toInstant.isBefore(availableAfter) =>
           for {
             sequencerAlias <- SequencerAlias.create(svName)
             grpcSequencerConnection <- GrpcSequencerConnection.create(
