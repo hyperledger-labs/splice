@@ -118,7 +118,7 @@ jobs:
   bundle:
     docker:
       - image: cimg/base:2021.04
-    resource_class: 2xlarge+
+    resource_class: xlarge
     environment:
       <<: *env
     steps:

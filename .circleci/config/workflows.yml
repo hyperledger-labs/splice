@@ -86,7 +86,7 @@ workflows:
         start_canton_options: "-w"
         extra_pre_sbt_cmd: "./start-frontends.sh -d -s"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
-        resource_class: "2xlarge+"
+        resource_class: "2xlarge"
         parallelism: 4
     - scala_test:
         <<: *notify-fail
@@ -100,7 +100,7 @@ workflows:
         start_canton_options: "-s"
         extra_pre_sbt_cmd: "./start-frontends.sh -d -s"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
-        resource_class: "2xlarge"
+        resource_class: "xlarge"
         parallelism: 1
     - scala_test:
         <<: *notify-fail
@@ -114,7 +114,7 @@ workflows:
         start_canton_options: "-w"
         extra_pre_sbt_cmd: "./start-frontends.sh -d -s -m"
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
-        resource_class: "2xlarge"
+        resource_class: "xlarge"
         parallelism: 1
     - scala_test:
         <<: *notify-fail
