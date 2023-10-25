@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives.*
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
+import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
@@ -141,7 +142,9 @@ class ScanApp(
         loggerFactory,
       )
 
-      routes = cors() {
+      routes = cors(
+        CorsSettings(ac).withExposedHeaders(Seq("traceparent"))
+      ) {
         withTraceContext { traceContext =>
           requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {

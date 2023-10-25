@@ -4,7 +4,7 @@ import { vi } from 'vitest';
 import { config } from './config';
 
 // Provide an implementation for webcrypto when generating insecure jwts in the app
-vi.stubGlobal('crypto', { subtle: crypto.webcrypto.subtle });
+vi.stubGlobal('crypto', crypto.webcrypto);
 
 // Provide a global variable for the app config in the test environment
 window.canton_network_config = config;

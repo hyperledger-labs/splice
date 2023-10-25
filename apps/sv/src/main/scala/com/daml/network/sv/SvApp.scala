@@ -362,16 +362,18 @@ class SvApp(
       )
 
       routes = cors(
-        CorsSettings(ac).withAllowedMethods(
-          List(
-            HttpMethods.DELETE,
-            HttpMethods.GET,
-            HttpMethods.POST,
-            HttpMethods.PUT,
-            HttpMethods.HEAD,
-            HttpMethods.OPTIONS,
+        CorsSettings(ac)
+          .withAllowedMethods(
+            List(
+              HttpMethods.DELETE,
+              HttpMethods.GET,
+              HttpMethods.POST,
+              HttpMethods.PUT,
+              HttpMethods.HEAD,
+              HttpMethods.OPTIONS,
+            )
           )
-        )
+          .withExposedHeaders(Seq("traceparent"))
       ) {
         withTraceContext { implicit traceContext =>
           requestLogger(traceContext) {

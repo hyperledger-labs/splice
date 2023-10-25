@@ -1,8 +1,12 @@
 package com.daml.network.admin.api
 
-import akka.http.scaladsl.server.{Directive, Directive1}
+import akka.http.scaladsl.server
+import akka.http.scaladsl.server.{Directive, Directive1, RequestContext, RouteResult}
+import com.daml.network.admin.api.client.TraceContextPropagation.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.tracing.W3CTraceContext
+
+import scala.concurrent.Future
 
 object TraceContextDirectives {
 
@@ -20,13 +24,28 @@ object TraceContextDirectives {
         .fromHeaders(headersMap)
         .map { w3ctx =>
           val traceContext = w3ctx.toTraceContext
-          inner(Tuple1(traceContext))(ctx)
+          withTraceResponseHeaders(inner, traceContext, ctx)
         }
         .getOrElse {
           TraceContext.withNewTraceContext { traceContext =>
-            inner(Tuple1(traceContext))(ctx)
+            withTraceResponseHeaders(inner, traceContext, ctx)
           }
         }
     }
   }
+
+  private def withTraceResponseHeaders(
+      inner: Tuple1[TraceContext] => server.Route,
+      traceContext: TraceContext,
+      ctx: RequestContext,
+  ): Future[RouteResult] = {
+    // Note: This is similar to the respondWithHeader() directive from the Akka DSL
+    inner(Tuple1(traceContext))(ctx).map {
+      case RouteResult.Complete(response) =>
+        val newResponse = response.withHeaders(traceContext.propagate(response.headers.toList))
+        RouteResult.Complete(newResponse)
+      case other => other
+    }(ctx.executionContext)
+  }
+
 }

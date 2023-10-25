@@ -6,7 +6,7 @@ import { buildServer } from '../mocks/server';
 import { config } from './config';
 
 // Provide an implementation for webcrypto when generating insecure jwts in the app
-vi.stubGlobal('crypto', { subtle: crypto.webcrypto.subtle });
+vi.stubGlobal('crypto', crypto.webcrypto);
 
 type Config = typeof config;
 export type Services = Config['services'];

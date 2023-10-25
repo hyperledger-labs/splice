@@ -8,6 +8,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
 import org.apache.commons.io.FileUtils
 import org.openqa.selenium.bidi.Event
@@ -189,11 +190,22 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     }
   }
 
+  private def traceContextFromConsoleMessage(msg: String): TraceContext = {
+    // If available, frontend console log messages apppend the W3C trace parent value at the end
+    // of the message. See OpenApiLoggingMiddleware.ts.
+    val traceParentRegEx =
+      raw".*\[([0-9a-zA-Z]{2}-[0-9a-zA-Z]{32}-[0-9a-zA-Z]{16}-[0-9a-zA-Z]{2})\]$$".r
+    msg match {
+      case traceParentRegEx(value) => TraceContext.fromW3CTraceParent(value)
+      case _ => traceContext
+    }
+  }
+
   protected def startWebDriver(name: String) = {
     if (!frontendNames.contains(name)) {
       throw new IllegalArgumentException(s"$name was not in defined frontends $frontendNames")
     }
-    val logger = loggerFactory.append("web-frontend", name).getLogger(getClass)
+    val logger = loggerFactory.append("web-frontend", name).getTracedLogger(getClass)
     logger.info(s"Starting web-frontend")
     val logFileName =
       s"browser.${this.getClass.getName}.${name}.${FrontendIntegrationTest.counter.getAndIncrement()}"
@@ -234,11 +246,12 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
       logEntry => {
         logEntry.getConsoleLogEntry.toScala.foreach { consoleLogEntry =>
           val msg = consoleLogEntry.getText
+          val ctx = traceContextFromConsoleMessage(msg)
           consoleLogEntry.getLevel match {
-            case LogLevel.DEBUG => logger.debug(msg)
-            case LogLevel.INFO => logger.info(msg)
-            case LogLevel.WARNING => logger.warn(msg)
-            case LogLevel.ERROR => logger.error(msg)
+            case LogLevel.DEBUG => logger.debug(msg)(ctx)
+            case LogLevel.INFO => logger.info(msg)(ctx)
+            case LogLevel.WARNING => logger.warn(msg)(ctx)
+            case LogLevel.ERROR => logger.error(msg)(ctx)
           }
         }
       },

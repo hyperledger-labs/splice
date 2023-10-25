@@ -2,7 +2,7 @@ package com.daml.network.environment
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.{ConnectionContext, Http}
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader, HttpRequest, HttpResponse}
 import akka.http.scaladsl.server.Directive0
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -26,12 +26,13 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.{HasUptime, WallClock}
 import com.digitalasset.canton.topology.UniqueIdentifier
-import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider}
+import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider, W3CTraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
 import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.SSLContext
+import scala.collection.immutable
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
@@ -82,8 +83,15 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
 
   private val httpExt = Http()(ac)
 
+  private def traceContextFromHeaders(headers: immutable.Seq[HttpHeader]) = {
+    W3CTraceContext
+      .fromHeaders(headers.map(h => h.name() -> h.value()).toMap)
+      .map(_.toTraceContext)
+      .getOrElse(traceContext)
+  }
   protected implicit val httpClient: HttpRequest => Future[HttpResponse] = (request: HttpRequest) =>
     {
+      val requestTraceCtx = traceContextFromHeaders(request.headers)
       import parameters.loggingConfig.api.*
       val logPayload = messagePayloads.getOrElse(false)
       val pathLimited = request.uri.path.toString
@@ -97,16 +105,17 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
           case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
             logger.debug(
               msg(s"Requesting with entity data: ${data.utf8String.limit(maxStringLength)}")
-            )
-          case _ => logger.debug(msg(s"omitting logging of request entity data."))
+            )(requestTraceCtx)
+          case _ => logger.debug(msg(s"omitting logging of request entity data."))(requestTraceCtx)
         }
       }
-      logger.trace(msg(s"headers: ${request.headers.toString.limit(maxMetadataSize)}"))
+      logger
+        .trace(msg(s"headers: ${request.headers.toString.limit(maxMetadataSize)}"))(requestTraceCtx)
       val host = request.uri.authority.host.address()
       val port = request.uri.effectivePort
       logger.trace(
         s"Connecting to host: ${host}, port: ${port} request.uri = ${request.uri}"
-      )
+      )(requestTraceCtx)
       val connectionContext = request.uri.scheme match {
         case "https" => ConnectionContext.httpsClient(SSLContext.getDefault)
         case _ => ConnectionContext.noEncryption()
@@ -129,9 +138,12 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
           }
       val start = System.currentTimeMillis()
       dispatchRequest(request).map { response =>
+        val responseTraceCtx = traceContextFromHeaders(response.headers)
         val end = System.currentTimeMillis()
-        logger.trace(msg(s"HTTP request took ${end - start} ms to complete"))
-        logger.debug(msg(s"Received response with status code: ${response.status}"))
+        logger.trace(msg(s"HTTP request took ${end - start} ms to complete"))(responseTraceCtx)
+        logger.debug(msg(s"Received response with status code: ${response.status}"))(
+          responseTraceCtx
+        )
         if (logPayload) {
           response.entity match {
             // Only logging strict messages which are already in memory, not attempting to log streams
@@ -140,16 +152,18 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
                 msg(
                   s"Received response with entity data: ${data.utf8String.limit(maxStringLength)}"
                 )
-              )
-            case _ => logger.debug(msg(s"omitting logging of response entity data."))
+              )(responseTraceCtx)
+            case _ =>
+              logger.debug(msg(s"omitting logging of response entity data."))(responseTraceCtx)
           }
         }
         logger.trace(
           msg(s"Response contains headers: ${response.headers.toString.limit(maxMetadataSize)}")
-        )
+        )(responseTraceCtx)
         response
       }
     }
+
   def requestLogger(implicit traceContext: TraceContext): Directive0 =
     HttpRequestLogger(parameters.loggingConfig.api, loggerFactory)
 

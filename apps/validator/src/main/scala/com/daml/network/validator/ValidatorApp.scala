@@ -657,15 +657,17 @@ class ValidatorApp(
         }
 
       routes = cors(
-        CorsSettings(ac).withAllowedMethods(
-          List(
-            HttpMethods.DELETE,
-            HttpMethods.GET,
-            HttpMethods.POST,
-            HttpMethods.HEAD,
-            HttpMethods.OPTIONS,
+        CorsSettings(ac)
+          .withAllowedMethods(
+            List(
+              HttpMethods.DELETE,
+              HttpMethods.GET,
+              HttpMethods.POST,
+              HttpMethods.HEAD,
+              HttpMethods.OPTIONS,
+            )
           )
-        )
+          .withExposedHeaders(Seq("traceparent"))
       ) {
         withTraceContext { implicit traceContext =>
           requestLogger(traceContext) {
