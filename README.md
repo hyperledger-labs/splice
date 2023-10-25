@@ -244,6 +244,16 @@ There are a few extensions that improve the VS Code experience when working on v
 - [Nix](https://marketplace.visualstudio.com/items?itemName=bbenoist.Nix)
 - [vscode-proto3](https://marketplace.visualstudio.com/items?itemName=zxh404.vscode-proto3)
 
+#### Configuring VS Code for Daml Development
+
+- Install the Daml open source SDK by running
+   ```
+   curl -sSL https://get.daml.com/ | sh
+   ```
+   or following the instructions at https://docs.daml.com/getting-started/installation.html.
+   - The Daml SDK is not required for building our repository, but it's required for the Daml extension in VS Code.
+- Install the Daml extension by running `daml studio` or by manually installing it from the VS Code extensions UI.
+
 #### Configuring VS Code for Scala Development
 
 It is possible to use VS Code for Scala development via the Metals extension (see above), if you'd prefer not to use IntelliJ (or just want to try it out). Setting this up requires some similar configuration as IntelliJ:
