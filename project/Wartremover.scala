@@ -18,8 +18,12 @@ object Wartremover {
       )
   }
 
+  lazy val extraWartRemoverErrors =
+    if (sys.env.contains("CI")) Seq(Wart.custom("com.daml.network.wart.Println"))
+    else Seq()
+
   lazy val cnWarts = Seq(
-    wartremoverErrors += Wart.custom("com.daml.network.wart.Println"),
+    wartremoverErrors ++= extraWartRemoverErrors,
     wartremover.WartRemover.dependsOnLocalProjectWarts(
       `cn-wartremover-extension`
     ),
