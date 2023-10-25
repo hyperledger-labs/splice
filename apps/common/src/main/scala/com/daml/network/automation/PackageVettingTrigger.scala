@@ -2,7 +2,12 @@ package com.daml.network.automation
 
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.cc
-import com.daml.network.environment.{DarResource, PackageIdResolver, ParticipantAdminConnection}
+import com.daml.network.environment.{
+  DarResource,
+  PackageIdResolver,
+  ParticipantAdminConnection,
+  RetryFor,
+}
 import com.daml.network.util.{CoinConfigSchedule, UploadablePackage}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
@@ -82,7 +87,10 @@ abstract class PackageVettingTrigger
       darO <- participantAdminConnection.lookupDar(resource.darHash)
       _ <- darO match {
         case None =>
-          participantAdminConnection.uploadDarFile(UploadablePackage.fromResource(resource))
+          participantAdminConnection.uploadDarFile(
+            UploadablePackage.fromResource(resource),
+            RetryFor.Automation,
+          )
         case Some(_) => Future.unit
       }
     } yield ()
