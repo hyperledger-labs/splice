@@ -162,6 +162,15 @@ class SvSvcAutomationService(
   registerTrigger(
     new CnsSubscriptionInitialPaymentTrigger(triggerContext, svcStore, connection)
   )
+
+  registerTrigger(
+    new SvPackageVettingTrigger(
+      participantAdminConnection,
+      svcStore,
+      config.prevetDuration,
+      triggerContext,
+    )
+  )
 }
 
 object SvSvcAutomationService {

@@ -471,6 +471,7 @@ class ValidatorApp(
         config.domains.global.buyExtraTraffic,
         config.appManager,
         config.svValidator,
+        config.prevetDuration,
         config.domains.global.alias,
         clock,
         walletManager,

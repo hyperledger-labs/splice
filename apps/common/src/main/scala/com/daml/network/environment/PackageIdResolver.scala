@@ -152,14 +152,14 @@ object PackageIdResolver {
       val pkg = modulePackages
         .get(name.moduleName)
         .getOrElse(throw new IllegalArgumentException(s"Unknown template $name"))
-      val version = PackageVersion.assertFromString(readPackageVersion(config.packageConfig, pkg))
+      val version = readPackageVersion(config.packageConfig, pkg)
       packageMap
         .get((pkg.packageName, version))
-        .getOrElse(
+        .fold(
           throw new IllegalArgumentException(
             s"No package with name ${pkg.packageName} and version ${version} is known"
           )
-        )
+        )(_.packageId)
     }
 
     override def resolvePackageId(
@@ -177,30 +177,32 @@ object PackageIdResolver {
     }
   }
 
-  // Map from (pkgName, pkgVersion) -> pkgId
+  def lookupPackage(pkg: Package, version: PackageVersion): Option[DarResource] =
+    packageMap.get((pkg.packageName, version))
+
+  // Map from (pkgName, pkgVersion) -> DarResource
   private lazy val packageMap =
-    availablePackageVersions.toList
-      .flatMap({ case (pkg, versions) => versions.map(v => (pkg, v)) })
-      .map { case (pkg, version) =>
-        val path = s"dar/${pkg.packageName}-$version.dar"
+    packageResources
+      .flatMap(pkgResource => pkgResource.all)
+      .map { darResource =>
         val mainDalf =
-          scala.util.Using.resource(getClass.getClassLoader.getResourceAsStream(path)) {
+          scala.util.Using.resource(getClass.getClassLoader.getResourceAsStream(darResource.path)) {
             inputStream =>
-              DarUtil.readDar(path, inputStream).main
+              DarUtil.readDar(darResource.path, inputStream).main
           }
         val metadata = mainDalf._2.metadata.getOrElse(
           throw new AssertionError(s"Package is missing metadata which is mandatory in LF >= 1.8")
         )
-        ((metadata.name, metadata.version) -> mainDalf._1)
+        ((metadata.name, metadata.version) -> darResource)
       }
       .toMap
 
-  private def readPackageVersion(
+  def readPackageVersion(
       packageConfig: cc.coinconfig.PackageConfig,
       pkg: Package,
-  ): String = {
+  ): PackageVersion = {
     import Package.*
-    pkg match {
+    val version = pkg match {
       case CantonCoin => packageConfig.cantonCoin
       case CantonNameService => packageConfig.cantonNameService
       case DirectoryService => packageConfig.directoryService
@@ -209,21 +211,18 @@ object PackageIdResolver {
       case Wallet => packageConfig.wallet
       case WalletPayments => packageConfig.walletPayments
     }
+    PackageVersion.assertFromString(version)
   }
 
-  // Ideally we would just list all bundled resources but listing all resources
-  // in a directory in Java is a huge mess and only really possible with
-  // very heavyweight external deps. Given that we easily catch any issues here during
-  // testing we just hardcode it.
-  private val availablePackageVersions: Map[Package, Set[String]] =
-    Map(
-      Package.CantonCoin -> Set("0.1.0"),
-      Package.CantonNameService -> Set("0.1.0"),
-      Package.DirectoryService -> Set("0.1.0"),
-      Package.SvcGovernance -> Set("0.1.0"),
-      Package.ValidatorLifecycle -> Set("0.1.0"),
-      Package.Wallet -> Set("0.1.0"),
-      Package.WalletPayments -> Set("0.1.0"),
+  private val packageResources: Seq[PackageResource] =
+    Seq(
+      DarResources.cantonCoin,
+      DarResources.cantonNameService,
+      DarResources.directoryService,
+      DarResources.svcGovernance,
+      DarResources.validatorLifecycle,
+      DarResources.wallet,
+      DarResources.walletPayments,
     )
 
   // Map from module name to package containing that module
@@ -247,7 +246,7 @@ object PackageIdResolver {
     "CN.Wallet.Subscriptions" -> Package.WalletPayments,
   )
 
-  private sealed abstract class Package extends Product with Serializable {
+  sealed abstract class Package extends Product with Serializable {
     def packageName = {
       val clsName = this.productPrefix
       // Turn CantonCoin into canton-coin
@@ -258,7 +257,7 @@ object PackageIdResolver {
     }
   }
 
-  private object Package {
+  object Package {
     final case object CantonCoin extends Package
     final case object CantonNameService extends Package
     final case object DirectoryService extends Package

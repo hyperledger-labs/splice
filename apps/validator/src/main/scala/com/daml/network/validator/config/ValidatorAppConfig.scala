@@ -151,6 +151,7 @@ case class ValidatorAppBackendConfig(
     participantIdentitiesBackup: Option[BackupDumpConfig] = None,
     appManager: Option[AppManagerConfig] = None,
     svValidator: Boolean = false,
+    prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(5),
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

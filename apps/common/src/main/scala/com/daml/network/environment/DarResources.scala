@@ -1,6 +1,9 @@
 package com.daml.network.environment
 
 import com.daml.network.util.DarUtil
+import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashOps, HashPurpose}
+import com.google.protobuf.ByteString
+import scala.util.Using
 
 object DarResources {
   val cantonCoin_0_1_0 = DarResource("canton-coin-0.1.0.dar")
@@ -77,15 +80,24 @@ final case class PackageResource(
 final case class DarResource(
     path: String,
     packageId: String,
+    darHash: Hash,
 )
 
 object DarResource {
+  private val hashOps = new HashOps {
+    override def defaultHashAlgorithm = HashAlgorithm.Sha256
+  }
+
   def apply(file: String): DarResource = {
     val path = s"dar/$file"
     val pkgId = DarUtil.readPackageId(path)
+    val darBytes =
+      Using.resource(getClass.getClassLoader.getResourceAsStream(path))(ByteString.readFrom(_))
+    val hash = hashOps.digest(HashPurpose.DarIdentifier, darBytes)
     DarResource(
       path,
       pkgId,
+      hash,
     )
   }
 }
