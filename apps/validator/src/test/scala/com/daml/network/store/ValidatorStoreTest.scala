@@ -14,7 +14,7 @@ import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, CNPostgresTest}
-import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
+import com.daml.network.util.{AssignedContract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.store.db.DbValidatorStore
@@ -375,6 +375,60 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
               Set.empty,
             ),
           )
+        }
+      }
+    }
+
+    "listCoinRulesTransferFollowers" should {
+      "return correct results" in {
+        val signatories = Seq(validator)
+        for {
+          store <- mkStore()
+          coinRules1 = coinRules()
+          walletInstall1 = walletInstall(user1, "user1")
+          // TODO (#7822) move to UserWallet
+          coin1 = coin(validator, 1, 1L, 0.1)
+          validatorRight1 = validatorRight(user1)
+          appConfiguration1 = appConfiguration(provider1, 1L, "config")
+          appRelease1 = appRelease(provider1, "version")
+          registeredApp1 = registeredApp(provider1)
+          installedApp1 = installedApp(provider1)
+          approvedReleaseConfig1 = approvedReleaseConfig(provider1, 1L)
+          _ <- dummyDomain.create(walletInstall1, createdEventSignatories = signatories)(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(coin1, createdEventSignatories = signatories)(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(validatorRight1, createdEventSignatories = signatories)(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(appConfiguration1, createdEventSignatories = signatories)(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(appRelease1, createdEventSignatories = signatories)(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(registeredApp1, createdEventSignatories = signatories)(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(installedApp1, createdEventSignatories = signatories)(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(approvedReleaseConfig1, createdEventSignatories = signatories)(
+            store.multiDomainAcsStore
+          )
+          _ <- dummy2Domain.create(coinRules1)(
+            store.multiDomainAcsStore
+          )
+          tfResult <- store.listCoinRulesTransferFollowers(
+            AssignedContract(coinRules1, dummy2Domain)
+          )
+        } yield {
+          val actual = tfResult.map(_.contract.identifier.getEntityName)
+          val expected =
+            ValidatorStore.templatesMovedByMyAutomation.map(_.TEMPLATE_ID.getEntityName)
+          actual should contain theSameElementsAs expected
         }
       }
     }

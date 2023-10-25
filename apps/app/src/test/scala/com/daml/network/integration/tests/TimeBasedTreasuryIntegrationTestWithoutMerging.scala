@@ -397,7 +397,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
           // if we run a tap, only 3 of 4 possible inputs are selected because one input slot is "taken" by the tap
           // (notice how the app reward coupon is not an input)
           _.message should include regex (
-            "with inputs List\\(InputCoin\\(.*\\), InputCoin\\(.*\\), InputAppRewardCoupon\\(.*\\)\\)"
+            "with inputs Vector\\(InputCoin\\(.*\\), InputCoin\\(.*\\), InputAppRewardCoupon\\(.*\\)\\)"
           )
         )
       },
@@ -445,7 +445,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
         )(
           // but only the non-expired coin is selected as input.
           _.message should include regex (
-            "with inputs List\\(InputCoin\\(.*\\)\\)"
+            "with inputs Vector\\(InputCoin\\(.*\\)\\)"
           )
         )
       },

@@ -273,7 +273,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     val templateIdMap = companions
       .map(c => QualifiedName(c.TEMPLATE_ID) -> c)
       .toMap
-    val templateIds = templateIdMap.keys.mkString("(',", "','", "')")
+    val templateIds = templateIdMap.keys.mkString("('", "','", "')")
     for {
       result <- storage.query(
         selectFromAcsTableWithState(

@@ -50,16 +50,6 @@ object CNNodeTests {
         : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
       CNNodeEnvironmentDefinition
         .simpleTopology(this.getClass.getSimpleName)
-
-    protected def initSvc()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
-      env.fullSvcApps.local.foreach(_.start())
-      env.fullSvcApps.local.foreach(_.waitForInitialization())
-    }
-
-    protected def initSvcWithSv1Only()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
-      env.minimalSvcApps.local.foreach(_.start())
-      env.minimalSvcApps.local.foreach(_.waitForInitialization())
-    }
   }
 
   trait CNNodeIntegrationTestWithSharedEnvironment
@@ -190,6 +180,16 @@ object CNNodeTests {
       with CommonCNNodeAppInstanceReferences
       with LedgerApiExtensions
       with AppendedClues {
+
+    protected def initSvc()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
+      env.fullSvcApps.local.foreach(_.start())
+      env.fullSvcApps.local.foreach(_.waitForInitialization())
+    }
+
+    protected def initSvcWithSv1Only()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
+      env.minimalSvcApps.local.foreach(_.start())
+      env.minimalSvcApps.local.foreach(_.waitForInitialization())
+    }
 
     def defaultTickDuration(implicit env: CNNodeTestConsoleEnvironment): NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds((sv1Backend.config.onboarding match {

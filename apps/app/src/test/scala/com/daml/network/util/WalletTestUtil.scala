@@ -825,6 +825,34 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     )
   }
 
+  /** Directly executes the CoinRules_DevNet_Tap choice. Note that the receiver must be hosted on the same participant as the SVC. */
+  def tapCoin(
+      participantClient: CNParticipantClientReference,
+      receiver: PartyId,
+      amount: BigDecimal,
+      domainId: Option[DomainId] = None,
+  )(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): Unit = {
+    val now = env.environment.clock.now
+    val tc = sv1ScanBackend.getTransferContextWithInstances(now)
+
+    participantClient.ledger_api_extensions.commands.submitWithResult(
+      userId = aliceWalletClient.config.ledgerApiUser,
+      actAs = Seq(svcParty, receiver),
+      readAs = Seq.empty,
+      update = tc.coinRules.contract.contractId.exerciseCoinRules_DevNet_Tap(
+        receiver.toLf,
+        amount.bigDecimal,
+        tc.latestOpenMiningRound.contract.contractId,
+      ),
+      domainId = domainId orElse (tc.coinRules.state match {
+        case ContractState.InFlight => None
+        case ContractState.Assigned(domain) => Some(domain)
+      }),
+    )
+  }
+
   /** Directly creates a new coin. Note that the receiver must be hosted on the same participant as the SVC. */
   def createCoin(
       participantClient: CNParticipantClientReference,

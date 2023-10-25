@@ -3,6 +3,7 @@ package com.daml.network.store.db
 import com.daml.ledger.javaapi.data.ContractMetadata
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as paymentCodegen,
@@ -779,6 +780,65 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         }
       }
     }
+
+    "listDirectoryEntries" should {
+      "return correct results" in {
+        val payData = subscriptionPayData()
+        for {
+          store1 <- mkStore(user1)
+          (subscription1, state1) = subscriptionInIdleState(
+            user1,
+            provider1,
+            payData,
+            time(1),
+          )
+          subscriptionRequest1 = subscription1.payload.reference
+          directoryEntryContext1 = directoryEntryContext(
+            user1,
+            "user1",
+            subscriptionRequest1,
+            provider1,
+          )
+          directoryEntry1 = directoryEntry(
+            user1,
+            "user1",
+            provider1,
+          )
+          _ <- dummyDomain.create(subscription1, createdEventSignatories = Seq(user1))(
+            store1.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(state1, createdEventSignatories = Seq(user1))(
+            store1.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(
+            directoryEntryContext1,
+            createdEventSignatories = Seq(user1, provider1),
+          )(
+            store1.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(directoryEntry1, createdEventSignatories = Seq(user1, provider1))(
+            store1.multiDomainAcsStore
+          )
+        } yield {
+          eventually() {
+            val actual = store1.listDirectoryEntries().futureValue
+            val expected = Seq(
+              UserWalletStore.DirectoryEntryWithPayData(
+                contractId = directoryEntry1.contractId,
+                expiresAt = directoryEntry1.payload.expiresAt,
+                entryName = directoryEntry1.payload.name,
+                amount = state1.payload.payData.paymentAmount.amount,
+                currency = state1.payload.payData.paymentAmount.currency,
+                paymentInterval = state1.payload.payData.paymentInterval,
+                paymentDuration = state1.payload.payData.paymentDuration,
+              )
+            )
+            actual should contain theSameElementsAs expected
+          }
+        }
+      }
+
+    }
   }
 
   private lazy val provider1 = providerParty(1)
@@ -1008,7 +1068,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       paymentDurationSeconds: Long = 1L,
   ): subsCodegen.SubscriptionPayData = {
     new subsCodegen.SubscriptionPayData(
-      new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount), currency),
+      new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount).setScale(10), currency),
       new RelTime(paymentIntervalSeconds * 1000L * 1000L),
       new RelTime(paymentDurationSeconds * 1000L * 1000L),
     )
@@ -1026,6 +1086,56 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     contract(
       identifier = templateId,
       contractId = new subsCodegen.SubscriptionRequest.ContractId(nextCid()),
+      payload = template,
+      metadata = ContractMetadata.Empty(),
+    )
+  }
+
+  protected def directoryEntry(
+      user: PartyId,
+      name: String,
+      provider: PartyId = providerParty(0),
+      entryUrl: String = "https://cns-entry-url.com",
+      entryDescription: String = "Sample fake description",
+  ) = {
+    val templateId = dirCodegen.DirectoryEntry.TEMPLATE_ID
+    val template = new dirCodegen.DirectoryEntry(
+      user.toProtoPrimitive,
+      provider.toProtoPrimitive,
+      name,
+      entryUrl,
+      entryDescription,
+      Instant.now().plusSeconds(3600),
+    )
+    contract(
+      identifier = templateId,
+      contractId = new dirCodegen.DirectoryEntry.ContractId(nextCid()),
+      payload = template,
+      metadata = ContractMetadata.Empty(),
+    )
+  }
+
+  protected def directoryEntryContext(
+      user: PartyId,
+      name: String,
+      subscriptionRequest: subsCodegen.SubscriptionRequest.ContractId,
+      provider: PartyId = providerParty(0),
+      entryUrl: String = "https://cns-entry-url.com",
+      entryDescription: String = "Sample fake description",
+  ) = {
+    val templateId = dirCodegen.DirectoryEntryContext.TEMPLATE_ID
+    val template = new dirCodegen.DirectoryEntryContext(
+      svcParty.toProtoPrimitive,
+      provider.toProtoPrimitive,
+      user.toProtoPrimitive,
+      name,
+      entryUrl,
+      entryDescription,
+      subscriptionRequest,
+    )
+    contract(
+      identifier = templateId,
+      contractId = new dirCodegen.DirectoryEntryContext.ContractId(nextCid()),
       payload = template,
       metadata = ContractMetadata.Empty(),
     )
@@ -1197,7 +1307,8 @@ class DbUserWalletStoreTest
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         DarResources.cantonCoin.all ++
-          DarResources.wallet.all
+          DarResources.wallet.all ++
+          DarResources.directoryService.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)

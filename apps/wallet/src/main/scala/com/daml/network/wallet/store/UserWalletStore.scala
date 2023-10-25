@@ -10,6 +10,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.store.{CNNodeAppStoreWithHistory, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.*
@@ -39,6 +40,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A store for serving all queries for a specific wallet end-user. */
@@ -338,13 +340,13 @@ trait UserWalletStore
           .get(es.subscriptionReference)
           .map(subPayData =>
             DirectoryEntryWithPayData(
-              contractId = es.entry.contractId.contractId,
-              expiresAt = es.entry.payload.expiresAt.toEpochMilli().toString(),
+              contractId = es.entry.contractId,
+              expiresAt = es.entry.payload.expiresAt,
               entryName = es.entry.payload.name,
-              amount = subPayData.paymentAmount.amount.toString(),
-              currency = subPayData.paymentAmount.currency.toString(),
-              paymentInterval = subPayData.paymentInterval.microseconds.toString(),
-              paymentDuration = subPayData.paymentDuration.microseconds.toString(),
+              amount = subPayData.paymentAmount.amount,
+              currency = subPayData.paymentAmount.currency,
+              paymentInterval = subPayData.paymentInterval,
+              paymentDuration = subPayData.paymentDuration,
             )
           )
       }
@@ -422,13 +424,13 @@ object UserWalletStore {
       payData: subsCodegen.SubscriptionPayData,
   )
   final case class DirectoryEntryWithPayData(
-      contractId: String,
-      expiresAt: String,
+      contractId: directoryCodegen.DirectoryEntry.ContractId,
+      expiresAt: Instant,
       entryName: String,
-      amount: String,
-      currency: String,
-      paymentInterval: String,
-      paymentDuration: String,
+      amount: java.math.BigDecimal,
+      currency: walletCodegen.Currency,
+      paymentInterval: RelTime,
+      paymentDuration: RelTime,
   )
   final case class EntryWithSubscriptionContext(
       entry: Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry],

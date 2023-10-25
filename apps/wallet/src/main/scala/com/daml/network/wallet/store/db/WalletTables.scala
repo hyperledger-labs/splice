@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
@@ -113,6 +114,12 @@ object WalletTables extends AcsTables {
           )
         case t if t == QualifiedName(coinCodegen.FeaturedAppRight.TEMPLATE_ID) =>
           tryToDecode(coinCodegen.FeaturedAppRight.COMPANION, createdEvent)(noIndex)
+        case t if t == QualifiedName(dirCodegen.DirectoryInstall.TEMPLATE_ID) =>
+          tryToDecode(dirCodegen.DirectoryInstall.COMPANION, createdEvent)(noIndex)
+        case t if t == QualifiedName(dirCodegen.DirectoryEntry.TEMPLATE_ID) =>
+          tryToDecode(dirCodegen.DirectoryEntry.COMPANION, createdEvent)(noIndex)
+        case t if t == QualifiedName(dirCodegen.DirectoryEntryContext.TEMPLATE_ID) =>
+          tryToDecode(dirCodegen.DirectoryEntryContext.COMPANION, createdEvent)(noIndex)
         case t =>
           Left(s"Template $t cannot be decoded as an entry for the user wallet store.")
       }

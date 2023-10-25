@@ -81,13 +81,13 @@ class HttpExternalDirectoryHandler(
               entriesWithPayData
                 .map(e =>
                   d0.DirectoryEntryResponse(
-                    contractId = e.contractId,
+                    contractId = e.contractId.toString(),
                     name = e.entryName,
-                    amount = e.amount,
-                    currency = e.currency,
-                    expiresAt = e.expiresAt,
-                    paymentInterval = e.paymentInterval,
-                    paymentDuration = e.paymentDuration,
+                    amount = e.amount.toString(),
+                    currency = e.currency.toString(),
+                    expiresAt = e.expiresAt.toEpochMilli().toString(),
+                    paymentInterval = e.paymentInterval.microseconds.toString(),
+                    paymentDuration = e.paymentDuration.microseconds.toString(),
                   )
                 )
                 .toVector
