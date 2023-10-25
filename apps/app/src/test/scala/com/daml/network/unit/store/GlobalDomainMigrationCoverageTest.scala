@@ -79,6 +79,7 @@ class GlobalDomainMigrationCoverageTest
 object GlobalDomainMigrationCoverageTest {
   import sv.store.{SvStore, SvSvStore, SvSvcStore}
   import validator.store.ValidatorStore
+  import wallet.store.UserWalletStore
 
   private val dummyParty = PartyId.tryFromProtoPrimitive("foo::dummy")
 
@@ -105,6 +106,13 @@ object GlobalDomainMigrationCoverageTest {
         SvSvStore.contractFilter(SvStore.Key(dummyParty, dummyParty)),
         SvSvStore.templatesMovedByMyAutomation,
       ),
+      (
+        UserWalletStore,
+        UserWalletStore.contractFilter(
+          UserWalletStore.Key(dummyParty, dummyParty, "irrelevant username", dummyParty)
+        ),
+        UserWalletStore.templatesMovedByMyAutomation,
+      ),
     )
 
   // How do we ensure that new templates get migration added somewhere?  If
@@ -121,10 +129,9 @@ object GlobalDomainMigrationCoverageTest {
   private val todoCnsDirectory = ("TODO (#5959) make directory/cns contracts follow CoinRules;"
     + " global domain migration will break the cns if this is not done")
 
-  // "not handled" usually means "handled by a separate automation"
   private val knownNotHandled = {
-    import codegen.java.cc.{coin, coinimport, globaldomain}
-    import codegen.java.cn.{cns as cnsCodegen, directory as directoryCodegen, svc}
+    import codegen.java.cc.globaldomain
+    import codegen.java.cn.{cns as cnsCodegen, directory as directoryCodegen}
     import codegen.java.cn.wallet.{subscriptions as subsCodegen, topupstate as topUpCodegen}
     Seq(
       cnsCodegen.CnsEntry.COMPANION -> todoCnsDirectory,
@@ -140,11 +147,6 @@ object GlobalDomainMigrationCoverageTest {
       subsCodegen.TerminatedSubscription.COMPANION -> todoCnsDirectory,
       globaldomain.MemberTraffic.COMPANION -> "tied to a specific domainId, never migrated",
       topUpCodegen.ValidatorTopUpState.COMPANION -> "tied to a specific domainId, never migrated",
-      coinimport.ImportCrate.COMPANION -> "TODO (#7822) follow CoinRules in SvSvc",
-      coin.AppRewardCoupon.COMPANION -> "TODO (#7822) follow CoinRules in UserWallet",
-      coin.LockedCoin.COMPANION -> "TODO (#7822) follow CoinRules in UserWallet",
-      coin.ValidatorRewardCoupon.COMPANION -> "TODO (#7822) follow CoinRules in UserWallet",
-      svc.coinprice.CoinPriceVote.COMPANION -> "TODO (#7822) follow CoinRules in SvSvc",
     ).view.map { case (c, reason) =>
       (QualifiedName(c.TEMPLATE_ID), reason)
     }.toMap

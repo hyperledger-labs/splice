@@ -12,7 +12,9 @@ import com.daml.network.codegen.java.cn.{
   svcrules as svcr,
   svonboarding as so,
   validatoronboarding as vo,
+  wallet as cnw,
 }
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.config.CNNodeConfigTransforms.updateAllAutomationConfigs
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
@@ -63,7 +65,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
 
   "scheduled global domain upgrade happens" in { implicit env =>
     initSvcWithSv1Only() withClue "spin up Svc"
-    onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
+    val sv1WalletUser = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
 
     val timeUntilNewRule = defaultTickDuration
     val timeToWaitForNewRule = tickDurationWithBuffer
@@ -142,11 +144,16 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
     def createSampleAndEnsurePresence[
         TCid <: ContractId[T],
         T <: Template,
-    ](companion: Contract.Companion.Template[TCid, T])(payload: T) =
-      actAndCheck(
+    ](companion: Contract.Companion.Template[TCid, T])(payload: T): TCid = {
+      val (created, _) = actAndCheck(
         s"create sample ${companion.TEMPLATE_ID.getEntityName}",
         exerciseSvc(payload.create()),
       )(s"ensure ${companion.TEMPLATE_ID.getEntityName} is there", _ => nonEmptyOnSv1(companion))
+      companion.toContractId(new ContractId(created.contractId.contractId))
+    }
+
+    val dummyRound = new cc.round.types.Round(42)
+    val dummyDecimal = new java.math.BigDecimal(42)
 
     clue("create governance contracts of various kinds") {
       actAndCheck(
@@ -159,7 +166,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
                 "alice",
                 "Alice",
                 "alice-participant-id",
-                new cc.round.types.Round(42),
+                dummyRound,
                 previousGlobalId.toProtoPrimitive,
               )
             )
@@ -235,7 +242,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           new svcr.SvReward(
             svcParty.toProtoPrimitive,
             sv1Party.toProtoPrimitive,
-            new cc.round.types.Round(42),
+            dummyRound,
             new java.math.BigDecimal("42"),
           ).create()
         ),
@@ -269,10 +276,10 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         exerciseSvc(
           new cc.round.IssuingMiningRound(
             svcParty.toProtoPrimitive,
-            new cc.round.types.Round(42),
-            new java.math.BigDecimal(42),
-            new java.math.BigDecimal(42),
-            new java.math.BigDecimal(42),
+            dummyRound,
+            dummyDecimal,
+            dummyDecimal,
+            dummyDecimal,
             oldestRound.payload.opensAt,
             newestRound.payload.targetClosesAt,
           ).create()
@@ -287,10 +294,10 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         exerciseSvc(
           new cc.round.ClosedMiningRound(
             svcParty.toProtoPrimitive,
-            new cc.round.types.Round(42),
-            new java.math.BigDecimal(42),
-            new java.math.BigDecimal(42),
-            new java.math.BigDecimal(42),
+            dummyRound,
+            dummyDecimal,
+            dummyDecimal,
+            dummyDecimal,
           )
             .create()
         ),
@@ -307,10 +314,31 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       actAndCheck(
         "create sample UnclaimedReward",
         exerciseSvc(
-          new cc.coin.UnclaimedReward(svcParty.toProtoPrimitive, new java.math.BigDecimal(42))
+          new cc.coin.UnclaimedReward(svcParty.toProtoPrimitive, dummyDecimal)
             .create()
         ),
       )("ensure UnclaimedReward is there", _ => nonEmptyOnSv1(cc.coin.UnclaimedReward.COMPANION))
+
+      createSampleAndEnsurePresence(cc.coinimport.ImportCrate.COMPANION) {
+        val svc = svcParty.toProtoPrimitive
+        val receiver = svc
+        new cc.coinimport.ImportCrate(
+          svc,
+          receiver,
+          new cc.coinimport.importpayload.IP_Coin(
+            new cc.coin.Coin(
+              svc,
+              receiver,
+              new cc.fees.ExpiringAmount(
+                dummyDecimal,
+                dummyRound,
+                new cc.fees.RatePerRound(dummyDecimal),
+              ),
+              java.util.Optional.empty,
+            )
+          ),
+        )
+      }
     }
 
     clue("create app-manager contracts of various kinds") {
@@ -364,6 +392,129 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           0,
           httpdefs.ReleaseConfiguration(Vector.empty, version, httpdefs.Timespan()).asJson.noSpaces,
           "00000000",
+        )
+      )
+    }
+
+    def protectAppRewardCoupons = sv1Backend.leaderBasedAutomation
+      .trigger[com.daml.network.sv.automation.leaderbased.ExpireRewardCouponsTrigger]
+
+    clue("create user wallet contracts of various kinds") {
+      val svc = svcParty.toProtoPrimitive
+      val validator = sv1ValidatorBackend.getValidatorPartyId()
+      val provider = sv1WalletUser
+      val maxTimestamp = com.daml.lf.data.Time.Timestamp.MaxValue.toInstant
+
+      protectAppRewardCoupons.pause().futureValue
+
+      createSampleAndEnsurePresence(cc.coin.AppRewardCoupon.COMPANION)(
+        new cc.coin.AppRewardCoupon(
+          svcParty.toProtoPrimitive,
+          provider.toProtoPrimitive,
+          false,
+          dummyDecimal,
+          dummyRound,
+        )
+      )
+
+      val lockedCoinCid = createSampleAndEnsurePresence(cc.coin.LockedCoin.COMPANION)(
+        new cc.coin.LockedCoin(
+          new cc.coin.Coin(
+            svcParty.toProtoPrimitive,
+            provider.toProtoPrimitive,
+            new cc.fees.ExpiringAmount(
+              dummyDecimal,
+              dummyRound,
+              new cc.fees.RatePerRound(dummyDecimal),
+            ),
+            java.util.Optional.empty,
+          ),
+          new cc.expiry.TimeLock(
+            java.util.List.of(),
+            maxTimestamp,
+          ),
+        )
+      )
+
+      createSampleAndEnsurePresence(cc.coin.ValidatorRewardCoupon.COMPANION)(
+        new cc.coin.ValidatorRewardCoupon(
+          svcParty.toProtoPrimitive,
+          validator.toProtoPrimitive,
+          dummyDecimal,
+          dummyRound,
+        )
+      )
+
+      val appPaymentRequestCid =
+        createSampleAndEnsurePresence(cnw.payment.AppPaymentRequest.COMPANION)(
+          new cnw.payment.AppPaymentRequest(
+            sv1WalletUser.toProtoPrimitive,
+            java.util.List.of(),
+            provider.toProtoPrimitive,
+            svc,
+            maxTimestamp,
+            "irrelevant description",
+          )
+        )
+
+      createSampleAndEnsurePresence(cnw.payment.AcceptedAppPayment.COMPANION)(
+        new cnw.payment.AcceptedAppPayment(
+          sv1WalletUser.toProtoPrimitive,
+          java.util.List.of,
+          provider.toProtoPrimitive,
+          svc,
+          lockedCoinCid,
+          dummyRound,
+          appPaymentRequestCid,
+        )
+      )
+
+      val dummyPaymentAmount = new cnw.payment.PaymentAmount(dummyDecimal, cnw.payment.Currency.CC)
+
+      val dummySubscriptionData = new cnw.subscriptions.SubscriptionData(
+        sv1WalletUser.toProtoPrimitive,
+        svc,
+        provider.toProtoPrimitive,
+        svc,
+        "irrelevant description",
+      )
+
+      val subscriptionRequestCid =
+        createSampleAndEnsurePresence(cnw.subscriptions.SubscriptionRequest.COMPANION)(
+          new cnw.subscriptions.SubscriptionRequest(
+            dummySubscriptionData,
+            new cnw.subscriptions.SubscriptionPayData(
+              dummyPaymentAmount,
+              new RelTime(1000000000000L),
+              new RelTime(1000000000000L),
+            ),
+          )
+        )
+
+      createSampleAndEnsurePresence(cnw.subscriptions.Subscription.COMPANION)(
+        new cnw.subscriptions.Subscription(dummySubscriptionData, subscriptionRequestCid)
+      )
+
+      createSampleAndEnsurePresence(cnw.transferoffer.TransferOffer.COMPANION)(
+        new cnw.transferoffer.TransferOffer(
+          svc,
+          sv1WalletUser.toProtoPrimitive,
+          svc,
+          dummyPaymentAmount,
+          "irrelevant description",
+          maxTimestamp,
+          "irrelevant tracking id",
+        )
+      )
+
+      createSampleAndEnsurePresence(cnw.transferoffer.AcceptedTransferOffer.COMPANION)(
+        new cnw.transferoffer.AcceptedTransferOffer(
+          svc,
+          sv1WalletUser.toProtoPrimitive,
+          svc,
+          dummyPaymentAmount,
+          maxTimestamp,
+          "irrelevant tracking id",
         )
       )
     }
@@ -439,15 +590,13 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
     clue(
       "see whether coin contracts signed only by SVC (in particular mining rounds) follow svcrules"
     ) {
+      import com.daml.network.sv.store.SvSvcStore
       allContractsMigrated(
-        c(cc.round.OpenMiningRound.COMPANION),
-        c(cc.round.SummarizingMiningRound.COMPANION),
-        c(cc.round.IssuingMiningRound.COMPANION),
-        c(cc.round.ClosedMiningRound.COMPANION),
-        c(cc.coin.FeaturedAppRight.COMPANION),
-        // TODO (#7210) c(cc.coin.SvcReward.COMPANION),
-        c(cc.coin.UnclaimedReward.COMPANION),
-        c(cc.validatorlicense.ValidatorLicense.COMPANION),
+        SvSvcStore.coinRulesFollowers
+          filterNot Set(
+            cc.coin.SvcReward.COMPANION // TODO (#7210)
+          )
+          map (c(_)): _*
       )
     }
 
@@ -467,6 +616,16 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       import com.daml.network.validator.store.ValidatorStore.templatesMovedByMyAutomation as templatesMovedByValidatorAutomation
       allContractsMigrated(templatesMovedByValidatorAutomation map (c(_, sv1ValidatorParty)): _*)
     }
+
+    clue("see whether coin/wallet contracts signed by wallet user follow coinrules") {
+      import com.daml.network.wallet.store.UserWalletStore.templatesMovedByMyAutomation as templatesMovedByUserWalletAutomation
+      allContractsMigrated(
+        templatesMovedByUserWalletAutomation
+          map (c(_, sv1WalletUser)): _*
+      )
+    }
+
+    protectAppRewardCoupons.resume()
 
   // check scan for other contracts' transfer:
   // TODO (#5959) check directory contracts

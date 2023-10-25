@@ -22,11 +22,12 @@ import com.daml.network.util.{
   ContractWithState,
   TemplateJsonDecoder,
 }
-import com.daml.network.wallet.store.UserWalletStore.{
+import UserWalletStore.{
   Subscription,
   SubscriptionIdleState,
   SubscriptionPaymentState,
   SubscriptionState,
+  templatesMovedByMyAutomation,
 }
 import com.daml.network.wallet.store.db.DbUserWalletStore
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
@@ -36,7 +37,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -353,6 +354,14 @@ trait UserWalletStore
     }
   }
 
+  final def listLaggingCoinRulesFollowers(targetDomain: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Seq[AssignedContract[?, ?]]] =
+    multiDomainAcsStore.listAssignedContractsNotOnDomainN(
+      targetDomain,
+      templatesMovedByMyAutomation: _*
+    )
+
   override protected def txLogParser =
     new UserWalletTxLogParser(
       loggerFactory,
@@ -469,6 +478,21 @@ object UserWalletStore {
           retryProvider,
         )
     }
+  }
+
+  private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] = {
+    Seq[ConstrainedTemplate](
+      coinCodegen.AppRewardCoupon.COMPANION,
+      coinCodegen.Coin.COMPANION,
+      coinCodegen.LockedCoin.COMPANION,
+      coinCodegen.ValidatorRewardCoupon.COMPANION,
+      subsCodegen.Subscription.COMPANION,
+      subsCodegen.SubscriptionRequest.COMPANION,
+      transferOffersCodegen.AcceptedTransferOffer.COMPANION,
+      transferOffersCodegen.TransferOffer.COMPANION,
+      walletCodegen.AcceptedAppPayment.COMPANION,
+      walletCodegen.AppPaymentRequest.COMPANION,
+    )
   }
 
   case class Key(

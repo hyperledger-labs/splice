@@ -880,7 +880,7 @@ object SvSvcStore {
     )
   }
 
-  private val coinRulesFollowers: Seq[ConstrainedTemplate] = Seq[ConstrainedTemplate](
+  private[network] val coinRulesFollowers: Seq[ConstrainedTemplate] = Seq[ConstrainedTemplate](
     cc.round.OpenMiningRound.COMPANION,
     cc.round.SummarizingMiningRound.COMPANION,
     cc.round.IssuingMiningRound.COMPANION,
@@ -888,7 +888,9 @@ object SvSvcStore {
     cc.coin.FeaturedAppRight.COMPANION,
     cc.coin.SvcReward.COMPANION,
     cc.coin.UnclaimedReward.COMPANION,
+    cc.coinimport.ImportCrate.COMPANION,
     cc.validatorlicense.ValidatorLicense.COMPANION,
+    cn.svc.coinprice.CoinPriceVote.COMPANION,
   )
 
   private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =

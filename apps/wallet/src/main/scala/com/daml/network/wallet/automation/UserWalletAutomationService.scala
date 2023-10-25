@@ -1,7 +1,13 @@
 package com.daml.network.wallet.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{AssignTrigger, CNNodeAppAutomationService, UnassignTrigger}
+import com.daml.network.automation.{
+  AssignTrigger,
+  CNNodeAppAutomationService,
+  TransferFollowTrigger,
+  UnassignTrigger,
+}
+import TransferFollowTrigger.Task as FollowTask
 import UnassignTrigger.GetTargetDomain
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.config.AutomationConfig
@@ -14,7 +20,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class UserWalletAutomationService(
     store: UserWalletStore,
@@ -73,6 +79,23 @@ class UserWalletAutomationService(
   )
 
   registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.endUserParty))
+
+  registerTrigger(
+    new TransferFollowTrigger(
+      triggerContext,
+      store,
+      connection,
+      store.key.endUserParty,
+      implicit tc =>
+        scanConnection.getCoinRules() flatMap { coinRules =>
+          coinRules.toAssignedContract map { coinRules =>
+            store
+              .listLaggingCoinRulesFollowers(coinRules.domain)
+              .map(_ map (FollowTask(coinRules, _)))
+          } getOrElse Future.successful(Seq.empty)
+        },
+    )
+  )
 }
 
 object UserWalletAutomationService {
