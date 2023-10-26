@@ -51,10 +51,6 @@ ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to loc
 # that we could ignore.
 A security-sensitive error has been received.*TransactionProcessingSteps:participant=
 
-# TODO(#5705): remove once serial mismatches are no longer logged as WARN and a follow-up ERROR
-Topology evaluation failed with Txs failed.*Serial mismatch
-domain outbox flusher The domain.*failed the following topology transactions
-
 # TODO(#5706): investigate and remove once fixed
 MEDIATOR_INVALID_MESSAGE.*Received a mediator response.*with an unknown request id.*Discarding response
 

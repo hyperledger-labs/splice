@@ -512,7 +512,7 @@ class HttpSvHandler(
     logger.info("Querying sequencer domain state")
     for {
       _ <- addSequencerToTopologyState(sequencerAdminConnection, sequencerId)
-      // TODO(#5094) We need to generate a dummy transaction before generating the export
+      // We need to generate a dummy transaction before generating the export
       // to make sure that the new sequencer gets a sequencer counter that is included in the snapshot.
       // Note that for now we do the dummy transaction here independent of whether the sequencer has already been onboarded
       // in the topology state or not. We could crash after the topology update but before this and there doesn't seem to be a good way

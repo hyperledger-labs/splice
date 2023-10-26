@@ -527,15 +527,6 @@ object RetryProvider {
                     statusCode == Status.Code.INVALID_ARGUMENT && description.contains(
                       "An error occurred. Please contact the operator and inquire about the request"
                     ) ||
-                      // TODO(#6050) Remove me once Canton fixes this time-related issue or retries itself
-                      statusCode == Status.Code.INVALID_ARGUMENT && errorDetails.exists {
-                        case ed: ErrorDetails.ErrorInfoDetail =>
-                          ed.metadata
-                            .get("reason")
-                            .exists(_.contains("ContractConsistencyError"))
-                        case _ => false
-                      }
-                      ||
                       // This can happen if the party allocation has not yet been propagated to the new domain.
                       statusCode == Status.Code.INVALID_ARGUMENT &&
                       raw"No participant of the party .* has confirmation permission on both domains at respective timestamps".r
