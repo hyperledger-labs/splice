@@ -1510,8 +1510,17 @@ function _unlock() {
   kubectl delete secret cluster-lock > /dev/null
 }
 
+function _check_stateful_sets() {
+    # Checks if any StatefulSets EXCEPT those with a prometheus image (which are part of the infra stack)
+    # are currently deployed
+    # grep exits with return code 1 if it finds no matches so we account for that
+    query_result=$(kubectl get StatefulSets -A -o json 2> /dev/null | jq '.items[].spec.template.spec.containers[].image' |  { grep -v prometheus || test $? = 1; })
+    echo "$query_result"
+}
+
 function _check_reset_and_unlock() {
-    s=$(kubectl get StatefulSets -A --no-headers 2>/dev/null)
+    s=$(_check_stateful_sets)
+
     if [ -n "$s" ]; then
         echo -e "Cluster not reset, it is recommended to reset it before unlocking. Reset now?"
         read -r -p '[y/n]: '
@@ -1519,7 +1528,10 @@ function _check_reset_and_unlock() {
             _cluster_reset
             echo "Done resetting, unlocking.."
         fi
+    else
+        echo "Cluster does not need reset, unlocking.."
     fi
+
     _unlock
 }
 
