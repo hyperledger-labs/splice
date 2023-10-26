@@ -1428,6 +1428,14 @@ Network. Steps to do this are as follows:
         --role="${ii}"
    done
    ```
+13. Grant CircleCI's account permissions to read the `gcp-bucket-sa-key-secret` secret:
+
+   ```
+   gcloud projects add-iam-policy-binding ${CLOUDSDK_CORE_PROJECT} \
+      --member serviceAccount:circleci@${CLOUDSDK_CORE_PROJECT}.iam.gserviceaccount.com \
+      --role "roles/secretmanager.secretAccessor" \
+      --condition=title="SA key secret",expression='resource.name.endsWith("secrets/gcp-bucket-sa-key-secret/versions/1")'
+   ```
 
 ## Cluster Data Dumps
 
