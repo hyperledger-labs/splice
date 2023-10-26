@@ -19,7 +19,7 @@ import com.daml.network.sv.cometbft.{
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.{SetupUtil, SvcPartyHosting}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.{SvOnboardingToken, SvUtil, SvcRulesLock}
+import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -71,7 +71,6 @@ class JoiningNodeInitializer(
         SvSvAutomationService,
         SvSvcStore,
         SvSvcAutomationService,
-        SvcRulesLock,
     )
   ] = {
     val initConnection = ledgerClient.connection(
@@ -180,7 +179,6 @@ class JoiningNodeInitializer(
         }
       _ <- waitForSvcMembership(svcStore)
       _ <- SetupUtil.ensureSvcPartyMetadataAnnotation(svAutomation.connection, config, svcPartyId)
-      svcRulesLock = new SvcRulesLock(svcAutomation, loggerFactory, retryProvider)
       _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
         for {
           _ <- waitUntilCometBftNodeHasCaughtUp
@@ -209,7 +207,6 @@ class JoiningNodeInitializer(
         svAutomation,
         svcStore,
         svcAutomation,
-        svcRulesLock,
       )
     }
   }

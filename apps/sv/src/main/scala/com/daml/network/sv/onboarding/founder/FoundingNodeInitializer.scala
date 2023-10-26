@@ -19,7 +19,7 @@ import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, Sv
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
 import com.daml.network.sv.onboarding.{SetupUtil, SvcPartyHosting}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.{SvUtil, SvcRulesLock}
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
 import com.daml.network.util.{AssignedContract, GcpBucket, TemplateJsonDecoder, UploadablePackage}
@@ -92,7 +92,6 @@ class FoundingNodeInitializer(
         SvSvAutomationService,
         SvSvcStore,
         SvSvcAutomationService,
-        SvcRulesLock,
     )
   ] = {
     val initConnection = ledgerClient.connection(
@@ -179,7 +178,6 @@ class FoundingNodeInitializer(
       // for example if the founding SV node restarted after bootstrapping the SvcRules.
       // We only set the domain sequencer config if the existing one is different here.
       _ <- withSvcStore.reconcileSequencerConfigIfRequired(Some(localDomainNode))
-      svcRulesLock = new SvcRulesLock(svcAutomation, loggerFactory, retryProvider)
     } yield (
       globalDomain,
       svcPartyHosting,
@@ -187,7 +185,6 @@ class FoundingNodeInitializer(
       svAutomation,
       svcStore,
       svcAutomation,
-      svcRulesLock,
     )
   }
 

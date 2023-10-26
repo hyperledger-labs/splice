@@ -6,7 +6,10 @@ import cats.syntax.traverse.*
 import com.daml.network.config.CNThresholds
 import com.daml.network.config.CNThresholds.getPartyToParticipantThreshold
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
-import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
+import com.daml.network.environment.TopologyAdminConnection.{
+  AuthorizedStateChanged,
+  TopologyTransactionType,
+}
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
@@ -371,13 +374,14 @@ class TopologyAdminConnection(
     *
     *  This type of re-create of the topology transactions is required to ensure that updating the same topology state in parallel will eventually succeed for all the updates
     */
-  private def ensureTopologyMapping[M <: TopologyMappingX: ClassTag](
+  def ensureTopologyMapping[M <: TopologyMappingX: ClassTag](
       store: TopologyStoreId,
       description: String,
       check: => EitherT[Future, TopologyResult[M], TopologyResult[M]],
       update: M => Either[String, M],
       signedBy: Fingerprint,
       isProposal: Boolean = false,
+      recreateOnAuthorizedStateChange: Boolean = true,
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] =
     retryProvider.retryForAutomation(
       description,
@@ -405,8 +409,8 @@ class TopologyAdminConnection(
                         )
                     } else {
                       EitherT.leftT(
-                        new QuietNonRetryableException(
-                          "Base authorized state has changed, must be re-created."
+                        AuthorizedStateChanged(
+                          currentAuthorizedState.base.serial
                         )
                       )
                     }
@@ -415,8 +419,9 @@ class TopologyAdminConnection(
                 logger,
               )
             }
-            .recover { case ex: QuietNonRetryableException =>
-              throw Status.FAILED_PRECONDITION.withDescription(ex.getMessage).asRuntimeException()
+            .recover {
+              case ex: AuthorizedStateChanged if recreateOnAuthorizedStateChange =>
+                throw Status.FAILED_PRECONDITION.withDescription(ex.getMessage).asRuntimeException()
             }
         },
         Future.successful,
@@ -499,44 +504,6 @@ class TopologyAdminConnection(
       TopologyStoreId.DomainStore(domainId),
       show"Party $party is proposed on $newParticipant",
       queryType => findPartyToParticipant(queryType),
-      previous =>
-        Right(
-          previous.copy(
-            participants = HostingParticipant(
-              newParticipant,
-              ParticipantPermissionX.Submission,
-            ) +: previous.participants,
-            threshold = getPartyToParticipantThreshold(
-              svcRulesMembersSize,
-              previous.participants.length,
-            ),
-          )
-        ),
-      signedBy,
-    )
-  }
-
-  // TODO(#7884): handle threshold update for sv off-boarding
-  def ensurePartyToParticipant(
-      domainId: DomainId,
-      party: PartyId,
-      newParticipant: ParticipantId,
-      signedBy: Fingerprint,
-      svcRulesMembersSize: Int,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] = {
-    ensureTopologyMapping[PartyToParticipantX](
-      TopologyStoreId.DomainStore(domainId),
-      show"Party $party is authorized on $newParticipant",
-      EitherT(
-        getPartyToParticipant(domainId, party).map(result =>
-          Either.cond(
-            result.mapping.participants
-              .exists(hosting => hosting.participantId == newParticipant),
-            result,
-            result,
-          )
-        )
-      ),
       previous =>
         Right(
           previous.copy(
@@ -861,6 +828,9 @@ object TopologyAdminConnection {
     }
 
   }
+
+  final case class AuthorizedStateChanged(baseSerial: PositiveInt)
+      extends QuietNonRetryableException(s"Authorized state changed, new base serial $baseSerial")
 
   def proposeCollectively[T <: TopologyMappingX](
       connections: NonEmpty[List[TopologyAdminConnection]]

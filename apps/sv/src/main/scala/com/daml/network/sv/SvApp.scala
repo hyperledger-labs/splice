@@ -203,7 +203,6 @@ class SvApp(
           svAutomation,
           svcStore,
           svcAutomation,
-          svcRulesLock,
         ),
         foundingConfig,
       ) <-
@@ -332,7 +331,6 @@ class SvApp(
           svAutomation,
           svcAutomation,
           participantAdminConnection,
-          svcRulesLock,
           retryProvider,
           svcPartyHosting,
           loggerFactory,

@@ -1,27 +1,16 @@
 package com.daml.network.sv.onboarding.sponsor
 
-import cats.data.{EitherT, OptionT}
+import cats.data.EitherT
 import cats.syntax.foldable.*
 import com.daml.error.utils.ErrorDetails
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.config.CNThresholds
-import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AllProposals
-import com.daml.network.environment.{
-  ParticipantAdminConnection,
-  RetryProvider,
-  TopologyAdminConnection,
-}
+import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.onboarding.SvcPartyHosting
-import com.daml.network.sv.onboarding.SvcPartyHosting.{
-  RequiredProposalNotFound,
-  SvcPartyMigrationFailure,
-}
+import com.daml.network.sv.onboarding.SvcPartyHosting.SvcPartyMigrationFailure
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.SvcRulesLock
 import com.digitalasset.canton.LfTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.transaction.PartyToParticipantX
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -36,7 +25,6 @@ class SvcPartyMigration(
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     participantAdminConnection: ParticipantAdminConnection,
-    svcRulesLock: SvcRulesLock,
     retryProvider: RetryProvider,
     svcPartyHosting: SvcPartyHosting,
     protected val loggerFactory: NamedLoggerFactory,
@@ -58,82 +46,25 @@ class SvcPartyMigration(
       participantId: ParticipantId
   )(implicit tc: TraceContext): EitherT[Future, SvcPartyMigrationFailure, ByteString] = {
     logger.info(s"Sponsor SV authorizing svc party to participant $participantId")
-    // As a work around to #3933, prevent participant from crashing when authorization transaction is being processed
-    // TODO(#3933): we can remove this when canton team has completed a proper fix to #3933
-    svcRulesLock
-      .withLock(s"authorizing SVC party to participant $participantId")(
-        for {
-          svcRules <- EitherT.liftF(svcStore.getSvcRules())
-          svcMembersSize = svcRules.payload.members.size()
-          acsBytes <- validateProposalForNewMember(participantId, svcMembersSize)
-            .semiflatMap { _ =>
-              for {
-                ourParticipant <- participantAdminConnection.getParticipantId()
-                // this will wait until the PartyToParticipant state change completed
-                authorizedAt <- partyHosting
-                  .authorizeSvcPartyToParticipant(
-                    globalDomain,
-                    participantId,
-                    svcMembersSize,
-                    ourParticipant.uid.namespace.fingerprint,
-                  )
-                _ = logger.info(
-                  s"SVC party was authorized on $participantId, downloading snapshot at time $authorizedAt."
-                )
-                acsBytes <- downloadSnapshotFromTime(authorizedAt)
-              } yield acsBytes
-            }
-        } yield {
-          acsBytes
-        }
+    for {
+      svcRules <- EitherT.liftF(svcStore.getSvcRules())
+      svcMembersSize = svcRules.payload.members.size()
+      ourParticipant <- EitherT.liftF(participantAdminConnection.getParticipantId())
+      // this will wait until the PartyToParticipant state change completed
+      authorizedAt <- partyHosting
+        .authorizeSvcPartyToParticipant(
+          globalDomain,
+          participantId,
+          svcMembersSize,
+          ourParticipant.uid.namespace.fingerprint,
+        )
+      _ = logger.info(
+        s"SVC party was authorized on $participantId, downloading snapshot at time $authorizedAt."
       )
-  }
-
-  private def validateProposalForNewMember(
-      participantId: ParticipantId,
-      svcMembersSize: Int,
-  )(implicit tc: TraceContext): EitherT[
-    Future,
-    SvcPartyMigrationFailure,
-    TopologyAdminConnection.TopologyResult[PartyToParticipantX],
-  ] = {
-    val partyToParticipantAcceptedState =
-      participantAdminConnection.getPartyToParticipant(globalDomain, svcParty)
-    OptionT(
-      participantAdminConnection
-        .listPartyToParticipant(
-          globalDomain.filterString,
-          filterParty = svcParty.filterString,
-          proposals = AllProposals,
-        )
-        .flatMap { proposals =>
-          partyToParticipantAcceptedState
-            .map(acceptedState =>
-              CNThresholds.getPartyToParticipantThreshold(
-                svcMembersSize,
-                acceptedState.mapping.participantIds.size,
-              )
-            )
-            .map { expectedThreshold =>
-              proposals.find(proposal =>
-                proposal.mapping.participantIds
-                  .contains(participantId) && proposal.mapping.threshold == expectedThreshold
-              )
-            }
-        }
-    )
-      .orElse(OptionT.liftF(partyToParticipantAcceptedState).filter { partyToParticipant =>
-        partyToParticipant.mapping.participantIds.contains(
-          participantId
-        )
-      })
-      .toRightF {
-        partyToParticipantAcceptedState.map { partyToParticipant =>
-          RequiredProposalNotFound(
-            partyToParticipant.base.serial
-          )
-        }
-      }
+      acsBytes <- EitherT.liftF(downloadSnapshotFromTime(authorizedAt))
+    } yield {
+      acsBytes
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
