@@ -1697,6 +1697,7 @@
           "keysSecret": "",
           "p2pPort": 26656,
           "privateKey": "/7L74Bs18740fTPdEL04BeO2Gs+1lzEeCjAiB1DYcysmLnU1FAkg/Ho9XsOiIp4U/KT/YNrtIi/A0prm/Ew3eQ==",
+          "retainBlocks": 0,
           "rpcPort": 26657,
           "validator": {
             "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
@@ -2647,6 +2648,7 @@
           "keysSecret": "",
           "p2pPort": 26656,
           "privateKey": "1Je33z2g+Dj2UWLqnsO+xwUwbalIS0LLcYAoj+fYuEE2le4kJjJ0h+L7FfVg+3mbgvrikdke91I2X5C2frj0Eg==",
+          "retainBlocks": 0,
           "rpcPort": 26657,
           "validator": {
             "keyAddress": "04A57312179F1E0C93B868779EE4C7FAC41666F0",
@@ -3490,6 +3492,7 @@
           "keysSecret": "",
           "p2pPort": 26656,
           "privateKey": "DdbW/buPo4TXxW+/cvQxp5Lh1BZyH5GYHGoU0uTUQA/S1oZ32DDu1+CZhtrZhqEFMuxPlXVXvyvXsZLBdCkgdQ==",
+          "retainBlocks": 0,
           "rpcPort": 26657,
           "validator": {
             "keyAddress": "FFF137F42421B0257CDC8B2E41F777B81A081E80",
@@ -4259,6 +4262,7 @@
           "keysSecret": "",
           "p2pPort": 26656,
           "privateKey": "xMB8gnYbacyZqU94cgwJBK2OJO3DffO12uHgeieotVj/Q9LbZEwLue9GnG8+G5GNRDgX8z75txr/Z541Uqyb3A==",
+          "retainBlocks": 10000,
           "rpcPort": 26657,
           "validator": {
             "keyAddress": "DE36D23DE022948A11200ABB9EE07F049D17D903",

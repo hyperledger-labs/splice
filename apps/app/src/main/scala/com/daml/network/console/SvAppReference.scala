@@ -77,6 +77,12 @@ abstract class SvAppReference(
       httpCommand(HttpSvAppClient.GetCometBftNodeStatus())
     }
 
+  @Help.Summary("Get the CometBFT node dump")
+  def cometBftNodeDebugDump(): definitions.CometBftNodeDumpResponse =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAdminAppClient.GetCometBftNodeDump())
+    }
+
   def onboardSvPartyMigrationAuthorize(
       participantId: ParticipantId,
       candidateParty: PartyId,
@@ -105,14 +111,17 @@ abstract class SvAppReference(
     }
 }
 
-class SvAppClientReference(
+final case class SvAppClientReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
-    name: String,
+    override val name: String,
     val config: SvAppClientConfig,
+    override val token: Option[String] = None,
 ) extends SvAppReference(consoleEnvironment, name)
     with BaseInspection[ParticipantNode] {
 
   override def httpClientConfig = config.adminApi
+
+  override protected val instanceType = "SV Client"
 
 }
 

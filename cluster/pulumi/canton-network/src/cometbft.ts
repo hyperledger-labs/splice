@@ -69,6 +69,7 @@ const nodeConfigs: {
     privateKey:
       'xMB8gnYbacyZqU94cgwJBK2OJO3DffO12uHgeieotVj/Q9LbZEwLue9GnG8+G5GNRDgX8z75txr/Z541Uqyb3A==',
     identifier: 'cometbft-sv-4',
+    retainBlocks: 10000, // sv4 is for now the only sv to prune its data.
     externalAddress: p2pExternalAddress(26686),
     istioPort: 26686,
     validator: {
@@ -157,6 +158,7 @@ type NodeConfig = {
   istioPort: number;
   externalAddress: string;
   identifier: string;
+  retainBlocks?: number;
   id: Output<string> | string;
 };
 

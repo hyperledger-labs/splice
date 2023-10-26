@@ -485,4 +485,25 @@ max_open_connections = 3
 
 # Instrumentation namespace
 namespace = "cometbft"
+
+# pruning - abci configuration options
+[abci_configuration_options]
+
+# Number of blocks that should be retained in memory at all time, anything older than this value will be locally pruned,
+# unless retainReq have been configured with a rpc call.
+# 0 - keep all blocks.
+
+# current strategy:
+# enable it only on devnet for testing purposes
+{{- if .Values.isDevNet }}
+retain_blocks = {{ $.Values.node.retainBlocks }}
+{{- else }}
+retain_blocks = 0
+{{- end }}
+
+# Interval in which a new snapshot should be generated, in order to assist new peers to fast sync.
+# A value below 1000 is not recommended.
+# The snapshot is taken about every 20 minutes
+snapshot_height_delta = {{ $.Values.stateSync.minTrustHeightAge }}
+
 {{- end }}

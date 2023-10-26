@@ -43,6 +43,8 @@ node:
   rpcPort: 26657
   # Identifier used to prefix created resources and as part of the optional Istio ingress
   identifier:
+  # Number of blocks to keep, used for pruning. 0 -> keep all blocks.
+  retainBlocks: 0
   # URL that can be used by other nodes to access the p2p port of the node.
   # Must be set in the format <host>:<port>
   externalAddress: ""
