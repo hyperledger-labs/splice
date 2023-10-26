@@ -54,7 +54,6 @@
   - [Participant Admin User Configuration](#participant-admin-user-configuration)
   - [Token configuration](#token-configuration)
   - [Testing the SV Helm Runbook](#testing-the-sv-helm-runbook)
-  - [Testing the SV Helm Runbook against a local build manually](#testing-the-sv-helm-runbook-against-a-local-build-manually)
   - [SV Operations](#sv-operations)
     - [Approving new SVs](#approving-new-svs)
       - [Approving via SV API](#approving-via-sv-api)
@@ -1193,7 +1192,7 @@ cncluster update_secrets
 The [sv-runbook](./cluster/pulumi/sv-runbook) pulumi script reproduces the steps of the
 [SV runbook for Helm deployment](./cluster/images/docs/src/sv_operator/sv_helm.rst).
 It can be used to mimick a customer SV deployment, and can use the charts and images
-from the artifactory (as published for versions deployed to DevNet&TestNet), or those built locally.
+from Artifactory (as published for versions deployed to DevNet & TestNet), or those built locally.
 
 To build the required artifacts from your current local repo:
 
@@ -1204,91 +1203,25 @@ To build the required artifacts from your current local repo:
 The Pulumi script depends on the following env variables to be defined
 (e.g. by exporting them from your `.envrc.private`):
 
-- `AUTH0_DOMAIN`: please use our sv-test domain: `canton-network-sv-test.us.auth0.com`
-- `AUTH0_CLIENT_ID`: management client id of the sv-test domain, as obtained from https://manage.auth0.com/dashboard/us/canton-network-sv-test/apis/644fdcbfd1cecaff1c09e136/test
-- `AUTH0_CLIENT_SECRET`: management secret of the sv-test domain, as obtained from https://manage.auth0.com/dashboard/us/canton-network-sv-test/apis/644fdcbfd1cecaff1c09e136/test
+- `AUTH0_SV_MANAGEMENT_API_CLIENT_ID`: management client id of the sv-test domain, as obtained from https://manage.auth0.com/dashboard/us/canton-network-sv-test/apis/644fdcbfd1cecaff1c09e136/test
+- `AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET`: management secret of the sv-test domain, as obtained from https://manage.auth0.com/dashboard/us/canton-network-sv-test/apis/644fdcbfd1cecaff1c09e136/test
 - `ARTIFACTORY_USER`: your username at digitalasset.jfrog.io (can be seen in the top-right corner after logging in with Google SSO)
 - `ARTIFACTORY_PASSWORD`: Your identity token at digitalasset.jfrog.io (can be obtained by generating an identity token in your user profile)
 
 
-To deploy the SV node following the runbook, cd to the scratchnet directory you wish to use, lock it, and run:
+To deploy the SV node following the runbook, cd to the scratchnet directory you wish to use, lock the cluster with `cncluster lock`, and run:
 
-`cncluster papply_sv <cluster running the global domain> [<artifactory charts version>]`
+`cncluster apply_sv <cluster running the global domain> [<artifactory charts version>]`
 
 By default, Pulumi will be using the charts and images as built locally and pushed to the dev artifactory using the `make` commands above.
 It also supports deploying a version based on externally released artifacts, the ones customers use
 by specifying their version in the `<artifactory charts version>` argument.
 
-Once everything is up and running, you should be able to e.g. browse to the SV wallet at `https://wallet.sv.svc.sv.network.canton.global`.
+Once everything is up and running, you should be able to e.g. browse to the SV wallet at `https://wallet.sv.svc.<CLUSTER_BASENAME>.network.canton.global`, where CLUSTER_BASENAME depends on the scratchnet you deployed to (`scratcha` for `scratchneta` and so on)
 
 To bring the deployment down, run:
 
 `cncluster pdown_sv`
-
-
-## Testing the SV Helm Runbook against a local build manually
-
-If you wish to follow the SV runbook for Helm deployment manually, rather than through the Pulumi step, and use locally built resources:
-
-When working against a local cluster, you can skip all the artifactory
-setup in the runbook. We will instead be using docker images from
-gcloud and local helm charts.
-
-1. Lock the scratchnet cluster you want to use for testing using `cncluster lock`. Reset it if it's not empty already.
-2. Create a file called `scratch.yaml` with the following content:
-
-   ```
-   imageRepo: "us-central1-docker.pkg.dev/da-cn-images/cn-images"
-   cluster:
-     fixedTokens: true
-   ```
-
-   This will configure Helm to fetch docker images from GCP and enable
-   the fixed token mode which is used for all scratchnet clusters.
-3. Run `make docker-push -j` to push docker images to GCP.
-   Note that this does an incremental build. If things break, you can force a full rebuild by first running `make clean`.
-4. Run `make cluster/helm/build` to build the Helm charts. You will need to rerun this every time you modify the helm charts.
-5. Following the runbook, create `participant-values.yaml`,
-   `validator-values.yaml` and `sv-values.yaml`. Replace
-   `TARGET_CLUSTER` with the cluster you are testing against. Note
-   that this is not the cluster you locked before, that will only
-   contain your own SV node. You need a cluster that contains
-   everything else. This cluster needs to run a compatible
-   version. Often you can use staging or devnet for this. If that does
-   not work, you may need to lock another scratchnet and go through
-   the usual `cncluster apply` flow.  Use the following SV name, private and
-   public key in `sv-values.yaml`:
-   ```
-   # SV identity for manual tests
-   name = "DA-Test-Node"
-   public-key = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7uz+zW1YcPJIl+TKqXv6/dfxcx+3ISVFgP6m2saeQ0l6r2lNW+WLfq+HUMcycxX9t6bUJ5kyEebYyfk9JW18KA=="
-   private-key = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgdRTS3iLr8rPFaLUBbVcu8qYxklmMzQo/4UXcULYESm2hRANCAATu7P7NbVhw8kiX5Mqpe/r91/FzH7chJUWA/qbaxp5DSXqvaU1b5Yt+r4dQxzJzFf23ptQnmTIR5tjJ+T0lbXwo"
-   ```
-   Use either of the user ids from
-   [our list of passwords](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit?ouid=103930368588823687273&usp=docs_home&ths=true)
-   as the `validator_wallet_user` in `validator-values.yaml` Use
-   `https://canton.network.global` as the audience and
-   `https://canton-network-dev.us.auth0.com/.well-known/jwks.json` as
-   the JWKS url in `validator-values.yaml`.
-6. Once you created the config files, you can run the `helm install` commands from the runbook. Instead of specifying the artifactory repo, specify the path
-   to the local tarball created by `make cluster/helm/build`, by adding `-f scratch.yaml` to overwrite all docker images repo and omit `--version`.
-   So `helm install participant canton-network-helm/cn-participant -n svc --version ${CHART_VERSION} -f participant-values.yaml`
-   becomes `helm install participant $REPO_ROOT/cluster/helm/target/cn-participant-*.tgz -n svc -f participant-values.yaml -f scratch.yaml`.
-7. If you made a change, uninstall the chart first, e.g., `helm
-   uninstall participant -n svc --wait`.
-   * Note the `--wait` which is useful if you intend to reinstall the chart, to make sure things are cleaned up before recreated. This is especially important for the ingress chart.
-   * Note that uninstall postgres does
-   not delete the persistent volume so in that case run `kubectl
-   delete pvc -A --all`.
-8. For the ingress, create `ingress-values.yaml` with the content from the runbook and then extend it with
-   ```
-   cluster:
-    # existing cluster section stays here
-    basename: YOUR_SCRATCHNET # e.g.. scratchb
-    ipAddress: "34.171.136.234" # ip address of the cluster as output by `cncluster ipaddr`
-   ```
-   cert-manager will already be setup so no need to do anything about that.
-9. You can reach the ingress at the usual address of you scratchnet, e.g., `https://scratchb.network.canton.global` or `https://sv.sv-1.svc.scratchb.network.canton.global`.
 
 ## SV Operations
 
