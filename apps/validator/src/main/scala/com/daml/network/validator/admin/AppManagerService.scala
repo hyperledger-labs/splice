@@ -2,7 +2,11 @@ package com.daml.network.validator.admin
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection}
+import com.daml.network.environment.{
+  CNLedgerConnection,
+  CommandPriority,
+  ParticipantAdminConnection,
+}
 import io.circe.parser.decode
 import com.daml.network.environment.RetryFor
 import com.daml.network.http.v0.definitions
@@ -43,6 +47,7 @@ class AppManagerService(
       configuration: AppConfiguration,
       release: java.io.File,
       retryFor: RetryFor,
+      priority: CommandPriority = CommandPriority.Low,
   )(implicit
       tc: TraceContext
   ): Future[Unit] = {
@@ -68,23 +73,30 @@ class AppManagerService(
         Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
         participantAdminConnection,
       )
-      _ <- storeAppRelease(providerPartyId, release, retryFor)
+      _ <- storeAppRelease(providerPartyId, release, retryFor, priority)
       _ <- store.storeAppConfiguration(
         AppManagerStore.AppConfiguration(
           providerPartyId,
           configuration,
-        )
+        ),
+        priority,
       )
       _ <- store.storeRegisteredApp(
         AppManagerStore.RegisteredApp(
           providerPartyId,
           configuration,
-        )
+        ),
+        priority,
       )
     } yield ()
   }
 
-  def storeAppRelease(provider: PartyId, release: java.io.File, retryFor: RetryFor)(implicit
+  def storeAppRelease(
+      provider: PartyId,
+      release: java.io.File,
+      retryFor: RetryFor,
+      priority: CommandPriority = CommandPriority.Low,
+  )(implicit
       tc: TraceContext
   ): Future[Unit] =
     for {
@@ -102,7 +114,8 @@ class AppManagerService(
             releaseManifest.version,
             dars.map(_._2.toHexString).toVector,
           ),
-        )
+        ),
+        priority,
       )
     } yield ()
 

@@ -198,6 +198,7 @@ class ValidatorApp(
           participantAdminConnection,
           retryProvider,
           logger,
+          CommandPriority.High,
         )
     } yield {
       logger.info(
@@ -440,6 +441,15 @@ class ValidatorApp(
         retryProvider,
         loggerFactory,
       )
+
+      // Register the traffic balance service
+      trafficBalanceService = newTrafficBalanceService(participantAdminConnection, scanConnection)
+      _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
+
+      // All ledger commands submitted by the validator party past this point during initialization
+      // must have their priority set as CommandPriority.High to ensure that they are not blocked by
+      // the traffic balance service while the first top-up for the validator is yet to go through.
+
       svcParty <- scanConnection.getSvcPartyIdWithRetries()
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
@@ -509,6 +519,7 @@ class ValidatorApp(
         automation.connection,
         retryProvider,
         logger,
+        CommandPriority.High,
       )
       _ <- ValidatorUtil.onboard(
         endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
@@ -520,15 +531,9 @@ class ValidatorApp(
         participantAdminConnection,
         retryProvider,
         logger,
+        CommandPriority.High,
       )
       _ <- ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
-
-      // We're registering the trafficBalanceService on the LedgerClient after the validator has been onboarded
-      // (in particular after the validator's wallet has been installed) because the top-up trigger relies on
-      // the validator's WalletAppInstall contract to submit the top-up transaction and we do not want the wallet
-      // installation or other validator onboarding steps to be throttled by the balance check.
-      trafficBalanceService = newTrafficBalanceService(participantAdminConnection, scanConnection)
-      _ = ledgerClient.registerTrafficBalanceService(trafficBalanceService)
 
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
@@ -608,6 +613,7 @@ class ValidatorApp(
                 app.config,
                 new java.io.File(app.releaseFile),
                 RetryFor.WaitingOnInitDependency,
+                CommandPriority.High,
               )
             }
             // TODO (#7458): use the endpoint implemented in #7516

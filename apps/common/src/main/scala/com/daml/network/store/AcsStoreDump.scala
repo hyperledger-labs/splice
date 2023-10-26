@@ -6,7 +6,7 @@ import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.lf.data.Ref
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_ValidatorLicense
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.{
@@ -120,6 +120,7 @@ object AcsStoreDump {
       ledgerConnection: CNLedgerConnection,
       retryProvider: RetryProvider,
       logger: TracedLogger,
+      priority: CommandPriority = CommandPriority.Low,
   )(implicit
       ec: ExecutionContext
   ): Future[Done] = TraceContext.withNewTraceContext(implicit tc => {
@@ -140,6 +141,7 @@ object AcsStoreDump {
                   shipment.openRound.contractId,
                 )
               ),
+              priority = priority,
             )
             .withDomainId(
               shipment.openRound.domain,

@@ -16,7 +16,13 @@ import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.codegen.java.da.set.types.Set as DamlSet
-import com.daml.network.environment.{CNLedgerConnection, DarResource, DarResources, RetryProvider}
+import com.daml.network.environment.{
+  CNLedgerConnection,
+  CommandPriority,
+  DarResource,
+  DarResources,
+  RetryProvider,
+}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
@@ -104,6 +110,7 @@ object CNNodeUtil {
           Option[ContractWithState[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]
         ]
       ],
+      priority: CommandPriority = CommandPriority.Low,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
     retryProvider.retryForClientCalls(
       "createValidatorRight",
@@ -114,6 +121,7 @@ object CNNodeUtil {
               actAs = Seq(validator, user),
               readAs = Seq.empty,
               createValidatorRightCommand(svc, validator, user),
+              priority = priority,
             )
             .withDedup(
               commandId = CNLedgerConnection

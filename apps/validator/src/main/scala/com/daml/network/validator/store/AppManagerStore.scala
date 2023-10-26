@@ -3,7 +3,7 @@ package com.daml.network.validator.store
 import akka.http.scaladsl.model.Uri
 import cats.syntax.either.*
 import com.daml.network.codegen.java.cn.appmanager.store as codegen
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}
 import com.daml.network.http.v0.definitions
 import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
 import com.daml.network.store.CNNodeAppStoreWithIngestion
@@ -42,7 +42,9 @@ final class AppManagerStore(
   private val connection = storeWithIngestion.connection
   private val validator = store.key.validatorParty
 
-  def storeAppRelease(release: AppRelease)(implicit tc: TraceContext): Future[Unit] =
+  def storeAppRelease(release: AppRelease, priority: CommandPriority = CommandPriority.Low)(implicit
+      tc: TraceContext
+  ): Future[Unit] =
     idempotentCreate(
       show"app release for ${release.provider} in version ${release.release.version}",
       store
@@ -58,9 +60,13 @@ final class AppManagerStore(
         release.release.version,
         release.release.asJson.noSpaces,
       ),
+      priority,
     )
 
-  def storeAppConfiguration(configuration: AppConfiguration)(implicit
+  def storeAppConfiguration(
+      configuration: AppConfiguration,
+      priority: CommandPriority = CommandPriority.Low,
+  )(implicit
       tc: TraceContext
   ): Future[Unit] =
     idempotentCreate(
@@ -78,9 +84,13 @@ final class AppManagerStore(
         configuration.configuration.version,
         configuration.configuration.asJson.noSpaces,
       ),
+      priority,
     )
 
-  def storeRegisteredApp(registered: RegisteredApp)(implicit tc: TraceContext): Future[Unit] =
+  def storeRegisteredApp(
+      registered: RegisteredApp,
+      priority: CommandPriority = CommandPriority.Low,
+  )(implicit tc: TraceContext): Future[Unit] =
     idempotentCreate(
       show"registered app ${registered.provider}",
       store.lookupRegisteredApp(registered.provider),
@@ -92,6 +102,7 @@ final class AppManagerStore(
         validator.toProtoPrimitive,
         registered.provider.toProtoPrimitive,
       ),
+      priority,
     )
 
   def storeInstalledApp(installed: InstalledApp)(implicit tc: TraceContext): Future[Unit] =
@@ -139,6 +150,7 @@ final class AppManagerStore(
       lookup: => Future[QueryResult[Option[ContractWithState[TCid, T]]]],
       commandId: CNLedgerConnection.CommandId,
       payload: T,
+      priority: CommandPriority = CommandPriority.Low,
   )(implicit tc: TraceContext): Future[Unit] =
     retryProvider
       .retryForClientCalls(
@@ -156,6 +168,7 @@ final class AppManagerStore(
                   actAs = Seq(validator),
                   readAs = Seq(validator),
                   update = payload.create,
+                  priority = priority,
                 )
                 .withDomainId(domain)
                 .withDedup(

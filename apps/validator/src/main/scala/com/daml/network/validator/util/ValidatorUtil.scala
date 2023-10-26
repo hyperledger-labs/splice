@@ -1,7 +1,12 @@
 package com.daml.network.validator.util
 
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
-import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{
+  CNLedgerConnection,
+  CommandPriority,
+  ParticipantAdminConnection,
+  RetryProvider,
+}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
@@ -26,6 +31,7 @@ private[validator] object ValidatorUtil {
       domainId: DomainId,
       retryProvider: RetryProvider,
       logger: TracedLogger,
+      priority: CommandPriority,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -49,6 +55,7 @@ private[validator] object ValidatorUtil {
                   endUserName,
                   endUserParty.toProtoPrimitive,
                 ).create,
+                priority,
               )
               .withDedup(
                 commandId = CNLedgerConnection
@@ -79,6 +86,7 @@ private[validator] object ValidatorUtil {
       participantAdminConnection: ParticipantAdminConnection,
       retryProvider: RetryProvider,
       logger: TracedLogger,
+      priority: CommandPriority = CommandPriority.Low,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[PartyId] = {
     val store = storeWithIngestion.store
     for {
@@ -111,6 +119,7 @@ private[validator] object ValidatorUtil {
         domainId = domainId,
         retryProvider = retryProvider,
         logger = logger,
+        priority = priority,
       )
       // Create validator right contract so validator can collect validator rewards
       _ <- CNNodeUtil.createValidatorRight(
@@ -123,6 +132,7 @@ private[validator] object ValidatorUtil {
         domainId = domainId,
         retryProvider = retryProvider,
         logger = logger,
+        priority = priority,
       )
     } yield userPartyId
   }
