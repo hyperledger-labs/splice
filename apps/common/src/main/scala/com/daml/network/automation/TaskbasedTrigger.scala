@@ -3,6 +3,8 @@ package com.daml.network.automation
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.daml.network.environment.RetryFor
+import com.daml.network.environment.RetryProvider.RetryableConditions
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -65,10 +67,12 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
 
       logger.info(show"Processing\n$task")
       context.retryProvider
-        .retryForAutomation(
+        .retry(
+          RetryFor.Automation,
           "processTaskWithRetry",
           processTaskWithStalenessCheck(),
           logger,
+          additionalRetryableConditions,
         )
         .transform {
           case Success(taskOutcomeE) =>
@@ -104,5 +108,7 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
         }
     }
   }
+
+  private[automation] def additionalRetryableConditions: RetryableConditions = Map.empty
 
 }

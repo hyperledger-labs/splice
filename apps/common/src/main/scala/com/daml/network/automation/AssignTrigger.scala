@@ -50,4 +50,19 @@ class AssignTrigger(
           )
         }
     } yield TaskSuccess(outcome)
+
+  private[automation] override final def additionalRetryableConditions = {
+    import io.grpc.Status
+    import com.daml.error.ErrorCategory.InvalidIndependentOfSystemState
+    import com.daml.network.environment.RetryProvider.Condition
+    /*
+    targeting this error, for which we want to retry (see #8267):
+    category=Some(InvalidIndependentOfSystemState)
+    statusCode=INVALID_ARGUMENT
+    description=INVALID_ARGUMENT(8,dd8e5b92): The submitted command has invalid arguments: Cannot find transfer data for transfer `TransferId(ts = 1970-01-01T00:05:21.000023Z, source = global-domain::1220f64a394b...)`: transfer already completed
+    ErrorInfoDetail(INVALID_ARGUMENT,Map(participant -> sv1Participant, tid -> dd8e5b92b8bd27f79ba97e75c3e8ceb6, category -> 8, definite_answer -> false))
+    RequestInfoDetail(dd8e5b92b8bd27f79ba97e75c3e8ceb6) io.grpc.StatusRuntimeException: INVALID_ARGUMENT: INVALID_ARGUMENT(8,dd8e5b92): The submitted command has invalid arguments: Cannot find transfer data for transfer `TransferId(ts = 1970-01-01T00:05:21.000023Z, source = global-domain::1220f64a394b...)`: transfer already completed
+     */
+    Map(Status.Code.INVALID_ARGUMENT -> Condition.Category(InvalidIndependentOfSystemState))
+  }
 }

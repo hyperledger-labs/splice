@@ -73,6 +73,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
   private val retryable = RetryProvider.RetryableError(
     "pollingTriggerTask",
     Seq.empty,
+    Map.empty,
     "transient",
     "non-transient",
     s"restarting after ${context.config.pollingInterval}",

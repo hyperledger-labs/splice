@@ -429,12 +429,28 @@ object RetryProvider {
     new RetryProvider(loggerFactory, timeouts, futureSupervisor, metricsFactory)
   }
 
+  type RetryableConditions = Map[Status.Code, Condition]
+
+  sealed abstract class Condition {
+    import Condition.*
+    final def matches(category: Option[ErrorCategory]): Boolean = this match {
+      case Category(cat) => category contains cat
+      case All => true
+    }
+  }
+
+  object Condition {
+    case object All extends Condition
+    final case class Category(cat: ErrorCategory) extends Condition
+  }
+
   /** @param additionalCodes Additional gRPC status codes on which we can retry the given call,
     *                        since we know that an external process is changing the system state.
     */
   case class RetryableError(
       operationName: String,
       additionalCodes: Seq[Status.Code],
+      additionalConditions: RetryableConditions,
       transientDescription: String,
       nonTransientDescription: String,
       fatalBehavior: String,
@@ -552,7 +568,11 @@ object RetryProvider {
                       // by toxiproxy (or a like network condition). See #4256 for details.
                       (statusCode == Status.Code.UNKNOWN && description.contains(
                         "channel closed"
-                      ))
+                      )) ||
+                      // additional codes subject to conditions
+                      additionalConditions
+                        .get(statusCode)
+                        .exists(_.matches(errorCategory))
                   ) =>
               val msg = Seq(
                 s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): ${ex.getMessage}",
@@ -660,12 +680,30 @@ object RetryProvider {
       ) = RetryProvider.RetryableError(
         operationName,
         additionalCodes,
+        Map.empty,
         transientDescription,
         nonTransientDescription,
         fatalBehavior,
         metricsFactory,
       )
     }
+
+    implicit val mapCodeConditions: Retryable[RetryableConditions] =
+      new Retryable[RetryableConditions] {
+        override def apply(
+            operationName: String,
+            additionalConditions: RetryableConditions,
+            metricsFactory: LabeledMetricsFactory,
+        ) = RetryProvider.RetryableError(
+          operationName,
+          Seq.empty,
+          additionalConditions,
+          transientDescription,
+          nonTransientDescription,
+          fatalBehavior,
+          metricsFactory,
+        )
+      }
   }
 
   /** A mixin that always derives `#timeouts` from `#retryProvider`, thus
