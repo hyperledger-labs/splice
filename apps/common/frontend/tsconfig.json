@@ -5,5 +5,6 @@
     "outDir": "lib",
     "isolatedModules": false,
     "types": ["node", "vite/client"]
-  }
+  },
+  "include": ["src"]
 }
