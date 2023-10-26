@@ -13,7 +13,6 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRules_ConfirmSvOnboarding}
 import com.daml.network.console.SvAppBackendReference
-import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardingStatus
 import com.daml.network.sv.util.SvOnboardingToken
@@ -27,10 +26,6 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.Random
-
-class InMemorySvOnboardingIntegrationTest extends SvOnboardingIntegrationTest {
-  registerPlugin(new UseInMemoryStores(loggerFactory))
-}
 
 class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
 
