@@ -58,7 +58,7 @@ trait AcsQueries extends AcsJdbcTypes {
           <<[Json],
           <<[Json],
           <<[Timestamp],
-          <<[Option[String]],
+          <<[String],
           <<[Array[Byte]],
           <<[Option[Timestamp]],
         )
@@ -157,6 +157,7 @@ trait AcsQueries extends AcsJdbcTypes {
       storeIdFromAcsRow.map { storeId =>
         AcsQueries.SelectFromAcsTableResult(
           storeId,
+          pp.<<,
           pp.<<,
           pp.<<,
           pp.<<,
@@ -296,24 +297,7 @@ trait AcsQueries extends AcsJdbcTypes {
       companionClass: ContractCompanion[C, TCId, T],
       decoder: TemplateJsonDecoder,
   ): Contract[TCId, T] = {
-    companionClass
-      .fromJson(companion)(
-        new Identifier(
-          row.templateIdPackageId,
-          row.templateIdQualifiedName.moduleName,
-          row.templateIdQualifiedName.entityName,
-        ),
-        row.contractId.contractId,
-        row.createArguments,
-        row.createArgumentsValue,
-        row.contractMetadataCreatedAt.toInstant,
-        row.contractMetadataContractKeyHash,
-        row.contractMetadataDriverInternal,
-      )
-      .fold(
-        err => throw new IllegalStateException(s"Stored a contract that cannot be decoded: $err"),
-        identity,
-      )
+    row.toContract(companion)
   }
 
   protected def assignedContractFromRow[C, TCid <: ContractId[_], T](companion: C)(
@@ -362,10 +346,34 @@ object AcsQueries {
       createArguments: Json,
       createArgumentsValue: Json,
       contractMetadataCreatedAt: Timestamp,
-      contractMetadataContractKeyHash: Option[String] = None,
+      contractMetadataContractKeyHash: String,
       contractMetadataDriverInternal: Array[Byte],
-      contractExpiresAt: Option[Timestamp] = None,
-  )
+      contractExpiresAt: Option[Timestamp],
+  ) {
+    def toContract[C, TCId <: ContractId[_], T](companion: C)(implicit
+        companionClass: ContractCompanion[C, TCId, T],
+        decoder: TemplateJsonDecoder,
+    ): Contract[TCId, T] = {
+      companionClass
+        .fromJson(companion)(
+          new Identifier(
+            templateIdPackageId,
+            templateIdQualifiedName.moduleName,
+            templateIdQualifiedName.entityName,
+          ),
+          contractId.contractId,
+          createArguments,
+          createArgumentsValue,
+          contractMetadataCreatedAt.toInstant,
+          contractMetadataContractKeyHash,
+          contractMetadataDriverInternal,
+        )
+        .fold(
+          err => throw new IllegalStateException(s"Stored a contract that cannot be decoded: $err"),
+          identity,
+        )
+    }
+  }
 
   case class SelectFromContractStateResult(
       stateNumber: Long,

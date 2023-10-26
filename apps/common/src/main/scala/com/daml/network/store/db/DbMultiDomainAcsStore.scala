@@ -2,6 +2,7 @@ package com.daml.network.store.db
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
+import cats.data.OptionT
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.ledger.javaapi.data.codegen.ContractId
@@ -282,7 +283,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
           where =
             sql"""template_id_qualified_name IN #${templateIds} and assigned_domain is not null and assigned_domain != $excludedDomain""",
         ),
-        "listAssignedContractsNotOnDomains",
+        "listAssignedContractsNotOnDomainN",
       )
       assigned = result.map(row =>
         assignedContractFromRow(
@@ -1161,9 +1162,40 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     } yield eventIds.map((TxLogEvent.apply _).tupled)
   }
 
-  override def getJsonAcsSnapshot(ignoredContracts: Set[QualifiedName]): Future[JsonAcsSnapshot] =
-    // TODO(#6400): implement snapshot reading for the DB store
-    ???
+  override def getJsonAcsSnapshot(
+      ignoredContracts: Set[QualifiedName]
+  )(implicit tc: TraceContext): Future[JsonAcsSnapshot] = {
+    val qualifiedNamesSql = ignoredContracts
+      .map(q => sql"$q")
+      .reduceOption { (acc, next) =>
+        (acc ++ sql"," ++ next).toActionBuilder
+      }
+      .getOrElse(sql"")
+
+    waitUntilAcsIngested {
+      for {
+        rows <- storage.query(
+          selectFromAcsTableWithOffset(
+            acsTableName,
+            storeId,
+            (sql"template_id_qualified_name not in (" ++ qualifiedNamesSql ++ sql")").toActionBuilder,
+          ),
+          "getJsonAcsSnapshot",
+        )
+        offset <- OptionT
+          .fromOption[Future](rows.headOption)
+          .getOrRaise(offsetExpectedError())
+          .map(_.offset)
+        contracts <- rows.flatMap(_.row).traverse { row =>
+          OptionT
+            .fromOption[Future](contractFilter.decodeMatchingContractFromRow(row))
+            .getOrRaise(
+              new IllegalStateException("Stored a contract that is not in the contract filter.")
+            )
+        }
+      } yield JsonAcsSnapshot(offset, contracts)
+    }
+  }
 
 }
 

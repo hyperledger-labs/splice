@@ -188,8 +188,8 @@ object DirectoryApp {
           timeouts.shutdownNetwork.unwrap,
         ),
         automation,
-        storage,
         store,
+        storage,
         scanConnection,
       )(logger)
 

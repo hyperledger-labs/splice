@@ -3,6 +3,11 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_RemoveMember
+import com.daml.network.integration.plugins.UseInMemoryStores
+
+class InMemorySvOffboardingIntegrationTest extends SvOffboardingIntegrationTest {
+  registerPlugin(new UseInMemoryStores(loggerFactory))
+}
 
 class SvOffboardingIntegrationTest extends SvIntegrationTestBase {
 

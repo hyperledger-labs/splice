@@ -24,10 +24,13 @@ class InMemoryMultiDomainAcsStoreTest
     with HasActorSystem {
   import MultiDomainAcsStore.*
 
-  override def mkStore(id: Int): InMemoryMultiDomainAcsStore[TestTxLogIndexRecord, TestTxLogEntry] =
+  override def mkStore(
+      id: Int,
+      filter: MultiDomainAcsStore.ContractFilter,
+  ): InMemoryMultiDomainAcsStore[TestTxLogIndexRecord, TestTxLogEntry] =
     new InMemoryMultiDomainAcsStore(
       loggerFactory,
-      contractFilter,
+      filter,
       TestTxLogStoreParser,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )(actorSystem.dispatcher)

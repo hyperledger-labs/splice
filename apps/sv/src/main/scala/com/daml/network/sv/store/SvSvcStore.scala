@@ -693,7 +693,7 @@ trait SvSvcStore
     cn.svcrules.ElectionRequest,
   ]]]
 
-  def getJsonAcsSnapshot(): Future[JsonAcsSnapshot] =
+  def getJsonAcsSnapshot()(implicit tc: TraceContext): Future[JsonAcsSnapshot] =
     multiDomainAcsStore.getJsonAcsSnapshot(ignoredContractsForAcsDump)
 
   def getImportShipmentFor(

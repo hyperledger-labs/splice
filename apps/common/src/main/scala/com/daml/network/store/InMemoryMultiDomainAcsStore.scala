@@ -562,7 +562,9 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
   override def close(): Unit = ()
 
-  override def getJsonAcsSnapshot(ignoredContracts: Set[QualifiedName]): Future[JsonAcsSnapshot] =
+  override def getJsonAcsSnapshot(
+      ignoredContracts: Set[QualifiedName]
+  )(implicit tc: TraceContext): Future[JsonAcsSnapshot] =
     Future {
       val state = stateVar
       state.offset match {

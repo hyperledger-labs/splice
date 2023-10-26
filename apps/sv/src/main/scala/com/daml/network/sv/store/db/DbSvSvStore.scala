@@ -36,6 +36,7 @@ class DbSvSvStore(
       DbSvSvStore.tableName,
       // TODO (#5544): change this to something better
       storeDescriptor = Json.obj(
+        "name" -> Json.fromString("DbSvSvStore"),
         "version" -> Json.fromInt(1),
         "svParty" -> Json.fromString(key.svParty.toProtoPrimitive),
         "svcParty" -> Json.fromString(key.svcParty.toProtoPrimitive),

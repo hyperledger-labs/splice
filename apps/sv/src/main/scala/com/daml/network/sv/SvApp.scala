@@ -107,7 +107,7 @@ class SvApp(
     .filter(_.enabled)
 
   override def packages =
-    super.packages ++ DarResources.svcGovernance.all
+    super.packages ++ DarResources.svcGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.directoryService.all ++ DarResources.cantonNameService.all
 
   override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
@@ -660,11 +660,11 @@ object SvApp {
           binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
           timeouts.shutdownNetwork.unwrap,
         ),
-        SyncCloseable("storage", storage.close()),
-        SyncCloseable("sv store", svStore.close()),
-        SyncCloseable("svc store", svcStore.close()),
         SyncCloseable("sv automation", svAutomation.close()),
         SyncCloseable("svc automation", svcAutomation.close()),
+        SyncCloseable("sv store", svStore.close()),
+        SyncCloseable("svc store", svcStore.close()),
+        SyncCloseable("storage", storage.close()),
         SyncCloseable(
           s"Domain connections",
           localDomainNode.foreach(_.close()),

@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.config.SharedCNNodeAppParameters
+import com.daml.network.config.{CNStorageFactory, SharedCNNodeAppParameters}
 import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.metrics.SvAppMetrics
@@ -106,7 +106,7 @@ object SvAppBootstrap {
           testingConfigInternal,
           clock,
           svMetrics,
-          new CommunityStorageFactory(svConfig.storage),
+          new CNStorageFactory(svConfig.storage),
           loggerFactory,
           futureSupervisor,
           configuredOpenTelemetry,

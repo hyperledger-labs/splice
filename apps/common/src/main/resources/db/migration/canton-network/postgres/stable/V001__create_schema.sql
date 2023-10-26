@@ -39,9 +39,9 @@ create table acs_store_template(
     create_arguments_value jsonb not null,
 
     -- contract metadata for explicit disclosure
-    contract_metadata_created_at bigint,
-    contract_metadata_contract_key_hash text,
-    contract_metadata_driver_internal bytea,
+    contract_metadata_created_at bigint not null,
+    contract_metadata_contract_key_hash text not null,
+    contract_metadata_driver_internal bytea not null,
 
     -- expiry time of expiring contracts in micros since unix epoch
     -- part of the template as we expect all stores to support expiry

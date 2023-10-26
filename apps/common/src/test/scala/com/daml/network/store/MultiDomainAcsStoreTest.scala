@@ -3,13 +3,13 @@ package com.daml.network.store
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{ContractMetadata, Identifier}
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
+import com.daml.network.codegen.java.cc.coin.{AppRewardCoupon, Coin, ValidatorRewardCoupon}
 import com.daml.network.codegen.java.cn.splitwell.*
 import com.daml.network.codegen.java.cn.wallet.payment.AppPaymentRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.ledger.api.ReassignmentEvent
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord}
-import com.daml.network.util.{AssignedContract, Contract, ContractWithState}
+import com.daml.network.util.{AssignedContract, Contract, ContractWithState, QualifiedName}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.topology.DomainId
@@ -36,7 +36,7 @@ abstract class MultiDomainAcsStoreTest[
     id
   }
 
-  protected val contractFilter: MultiDomainAcsStore.ContractFilter = {
+  private val defaultContractFilter: MultiDomainAcsStore.ContractFilter = {
     import MultiDomainAcsStore.mkFilter
 
     MultiDomainAcsStore.SimpleContractFilter(
@@ -47,7 +47,10 @@ abstract class MultiDomainAcsStoreTest[
     )
   }
 
-  protected def mkStore(id: Int = 0): Store
+  protected def mkStore(
+      id: Int = 0,
+      filter: MultiDomainAcsStore.ContractFilter = defaultContractFilter,
+  ): Store
 
   protected type Store = S
   protected type C = Contract[AppRewardCoupon.ContractId, AppRewardCoupon]
@@ -654,6 +657,38 @@ abstract class MultiDomainAcsStoreTest[
           c.contract.identifier.getPackageId shouldBe upgradedPackageId
         }
       } yield succeed
+    }
+
+    "getJsonAcsSnapshot" in {
+      val contractFilter: MultiDomainAcsStore.ContractFilter = {
+        import MultiDomainAcsStore.mkFilter
+
+        MultiDomainAcsStore.SimpleContractFilter(
+          svcParty,
+          templateFilters = Map(
+            mkFilter(AppRewardCoupon.COMPANION)(_ => true),
+            mkFilter(ValidatorRewardCoupon.COMPANION)(_ => true),
+            mkFilter(Coin.COMPANION)(_ => true),
+          ),
+        )
+      }
+
+      implicit val store = mkStore(filter = contractFilter)
+      val appReward1 = appRewardCoupon(1, svcParty)
+      val appReward2 = appRewardCoupon(2, userParty(2))
+      val validatorReward = validatorRewardCoupon(3, userParty(3))
+      for {
+        _ <- acs(Seq((appReward1, d1, 0L)))
+        _ <- d1.create(appReward2)
+        _ <- d1.create(validatorReward)
+        _ <- d1.create(coin(userParty(4), 4.2, 3, 0.01))
+        result <- store.getJsonAcsSnapshot(ignoredContracts = Set(QualifiedName(Coin.TEMPLATE_ID)))
+      } yield {
+        result.contracts.size should be(3)
+        result.contracts should contain(appReward1)
+        result.contracts should contain(appReward2)
+        result.contracts should contain(validatorReward)
+      }
     }
   }
 }

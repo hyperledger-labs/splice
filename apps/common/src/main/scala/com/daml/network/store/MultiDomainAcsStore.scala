@@ -14,6 +14,7 @@ import com.daml.network.environment.ledger.api.{
   ReassignmentEvent,
   TreeUpdate,
 }
+import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.{
   AssignedContract,
@@ -213,7 +214,9 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
   def ingestionSink: MultiDomainAcsStore.IngestionSink
 
   /** Get a snapshot of all contracts in the ACS encoded as JSON. */
-  def getJsonAcsSnapshot(ignoredContracts: Set[QualifiedName]): Future[JsonAcsSnapshot]
+  def getJsonAcsSnapshot(ignoredContracts: Set[QualifiedName])(implicit
+      tc: TraceContext
+  ): Future[JsonAcsSnapshot]
 
   /** Testing API: returns all contracts that have in-flight reassignments */
   private[store] def listIncompleteReassignments()(implicit
@@ -244,6 +247,10 @@ object MultiDomainAcsStore {
 
     def decodeMatchingContract(ev: CreatedEvent): Option[Contract[?, ?]]
 
+    def decodeMatchingContractFromRow(
+        row: SelectFromAcsTableResult
+    )(implicit templateJsonDecoder: TemplateJsonDecoder): Option[Contract[?, ?]]
+
     def isStakeholderOf(ev: CreatedEvent): Boolean
 
     def ensureStakeholderOf(ev: CreatedEvent): Unit = {
@@ -256,12 +263,15 @@ object MultiDomainAcsStore {
     }
   }
 
+  private type DecodeFromCreatedEvent = CreatedEvent => Option[Contract[?, ?]]
+  private type DecodeFromRow = (SelectFromAcsTableResult, TemplateJsonDecoder) => Contract[?, ?]
+
   /** A helper to easily construct a [[ContractFilter]] for a single party. */
   case class SimpleContractFilter(
       primaryParty: PartyId,
       templateFilters: Map[
         QualifiedName,
-        (CreatedEvent => Boolean, CreatedEvent => Option[Contract[?, ?]]),
+        (CreatedEvent => Boolean, DecodeFromCreatedEvent, DecodeFromRow),
       ],
   ) extends ContractFilter {
 
@@ -272,7 +282,7 @@ object MultiDomainAcsStore {
       )
 
     override def contains(ev: CreatedEvent): Boolean =
-      templateFilters.get(QualifiedName(ev.getTemplateId)).exists { case (evPredicate, _) =>
+      templateFilters.get(QualifiedName(ev.getTemplateId)).exists { case (evPredicate, _, _) =>
         evPredicate(ev)
       }
 
@@ -285,11 +295,20 @@ object MultiDomainAcsStore {
       templateFilters.contains(QualifiedName(identifier))
     }
 
-    override def decodeMatchingContract(ev: CreatedEvent): Option[Contract[?, ?]] =
+    override def decodeMatchingContract(ev: CreatedEvent): Option[Contract[?, ?]] = {
       for {
-        (_, decoder) <- templateFilters.get(QualifiedName(ev.getTemplateId))
+        (_, decoder, _) <- templateFilters.get(QualifiedName(ev.getTemplateId))
         contract <- decoder(ev)
       } yield contract
+    }
+
+    override def decodeMatchingContractFromRow(
+        row: SelectFromAcsTableResult
+    )(implicit templateJsonDecoder: TemplateJsonDecoder): Option[Contract[?, ?]] = {
+      for {
+        (_, _, decoder) <- templateFilters.get(row.templateIdQualifiedName)
+      } yield decoder(row, templateJsonDecoder)
+    }
 
     override def isStakeholderOf(ev: CreatedEvent): Boolean = {
       val eventStakeholder = (ev.getSignatories.asScala ++ ev.getObservers.asScala).toSet
@@ -302,7 +321,16 @@ object MultiDomainAcsStore {
       templateCompanion: Contract.Companion.Template[TCid, T]
   )(
       p: Contract[TCid, T] => Boolean
-  ): (QualifiedName, (CreatedEvent => Boolean, CreatedEvent => Option[Contract[?, ?]])) =
+  )(implicit
+      companionClass: ContractCompanion[Contract.Companion.Template[TCid, T], TCid, T]
+  ): (
+      QualifiedName,
+      (
+          CreatedEvent => Boolean,
+          CreatedEvent => Option[Contract[?, ?]],
+          DecodeFromRow,
+      ),
+  ) =
     (
       QualifiedName(templateCompanion.TEMPLATE_ID),
       (
@@ -311,6 +339,8 @@ object MultiDomainAcsStore {
           c.exists(p)
         },
         ev => Contract.fromCreatedEvent(templateCompanion)(ev),
+        (row, templateJsonDecoder) =>
+          row.toContract(templateCompanion)(companionClass, templateJsonDecoder),
       ),
     )
 
@@ -359,7 +389,7 @@ object MultiDomainAcsStore {
         payload: Json,
         payloadValue: Json,
         createdAt: Instant,
-        contractKeyHash: Option[String],
+        contractKeyHash: String,
         driverInternal: Array[Byte],
     )(implicit
         decoder: TemplateJsonDecoder
@@ -367,7 +397,7 @@ object MultiDomainAcsStore {
       val cId = toContractId(companion, contractId)
       val metadata = new ContractMetadata(
         createdAt,
-        ByteString.copyFromUtf8(contractKeyHash.getOrElse("")),
+        ByteString.copyFromUtf8(contractKeyHash),
         ByteString.copyFrom(driverInternal),
       )
       fromJson(

@@ -322,9 +322,10 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     "listExpiredVoteRequests" should {
 
       "return all vote requests that are expired as of now" in {
-        val now = Instant.now()
-        val expired = (1 to 3).map(n => voteRequest(n, now.minusSeconds(n.toLong * 3600)))
-        val notExpired = (4 to 6).map(n => voteRequest(n, now.plusSeconds(n.toLong * 3600)))
+        val expired = (1 to 3).map(n =>
+          voteRequest(requester = userParty(n), expiry = Instant.now.minusSeconds(n.toLong * 3600))
+        )
+        val notExpired = (4 to 6).map(n => voteRequest(requester = userParty(n)))
         for {
           store <- mkStore()
           _ <- Future.traverse(expired ++ notExpired)(
@@ -909,9 +910,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       "list all past VoteResults" in {
         for {
           store <- mkStore()
-          voteRequestContract = voteRequest(1, Instant.now().plusSeconds(1.toLong * 3600))
+          voteRequestContract = voteRequest(requester = userParty(1))
           _ <- dummyDomain.create(voteRequestContract)(store.multiDomainAcsStore)
-          votes = (1 to 4).map(n => vote(n, voteRequestContract.contractId)).toList
+          votes = (1 to 4).map(n => vote(userParty(n), voteRequestContract.contractId)).toList
           result = mkExecuteDefiniteVoteResult(voteRequestContract)
           _ <- Future.traverse(votes)(dummyDomain.create(_)(store.multiDomainAcsStore))
           definitiveVoteTx <- dummyDomain.exercise(
@@ -1004,6 +1005,87 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             .size shouldBe (1)
         }
       }
+    }
+
+    "listVotesByVoteRequests" should {
+
+      "return all votes by their VoteRequest contract ids" in {
+        val goodVoteRequests =
+          (1 to 3).map(n => voteRequest(requester = userParty(n)))
+        val badVoteRequests =
+          (4 to 6).map(n => voteRequest(requester = userParty(n)))
+        val goodVotes =
+          (1 to 6).map(n => vote(userParty(n), goodVoteRequests((n - 1) % 3).contractId))
+        val badVotes = (1 to 3).map(n => vote(userParty(n), badVoteRequests(n - 1).contractId))
+        for {
+          store <- mkStore()
+          _ <- Future.traverse(goodVoteRequests ++ badVoteRequests)(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          _ <- Future.traverse(goodVotes ++ badVotes)(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          result <- store.listVotesByVoteRequests(goodVoteRequests.map(_.contractId))
+        } yield {
+          result should contain theSameElementsAs (goodVotes)
+        }
+      }
+
+    }
+
+    "lookupVoteRequestByThisSvAndActionWithOffset" should {
+
+      "find the vote request done by this SV and with the passed action" in {
+        val goodAction = addUser666Action
+        val goodVoteRequest =
+          voteRequest(
+            action = goodAction,
+            requester = storeSvParty,
+          )
+        val doneByAnotherSV =
+          voteRequest(
+            action = goodAction,
+            requester = providerParty(1234),
+          )
+        val differentAction =
+          voteRequest(
+            action = addUser667Action,
+            requester = storeSvParty,
+          )
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(doneByAnotherSV)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(differentAction)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(goodVoteRequest)(store.multiDomainAcsStore)
+          result <- store.lookupVoteRequestByThisSvAndActionWithOffset(goodAction)
+        } yield {
+          result.value should be(Some(goodVoteRequest))
+        }
+      }
+
+    }
+
+    "lookupVoteByThisSvAndVoteRequestWithOffset" should {
+
+      "find the vote by vote request done by this SV" in {
+        val goodRequest = voteRequest(requester = storeSvParty)
+        val badRequest = voteRequest(requester = providerParty(1234))
+        val goodVote = vote(storeSvParty, goodRequest.contractId)
+        val doneByAnother = vote(providerParty(1234), goodRequest.contractId)
+        val anotherRequest = vote(storeSvParty, badRequest.contractId)
+        for {
+          store <- mkStore()
+          _ <- dummyDomain.create(goodRequest)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(badRequest)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(goodVote)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(doneByAnother)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(anotherRequest)(store.multiDomainAcsStore)
+          result <- store.lookupVoteByThisSvAndVoteRequestWithOffset(goodRequest.contractId)
+        } yield {
+          result.value should be(Some(goodVote))
+        }
+      }
+
     }
 
   }
@@ -1107,31 +1189,35 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       .map(_ => (oldest, middle, newest))
   }
 
-  private def voteRequest(n: Int, expiry: Instant) = {
+  private def voteRequest(
+      requester: PartyId,
+      expiry: Instant = Instant.now().plusSeconds(3600L),
+      action: ActionRequiringConfirmation = addUser666Action,
+  ) = {
     val template = new VoteRequest(
       svcParty.toProtoPrimitive,
-      userParty(n).toProtoPrimitive,
-      addUser666Action,
+      requester.toProtoPrimitive,
+      action,
       new Reason("https://www.example.com", ""),
       expiry,
     )
 
     contract(
       VoteRequest.TEMPLATE_ID,
-      new VoteRequest.ContractId(validContractId(n)),
+      new VoteRequest.ContractId(nextCid()),
       template,
       ContractMetadata.Empty(),
     )
   }
 
   private def vote(
-      n: Int,
+      requester: PartyId,
       voteRequestCid: VoteRequest.ContractId,
   ): Contract[Vote.ContractId, Vote] = {
     val template = new Vote(
       svcParty.toProtoPrimitive,
       voteRequestCid,
-      userParty(n).toProtoPrimitive,
+      requester.toProtoPrimitive,
       true,
       new Reason("url", "summary"),
       Instant.now().plusSeconds(3600),
@@ -1139,7 +1225,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     contract(
       Vote.TEMPLATE_ID,
-      new Vote.ContractId(validContractId((n))),
+      new Vote.ContractId(nextCid()),
       template,
       ContractMetadata.Empty(),
     )

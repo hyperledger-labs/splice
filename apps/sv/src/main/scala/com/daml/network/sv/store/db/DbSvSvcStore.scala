@@ -727,15 +727,15 @@ class DbSvSvcStore(
           selectFromAcsTableWithOffset(
             DbSvSvcStore.acsTableName,
             storeId,
-            sql"""
+            where = sql"""
                           template_id_qualified_name = ${QualifiedName(
                 ValidatorLicense.TEMPLATE_ID
               )}
                       and validator = $validator
-                    limit 1;
                         """,
+            orderLimit = sql"limit 1",
           ).headOption,
-          "lookupSvOnboardingRequestByCandidatePartyWithOffset",
+          "lookupValidatorLicenseWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
       resultWithOffset.offset,
@@ -774,7 +774,7 @@ class DbSvSvcStore(
           (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
             sql"""
                  where store_id = $storeId
-                   and template_id_qualified_name = ${QualifiedName(CoinPriceVote.TEMPLATE_ID)}
+                   and template_id_qualified_name = ${QualifiedName(Vote.TEMPLATE_ID)}
                    and vote_request_cid in #$voteRequestCidsSql
                  limit ${sqlLimit(Limit.DefaultLimit)}
                """).toActionBuilder.as[SelectFromAcsTableResult],
@@ -794,12 +794,12 @@ class DbSvSvcStore(
             selectFromAcsTableWithOffset(
               DbSvSvcStore.acsTableName,
               storeId,
-              sql"""
+              where = sql"""
                             template_id_qualified_name = ${QualifiedName(Vote.TEMPLATE_ID)}
-                            vote_request_cid = $voteRequestCid
+                        and vote_request_cid = $voteRequestCid
                         and voter = ${key.svParty}
-                      limit 1;
                           """,
+              orderLimit = sql"limit 1",
             ).headOption,
             "lookupVoteByThisSvAndVoteRequestWithOffset",
           )
@@ -820,12 +820,12 @@ class DbSvSvcStore(
           selectFromAcsTableWithOffset(
             DbSvSvcStore.acsTableName,
             storeId,
-            sql"""
+            where = sql"""
                           template_id_qualified_name = ${QualifiedName(VoteRequest.TEMPLATE_ID)}
-                          action_requiring_confirmation = ${payloadJsonFromValue(action.toValue)}
+                      and action_requiring_confirmation = ${payloadJsonFromValue(action.toValue)}
                       and requester = ${key.svParty}
-                    limit 1;
                         """,
+            orderLimit = sql"limit 1",
           ).headOption,
           "lookupVoteRequestByThisSvAndActionWithOffset",
         )

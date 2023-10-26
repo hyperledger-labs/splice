@@ -12,6 +12,7 @@ import com.daml.network.codegen.java.cn.svcrules.ElectionRequest
 
 import java.time.Duration as JavaDuration
 import scala.jdk.CollectionConverters.*
+import scala.concurrent.duration.DurationInt
 
 class SvcElectionTimeBasedIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElections {
@@ -70,7 +71,23 @@ class SvcElectionTimeBasedIntegrationTest
     }
 
     // Stop the leader so we can detect its inactivity later
-    bracket(sv1Backend.stop(), sv1Backend.startSync()) {
+    bracket(
+      sv1Backend.stop(),
+      // when starting up, eventually SV1 will find out it was replaced as leader
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
+        sv1Backend.startSync(),
+        entries => {
+          forExactly(1, entries) { line =>
+            line.loggerName should include("SV=sv1")
+            line.message should include(
+              "Noticed an SvcRules epoch change"
+            )
+
+          }
+        },
+        timeUntilSuccess = 1.minute,
+      ),
+    ) {
       clue(
         "Advance time such that a new round should be opened. SVs should start their checks of the leader's inactivity"
       ) {

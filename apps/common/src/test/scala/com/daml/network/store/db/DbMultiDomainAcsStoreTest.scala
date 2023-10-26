@@ -3,12 +3,11 @@ package com.daml.network.store.db
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
-import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
 import com.daml.network.store.db.AcsTables.ContractStateRowData
-import com.daml.network.store.{MultiDomainAcsStoreTest, StoreTest}
-import com.daml.network.util.{Contract, QualifiedName, ResourceTemplateDecoder, TemplateJsonDecoder}
+import com.daml.network.store.{MultiDomainAcsStore, MultiDomainAcsStoreTest, StoreTest}
+import com.daml.network.util.{QualifiedName, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
@@ -53,7 +52,7 @@ class DbMultiDomainAcsStoreTest
       .parse(raw"""{"test": "DbMultiDomainAcsStoreTest", "id": $id}""")
       .getOrElse(sys.error("Why is it so hard to define a JSON literal"))
 
-  override def mkStore(id: Int) = {
+  override def mkStore(id: Int, filter: MultiDomainAcsStore.ContractFilter) = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(DarResources.cantonCoin.all)
     implicit val templateJsonDecoder: TemplateJsonDecoder =
@@ -67,25 +66,26 @@ class DbMultiDomainAcsStoreTest
         "txlog_store_template",
         storeDescriptor(id),
         loggerFactory,
-        contractFilter,
+        filter,
         TestTxLogStoreParser,
         RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-        (evt, csr, _) => Right(create(store.storeId, evt, csr)),
+        (evt, csr, _) => Right(create(filter, store.storeId, evt, csr)),
         (_, _) => Right(DBIO.successful(())),
       )
     store
   }
 
   private def create(
+      filter: MultiDomainAcsStore.ContractFilter,
       storeId: Int,
       evt: CreatedEvent,
       contractState: ContractStateRowData,
   ) = {
     import storage.DbStorageConverters.setParameterByteArray
 
-    val contract = Contract
-      .fromCreatedEvent(coinCodegen.AppRewardCoupon.COMPANION)(evt)
-      .valueOrFail("Failed to parse contract.")
+    val contract = filter
+      .decodeMatchingContract(evt)
+      .valueOrFail("Failed to decode contract.")
     val contractId = new ContractId[Any](evt.getContractId)
     val templateId = contract.identifier
     val templateIdPackageId = lengthLimited(templateId.getPackageId)

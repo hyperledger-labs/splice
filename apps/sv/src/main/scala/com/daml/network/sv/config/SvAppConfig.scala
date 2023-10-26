@@ -4,6 +4,7 @@ import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AutomationConfig,
   BackupDumpConfig,
+  CNDbConfig,
   CNNodeBackendConfig,
   CNParticipantClientConfig,
   GcpBucketConfig,
@@ -132,7 +133,7 @@ final case class SvDomainConfig(
 
 case class SvAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
+    override val storage: CNDbConfig,
     ledgerApiUser: String,
     // The SV app shares the primary party with the validator app. To discover it we query the
     // validator user. Additionally, the founding SV app is expected to create that user,

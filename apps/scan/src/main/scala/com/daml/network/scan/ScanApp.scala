@@ -203,9 +203,9 @@ object ScanApp {
           binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
           timeouts.shutdownNetwork.unwrap,
         ),
-        storage,
-        store,
         automation,
+        store,
+        storage,
       )(logger)
   }
 }
