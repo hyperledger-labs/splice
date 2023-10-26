@@ -125,9 +125,8 @@ object SvcPartyHosting {
   final case class LockAcquireFailure(lockReason: String, cause: Throwable)
       extends SvcPartyMigrationFailure
 
-  final case class RequiredProposalsNotFound(
-      partoToParticipantSerial: PositiveInt,
-      unionspaceDefinitionSerial: PositiveInt,
+  final case class RequiredProposalNotFound(
+      partyToParticipantSerial: PositiveInt
   ) extends SvcPartyMigrationFailure
 
   case class PartyToParticipantProposalThresholdMismatch()

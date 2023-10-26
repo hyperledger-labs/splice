@@ -866,14 +866,10 @@ components:
           type: object
           required:
             - party_to_participant_base_serial
-            - unionspace_base_serial
           properties:
             party_to_participant_base_serial:
               type: integer
               description: "The serial of the party to participant accepted state as seen by the sponsor"
-            unionspace_base_serial:
-              type: integer
-              description: "The serial of the unionspace accepted state as seen by the sponsor"
 
     OnboardSvSequencerRequest:
       type: object

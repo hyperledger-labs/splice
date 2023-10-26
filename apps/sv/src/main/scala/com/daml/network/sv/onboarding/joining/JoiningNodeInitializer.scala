@@ -200,15 +200,18 @@ class JoiningNodeInitializer(
       }
       _ <- withSvStore
         .setDomainNodeConfigIfRequired(svcAutomation, localDomainNode)
-    } yield (
-      globalDomain,
-      svcPartyHosting,
-      svStore,
-      svAutomation,
-      svcStore,
-      svcAutomation,
-      svcRulesLock,
-    )
+    } yield {
+      svcAutomation.registerPostOnboardingTriggers()
+      (
+        globalDomain,
+        svcPartyHosting,
+        svStore,
+        svAutomation,
+        svcStore,
+        svcAutomation,
+        svcRulesLock,
+      )
+    }
   }
 
   private def withSvConnection[T](
@@ -372,6 +375,14 @@ class JoiningNodeInitializer(
             } yield (),
             logger,
           )
+          _ = logger.info("Adding member to the unionspace.")
+          _ <- participantAdminConnection
+            .ensureUnionspaceDefinitionProposalAccepted(
+              domainId,
+              svcParty.uid.namespace,
+              svParty.uid.namespace,
+              svParty.uid.namespace.fingerprint,
+            )
         } yield ()
       }
 

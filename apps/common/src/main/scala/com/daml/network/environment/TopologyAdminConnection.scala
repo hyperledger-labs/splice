@@ -4,6 +4,10 @@ import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.config.CNThresholds
+import com.daml.network.config.CNThresholds.getPartyToParticipantThreshold
+import com.daml.network.environment.RetryProvider.QuietNonRetryableException
+import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
+import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommandsX
@@ -26,9 +30,6 @@ import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.topology.store.{TimeQueryX, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.*
-import com.daml.network.config.CNThresholds.getPartyToParticipantThreshold
-import com.daml.network.environment.RetryProvider.QuietNonRetryableException
-import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
   IdentifierDelegationX,
@@ -71,16 +72,16 @@ class TopologyAdminConnection(
       filterParty: String = "",
       filterParticipant: String = "",
       timeQuery: TimeQueryX = TimeQueryX.HeadState,
-      proposals: Boolean = false,
+      proposals: TopologyTransactionType = AuthorizedState,
   )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipantX]]] = {
     runCmd(
       TopologyAdminCommandsX.Read.ListPartyToParticipant(
         BaseQueryX(
           filterStore,
-          proposals = proposals,
+          proposals = proposals.proposals,
           timeQuery,
           operation,
-          filterSigningKey = "",
+          filterSigningKey = proposals.signingKey.getOrElse(""),
           protocolVersion = None,
         ),
         filterParty,
@@ -180,16 +181,16 @@ class TopologyAdminConnection(
   private def listUnionspaceDefinition(
       domainId: DomainId,
       unionspace: Namespace,
-      proposals: Boolean = false,
+      proposals: TopologyTransactionType = AuthorizedState,
   )(implicit tc: TraceContext) = {
     runCmd(
       TopologyAdminCommandsX.Read.ListUnionspaceDefinition(
         BaseQueryX(
           filterStore = domainId.filterString,
-          proposals = proposals,
+          proposals = proposals.proposals,
           timeQuery = TimeQueryX.HeadState,
           ops = None,
-          filterSigningKey = "",
+          filterSigningKey = proposals.signingKey.getOrElse(""),
           protocolVersion = None,
         ),
         filterNamespace = unionspace.toProtoPrimitive,
@@ -347,7 +348,7 @@ class TopologyAdminConnection(
       check(TopologyTransactionType.AuthorizedState)
         .leftFlatMap { authorizedState =>
           EitherT(
-            check(TopologyTransactionType.ProposalsOnly)
+            check(TopologyTransactionType.ProposalSignedBy(signedBy))
               .leftMap(_ => authorizedState)
               .value
               .recover {
@@ -455,47 +456,49 @@ class TopologyAdminConnection(
       svcRulesMembersSize: Int,
       signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] = {
-    def findPartyToParticipant(proposal: Boolean) = EitherT {
-      if (proposal) {
-        listPartyToParticipant(
-          filterStore = domainId.filterString,
-          filterParty = party.filterString,
-          proposals = proposal,
-        ).map { proposals =>
-          proposals
-            .find(proposal =>
-              proposal.mapping.participantIds.contains(
-                newParticipant
-              ) && proposal.mapping.threshold == getPartyToParticipantThreshold(
-                svcRulesMembersSize,
-                proposal.mapping.participantIds.size - 1,
-              )
-            )
-            .getOrElse(
-              throw Status.NOT_FOUND
-                .withDescription(
-                  s"No party to participant proposal for party $party and participant $newParticipant on domain $domainId"
+    def findPartyToParticipant(topologyTransactionType: TopologyTransactionType) = EitherT {
+      topologyTransactionType match {
+        case proposals @ (TopologyTransactionType.ProposalSignedBy(_) |
+            TopologyTransactionType.AllProposals) =>
+          listPartyToParticipant(
+            filterStore = domainId.filterString,
+            filterParty = party.filterString,
+            proposals = proposals,
+          ).map { proposals =>
+            proposals
+              .find(proposal =>
+                proposal.mapping.participantIds.contains(
+                  newParticipant
+                ) && proposal.mapping.threshold == getPartyToParticipantThreshold(
+                  svcRulesMembersSize,
+                  proposal.mapping.participantIds.size - 1,
                 )
-                .asRuntimeException()
+              )
+              .getOrElse(
+                throw Status.NOT_FOUND
+                  .withDescription(
+                    s"No party to participant proposal for party $party and participant $newParticipant on domain $domainId"
+                  )
+                  .asRuntimeException()
+              )
+              .asRight
+          }
+        case TopologyTransactionType.AuthorizedState =>
+          getPartyToParticipant(domainId, party).map(result =>
+            Either.cond(
+              result.mapping.participants
+                .exists(hosting => hosting.participantId == newParticipant),
+              result,
+              result,
             )
-            .asRight
-        }
-      } else {
-        getPartyToParticipant(domainId, party).map(result =>
-          Either.cond(
-            result.mapping.participants
-              .exists(hosting => hosting.participantId == newParticipant),
-            result,
-            result,
           )
-        )
       }
     }
 
     ensureTopologyProposal[PartyToParticipantX](
       TopologyStoreId.DomainStore(domainId),
       show"Party $party is proposed on $newParticipant",
-      queryType => findPartyToParticipant(proposal = queryType.proposals),
+      queryType => findPartyToParticipant(queryType),
       previous =>
         Right(
           previous.copy(
@@ -685,64 +688,7 @@ class TopologyAdminConnection(
       isProposal = false,
     )
 
-  def findUnionspaceDefinitionProposal(
-      globalDomain: DomainId,
-      unionspace: Namespace,
-      newMember: Namespace,
-  )(implicit
-      traceContext: TraceContext
-  ): OptionT[Future, TopologyResult[UnionspaceDefinitionX]] = {
-    OptionT(
-      listUnionspaceDefinition(globalDomain, unionspace, proposals = true).map(
-        _.find(_.mapping.owners.contains(newMember))
-      )
-    )
-  }
-
-  def ensureUnionspaceDefinitionProposal(
-      domainId: DomainId,
-      unionspace: Namespace,
-      newOwner: Namespace,
-      signedBy: Fingerprint,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[TopologyResult[UnionspaceDefinitionX]] =
-    ensureTopologyProposal[UnionspaceDefinitionX](
-      TopologyStoreId.DomainStore(domainId),
-      show"Namespace $newOwner is proposed in owners of UnionspaceDefinition",
-      {
-        case proposals @ TopologyTransactionType.ProposalsOnly =>
-          EitherT(
-            listUnionspaceDefinition(domainId, unionspace, proposals.proposals).map(
-              _.find(_.mapping.owners.contains(newOwner))
-                .getOrElse(
-                  throw Status.NOT_FOUND
-                    .withDescription(
-                      s"No unionspace proposal found for unionspace $unionspace for new owner $newOwner on domain $domainId"
-                    )
-                    .asRuntimeException()
-                )
-                .asRight
-            )
-          )
-        case TopologyTransactionType.AuthorizedState =>
-          EitherT(
-            getUnionspaceDefinition(domainId, unionspace).map(result =>
-              Either.cond(result.mapping.owners.contains(newOwner), result, result)
-            )
-          )
-      },
-      previous =>
-        // constructor is not exposed so no copy
-        UnionspaceDefinitionX.create(
-          previous.unionspace,
-          previous.threshold,
-          previous.owners.incl(newOwner),
-        ),
-      signedBy,
-    )
-
-  def ensureUnionspaceDefinition(
+  def ensureUnionspaceDefinitionProposalAccepted(
       domainId: DomainId,
       unionspace: Namespace,
       newOwner: Namespace,
@@ -753,11 +699,7 @@ class TopologyAdminConnection(
     ensureTopologyMapping[UnionspaceDefinitionX](
       TopologyStoreId.DomainStore(domainId),
       show"Namespace $newOwner is in owners of UnionspaceDefinition",
-      EitherT(
-        getUnionspaceDefinition(domainId, unionspace).map(result =>
-          Either.cond(result.mapping.owners.contains(newOwner), result, result)
-        )
-      ),
+      unionspaceDefinitionForNamespace(domainId, unionspace, newOwner),
       previous =>
         // constructor is not exposed so no copy
         UnionspaceDefinitionX.create(
@@ -766,7 +708,20 @@ class TopologyAdminConnection(
           previous.owners.incl(newOwner),
         ),
       signedBy,
+      isProposal = true,
     )
+
+  private def unionspaceDefinitionForNamespace(
+      domainId: DomainId,
+      unionspace: Namespace,
+      owner: Namespace,
+  )(implicit tc: TraceContext) = {
+    EitherT(
+      getUnionspaceDefinition(domainId, unionspace).map(result =>
+        Either.cond(result.mapping.owners.contains(owner), result, result)
+      )
+    )
+  }
 
   def ensureTrafficControlState(
       domainId: DomainId,
@@ -882,16 +837,27 @@ object TopologyAdminConnection {
 
   sealed trait TopologyTransactionType {
     def proposals: Boolean
+    def signingKey: Option[String]
   }
 
   object TopologyTransactionType {
 
-    case object ProposalsOnly extends TopologyTransactionType {
+    case object AllProposals extends TopologyTransactionType {
       override def proposals: Boolean = true
+
+      override def signingKey: Option[String] = None
+    }
+
+    case class ProposalSignedBy(signature: Fingerprint) extends TopologyTransactionType {
+      override def proposals: Boolean = true
+
+      override def signingKey: Option[String] = Some(signature.toProtoPrimitive)
     }
 
     case object AuthorizedState extends TopologyTransactionType {
       override def proposals: Boolean = false
+
+      override def signingKey: Option[String] = None
     }
 
   }

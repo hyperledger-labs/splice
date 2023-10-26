@@ -235,10 +235,9 @@ object HttpSvAppClient {
   )
 
   case class OnboardSvPartyMigrationAuthorizeProposalNotFound(
-      partyToParticipantMappingSerial: PositiveInt,
-      unionspaceDefinitionSerial: PositiveInt,
+      partyToParticipantMappingSerial: PositiveInt
   ) extends QuietNonRetryableException(
-        s"Party migration failed as required proposals were not found. Found base mappings: PartyToParticipant($partyToParticipantMappingSerial), UnionspaceDefinition($unionspaceDefinitionSerial)"
+        s"Party migration failed as required proposals were not found. Found base mappings: PartyToParticipant($partyToParticipantMappingSerial)"
       )
   case class OnboardSvPartyMigrationAuthorizeResponse(
       acsSnapshot: ByteString
@@ -312,8 +311,7 @@ object HttpSvAppClient {
         Right(
           Left(
             OnboardSvPartyMigrationAuthorizeProposalNotFound(
-              PositiveInt.tryCreate(proposalNotFound.partyToParticipantBaseSerial.intValue),
-              PositiveInt.tryCreate(proposalNotFound.unionspaceBaseSerial.intValue),
+              PositiveInt.tryCreate(proposalNotFound.partyToParticipantBaseSerial.intValue)
             )
           )
         )

@@ -341,16 +341,14 @@ class HttpSvHandler(
               )
             )
           case SvcPartyHosting
-                .RequiredProposalsNotFound(
-                  partyToParticipantSerial,
-                  unionspaceDefinitionSerial,
+                .RequiredProposalNotFound(
+                  partyToParticipantSerial
                 ) =>
             OnboardSvPartyMigrationAuthorizeResponseBadRequest(
               OnboardSvPartyMigrationAuthorizeErrorResponse(
                 proposalNotFound = Some(
                   OnboardSvPartyMigrationAuthorizeErrorResponse.ProposalNotFound(
-                    BigInt(partyToParticipantSerial.value),
-                    BigInt(unionspaceDefinitionSerial.value),
+                    BigInt(partyToParticipantSerial.value)
                   )
                 )
               )

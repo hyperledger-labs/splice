@@ -103,14 +103,6 @@ class SvSvcAutomationService(
     }
   }
 
-  registerTrigger(
-    new ReconcileSequencerLimitWithMemberTrafficTrigger(
-      triggerContext,
-      svcStore,
-      participantAdminConnection,
-    )
-  )
-
   if (config.automation.enableLeaderReplacementTrigger) {
     registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
   }
@@ -162,7 +154,6 @@ class SvSvcAutomationService(
   registerTrigger(
     new CnsSubscriptionInitialPaymentTrigger(triggerContext, svcStore, connection)
   )
-
   registerTrigger(
     new SvPackageVettingTrigger(
       participantAdminConnection,
@@ -171,6 +162,20 @@ class SvSvcAutomationService(
       triggerContext,
     )
   )
+
+  def registerPostOnboardingTriggers(): Unit = {
+    // requires namespace permissions to run these triggers, can only be run after onboarding
+    registerTrigger(
+      new ReconcileSequencerLimitWithMemberTrafficTrigger(
+        triggerContext,
+        svcStore,
+        participantAdminConnection,
+      )
+    )
+    registerTrigger(
+      new SvOnboardingNamespaceProposalTrigger(triggerContext, svcStore, participantAdminConnection)
+    )
+  }
 }
 
 object SvSvcAutomationService {

@@ -1,11 +1,11 @@
 package com.daml.network.sv.onboarding.sponsor
 
 import cats.data.{EitherT, OptionT}
-import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.foldable.*
 import com.daml.error.utils.ErrorDetails
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.config.CNThresholds
+import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AllProposals
 import com.daml.network.environment.{
   ParticipantAdminConnection,
   RetryProvider,
@@ -14,14 +14,14 @@ import com.daml.network.environment.{
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.onboarding.SvcPartyHosting
 import com.daml.network.sv.onboarding.SvcPartyHosting.{
-  RequiredProposalsNotFound,
+  RequiredProposalNotFound,
   SvcPartyMigrationFailure,
 }
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvcRulesLock
 import com.digitalasset.canton.LfTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.transaction.{PartyToParticipantX, UnionspaceDefinitionX}
+import com.digitalasset.canton.topology.transaction.PartyToParticipantX
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -65,7 +65,7 @@ class SvcPartyMigration(
         for {
           svcRules <- EitherT.liftF(svcStore.getSvcRules())
           svcMembersSize = svcRules.payload.members.size()
-          acsBytes <- validateProposalsForNewMember(participantId, svcMembersSize)
+          acsBytes <- validateProposalForNewMember(participantId, svcMembersSize)
             .semiflatMap { _ =>
               for {
                 ourParticipant <- participantAdminConnection.getParticipantId()
@@ -81,15 +81,6 @@ class SvcPartyMigration(
                   s"SVC party was authorized on $participantId, downloading snapshot at time $authorizedAt."
                 )
                 acsBytes <- downloadSnapshotFromTime(authorizedAt)
-                _ = logger.info(
-                  s"Adding candidate SV with participant $participantId to unionspace"
-                )
-                _ <- participantAdminConnection.ensureUnionspaceDefinition(
-                  globalDomain,
-                  svcParty.uid.namespace,
-                  participantId.uid.namespace,
-                  ourParticipant.uid.namespace.fingerprint,
-                )
               } yield acsBytes
             }
         } yield {
@@ -98,65 +89,48 @@ class SvcPartyMigration(
       )
   }
 
-  private def validateProposalsForNewMember(
+  private def validateProposalForNewMember(
       participantId: ParticipantId,
       svcMembersSize: Int,
   )(implicit tc: TraceContext): EitherT[
     Future,
     SvcPartyMigrationFailure,
-    (
-        TopologyAdminConnection.TopologyResult[PartyToParticipantX],
-        TopologyAdminConnection.TopologyResult[UnionspaceDefinitionX],
-    ),
+    TopologyAdminConnection.TopologyResult[PartyToParticipantX],
   ] = {
     val partyToParticipantAcceptedState =
       participantAdminConnection.getPartyToParticipant(globalDomain, svcParty)
-    lazy val acceptedState = (
-      partyToParticipantAcceptedState,
+    OptionT(
       participantAdminConnection
-        .getUnionspaceDefinition(globalDomain, svcParty.uid.namespace),
-    ).tupled
-    (
-      OptionT(
-        participantAdminConnection
-          .listPartyToParticipant(
-            globalDomain.filterString,
-            filterParty = svcParty.filterString,
-            proposals = true,
-          )
-          .flatMap { proposals =>
-            partyToParticipantAcceptedState
-              .map(acceptedState =>
-                CNThresholds.getPartyToParticipantThreshold(
-                  svcMembersSize,
-                  acceptedState.mapping.participantIds.size,
-                )
+        .listPartyToParticipant(
+          globalDomain.filterString,
+          filterParty = svcParty.filterString,
+          proposals = AllProposals,
+        )
+        .flatMap { proposals =>
+          partyToParticipantAcceptedState
+            .map(acceptedState =>
+              CNThresholds.getPartyToParticipantThreshold(
+                svcMembersSize,
+                acceptedState.mapping.participantIds.size,
               )
-              .map { expectedThreshold =>
-                proposals.find(proposal =>
-                  proposal.mapping.participantIds
-                    .contains(participantId) && proposal.mapping.threshold == expectedThreshold
-                )
-              }
-          }
-      ),
-      participantAdminConnection.findUnionspaceDefinitionProposal(
-        globalDomain,
-        svcParty.uid.namespace,
-        participantId.uid.namespace,
-      ),
-    ).tupled
-      .orElse(OptionT.liftF(acceptedState).filter {
-        case (partyToParticipant, unionspaceDefinition) =>
-          partyToParticipant.mapping.participantIds.contains(
-            participantId
-          ) && unionspaceDefinition.mapping.owners.contains(participantId.uid.namespace)
+            )
+            .map { expectedThreshold =>
+              proposals.find(proposal =>
+                proposal.mapping.participantIds
+                  .contains(participantId) && proposal.mapping.threshold == expectedThreshold
+              )
+            }
+        }
+    )
+      .orElse(OptionT.liftF(partyToParticipantAcceptedState).filter { partyToParticipant =>
+        partyToParticipant.mapping.participantIds.contains(
+          participantId
+        )
       })
       .toRightF {
-        acceptedState.map { case (partyToParticipant, unionspaceDefinition) =>
-          RequiredProposalsNotFound(
-            partyToParticipant.base.serial,
-            unionspaceDefinition.base.serial,
+        partyToParticipantAcceptedState.map { partyToParticipant =>
+          RequiredProposalNotFound(
+            partyToParticipant.base.serial
           )
         }
       }

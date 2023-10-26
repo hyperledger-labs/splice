@@ -55,14 +55,6 @@ class JoiningNodeSvcPartyHosting(
                     svcMembersSize,
                     svParty.uid.namespace.fingerprint,
                   )
-                _ = logger.info("Proposing addition to unionspace.")
-                unionspaceDefinitionProposal <- participantAdminConnection
-                  .ensureUnionspaceDefinitionProposal(
-                    domainId,
-                    svcParty.uid.namespace,
-                    svParty.uid.namespace,
-                    svParty.uid.namespace.fingerprint,
-                  )
                 _ = logger.info("Disconnecting from all domains")
                 _ <- participantAdminConnection.disconnectFromAllDomains()
                 _ = logger.info("candidate SV participant disconnected from global domain")
@@ -77,10 +69,10 @@ class JoiningNodeSvcPartyHosting(
                       .flatMap {
                         case Left(proposalNotFound) =>
                           if (
-                            proposalNotFound.partyToParticipantMappingSerial >= partyToParticipantProposal.base.serial || proposalNotFound.unionspaceDefinitionSerial >= unionspaceDefinitionProposal.base.serial
+                            proposalNotFound.partyToParticipantMappingSerial >= partyToParticipantProposal.base.serial
                           ) {
                             logger.info(
-                              s"Proposals $partyToParticipantProposal, $unionspaceDefinitionProposal no longer matches base serial, must be re-created $proposalNotFound"
+                              s"Proposals $partyToParticipantProposal no longer matches base serial, must be re-created $proposalNotFound"
                             )
                             Future.failed(proposalNotFound)
                           } else {
@@ -126,7 +118,7 @@ class JoiningNodeSvcPartyHosting(
                         .map(_ =>
                           throw Status.FAILED_PRECONDITION
                             .withDescription(
-                              s"Proposal not found by sponsor, and serial $proposalNotFound does not match proposal serial ${partyToParticipantProposal.base.serial}, ${unionspaceDefinitionProposal.base.serial}. Proposal must be re-created."
+                              s"Proposal not found by sponsor, and serial $proposalNotFound does not match proposal serial ${partyToParticipantProposal.base.serial}. Proposal must be re-created."
                             )
                             .asRuntimeException()
                         )

@@ -164,6 +164,7 @@ class FoundingNodeInitializer(
         cometBftNode,
         globalDomain,
       )
+      _ = svcAutomation.registerPostOnboardingTriggers()
       _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
       withSvcStore = new WithSvcStore(svcAutomation, globalDomain)
       _ <- retryProvider.ensureThatB(
