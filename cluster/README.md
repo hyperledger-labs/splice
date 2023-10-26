@@ -2,6 +2,10 @@
 
 - [Table of Contents](#table-of-contents)
   - [Available Clusters](#available-clusters)
+  - [Auth0 Tenants/Applications](#auth0-tenantsapplications)
+    - [`canton-network-dev` Tenant](#canton-network-dev-tenant)
+    - [`canton-network-sv-test` Tenant](#canton-network-sv-test-tenant)
+    - [`canton-network-validator-test` Tenant](#canton-network-validator-test-tenant)
   - [Connecting to a Cluster](#connecting-to-a-cluster)
     - [Granting VPN Access to External Partners](#granting-vpn-access-to-external-partners)
     - [Connecting Locally Hosted Canton Network Apps to a Cluster](#connecting-locally-hosted-canton-network-apps-to-a-cluster)
@@ -99,6 +103,57 @@ The `ScratchNetX` clusters are manually managed and intended to be
 test beds for new code and deployment process updates. These are a
 shared resource, so please coordinate with the team prior to making
 changes.
+
+## Auth0 Tenants/Applications
+
+Across all our Canton Network clusters, we use the same set of Auth0 applications to handle auth for various components of our three deployment stacks. A list of these applications along with a description of how they are used follows:
+
+### `canton-network-dev` Tenant
+
+This tenant is used by components of the `canton-network` Pulumi stack to deploy:
+* four supervalidator nodes `SV1-4` along with their wallet, directory and SV UIs
+* a Splitwell instance backed by its own validator
+* a standalone validator `Validator1` along with wallet, directory and splitwell UIs
+
+(In the table below i goes from 1 to 4)
+
+| Application Name             | Type                    | Purpose                                                      |
+|------------------------------|-------------------------|--------------------------------------------------------------|
+| API Explorer Application     | Machine to Machine      | Managing users for tests                                     |
+| SVi backend                  | Machine to Machine      | Auth for SV1-4 backends                                      |
+| SVi validator backend        | Machine to Machine      | Auth for SV1-4 validator backends                            |
+| Splitwell backend            | Machine to Machine      | Auth for splitwell backend                                   |
+| Splitwell validator backend  | Machine to Machine      | Auth for splitwell validator backend                         |
+| Validator1 backend           | Machine to Machine      | Auth for Validator1 backend                                  |
+| SVi Frontends                | Single Page Application | Auth for Wallet, Directory and SV UIs for SV1-4              |
+| Splitwell UI                 | Single Page Application | Auth for Splitwell UI                                        |
+| Validator1 UI                | Single Page Application | Auth for Wallet, Directory and Splitwell UIs for Validator1  |
+
+### `canton-network-sv-test` Tenant
+
+This tenant is used by components of the `sv-runbook` Pulumi stack to deploy:
+* a supervalidator `SV` along with associated wallet, directory and SV UIs
+
+| Application Name             | Type                    | Purpose                                                      |
+|------------------------------|-------------------------|--------------------------------------------------------------|
+| API Explorer Application     | Machine to Machine      | Managing users for tests                                     |
+| SV backend                   | Machine to Machine      | Auth for SV backend                                          |
+| Validator backend            | Machine to Machine      | Auth for SV validator backend                                |
+| Wallet UI                    | Single Page Application | Auth for SV Wallet UI                                        |
+| Directory UI                 | Single Page Application | Auth for SV Directory UI                                     |
+| SV UI                        | Single Page Application | Auth for SV UI                                               |
+
+### `canton-network-validator-test` Tenant
+
+This tenant is used by components of the `validator-runbook` Pulumi stack to deploy:
+* a standalone validator `Validator` along with associated wallet and directory UIs
+
+| Application Name             | Type                    | Purpose                                                      |
+|------------------------------|-------------------------|--------------------------------------------------------------|
+| API Explorer Application     | Machine to Machine      | Managing users for tests                                     |
+| Validator app backend        | Machine to Machine      | Auth for Validator backend                                   |
+| Wallet UI                    | Single Page Application | Auth for Validator Wallet UI                                 |
+| Directory UI                 | Single Page Application | Auth for Validator Directory UI                              |
 
 ## Connecting to a Cluster
 

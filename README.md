@@ -1031,25 +1031,11 @@ To make sure your lock files match CI, run the following steps:
 
 ## Auth0 Configuration
 
-We use Auth0 as our IAM integration & OAuth provider for applications we (as DA/the Canton Network team) run in our Google Cloud cluster(s). This section elucidates how this is currently set up, but keep in mind this is not necessarily how we'd advise users of self-hosted validators to set up an Auth0 integration. For that, they should look at the relevant runbook docs section.
+We use Auth0 as our IAM integration & OAuth provider for applications we (as DA/the Canton Network team) run in our Google Cloud cluster(s). [This section](./cluster/README.md#auth0-tenantsapplications) elucidates how this is currently set up, but keep in mind this is not necessarily how we'd advise users of self-hosted validators to set up an Auth0 integration. For that, they should look at the relevant runbook docs section.
 
-### Tenant & Application Layout
+If you don't have access to any listed tenant, give a shout in the `#team-canton-network-internal` Slack channel. Any admin of the tenant may invite anyone else (and everyone is an admin by default).
 
-Currently we maintain two tenants with some application clients in them:
-
-1. `canton-network-test`: A tenant dedicated for test environments
-    - `API Explorer Application`: We use this for getting auth0 management tokens, which we need for creating test users for integration tests.
-    - `Local Auth`: An application to support auth0 auth for all frontends running on localhost
-2. `canton-network-dev`: The tenant dedicated for our cluster deployments
-    - `API Explorer Application`: We use this for getting auth0 management tokens, which we need for creating test users for the preflight check.
-    - `CN validator backend`: An application for all validator app backends running on all cluster deployments (scratch, staging, dev, and test)
-    - `CN wallet backend`: An application for all wallet app backends running on all cluster deployments (scratch, staging, dev, and test)
-    - `SPA Experiment`: An application for the SPA experiment located in `/experiments/auth0-spa` in this repository
-    - `Validator1 Auth`: A monolith application that supports all validator1-hosted UIs (Splitwell, Directory, and Wallet) running on all cluster deployments (scratch, staging, dev, and test)
-
-If you don't have access to either tenant, give a shout in the #team-canton-network-internal Slack channel. Any admin of the tenant may invite anyone else (and everyone is an admin by default).
-
-We also have a few username-password combinations in use in our clusters, who are maintained as users in the `canton-network-dev` tenant. Their details are in [this Google doc](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit#).
+We also have a few username-password combinations in use in our clusters, who are maintained as users in the tenants we use. Their details are in [this Google doc](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit#).
 
 ## CircleCI Configuration
 
