@@ -18,6 +18,11 @@ Release Notes
     will also be removed.
   * Renamed ``SV_WALLET_USER_ID`` placeholder in ``validator-values.yaml`` to ``OPERATOR_WALLET_USER_ID`` to better reflect that this value is the operator's user in the deployment for both SVs and standalone validator nodes
 
+* Bugfixes:
+
+  * Fixed an issue with fees in Scan recent activity and transaction history API where some sender and receiver fees were not reported.
+    If a party transfers to themself, it will now be included in the Transfer receivers property in API responses (this was previously filtered out).
+
 2023-10-23
 ----------
 

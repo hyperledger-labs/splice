@@ -22,6 +22,7 @@ import java.time.Duration
 import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+import com.digitalasset.canton.data.CantonTimestamp
 
 trait TimeTestUtil extends CNNodeTestCommon {
   this: CommonCNNodeAppInstanceReferences & WalletTestUtil =>
@@ -209,10 +210,11 @@ trait TimeTestUtil extends CNNodeTestCommon {
       validatorParty: PartyId,
       coin: HttpWalletAppClient.CoinPosition,
       outputs: Seq[cc.coin.TransferOutput],
+      now: CantonTimestamp,
   )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment) = {
     val coinRules = sv1ScanBackend.getCoinRules()
-    val transferContext = sv1ScanBackend.getUnfeaturedAppTransferContext(getLedgerTime)
-    val openRound = sv1ScanBackend.getLatestOpenMiningRound(getLedgerTime)
+    val transferContext = sv1ScanBackend.getUnfeaturedAppTransferContext(now)
+    val openRound = sv1ScanBackend.getLatestOpenMiningRound(now)
 
     val authorizers =
       Seq(userParty, validatorParty) ++ outputs.map(o => PartyId.tryFromProtoPrimitive(o.receiver))

@@ -18,6 +18,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
 import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem
 import com.daml.network.integration.plugins.UseInMemoryStores
+import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 
 class InMemoryScanIntegrationTest extends ScanIntegrationTest {
   registerPlugin(new UseInMemoryStores(loggerFactory))
@@ -210,6 +211,7 @@ class ScanIntegrationTest
   "list recent transfers and taps, with rewards collection and coin merging turned off" in {
     implicit env =>
       val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
+      val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       val aliceUserName = aliceWalletClient.config.ledgerApiUser
       val bobUserName = bobWalletClient.config.ledgerApiUser
 
@@ -227,8 +229,14 @@ class ScanIntegrationTest
 
       bobMergeCoinsTrigger.pause().futureValue
 
-      val bobTapAmount = 1000.0
-      val aliceTapAmount = 1000.0
+      val latestRound =
+        sv1ScanBackend.getLatestOpenMiningRound(CantonTimestamp.now()).contract.payload.round.number
+
+      val coinConfig =
+        sv1ScanBackend.getCoinConfigForRound(latestRound)
+
+      val bobTapAmount = 100000.0
+      val aliceTapAmount = 100000.0
 
       actAndCheck(
         "Tap coins for Alice and bob", {
@@ -243,8 +251,8 @@ class ScanIntegrationTest
         },
       )
 
-      val transferAmount = 100.0
-      clue("Transfer some CC to alice")({
+      val transferAmount = BigDecimal(10000.0)
+      clue("Transfer some CC to alice") {
         p2pTransfer(
           bobValidatorBackend,
           bobWalletClient,
@@ -252,57 +260,163 @@ class ScanIntegrationTest
           aliceUserParty,
           transferAmount,
         )
-      })
+      }
 
-      clue("Alice receives the transfer from bob")({
+      clue("Alice receives the transfer from bob") {
         eventually() {
           val balance = aliceWalletClient.balance()
-          assertInRange(
-            balance.unlockedQty,
-            (aliceTapAmount + transferAmount - 1, aliceTapAmount + transferAmount),
-          )
+          balance.unlockedQty shouldBe (aliceTapAmount + transferAmount)
         }
         eventually() {
+          val approxBobFees = 3 // this value depends on transferAmount
           val balance = bobWalletClient.balance()
           assertInRange(
             balance.unlockedQty,
-            (bobTapAmount - transferAmount - 2, bobTapAmount - transferAmount),
+            (bobTapAmount - transferAmount - approxBobFees, bobTapAmount - transferAmount),
           )
         }
-      })
+      }
+      val bobBalanceAfterTransfer = bobWalletClient.balance()
 
-      eventually() {
-        // only look at activities that bob sent to prevent flakes,
-        // some activities may have occurred with the same SVC in previous tests
-        val transfers =
-          sv1ScanBackend.listActivity(None, 10).flatMap(_.transfer).filter { transfer =>
-            PartyId.tryFromProtoPrimitive(
-              transfer.sender.party
-            ) == bobUserParty
+      clue("The transfer from Bob to Alice is shown in scan activity") {
+        eventually() {
+          // only look at activities that bob sent
+          val transfers =
+            sv1ScanBackend.listActivity(None, 10).flatMap(_.transfer).filter { transfer =>
+              PartyId.tryFromProtoPrimitive(
+                transfer.sender.party
+              ) == bobUserParty
+            }
+
+          transfers should have size (1)
+          val transfer = transfers.head
+          val inputCoinAmount =
+            transfer.sender.inputCoinAmount.map(BigDecimal(_)).getOrElse(BigDecimal(0))
+          val senderChangeFee = BigDecimal(transfer.sender.senderChangeFee)
+          senderChangeFee shouldBe (coinConfig.coinCreateFee)
+          val senderFee = BigDecimal(transfer.sender.senderFee)
+          val holdingFees = BigDecimal(transfer.sender.holdingFees)
+          val senderChangeAmount = BigDecimal(transfer.sender.senderChangeAmount)
+
+          senderFee shouldBe expectedSenderFee(transferAmount)
+
+          val totalSenderFee = senderFee + holdingFees + senderChangeFee
+
+          inputCoinAmount - senderChangeAmount shouldBe (transferAmount + totalSenderFee)
+
+          // alice receives transfer
+          transfer.receivers
+            .map(r => BigDecimal(r.amount))
+            .sum shouldBe transferAmount
+
+          // receiverFee is by default set to 0, sender pays all fees.
+          transfer.receivers
+            .map(r => BigDecimal(r.receiverFee)) should contain only (BigDecimal(0))
+
+          val taps = sv1ScanBackend.listActivity(None, 10).flatMap(_.tap).filter { tap =>
+            PartyId.tryFromProtoPrimitive(tap.coinOwner) == bobUserParty
           }
-
-        transfers should have size (1)
-        val transfer = transfers.head
-        // bob transferred 100 + fees
-        val inputCoinAmount =
-          transfer.sender.inputCoinAmount.map(BigDecimal(_)).getOrElse(BigDecimal(0))
-
-        BigDecimal(transfer.sender.senderChangeAmount) - inputCoinAmount should beWithin(
-          BigDecimal(-1 * (transferAmount + 1.1)),
-          BigDecimal(-1 * transferAmount),
-        )
-        // alice receives transfer
-        transfer.receivers
-          .map(r => BigDecimal(r.amount))
-          .sum shouldBe BigDecimal(transferAmount)
-
-        val taps = sv1ScanBackend.listActivity(None, 10).flatMap(_.tap).filter { tap =>
-          PartyId.tryFromProtoPrimitive(tap.coinOwner) == bobUserParty
+          taps should have size (1)
+          val tap = taps.head
+          // bob tapped
+          BigDecimal(tap.coinAmount) shouldBe (BigDecimal(bobTapAmount))
         }
-        taps should have size (1)
-        val tap = taps.head
-        // bob tapped
-        BigDecimal(tap.coinAmount) shouldBe (BigDecimal(bobTapAmount))
+      }
+      val selfTransferAmount = BigDecimal(1000)
+      clue("Self Transfer some CC from/to Bob") {
+        p2pTransfer(
+          bobValidatorBackend,
+          bobWalletClient,
+          bobWalletClient,
+          bobUserParty,
+          selfTransferAmount,
+        )
+      }
+      clue("Bob receives self-transfer") {
+        eventually() {
+          // a self-transfer should cost some fees.
+          val balance = bobWalletClient.balance()
+          balance.unlockedQty should be < bobBalanceAfterTransfer.unlockedQty
+        }
+      }
+      clue("Bob's self-transfer is shown in scan activity") {
+        eventually() {
+          // only check bob's self transfer
+          val transfers =
+            sv1ScanBackend.listActivity(None, 10).flatMap(_.transfer).filter { transfer =>
+              PartyId.tryFromProtoPrimitive(
+                transfer.sender.party
+              ) == bobUserParty &&
+              transfer.receivers.size == 1 && PartyId
+                .tryFromProtoPrimitive(transfer.receivers.head.party) == bobUserParty
+            }
+          transfers should have size (1)
+          val transfer = transfers.head
+          val receiver = transfer.receivers.loneElement
+          PartyId
+            .tryFromProtoPrimitive(receiver.party) shouldBe (bobUserParty)
+          val inputCoinAmount =
+            transfer.sender.inputCoinAmount.map(BigDecimal(_)).getOrElse(BigDecimal(0))
+          val senderChangeFee = BigDecimal(transfer.sender.senderChangeFee)
+          senderChangeFee shouldBe (coinConfig.coinCreateFee)
+
+          val senderFee = BigDecimal(transfer.sender.senderFee)
+          val holdingFees = BigDecimal(transfer.sender.holdingFees)
+          val senderChangeAmount = BigDecimal(transfer.sender.senderChangeAmount)
+          senderFee shouldBe BigDecimal(CNNodeUtil.defaultCreateFee.fee)
+
+          val totalSenderFee = senderFee + holdingFees + senderChangeFee
+          inputCoinAmount - senderChangeAmount shouldBe (selfTransferAmount + totalSenderFee)
+
+          BigDecimal(receiver.amount) shouldBe selfTransferAmount
+          BigDecimal(receiver.receiverFee) shouldBe BigDecimal(0)
+        }
+      }
+
+      val balance0 = charlieWalletClient.balance().unlockedQty
+      val receiverFeeRatio = BigDecimal("0.5")
+      actAndCheck(
+        "Alice makes a transfer with a non-zero receiverFeeRatio",
+        rawTransfer(
+          aliceValidatorBackend,
+          aliceWalletClient.config.ledgerApiUser,
+          aliceUserParty,
+          aliceValidatorBackend.getValidatorPartyId(),
+          aliceWalletClient.list().coins.head,
+          Seq(
+            transferOutputCoin(
+              charlieUserParty,
+              receiverFeeRatio,
+              transferAmount,
+            )
+          ),
+          CantonTimestamp.now(),
+        ),
+      )(
+        "Charlie has received the CC",
+        _ => charlieWalletClient.balance().unlockedQty should be > balance0,
+      )
+      clue("Alice's transfer to Charlie shows receiver fees according to receiverFeeRatio set") {
+        eventually() {
+          // only check bob's self transfer
+          val transfers =
+            sv1ScanBackend.listActivity(None, 10).flatMap(_.transfer).filter { transfer =>
+              PartyId.tryFromProtoPrimitive(
+                transfer.sender.party
+              ) == aliceUserParty &&
+              transfer.receivers.size == 1 && PartyId
+                .tryFromProtoPrimitive(transfer.receivers.head.party) == charlieUserParty
+            }
+          transfers should have size (1)
+          val transfer = transfers.head
+          val receiver = transfer.receivers.loneElement
+          PartyId
+            .tryFromProtoPrimitive(receiver.party) shouldBe (charlieUserParty)
+          BigDecimal(receiver.amount) shouldBe transferAmount
+          BigDecimal(receiver.receiverFee) shouldBe expectedSenderFee(
+            transferAmount
+          ) * receiverFeeRatio
+        }
       }
   }
 
@@ -456,5 +570,24 @@ class ScanIntegrationTest
         .filter(_.coinOwner == sv1UserParty.toProtoPrimitive)
       BigDecimal(sv1MintsFromHistory.loneElement.coinAmount) shouldBe BigDecimal(mintAmount)
     }
+  }
+
+  def expectedSenderFee(amount: BigDecimal) = {
+    require(amount > 1000 && amount < 100000)
+    val initialRate = CNNodeUtil.defaultTransferFee.initialRate
+    val step1 = CNNodeUtil.defaultTransferFee.steps.get(0)
+    val step2 = CNNodeUtil.defaultTransferFee.steps.get(1)
+    val step3 = CNNodeUtil.defaultTransferFee.steps.get(2)
+    val (step1Amount, step1Mult) = (step1._1, step1._2)
+    val (step2Amount, step2Mult) = (step2._1, step2._2)
+    // ensuring the right steps are hardcoded here.
+    BigDecimal(step3._1) should be > amount
+    val remainder = amount - step1Amount - step2Amount
+    // this is specific for the transferAmount > step3._1
+    val steppedRate =
+      initialRate * step1Amount + step1Mult * step2Amount +
+        step2Mult
+        * remainder
+    CNNodeUtil.defaultCreateFee.fee + steppedRate
   }
 }

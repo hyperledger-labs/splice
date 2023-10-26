@@ -210,6 +210,7 @@ class WalletTxLogTimeBasedIntegrationTest
               Duration.ofMinutes(5),
             ),
           ),
+          getLedgerTime,
         ),
       )(
         "Charlie has received the CC",

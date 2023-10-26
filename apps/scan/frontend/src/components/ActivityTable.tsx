@@ -135,19 +135,30 @@ function toActivities(item: ListActivityResponseItem, svcPartyId: string): Activ
       .plus(BigNumber(senderAmount.sender_change_fee));
   }
 
-  function getActivityFromTransfer(transfer: Transfer): ActivityView {
+  function isSelfTransfer(transfer: Transfer): boolean {
     const receivers = transfer.receivers;
+    return (
+      receivers.length === 0 ||
+      (receivers.map(r => r.party).includes(transfer.sender.party) && receivers.length === 1)
+    );
+  }
+
+  function getActivityFromTransfer(transfer: Transfer): ActivityView {
     let activityType;
     let provider;
     let receiver;
     let feesBurnt;
     let transferAmount;
-    if (transfer.receivers.length === 0) {
+
+    const receivers = transfer.receivers;
+    const selfTransfer = isSelfTransfer(transfer);
+
+    if (selfTransfer) {
       activityType = 'Merge Fee Burn';
     } else {
       activityType = 'Transfer';
     }
-    if (transfer.receivers.length === 0) {
+    if (selfTransfer) {
       provider = svcPartyId;
     } else {
       provider = transfer.provider;
@@ -161,26 +172,17 @@ function toActivities(item: ListActivityResponseItem, svcPartyId: string): Activ
       receiver = 'Multiple';
     }
     const senderAmount = transfer.sender;
-    if (receivers.length === 0) {
-      feesBurnt = feesFromSender(senderAmount);
-    } else if (receivers.length === 1) {
-      const r = receivers[0];
-      feesBurnt = feesFromSender(senderAmount).plus(BigNumber(r.receiver_fee));
-    } else {
-      const receiverFees = transfer.receivers
-        .map(r => BigNumber(r.receiver_fee))
-        .reduce((prev, cur) => prev.plus(cur));
-      feesBurnt = feesFromSender(senderAmount).plus(receiverFees);
-    }
-    if (receivers.length === 0) {
+    const receiverFees = receivers
+      .map(r => BigNumber(r.receiver_fee))
+      .reduce((prev, cur) => prev.plus(cur), BigNumber(0));
+    feesBurnt = feesFromSender(senderAmount).plus(receiverFees);
+
+    if (selfTransfer) {
       transferAmount = BigNumber(0);
-    } else if (receivers.length === 1) {
-      const r = receivers[0];
-      transferAmount = BigNumber(r.amount);
     } else {
       transferAmount = receivers
         .map(r => BigNumber(r.amount))
-        .reduce((prev, cur) => prev.plus(cur));
+        .reduce((prev, cur) => prev.plus(cur), BigNumber(0));
     }
     return {
       activityType: activityType,
@@ -240,13 +242,14 @@ function toActivities(item: ListActivityResponseItem, svcPartyId: string): Activ
   if (item.transfer != null) {
     const transfer = item.transfer!;
     const appRewardAmount = BigNumber(transfer.sender.input_app_reward_amount ?? '0');
+    const selfTransfer = isSelfTransfer(transfer);
+    let receiver;
+    if (selfTransfer) {
+      receiver = activity.sender;
+    } else {
+      receiver = activity.receiver;
+    }
     if (!appRewardAmount.isEqualTo(BigNumber(0))) {
-      let receiver;
-      if (transfer.receivers.length === 0) {
-        receiver = activity.sender;
-      } else {
-        receiver = activity.receiver;
-      }
       activities.push({
         ...activity,
         activityType: 'App Reward Collected',
@@ -259,12 +262,6 @@ function toActivities(item: ListActivityResponseItem, svcPartyId: string): Activ
     }
     const validatorRewardAmount = BigNumber(transfer.sender.input_validator_reward_amount ?? '0');
     if (!validatorRewardAmount.isEqualTo(BigNumber(0))) {
-      let receiver;
-      if (transfer.receivers.length === 0) {
-        receiver = activity.sender;
-      } else {
-        receiver = activity.receiver;
-      }
       activities.push({
         ...activity,
         activityType: 'Validator Reward Collected',

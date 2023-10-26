@@ -216,9 +216,7 @@ object TxLogEntry {
       res: cc.coin.TransferResult,
   ): SenderAmount = {
     val sender = arg.transfer.sender
-
     val senderFee = parseOutputAmounts(arg, res)
-      .filter(o => o.output.receiver == sender && o.output.lock.isEmpty)
       .map(_.senderFee)
       .sum
 
@@ -243,7 +241,6 @@ object TxLogEntry {
     // The code below merges amounts and fees for the same receiver, while preserving
     // the order of receivers.
     parseOutputAmounts(arg, res)
-      .filter(_.output.receiver != arg.transfer.sender)
       .map(o =>
         ReceiverAmount(
           party = o.output.receiver,
