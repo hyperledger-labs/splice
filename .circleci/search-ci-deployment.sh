@@ -3,11 +3,11 @@ set -eou pipefail
 
 # Add your personal Circle CI API token to the CIRCLECI_TOKEN environment variable before running the script.
 function usage() {
-  echo "Usage: ./search-ci-deployment.sh -n <WORKFLOW_NAME> [<flags>]"
+  echo "Usage: ./search-ci-deployment.sh <flags>"
   echo "Flags:"
   echo "  -h                                                       display help message"
   echo "  -n   <WORKFLOW_NAME>                                     name of a cci workflow"
-  echo "  -l   <N_LATEST_RUNS>                                     number of latest runs to display"
+  echo "  [-l   <N_LATEST_RUNS>]                                   number of latest runs to display (default 1)"
 }
 
 CCI_PROJECT="github/DACH-NY/canton-network-node"

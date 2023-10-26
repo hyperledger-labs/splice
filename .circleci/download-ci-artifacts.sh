@@ -6,17 +6,46 @@ set -eou pipefail
 
 echo "This script downloads all build artifacts from a CircleCI job"
 
+function usage() {
+  echo "Usage: ./download-ci-artifacts.sh <CI_BUILD_NUM> | <flags>"
+  echo "Flags:"
+  echo "  -h                                                    display help message"
+  echo "  -j   <CI_BUILD_NUM>                                   cci job number"
+  echo "  [-r   <RUN_NUM>]                                      cci run number (default all)"
+}
+
+while getopts "h:j:r:" arg; do
+  case ${arg} in
+    h)
+      usage
+      exit 0
+      ;;
+    j)
+      CI_BUILD_NUM="${OPTARG}"
+      ;;
+    r)
+      RUN_NUM="${OPTARG}"
+      ;;
+    ?)
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "${CI_BUILD_NUM+x}" ]]; then
+  CI_BUILD_NUM=$1
+fi
+
+if [ -n "${RUN_NUM-}" ]; then
+  regex='https://[^"]*/'${RUN_NUM}'/[^"]*'
+else
+  regex='https://[^"]*'
+fi
+
 CI_VCSTYPE="github"
 CI_ORGNAME="DACH-NY"
 CI_PROJECT="canton-network-node"
-
-if [ -z "${1:-}" ]; then
-  echo "Please enter the job number. This should be a ~5 digit number."
-  read -r CI_BUILD_NUM
-else
-  CI_BUILD_NUM="${1}"
-fi
-
 BASE_TARGET_DIRECTORY="$(pwd)/log/ci/$CI_BUILD_NUM"
 mkdir -p "$BASE_TARGET_DIRECTORY"
 echo "Saving all artifacts to $BASE_TARGET_DIRECTORY"
@@ -24,7 +53,7 @@ echo "Saving all artifacts to $BASE_TARGET_DIRECTORY"
 ARTIFACTS_URL="https://circleci.com/api/v2/project/$CI_VCSTYPE/$CI_ORGNAME/$CI_PROJECT/$CI_BUILD_NUM/artifacts"
 
 curl -s -u "${CIRCLECI_TOKEN}": -H "Content-Type: application/json" \
-      "$ARTIFACTS_URL" | grep -o 'https://[^"]*' > "$BASE_TARGET_DIRECTORY/artifacts.txt"
+      "$ARTIFACTS_URL" | grep -o "${regex}" > "$BASE_TARGET_DIRECTORY/artifacts.txt"
 
 while read -r p; do
   if [[ $p = *.log.gz ]] || [[ $p = *.clog.gz ]]; then
