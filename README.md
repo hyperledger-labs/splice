@@ -351,6 +351,10 @@ buddy for help with getting started on the code base.
 
 (AKA "Flake Rotation", "Flaky Test Duty")
 
+Important resources:
+- [flake checklist](support/FLAKE_CHECKLIST.md)
+- [preflight checklist](support/PREFLIGHT_CHECKLIST.md)
+
 The Canton Network team has a formal support rotation.
 Each of our weekly sprints has a pair of engineers
 assigned to be responsible during the sprint for driving the
@@ -396,20 +400,7 @@ ask another engineer to substitute for them.
 For engineers on support duty, the resolution process is as follows.
 
 * When there is a Slack message on [#team-canton-network-internal-ci](https://daholdings.slack.com/archives/C05DT77QF5M)
-  indicating a failure, investigate
-  and assess if it's a new or existing failure. For new failures
-  (for which the resolution is not immediately clear and involves a PR that can be submitted right away),
-  create a new tracking issue in the [Flaky Test](https://github.com/DACH-NY/canton-network-node/milestone/19)
-  GitHub milestone.  The issue for a given failure should be linked in the Slack
-  thread for the failure itself.
-* All relevent information should be tracked to the extent possible in the
-  Github issue. This includes logs, screenshots, links to CI jobs, and any
-  observations or notes that might be useful as the issue is investigated.
-* After assessing the issue, reach out to other team members as is useful to
-  resolve the issue. Once the root cause has been identified, note that in the
-  Github issue, along with any reproduction instructions if possible.
-  Where possible fix the root cause, or drive the fixing of the root cause
-  to keep the number of active flakes low and team productivity high.
+  indicating a failure follow the checklist [for flakes](support/FLAKE_CHECKLIST.md).
 * PR's for any fixes should also be linked to the issue.
 * For failures that are not frequent enough to warrant a fix, the
   issue in Github should be labeled "infrequent/no repo".
@@ -420,6 +411,7 @@ flaky test and can be more holistically resolved.
 
 In addition to driving the elimination of flakes in our test setup,
 the engineers on support duty are also the first line of defence when it comes to keeping our cluster deployments healthy.
+For any deployment or preflight failures follow the [preflight checklist](support/PREFLIGHT_CHECKLIST.md) to identify the root cause.
 The `DevNet` and `TestNet` clusters are especially noteworthy in this context, as they are used by our external partners.
 **At least one engineer on support rotation that resides in the European timezone must be online at 9:00 AM CET/CEST
 on Mondays**,

@@ -21,19 +21,6 @@ responsible for resolving it.
    * The Canton logs are in `canton.clog` for wallclock tests, `canton-simtime.clog` for
      simtime tests and `canton-standalone-$suffix.clog` for tests that
      start a new Canton instance within the test.
-   * For preflight checks, you frequently also need the logs of the
-     corresponding app running in our cluster. Those logs are not in
-     the CircleCI artifacts.  Our CircleCI jobs
-     ([example](https://app.circleci.com/pipelines/github/DACH-NY/canton-network-node/50917/workflows/448be273-6661-4e02-87d9-97a8e2b20b8a/jobs/314609))
-     have a step called *Displaying commands to download gcloud
-     logs*. This prints the `cncluster gcloud_logs` command to
-     download the logs for each app in our cluster for the timeframe
-     the test ran. Downloading all of them can be slow so usually you
-     want to identify the potentially relevant apps based on the logs
-     found in the CircleCI artifacts, e.g., a failure in
-     `Validator1PreflightIntegrationTest` is likely going to require
-     logs of the validator1 validator app and the validator1
-     participant.
 4. Based on the CircleCI output and the log files, check if there is
    already an issue in the [Flaky Tests
    milestone](https://github.com/DACH-NY/canton-network-node/issues?q=is%3Aopen+is%3Aissue+milestone%3A%22Flaky+Tests%22). If
@@ -60,6 +47,7 @@ contact `git blame` can be a useful starting point to find someone
 that worked on the relevant part of the system. If you can't find
 someone that well, post in `#team-canton-network-internal.`
 The person who is assigned the issue should have full context. Specifically, as the person on flake rotation who is assigning an issue, please communicate how often this issue has occurred and how blocking it is for the rest of the team.
+
 ## Investigating the cause of a flake and fixing it
 
 Once an issue has been created and assigned, it is time to investigate
