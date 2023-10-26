@@ -13,6 +13,7 @@ import com.daml.network.http.v0.wallet.WalletClient
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{JavaDecodeUtil as DecodeUtil, WalletTestUtil}
+import com.daml.network.integration.plugins.UseInMemoryStores
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
@@ -21,6 +22,10 @@ import org.slf4j.event.Level
 
 import scala.concurrent.Future
 import scala.util.Try
+
+class InMemoryWalletIntegrationTest extends WalletIntegrationTest {
+  registerPlugin(new UseInMemoryStores(loggerFactory))
+}
 
 class WalletIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
