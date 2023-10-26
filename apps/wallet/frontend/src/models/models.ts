@@ -1,9 +1,5 @@
 import BigNumber from 'bignumber.js';
 import { Contract } from 'common-frontend';
-import {
-  AcceptedTransferOffer,
-  TransferOffer,
-} from 'common-frontend/daml.js/wallet-0.1.0/lib/CN/Wallet/TransferOffer/module';
 import { CoinPosition } from 'wallet-openapi';
 
 import {
@@ -11,7 +7,11 @@ import {
   SubscriptionIdleState,
   SubscriptionPayment,
   SubscriptionRequest,
-} from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
+} from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
+import {
+  AcceptedTransferOffer,
+  TransferOffer,
+} from '@daml.js/wallet/lib/CN/Wallet/TransferOffer/module';
 import { Party, ContractId } from '@daml/types';
 
 import { ConvertedCurrency } from '../utils/currencyConversion';

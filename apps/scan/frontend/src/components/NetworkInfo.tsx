@@ -6,8 +6,6 @@ import {
   Loading,
   microsecondsToMinutes,
 } from 'common-frontend';
-import { CoinConfig } from 'common-frontend/daml.js/canton-coin-0.1.0/lib/CC/CoinConfig/module';
-import { SteppedRate } from 'common-frontend/daml.js/canton-coin-0.1.0/lib/CC/Fees/module';
 import { useGetCoinRules } from 'common-frontend/scan-api';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -22,6 +20,9 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+
+import { CoinConfig } from '@daml.js/canton-coin/lib/CC/CoinConfig/module';
+import { SteppedRate } from '@daml.js/canton-coin/lib/CC/Fees/module';
 
 const NetworkInfo: React.FC = () => {
   const getCoinRulesQuery = useGetCoinRules();

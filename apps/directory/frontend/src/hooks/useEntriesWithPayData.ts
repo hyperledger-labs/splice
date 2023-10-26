@@ -8,7 +8,7 @@ import {
   SubscriptionPayData,
   SubscriptionPayment,
   SubscriptionRequest,
-} from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
+} from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';
 
 import {

@@ -12,7 +12,7 @@ import {
   Typography,
 } from '@mui/material';
 
-import { CoinConfig, USD } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
+import { CoinConfig, USD } from '@daml.js/canton-coin/lib/CC/CoinConfig';
 import {
   ActionRequiringConfirmation,
   SvcRulesConfig,

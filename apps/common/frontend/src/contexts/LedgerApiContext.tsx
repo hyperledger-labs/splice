@@ -7,13 +7,45 @@ import { Choice, ContractId, Template, TemplateOrInterface } from '@daml/types';
 
 const DIRECTORY_LEDGER_NAME = 'directory-ledger';
 
+export abstract class PackageIdResolver {
+  protected getQualifiedName(templateId: string): string {
+    const parts = templateId.split(':');
+    if (parts.length !== 3) {
+      throw Error(`Invalid template id: ${templateId}, expected 3 parts but got ${parts.length}`);
+    }
+    return `${parts[1]}:${parts[2]}`;
+  }
+  abstract resolveTemplateId(templateId: string): Promise<string>;
+
+  async resolveTemplateOrInterface<T extends object, K>(
+    tmpl: TemplateOrInterface<T, K>
+  ): Promise<TemplateOrInterface<T, K>> {
+    const templateId = await this.resolveTemplateId(tmpl.templateId);
+    return { ...tmpl, templateId };
+  }
+
+  async resolveTemplate<T extends object, K>(tmpl: Template<T, K>): Promise<Template<T, K>> {
+    const resolvedTmpl = await this.resolveTemplateOrInterface(tmpl);
+    return resolvedTmpl as Template<T, K>;
+  }
+
+  async resolveChoice<T extends object, C, R, K>(
+    choice: Choice<T, C, R, K>
+  ): Promise<Choice<T, C, R, K>> {
+    const template = await this.resolveTemplateOrInterface(choice.template());
+    return { ...choice, template: () => template };
+  }
+}
+
 // Uses the JSON API (via @daml/ledger) to connect to the ledger.
 export class LedgerApiClient {
   private ledger: Ledger;
   private userId: string;
-  constructor(ledger: Ledger, userId: string) {
+  private packageIdResolver: PackageIdResolver;
+  constructor(ledger: Ledger, userId: string, packageIdResolver: PackageIdResolver) {
     this.ledger = ledger;
     this.userId = userId;
+    this.packageIdResolver = packageIdResolver;
   }
   async getPrimaryParty(): Promise<string> {
     const user = await callWithLogging(
@@ -27,10 +59,11 @@ export class LedgerApiClient {
 
   async create<T extends object, K>(
     actAs: string[],
-    template: Template<T, K>,
+    unresolvedTemplate: Template<T, K>,
     payload: T,
     domainId?: string
   ): Promise<Contract<T>> {
+    const template = await this.packageIdResolver.resolveTemplate(unresolvedTemplate);
     console.debug(
       `Creating template templateId=${template.templateId}, actAs=${JSON.stringify(
         actAs
@@ -62,12 +95,13 @@ export class LedgerApiClient {
   async exercise<T extends object, C, R, K>(
     actAs: string[],
     readAs: string[],
-    choice: Choice<T, C, R, K>,
+    unresolvedChoice: Choice<T, C, R, K>,
     contractId: ContractId<T>,
     argument: C,
     domainId?: string,
     disclosedContracts: DisclosedContract[] = []
   ): Promise<R> {
+    const choice = await this.packageIdResolver.resolveChoice(unresolvedChoice);
     console.debug(
       `Exercising choice: actAs=${JSON.stringify(actAs)}, readAs=${JSON.stringify(
         readAs
@@ -104,11 +138,14 @@ export class LedgerApiClient {
     return result[0];
   }
 
-  async query<T extends object, K, I extends string>(
+  // TODO(#8269) Remove this once the directory UI has been switched to read directly from the validator
+  // as it doesn't support upgrading.
+  async query<T extends object, K>(
     operationName: string,
-    template: TemplateOrInterface<T, K, I>,
+    unresolvedTemplate: Template<T, K>,
     query?: Query<T>
-  ): Promise<CreateEvent<T, K, I>[]> {
+  ): Promise<CreateEvent<T, K>[]> {
+    const template = await this.packageIdResolver.resolveTemplate(unresolvedTemplate);
     return await callWithLogging(
       DIRECTORY_LEDGER_NAME,
       operationName,
@@ -122,6 +159,7 @@ export class LedgerApiClient {
     ev: CreateEvent<T, K, I>
   ): Contract<T> {
     return {
+      templateId: ev.templateId,
       contractId: ev.contractId,
       payload: ev.payload,
       // For now, we set dummy values here because the JSON API does not
@@ -139,10 +177,12 @@ const LedgerApiContext = React.createContext<LedgerApiClient | undefined>(undefi
 
 export interface LedgerApiProps {
   jsonApiUrl: string;
+  packageIdResolver: PackageIdResolver;
 }
 
 export const LedgerApiClientProvider: React.FC<React.PropsWithChildren<LedgerApiProps>> = ({
   jsonApiUrl,
+  packageIdResolver,
   children,
 }) => {
   const { userAccessToken, userId } = useUserState();
@@ -151,7 +191,7 @@ export const LedgerApiClientProvider: React.FC<React.PropsWithChildren<LedgerApi
 
   if (userAccessToken && userId) {
     const ledgerOptions: LedgerOptions = { httpBaseUrl: jsonApiUrl, token: userAccessToken };
-    ledgerApiClient = new LedgerApiClient(new Ledger(ledgerOptions), userId);
+    ledgerApiClient = new LedgerApiClient(new Ledger(ledgerOptions), userId, packageIdResolver);
   }
 
   return <LedgerApiContext.Provider value={ledgerApiClient}>{children}</LedgerApiContext.Provider>;

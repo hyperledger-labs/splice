@@ -1,4 +1,3 @@
-import { CoinRules } from 'common-frontend/daml.js/canton-coin-0.1.0/lib/CC/Coin/module';
 import { RestHandler, rest } from 'msw';
 import {
   GetCoinRulesResponse,
@@ -9,6 +8,7 @@ import {
   ListActivityResponse,
 } from 'scan-openapi';
 
+import { CoinRules } from '@daml.js/canton-coin/lib/CC/Coin/module';
 import damlTypes from '@daml/types';
 
 export const buildScanMock = (scanUrl: string): RestHandler[] => [
@@ -210,6 +210,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
               },
               isDevNet: true,
               lock: false,
+              upgrade: null,
             }),
             payload_value: {},
             metadata: {

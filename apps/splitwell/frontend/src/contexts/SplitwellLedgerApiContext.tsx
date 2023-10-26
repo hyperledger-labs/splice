@@ -208,21 +208,27 @@ const SplitwellLedgerApiContext = React.createContext<SplitwellLedgerApiClient |
 
 export const SplitwellLedgerApiClientProvider: React.FC<
   React.PropsWithChildren<LedgerApiProps>
-> = ({ jsonApiUrl, children }) => {
+> = ({ jsonApiUrl, children, packageIdResolver }) => {
   const { userAccessToken, userId } = useUserState();
 
   let ledgerApiClient: SplitwellLedgerApiClient | undefined;
 
   if (userAccessToken && userId) {
     const ledgerOptions: LedgerOptions = { httpBaseUrl: jsonApiUrl, token: userAccessToken };
-    ledgerApiClient = new SplitwellLedgerApiClient(new Ledger(ledgerOptions), userId);
+    ledgerApiClient = new SplitwellLedgerApiClient(
+      new Ledger(ledgerOptions),
+      userId,
+      packageIdResolver
+    );
   }
 
   // We instantiate both the basic ledger api context and the one for splitwell so hooks like
   // usePrimaryParty that only rely on the basic one work as well
   return (
     <SplitwellLedgerApiContext.Provider value={ledgerApiClient}>
-      <LedgerApiClientProvider jsonApiUrl={jsonApiUrl}>{children}</LedgerApiClientProvider>
+      <LedgerApiClientProvider jsonApiUrl={jsonApiUrl} packageIdResolver={packageIdResolver}>
+        {children}
+      </LedgerApiClientProvider>
     </SplitwellLedgerApiContext.Provider>
   );
 };

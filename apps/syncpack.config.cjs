@@ -3,14 +3,19 @@ module.exports = {
     {
       /**
        * Ignore version syncing of daml codegens because syncpack complains that the versions
-       * "file:daml.js/directory-service-0.1.0"
+       * "file:daml.js/directory-service-0.2.0"
        * and
-       * "file:../../common/frontend/daml.js/directory-service-0.1.0"
+       * "file:../../common/frontend/daml.js/directory-service-0.2.0"
        * are different
        */
       label: "Daml codegen",
       packages: ["**"],
-      dependencies: ["@daml.js/directory", "@daml.js/wallet-payments"],
+      dependencies: [
+        "@daml.js/canton-coin",
+        "@daml.js/directory",
+        "@daml.js/wallet",
+        "@daml.js/wallet-payments",
+      ],
       isIgnored: true,
     },
     {

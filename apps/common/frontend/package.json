@@ -14,9 +14,10 @@
     ]
   },
   "dependencies": {
-    "@daml.js/directory": "file:daml.js/directory-service-0.1.0",
-    "@daml.js/wallet": "file:daml.js/wallet-0.1.0",
-    "@daml.js/wallet-payments": "file:daml.js/wallet-payments-0.1.0",
+    "@daml.js/canton-coin": "file:daml.js/canton-coin-0.2.0",
+    "@daml.js/directory": "file:daml.js/directory-service-0.2.0",
+    "@daml.js/wallet": "file:daml.js/wallet-0.2.0",
+    "@daml.js/wallet-payments": "file:daml.js/wallet-payments-0.2.0",
     "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",
     "@daml/types": "file:../../../nix/vendored/daml-types-0.0.0.tgz",
     "@js-temporal/polyfill": "^0.4.4",

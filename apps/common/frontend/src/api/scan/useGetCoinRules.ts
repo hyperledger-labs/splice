@@ -1,6 +1,6 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
-import { CoinRules } from '@daml.js/canton-coin-0.1.0/lib/CC/Coin/';
+import { CoinRules } from '@daml.js/canton-coin/lib/CC/Coin/';
 
 import { Contract, PollingStrategy } from '../../utils';
 import { useScanClient } from './ScanClientContext';

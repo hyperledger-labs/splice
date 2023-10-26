@@ -7,6 +7,7 @@ import {
   theme,
   UserProvider,
   cnReplaceEqualDeep,
+  PackageIdResolver,
 } from 'common-frontend';
 import React from 'react';
 import {
@@ -18,11 +19,47 @@ import {
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
 
+import * as directoryOld from '@daml.js/directory-old/lib/CN/Directory';
+import * as walletOld from '@daml.js/wallet-payments-old/lib/CN/Wallet/Subscriptions';
+
 import AuthCheck from './routes/authCheck';
 import Home from './routes/home';
 import PostPayment from './routes/postPayment';
 import Root from './routes/root';
 import { config } from './utils';
+
+// TODO(#7114) Remove this together with the whole LedgerApiClientProvider once directory
+// talks to the backend.
+class DirectoryPackageIdResolver extends PackageIdResolver {
+  async resolveTemplateId(templateId: string): Promise<string> {
+    switch (this.getQualifiedName(templateId)) {
+      case 'CN.Directory:DirectoryInstall': {
+        return directoryOld.DirectoryInstall.templateId;
+      }
+      case 'CN.Directory:DirectoryInstallRequest': {
+        return directoryOld.DirectoryInstallRequest.templateId;
+      }
+      case 'CN.Directory:DirectoryEntry': {
+        return directoryOld.DirectoryEntry.templateId;
+      }
+      case 'CN.Directory:DirectoryEntryContext': {
+        return directoryOld.DirectoryEntryContext.templateId;
+      }
+      case 'CN.Wallet.Subscriptions:Subscription': {
+        return walletOld.Subscription.templateId;
+      }
+      case 'CN.Wallet.Subscriptions:SubscriptionPayment': {
+        return walletOld.SubscriptionPayment.templateId;
+      }
+      case 'CN.Wallet.Subscriptions:SubscriptionIdleState': {
+        return walletOld.SubscriptionIdleState.templateId;
+      }
+      default: {
+        throw new Error(`Unknown temmplate id: ${templateId}`);
+      }
+    }
+  }
+}
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const queryClient = new QueryClient({
@@ -38,7 +75,10 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
       <QueryClientProvider client={queryClient}>
         <ReactQueryDevtools initialIsOpen={false} />
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
-          <LedgerApiClientProvider jsonApiUrl={config.services.jsonApi.url}>
+          <LedgerApiClientProvider
+            jsonApiUrl={config.services.jsonApi.url}
+            packageIdResolver={new DirectoryPackageIdResolver()}
+          >
             <DirectoryClientProvider url={config.services.directory.url}>
               {children}
             </DirectoryClientProvider>

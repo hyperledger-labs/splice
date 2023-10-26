@@ -546,13 +546,17 @@ lazy val `apps-common-frontend` = {
     .settings(
       // daml typescript code generation settings:
       damlTsCodegenSources :=
-        (`canton-coin-daml` / Compile / damlBuild).value ++
-          (`wallet-daml` / Compile / damlBuild).value ++
-          (`wallet-payments-daml` / Compile / damlBuild).value ++
+        (`canton-coin-upgrade-daml` / Compile / damlBuild).value ++
+          (`wallet-upgrade-daml` / Compile / damlBuild).value ++
+          (`wallet-payments-upgrade-daml` / Compile / damlBuild).value ++
+          (`directory-upgrade-daml` / Compile / damlBuild).value ++
+          (`svc-governance-upgrade-daml` / Compile / damlBuild).value ++
+          (`splitwell-upgrade-daml` / Compile / damlBuild).value ++
+          (`validator-lifecycle-daml` / Compile / damlBuild).value ++
+          // Generated for package id resolution only
           (`directory-daml` / Compile / damlBuild).value ++
-          (`svc-governance-daml` / Compile / damlBuild).value ++
           (`splitwell-daml` / Compile / damlBuild).value ++
-          (`validator-lifecycle-daml` / Compile / damlBuild).value,
+          (`wallet-payments-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
       npmInstallDeps := baseDirectory.value / "package.json" +: damlTsCodegen.value,

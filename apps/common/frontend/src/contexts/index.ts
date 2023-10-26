@@ -8,4 +8,5 @@ export {
   LedgerApiProps,
   LedgerApiClientProvider,
   useLedgerApiClient,
+  PackageIdResolver,
 } from './LedgerApiContext';

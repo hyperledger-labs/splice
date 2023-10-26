@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 
 import { FormControl, Stack, TextField, Typography } from '@mui/material';
 
-import { FeaturedAppRight } from '@daml.js/canton-coin-0.1.0/lib/CC/Coin';
+import { FeaturedAppRight } from '@daml.js/canton-coin/lib/CC/Coin';
 import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 import { ContractId } from '@daml/types';
 

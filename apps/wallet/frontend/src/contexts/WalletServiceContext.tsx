@@ -17,8 +17,8 @@ import {
   WalletApi,
 } from 'wallet-openapi';
 
-import * as payment from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
-import { AppPaymentRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
+import * as payment from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 import {
   Subscription,
   SubscriptionIdleState,

@@ -7,6 +7,7 @@ import {
   theme,
   cnReplaceEqualDeep,
   useUserState,
+  PackageIdResolver,
 } from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import React, { useEffect } from 'react';
@@ -19,6 +20,8 @@ import {
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
 
+import * as splitwellOld from '@daml.js/splitwell-old/lib/CN/Splitwell';
+
 import { SplitwellLedgerApiClientProvider } from './contexts/SplitwellLedgerApiContext';
 import { SplitwellClientProvider } from './contexts/SplitwellServiceContext';
 import './index.css';
@@ -26,6 +29,20 @@ import AuthCheck from './routes/authCheck';
 import Home from './routes/home';
 import Root from './routes/root';
 import { useConfig } from './utils/config';
+
+// TODO(#8268) Infer the package id based on coin rules here.
+class SplitwellPackageIdResolver extends PackageIdResolver {
+  async resolveTemplateId(templateId: string): Promise<string> {
+    switch (this.getQualifiedName(templateId)) {
+      case 'CN.Splitwell:SplitwellRules': {
+        return splitwellOld.SplitwellRules.templateId;
+      }
+      default: {
+        throw new Error(`Unknown temmplate id: ${templateId}`);
+      }
+    }
+  }
+}
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const queryClient = new QueryClient({
@@ -55,7 +72,10 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
           <SplitwellClientProvider url={config.services.splitwell.url}>
             <DirectoryClientProvider url={config.services.directory.url}>
               <ScanClientProvider url={config.services.scan.url}>
-                <SplitwellLedgerApiClientProvider jsonApiUrl={config.services.jsonApi.url}>
+                <SplitwellLedgerApiClientProvider
+                  jsonApiUrl={config.services.jsonApi.url}
+                  packageIdResolver={new SplitwellPackageIdResolver()}
+                >
                   {children}
                 </SplitwellLedgerApiClientProvider>
               </ScanClientProvider>

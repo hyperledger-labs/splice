@@ -1,9 +1,5 @@
+import { Vote, VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules';
 import { ContractId, Numeric, Optional, Party } from '@daml/types';
-
-import {
-  Vote,
-  VoteRequest,
-} from '../../../../common/frontend/daml.js/svc-governance-0.1.0/lib/CN/SvcRules';
 
 export interface CoinPriceVote {
   sv: Party;

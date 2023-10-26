@@ -8,8 +8,8 @@ import { Box, Button, Card, CardContent, CardHeader, Stack, Typography } from '@
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 
 import { Tuple2 } from '@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7/lib/DA/Types';
-import { CoinConfig, USD } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
-import { Schedule } from '@daml.js/canton-coin-0.1.0/lib/CC/Schedule';
+import { CoinConfig, USD } from '@daml.js/canton-coin/lib/CC/CoinConfig';
+import { Schedule } from '@daml.js/canton-coin/lib/CC/Schedule';
 
 dayjs.extend(utc);
 

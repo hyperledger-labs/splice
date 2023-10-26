@@ -1,6 +1,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend';
-import { ValidatorLicense } from 'common-frontend/daml.js/canton-coin-0.1.0/lib/CC/ValidatorLicense/module';
+
+import { ValidatorLicense } from '@daml.js/canton-coin/lib/CC/ValidatorLicense/module';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 

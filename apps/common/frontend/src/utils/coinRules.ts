@@ -1,8 +1,8 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
-import { CoinConfig } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
-import { Schedule } from '@daml.js/canton-coin-0.1.0/lib/CC/Schedule';
+import { CoinConfig } from '@daml.js/canton-coin/lib/CC/CoinConfig';
+import { Schedule } from '@daml.js/canton-coin/lib/CC/Schedule';
 
 dayjs.extend(utc);
 

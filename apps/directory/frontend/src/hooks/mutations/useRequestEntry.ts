@@ -2,7 +2,7 @@ import { UseMutationResult, useMutation } from '@tanstack/react-query';
 import { useLedgerApiClient, usePrimaryParty } from 'common-frontend';
 
 import { DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
-import { SubscriptionRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
+import { SubscriptionRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';
 
 import { useDirectoryInstall, useProviderParty } from '..';

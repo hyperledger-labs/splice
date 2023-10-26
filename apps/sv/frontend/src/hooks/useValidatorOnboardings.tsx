@@ -1,6 +1,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend';
-import { ValidatorOnboarding } from 'common-frontend/daml.js/validator-lifecycle-0.1.0/lib/CN/ValidatorOnboarding/module';
+
+import { ValidatorOnboarding } from '@daml.js/validator-lifecycle/lib/CN/ValidatorOnboarding/module';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 

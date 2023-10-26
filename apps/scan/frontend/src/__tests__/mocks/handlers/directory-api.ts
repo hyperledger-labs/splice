@@ -1,6 +1,7 @@
-import { DirectoryEntry } from 'common-frontend/daml.js/directory-service-0.1.0/lib/CN/Directory/module';
 import { ErrorResponse, LookupEntryByPartyResponse } from 'directory-openapi';
 import { RestHandler, rest } from 'msw';
+
+import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory/module';
 
 export const buildDirectoryMock = (directoryUrl: string): RestHandler[] => [
   rest.get<null, { partyId: string }, LookupEntryByPartyResponse | ErrorResponse>(

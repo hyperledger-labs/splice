@@ -16,7 +16,7 @@ import { CometBftNodeDumpOrErrorResponse, NodeStatus } from 'sv-openapi';
 import { Box, Tab, Table, TableBody, TableRow, Tabs, Typography } from '@mui/material';
 import TableCell from '@mui/material/TableCell';
 
-import { CoinRules } from '@daml.js/canton-coin-0.1.0/lib/CC/Coin';
+import { CoinRules } from '@daml.js/canton-coin/lib/CC/Coin';
 import { SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { useSvcInfos } from '../contexts/SvContext';
@@ -242,6 +242,7 @@ const SvcViewPrettyJSON = () => {
     lock: svcInfoData?.coinRules.payload.lock!,
     isDevNet: svcInfoData?.coinRules.payload.isDevNet!,
     configSchedule: getCoinConfigurationAsOfNow(svcInfoData?.coinRules.payload.configSchedule!),
+    upgrade: null,
   };
 
   return (

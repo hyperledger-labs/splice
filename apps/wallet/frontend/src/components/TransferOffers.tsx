@@ -8,7 +8,6 @@ import {
   ErrorDisplay,
   Loading,
 } from 'common-frontend';
-import { TransferOffer } from 'common-frontend/daml.js/wallet-0.1.0/lib/CN/Wallet/TransferOffer/module';
 import { useCoinPrice } from 'common-frontend/scan-api';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -16,7 +15,8 @@ import { ArrowCircleLeftOutlined } from '@mui/icons-material';
 import { Box, Button, Card, CardContent, Chip, Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
-import { Currency } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
+import { Currency } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+import { TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer/module';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { usePrimaryParty, useTransferOffers } from '../hooks';

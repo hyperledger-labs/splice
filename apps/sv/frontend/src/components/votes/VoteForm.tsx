@@ -21,9 +21,9 @@ import {
   TextField,
 } from '@mui/material';
 
+import { VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules';
 import { ContractId } from '@daml/types';
 
-import { VoteRequest } from '../../../../../common/frontend/daml.js/svc-governance-0.1.0/lib/CN/SvcRules';
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
 import { SvVote } from '../../models/models';
 import { config } from '../../utils';

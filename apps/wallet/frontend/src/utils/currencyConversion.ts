@@ -1,6 +1,6 @@
 import BigNumber from 'bignumber.js';
 
-import { Currency } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
+import { Currency } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 
 export interface ConvertedCurrency {
   amount: BigNumber;

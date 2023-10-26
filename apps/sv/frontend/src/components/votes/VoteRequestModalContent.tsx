@@ -22,9 +22,9 @@ import {
   Typography,
 } from '@mui/material';
 
+import { VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules';
 import { ContractId, Party } from '@daml/types';
 
-import { VoteRequest } from '../../../../../common/frontend/daml.js/svc-governance-0.1.0/lib/CN/SvcRules';
 import { useSvcInfos } from '../../contexts/SvContext';
 import { useListVotes } from '../../hooks/useListVotes';
 import { useVoteRequest } from '../../hooks/useVoteRequest';

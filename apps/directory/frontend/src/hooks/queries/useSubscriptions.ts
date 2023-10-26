@@ -1,7 +1,7 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
 import { Contract, useLedgerApiClient, usePrimaryParty } from 'common-frontend';
 
-import { Subscription } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
+import { Subscription } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 
 import { useProviderParty } from '..';
 

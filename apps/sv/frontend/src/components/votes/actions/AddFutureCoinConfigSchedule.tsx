@@ -8,7 +8,7 @@ import { FormControl, Stack, Typography } from '@mui/material';
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 
 import { Tuple2 } from '@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7/lib/DA/Types';
-import { CoinConfig, USD } from '@daml.js/canton-coin-0.1.0/lib/CC/CoinConfig';
+import { CoinConfig, USD } from '@daml.js/canton-coin/lib/CC/CoinConfig';
 import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { useSvcInfos } from '../../../contexts/SvContext';

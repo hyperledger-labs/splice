@@ -25,7 +25,7 @@ import {
   Typography,
 } from '@mui/material';
 
-import { SubscriptionPayData } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Subscriptions';
+import { SubscriptionPayData } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { Party } from '@daml/types';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';

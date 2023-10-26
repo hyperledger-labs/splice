@@ -39,7 +39,7 @@ class SvFrontendIntegrationTest
 
     "warn if user fails to login" in { _ =>
       withFrontEnd("sv1") { implicit webDriver =>
-        loggerFactory.assertLogs(
+        loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
           {
             actAndCheck(
               "login does not work with wrong user", {
@@ -53,9 +53,20 @@ class SvFrontendIntegrationTest
                 ),
             )
           },
-          _.warningMessage should include(
-            "Authorization Failed"
-          ),
+          entries => {
+            forExactly(1, entries) {
+              _.warningMessage should include(
+                "Authorization Failed"
+              )
+            }
+            // Vite loads the generated daml code multiple times which triggers this warning.
+            // We also ignore that in our warning checker on CI.
+            forExactly(entries.length - 1, entries) {
+              _.warningMessage should include(
+                "Trying to re-register"
+              )
+            }
+          },
         )
       }
     }

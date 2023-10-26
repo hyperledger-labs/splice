@@ -17,6 +17,7 @@ export interface ContractMetadata {
 }
 
 export interface Contract<T> {
+  templateId: string;
   contractId: ContractId<T>;
   payload: T;
   metadata: ContractMetadata;
@@ -33,6 +34,7 @@ export const Contract = {
     c: OpenAPIContract,
     tmpl: ContractTypeCompanion<T, K, I>
   ): Contract<T> => ({
+    templateId: c.template_id,
     contractId: c.contract_id as ContractId<T>,
     payload: tmpl.decoder.runWithException(c.payload),
     metadata: {
@@ -45,7 +47,7 @@ export const Contract = {
     tmpl: Template<T, K>,
     c: Contract<T>
   ): DisclosedContract => ({
-    templateId: tmpl.templateId,
+    templateId: c.templateId,
     contractId: c.contractId,
     payload: tmpl.encode(c.payload),
     metadata: c.metadata,
@@ -56,6 +58,7 @@ export const Contract = {
   ): Contract<T> => {
     const payloadSchema = z.custom<T>(val => tmpl.decoder.run(val).ok);
     const contractSchema = z.object({
+      templateId: z.string(),
       contractId: z.custom<ContractId<T>>(val => typeof val === 'string'),
       // for some reason, TS cant infer types correctly if we in-line the generic custom payload schema here,
       // so we'll just validate it separately
