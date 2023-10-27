@@ -4,12 +4,11 @@ import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.directory.{DirectoryEntry, DirectoryInstall}
-import com.daml.network.directory.config.DirectoryDomainConfig
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore
-import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
+import AcsQueries.{SelectFromAcsTableResult, SelectFromAcsTableWithStateResult}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -31,7 +30,6 @@ class DbDirectoryStore(
     override val providerParty: PartyId,
     override val svcParty: PartyId,
     storage: DbStorage,
-    override protected[this] val domainConfig: DirectoryDomainConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
 )(implicit
@@ -211,32 +209,13 @@ class DbDirectoryStore(
         .query(
           sql"""
               select
-                       idle.store_id,
-                       idle.event_number,
-                       idle.contract_id,
-                       idle.template_id_package_id,
-                       idle.template_id_qualified_name,
-                       idle.create_arguments,
-                       idle.create_arguments_value,
-                       idle.contract_metadata_created_at,
-                       idle.contract_metadata_contract_key_hash,
-                       idle.contract_metadata_driver_internal,
-                       idle.contract_expires_at,
-                       ctx.store_id,
-                       ctx.event_number,
-                       ctx.contract_id,
-                       ctx.template_id_package_id,
-                       ctx.template_id_qualified_name,
-                       ctx.create_arguments,
-                       ctx.create_arguments_value,
-                       ctx.contract_metadata_created_at,
-                       ctx.contract_metadata_contract_key_hash,
-                       ctx.contract_metadata_driver_internal,
-                       ctx.contract_expires_at
+                       #${SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated("idle.")},
+                       #${SelectFromAcsTableResult.sqlColumnsCommaSeparated("ctx.")}
               from     directory_acs_store idle
               join     directory_acs_store ctx
               on       idle.subscription_reference_contract_id = ctx.subscription_reference_contract_id
                 and      ctx.store_id = idle.store_id
+                and      ctx.assigned_domain = idle.assigned_domain
               where    idle.store_id = $storeId
                 and      idle.template_id_qualified_name = ${QualifiedName(
               subsCodegen.SubscriptionIdleState.COMPANION.TEMPLATE_ID
@@ -245,13 +224,15 @@ class DbDirectoryStore(
               directoryCodegen.DirectoryEntryContext.COMPANION.TEMPLATE_ID
             )}
                 and      idle.subscription_next_payment_due_at < $now
+                and      idle.assigned_domain is not null
               order by idle.subscription_next_payment_due_at
               limit    $limit
-          """.as[(SelectFromAcsTableResult, SelectFromAcsTableResult)],
+          """.as[(SelectFromAcsTableWithStateResult, SelectFromAcsTableResult)],
           "listExpiredDirectorySubscriptions",
         )
     } yield joinedRows.map { case (idleRow, ctxRow) =>
-      val idleContract = contractFromRow(subsCodegen.SubscriptionIdleState.COMPANION)(idleRow)
+      val idleContract =
+        assignedContractFromRow(subsCodegen.SubscriptionIdleState.COMPANION)(idleRow)
       val ctxContract = contractFromRow(directoryCodegen.DirectoryEntryContext.COMPANION)(ctxRow)
       DirectoryStore.IdleDirectorySubscription(idleContract, ctxContract)
     }

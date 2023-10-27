@@ -5,6 +5,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, ContractState}
 import com.daml.network.store.db.AcsQueries.{
+  SelectFromAcsTableResult,
   SelectFromAcsTableWithStateResult,
   SelectFromContractStateResult,
 }
@@ -31,17 +32,7 @@ trait AcsQueries extends AcsJdbcTypes {
     */
   protected def selectFromAcsTable(tableName: String): SQLActionBuilder =
     sql"""
-       select store_id,
-         event_number,
-         contract_id,
-         template_id_package_id,
-         template_id_qualified_name,
-         create_arguments,
-         create_arguments_value,
-         contract_metadata_created_at,
-         contract_metadata_contract_key_hash,
-         contract_metadata_driver_internal,
-         contract_expires_at
+       select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()}
        from #$tableName
        """.stripMargin
 
@@ -73,24 +64,7 @@ trait AcsQueries extends AcsJdbcTypes {
       orderLimit: SQLActionBuilder = sql"",
   ) =
     (sql"""
-       select store_id,
-         event_number,
-         contract_id,
-         template_id_package_id,
-         template_id_qualified_name,
-         create_arguments,
-         create_arguments_value,
-         contract_metadata_created_at,
-         contract_metadata_contract_key_hash,
-         contract_metadata_driver_internal,
-         contract_expires_at,
-         state_number,
-         assigned_domain,
-         reassignment_counter,
-         reassignment_target_domain,
-         reassignment_source_domain,
-         reassignment_submitter,
-         reassignment_unassign_id
+       select #${SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated()}
        from #$tableName acs
        where acs.store_id = $storeId and """ ++ where ++ sql"""
        """ ++ orderLimit).toActionBuilder.as[AcsQueries.SelectFromAcsTableWithStateResult]
@@ -375,6 +349,21 @@ object AcsQueries {
     }
   }
 
+  object SelectFromAcsTableResult {
+    def sqlColumnsCommaSeparated(qualifier: String = "") =
+      s"""${qualifier}store_id,
+          ${qualifier}event_number,
+          ${qualifier}contract_id,
+          ${qualifier}template_id_package_id,
+          ${qualifier}template_id_qualified_name,
+          ${qualifier}create_arguments,
+          ${qualifier}create_arguments_value,
+          ${qualifier}contract_metadata_created_at,
+          ${qualifier}contract_metadata_contract_key_hash,
+          ${qualifier}contract_metadata_driver_internal,
+          ${qualifier}contract_expires_at"""
+  }
+
   case class SelectFromContractStateResult(
       stateNumber: Long,
       assignedDomain: Option[DomainId],
@@ -389,6 +378,19 @@ object AcsQueries {
       acsRow: SelectFromAcsTableResult,
       stateRow: SelectFromContractStateResult,
   )
+
+  object SelectFromAcsTableWithStateResult {
+    def sqlColumnsCommaSeparated(qualifier: String = "") =
+      SelectFromAcsTableResult.sqlColumnsCommaSeparated(qualifier) + s""",
+        ${qualifier}state_number,
+        ${qualifier}assigned_domain,
+        ${qualifier}reassignment_counter,
+        ${qualifier}reassignment_target_domain,
+        ${qualifier}reassignment_source_domain,
+        ${qualifier}reassignment_submitter,
+        ${qualifier}reassignment_unassign_id
+      """
+  }
 
   case class SelectFromAcsTableResultWithOffset(
       offset: String,

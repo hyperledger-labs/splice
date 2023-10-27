@@ -35,26 +35,22 @@ class ExpiredDirectorySubscriptionTrigger(
         store.providerParty.toProtoPrimitive
       )
     )
-    store.domains.waitForDomainConnection(store.defaultAcsDomain).flatMap { domainId =>
-      connection
-        .submit(actAs = Seq(store.providerParty), readAs = Seq(), cmd)
-        .withDomainId(domainId)
-        .noDedup
-        .yieldUnit()
-        .map(_ => TaskSuccess(s"archived expired directory subscription"))
-    }
+    connection
+      .submit(actAs = Seq(store.providerParty), readAs = Seq(), cmd)
+      .noDedup
+      .yieldUnit()
+      .map(_ => TaskSuccess(s"archived expired directory subscription"))
   }
 
   override protected def isStaleTask(
       task: ScheduledTaskTrigger.ReadyTask[DirectoryStore.IdleDirectorySubscription]
   )(implicit tc: TraceContext): Future[Boolean] =
     (for {
-      domainId <- OptionT liftF store.defaultAcsDomainIdF
       _ <- OptionT(
         store.multiDomainAcsStore.lookupContractByIdOnDomain(
           subsCodegen.SubscriptionIdleState.COMPANION
         )(
-          domainId,
+          task.work.state.domain,
           task.work.state.contractId,
         )
       )
@@ -62,7 +58,7 @@ class ExpiredDirectorySubscriptionTrigger(
         store.multiDomainAcsStore.lookupContractByIdOnDomain(
           directoryCodegen.DirectoryEntryContext.COMPANION
         )(
-          domainId,
+          task.work.state.domain,
           task.work.context.contractId,
         )
       )

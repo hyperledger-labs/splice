@@ -2,16 +2,11 @@ package com.daml.network.directory.store
 
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.directory.config.DirectoryDomainConfig
 import com.daml.network.directory.store.db.DbDirectoryStore
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{
-  CNNodeAppStoreWithoutHistory,
-  ConfiguredDefaultDomain,
-  MultiDomainAcsStore,
-}
-import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -28,7 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
   * to simplify implementing the store. They are all made overridable so that a DB backed store can use
   * custom indices to ensure the scalability of these queries.
   */
-trait DirectoryStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomain {
+trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
 
   import MultiDomainAcsStore.QueryResult
 
@@ -42,10 +37,6 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefault
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
-
-  protected[this] def domainConfig: DirectoryDomainConfig
-
-  override final def defaultAcsDomain = domainConfig.global.alias
 
   /** Lookup the directory install for a user */
   def lookupInstallByUserWithOffset(
@@ -92,6 +83,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefault
       _.expiresAt
     )
 
+  /** List subscriptions ready for expiry. */
   def listExpiredDirectorySubscriptions(
       now: CantonTimestamp,
       limit: Int,
@@ -110,7 +102,6 @@ object DirectoryStore {
       providerParty: PartyId,
       svcParty: PartyId,
       storage: Storage,
-      domains: DirectoryDomainConfig,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
   )(implicit
@@ -123,7 +114,6 @@ object DirectoryStore {
         new InMemoryDirectoryStore(
           providerParty = providerParty,
           svcParty = svcParty,
-          domains,
           loggerFactory,
           retryProvider,
         )
@@ -132,7 +122,6 @@ object DirectoryStore {
           providerParty = providerParty,
           svcParty = svcParty,
           db,
-          domains,
           loggerFactory,
           retryProvider,
         )
@@ -140,7 +129,7 @@ object DirectoryStore {
   }
 
   case class IdleDirectorySubscription(
-      state: Contract[
+      state: AssignedContract[
         subsCodegen.SubscriptionIdleState.ContractId,
         subsCodegen.SubscriptionIdleState,
       ],

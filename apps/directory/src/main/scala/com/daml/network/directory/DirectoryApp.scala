@@ -97,7 +97,6 @@ class DirectoryApp(
         providerParty = svcParty,
         svcParty = svcParty,
         storage,
-        config.domains,
         loggerFactory,
         retryProvider,
       )
@@ -110,7 +109,6 @@ class DirectoryApp(
         retryProvider,
         loggerFactory,
       )
-      _ <- store.domains.waitForDomainConnection(config.domains.global.alias)
       handler = new HttpDirectoryHandler(
         store,
         loggerFactory,

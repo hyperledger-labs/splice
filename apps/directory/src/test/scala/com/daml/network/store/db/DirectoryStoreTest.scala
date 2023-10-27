@@ -15,7 +15,6 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   SubscriptionRequest,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.config.{DomainConfig, GlobalOnlyDomainConfig}
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.directory.store.DirectoryStore.IdleDirectorySubscription
 import com.daml.network.directory.store.db.DbDirectoryStore
@@ -23,7 +22,7 @@ import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.StoreTest
-import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
+import com.daml.network.util.{AssignedContract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.offset.Offset
@@ -143,7 +142,7 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
           val expected = data
             .take(3)
             .map { case (ctxContract, idleContract) =>
-              IdleDirectorySubscription(idleContract, ctxContract)
+              IdleDirectorySubscription(AssignedContract(idleContract, dummyDomain), ctxContract)
             }
             .reverse
           eventually() {
@@ -294,7 +293,6 @@ class InMemoryDirectoryStoreTest extends DirectoryStoreTest {
     val store = new InMemoryDirectoryStore(
       provider,
       svcParty,
-      GlobalOnlyDomainConfig(DomainConfig(DomainAlias.tryCreate(domain))),
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )
@@ -329,7 +327,6 @@ class DbDirectoryStoreTest
       provider,
       svcParty,
       storage,
-      GlobalOnlyDomainConfig(DomainConfig(DomainAlias.tryCreate(domain))),
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )
