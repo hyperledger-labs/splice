@@ -66,7 +66,10 @@ export async function installSplitwell(
     [svc, participant]
   );
 
-  const extraDependsOn = [svc, installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell')];
+  const extraDependsOn = [
+    svc,
+    await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell'),
+  ];
 
   return installValidatorApp({
     auth0Client,

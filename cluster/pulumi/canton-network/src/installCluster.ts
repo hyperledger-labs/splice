@@ -153,7 +153,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     infraStack.requireOutput(InfrastructureOutputs.INGRESS_NAMESPACE) as pulumi.Output<string>
   );
 
-  const { svApp: sv1, postgresDatabase: postgresDB1 } = installSvNode({
+  const { svApp: sv1, postgresDatabase: postgresDB1 } = await installSvNode({
     auth0Client,
     nodename: 'sv-1',
     onboardingName: isDevNet ? 'Canton-Foundation-1' : 'Canton-Foundation',
@@ -179,7 +179,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   });
 
   if (!singleSv) {
-    installSvNode({
+    await installSvNode({
       auth0Client,
       nodename: 'sv-2',
       onboardingName: 'Canton-Foundation-2',
@@ -197,7 +197,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       topupConfig,
       sequencerDriver: globalDomainSequencerDriver,
     });
-    installSvNode({
+    await installSvNode({
       auth0Client,
       nodename: 'sv-3',
       onboardingName: 'Canton-Foundation-3',
@@ -215,7 +215,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       topupConfig,
       sequencerDriver: globalDomainSequencerDriver,
     });
-    installSvNode({
+    await installSvNode({
       auth0Client,
       nodename: 'sv-4',
       onboardingName: 'Canton-Foundation-4',

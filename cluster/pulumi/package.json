@@ -36,6 +36,7 @@
         "canton-network",
         "infra",
         "sv-runbook",
-        "observability"
+        "observability",
+        "validator-runbook"
     ]
 }

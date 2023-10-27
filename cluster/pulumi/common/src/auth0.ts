@@ -72,7 +72,7 @@ export class Auth0Fetch implements Auth0Client {
   }
 
   public async loadAuth0Cache(): Promise<void> {
-    pulumi.log.info('Loading Auth0 Cache');
+    await pulumi.log.info('Loading Auth0 Cache');
     const cacheMap = {} as Auth0CacheMap;
 
     try {
@@ -87,17 +87,17 @@ export class Auth0Fetch implements Auth0Client {
         cacheMap[clientId] = JSON.parse(Buffer.from(data[clientId], 'base64').toString('ascii'));
       }
 
-      pulumi.log.info('Auth0 cache loaded...');
+      await pulumi.log.info('Auth0 cache loaded...');
     } catch (e) {
-      pulumi.log.info('No Auth0 cache secret found.');
+      await pulumi.log.info('No Auth0 cache secret found.');
     }
 
     this.auth0Cache = cacheMap;
   }
 
-  async saveAuth0Cache(): Promise<void> {
-    pulumi.log.info('Saving Auth0 cache');
+  public async saveAuth0Cache(): Promise<void> {
     const data = {} as Record<string, string>;
+    await pulumi.log.info('Saving Auth0 cache');
 
     if (!this.auth0Cache) {
       console.error('No auth0 cache loaded in Auth0Fetch');
@@ -139,13 +139,13 @@ export class Auth0Fetch implements Auth0Client {
       }
     }
 
-    pulumi.log.info('Auth0 cache saved');
+    await pulumi.log.info('Auth0 cache saved');
   }
 
   public async getSecrets(): Promise<Auth0SecretMap> {
-    pulumi.log.info('getSecrets()');
+    await pulumi.log.info('getSecrets()');
     if (this.secrets === undefined) {
-      pulumi.log.info('Calling Auth0 API for getSecrets()');
+      await pulumi.log.info('Calling Auth0 API for getSecrets()');
       this.secrets = await this.loadSecrets();
     }
     return this.secrets;
@@ -156,7 +156,7 @@ export class Auth0Fetch implements Auth0Client {
     clientSecret: string,
     audience?: string
   ): Promise<string> {
-    pulumi.log.info('Getting access token for Auth0 client: ' + clientId);
+    await pulumi.log.info('Getting access token for Auth0 client: ' + clientId);
 
     const now = new Date();
 
@@ -165,9 +165,9 @@ export class Auth0Fetch implements Auth0Client {
       if (cachedSecret) {
         const cachedSecretExpiry = new Date(cachedSecret.expiry);
         if (addTimeSeconds(now, REQUIRED_TOKEN_LIFETIME) > cachedSecretExpiry) {
-          pulumi.log.info('Ignoring expired cached Auth0 token for client: ' + clientId);
+          await pulumi.log.info('Ignoring expired cached Auth0 token for client: ' + clientId);
         } else {
-          pulumi.log.info('Using cached Auth0 token for client: ' + clientId);
+          await pulumi.log.info('Using cached Auth0 token for client: ' + clientId);
           return cachedSecret.accessToken;
         }
       }
@@ -175,7 +175,7 @@ export class Auth0Fetch implements Auth0Client {
 
     const aud = audience || 'https://canton.network.global';
 
-    pulumi.log.info(
+    await pulumi.log.info(
       'Querying access token for Auth0 client: ' + clientId + ' with audience ' + aud
     );
     const auth0 = new AuthenticationClient({
@@ -204,7 +204,7 @@ export class Auth0Fetch implements Auth0Client {
     const expiry = addTimeSeconds(now, expires_in);
 
     if (this.auth0Cache && tokenResponse.access_token) {
-      pulumi.log.info(
+      await pulumi.log.info(
         'Caching access token for Auth0 client: ' + clientId + ' expiry: ' + expiry.toJSON()
       );
 
@@ -281,12 +281,12 @@ async function auth0Secret(
   }
 }
 
-export function installAuth0Secret(
+export async function installAuth0Secret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
   clientName: string
-): k8s.core.v1.Secret {
+): Promise<k8s.core.v1.Secret> {
   async function secretFor(
     auth0Client: Auth0Client,
     clientName: string
@@ -294,27 +294,30 @@ export function installAuth0Secret(
     return await auth0Secret(auth0Client, await auth0Client.getSecrets(), clientName);
   }
 
-  return new k8s.core.v1.Secret(
-    'auth0-secret-' + xns.logicalName + '-' + clientName,
-    {
-      metadata: {
-        name: 'cn-app-' + secretNameApp + '-ledger-api-auth',
-        namespace: xns.ns.metadata.name,
-      },
-      stringData: secretFor(auth0Client, clientName),
-    },
-    {
-      dependsOn: xns.ns,
-    }
+  return secretFor(auth0Client, clientName).then(
+    secret =>
+      new k8s.core.v1.Secret(
+        'auth0-secret-' + xns.logicalName + '-' + clientName,
+        {
+          metadata: {
+            name: 'cn-app-' + secretNameApp + '-ledger-api-auth',
+            namespace: xns.ns.metadata.name,
+          },
+          stringData: secret,
+        },
+        {
+          dependsOn: xns.ns,
+        }
+      )
   );
 }
 
-export function installAuth0UISecret(
+export async function installAuth0UISecret(
   auth0Client: Auth0Client,
   xns: ExactNamespace,
   secretNameApp: string,
   clientName: string
-): k8s.core.v1.Secret {
+): Promise<k8s.core.v1.Secret> {
   async function getClientId() {
     const clientSecrets = lookupClientSecrets(
       await auth0Client.getSecrets(),
@@ -324,12 +327,8 @@ export function installAuth0UISecret(
     return clientSecrets.client_id;
   }
 
-  return installAuth0UiSecretWithClientId(
-    auth0Client,
-    xns,
-    secretNameApp,
-    clientName,
-    getClientId()
+  return getClientId().then(id =>
+    installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, clientName, id)
   );
 }
 

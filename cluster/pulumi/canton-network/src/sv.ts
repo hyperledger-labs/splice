@@ -96,18 +96,18 @@ async function getAcsBootstrappingDump(xns: ExactNamespace, config: Bootstrappin
   };
 }
 
-export function installSvNode(config: SvConfig): {
+export async function installSvNode(config: SvConfig): Promise<{
   svApp: pulumi.Resource;
   postgresDatabase: postgres.Postgres;
-} {
+}> {
   const xns = exactNamespace(config.nodename);
 
   const auth0BackendSecrets: pulumi.Input<pulumi.Resource>[] = [
-    installAuth0Secret(config.auth0Client, xns, 'sv', config.nodename),
+    await installAuth0Secret(config.auth0Client, xns, 'sv', config.nodename),
   ];
 
   const auth0UISecrets: pulumi.Resource[] = [
-    installAuth0UISecret(config.auth0Client, xns, 'sv', config.nodename),
+    await installAuth0UISecret(config.auth0Client, xns, 'sv', config.nodename),
   ];
 
   const backupConfig: BackupConfig | undefined = config.backupConfig
@@ -266,7 +266,7 @@ export function installSvNode(config: SvConfig): {
     }
   }
 
-  installValidatorApp({
+  await installValidatorApp({
     auth0Client: config.auth0Client,
     xns,
     validatorWalletUser: config.validatorWalletUser,

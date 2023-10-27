@@ -119,7 +119,7 @@ export function loadJsonFromFile(path: PathLike): any {
 
     return JSON.parse(content);
   } catch (e) {
-    pulumi.log.error(`could not read JSON from: ${path}`);
+    console.error(`could not read JSON from: ${path}`);
     throw e;
   }
 }

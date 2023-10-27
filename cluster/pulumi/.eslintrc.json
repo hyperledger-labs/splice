@@ -1,6 +1,11 @@
 {
       "root": true,
   "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": [
+      "./tsconfig.json"
+    ]
+  },
   "plugins": [
     "@typescript-eslint"
   ],
@@ -13,6 +18,7 @@
     "curly": ["error"],
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/explicit-module-boundary-types": "warn",
-    "@typescript-eslint/ban-types": "warn"
+    "@typescript-eslint/ban-types": "warn",
+    "@typescript-eslint/no-floating-promises": "warn"
   }
 }

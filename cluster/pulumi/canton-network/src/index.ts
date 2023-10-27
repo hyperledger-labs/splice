@@ -13,4 +13,5 @@ async function main() {
   await auth0Fetch.saveAuth0Cache();
 }
 
+// eslint-disable-next-line @typescript-eslint/no-floating-promises
 main();

@@ -48,7 +48,7 @@ export type ValidatorConfig = {
   svValidator?: boolean;
 };
 
-export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
+export async function installValidatorApp(config: ValidatorConfig): Promise<pulumi.Resource> {
   const participantBootstrapDumpSecret: pulumi.Resource | undefined =
     config.participantBootstrapDump
       ? fetchAndInstallParticipantBootstrapDump(config.xns, config.participantBootstrapDump)
@@ -69,7 +69,7 @@ export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
       : installBootstrapDataBucketSecret(config.xns, config.backupConfig.config.bucket)
     : undefined;
 
-  const dependsOn: pulumi.Resource[] = [
+  const dependsOn: pulumi.Input<pulumi.Resource>[] = [
     config.xns.ns,
     config.participant,
     installAuth0Secret(config.auth0Client, config.xns, 'validator', config.auth0AppName),
