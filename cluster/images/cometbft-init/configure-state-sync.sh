@@ -44,6 +44,7 @@ function _configure_state_sync() {
 
 enable="${STATE_SYNC_ENABLE:-false}"
 if [ "$enable" == "false" ]; then
+  echo "State sync has been explicitly disabled."
   _set_state_sync_disabled
 else
   rpc_servers="${STATE_SYNC_RPC_SERVERS}"
@@ -57,10 +58,11 @@ else
 
   min_trust_height_age=${STATE_SYNC_MIN_TRUST_HEIGHT_AGE:-100}
   trust_period=${STATE_SYNC_TRUST_PERIOD:-"168h0m0s"}  # trust period defaults to 1 week
-  latest_block_height=$( curl -sL --fail -X GET "${base_url}/status" | jq -r '.result.sync_info.latest_block_height' )
+  latest_block_height=$( curl -fsSL "${base_url}/status" | jq -r '.result.sync_info.latest_block_height' )
   echo "Latest block height: $latest_block_height"
   # Disable state sync entirely if latest_block_height is less than min_trust_height_age
   if [ "$latest_block_height" -le "$min_trust_height_age" ]; then
+    echo "Latest block height is less than the min trust height age $min_trust_height_age. State sync will be disabled."
     _set_state_sync_disabled
   else
     enable=true

@@ -30,3 +30,7 @@
 {{ $_ := required "(.Values.istioVirtualService).port is required." (.Values.istioVirtualService).port }}
 {{ $_ := required "(.Values.istioVirtualService).gateway is required." (.Values.istioVirtualService).gateway }}
 {{- end}}
+
+{{- if (.Values.stateSync).enable }}
+{{ $_ := required "(.Values.stateSync).rpcServers is required." (.Values.stateSync).rpcServers }}
+{{- end}}

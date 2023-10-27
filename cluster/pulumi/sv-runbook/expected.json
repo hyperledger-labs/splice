@@ -213,7 +213,6 @@
         },
         "nodeName": "DA-Helm-Test-Node",
         "stateSync": {
-          "enable": true,
           "rpcServers": "https://sv.sv-1.svc.svrun.network.canton.global:443/cometbft-rpc/,https://sv.sv-1.svc.svrun.network.canton.global:443/cometbft-rpc/"
         }
       }

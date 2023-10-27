@@ -502,8 +502,6 @@ retain_blocks = 0
 {{- end }}
 
 # Interval in which a new snapshot should be generated, in order to assist new peers to fast sync.
-# A value below 1000 is not recommended.
-# The snapshot is taken about every 20 minutes
-snapshot_height_delta = {{ $.Values.stateSync.minTrustHeightAge }}
+snapshot_height_delta = {{ $.Values.node.snapshotHeightDelta }}
 
 {{- end }}

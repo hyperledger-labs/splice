@@ -96,16 +96,6 @@ export function installCometBftNode(
   onboardingName: string
 ): Service {
   const nodeConfig = nodeConfigs[nodename];
-  const stateSync = {
-    enable: false,
-    rpcServers: '',
-  };
-  // Enable state sync for SVs 2-4
-  if (nodename !== 'sv-1') {
-    stateSync.enable = true;
-    stateSync.rpcServers =
-      rpcServiceAddress('cometbft-sv-1', 'sv-1') + ',' + rpcServiceAddress('cometbft-sv-1', 'sv-1');
-  }
   const cometbftRelease = installCNHelmChart(xns, 'cometbft', 'cn-cometbft', {
     nodeName: onboardingName,
     imageName: 'cometbft',
@@ -131,7 +121,12 @@ export function installCometBftNode(
         };
       }),
     isDevNet: isDevNet,
-    stateSync: stateSync,
+    stateSync: {
+      rpcServers:
+        rpcServiceAddress('cometbft-sv-1', 'sv-1') +
+        ',' +
+        rpcServiceAddress('cometbft-sv-1', 'sv-1'),
+    },
     genesis: {
       chainId: `${CLUSTER_BASENAME}`,
     },

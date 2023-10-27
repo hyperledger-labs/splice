@@ -1709,6 +1709,7 @@
           "privateKey": "/7L74Bs18740fTPdEL04BeO2Gs+1lzEeCjAiB1DYcysmLnU1FAkg/Ho9XsOiIp4U/KT/YNrtIi/A0prm/Ew3eQ==",
           "retainBlocks": 0,
           "rpcPort": 26657,
+          "snapshotHeightDelta": 1000,
           "validator": {
             "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
             "privateKey": "npgiYbG0Iaslb/JHzliAg5BkfYMOaK3tCdKWvvO4FjCCmTBzVYK20vxkBMEg9YgFEKtvR5XgnAwKeNFrnpEQ/A==",
@@ -1741,9 +1742,8 @@
           }
         },
         "stateSync": {
-          "enable": false,
-          "minTrustHeightAge": 1100,
-          "rpcServers": "",
+          "enable": true,
+          "rpcServers": "http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657",
           "trustPeriod": "168h0m0s"
         }
       }
@@ -2680,6 +2680,7 @@
           "privateKey": "1Je33z2g+Dj2UWLqnsO+xwUwbalIS0LLcYAoj+fYuEE2le4kJjJ0h+L7FfVg+3mbgvrikdke91I2X5C2frj0Eg==",
           "retainBlocks": 0,
           "rpcPort": 26657,
+          "snapshotHeightDelta": 1000,
           "validator": {
             "keyAddress": "04A57312179F1E0C93B868779EE4C7FAC41666F0",
             "privateKey": "58rlJ+0WYnpfgn26k4TjBAibToi+irz8C2x4XEVBWIgFVIz3+48YtTuUmPvZJTDVrbrXPYvpjLZcouGlS9vGoQ==",
@@ -2709,7 +2710,6 @@
         },
         "stateSync": {
           "enable": true,
-          "minTrustHeightAge": 1100,
           "rpcServers": "http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657",
           "trustPeriod": "168h0m0s"
         }
@@ -3539,6 +3539,7 @@
           "privateKey": "DdbW/buPo4TXxW+/cvQxp5Lh1BZyH5GYHGoU0uTUQA/S1oZ32DDu1+CZhtrZhqEFMuxPlXVXvyvXsZLBdCkgdQ==",
           "retainBlocks": 0,
           "rpcPort": 26657,
+          "snapshotHeightDelta": 1000,
           "validator": {
             "keyAddress": "FFF137F42421B0257CDC8B2E41F777B81A081E80",
             "privateKey": "y+vvdb5lKRMplJ3mWe5NMdN293Nm6BSzDJFV0txGGKt3GbifUxE/8a5ISQkjBt0HjNVwYB5pyiEUo21soryhEA==",
@@ -3568,7 +3569,6 @@
         },
         "stateSync": {
           "enable": true,
-          "minTrustHeightAge": 1100,
           "rpcServers": "http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657",
           "trustPeriod": "168h0m0s"
         }
@@ -4319,6 +4319,7 @@
           "privateKey": "xMB8gnYbacyZqU94cgwJBK2OJO3DffO12uHgeieotVj/Q9LbZEwLue9GnG8+G5GNRDgX8z75txr/Z541Uqyb3A==",
           "retainBlocks": 10000,
           "rpcPort": 26657,
+          "snapshotHeightDelta": 1000,
           "validator": {
             "keyAddress": "DE36D23DE022948A11200ABB9EE07F049D17D903",
             "privateKey": "nUSWALRjErKf+/SVI93LU5venfN/YvsLaVdLYhbYPFPa6Zl1RL3trpVRcwayAon9VtBtqfFZoVTErVCKaGUSOg==",
@@ -4348,7 +4349,6 @@
         },
         "stateSync": {
           "enable": true,
-          "minTrustHeightAge": 1100,
           "rpcServers": "http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657",
           "trustPeriod": "168h0m0s"
         }

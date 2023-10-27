@@ -9,14 +9,10 @@ nodeName: ""
 isDevNet: true
 
 stateSync:
-  # turn on experimental state sync which could speed up initialization considerably for large chains.
-  enable: false
+  # state sync speeds up initialization considerably for large chains.
+  enable: true
   # at least 2 not necessarily unique comma-separated entries must be provided for rpc_servers if enable is true
   rpcServers: ""
-  # the trust height will be set to these many blocks earlier than the latest block height
-  # this should always be greater than the height interval b/w snapshots that is currently set to 1000 in the driver
-  # https://github.com/DACH-NY/canton-drivers/blob/main/drivers/cometbft/canton-network/abci/src/canton_network/abci_config/config.go#L24)
-  minTrustHeightAge: 1100
   # trust all snapshots from the trust height onwards for a period of 1 week
   trustPeriod: "168h0m0s"
 
@@ -45,6 +41,9 @@ node:
   identifier:
   # Number of blocks to keep, used for pruning. 0 -> keep all blocks.
   retainBlocks: 0
+  # Interval in which a new snapshot should be generated, in order to assist new peers to sync quickly.
+  # A value below 1000 is not recommended.
+  snapshotHeightDelta: 1000
   # URL that can be used by other nodes to access the p2p port of the node.
   # Must be set in the format <host>:<port>
   externalAddress: ""

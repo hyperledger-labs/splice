@@ -14,3 +14,10 @@ node:
 
 genesis:
   chainId: "TARGET_CLUSTER"
+
+stateSync:
+  # Uncomment the line below to disable state sync
+  # enable: false
+
+  # Note that the ending slash and the port number are significant in the list of rpcServers
+  rpcServers: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global:443/cometbft-rpc/,https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global:443/cometbft-rpc/"

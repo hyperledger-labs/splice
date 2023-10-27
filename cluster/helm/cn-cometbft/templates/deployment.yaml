@@ -47,11 +47,13 @@ spec:
                 && sleep infinity
           env:
             - name: STATE_SYNC_ENABLE
-              value: "{{ $.Values.stateSync.enable }}"
+              value: "{{ and $.Values.stateSync.enable (ne $.Values.founder.nodeId $.Values.node.id) }}"
             - name: STATE_SYNC_RPC_SERVERS
               value: "{{ $.Values.stateSync.rpcServers }}"
+            # the trust height will be set to these many blocks earlier than the latest block height
+            # this should always be at least as much as the height interval b/w snapshots
             - name: STATE_SYNC_MIN_TRUST_HEIGHT_AGE
-              value: "{{ $.Values.stateSync.minTrustHeightAge }}"
+              value: "{{ $.Values.stateSync.minTrustHeightAge | default $.Values.node.snapshotHeightDelta }}"
             - name: STATE_SYNC_TRUST_PERIOD
               value: "{{ $.Values.stateSync.trustPeriod }}"
         - name: {{ $fullName }}
