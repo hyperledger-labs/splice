@@ -9,9 +9,9 @@
     "timetable" : {
       "per-hour" : 1,
       "hours-of-day": [
-        3
+        21
       ],
-      "days-of-week" : [ "MON" ],
+      "days-of-week" : [ "SUN" ],
       "days-of-month" : [ ],
       "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
     }
