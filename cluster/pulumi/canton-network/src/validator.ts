@@ -112,6 +112,9 @@ export function installValidatorApp(config: ValidatorConfig): pulumi.Resource {
         ? { secretName: participantBootstrapDumpSecretName }
         : undefined,
       svValidator: config.svValidator,
+      metrics: {
+        enable: true,
+      },
     },
     dependsOn
   );

@@ -38,10 +38,15 @@ kind: Service
 metadata:
   name: splitwell-app
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: splitwell-app
 spec:
   selector:
     app: splitwell-app
   ports:
   - name: sw-api
     port: 5213
+    protocol: TCP
+  - name: metrics
+    port: 10013
     protocol: TCP

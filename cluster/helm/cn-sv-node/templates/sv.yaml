@@ -216,10 +216,15 @@ kind: Service
 metadata:
   name: sv-app
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: sv-app
 spec:
   selector:
     app: sv-app
   ports:
   - name: sv-api
     port: 5014
+    protocol: TCP
+  - name: metrics
+    port: 10013
     protocol: TCP

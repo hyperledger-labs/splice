@@ -217,6 +217,9 @@ export function installSvNode(config: SvConfig): {
     participantIdentitiesDumpImport: config.bootstrappingDumpConfig
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
+    metrics: {
+      enable: true,
+    },
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -241,12 +244,25 @@ export function installSvNode(config: SvConfig): {
   if (config.withScan) {
     const scanValues = {
       clusterUrl: `${CLUSTER_BASENAME}.network.canton.global`,
+      metrics: {
+        enable: true,
+      },
     };
     const scanApp = installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, [
       svApp,
     ]);
     if (config.onboarding.type == 'found-collective') {
-      installCNHelmChart(xns, 'directory-' + xns.logicalName, 'cn-directory', {}, [scanApp]);
+      installCNHelmChart(
+        xns,
+        'directory-' + xns.logicalName,
+        'cn-directory',
+        {
+          metrics: {
+            enable: true,
+          },
+        },
+        [scanApp]
+      );
     }
   }
 

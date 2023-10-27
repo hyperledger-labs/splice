@@ -59,6 +59,9 @@ export async function installSplitwell(
     {
       postgres: postgresDb.address,
       postgresPassword: postgresDb.password,
+      metrics: {
+        enable: true,
+      },
     },
     [svc, participant]
   );

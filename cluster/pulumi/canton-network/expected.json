@@ -1476,6 +1476,11 @@
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "postgres": "postgres.splitwell.svc.cluster.local",
         "resources": {
           "limits": {
@@ -1577,6 +1582,11 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "onboardingSecretFrom": {
           "secretKeyRef": {
             "key": "secret",
@@ -1802,6 +1812,11 @@
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -2283,6 +2298,11 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "resources": {
           "limits": {
             "memory": "1536Mi"
@@ -2454,6 +2474,11 @@
         "globalDomainUrl": "http://global-domain-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "isDevNet": true,
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "onboardingName": "Canton-Foundation-1",
         "onboardingType": "found-collective",
         "resources": {
@@ -2535,6 +2560,11 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -3155,6 +3185,11 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "resources": {
           "limits": {
             "memory": "1536Mi"
@@ -3298,6 +3333,11 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "onboardingName": "Canton-Foundation-2",
         "onboardingType": "join-with-key",
         "resources": {
@@ -3379,6 +3419,11 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -4068,6 +4113,11 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "onboardingName": "Canton-Foundation-3",
         "onboardingType": "join-with-key",
         "resources": {
@@ -4149,6 +4199,11 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -4838,6 +4893,11 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "onboardingName": "Canton-Foundation-4",
         "onboardingType": "join-with-key",
         "resources": {
@@ -4919,6 +4979,11 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -5409,6 +5474,11 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
         "onboardingSecretFrom": {
           "secretKeyRef": {
             "key": "secret",

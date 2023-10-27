@@ -173,6 +173,8 @@ kind: Service
 metadata:
   name: validator-app
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: validator-app
 spec:
   selector:
     app: validator-app
@@ -180,3 +182,5 @@ spec:
   - name: val-http
     port: 5003
     protocol: TCP
+  - name: metrics
+    port: 10013

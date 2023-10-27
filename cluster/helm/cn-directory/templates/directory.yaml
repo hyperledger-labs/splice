@@ -56,10 +56,15 @@ kind: Service
 metadata:
   name: directory-app
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: directory-app
 spec:
   selector:
     app: directory-app
   ports:
   - name: directory-api
     port: 5010
+    protocol: TCP
+  - name: metrics
+    port: 10013
     protocol: TCP

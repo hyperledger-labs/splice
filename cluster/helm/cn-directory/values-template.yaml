@@ -12,3 +12,8 @@ resources:
   requests:
     cpu: 1
     memory: 4096Mi
+
+metrics:
+  enable: false
+  release: prometheus-grafana-monitoring
+  interval: 30s

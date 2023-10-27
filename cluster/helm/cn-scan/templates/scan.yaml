@@ -56,12 +56,17 @@ kind: Service
 metadata:
   name: scan-app
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: scan-app
 spec:
   selector:
     app: scan-app
   ports:
   - name: scan-api
     port: 5012
+    protocol: TCP
+  - name: metrics
+    port: 10013
     protocol: TCP
 ---
 apiVersion: apps/v1
