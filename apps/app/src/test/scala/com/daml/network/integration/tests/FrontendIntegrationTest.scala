@@ -364,7 +364,13 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     try {
       testCode
     } catch {
-      case e: StaleElementReferenceException => fail(e)
+      case e: StaleElementReferenceException =>
+        // StaleElementReferenceException usually happens when the test is interacting with the web page
+        // while the web page is being redrawn. Often these redraws can be optimized away in React, so we record them here.
+        logger.debug(
+          s"Retrying StaleElementReferenceException\n${e.getStackTrace.map("  at " + _.toString).mkString("\n")}"
+        )(TraceContext.empty)
+        fail(e)
     }
   }
 
