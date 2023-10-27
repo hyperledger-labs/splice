@@ -116,7 +116,6 @@ object AcsStoreDump {
   def receiveCratesFor(
       party: PartyId,
       getImportShipment: (PartyId, TraceContext) => Future[ImportShipment],
-      useReadAs: Option[PartyId],
       ledgerConnection: CNLedgerConnection,
       retryProvider: RetryProvider,
       logger: TracedLogger,
@@ -134,7 +133,7 @@ object AcsStoreDump {
           ledgerConnection
             .submit(
               actAs = Seq(party),
-              readAs = useReadAs.toList,
+              readAs = Seq.empty,
               crate.exercise(
                 _.exerciseImportCrate_Receive(
                   party.toProtoPrimitive,
@@ -143,16 +142,8 @@ object AcsStoreDump {
               ),
               priority = priority,
             )
-            .withDomainId(
-              shipment.openRound.domain,
-              disclosedContracts =
-                // Explicit disclosure blows up when using contracts imported via party migration, as the
-                // createdAt timestamps of the imported contracts are wrong (see #6661).
-                // For these cases, we can though read as the SVC party.
-                if (useReadAs.isDefined)
-                  DisclosedContracts()
-                else
-                  DisclosedContracts(crate, shipment.openRound.toContractWithState),
+            .withDisclosedContracts(
+              DisclosedContracts(crate, shipment.openRound.toContractWithState)
             )
             .noDedup
             .yieldUnit()

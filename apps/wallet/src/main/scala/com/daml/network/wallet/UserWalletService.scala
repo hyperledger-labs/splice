@@ -96,7 +96,6 @@ class UserWalletService(
   private val receiveImportCratesF = AcsStoreDump.receiveCratesFor(
     key.endUserParty,
     (party: PartyId, tc0: TraceContext) => scanConnection.getImportShipment(party)(tc0),
-    useReadAs = None,
     automation.connection,
     retryProvider,
     logger,

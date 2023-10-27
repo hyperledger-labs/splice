@@ -1212,7 +1212,6 @@ object SvApp {
         svParty,
         (party: PartyId, tc0: TraceContext) =>
           svcStoreWithIngestion.store.getImportShipmentFor(party)(tc0),
-        Some(store.key.svcParty),
         svcStoreWithIngestion.connection,
         retryProvider,
         logger,
