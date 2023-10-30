@@ -17,7 +17,7 @@ const config = {
   services: {
     validator: {
       // URL of the validator app HTTP API
-      url: 'http://localhost:5003',
+      url: 'http://localhost:5003/api/validator',
     },
     // BEGIN_WALLET_CLUSTER_BACKEND_CONFIG
     directory: {

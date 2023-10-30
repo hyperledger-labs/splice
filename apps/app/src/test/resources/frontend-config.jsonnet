@@ -97,13 +97,13 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
   },
   sv3: {
     sv: { url: "http://localhost:5714" },
-    validator: { url: "http://localhost:5003" },
+    validator: { url: "http://localhost:5003/api/validator" },
     directory: { url: "http://localhost:5110" },
     scan: { url: "http://localhost:5012" },
   },
   sv4: {
     sv: { url: "http://localhost:5814" },
-    validator: { url: "http://localhost:5003" },
+    validator: { url: "http://localhost:5003/api/validator" },
     directory: { url: "http://localhost:5110" },
     scan: { url: "http://localhost:5012" },
   },
