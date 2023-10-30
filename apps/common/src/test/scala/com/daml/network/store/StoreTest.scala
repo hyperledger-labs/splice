@@ -92,7 +92,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       svcParty.toProtoPrimitive,
       schedule,
       false,
-      false,
       Optional.empty(),
     )
     contract(

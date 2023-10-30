@@ -45,7 +45,6 @@ Using approximate topology snapshot at .* for desired timestamp .*
 
 # TODO(#3933) We expect these logs when topology change during party migration.
 MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for informee participants
-FAILED_PRECONDITION/DAML_INTERPRETATION_ERROR.+'Contract is not locked' was not met
 ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to locked contracts
 # Also triggered by party migrations. Unfortunately the participant doesn't log anything more specific here
 # that we could ignore.

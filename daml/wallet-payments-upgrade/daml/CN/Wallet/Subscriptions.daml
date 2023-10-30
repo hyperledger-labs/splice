@@ -169,7 +169,7 @@ template SubscriptionInitialPayment
       controller subscriptionData.receiver
       do
         _ <- create TerminatedSubscription with ..
-        exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules transferContext.openMiningRound)
+        exercise lockedCoin (LockedCoin_Unlock transferContext.openMiningRound)
 
     choice SubscriptionInitialPayment_Expire : CoinCreateSummary (ContractId Coin)
       with
@@ -180,7 +180,7 @@ template SubscriptionInitialPayment
         -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedCoin, and the AcceptedAppPayment in #3152
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         _ <- create TerminatedSubscription with ..
-        exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.coinRules transferContext.openMiningRound) -- would fail if we can't expire yet
+        exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
 
 
 -- | The base state in our subscription flow.
@@ -278,7 +278,7 @@ template SubscriptionPayment
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        ccsum <- exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules transferContext.openMiningRound)
+        ccsum <- exercise lockedCoin (LockedCoin_Unlock transferContext.openMiningRound)
         pure (state, ccsum)
 
     choice SubscriptionPayment_Expire : (ContractId SubscriptionIdleState, CoinCreateSummary (ContractId Coin))
@@ -293,7 +293,7 @@ template SubscriptionPayment
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        ccsum <- exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.coinRules transferContext.openMiningRound) -- would fail if we can't expire yet
+        ccsum <- exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
         pure (state, ccsum)
 
 
@@ -342,7 +342,7 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin = do
   let SubscriptionData { sender; receiver; provider } = subscriptionData
 
   -- unlock coin and transfer the remainder to the receiver
-  ccsum <- exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules transferContext.openMiningRound)
+  ccsum <- exercise lockedCoin (LockedCoin_Unlock transferContext.openMiningRound)
   let transfer = Transfer with
         sender
         provider

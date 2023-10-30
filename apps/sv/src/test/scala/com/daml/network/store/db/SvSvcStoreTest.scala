@@ -1272,7 +1272,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       ),
       Collections.emptyMap(),
       true,
-      false,
     )
 
     contract(

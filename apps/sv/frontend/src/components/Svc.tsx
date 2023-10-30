@@ -239,7 +239,6 @@ const SvcViewPrettyJSON = () => {
 
   const updatedCoinRules: CoinRules = {
     svc: svcInfoData?.coinRules.payload.svc!,
-    lock: svcInfoData?.coinRules.payload.lock!,
     isDevNet: svcInfoData?.coinRules.payload.isDevNet!,
     configSchedule: getCoinConfigurationAsOfNow(svcInfoData?.coinRules.payload.configSchedule!),
     upgrade: null,

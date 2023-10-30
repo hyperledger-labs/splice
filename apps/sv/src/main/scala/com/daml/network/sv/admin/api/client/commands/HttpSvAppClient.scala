@@ -21,7 +21,6 @@ import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.Generi
 import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
-import io.grpc.Status
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
@@ -285,17 +284,6 @@ object HttpSvAppClient {
     ) = {
       case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(
             definitions.OnboardSvPartyMigrationAuthorizeErrorResponse(
-              Some(lockNotAvailable),
-              None,
-              None,
-            )
-          ) =>
-        throw Status.FAILED_PRECONDITION
-          .withDescription(lockNotAvailable.error)
-          .asRuntimeException()
-      case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(
-            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse(
-              None,
               Some(acceptedStateNotFound),
               None,
             )
@@ -303,7 +291,6 @@ object HttpSvAppClient {
         Left(acceptedStateNotFound.error)
       case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(
             definitions.OnboardSvPartyMigrationAuthorizeErrorResponse(
-              None,
               None,
               Some(proposalNotFound),
             )

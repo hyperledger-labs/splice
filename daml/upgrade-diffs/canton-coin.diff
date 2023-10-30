@@ -1,7 +1,7 @@
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Coin.daml ../daml/canton-coin-upgrade/daml/CC/Coin.daml
 --- ../daml/canton-coin/daml/CC/Coin.daml
 +++ ../daml/canton-coin-upgrade/daml/CC/Coin.daml
-@@ -50,6 +50,7 @@
+@@ -49,6 +49,7 @@
      svc : Party
      owner : Party
      amount : ExpiringAmount
@@ -9,15 +9,15 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Coin.daml
    where
      signatory svc, owner
      ensure validExpiringAmount amount
-@@ -250,6 +251,7 @@
+@@ -233,6 +234,7 @@
+     svc : Party
      configSchedule : Schedule Time (CoinConfig USD)
      isDevNet : Bool
-     lock : Bool
 +    upgrade : Optional ()
    where
      ensure validSchedule configSchedule validCoinConfig
  
-@@ -1023,11 +1025,13 @@
+@@ -965,11 +967,13 @@
              svc
              owner = sender
              amount = expiringAmount transferConfigCC.holdingFee summary.senderChangeAmount currentOpenRound.round
@@ -81,10 +81,10 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/T
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/Util.daml ../daml/canton-coin-upgrade/daml/CC/Scripts/Util.daml
 --- ../daml/canton-coin/daml/CC/Scripts/Util.daml
 +++ ../daml/canton-coin-upgrade/daml/CC/Scripts/Util.daml
-@@ -64,6 +64,7 @@
+@@ -63,6 +63,7 @@
+   _ <- submit svc $ createCmd CoinRules with
      configSchedule = defaultCoinConfigSchedule
      isDevNet = True
-     lock = False
 +    upgrade = Some ()
      ..
  

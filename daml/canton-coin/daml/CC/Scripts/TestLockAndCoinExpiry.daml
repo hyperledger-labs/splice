@@ -124,8 +124,8 @@ testExpireLockedCoin = do
 
   -- Lock is not yet expired
   -- svc fails to expire the coin
-  testChoiceFailed app [app.svc] [app.svc] $ \coinRules ->
-    exerciseCmd cid (LockedCoin_ExpireCoin roundCid coinRules)
+  testChoiceFailed [app.svc] [app.svc] $ 
+    exerciseCmd cid (LockedCoin_ExpireCoin roundCid)
 
   -- Current round is 4
   roundCid <- advanceRound app (Round 4)
@@ -133,8 +133,8 @@ testExpireLockedCoin = do
   -- Coin is not yet expired
   -- 2 rounds before current round = 4 - 2 = 2 which is before round 3 when the coin expires
   -- svc fails to expire the coin
-  testChoiceFailed app [app.svc] [app.svc] $ \coinRules ->
-    exerciseCmd cid (LockedCoin_ExpireCoin roundCid coinRules)
+  testChoiceFailed [app.svc] [app.svc] $ 
+    exerciseCmd cid (LockedCoin_ExpireCoin roundCid)
 
   -- Current round is 5
   roundCid <- advanceRound app (Round 5)
@@ -144,8 +144,8 @@ testExpireLockedCoin = do
   -- Coin is expired
   -- 2 rounds before current round => 5 - 2 = 3 which is equal to round 3 when the coin expires
   -- svc expires the coin
-  expireSummary <- testChoice app [app.svc] [app.svc] $ \coinRules ->
-    exerciseCmd cid (LockedCoin_ExpireCoin roundCid coinRules)
+  expireSummary <- testChoice [app.svc] [app.svc] $ 
+    exerciseCmd cid (LockedCoin_ExpireCoin roundCid)
 
   normalizedBalanceAfterExpiry <- getNormalizedBalance app.svc
   expireSummary.changeToInitialAmountAsOfRoundZero === normalizedBalanceAfterExpiry - normalizedBalanceBeforeExpiry
@@ -176,16 +176,16 @@ testExpireCoin = do
 
   -- 2 rounds before latest active round = 3 - 2 = 1 which is before round 3 when the coin expires
   -- svc fails to expire the coin
-  testChoiceFailed app [app.svc] [app.svc] $ \coinRules ->
-    exerciseCmd cid (Coin_Expire latestActiveRoundCid coinRules)
+  testChoiceFailed [app.svc] [app.svc] $ 
+    exerciseCmd cid (Coin_Expire latestActiveRoundCid)
 
   -- current latest active round is 4
   latestActiveRoundCid <- advanceRound app (Round 4)
 
   -- 2 rounds before current latest active round => 4 - 2 = 2 which is before round 3 when the coin expires
   -- svc fails to expire the coin
-  testChoiceFailed app [app.svc] [app.svc] $ \coinRules ->
-    exerciseCmd cid (Coin_Expire latestActiveRoundCid coinRules)
+  testChoiceFailed [app.svc] [app.svc] $
+    exerciseCmd cid (Coin_Expire latestActiveRoundCid)
 
   -- current latest active round is 5
   latestActiveRoundCid <- advanceRound app (Round 5)
@@ -194,8 +194,8 @@ testExpireCoin = do
 
   -- 2 rounds before current latest active round => 5 - 2 = 3 which is equal to round 3 when the coin expires
   -- svc expires the coin
-  expireSummary <- testChoice app [app.svc] [app.svc] $ \coinRules ->
-    exerciseCmd cid (Coin_Expire latestActiveRoundCid coinRules)
+  expireSummary <- testChoice [app.svc] [app.svc] $ 
+    exerciseCmd cid (Coin_Expire latestActiveRoundCid)
 
   normalizedBalanceAfterExpiry <- getNormalizedBalance app.svc
   expireSummary.changeToInitialAmountAsOfRoundZero === normalizedBalanceAfterExpiry - normalizedBalanceBeforeExpiry
@@ -224,15 +224,13 @@ addRelRoundN n t relTime
   | n <= 0 = t
   | otherwise = addRelRoundN (n-1) (addRelTime t relTime) relTime
 
-testChoice : CCApp -> [Party] -> [Party] -> (ContractId CoinRules -> Commands a) -> Script a
-testChoice app actAs readAs buildCommand = do
-  Some (coinRules, _) <- queryCoinRulesByKey app.svc
-  submitMulti actAs readAs (buildCommand coinRules)
+testChoice : [Party] -> [Party] -> Commands a -> Script a
+testChoice actAs readAs buildCommand = do
+  submitMulti actAs readAs buildCommand
 
-testChoiceFailed : HasField "svc" r Party => r -> [Party] -> [Party] -> (ContractId CoinRules -> Commands a) -> Script ()
-testChoiceFailed app actAs readAs buildCommand = do
-  Some (coinRules, _) <- queryCoinRulesByKey app.svc
-  submitMultiMustFail actAs readAs (buildCommand coinRules)
+testChoiceFailed : [Party] -> [Party] -> Commands a -> Script ()
+testChoiceFailed actAs readAs buildCommand = do
+  submitMultiMustFail actAs readAs buildCommand 
   pure ()
 
 getLockedCoinCmd : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (Commands TransferResult)

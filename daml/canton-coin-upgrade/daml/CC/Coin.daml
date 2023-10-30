@@ -22,7 +22,6 @@ import CC.Issuance
 import CC.Round
 import CC.Round.Types
 import CC.GlobalDomain
-import CC.Util
 
 import CN.Util.Assert
 
@@ -58,18 +57,14 @@ template Coin
     choice Coin_Expire : CoinExpireSummary
       with
         roundCid : ContractId OpenMiningRound
-        coinRulesCid : ContractId CoinRules
       -- For simplicity and to communicate this as the standard-case, we only allow the SVC to expire coins (see #1789 for full context)
       controller svc
-      do coinRules <- fetch coinRulesCid
-         -- This is not necessary as there is already a checking in SvcRules but still add it here to be consistent with other choices.
-         requireUnlocked coinRules.lock
-         requireCoinExpiredForAllOpenRounds roundCid this
-         return CoinExpireSummary with
-           owner = owner
-           round = amount.createdAt
-           changeToInitialAmountAsOfRoundZero = - getValueAsOfRound0 amount
-           changeToHoldingFeesRate = - (amount.ratePerRound.rate)
+      do  requireCoinExpiredForAllOpenRounds roundCid this
+          return CoinExpireSummary with
+            owner = owner
+            round = amount.createdAt
+            changeToInitialAmountAsOfRoundZero = - getValueAsOfRound0 amount
+            changeToHoldingFeesRate = - (amount.ratePerRound.rate)
 
 template LockedCoin
   with
@@ -81,12 +76,9 @@ template LockedCoin
 
     choice LockedCoin_Unlock : CoinCreateSummary (ContractId Coin)
       with
-        coinRulesCid : ContractId CoinRules
         openRoundCid : ContractId OpenMiningRound
       controller coin.owner :: lock.holders
-      do coinRules <- fetch coinRulesCid
-         requireUnlocked coinRules.lock
-         openMiningRound <- exercise openRoundCid (OpenMiningRound_Fetch coin.owner)
+      do openMiningRound <- exercise openRoundCid (OpenMiningRound_Fetch coin.owner)
          coinCid <- create coin
          return CoinCreateSummary with
            coin = coinCid
@@ -94,12 +86,9 @@ template LockedCoin
 
     choice LockedCoin_OwnerExpireLock : CoinCreateSummary (ContractId Coin)
       with
-        coinRulesCid : ContractId CoinRules
         openRoundCid : ContractId OpenMiningRound
       controller coin.owner
-      do coinRules <- fetch coinRulesCid
-         requireUnlocked coinRules.lock
-         openMiningRound <- exercise openRoundCid (OpenMiningRound_Fetch coin.owner)
+      do openMiningRound <- exercise openRoundCid (OpenMiningRound_Fetch coin.owner)
          t <- getTime
          require "Lock is expired" (lock.expiresAt < t)
          coinCid <- create coin
@@ -110,13 +99,9 @@ template LockedCoin
     choice LockedCoin_ExpireCoin : CoinExpireSummary
       with
         roundCid : ContractId OpenMiningRound
-        coinRulesCid : ContractId CoinRules
       -- For simplicity and to communicate this as the standard-case, we only allow the SVC to expire coins (see #1789 for full context)
       controller coin.svc
-      do coinRules <- fetch coinRulesCid
-         -- This is not necessary as there is already a checking in SvcRules but still add it here to be consistent with other choices.
-         requireUnlocked coinRules.lock
-         t <- getTime
+      do t <- getTime
          require "Lock is expired" (lock.expiresAt < t)
          requireCoinExpiredForAllOpenRounds roundCid coin
          return CoinExpireSummary with
@@ -216,7 +201,6 @@ template ValidatorRewardCoupon
       with
         validator : Party
         rightCid : ContractId ValidatorRight
-        coinRulesCid : ContractId CoinRules
       controller svc, validator
       do
         right <- fetch rightCid
@@ -250,7 +234,6 @@ template CoinRules
     svc : Party
     configSchedule : Schedule Time (CoinConfig USD)
     isDevNet : Bool
-    lock : Bool
     upgrade : Optional ()
   where
     ensure validSchedule configSchedule validCoinConfig
@@ -271,7 +254,7 @@ template CoinRules
         transfer : Transfer
         context : TransferContext
        controller Set.toList (transferControllers transfer)
-       do executeTransfer self context svc transfer
+       do executeTransfer context svc transfer
 
     -- Global domain usage
     ----------------------
@@ -288,7 +271,6 @@ template CoinRules
         trafficAmount : Int
       controller provider
       do
-        requireUnlocked lock
         -- validate choice parameters
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
@@ -327,8 +309,6 @@ template CoinRules
         trafficCids : [ContractId MemberTraffic]
       controller svc
       do
-        requireUnlocked lock
-
         -- fetch, validate and archive all given contracts
         let firstCid::remainingCids = trafficCids
         first <- fetch firstCid
@@ -367,7 +347,6 @@ template CoinRules
         openRound: ContractId OpenMiningRound
       controller svc, receiver
       do
-        requireUnlocked lock
         openRound <- fetch openRound
         let transferConfigCC = transferConfigCCFromOpenRound openRound
             expiringAmount = ExpiringAmount with
@@ -390,7 +369,6 @@ template CoinRules
         openRound: ContractId OpenMiningRound
       controller receiver
       do
-        requireUnlocked lock
         require "isDevNet flag is true" isDevNet
         exercise self CoinRules_Mint with ..
 
@@ -399,7 +377,6 @@ template CoinRules
         provider : Party
       controller provider
       do
-        requireUnlocked lock
         require "isDevNet flag is true" isDevNet
         create FeaturedAppRight with svc; provider
 
@@ -414,7 +391,6 @@ template CoinRules
         coinPrice : Decimal
       controller svc
       do
-        requireUnlocked lock
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
         let tickDuration = configUsd.tickDuration
@@ -454,7 +430,6 @@ template CoinRules
         latestRoundCid : ContractId OpenMiningRound
       controller svc
       do
-        requireUnlocked lock
         roundToArchive <- fetch roundToArchiveCid
         middleRound <- fetch middleRoundCid
         latestRound <- fetch latestRoundCid
@@ -502,7 +477,6 @@ template CoinRules
         summary : OpenMiningRoundSummary
       controller svc
       do
-        requireUnlocked lock
         -- archive summarizing mining round
         miningRound <- fetch miningRoundCid
         archive miningRoundCid
@@ -544,7 +518,6 @@ template CoinRules
         issuingRoundCid : ContractId IssuingMiningRound
       controller svc
       do
-        requireUnlocked lock
         -- archive issuing mining round
         now <- getTime
         issuingRound <- fetch issuingRoundCid
@@ -566,7 +539,6 @@ template CoinRules
         closedRoundCid : ContractId ClosedMiningRound
       controller svc
       do
-        requireUnlocked lock
         -- archive closed mining round
         miningRound <- fetch closedRoundCid
         archive closedRoundCid
@@ -581,7 +553,6 @@ template CoinRules
         appCouponCids : [ContractId AppRewardCoupon]
       controller svc
       do
-        requireUnlocked lock
         -- retrieve round
         closedRound <- fetch closedRoundCid
         require "SVC matches" (closedRound.svc == svc)
@@ -615,7 +586,6 @@ template CoinRules
         unclaimedRewardCids : [ContractId UnclaimedReward]
       controller svc
       do
-        requireUnlocked lock
         require "More than one unclaimed reward contracts" (length unclaimedRewardCids > 1)
 
         -- fetch and archive all given rewards
@@ -638,7 +608,6 @@ template CoinRules
         p : Party
       controller p
       do
-        requireUnlocked lock
         pure (self, this)
 
     -- This inserts a new CoinConfig Schedule into the future Schedules
@@ -647,7 +616,6 @@ template CoinRules
         newScheduleItem : (Time, CoinConfig USD)
       controller svc
       do
-        requireUnlocked lock
         now <- getTime
         require "The insertion is scheduled in the future" (now < newScheduleItem._1)
         create this with configSchedule = prune now (insert newScheduleItem this.configSchedule)
@@ -658,7 +626,6 @@ template CoinRules
         scheduleTime: Time
       controller svc
       do
-        requireUnlocked lock
         now <- getTime
         require "The removal is scheduled in the future" (now < scheduleTime)
         create this with configSchedule = prune now (remove scheduleTime this.configSchedule)
@@ -669,33 +636,9 @@ template CoinRules
         scheduleItem: (Time, CoinConfig USD)
       controller svc
       do
-        requireUnlocked lock
         now <- getTime
         require "The update is scheduled in the future" (now < scheduleItem._1)
         create this with configSchedule = prune now (update scheduleItem this.configSchedule)
-
-
-    -- Lock or Unlock Choices that could be observed by SVC
-    -------------------------------------------------------
-
-    -- TODO(#3933) remove these once they are no longer needed for preventing participant crashes during svc party migration
-    choice CoinRules_Lock : ContractId CoinRules
-      controller svc
-      do
-        require "it is currently not locked" (not lock)
-        create CoinRules with
-          lock = True
-          ..
-
-    -- TODO(#3933) remove these once they are no longer needed for preventing participant crashes during svc party migration
-    choice CoinRules_Unlock : ContractId CoinRules
-      controller svc
-      do
-        require "It is currently locked" lock
-        create CoinRules with
-          lock = False
-          ..
-
 
 -- Transfer logic
 -- ==============
@@ -752,11 +695,11 @@ checkTransferConstraints transfer summary transferConfigCC
 
 -- | Execute a transfer.
 --
-executeTransfer : ContractId CoinRules -> TransferContext -> Party -> Transfer -> Update TransferResult
-executeTransfer coinRulesCid context svc t = do
+executeTransfer : TransferContext -> Party -> Transfer -> Update TransferResult
+executeTransfer context svc t = do
   -- compute summaries
   csum <- summarizeAndValidateContext context svc t
-  isum <- summarizeAndConsumeInputs coinRulesCid csum svc t.sender t.inputs
+  isum <- summarizeAndConsumeInputs csum svc t.sender t.inputs
   osum <- preprocessOutputs csum.config t.sender t.outputs
   summary <- summarizeTransfer csum.openRound csum.config isum osum
   -- check that overall transfer constraints are satisfied
@@ -854,8 +797,8 @@ getIssuingMiningRound csum round = do
     Some issuingRound -> pure issuingRound
 
 summarizeAndConsumeInputs
-  : ContractId CoinRules -> TransferContextSummary -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
-summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
+  : TransferContextSummary -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
+summarizeAndConsumeInputs csum svc sender inps = do
     foldlA (summarizeAndConsumeInput csum.openRound.round) initialSummary inps
   where
     initialSummary = TransferInputsSummary with
@@ -913,7 +856,6 @@ summarizeAndConsumeInputs coinRulesCid csum svc sender inps = do
         exercise couponCid ValidatorRewardCoupon_ArchiveAsValidator with
           validator = sender
           rightCid
-          coinRulesCid
       -- check coupon
       require "SVC matches" (svc == coupon.svc)
       -- compute balance change

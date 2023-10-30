@@ -209,7 +209,6 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                 futureValues: [],
               },
               isDevNet: true,
-              lock: false,
               upgrade: null,
             }),
             payload_value: {},

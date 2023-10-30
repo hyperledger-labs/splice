@@ -330,16 +330,6 @@ class HttpSvHandler(
       )
       .fold(
         {
-          case SvcPartyHosting.LockAcquireFailure(lockReason, _) =>
-            OnboardSvPartyMigrationAuthorizeResponseBadRequest(
-              OnboardSvPartyMigrationAuthorizeErrorResponse(
-                lockNotAvailable = Some(
-                  ErrorResponse(
-                    s"Lock for $lockReason cannot be acquired"
-                  )
-                )
-              )
-            )
           case SvcPartyHosting
                 .RequiredProposalNotFound(
                   partyToParticipantSerial

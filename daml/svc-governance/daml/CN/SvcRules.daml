@@ -13,7 +13,6 @@ import CC.Coin
 
 import CC.Round
 import CC.Round.Types
-import CC.Util
 import CC.ValidatorLicense
 import CN.Wallet.Subscriptions
 import CC.GlobalDomain (initialMemberTraffic, MemberTraffic)
@@ -298,7 +297,6 @@ template SvcRules with
     config : SvcRulesConfig
     initialTrafficState: Map.Map Text TrafficState -- ^ Map from participant/mediator ID to its traffic state at the time of SVC founding. Used for testing, empty in prod.
     isDevNet : Bool
-    lock : Bool -- ^ If it is true, all choices are disabled. TODO(#3933) We should remove this as it is a workaround to protect participants from crashing due to #3933
   where
     ensure
       leader `Map.member` members &&
@@ -323,7 +321,6 @@ template SvcRules with
         domainId : Text
       controller svc
       do
-        requireUnlocked lock
         require "Member party is new" (not $ newMemberParty `Map.member` members)
         unless isDevNet $ do
           require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
@@ -350,14 +347,12 @@ template SvcRules with
           config
           initialTrafficState
           isDevNet
-          lock
 
     choice SvcRules_RemoveMember : ContractId SvcRules
       with
         member : Party
       controller svc
       do
-        requireUnlocked lock
         require "Member exists" (member `Map.member` members)
         require "There is more than one member" (Map.size members > 1)
         -- NOTE: this immediate deletion also slashes that member's share of the current round's issuance
@@ -378,7 +373,6 @@ template SvcRules with
           config
           initialTrafficState
           isDevNet
-          lock
 
     -- Challenge an SV member that seems to be non-responsive.
     -- The challenge will need to be seconded by another member after the deadine timer has elapsed before being executed.
@@ -389,7 +383,6 @@ template SvcRules with
         firstChallenger : Party
       controller firstChallenger
       do
-        requireUnlocked lock
         require "IsDevnet is true" isDevNet
         require "Challenger is a collective member" (firstChallenger `Map.member` members)
         require "Challenged is a collective member" (challenged `Map.member` members)
@@ -407,7 +400,6 @@ template SvcRules with
         secondChallenger : Party
       controller secondChallenger
       do
-        requireUnlocked lock
         require "Second challenger is a collective member" (secondChallenger `Map.member` members)
         firstChallenge <- fetch firstChallengeCid
         require "The two challengers are different" (secondChallenger /= firstChallenge.firstChallenger)
@@ -451,7 +443,6 @@ template SvcRules with
         svParticipantId : Text
       controller sv
       do
-        requireUnlocked lock
 
         svOnboardingConfirmed <- fetch svOnboardingConfirmedCid
         archive svOnboardingConfirmedCid
@@ -488,7 +479,6 @@ template SvcRules with
         newNodeConfig : DomainNodeConfig
       controller sv
       do
-        requireUnlocked lock
         require "Domain with this id is configured" (domainId `Map.member` config.globalDomain.domains)
         case Map.lookup sv members of
           None -> error "SV is not a collective member"
@@ -511,7 +501,6 @@ template SvcRules with
         ranking : [Party]
       controller requester
       do
-        requireUnlocked lock
         -- TODO(#7649): consider interaction with concurrent membership changes
         require "Requester is a collective member" (requester `Map.member` members)
         require "All members are ranked exactly once" (sort ranking == sort (Map.keys members))
@@ -525,7 +514,6 @@ template SvcRules with
         requestCids : [ContractId ElectionRequest]
       controller actor
       do
-        requireUnlocked lock
         let summary = summarizeCollective this
         -- fetch, check, and archive all requests
         reqs <- forA requestCids $ \requestCid -> do
@@ -552,7 +540,6 @@ template SvcRules with
         requestCid : ContractId ElectionRequest
       controller leader
       do
-        requireUnlocked lock
         request <- fetch requestCid
         archive requestCid
         require "Election request is outdated" (request.epoch < epoch)
@@ -567,7 +554,6 @@ template SvcRules with
         action : ActionRequiringConfirmation
       controller confirmer
       do
-        requireUnlocked lock
         require "Confirmer is a collective member" (confirmer `Map.member` members)
         now <- getTime
         let expiresAt = now `addRelTime` config.actionConfirmationTimeout
@@ -584,7 +570,6 @@ template SvcRules with
         confirmationCids : [ContractId Confirmation]
       controller leader
       do
-        requireUnlocked lock
         let s = summarizeCollective this
         require "Enough confirmations" (length confirmationCids >= s.requiredNumVotes)
         confirmers <- forA confirmationCids $ \confirmationCid -> do
@@ -609,7 +594,6 @@ template SvcRules with
         voteRequestTimeout : Optional RelTime
       controller requester
       do
-        requireUnlocked lock
         require "Initiator is a collective member" (requester `Map.member` members)
         requireWellformedReason config reason
         now <- getTime
@@ -642,7 +626,6 @@ template SvcRules with
         reason : Reason
       controller voter
       do
-        requireUnlocked lock
         -- validate vote parameters
         requireWellformedReason config reason
         require "Voter is a collective member" (voter `Map.member` members)
@@ -670,7 +653,6 @@ template SvcRules with
         reason : Reason
       controller voter
       do
-        requireUnlocked lock
         -- validate response
         requireWellformedReason config reason
         require "Voter is a collective member" (voter `Map.member` members)
@@ -696,7 +678,6 @@ template SvcRules with
         voteCids : [ContractId Vote]
       controller leader
       do
-        requireUnlocked lock
         -- validate and archive request
         request <- fetch requestCid
         archive requestCid
@@ -750,7 +731,6 @@ template SvcRules with
         choiceArg : VoteRequest_Expire
       controller leader
       do
-        requireUnlocked lock
         exercise cid choiceArg
 
 
@@ -764,7 +744,6 @@ template SvcRules with
         coinPrice : Decimal
       controller sv
       do
-        requireUnlocked lock
         -- validate and archive existing vote
         vote <- fetch voteCid
         archive voteCid
@@ -792,7 +771,6 @@ template SvcRules with
         duplicateVoteCids : [[ContractId CoinPriceVote]]
       controller leader
       do
-        requireUnlocked lock
         -- validate and archive non-member votes
         forA_ nonMemberVoteCids $ \voteCid -> do
           vote <- fetch voteCid
@@ -826,7 +804,6 @@ template SvcRules with
         newConfig : SvcRulesConfig
       controller svc
       do
-        requireUnlocked lock
         -- TODO(M3-57): sanity check the newConfig to avoid locking up the consortium, e.g., by setting `maxTextLength = -1`
         create this with config = newConfig
 
@@ -839,7 +816,6 @@ template SvcRules with
         provider : Party
       controller svc
       do
-        requireUnlocked lock
         create FeaturedAppRight with
           svc
           provider
@@ -849,7 +825,6 @@ template SvcRules with
         rightCid : ContractId FeaturedAppRight
       controller svc
       do
-        requireUnlocked lock
         right <- fetch rightCid
         require "SVC matches" (right.svc == svc)
         archive rightCid
@@ -864,7 +839,6 @@ template SvcRules with
         validator : Party
       controller sponsor
       do
-        requireUnlocked lock
         require "Sponsor is a collective member" (sponsor `Map.member` members)
         -- create license that records in particular which SV sponsored the onboarding of the validator
         create ValidatorLicense with ..
@@ -882,7 +856,6 @@ template SvcRules with
         sponsor : Party
       controller sponsor
       do
-        requireUnlocked lock
         require "Sponsor is a collective member" (sponsor `Map.member` members)
         now <- getTime
         let expiresAt = now `addRelTime` config.svOnboardingRequestTimeout
@@ -893,7 +866,6 @@ template SvcRules with
         cid: ContractId SvOnboardingRequest
       controller leader
       do
-        requireUnlocked lock
         exercise cid SvOnboardingRequest_Expire
 
     nonconsuming choice SvcRules_ArchiveSvOnboardingRequest : ()
@@ -901,7 +873,6 @@ template SvcRules with
         svOnboardingRequestCid: ContractId SvOnboardingRequest
       controller leader
       do
-        requireUnlocked lock
         -- require that the member is already added to the SVC
         -- TODO(#3756) Enable archiving also before the member is added, after a matching `SvOnboardingConfirmed` contract is created.
         svOnboardingRequest <- fetch svOnboardingRequestCid
@@ -917,7 +888,6 @@ template SvcRules with
         reason : Text
       controller svc
       do
-        requireUnlocked lock
         require "Member party is new" (not $ newMemberParty `Map.member` members)
         if (not isDevNet)
           then
@@ -937,7 +907,6 @@ template SvcRules with
         cid: ContractId SvOnboardingConfirmed
       controller leader
       do
-        requireUnlocked lock
         exercise cid SvOnboardingConfirmed_Expire
 
 
@@ -950,7 +919,6 @@ template SvcRules with
         choiceArg : Coin_Expire
       controller leader
       do
-        requireUnlocked lock
         exercise cid choiceArg
 
     nonconsuming choice SvcRules_LockedCoin_ExpireCoin : CoinExpireSummary
@@ -959,7 +927,6 @@ template SvcRules with
         choiceArg : LockedCoin_ExpireCoin
       controller leader
       do
-        requireUnlocked lock
         exercise cid choiceArg
 
 
@@ -976,7 +943,6 @@ template SvcRules with
         coinPriceVoteCids : [ContractId CoinPriceVote]
       controller leader
       do
-        requireUnlocked lock
         coinPrice <- fetchMedianCoinPrice svc (Map.keys members) coinPriceVoteCids
         exercise coinRulesCid CoinRules_AdvanceOpenMiningRounds with ..
 
@@ -990,7 +956,6 @@ template SvcRules with
         choiceArg : CnsEntryContext_CollectEntryRenewalPayment
       controller leader
       do
-        requireUnlocked lock
         exercise cnsEntryContextCid choiceArg
 
     nonconsuming choice SvcRules_ExpireCnsEntry : ()
@@ -999,7 +964,6 @@ template SvcRules with
         choiceArg : CnsEntry_Expire
       controller leader
       do
-        requireUnlocked lock
         exercise cnsEntryCid choiceArg
 
     nonconsuming choice SvcRules_ExpireSubscription : ()
@@ -1009,7 +973,6 @@ template SvcRules with
         choiceArg : SubscriptionIdleState_ExpireSubscription
       controller leader
       do
-        requireUnlocked lock
         aborted <- exercise subscriptionIdleStateCid choiceArg
         exercise cnsEntryContextCid (CnsEntryContext_Terminate svc aborted)
 
@@ -1019,7 +982,6 @@ template SvcRules with
         terminatedSubscriptionCid : ContractId TerminatedSubscription
       controller leader
       do
-        requireUnlocked lock
         exercise cnsEntryContextCid (CnsEntryContext_Terminate svc terminatedSubscriptionCid)
 
 
@@ -1031,7 +993,6 @@ template SvcRules with
         rewardCid : ContractId SvcReward
       controller leader
       do
-        requireUnlocked lock
         reward <- fetch rewardCid
         archive rewardCid
         require "SVC matches" (reward.svc == svc)
@@ -1058,7 +1019,6 @@ template SvcRules with
         openRoundCid : ContractId OpenMiningRound
       controller sv
       do
-        requireUnlocked lock
         reward <- fetch rewardCid
         archive rewardCid
         require "SVC matches" (reward.svc == svc)
@@ -1079,7 +1039,6 @@ template SvcRules with
         choiceArg : CoinRules_ClaimExpiredRewards
       controller leader
       do
-        requireUnlocked lock
         exercise coinRulesCid choiceArg
 
     -- Batch merge of unclaimed rewards
@@ -1090,7 +1049,6 @@ template SvcRules with
         unclaimedRewardCids : [ContractId UnclaimedReward]
       controller leader
       do
-        requireUnlocked lock
         require "Number of unclaimed rewards is above the configured threshold" $ length unclaimedRewardCids > config.numUnclaimedRewardsThreshold
         exercise coinRulesCid CoinRules_MergeUnclaimedRewards with ..
 
@@ -1101,7 +1059,6 @@ template SvcRules with
         issuingRoundCid : ContractId IssuingMiningRound
       controller leader
       do
-        requireUnlocked lock
         exercise coinRulesCid CoinRules_MiningRound_Close with ..
 
 
@@ -1128,40 +1085,8 @@ template SvcRules with
         trafficCids : [ContractId MemberTraffic]
       controller leader
       do
-        requireUnlocked lock
         require "Number of member traffic contracts is above the configured threshold" $ length trafficCids > config.numMemberTrafficContractsThreshold
         exercise coinRulesCid CoinRules_MergeMemberTrafficContracts with ..
-
-    -- Lock or Unlock Choices that could be observed by SVC
-    -------------------------------------------------------
-
-    -- TODO(#3933) remove these once they are no longer needed for preventing participant crashes during svc party migration
-    choice SvcRules_Lock : ContractId SvcRules
-      with
-        sv : Party
-        coinRulesCid : ContractId CoinRules
-      controller sv
-      do
-        require "SV is a collective member" (sv `Map.member` members)
-        require "it is currently not locked" (not lock)
-        exercise coinRulesCid CoinRules_Lock
-        create SvcRules with
-          lock = True
-          ..
-
-    -- TODO(#3933) remove these once they are no longer needed for preventing participant crashes during svc party migration
-    choice SvcRules_Unlock : ContractId SvcRules
-      with
-        sv : Party
-        coinRulesCid : ContractId CoinRules
-      controller sv
-      do
-        require "SV is a collective member" (sv `Map.member` members)
-        require "It is currently locked" lock
-        exercise coinRulesCid CoinRules_Unlock
-        create SvcRules with
-          lock = False
-          ..
 
 -- Utility functions
 --------------------

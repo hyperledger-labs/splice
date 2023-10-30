@@ -63,7 +63,6 @@ genericSetupApp svcPrefix = do
   _ <- submit svc $ createCmd CoinRules with
     configSchedule = defaultCoinConfigSchedule
     isDevNet = True
-    lock = False
     ..
 
   submitExerciseCoinRulesByKey app [svc] [] CoinRules_Bootstrap_Rounds with

@@ -49,7 +49,6 @@ class ModelUpgradeIntegrationTest
         coinRules.payload.svc,
         newSchedule,
         coinRules.payload.isDevNet,
-        coinRules.payload.lock,
         coinRules.payload.upgrade,
       )
       clue("Activating new version") {

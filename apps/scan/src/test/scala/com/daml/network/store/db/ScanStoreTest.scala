@@ -1022,14 +1022,12 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 
   private def mkCoinExpire() =
     new coinCodegen.Coin_Expire(
-      new roundCodegen.OpenMiningRound.ContractId(nextCid()),
-      new cc.coin.CoinRules.ContractId(nextCid()),
+      new roundCodegen.OpenMiningRound.ContractId(nextCid())
     ).toValue
 
   private def mkLockedCoinExpireCoin() =
     new coinCodegen.LockedCoin_ExpireCoin(
-      new roundCodegen.OpenMiningRound.ContractId(nextCid()),
-      new cc.coin.CoinRules.ContractId(nextCid()),
+      new roundCodegen.OpenMiningRound.ContractId(nextCid())
     ).toValue
 
   private def mkCoinExpireSummary(
@@ -1103,7 +1101,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       ),
       Collections.emptyMap(),
       true,
-      false,
     )
     contract(
       identifier = templateId,

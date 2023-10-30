@@ -122,9 +122,6 @@ object SvcPartyHosting {
 
   sealed trait SvcPartyMigrationFailure
 
-  final case class LockAcquireFailure(lockReason: String, cause: Throwable)
-      extends SvcPartyMigrationFailure
-
   final case class RequiredProposalNotFound(
       partyToParticipantSerial: PositiveInt
   ) extends SvcPartyMigrationFailure

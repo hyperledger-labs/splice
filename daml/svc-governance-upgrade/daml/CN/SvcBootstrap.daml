@@ -45,7 +45,6 @@ template SvcBootstrap with
             initialValue = coinConfig
             futureValues = []
           isDevNet
-          lock = False
           upgrade = Some ()
         _ <- create CnsRules with
           svc
@@ -85,7 +84,6 @@ template SvcBootstrap with
           config
           initialTrafficState
           isDevNet
-          lock = False
         -- create initial traffic contracts for the founding member based on configured initial traffic grant
         let domainId = coinConfig.globalDomain.activeDomain
         let trafficAmount = config.initialTrafficGrant

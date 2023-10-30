@@ -858,8 +858,6 @@ components:
     OnboardSvPartyMigrationAuthorizeErrorResponse:
       type: object
       properties:
-        lock_not_available:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         accepted_state_not_found:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         proposal_not_found:

@@ -673,20 +673,6 @@ object HttpWalletHandler {
           s"The operation $operationName failed with a nonspecifc INVALID_ARGUMENT error $ex."
         )
         TransientErrorKind
-      case Failure(ex: io.grpc.StatusRuntimeException)
-          if (ex.getStatus.getCode == Status.Code.FAILED_PRECONDITION && ex.getStatus.getDescription
-            .contains("The requirement 'Contract is not locked' was not met.")) =>
-        logger.info(
-          s"The operation $operationName failed due to the svcRules lock $ex."
-        )
-        TransientErrorKind
-      case Failure(ex: io.grpc.StatusRuntimeException)
-          if (ex.getStatus.getCode == Status.Code.FAILED_PRECONDITION && ex.getStatus.getDescription
-            .contains("The requirement 'Contract is not locked' was not met.")) =>
-        logger.info(
-          s"The operation $operationName failed due to the svcRules lock $ex."
-        )
-        TransientErrorKind
       case Failure(ex) =>
         logThrowable(ex, logger)
         FatalErrorKind

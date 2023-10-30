@@ -1,6 +1,5 @@
 module CN.Scripts.TestDecentralizedAutomation where
 
-import DA.Action
 import DA.Assert
 import DA.Foldable (forA_)
 import DA.List
@@ -16,7 +15,6 @@ import CC.Coin
 import CN.SvcRules
 import CN.Util.Assert
 
-import CC.Scripts.Parameters
 import CC.Scripts.Util
 import CN.Scripts.SvcTestUtils
 import CN.Cns
@@ -201,132 +199,6 @@ testConfirmationExpiry = do
   -- leader expires the confirmation
   leaderSubmits app $ \cid -> exerciseCmd cid $
     SvcRules_ExpireStaleConfirmation svConfirmationCid
-
-
--- Testing the SVC activity lock
---------------------------------
-
-testActivityLockingOnSvcRulesCoinRulesChoices: Script ()
-testActivityLockingOnSvcRulesCoinRulesChoices = do
-  (app, svc, (_, sv2, _, _)) <- initDevNetCollective
-  [(svcRulesCid, _)] <- query @SvcRules svc
-  [(coinRulesCid, _)] <- query @CoinRules svc
-
-  -- lock choices in svcRules and coinRules
-  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_Lock with
-    sv = sv2
-    coinRulesCid
-
-  [(svcRulesCid, _)] <- query @SvcRules svc
-  svX <- allocateParty "svX"
-  coinConfig <- getCoinConfig app
-  let domainId = coinConfig.globalDomain.activeDomain
-  submitMultiMustFail [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" "sv2-participant-id" (Round 3) domainId)
-
-  [(coinRulesCid, _)] <- query @CoinRules svc
-  (round, _) <- getLatestOpenRound app
-  submitMultiMustFail [svc] [svc] $ exerciseCmd coinRulesCid (CoinRules_Mint svc 5.0 round)
-
-  -- unlock choices in svcRules and coinRules
-  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_Unlock with
-    sv = sv2
-    coinRulesCid
-
-  [(svcRulesCid, _)] <- query @SvcRules svc
-  svX <- allocateParty "svX"
-  submitMulti [svc] [svc] $ exerciseCmd svcRulesCid (SvcRules_AddMember svX "sv2" "sv2-participant-id" (Round 3) domainId)
-
-  [(coinRulesCid, _)] <- query @CoinRules svc
-  (round, _) <- getLatestOpenRound app
-  submitMulti [svc] [svc] $ exerciseCmd coinRulesCid (CoinRules_Mint svc 5.0 round)
-
-  pure ()
-
-testActivityLockOnLockedCoinChoices: Script ()
-testActivityLockOnLockedCoinChoices = do
-  (app, _, (sv1, _, _, _)) <- initDevNetCollective
-
-  alice <- setupUser app "alice" app.svc
-  bob <- setupUser app "bob" app.svc
-
-  cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
-  roundCid <- fst <$> getLatestOpenRound app
-  ensureHonorsActivityLock app sv1 [bob.primaryParty, alice.primaryParty] [app.svc] $ \coinRules ->
-    exerciseCmd cid (LockedCoin_Unlock coinRules roundCid)
-
-  cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
-  passTime (minutes 6)
-  roundCid <- fst <$> getLatestOpenRound app
-  ensureHonorsActivityLock app sv1 [alice.primaryParty] [app.svc] $ \coinRules ->
-    exerciseCmd cid (LockedCoin_OwnerExpireLock coinRules roundCid)
-
-  cid <- getLockedCoin app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (minutes 1)
-  replicateA_ 4 $ runNextIssuance app
-  (round, _) <- getLatestOpenRound app
-  ensureHonorsActivityLock app sv1 [app.svc] [app.svc] $ \coinRules ->
-    exerciseCmd cid (LockedCoin_ExpireCoin round coinRules)
-  pure ()
-
-testActivityLockOnCoinChoices : Script ()
-testActivityLockOnCoinChoices = do
-  (app, _, (sv1, _, _, _)) <- initDevNetCollective
-  alice <- setupUser app "alice" app.svc
-
-  cid <- tap app alice defaultTransferConfig.holdingFee.rate
-  replicateA_ 3 $ runNextIssuance app
-  (round, _) <- getLatestOpenRound app
-  ensureHonorsActivityLock app sv1 [app.svc] [app.svc] $ \coinRules ->
-    exerciseCmd cid (Coin_Expire round coinRules)
-  pure ()
-
-
-
-testLockControllers : Script ()
-testLockControllers = script do
-  (app, svc, (sv1, _, _, _)) <- initDevNetCollective
-  nonSv <- allocateParty "nonSv"
-  [(svcRulesCid, _)] <- query @SvcRules svc
-  [(coinRulesCid, _)] <- query @CoinRules svc
-  submitMultiMustFail [nonSv] [app.svc] $ exerciseCmd svcRulesCid (SvcRules_Lock nonSv coinRulesCid)
-  submitMulti [sv1] [app.svc] $ exerciseCmd svcRulesCid (SvcRules_Lock sv1 coinRulesCid)
-  pure ()
-
-ensureHonorsActivityLock : CCApp -> Party -> [Party] -> [Party] -> (ContractId CoinRules -> Commands a) -> Script ()
-ensureHonorsActivityLock app sv actAs readAs buildCommand = do
-  lockSvcRules app sv
-  Some (coinRules, _) <- queryCoinRulesByKey app.svc
-  submitMultiMustFail actAs readAs (buildCommand coinRules)
-
-  unlockSvcRules app sv
-  Some (coinRules, _) <- queryCoinRulesByKey app.svc
-  submitMulti actAs readAs (buildCommand coinRules)
-  pure ()
-
-lockSvcRules : CCApp -> Party -> Script ()
-lockSvcRules app sv = do
-  [(svcRulesCid, _)] <- query @SvcRules app.svc
-  [(coinRulesCid, _)] <- query @CoinRules app.svc
-  submitMulti [sv] [app.svc] $ exerciseCmd svcRulesCid SvcRules_Lock with
-    sv
-    coinRulesCid
-  pure ()
-
-unlockSvcRules : CCApp -> Party -> Script ()
-unlockSvcRules app sv = do
-  [(svcRulesCid, _)] <- query @SvcRules app.svc
-  [(coinRulesCid, _)] <- query @CoinRules app.svc
-  submitMulti [sv] [app.svc] $ exerciseCmd svcRulesCid SvcRules_Unlock with
-    sv
-    coinRulesCid
-  pure ()
-
-getLockedCoin : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (ContractId LockedCoin)
-getLockedCoin app owner lockHolder amount lockDuration =  do
--- tap amount + 1 to account for fees
-  _ <- tap app owner (amount + 1.0)
-  lockTo1 app owner lockHolder amount lockDuration
-  [(cid, _)] <- query @LockedCoin lockHolder
-  pure cid
 
 
 -- Testing CNS decentralization

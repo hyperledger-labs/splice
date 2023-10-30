@@ -174,7 +174,7 @@ template AcceptedAppPayment
         contextRound <- exercise context.openMiningRound (OpenMiningRound_Fetch provider)
         require ("Round at payment acceptance " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
         -- unlock coin and transfer the remainder to the receiver
-        ccsum <- exercise lockedCoin (LockedCoin_Unlock context.coinRules context.openMiningRound)
+        ccsum <- exercise lockedCoin (LockedCoin_Unlock context.openMiningRound)
         let transfer = Transfer with
               sender
               provider
@@ -192,7 +192,7 @@ template AcceptedAppPayment
         context : AppTransferContext
       controller map (\r -> r.receiver) ccReceiverAmounts
       do create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) ccReceiverAmounts
-         exercise lockedCoin (LockedCoin_Unlock context.coinRules context.openMiningRound)
+         exercise lockedCoin (LockedCoin_Unlock context.openMiningRound)
 
     choice AcceptedAppPayment_Expire : CoinCreateSummary (ContractId Coin)
       with
@@ -200,4 +200,4 @@ template AcceptedAppPayment
       controller sender
       do -- TODO(#3152) Split out coin unlocking from payment expiry
          create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) ccReceiverAmounts
-         exercise lockedCoin (LockedCoin_OwnerExpireLock context.coinRules context.openMiningRound)
+         exercise lockedCoin (LockedCoin_OwnerExpireLock context.openMiningRound)

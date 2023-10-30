@@ -30,15 +30,13 @@ class ExpiredLockedCoinTrigger(
   override protected def completeTaskAsLeader(
       co: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
-    coinRules <- store.getCoinRules()
     latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
     svcRules <- store.getSvcRules()
     cmd = svcRules.exercise(
       _.exerciseSvcRules_LockedCoin_ExpireCoin(
         co.work.contractId,
         new cc.coin.LockedCoin_ExpireCoin(
-          latestOpenMiningRound.contractId,
-          coinRules.contractId,
+          latestOpenMiningRound.contractId
         ),
       )
     )
