@@ -2,7 +2,6 @@ package com.daml.network.integration.tests
 
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.plugins.UsePostgres
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
@@ -16,8 +15,6 @@ class WalletTxLogTimeBasedIntegrationTest
     with WalletTestUtil
     with SplitwellTestUtil
     with WalletTxLogTestUtil {
-
-  registerPlugin(new UsePostgres(loggerFactory))
 
   private val coinPrice = BigDecimal(1.25).setScale(10)
 

@@ -4,7 +4,6 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.plugins.UsePostgres
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
 import com.digitalasset.canton.HasExecutionContext
@@ -15,8 +14,6 @@ class WalletTxLogWithDomainFeesIntegrationTest
     with WalletTestUtil
     with DomainFeesTestUtil
     with WalletTxLogTestUtil {
-
-  registerPlugin(new UsePostgres(loggerFactory))
 
   private val coinPrice = BigDecimal(1.25).setScale(10)
 
