@@ -57,7 +57,7 @@ export async function installValidator1(
     installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
   ]);
 
-  const extraDependsOn: pulumi.Resource[] = [svc];
+  const extraDependsOn: pulumi.Resource[] = [svc, postgresDb];
 
   return installValidatorApp({
     auth0Client,
@@ -69,6 +69,13 @@ export async function installValidator1(
     extraDomains: [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
     svSponsorAddress: 'http://sv-app.sv-1:5014',
     onboarding,
+    persistenceConfig: {
+      host: postgresDb.address,
+      password: postgresDb.password,
+      schema: pulumi.Output.create('cn_apps_validator'),
+      user: pulumi.Output.create('cnadmin'),
+      port: pulumi.Output.create(5432),
+    },
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     extraDependsOn,
     auth0AppName: 'validator1',

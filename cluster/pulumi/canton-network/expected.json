@@ -1817,6 +1817,12 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "persistence": {
+          "host": "postgres.sv-1.svc.cluster.local",
+          "port": 5432,
+          "schema": "cn_apps_directory",
+          "user": "cnadmin"
+        },
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -2303,6 +2309,12 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "persistence": {
+          "host": "postgres.sv-1.svc.cluster.local",
+          "port": 5432,
+          "schema": "cn_apps_scan",
+          "user": "cnadmin"
+        },
         "resources": {
           "limits": {
             "memory": "1536Mi"
@@ -2481,6 +2493,12 @@
         },
         "onboardingName": "Canton-Foundation-1",
         "onboardingType": "found-collective",
+        "persistence": {
+          "host": "postgres.sv-1.svc.cluster.local",
+          "port": 5432,
+          "schema": "cn_apps_sv_1",
+          "user": "cnadmin"
+        },
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -2564,6 +2582,12 @@
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
+        },
+        "persistence": {
+          "host": "postgres.sv-1.svc.cluster.local",
+          "port": 5432,
+          "schema": "cn_apps_validator",
+          "user": "cnadmin"
         },
         "resources": {
           "limits": {
@@ -3190,6 +3214,12 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "persistence": {
+          "host": "postgres.sv-2.svc.cluster.local",
+          "port": 5432,
+          "schema": "cn_apps_scan",
+          "user": "cnadmin"
+        },
         "resources": {
           "limits": {
             "memory": "1536Mi"
@@ -3340,6 +3370,12 @@
         },
         "onboardingName": "Canton-Foundation-2",
         "onboardingType": "join-with-key",
+        "persistence": {
+          "host": "postgres.sv-2.svc.cluster.local",
+          "port": 5432,
+          "schema": "cn_apps_sv_2",
+          "user": "cnadmin"
+        },
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -3423,6 +3459,12 @@
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
+        },
+        "persistence": {
+          "host": "postgres.sv-2.svc.cluster.local",
+          "port": 5432,
+          "schema": "cn_apps_validator",
+          "user": "cnadmin"
         },
         "resources": {
           "limits": {
@@ -4120,6 +4162,12 @@
         },
         "onboardingName": "Canton-Foundation-3",
         "onboardingType": "join-with-key",
+        "persistence": {
+          "host": "postgres.sv-3.svc.cluster.local",
+          "port": 5432,
+          "schema": "cn_apps_sv_3",
+          "user": "cnadmin"
+        },
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -4203,6 +4251,12 @@
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
+        },
+        "persistence": {
+          "host": "postgres.sv-3.svc.cluster.local",
+          "port": 5432,
+          "schema": "cn_apps_validator",
+          "user": "cnadmin"
         },
         "resources": {
           "limits": {
@@ -4900,6 +4954,12 @@
         },
         "onboardingName": "Canton-Foundation-4",
         "onboardingType": "join-with-key",
+        "persistence": {
+          "host": "postgres.sv-4.svc.cluster.local",
+          "port": 5432,
+          "schema": "cn_apps_sv_4",
+          "user": "cnadmin"
+        },
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -4983,6 +5043,12 @@
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
+        },
+        "persistence": {
+          "host": "postgres.sv-4.svc.cluster.local",
+          "port": 5432,
+          "schema": "cn_apps_validator",
+          "user": "cnadmin"
         },
         "resources": {
           "limits": {
@@ -5485,6 +5551,12 @@
             "name": "cn-app-validator-onboarding-validator1",
             "optional": false
           }
+        },
+        "persistence": {
+          "host": "postgres.validator1.svc.cluster.local",
+          "port": 5432,
+          "schema": "cn_apps_validator",
+          "user": "cnadmin"
         },
         "resources": {
           "limits": {

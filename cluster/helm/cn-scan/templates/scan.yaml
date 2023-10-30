@@ -23,6 +23,24 @@ spec:
         env:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }}
+        {{- with .Values.persistence }}
+        - name: ADDITIONAL_CONFIG_PERSISTENCE
+          value: |
+            canton.scan-apps.scan-app.storage {
+              type = postgres
+              config {
+                dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
+                properties = {
+                  databaseName = "cantonnet"
+                  currentSchema = "{{ .schema }}"
+                  serverName = "{{ .host }}"
+                  portNumber = {{ .port }}
+                  user = "{{ .user }}"
+                  password = "{{ .password }}"
+                }
+              }
+            }
+        {{- end }}
         {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         - name: CN_APP_SCAN_PARTICIPANT_ADDRESS
           value: {{ .Values.participantAddress | default "participant" | quote }}

@@ -16,6 +16,8 @@ import {
   validatorOnboardingSecretName,
 } from 'cn-pulumi-common';
 
+import { PersistenceConfig } from '../../common';
+
 export type ExtraDomain = {
   alias: string;
   url: string;
@@ -36,6 +38,7 @@ export type ValidatorConfig = {
   validatorWalletUser?: string;
   disableAllocateLedgerApiUserParty?: boolean;
   participant: pulumi.Resource;
+  persistenceConfig?: PersistenceConfig;
   backupConfig?: ValidatorBackupConfig;
   extraDependsOn?: pulumi.Resource[];
   appDars?: string[];
@@ -105,6 +108,7 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
           }
         : undefined,
       topup: config.topupConfig ? { enabled: true, ...config.topupConfig } : { enabled: false },
+      persistence: config.persistenceConfig,
       disableAllocateLedgerApiUserParty: config.disableAllocateLedgerApiUserParty,
       participantIdentitiesDumpPeriodicBackup: backupConfig,
       additionalConfig: config.additionalConfig,

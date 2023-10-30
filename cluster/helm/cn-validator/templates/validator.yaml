@@ -102,6 +102,24 @@ spec:
             canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.target-throughput = {{ (.Values.topup).targetThroughput }}
             canton.validator-apps.validator_backend.domains.global.buy-extra-traffic.min-topup-interval = {{ (.Values.topup).minTopupInterval }}
         {{- end }}
+        {{- with .Values.persistence }}
+        - name: ADDITIONAL_CONFIG_PERSISTENCE
+          value: |
+            canton.validator-apps.validator_backend.storage {
+              type = postgres
+              config {
+                dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
+                properties = {
+                  databaseName = "cantonnet"
+                  currentSchema = "{{ .schema }}"
+                  serverName = "{{ .host }}"
+                  portNumber = {{ .port }}
+                  user = "{{ .user }}"
+                  password = "{{ .password }}"
+                }
+              }
+            }
+        {{- end }}
         {{- with .Values.participantIdentitiesDumpPeriodicBackup }}
         - name: ADDITIONAL_CONFIG_CN_APP_VALIDATOR_PARTICIPANT_IDENTITIES_DUMP_PERIODIC_BACKUP
           value: |

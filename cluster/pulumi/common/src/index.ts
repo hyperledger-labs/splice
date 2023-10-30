@@ -10,3 +10,4 @@ export * from './runbook-backup';
 export * from './utils';
 export * from './backup';
 export * from './secrets';
+export * from './persistence';

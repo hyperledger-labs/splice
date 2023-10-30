@@ -209,6 +209,7 @@ export async function installSvNode(config: SvConfig): Promise<{
     })),
     isDevNet: config.isDevNet,
     approvedSvIdentities: config.approvedSvIdentities,
+    persistence: persistenceConfig(postgresDb, config.nodename.replace('-', '_')),
     acsDumpPeriodicExport: backupConfig,
     acsDumpImport:
       config.bootstrappingDumpConfig && config.onboarding.type === 'found-collective'
@@ -233,7 +234,7 @@ export async function installSvNode(config: SvConfig): Promise<{
     config.nodename + '-sv-app',
     'cn-sv-node',
     svValues,
-    dependsOn.concat([participant, cometBftRpcService].concat(domain ? [domain] : []))
+    dependsOn.concat([participant, cometBftRpcService, postgresDb].concat(domain ? [domain] : []))
   );
 
   if (config.onboarding.type == 'found-collective' && !config.withScan) {
@@ -247,22 +248,23 @@ export async function installSvNode(config: SvConfig): Promise<{
       metrics: {
         enable: true,
       },
+      persistence: persistenceConfig(postgresDb, 'scan'),
     };
     const scanApp = installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, [
       svApp,
+      postgresDb,
     ]);
     if (config.onboarding.type == 'found-collective') {
-      installCNHelmChart(
-        xns,
-        'directory-' + xns.logicalName,
-        'cn-directory',
-        {
-          metrics: {
-            enable: true,
-          },
+      const directoryValues = {
+        metrics: {
+          enable: true,
         },
-        [scanApp]
-      );
+        persistence: persistenceConfig(postgresDb, 'directory'),
+      };
+      installCNHelmChart(xns, 'directory-' + xns.logicalName, 'cn-directory', directoryValues, [
+        scanApp,
+        postgresDb,
+      ]);
     }
   }
 
@@ -281,7 +283,8 @@ export async function installSvNode(config: SvConfig): Promise<{
             secret: backupConfigSecret,
           }
         : undefined,
-    extraDependsOn: [svApp],
+    persistenceConfig: persistenceConfig(postgresDb, 'validator'),
+    extraDependsOn: [svApp, postgresDb],
     svValidator: true,
   });
 
@@ -302,4 +305,14 @@ export async function installSvNode(config: SvConfig): Promise<{
   );
 
   return { svApp, postgresDatabase: postgresDb };
+}
+
+function persistenceConfig(postgresDb: postgres.Postgres, appName: string) {
+  return {
+    host: postgresDb.address,
+    password: postgresDb.password,
+    schema: pulumi.Output.create(`cn_apps_${appName}`),
+    user: pulumi.Output.create('cnadmin'),
+    port: pulumi.Output.create(5432),
+  };
 }
