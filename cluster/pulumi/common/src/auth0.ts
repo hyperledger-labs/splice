@@ -58,6 +58,10 @@ export class Auth0Fetch implements Auth0Client {
       clientId: this.cfg.auth0MgtClientId,
       clientSecret: this.cfg.auth0MgtClientSecret,
       scope: 'read:clients read:client_keys',
+      retry: {
+        enabled: true,
+        maxRetries: 10,
+      },
     });
 
     const clients = await client.getClients();
