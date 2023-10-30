@@ -12,6 +12,10 @@ Release Notes
     `cometbft-values.yaml` is configured by default to fetch the snapshots from ``https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global:443/cometbft-rpc/`` which is the URL
     for the CometBFT RPC API of the Canton-Foundation SV. In order to disable state sync, set `stateSync.enable` to `false` in `cometbft-values.yaml`.
 
+* Documentation:
+
+  * Add brief overview about important :ref:`Identities used by SV nodes on different layers <sv-identities-overview>`.
+
 2023-10-30
 ----------
 

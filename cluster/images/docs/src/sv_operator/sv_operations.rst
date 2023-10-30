@@ -3,7 +3,8 @@
 SV Operations
 =============
 
-These sections give an overview of some of the functionalities enabled through your SV node.
+These sections give an overview of some of the functionalities enabled through your SV node
+as well as general information useful to SV node operators.
 
 .. _generate_onboarding_secret:
 
@@ -39,3 +40,70 @@ your SV there, as it will be the onboarding sponsor of the new validator (e.g. *
 Save that configuration file as ``validator-conboarding.conf`` in the
 root of the extracted release and follow the self-hosted
 :ref:`validator instructions to spin up another validator <self_hosted_validator>`.
+
+.. _sv-identities-overview:
+
+Identities used by SV nodes on different layers
+-----------------------------------------------
+
+This section gives a brief overview over some of the most important identities associated with a single SV node,
+and for each type of identity: its role and relevance for quorums (if any), under what circumstance it can be reused,
+and the implications of losing it (e.g., by loss or compromise of relevant cryptographic keys).
+
+Each identity is relevant on different layers, or within different subsystems, of the Canton Network software stack.
+We strive to reduce coupling between layers, so that in general it is possible to rotate identities independently of each other.
+
+SV identity
++++++++++++
+
+- Used for identifying your node *before* it was onboarded to the system. See :ref:`sv-identity`.
+
+- Established SVs will confirm onboarding requests by SVs that can authenticate themselves with regards to an approved SV identity.
+
+- An SV identity can be reused for multiple onboardings, as long as it's approved by a quorum of established SVs and,
+  for non-DevNet clusters, no SV with the same name is already onboarded.
+
+- An operator that has lost control over their SV identity will not be able to onboard SVs
+  until a quorum of established SV operators have approved a new identity under the control of that operator.
+
+Participant identity
+++++++++++++++++++++
+
+- Used for securing Daml workflows and for determining an SV's ``svPartyId``,
+  which is used for various SVC governance flows as well as for receiving SV rewards.
+  For general information on Canton and Daml identities see the `Canton documentation on Identity Management <https://docs.daml.com/canton/usermanual/identity_management.html>`_.
+- Participant identities are important for multiple types of quorums
+
+  - Quorums for confirming Daml transactions as the SVC party (>⅓ of onboarded SVs)
+  - Quorums for administering the domain topology on behalf of the SVC party (>⅔ of onboarded SVs once activated)
+  - Quorums for confirmation-based SVC Daml workflows (>⅔ of onboarded SVs; on DevNet instead usually >½)
+
+  .. TODO(#7746): remove "once activated"
+  .. TODO(#8249): remove DevNet special case
+
+- In general, participant identities *can't* be reused on the same global domain,
+  i.e., without the network being reset/redeployed.
+
+- Participant identities can be migrated and reused across networks upgrades.
+  See :ref:`sv-participant-identities-restore`.
+  At the moment, you will need to do so for preserving coin balances across network upgrades.
+
+- Loss of control over a participant identity implies loss of control over the coin balances for all parties hosted under that identity.
+  On a network level, loss of a participant identity constitutes an SV failure and reduces the overall fault tolerance buffer,
+  until the respective SV is offboarded from the SVC.
+
+CometBFT node identities
+++++++++++++++++++++++++
+
+- Used within the CometBFT network spanned by SVs for operating the global domain.
+  See :ref:`cometbft-identity`.
+
+- The CometBFT validator key is used in CometBFT quorums (>⅔ of SVs),
+  which are required for advancing the CometBFT blockchain and changing the CometBFT configuration and validator set.
+
+- Reusing CometBFT node identities can cause (transient) instability in the CometBFT network and is therefore not recommended.
+
+- Compromise of CometBFT key material constitutes an SV failure and reduces the overall fault tolerance buffer.
+  For recovering, it is sufficient for an SV operator to set up a new CometBFT node (with a fresh identity)
+  and make sure that it is correctly registered by their SV app backend
+  (e.g., by amending the configuration of their SV app backend and restarting it).
