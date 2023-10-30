@@ -400,6 +400,34 @@ The secret is created as follows, with the `node_key.json` and `priv_validator_k
         "--from-file=node_key.json=node_key.json" \
         "--from-file=priv_validator_key.json=priv_validator_key.json"
 
+.. _helm-cometbft-state-sync:
+
+Configuring CometBft state sync
++++++++++++++++++++++++++++++++
+
+CometBft has a feature called state sync that allows a new peer to catch up quickly by reading a snapshot of data at or near the head of
+the chain and verifying it instead of fetching and replaying every block. (See `CometBft documentation <https://docs.cometbft.com/v0.34/core/state-sync>`_).
+This leads to drastically shorter times to onboard new nodes at the cost of new nodes having a truncated block history.
+Further, when the chain has been pruned, state sync needs to be enabled on new nodes in order to bootstrap them successfully.
+
+There are 3 main configuration parameters that control state sync in CometBft:
+
+- `rpc_servers` - The list of CometBft RPC servers to connect to in order to fetch snapshots
+- `trust_height` - Height at which you should trust the chain
+- `trust_hash` - Hash corresponding to the trusted height
+
+A CometBft node installed using our helm charts (see :ref:`helm-sv-install`) with the default values set in
+``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml`` automatically uses state sync for bootstrapping
+if:
+
+- it has not been explicitly disabled by setting `stateSync.enable` to `false`
+- the block chain is mature enough for at least 1 state snapshot to have been taken i.e.
+  the height of the latest block is greater than or equal to the configured interval between snapshots
+
+The snapshots are fetched from the founding SV node which exposes its CometBft RPC API at `https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global:443/cometbft-rpc/`.
+This can be changed by setting `stateSync.rpcServers` accordingly. The `trust_height` and `trust_hash` are computed dynamically via an initialization script
+and setting them explicitly should not be required and is not currently supported.
+
 .. _helm-sv-install:
 
 Installing the Software

@@ -501,7 +501,7 @@ retain_blocks = {{ $.Values.node.retainBlocks }}
 retain_blocks = 0
 {{- end }}
 
-# Interval in which a new snapshot should be generated, in order to assist new peers to fast sync.
+# Interval in which a new snapshot should be generated, in order to assist new peers to sync quickly.
 snapshot_height_delta = {{ $.Values.node.snapshotHeightDelta }}
 
 {{- end }}
