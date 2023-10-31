@@ -722,9 +722,19 @@ function subcmd_create() {
     fi
 
     # Create a kms key for pulumi.
-    # TODO(#7752): for now we silently ignore errors in order to not fail if the key already exists.
-    # We should instead check for that case explicitly, and perhaps also rotate the key if it does exist
-    gcloud kms keys create "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --purpose "encryption" > /dev/null 2>&1 || true
+    error_message=$(gcloud kms keys create "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --purpose "encryption" 2>&1)
+    exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+      if [[ $error_message == *"ALREADY_EXISTS"* ]]; then
+        # Rotate the key if it exists
+        echo "ALREADY_EXISTS error encountered. Rotating the key..."
+        gcloud kms keys versions create --key "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --primary
+      else
+        echo "Failed to create a KMS key for Pulumi."
+        exit $exit_code
+      fi
+    fi
 
     _log "Cluster at IP ${IPADDR} ready"
 }
