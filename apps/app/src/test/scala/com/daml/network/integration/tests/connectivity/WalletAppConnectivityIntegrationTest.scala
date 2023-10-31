@@ -38,6 +38,7 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
   "wallet should recover after a disconnect from the Scan HTTP API" in { implicit env =>
     val (_, _) = onboardAliceAndBob()
 
+    // we deliberately retry tap(2) until it fails because there could be cached results.
     actAndCheck(
       "disable proxy connection",
       toxiproxy.disableConnectionViaProxy(
@@ -68,11 +69,13 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
       "tapping on alice wallet should work",
       _ => {
         aliceWalletClient.tap(3)
-        eventually() {
-          aliceWalletClient.list().coins should have length 1
-        }
       },
     )
+
+    // aliceWalletClient.list().coins contains one tap(3) and 0 or more tap(2) as it retries until connection fails.
+    forExactly(1, aliceWalletClient.list().coins) { coin =>
+      coin.contract.payload.amount.initialAmount.longValue() shouldBe 3L
+    }
 
   }
 }
