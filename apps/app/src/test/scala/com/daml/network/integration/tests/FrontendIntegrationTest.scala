@@ -457,6 +457,23 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     ).fold(e => logger.debug(s"Failed to get network requests: $e"), _ => ())
   }
 
+  protected def logCookies()(implicit webDriver: WebDriverType): Unit = {
+    // Note: only logging cookie names, as values might contain sensitive information
+    val cookies = webDriver
+      .manage()
+      .getCookies
+      .asScala
+    logger.debug(s"Cookies:\n${cookies.map(c => s"  ${c.getName}").mkString("\n")}")
+  }
+
+  protected def logLocalAndSessionStorage()(implicit webDriver: WebDriverType): Unit = {
+    // Note: only logging keys, as values might contain sensitive information
+    val localStorageKeys = webDriver.getLocalStorage.keySet.asScala
+    logger.debug(s"localStorage:\n${localStorageKeys.mkString("\n")}")
+    val sessionStorageKeys = webDriver.getLocalStorage.keySet.asScala
+    logger.debug(s"sessionStorage:\n${sessionStorageKeys.mkString("\n")}")
+  }
+
   protected def dumpDebugInfoOnFailure[T](value: => T)(implicit
       webDriver: WebDriverType
   ): T = {
@@ -471,6 +488,8 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
           screenshot()
           savePageSource()
           logNetworkRequests()
+          logCookies()
+          logLocalAndSessionStorage()
         }
         throw e
     }
@@ -500,30 +519,60 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     // Sometimes the whole auth0 login workflow gets stuck for unknown reasons.
     // Therefore we retry the whole workflow and take screenshots on each failed attempt.
     eventually(timeUntilSuccess = 1.minutes) {
-      dumpDebugInfoOnFailure {
-        silentActAndCheck(
-          "Auth0 login: Open target web page",
-          go to url,
-        )(
-          "Auth0 login: Log in or log out buttons are visible",
-          _ =>
-            Seq(
-              find(id("logout-button")),
-              find(id("oidc-login-button")),
-            ).flatten should have size 1,
-        )
-
-        if (find(id("logout-button")).isDefined) {
+      try {
+        dumpDebugInfoOnFailure {
           silentActAndCheck(
-            "Auth0 login: Log out",
-            click on id("logout-button"),
+            "Auth0 login: Open target web page",
+            go to url,
           )(
-            "Auth0 login: Login button is visible",
-            _ => find(id("oidc-login-button")) should not be empty,
+            "Auth0 login: Log in or log out buttons are visible",
+            _ =>
+              Seq(
+                find(id("logout-button")),
+                find(id("oidc-login-button")),
+              ).flatten should have size 1,
           )
-        }
 
-        loginViaAuth0InCurrentPage(username, password, assertCompleted)
+          if (find(id("logout-button")).isDefined) {
+            silentActAndCheck(
+              "Auth0 login: Log out",
+              click on id("logout-button"),
+            )(
+              "Auth0 login: Login button is visible",
+              _ => find(id("oidc-login-button")) should not be empty,
+            )
+          }
+
+          loginViaAuth0InCurrentPage(username, password, assertCompleted)
+        }
+      } catch {
+        case NonFatal(e) =>
+          // If the login fails, the web page might be stuck in a bad state.
+
+          // First, delete cookies related to auth0
+          // Note: the web driver API only allows you to delete cookies associated with the current page.
+          clue("Clearing cookies") {
+            val auth0cookies =
+              webDriver.manage().getCookies.asScala.filter(_.getDomain.contains("auth0"))
+            logger.debug(
+              s"Deleting the following cookies: ${auth0cookies.map(_.getName)}"
+            )
+            auth0cookies.foreach(webDriver.manage().deleteCookie)
+          }
+
+          // Next, clear local storage, as our oauth library puts data in there
+          // Note: again, you can only access the local storage of the current page.
+          clue("Clearing local storage") {
+            val auth0LocalState =
+              webDriver.getLocalStorage.keySet.asScala.filter(_.startsWith("oidc."))
+            logger.debug(
+              s"Deleting the following keys from localStorage: $auth0LocalState"
+            )
+            auth0LocalState.foreach(webDriver.getSessionStorage.removeItem)
+          }
+          // Finally, navigate away from the current page to clear any JavaScript state
+          go to "about:blank"
+          throw e
       }
     }
   }
