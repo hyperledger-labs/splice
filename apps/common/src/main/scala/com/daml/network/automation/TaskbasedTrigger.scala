@@ -19,6 +19,8 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
     override val tracer: Tracer,
 ) extends Trigger {
 
+  override def metrics = None // TODO(#8221)
+
   /** How to complete a task.
     *
     * This MUST take all the actions necessary such that 'isStaleTask' returns true after successful completion.

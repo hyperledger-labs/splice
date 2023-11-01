@@ -9,7 +9,7 @@ import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
 class PollingTriggerMetrics(
     metricsFactory: LabeledMetricsFactory
 ) {
-  val prefix: MetricName = CNMetrics.MetricsPrefix :+ "polling-trigger"
+  val prefix: MetricName = CNMetrics.MetricsPrefix :+ "trigger"
 
   @MetricDoc.Tag(
     summary = "How long it takes to complete one iteration of performWork",
@@ -20,7 +20,7 @@ class PollingTriggerMetrics(
   val iterationLatency: Timer = metricsFactory.timer(prefix :+ "iteration-latency")
 
   @MetricDoc.Tag(
-    summary = "Number of iterations of performWork",
+    summary = "Number of iterations of performWork that succeeded",
     description =
       "This metric measures the total number of successful polling iterations processed by the trigger.",
     qualification = Traffic,

@@ -20,9 +20,11 @@ import scala.util.{Failure, Success}
   * Look at its child classes (`ctrl + h` for type hierarchy in IntelliJ) for useful specializations.
   */
 trait PollingTrigger extends Trigger with FlagCloseableAsync {
-  val triggerMetrics: PollingTriggerMetrics = new PollingTriggerMetrics(context.metricsFactory)
+  override def metrics = Some(new PollingTriggerMetrics(context.metricsFactory))
+
   private implicit val mc: MetricsContext = MetricsContext(
-    "trigger_name" -> this.getClass.getSimpleName()
+    "trigger_name" -> this.getClass.getSimpleName(),
+    "trigger_type" -> "polling",
   )
 
   /** The main body of the polling trigger
@@ -52,15 +54,19 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
             "performWorkIfNotPaused may not be called concurrently",
           )
           runningTaskFinishedVar = Some(Promise())
-          performWorkIfAvailable().andThen { case _ =>
-            blocking {
-              synchronized {
-                assert(runningTaskFinishedVar.nonEmpty)
-                runningTaskFinishedVar.foreach(_.success(()))
-                runningTaskFinishedVar = None
+          metrics
+            .fold(performWorkIfAvailable())(
+              _.iterationLatency.timeFuture(performWorkIfAvailable())
+            )
+            .andThen { case _ =>
+              blocking {
+                synchronized {
+                  assert(runningTaskFinishedVar.nonEmpty)
+                  runningTaskFinishedVar.foreach(_.success(()))
+                  runningTaskFinishedVar = None
+                }
               }
             }
-          }
         }
       }
     }
@@ -122,24 +128,28 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
             case Failure(ex) =>
               // We call this to differentiate fatal errors for metric reporting
               (retryable.retryOK(Failure(ex), logger)) match {
-                case FatalErrorKind => triggerMetrics.iterationsFailed.mark()
-                case _ => triggerMetrics.iterationsRetried.mark()
+                case FatalErrorKind => metrics.map(_.iterationsFailed.mark()): Unit
+                case _ => metrics.map(_.iterationsRetried.mark()): Unit
               }
               loopWithDelay()
 
-            case Success(workDone) =>
+            case Success(workDone) => {
+              MetricsContext.withExtraMetricLabels[Unit](("work_done", workDone.toString)) {
+                implicit m => metrics.map(_.iterationsCompleted.mark()(m)): Unit
+              }
+
               if (context.retryProvider.isClosing) {
                 exitPollingLoop()
               } else if (workDone) {
                 // If productive work was done in the previous iteration, then we loop without a delay.
-                triggerMetrics.iterationsCompleted.mark()
-                pollingLoop(triggerMetrics.iterationLatency.timeFuture(performWorkIfNotPaused()))
+                pollingLoop(performWorkIfNotPaused())
               } else {
                 logger.trace(
                   show"No work performed. Sleeping for ${context.config.pollingInterval}"
                 )
                 loopWithDelay()
               }
+            }
           }
         }(loggingContext)
 
