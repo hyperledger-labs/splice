@@ -33,7 +33,12 @@ class GlobalDomainMigrationCoverageTest
       }
 
       "either handle or not handle each template" in {
-        forEvery(Table(("template", "reason"), knownNotHandled.toSeq: _*)) { (templateId, reason) =>
+        forEvery(
+          Table(
+            ("template", "reason"),
+            knownNotHandled.view.map { case (t, (r, _)) => t -> r }.toSeq: _*
+          )
+        ) { (templateId, reason) =>
           handled shouldNot contain(templateId) withClue reason
         }
         // ^ does part of v but with better error messages
@@ -73,10 +78,26 @@ class GlobalDomainMigrationCoverageTest
           _._1.getClass.getSimpleName
         ) shouldBe empty withClue "<- candidate handling stores in the map"
     }
+
+    "list every potential handler of each unhandled contract" in {
+      filtersAndMoveLists
+        .flatMap { case (label, filter, _) =>
+          (filter.ingestionFilter.templateIds intersect knownNotHandled.keySet).view
+            .map(label -> _)
+        }
+        .groupMap(_._2)(_._1.getClass.getSimpleName)
+        .transform { (ingestedId, activeStoreUsers) =>
+          (activeStoreUsers, knownNotHandled(ingestedId)._2.map(_.getClass.getSimpleName))
+        }
+        .filter { case (_, (actual, expected)) =>
+          actual.toSet != expected.toSet
+        } shouldBe empty withClue "<- actual candidate stores vs known-unhandling stores"
+    }
   }
 }
 
 object GlobalDomainMigrationCoverageTest {
+  import directory.store.DirectoryStore
   import sv.store.{SvStore, SvSvStore, SvSvcStore}
   import validator.store.ValidatorStore
   import wallet.store.UserWalletStore
@@ -113,6 +134,11 @@ object GlobalDomainMigrationCoverageTest {
         ),
         UserWalletStore.templatesMovedByMyAutomation,
       ),
+      (
+        DirectoryStore,
+        DirectoryStore.contractFilter(dummyParty),
+        DirectoryStore.templatesMovedByMyAutomation,
+      ),
     )
 
   // How do we ensure that new templates get migration added somewhere?  If
@@ -126,29 +152,28 @@ object GlobalDomainMigrationCoverageTest {
   //
   // and (hopefully) forestall overlooked required changes that way.
 
-  private val todoCnsDirectory = ("TODO (#5959) make directory/cns contracts follow CoinRules;"
-    + " global domain migration will break the cns if this is not done")
+  private def todoCns(referencingStores: Object*) = reason(
+    "TODO (#8357) make directory/cns contracts follow CoinRules;"
+      + " global domain migration will break the cns if this is not done",
+    referencingStores: _*
+  )
 
   private val knownNotHandled = {
     import codegen.java.cc.globaldomain
-    import codegen.java.cn.{cns as cnsCodegen, directory as directoryCodegen}
-    import codegen.java.cn.wallet.{subscriptions as subsCodegen, topupstate as topUpCodegen}
+    import codegen.java.cn.cns as cnsCodegen
+    import codegen.java.cn.wallet.topupstate as topUpCodegen
     Seq(
-      cnsCodegen.CnsEntry.COMPANION -> todoCnsDirectory,
-      cnsCodegen.CnsEntryContext.COMPANION -> todoCnsDirectory,
-      cnsCodegen.CnsRules.COMPANION -> todoCnsDirectory,
-      directoryCodegen.DirectoryEntry.COMPANION -> todoCnsDirectory,
-      directoryCodegen.DirectoryEntryContext.COMPANION -> todoCnsDirectory,
-      directoryCodegen.DirectoryInstall.COMPANION -> todoCnsDirectory,
-      directoryCodegen.DirectoryInstallRequest.COMPANION -> todoCnsDirectory,
-      subsCodegen.SubscriptionInitialPayment.COMPANION -> todoCnsDirectory,
-      subsCodegen.SubscriptionIdleState.COMPANION -> todoCnsDirectory,
-      subsCodegen.SubscriptionPayment.COMPANION -> todoCnsDirectory,
-      subsCodegen.TerminatedSubscription.COMPANION -> todoCnsDirectory,
-      globaldomain.MemberTraffic.COMPANION -> "tied to a specific domainId, never migrated",
-      topUpCodegen.ValidatorTopUpState.COMPANION -> "tied to a specific domainId, never migrated",
+      cnsCodegen.CnsEntry.COMPANION -> todoCns(SvSvcStore),
+      cnsCodegen.CnsEntryContext.COMPANION -> todoCns(SvSvcStore),
+      cnsCodegen.CnsRules.COMPANION -> todoCns(SvSvcStore),
+      globaldomain.MemberTraffic.COMPANION ->
+        reason("tied to a specific domainId, never migrated", SvSvcStore),
+      topUpCodegen.ValidatorTopUpState.COMPANION ->
+        reason("tied to a specific domainId, never migrated", ValidatorStore),
     ).view.map { case (c, reason) =>
       (QualifiedName(c.TEMPLATE_ID), reason)
     }.toMap
   }
+
+  private[this] def reason(reason: String, referencingStores: Object*) = (reason, referencingStores)
 }

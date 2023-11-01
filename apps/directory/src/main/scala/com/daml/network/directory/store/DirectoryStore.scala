@@ -6,13 +6,14 @@ import com.daml.network.directory.store.db.DbDirectoryStore
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore}
+import MultiDomainAcsStore.ConstrainedTemplate
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -97,6 +98,11 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
     directoryCodegen.DirectoryEntryContext.ContractId,
     directoryCodegen.DirectoryEntryContext,
   ]]]
+
+  final def listLaggingCoinRulesFollowers(targetDomain: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Seq[AssignedContract[?, ?]]] =
+    multiDomainAcsStore.listAssignedContractsNotOnDomainN(targetDomain)
 }
 
 object DirectoryStore {
@@ -144,6 +150,18 @@ object DirectoryStore {
     override def pretty: Pretty[this.type] =
       prettyOfClass(param("state", _.state), param("context", _.context))
   }
+
+  private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
+    Seq[ConstrainedTemplate](
+      directoryCodegen.DirectoryEntry.COMPANION,
+      directoryCodegen.DirectoryEntryContext.COMPANION,
+      directoryCodegen.DirectoryInstall.COMPANION,
+      directoryCodegen.DirectoryInstallRequest.COMPANION,
+      subsCodegen.SubscriptionInitialPayment.COMPANION,
+      subsCodegen.SubscriptionIdleState.COMPANION,
+      subsCodegen.SubscriptionPayment.COMPANION,
+      subsCodegen.TerminatedSubscription.COMPANION,
+    )
 
   /** Contract filter of a directory app store for a specific provider. */
   def contractFilter(providerPartyId: PartyId): MultiDomainAcsStore.ContractFilter =

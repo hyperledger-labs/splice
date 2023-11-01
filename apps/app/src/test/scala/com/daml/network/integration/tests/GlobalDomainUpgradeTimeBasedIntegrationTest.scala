@@ -9,6 +9,7 @@ import com.daml.ledger.javaapi.data.codegen.{
 }
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.{
+  directory as dir,
   svcrules as svcr,
   svonboarding as so,
   validatoronboarding as vo,
@@ -311,6 +312,10 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       }
     }
 
+    val dummyDistantRelTime = new RelTime(1000000000000L)
+
+    // TODO (#8386) revert 8315's da0c91c29abf for directory stubs
+
     clue("create app-manager contracts of various kinds") {
       import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
       import com.daml.network.http.v0.definitions as httpdefs
@@ -455,8 +460,8 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
             dummySubscriptionData,
             new cnw.subscriptions.SubscriptionPayData(
               dummyPaymentAmount,
-              new RelTime(1000000000000L),
-              new RelTime(1000000000000L),
+              dummyDistantRelTime,
+              dummyDistantRelTime,
             ),
           )
         )
@@ -595,10 +600,25 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       )
     }
 
-    protectAppRewardCoupons.resume()
+    clue("see whether directory contracts follow coinrules") {
+      import com.daml.network.directory.store.DirectoryStore.templatesMovedByMyAutomation as templatesMovedByDirectoryAutomation
+      allContractsMigrated(
+        templatesMovedByDirectoryAutomation
+          filterNot Set( // TODO (#8386) remove filtering
+            dir.DirectoryInstall.COMPANION,
+            dir.DirectoryEntry.COMPANION,
+            dir.DirectoryEntryContext.COMPANION,
+            dir.DirectoryInstallRequest.COMPANION,
+            cnw.subscriptions.SubscriptionInitialPayment.COMPANION,
+            cnw.subscriptions.SubscriptionIdleState.COMPANION,
+            cnw.subscriptions.SubscriptionPayment.COMPANION,
+            cnw.subscriptions.TerminatedSubscription.COMPANION,
+          )
+          map (c(_, sv1WalletUser)): _*
+      )
+    }
 
-  // check scan for other contracts' transfer:
-  // TODO (#5959) check directory contracts
+    protectAppRewardCoupons.resume()
   }
 
   private[this] def cleanAndAddNewSchedule(

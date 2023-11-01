@@ -1,7 +1,12 @@
 package com.daml.network.directory.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.CNNodeAppAutomationService
+import com.daml.network.automation.{
+  AssignTrigger,
+  CNNodeAppAutomationService,
+  TransferFollowTrigger,
+}
+import TransferFollowTrigger.Task as FollowTask
 import com.daml.network.config.AutomationConfig
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
@@ -10,7 +15,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Manages background automation that runs on an directory app. */
 class DirectoryAutomationService(
@@ -51,4 +56,22 @@ class DirectoryAutomationService(
   registerTrigger(
     new TerminatedSubscriptionTrigger(triggerContext, store, connection)
   )
+
+  registerTrigger(
+    new TransferFollowTrigger(
+      triggerContext,
+      store,
+      connection,
+      store.providerParty,
+      implicit tc =>
+        scanConnection.getCoinRules() flatMap { coinRules =>
+          coinRules.toAssignedContract map { coinRules =>
+            store
+              .listLaggingCoinRulesFollowers(coinRules.domain)
+              .map(_ map (FollowTask(coinRules, _)))
+          } getOrElse Future.successful(Seq.empty)
+        },
+    )
+  )
+  registerTrigger(new AssignTrigger(triggerContext, store, connection, store.providerParty))
 }
