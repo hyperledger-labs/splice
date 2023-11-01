@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.cns as codegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.{ValidatorAppBackendReference, WalletAppClientReference}
 import com.daml.network.environment.CNNodeEnvironmentImpl
@@ -9,23 +10,27 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{DisclosedContracts, WalletTestUtil}
+import com.daml.network.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
+import com.daml.network.sv.config.InitialCnsConfig
 
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.util.FutureInstances.*
 import cats.syntax.parallel.*
 import com.daml.network.codegen.java.cn.cns.CnsEntry
+import com.daml.network.sv.automation.leaderbased.ExpiredCnsEntryTrigger
+import com.daml.network.wallet.automation.SubscriptionReadyForPaymentTrigger
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.SuppressionRule
+import org.scalatest.Assertion
 import org.slf4j.event.Level
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-
 import scala.jdk.CollectionConverters.*
 
-class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
+class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with TriggerTestUtil {
 
   import CnsIntegrationTest.*
 
@@ -47,6 +52,26 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(cnsDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(cnsDarPath)
       })
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
+          _.withPausedTrigger[ExpiredCnsEntryTrigger]
+        )(config)
+      )
+      .addConfigTransform((_, config) =>
+        // setting the initialCnsEntryLifetime to be the same as initialCnsRenewalDuration
+        CNNodeConfigTransforms
+          .updateAllSvAppFoundCollectiveConfigs_(
+            _.copy(
+              initialCnsConfig = InitialCnsConfig(
+                renewalDuration = NonNegativeFiniteDuration.ofSeconds(10),
+                entryLifetime = NonNegativeFiniteDuration.ofSeconds(10),
+              )
+            )
+          )(config)
+      )
+
+  def leaderExpiredCnsEntryTrigger(implicit env: CNNodeTestConsoleEnvironment) =
+    sv1Backend.leaderBasedAutomation.trigger[ExpiredCnsEntryTrigger]
 
   "cns" should {
     "allocate unique cns entries, even when multiple parties race for them" in { implicit env =>
@@ -96,28 +121,34 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
     }
 
     "archive expired CNS entries" in { implicit env =>
-      clue("Creating a CNS entry that expires immediately") {
-        directoryBackend.listEntries("", 25) shouldBe empty
-        directoryBackend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
-          actAs = Seq(svcParty),
-          commands = new CnsEntry(
-            svcParty.toProtoPrimitive,
-            svcParty.toProtoPrimitive,
-            testEntryName,
-            testEntryUrl,
-            testEntryDescription,
-            Instant.now().plus(1, ChronoUnit.SECONDS),
-          ).create.commands.asScala.toSeq,
-          optTimeout = None,
-        )
-        eventually()(
-          lookupEntryByName(testEntryName) should not be empty
-        )
-      }
-      clue("Waiting for the backend to expire the entry...") {
-        eventually()(
-          lookupEntryByName(testEntryName) shouldBe empty
-        )
+      setTriggersWithin[Assertion](
+        triggersToPauseAtStart = Seq(),
+        triggersToResumeAtStart = Seq(leaderExpiredCnsEntryTrigger),
+      ) {
+        clue("Creating a CNS entry that expires immediately") {
+          directoryBackend.listEntries("", 25) shouldBe empty
+          directoryBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitJava(
+              actAs = Seq(svcParty),
+              commands = new CnsEntry(
+                svcParty.toProtoPrimitive,
+                svcParty.toProtoPrimitive,
+                testEntryName,
+                testEntryUrl,
+                testEntryDescription,
+                Instant.now().plus(1, ChronoUnit.SECONDS),
+              ).create.commands.asScala.toSeq,
+              optTimeout = None,
+            )
+          eventually()(
+            lookupEntryByName(testEntryName) should not be empty
+          )
+        }
+        clue("Waiting for the backend to expire the entry...") {
+          eventually()(
+            lookupEntryByName(testEntryName) shouldBe empty
+          )
+        }
       }
     }
 
@@ -216,6 +247,149 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
       )
     }
 
+    "allocate cns entries following an initial subscription payment and renew entries on follow-up payments" in {
+      implicit env =>
+        val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        val aliceUserName = aliceWalletClient.config.ledgerApiUser
+
+        def aliceSubscriptionReadyForPaymentTrigger =
+          aliceValidatorBackend
+            .userWalletAutomation(aliceUserName)
+            .trigger[SubscriptionReadyForPaymentTrigger]
+
+        aliceSubscriptionReadyForPaymentTrigger.pause().futureValue
+
+        val svc = sv1Backend.getSvcInfo().svcParty
+        val cnsRules = sv1ScanBackend.getCnsRules()
+
+        val subReqId = clue("Alice requests a cns entry") {
+          val cmd = cnsRules.contractId.exerciseCnsRules_RequestEntry(
+            testEntryName,
+            testEntryUrl,
+            testEntryDescription,
+            aliceUserParty.toProtoPrimitive,
+          )
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitWithResult(
+              userId = aliceWalletClient.config.ledgerApiUser,
+              actAs = Seq(aliceUserParty),
+              readAs = Seq.empty,
+              update = cmd,
+              disclosedContracts = DisclosedContracts(cnsRules).toLedgerApiDisclosedContracts,
+            )
+            .exerciseResult
+            ._2
+        }
+        clue("Alice obtains some coins and accepts the subscription") {
+          aliceWalletClient.tap(5.0)
+          aliceWalletClient.acceptSubscriptionRequest(subReqId)
+        }
+        val entry = clue("Getting Alice's new entry") {
+          eventually()(
+            lookupEntryByName(testEntryName).value
+          )
+        }
+        clue("Checking payload of new entry") {
+          val expectedPayload = new codegen.CnsEntry(
+            aliceUserParty.toProtoPrimitive,
+            svc.toProtoPrimitive,
+            testEntryName,
+            testEntryUrl,
+            testEntryDescription,
+            entry.data.expiresAt,
+          )
+          entry.data shouldBe expectedPayload
+        }
+
+        aliceSubscriptionReadyForPaymentTrigger.resume()
+
+        val renewedEntry = clue(
+          "Eventually, Alice makes a follow-up subscription payment, which the svc collects, renewing her entry."
+        ) {
+          eventually() {
+            val renewed = lookupEntryByName(testEntryName).value
+            renewed.id should not equal entry.id
+            renewed
+          }
+        }
+        clue("Checking payload of renewed entry") {
+          val newEntry = new codegen.CnsEntry(
+            entry.data.user,
+            entry.data.svc,
+            entry.data.name,
+            testEntryUrl,
+            testEntryDescription,
+            entry.data.expiresAt.plus(10, ChronoUnit.SECONDS),
+          )
+          renewedEntry.data shouldBe newEntry
+        }
+
+    }
+
+    "expire stale subscriptions" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val aliceUserName = aliceWalletClient.config.ledgerApiUser
+
+      def aliceSubscriptionReadyForPaymentTrigger =
+        aliceValidatorBackend
+          .userWalletAutomation(aliceUserName)
+          .trigger[SubscriptionReadyForPaymentTrigger]
+
+      setTriggersWithin[Assertion](
+        triggersToPauseAtStart = Seq(aliceSubscriptionReadyForPaymentTrigger),
+        triggersToResumeAtStart = Seq(leaderExpiredCnsEntryTrigger),
+      ) {
+
+        val cnsRules = sv1ScanBackend.getCnsRules()
+
+        val subReqId = clue("Alice requests a cns entry") {
+          val cmd = cnsRules.contractId.exerciseCnsRules_RequestEntry(
+            testEntryName,
+            testEntryUrl,
+            testEntryDescription,
+            aliceUserParty.toProtoPrimitive,
+          )
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+            .submitWithResult(
+              userId = aliceWalletClient.config.ledgerApiUser,
+              actAs = Seq(aliceUserParty),
+              readAs = Seq.empty,
+              update = cmd,
+              disclosedContracts = DisclosedContracts(cnsRules).toLedgerApiDisclosedContracts,
+            )
+            .exerciseResult
+            ._2
+        }
+
+        aliceWalletClient.tap(50.0)
+        actAndCheck(
+          "Alice accepts subscription and waits for entry", {
+            aliceWalletClient.acceptSubscriptionRequest(subReqId)
+          },
+        )(
+          "Subscription and entry are created",
+          _ => {
+            aliceWalletClient.listSubscriptions() should have length 1
+            inside(lookupEntryByName(testEntryName)) { case Some(entry) =>
+              entry.data.name shouldBe testEntryName
+            }
+          },
+        )
+
+        eventually() {
+          lookupEntryByName(testEntryName) shouldBe empty
+        }
+        // Wait for subscription to be expired.
+        eventually() {
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(subCodegen.Subscription.COMPANION)(aliceUserParty) shouldBe empty
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(subCodegen.SubscriptionIdleState.COMPANION)(aliceUserParty) shouldBe empty
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .filterJava(codegen.CnsEntryContext.COMPANION)(aliceUserParty) shouldBe empty
+        }
+      }
+    }
   }
 
   private def requestEntry(

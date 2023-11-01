@@ -11,7 +11,7 @@ import com.digitalasset.canton.util.AkkaUtil
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{blocking, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 
 /** A trigger receiving its tasks via an Akka source. */
 abstract class SourceBasedTrigger[T: Pretty](implicit
@@ -56,12 +56,15 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
             // ignoring the return value here, as we don't care anymore about whether the task was successful or not
             ()
           )
-
           require(executionHandleRef.get().isEmpty, "run was called twice")
+          if (paused) {
+            waitForResumePromise = Promise()
+          }
           logger.debug("Starting source processing loop")
           val (killSwitch: UniqueKillSwitch, completed0: Future[Done]) = AkkaUtil.runSupervised(
             logger.error("Fatally failed to handle task", _),
             source
+              .mapAsync(1) { task => waitForResumePromise.future.map(_ => task) }
               .viaMat(KillSwitches.single)(Keep.right)
               .toMat(Sink.foreachAsync[T](context.config.parallelism)(go))(
                 Keep.both
@@ -79,6 +82,7 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
             )
             killSwitch.shutdown()
           }
+
         }
       )
 
@@ -97,8 +101,23 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
     )
   }
 
-  // See https://github.com/akka/akka-stream-contrib/blob/main/src/main/scala/akka/stream/contrib/Valve.scala
-  override def pause(): Future[Unit] = ???
-  override def resume(): Unit = ???
-  override def runOnce()(implicit traceContext: TraceContext): Future[Boolean] = ???
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  @volatile
+  private var waitForResumePromise: Promise[Unit] = Promise.successful(())
+
+  override def pause(): Future[Unit] = blocking {
+    synchronized {
+      if (waitForResumePromise.isCompleted) {
+        waitForResumePromise = Promise()
+      }
+      Future.successful(())
+    }
+  }
+
+  override def resume(): Unit = blocking {
+    synchronized {
+      val _ = waitForResumePromise.trySuccess(())
+    }
+  }
+
 }

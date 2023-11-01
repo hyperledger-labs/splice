@@ -4,7 +4,7 @@ import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -39,11 +39,4 @@ trait Trigger extends FlagCloseable with NamedLogging with Spanning with HasHeal
   /** Resumes the trigger */
   def resume(): Unit
 
-  /** Runs the trigger once.
-    *
-    * The resulting Future completes with true when the trigger is done executing the work,
-    * or completes with false if there was nothing to do.
-    * See [[pause()]] for a description of when work is "done".
-    */
-  def runOnce()(implicit traceContext: TraceContext): Future[Boolean]
 }

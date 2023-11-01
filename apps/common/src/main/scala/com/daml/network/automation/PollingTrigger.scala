@@ -177,12 +177,20 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
       runningTaskFinishedVar.fold(Future.unit)(_.future)
     }
   }
+
   override def resume(): Unit = blocking {
     synchronized {
       pausedVar = false
     }
   }
-  override def runOnce()(implicit traceContext: TraceContext): Future[Boolean] = {
+
+  /** Runs the trigger once.
+    *
+    * The resulting Future completes with true when the trigger is done executing the work,
+    * or completes with false if there was nothing to do.
+    * See [[pause()]] for a description of when work is "done".
+    */
+  def runOnce()(implicit traceContext: TraceContext): Future[Boolean] = {
     blocking {
       synchronized {
         assert(
