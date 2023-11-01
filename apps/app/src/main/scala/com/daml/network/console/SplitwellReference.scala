@@ -12,6 +12,7 @@ import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.SplitwellApp
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
+import com.daml.network.splitwell.automation.SplitwellAutomationService
 import com.daml.network.splitwell.config.{SplitwellAppBackendConfig, SplitwellAppClientConfig}
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState}
@@ -480,6 +481,11 @@ final class SplitwellAppBackendReference(
     "Returns the state of this app. May only be called while the app is running."
   )
   def appState: SplitwellApp.State = _appState[SplitwellApp.State, SplitwellApp]
+
+  @Help.Summary(
+    "Returns the automation service for the splitwell application. May only be called while the app is running."
+  )
+  def splitwellAutomation: SplitwellAutomationService = appState.automation
 
   override lazy val ledgerApi = participantClient
 
