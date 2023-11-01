@@ -3,7 +3,7 @@ package com.daml.network.scan.store
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn
-import com.daml.network.environment.{CNLedgerConnection, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{BaseLedgerConnection, PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{
@@ -196,7 +196,7 @@ object ScanStore {
       svcParty: PartyId,
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
-      connection: CNLedgerConnection,
+      connection: BaseLedgerConnection,
       retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext,

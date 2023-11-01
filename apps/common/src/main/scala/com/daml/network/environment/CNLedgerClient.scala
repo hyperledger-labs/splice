@@ -67,6 +67,17 @@ class CNLedgerClient(
     trafficBalanceService.compareAndSet(None, Some(service))
   }: Unit
 
+  def readOnlyConnection(
+      connectionClient: String,
+      baseLoggerFactory: NamedLoggerFactory,
+  ): BaseLedgerConnection =
+    new BaseLedgerConnection(
+      this.client,
+      applicationId,
+      baseLoggerFactory.append("roConnClient", connectionClient),
+      retryProvider,
+    )
+
   def connection(
       connectionClient: String,
       baseLoggerFactory: NamedLoggerFactory,

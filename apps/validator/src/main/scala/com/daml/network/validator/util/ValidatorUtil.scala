@@ -2,6 +2,7 @@ package com.daml.network.validator.util
 
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.{
+  BaseLedgerConnection,
   CNLedgerConnection,
   CommandPriority,
   ParticipantAdminConnection,
@@ -62,7 +63,7 @@ private[validator] object ValidatorUtil {
                   .CommandId(
                     "com.daml.network.validator.installWalletForUser",
                     Seq(validatorServiceParty),
-                    CNLedgerConnection.sanitizeUserIdToPartyString(endUserName),
+                    BaseLedgerConnection.sanitizeUserIdToPartyString(endUserName),
                   ),
                 deduplicationOffset = offset,
               )

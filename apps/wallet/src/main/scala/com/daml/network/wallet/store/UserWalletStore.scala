@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.{BaseLedgerConnection, RetryProvider}
 import com.daml.network.store.{CNNodeAppStoreWithHistory, Limit, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.store.TxLogStore.TransactionTreeSource
@@ -461,7 +461,7 @@ object UserWalletStore {
       key: Key,
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
-      connection: CNLedgerConnection,
+      connection: BaseLedgerConnection,
       retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext,

@@ -9,7 +9,7 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
-import com.daml.network.environment.{CNLedgerConnection, CNNodeEnvironmentImpl}
+import com.daml.network.environment.{BaseLedgerConnection, CNNodeEnvironmentImpl}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
@@ -111,7 +111,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     partyIdFromTokenUser.toString
       .split("::")
       .head should be(
-      CNLedgerConnection.sanitizeUserIdToPartyString(aliceValidatorBackend.config.ledgerApiUser)
+      BaseLedgerConnection.sanitizeUserIdToPartyString(aliceValidatorBackend.config.ledgerApiUser)
     )
   }
 

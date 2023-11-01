@@ -2,7 +2,7 @@ package com.daml.network.store
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, TransactionTree}
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.BaseLedgerConnection
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -142,7 +142,7 @@ object TxLogStore {
   }
 
   object TransactionTreeSource {
-    case class LedgerConnection(party: PartyId, connection: CNLedgerConnection)
+    case class LedgerConnection(party: PartyId, connection: BaseLedgerConnection)
         extends TransactionTreeSource {
       override def getTransactionTreeByEventId(eventId: String): Future[TransactionTree] =
         connection.tryGetTransactionTreeByEventId(parties = Seq(party), id = eventId)

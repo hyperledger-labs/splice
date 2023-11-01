@@ -10,14 +10,7 @@ import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{
-  CNLedgerClient,
-  CNNode,
-  CNNodeStatus,
-  DarResources,
-  PackageIdResolver,
-  RetryFor,
-}
+import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus, DarResources, RetryFor}
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.admin.http.HttpScanHandler
@@ -84,10 +77,9 @@ class ScanApp(
   ): Future[ScanApp.State] = {
     for {
       svcParty <- ledgerClient
-        .connection(
+        .readOnlyConnection(
           this.getClass.getSimpleName,
           loggerFactory,
-          PackageIdResolver.NO_COMMAND_SUBMISSION,
         )
         .getSvcPartyFromUserMetadata(config.svUser)
       store <- Future.successful(
@@ -97,10 +89,9 @@ class ScanApp(
           storage,
           loggerFactory,
           // ScanStore needs its own connection for enriching the tx history on-demand
-          ledgerClient.connection(
+          ledgerClient.readOnlyConnection(
             this.getClass.getSimpleName,
             loggerFactory,
-            PackageIdResolver.NO_COMMAND_SUBMISSION,
           ),
           retryProvider,
         )

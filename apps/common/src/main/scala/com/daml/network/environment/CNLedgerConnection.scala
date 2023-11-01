@@ -59,15 +59,14 @@ import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
 import shapeless.<:!<
 
-class CNLedgerConnection(
+/** BaseLedgerConnection is a read-only ledger connection, typically used during initialization when we don't
+  * want to allow command submissions yet.
+  */
+class BaseLedgerConnection(
     client: LedgerClient,
     applicationId: String,
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
-    inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
-    trafficBalanceServiceO: AtomicReference[Option[TrafficBalanceService]],
-    completionOffsetCallback: String => Future[Unit],
-    packageIdResolver: PackageIdResolver,
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
     extends NamedLogging {
 
@@ -75,77 +74,7 @@ class CNLedgerConnection(
     TraceContext.empty
   )
 
-  import CNLedgerConnection.*
-
-  private[this] def timeouts = retryProvider.timeouts
-
-  private def callCallbacksOnCompletion[T, U](
-      result: Future[T]
-  )(getOffsetAndResult: T => (Option[String], U)): Future[U] = {
-    import TraceContext.Implicits.Empty.*
-    def callCallbacksInternal(result: Try[T]): Unit =
-      LoggerUtil.logOnThrow { // in case the callbacks throw.
-        result match {
-          case Success(_) => ()
-          case Failure(ex: io.grpc.StatusRuntimeException)
-              if ex.getMessage.contains(InactiveContracts.id) =>
-            val statusProto = io.grpc.protobuf.StatusProto.fromThrowable(ex)
-            ErrorDetails.from(statusProto).collect {
-              case ResourceInfoDetail(contractId, type_)
-                  if type_ == CantonErrorResource.ContractId.asString =>
-                inactiveContractCallbacks.get().foreach(f => f(contractId))
-            }: Unit
-
-          case Failure(_) => ()
-        }
-      }
-
-    result.onComplete(callCallbacksInternal)
-    result.flatMap(x => {
-      val (optOffset, result) = getOffsetAndResult(x)
-      optOffset match {
-        case None => Future.successful(result)
-        case Some(offset) =>
-          // Wait for the completion offset to have been processed.
-          completionOffsetCallback(offset).map(_ => result)
-      }
-    })
-  }
-
-  private def callCallbacksOnCompletionAndWaitForOffset[T, U](
-      result: Future[T]
-  )(getOffsetAndResult: T => (String, U)): Future[U] =
-    callCallbacksOnCompletion(result)(x => {
-      val (offset, result) = getOffsetAndResult(x)
-      (Some(offset), result)
-    })
-
-  private def callCallbacksOnCompletionNoWaitForOffset[T](result: Future[T]): Future[T] =
-    callCallbacksOnCompletion(result)(x => (None, x))
-
-  private def verifyEnoughExtraTrafficRemains(domainId: DomainId, commandPriority: CommandPriority)(
-      implicit tc: TraceContext
-  ): Future[Unit] = {
-    trafficBalanceServiceO
-      .get()
-      .fold(Future.unit)(trafficBalanceService => {
-        trafficBalanceService.lookupReservedTraffic(domainId).flatMap {
-          case None => Future.unit
-          case Some(reservedTraffic) =>
-            trafficBalanceService.lookupAvailableTraffic(domainId).flatMap {
-              case None => Future.unit
-              case Some(availableTraffic) =>
-                if (availableTraffic <= reservedTraffic && commandPriority == CommandPriority.Low)
-                  throw Status.ABORTED
-                    .withDescription(
-                      s"Traffic balance below amount reserved for top-ups ($availableTraffic < $reservedTraffic)"
-                    )
-                    .asRuntimeException()
-                else Future.unit
-            }
-        }
-      })
-  }
+  import BaseLedgerConnection.*
 
   // The participant ledger end as opposed to the per-domain ledger end.
   // We use this for synchronization in `UpdateIngestionService`.
@@ -158,197 +87,6 @@ class CNLedgerConnection(
 
   def ledgerEnd(): Future[Value.Absolute] =
     client.ledgerEnd()
-
-  // When using submitAndWaitForTransaction with a command whose resulting transaction is
-  // not visible to the submitting parties, one receives `TRANSACTION_NOT_FOUND`. In case, you run into this consider using
-  // one of the other methods in this class that rely on submitAndWaitForTransactionTree instead.
-
-  /** Produce a builder for a command submission.
-    *
-    * `update` can be one of three things:
-    *
-    *  1. an ordinary [[Command]] or [[Seq]] thereof,
-    *  2. an [[Update]], or
-    *  3. the result of [[Contract.Has#exercise]].
-    *
-    * Supply extra arguments to the builder with the `with*` and `no*` methods.
-    * At minimum, you must supply a deduplication strategy with
-    * [[submit#withDedup]] or [[submit#noDedup]]; that and other required steps
-    * result in compiler errors to the `yield*` methods if they are missing.
-    *
-    * Finalize the builder with one of the `yield*` methods to actually perform
-    * the command submission.  Different calls will compile depending on what
-    * `update` you supplied; for example, [[submit#yieldResult]] cannot be used
-    * with a plain `Command`, but works with the other two options.
-    * [[submit#yieldUnit]] and [[submit#yieldTransaction]] can always be used.
-    *
-    * {{{
-    *  submit(Seq(actor), Seq.empty,
-    *         someContract.exercise(_.exerciseFoo(42)))
-    *    .withDedup(CommandId(...), task.offset)
-    *    .yieldResult(): Future[Exercised[FooResult]]
-    * }}}
-    */
-  def submit[C, DomId](
-      actAs: Seq[PartyId],
-      readAs: Seq[PartyId],
-      update: C,
-      priority: CommandPriority = CommandPriority.Low,
-  )(implicit assignment: UpdateAssignment[C, DomId]): submit[C, Any, DomId] =
-    new submit(actAs, readAs, update, (), assignment.run(update), DisclosedContracts(), priority)
-
-  final class submit[C, CmdId, DomId] private[CNLedgerConnection] (
-      actAs: Seq[PartyId],
-      readAs: Seq[PartyId],
-      update: C,
-      commandIdDeduplicationOffset: CmdId,
-      domainId: DomId,
-      disclosedContracts: DisclosedContracts,
-      priority: CommandPriority,
-  ) {
-    private type DedupNotSpecifiedYet = CmdId =:= Any
-    private type DomainIdRequired = DomId <:< DomainId
-    private type DomainIdDisallowed = DomId <:< Unit
-
-    private[this] def copy[CmdId0, DomId0](
-        commandIdDeduplicationOffset: CmdId0 = this.commandIdDeduplicationOffset,
-        domainId: DomId0 = this.domainId,
-        disclosedContracts: DisclosedContracts = this.disclosedContracts,
-    ): submit[C, CmdId0, DomId0] =
-      new submit(
-        actAs,
-        readAs,
-        update,
-        commandIdDeduplicationOffset,
-        domainId,
-        disclosedContracts,
-        priority,
-      )
-
-    def withDedup(commandId: CommandId, deduplicationOffset: String)(implicit
-        cid: DedupNotSpecifiedYet
-    ): submit[C, (CommandId, String), DomId] =
-      copy(
-        commandIdDeduplicationOffset = (commandId, deduplicationOffset)
-      )
-
-    def withDedup(commandId: CommandId, deduplicationConfig: DedupConfig)(implicit
-        cid: DedupNotSpecifiedYet
-    ): submit[C, (CommandId, DedupConfig), DomId] =
-      copy(
-        commandIdDeduplicationOffset = (commandId, deduplicationConfig)
-      )
-
-    def noDedup(implicit cid: DedupNotSpecifiedYet): submit[C, Unit, DomId] =
-      copy(commandIdDeduplicationOffset = ())
-
-    @annotation.nowarn("cat=unused&msg=notNE")
-    def withDomainId(
-        domainId: DomainId,
-        disclosedContracts: DisclosedContracts = DisclosedContracts(),
-    )(implicit
-        noDomIdYet: DomainIdDisallowed,
-        // if you statically know you have NE, use withDisclosedContracts instead
-        notNE: disclosedContracts.type <:!< DisclosedContracts.NE,
-    ): submit[C, CmdId, DomainId] =
-      copy(
-        domainId = domainId,
-        disclosedContracts = disclosedContracts assertOnDomain domainId,
-      )
-
-    def withDisclosedContracts(disclosedContracts: DisclosedContracts)(implicit
-        dcAllowed: WithDisclosedContracts[C, DomId, disclosedContracts.type]
-    ): submit[C, CmdId, DomainId] =
-      copy(
-        domainId = dcAllowed.inferDomain(update, domainId, disclosedContracts),
-        disclosedContracts = disclosedContracts,
-      )
-
-    def yieldUnit()(implicit
-        tc: TraceContext,
-        dom: DomainIdRequired,
-        dedup: SubmitDedup[CmdId],
-        commandOut: SubmitCommands[C],
-    ): Future[Unit] = go()
-
-    def yieldTransaction()(implicit
-        tc: TraceContext,
-        dom: DomainIdRequired,
-        dedup: SubmitDedup[CmdId],
-        commandOut: SubmitCommands[C],
-    ): Future[Transaction] = go()
-
-    @annotation.nowarn("cat=unused&msg=pickT")
-    def yieldResult[Z]()(implicit
-        tc: TraceContext,
-        dom: DomainIdRequired,
-        dedup: SubmitDedup[CmdId],
-        commandOut: SubmitCommands[C],
-        pickT: YieldResult[C, Z],
-        result: SubmitResult[C, Z],
-    ): Future[Z] = go()
-
-    @annotation.nowarn("cat=unused&msg=pickT")
-    def yieldResultAndOffset[Z]()(implicit
-        tc: TraceContext,
-        dom: DomainIdRequired,
-        dedup: SubmitDedup[CmdId],
-        commandOut: SubmitCommands[C],
-        pickT: YieldResult[C, Z],
-        result: SubmitResult[C, (String, Z)],
-    ): Future[(String, Z)] =
-      go()
-
-    private[this] def go[Z]()(implicit
-        tc: TraceContext,
-        dom: DomainIdRequired,
-        dedup: SubmitDedup[CmdId],
-        commandOut: SubmitCommands[C],
-        result: SubmitResult[C, Z],
-    ): Future[Z] = {
-      verifyEnoughExtraTrafficRemains(domainId, priority)
-        .flatMap(_ => commandOut.run(update).toList.traverse(packageIdResolver.resolvePackageId(_)))
-        .flatMap { commands =>
-          import SubmitResult.*, LedgerClient.SubmitAndWaitFor as WF
-          val (commandId, deduplicationConfig) = dedup.split(commandIdDeduplicationOffset)
-
-          def clientSubmit[W, U](waitFor: WF[W])(getOffsetAndResult: W => (String, U)): Future[U] =
-            callCallbacksOnCompletionAndWaitForOffset(
-              client.submitAndWait(
-                workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
-                applicationId = applicationId,
-                commandId = commandId,
-                deduplicationConfig = deduplicationConfig,
-                actAs = actAs.map(_.toProtoPrimitive),
-                readAs = readAs.map(_.toProtoPrimitive),
-                commands = commands,
-                disclosedContracts = disclosedContracts assertOnDomain domainId,
-                waitFor = waitFor,
-              )
-            )(getOffsetAndResult)
-
-          @annotation.tailrec
-          def interpretResult[C0, Z0](update: C0, result: SubmitResult[C0, Z0]): Future[Z0] =
-            result match {
-              case _: Ignored =>
-                clientSubmit(WF.CompletionOffset)(offset => (offset, (): Z0))
-              case _: JustTransaction =>
-                clientSubmit(WF.Transaction)(tx => (tx.getOffset, tx))
-              case k: ResultAndOffset[t, Z0] =>
-                for {
-                  tree <- clientSubmit(WF.TransactionTree)(tx => (tx.getOffset, tx))
-                } yield k.continue(
-                  tree.getOffset,
-                  decodeExerciseResult(update, tree),
-                )
-              case wrapper: Contramap[C0, u, Z0] =>
-                interpretResult(wrapper.g(update), wrapper.rec)
-            }
-
-          interpretResult(update, result)
-        }
-    }
-  }
 
   def activeContracts(
       filter: IngestionFilter,
@@ -712,6 +450,369 @@ class CNLedgerConnection(
         logger,
       )
   }
+
+  // Note that this will only work for apps that run as the SV user, i.e., the sv app, directory and scan.
+  def getSvcPartyFromUserMetadata(userId: String): Future[PartyId] =
+    waitForUserMetadata(userId, SVC_PARTY_USER_METADATA_KEY).map(
+      PartyId.tryFromProtoPrimitive(_)
+    )
+
+  // Note that this will only work for apps that run as the SV user, i.e., the sv app, directory and scan.
+  def lookupSvcPartyFromUserMetadata(userId: String): Future[Option[PartyId]] =
+    lookupUserMetadata(userId, SVC_PARTY_USER_METADATA_KEY).map(
+      _.map(PartyId.tryFromProtoPrimitive(_))
+    )
+
+  def ensureIdentityProviderConfig(id: String, issuer: String, jwksUrl: String, audience: String)(
+      implicit tc: TraceContext
+  ): Future[Unit] =
+    retryProvider.retryForAutomation(
+      show"Create identity provider $id",
+      client.createIdentityProviderConfig(id, issuer, jwksUrl, audience).recover {
+        case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.ALREADY_EXISTS =>
+          logger.info(show"Identity provider $id already exists")
+      },
+      logger,
+    )
+
+}
+
+/** Subscription for reading the ledger */
+class CNLedgerSubscription[S](
+    source: Source[S, NotUsed],
+    mapOperator: Flow[S, ?, ?],
+    override protected[this] val retryProvider: RetryProvider,
+    override protected val loggerFactory: NamedLoggerFactory,
+)(implicit ec: ExecutionContext, mat: Materializer)
+    extends RetryProvider.Has
+    with FlagCloseableAsync
+    with NamedLogging {
+
+  import TraceContext.Implicits.Empty.*
+
+  private val (killSwitch, completed_) = AkkaUtil.runSupervised(
+    ex =>
+      if (retryProvider.isClosing) {
+        logger.info("Ignoring failure to handle transaction, as we are shutting down", ex)
+      } else {
+        logger.error("Fatally failed to handle transaction", ex)
+      },
+    source
+      // we place the kill switch before the map operator, such that
+      // we can shut down the operator quickly and signal upstream to cancel further sending
+      .viaMat(KillSwitches.single)(Keep.right)
+      .viaMat(mapOperator)(Keep.left)
+      // and we get the Future[Done] as completed from the sink so we know when the last message
+      // was processed
+      .toMat(Sink.ignore)(Keep.both),
+  )
+
+  def completed: Future[Done] = completed_
+
+  def initiateShutdown() =
+    killSwitch.shutdown()
+
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    import TraceContext.Implicits.Empty.*
+    List[AsyncOrSyncCloseable](
+      SyncCloseable(s"terminating ledger api stream", killSwitch.shutdown()),
+      AsyncCloseable(
+        s"ledger api stream terminated",
+        completed.transform {
+          case Success(v) => Success(v)
+          case Failure(_: StatusRuntimeException) =>
+            // don't fail to close if there was a grpc status runtime exception
+            // this can happen (i.e. server not available etc.)
+            Success(Done)
+          case Failure(ex) => Failure(ex)
+        },
+        timeouts.shutdownShort.unwrap,
+      ),
+    )
+  }
+}
+
+/** A ledger connection with full submission functionality */
+class CNLedgerConnection(
+    client: LedgerClient,
+    applicationId: String,
+    loggerFactory: NamedLoggerFactory,
+    retryProvider: RetryProvider,
+    inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
+    trafficBalanceServiceO: AtomicReference[Option[TrafficBalanceService]],
+    completionOffsetCallback: String => Future[Unit],
+    packageIdResolver: PackageIdResolver,
+)(implicit as: ActorSystem, ec: ExecutionContextExecutor)
+    extends BaseLedgerConnection(
+      client,
+      applicationId,
+      loggerFactory,
+      retryProvider,
+    ) {
+
+  import CNLedgerConnection.*
+
+  private[this] def timeouts = retryProvider.timeouts
+
+  private def callCallbacksOnCompletion[T, U](
+      result: Future[T]
+  )(getOffsetAndResult: T => (Option[String], U)): Future[U] = {
+    import TraceContext.Implicits.Empty.*
+    def callCallbacksInternal(result: Try[T]): Unit =
+      LoggerUtil.logOnThrow { // in case the callbacks throw.
+        result match {
+          case Success(_) => ()
+          case Failure(ex: io.grpc.StatusRuntimeException)
+              if ex.getMessage.contains(InactiveContracts.id) =>
+            val statusProto = io.grpc.protobuf.StatusProto.fromThrowable(ex)
+            ErrorDetails.from(statusProto).collect {
+              case ResourceInfoDetail(contractId, type_)
+                  if type_ == CantonErrorResource.ContractId.asString =>
+                inactiveContractCallbacks.get().foreach(f => f(contractId))
+            }: Unit
+
+          case Failure(_) => ()
+        }
+      }
+
+    result.onComplete(callCallbacksInternal)
+    result.flatMap(x => {
+      val (optOffset, result) = getOffsetAndResult(x)
+      optOffset match {
+        case None => Future.successful(result)
+        case Some(offset) =>
+          // Wait for the completion offset to have been processed.
+          completionOffsetCallback(offset).map(_ => result)
+      }
+    })
+  }
+
+  private def callCallbacksOnCompletionAndWaitForOffset[T, U](
+      result: Future[T]
+  )(getOffsetAndResult: T => (String, U)): Future[U] =
+    callCallbacksOnCompletion(result)(x => {
+      val (offset, result) = getOffsetAndResult(x)
+      (Some(offset), result)
+    })
+
+  private def callCallbacksOnCompletionNoWaitForOffset[T](result: Future[T]): Future[T] =
+    callCallbacksOnCompletion(result)(x => (None, x))
+
+  private def verifyEnoughExtraTrafficRemains(domainId: DomainId, commandPriority: CommandPriority)(
+      implicit tc: TraceContext
+  ): Future[Unit] = {
+    trafficBalanceServiceO
+      .get()
+      .fold(Future.unit)(trafficBalanceService => {
+        trafficBalanceService.lookupReservedTraffic(domainId).flatMap {
+          case None => Future.unit
+          case Some(reservedTraffic) =>
+            trafficBalanceService.lookupAvailableTraffic(domainId).flatMap {
+              case None => Future.unit
+              case Some(availableTraffic) =>
+                if (availableTraffic <= reservedTraffic && commandPriority == CommandPriority.Low)
+                  throw Status.ABORTED
+                    .withDescription(
+                      s"Traffic balance below amount reserved for top-ups ($availableTraffic < $reservedTraffic)"
+                    )
+                    .asRuntimeException()
+                else Future.unit
+            }
+        }
+      })
+  }
+
+  // When using submitAndWaitForTransaction with a command whose resulting transaction is
+  // not visible to the submitting parties, one receives `TRANSACTION_NOT_FOUND`. In case, you run into this consider using
+  // one of the other methods in this class that rely on submitAndWaitForTransactionTree instead.
+
+  /** Produce a builder for a command submission.
+    *
+    * `update` can be one of three things:
+    *
+    *  1. an ordinary [[Command]] or [[Seq]] thereof,
+    *     2. an [[Update]], or
+    *     3. the result of [[Contract.Has#exercise]].
+    *
+    * Supply extra arguments to the builder with the `with*` and `no*` methods.
+    * At minimum, you must supply a deduplication strategy with
+    * [[submit#withDedup]] or [[submit#noDedup]]; that and other required steps
+    * result in compiler errors to the `yield*` methods if they are missing.
+    *
+    * Finalize the builder with one of the `yield*` methods to actually perform
+    * the command submission.  Different calls will compile depending on what
+    * `update` you supplied; for example, [[submit#yieldResult]] cannot be used
+    * with a plain `Command`, but works with the other two options.
+    * [[submit#yieldUnit]] and [[submit#yieldTransaction]] can always be used.
+    *
+    * {{{
+    *  submit(Seq(actor), Seq.empty,
+    *         someContract.exercise(_.exerciseFoo(42)))
+    *    .withDedup(CommandId(...), task.offset)
+    *    .yieldResult(): Future[Exercised[FooResult]]
+    * }}}
+    */
+  def submit[C, DomId](
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      update: C,
+      priority: CommandPriority = CommandPriority.Low,
+  )(implicit assignment: UpdateAssignment[C, DomId]): submit[C, Any, DomId] =
+    new submit(actAs, readAs, update, (), assignment.run(update), DisclosedContracts(), priority)
+
+  final class submit[C, CmdId, DomId] private[CNLedgerConnection] (
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      update: C,
+      commandIdDeduplicationOffset: CmdId,
+      domainId: DomId,
+      disclosedContracts: DisclosedContracts,
+      priority: CommandPriority,
+  ) {
+    private type DedupNotSpecifiedYet = CmdId =:= Any
+    private type DomainIdRequired = DomId <:< DomainId
+    private type DomainIdDisallowed = DomId <:< Unit
+
+    private[this] def copy[CmdId0, DomId0](
+        commandIdDeduplicationOffset: CmdId0 = this.commandIdDeduplicationOffset,
+        domainId: DomId0 = this.domainId,
+        disclosedContracts: DisclosedContracts = this.disclosedContracts,
+    ): submit[C, CmdId0, DomId0] =
+      new submit(
+        actAs,
+        readAs,
+        update,
+        commandIdDeduplicationOffset,
+        domainId,
+        disclosedContracts,
+        priority,
+      )
+
+    def withDedup(commandId: CommandId, deduplicationOffset: String)(implicit
+        cid: DedupNotSpecifiedYet
+    ): submit[C, (CommandId, String), DomId] =
+      copy(
+        commandIdDeduplicationOffset = (commandId, deduplicationOffset)
+      )
+
+    def withDedup(commandId: CommandId, deduplicationConfig: DedupConfig)(implicit
+        cid: DedupNotSpecifiedYet
+    ): submit[C, (CommandId, DedupConfig), DomId] =
+      copy(
+        commandIdDeduplicationOffset = (commandId, deduplicationConfig)
+      )
+
+    def noDedup(implicit cid: DedupNotSpecifiedYet): submit[C, Unit, DomId] =
+      copy(commandIdDeduplicationOffset = ())
+
+    @annotation.nowarn("cat=unused&msg=notNE")
+    def withDomainId(
+        domainId: DomainId,
+        disclosedContracts: DisclosedContracts = DisclosedContracts(),
+    )(implicit
+        noDomIdYet: DomainIdDisallowed,
+        // if you statically know you have NE, use withDisclosedContracts instead
+        notNE: disclosedContracts.type <:!< DisclosedContracts.NE,
+    ): submit[C, CmdId, DomainId] =
+      copy(
+        domainId = domainId,
+        disclosedContracts = disclosedContracts assertOnDomain domainId,
+      )
+
+    def withDisclosedContracts(disclosedContracts: DisclosedContracts)(implicit
+        dcAllowed: WithDisclosedContracts[C, DomId, disclosedContracts.type]
+    ): submit[C, CmdId, DomainId] =
+      copy(
+        domainId = dcAllowed.inferDomain(update, domainId, disclosedContracts),
+        disclosedContracts = disclosedContracts,
+      )
+
+    def yieldUnit()(implicit
+        tc: TraceContext,
+        dom: DomainIdRequired,
+        dedup: SubmitDedup[CmdId],
+        commandOut: SubmitCommands[C],
+    ): Future[Unit] = go()
+
+    def yieldTransaction()(implicit
+        tc: TraceContext,
+        dom: DomainIdRequired,
+        dedup: SubmitDedup[CmdId],
+        commandOut: SubmitCommands[C],
+    ): Future[Transaction] = go()
+
+    @annotation.nowarn("cat=unused&msg=pickT")
+    def yieldResult[Z]()(implicit
+        tc: TraceContext,
+        dom: DomainIdRequired,
+        dedup: SubmitDedup[CmdId],
+        commandOut: SubmitCommands[C],
+        pickT: YieldResult[C, Z],
+        result: SubmitResult[C, Z],
+    ): Future[Z] = go()
+
+    @annotation.nowarn("cat=unused&msg=pickT")
+    def yieldResultAndOffset[Z]()(implicit
+        tc: TraceContext,
+        dom: DomainIdRequired,
+        dedup: SubmitDedup[CmdId],
+        commandOut: SubmitCommands[C],
+        pickT: YieldResult[C, Z],
+        result: SubmitResult[C, (String, Z)],
+    ): Future[(String, Z)] =
+      go()
+
+    private[this] def go[Z]()(implicit
+        tc: TraceContext,
+        dom: DomainIdRequired,
+        dedup: SubmitDedup[CmdId],
+        commandOut: SubmitCommands[C],
+        result: SubmitResult[C, Z],
+    ): Future[Z] = {
+      verifyEnoughExtraTrafficRemains(domainId, priority)
+        .flatMap(_ => commandOut.run(update).toList.traverse(packageIdResolver.resolvePackageId(_)))
+        .flatMap { commands =>
+          import SubmitResult.*, LedgerClient.SubmitAndWaitFor as WF
+          val (commandId, deduplicationConfig) = dedup.split(commandIdDeduplicationOffset)
+
+          def clientSubmit[W, U](waitFor: WF[W])(getOffsetAndResult: W => (String, U)): Future[U] =
+            callCallbacksOnCompletionAndWaitForOffset(
+              client.submitAndWait(
+                workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
+                applicationId = applicationId,
+                commandId = commandId,
+                deduplicationConfig = deduplicationConfig,
+                actAs = actAs.map(_.toProtoPrimitive),
+                readAs = readAs.map(_.toProtoPrimitive),
+                commands = commands,
+                disclosedContracts = disclosedContracts assertOnDomain domainId,
+                waitFor = waitFor,
+              )
+            )(getOffsetAndResult)
+
+          @annotation.tailrec
+          def interpretResult[C0, Z0](update: C0, result: SubmitResult[C0, Z0]): Future[Z0] =
+            result match {
+              case _: Ignored =>
+                clientSubmit(WF.CompletionOffset)(offset => (offset, (): Z0))
+              case _: JustTransaction =>
+                clientSubmit(WF.Transaction)(tx => (tx.getOffset, tx))
+              case k: ResultAndOffset[t, Z0] =>
+                for {
+                  tree <- clientSubmit(WF.TransactionTree)(tx => (tx.getOffset, tx))
+                } yield k.continue(
+                  tree.getOffset,
+                  decodeExerciseResult(update, tree),
+                )
+              case wrapper: Contramap[C0, u, Z0] =>
+                interpretResult(wrapper.g(update), wrapper.rec)
+            }
+
+          interpretResult(update, result)
+        }
+    }
+  }
+
   def submitReassignmentAndWaitNoDedup(
       submitter: PartyId,
       command: LedgerClient.ReassignmentCommand,
@@ -762,30 +863,6 @@ class CNLedgerConnection(
         ()
       }
   }
-
-  // Note that this will only work for apps that run as the SV user, i.e., the sv app, directory and scan.
-  def getSvcPartyFromUserMetadata(userId: String): Future[PartyId] =
-    waitForUserMetadata(userId, CNLedgerConnection.SVC_PARTY_USER_METADATA_KEY).map(
-      PartyId.tryFromProtoPrimitive(_)
-    )
-
-  // Note that this will only work for apps that run as the SV user, i.e., the sv app, directory and scan.
-  def lookupSvcPartyFromUserMetadata(userId: String): Future[Option[PartyId]] =
-    lookupUserMetadata(userId, CNLedgerConnection.SVC_PARTY_USER_METADATA_KEY).map(
-      _.map(PartyId.tryFromProtoPrimitive(_))
-    )
-
-  def ensureIdentityProviderConfig(id: String, issuer: String, jwksUrl: String, audience: String)(
-      implicit tc: TraceContext
-  ): Future[Unit] =
-    retryProvider.retryForAutomation(
-      show"Create identity provider $id",
-      client.createIdentityProviderConfig(id, issuer, jwksUrl, audience).recover {
-        case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.ALREADY_EXISTS =>
-          logger.info(show"Identity provider $id already exists")
-      },
-      logger,
-    )
 
   // simulate the completion check of command service; future only yields
   // successfully if the completion was OK
@@ -844,70 +921,41 @@ class CNLedgerConnection(
       },
     ))
   }
+
 }
 
-/** Subscription for reading the ledger */
-class CNLedgerSubscription[S](
-    source: Source[S, NotUsed],
-    mapOperator: Flow[S, ?, ?],
-    override protected[this] val retryProvider: RetryProvider,
-    override protected val loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContext, mat: Materializer)
-    extends RetryProvider.Has
-    with FlagCloseableAsync
-    with NamedLogging {
-
-  import TraceContext.Implicits.Empty.*
-
-  private val (killSwitch, completed_) = AkkaUtil.runSupervised(
-    ex =>
-      if (retryProvider.isClosing) {
-        logger.info("Ignoring failure to handle transaction, as we are shutting down", ex)
-      } else {
-        logger.error("Fatally failed to handle transaction", ex)
-      },
-    source
-      // we place the kill switch before the map operator, such that
-      // we can shut down the operator quickly and signal upstream to cancel further sending
-      .viaMat(KillSwitches.single)(Keep.right)
-      .viaMat(mapOperator)(Keep.left)
-      // and we get the Future[Done] as completed from the sink so we know when the last message
-      // was processed
-      .toMat(Sink.ignore)(Keep.both),
-  )
-
-  def completed: Future[Done] = completed_
-
-  def initiateShutdown() =
-    killSwitch.shutdown()
-
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
-    import TraceContext.Implicits.Empty.*
-    List[AsyncOrSyncCloseable](
-      SyncCloseable(s"terminating ledger api stream", killSwitch.shutdown()),
-      AsyncCloseable(
-        s"ledger api stream terminated",
-        completed.transform {
-          case Success(v) => Success(v)
-          case Failure(_: StatusRuntimeException) =>
-            // don't fail to close if there was a grpc status runtime exception
-            // this can happen (i.e. server not available etc.)
-            Success(Done)
-          case Failure(ex) => Failure(ex)
-        },
-        timeouts.shutdownShort.unwrap,
-      ),
-    )
-  }
-}
-
-object CNLedgerConnection {
+object BaseLedgerConnection {
 
   val SVC_PARTY_USER_METADATA_KEY: String = "sv.app.network.canton.global/svc_party"
 
   val APP_MANAGER_IDENTITY_PROVIDER_ID: String = "app_manager"
 
   val APP_MANAGER_ISSUER: String = "app_manager"
+
+  /** In a number of places we want to use a user id in a place where a `PartyString` expected, e.g.,
+    * in party id hints and in workflow ids. However, the allowed set of characters is slightly different so
+    * this function can be used to perform the necessary escaping. Note that PartyString is more restrictive than
+    * LedgerString so this can also be used to escape to ledger strings.
+    */
+  def sanitizeUserIdToPartyString(userId: String): String = {
+    // We escape invalid characters using _hexcode(invalidchar)
+    // See https://github.com/digital-asset/daml/blob/dfc8619e35969ce30daa2427d7318bf70bb75386/daml-lf/data/src/main/scala/com/digitalasset/daml/lf/data/IdString.scala#L320
+    // for allowed characters.
+    userId.view.flatMap {
+      case c if c >= 'a' && c <= 'z' => Seq(c)
+      case c if c >= 'A' && c <= 'Z' => Seq(c)
+      case c if c >= '0' && c <= '9' => Seq(c)
+      case c if c == ':' || c == '-' || c == ' ' => Seq(c)
+      case '_' => Seq('_', '_')
+      case c =>
+        '_' +: "%04x".format(c.toInt)
+    }.mkString
+  }
+}
+
+object CNLedgerConnection {
+
+  def uniqueId: String = UUID.randomUUID.toString
 
   /** Abstract representation of a command-id for deduplication.
     *
@@ -982,28 +1030,6 @@ object CNLedgerConnection {
     }
   }
 
-  /** In a number of places we want to use a user id in a place where a `PartyString` expected, e.g.,
-    * in party id hints and in workflow ids. However, the allowed set of characters is slightly different so
-    * this function can be used to perform the necessary escaping. Note that PartyString is more restrictive than
-    * LedgerString so this can also be used to escape to ledger strings.
-    */
-  def sanitizeUserIdToPartyString(userId: String): String = {
-    // We escape invalid characters using _hexcode(invalidchar)
-    // See https://github.com/digital-asset/daml/blob/dfc8619e35969ce30daa2427d7318bf70bb75386/daml-lf/data/src/main/scala/com/digitalasset/daml/lf/data/IdString.scala#L320
-    // for allowed characters.
-    userId.view.flatMap {
-      case c if c >= 'a' && c <= 'z' => Seq(c)
-      case c if c >= 'A' && c <= 'Z' => Seq(c)
-      case c if c >= '0' && c <= '9' => Seq(c)
-      case c if c == ':' || c == '-' || c == ' ' => Seq(c)
-      case '_' => Seq('_', '_')
-      case c =>
-        '_' +: "%04x".format(c.toInt)
-    }.mkString
-  }
-
-  def uniqueId: String = UUID.randomUUID.toString
-
   @implicitNotFound(
     "${CmdId} isn't a deduplication configuration or Unit. Did you call withDedup or noDedup?"
   )
@@ -1018,7 +1044,8 @@ object CNLedgerConnection {
       case (cid, dc) =>
         (cid.commandIdForSubmission, dc)
     }
-    implicit val noDedup: SubmitDedup[Unit] = SubmitDedup(_ => (uniqueId, NoDedup))
+    implicit val noDedup: SubmitDedup[Unit] =
+      SubmitDedup(_ => (CNLedgerConnection.uniqueId, NoDedup))
   }
 
   /** Some `update`s can determine the domain ID immediately; this typeclass

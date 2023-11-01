@@ -73,10 +73,9 @@ class JoiningNodeInitializer(
         SvSvcAutomationService,
     )
   ] = {
-    val initConnection = ledgerClient.connection(
+    val initConnection = ledgerClient.readOnlyConnection(
       this.getClass.getSimpleName,
       loggerFactory,
-      PackageIdResolver.NO_COMMAND_SUBMISSION,
     )
     // We need to connect to the domain here because otherwise we create a circular dependency
     // with the validator app: The validator app waits for its user to be provisioned (which happens in createValidatorUser)
@@ -399,7 +398,7 @@ class JoiningNodeInitializer(
     }
 
     def startOnboardingWithSvcPartyMigration(
-        initConnection: CNLedgerConnection,
+        initConnection: BaseLedgerConnection,
         svcStore: SvSvcStore,
     ): Future[SvSvcAutomationService] = {
       joiningConfig.getOrElse(
@@ -543,10 +542,9 @@ class JoiningNodeInitializer(
     )
 
   private def newSvcStore(key: SvStore.Key) = {
-    val connection = ledgerClient.connection(
+    val connection = ledgerClient.readOnlyConnection(
       this.getClass.getSimpleName,
       loggerFactory,
-      PackageIdResolver.NO_COMMAND_SUBMISSION,
     )
     SvSvcStore(
       key,
@@ -587,7 +585,7 @@ class JoiningNodeInitializer(
     loggerFactory,
   )
 
-  private def getSvcPartyId(connection: CNLedgerConnection): Future[PartyId] = for {
+  private def getSvcPartyId(connection: BaseLedgerConnection): Future[PartyId] = for {
     svcPartyFromMetadata <- connection.lookupSvcPartyFromUserMetadata(config.ledgerApiUser)
     svcParty <- svcPartyFromMetadata
       .fold(

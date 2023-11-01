@@ -94,10 +94,9 @@ class FoundingNodeInitializer(
         SvSvcAutomationService,
     )
   ] = {
-    val initConnection = ledgerClient.connection(
+    val initConnection = ledgerClient.readOnlyConnection(
       this.getClass.getSimpleName,
       loggerFactory,
-      PackageIdResolver.NO_COMMAND_SUBMISSION,
     )
 
     for {
@@ -188,7 +187,10 @@ class FoundingNodeInitializer(
     )
   }
 
-  private def setupSvcParty(connection: CNLedgerConnection, namespace: Namespace): Future[PartyId] =
+  private def setupSvcParty(
+      connection: BaseLedgerConnection,
+      namespace: Namespace,
+  ): Future[PartyId] =
     for {
       svc <- connection.ensurePartyAllocated(
         foundingConfig.svcPartyHint,
@@ -604,10 +606,9 @@ class FoundingNodeInitializer(
     )
 
   private def newSvcStore(key: SvStore.Key) = {
-    val connection = ledgerClient.connection(
+    val connection = ledgerClient.readOnlyConnection(
       this.getClass.getSimpleName,
       loggerFactory,
-      PackageIdResolver.NO_COMMAND_SUBMISSION,
     )
     SvSvcStore(
       key,

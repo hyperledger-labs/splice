@@ -228,7 +228,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     )
   }
 
-  private def waitForUser(connection: CNLedgerConnection): Future[Unit] = {
+  private def waitForUser(connection: BaseLedgerConnection): Future[Unit] = {
     logger.info(s"Waiting for user $serviceUser")
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
@@ -251,10 +251,9 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
   private val preInitialize1F = preInitializeBeforeLedgerConnection()
   private val ledgerClientF = preInitialize1F.flatMap { _ => createLedgerClient() }
   private val initializeF = ledgerClientF.flatMap { client =>
-    val initConnection = client.connection(
+    val initConnection = client.readOnlyConnection(
       this.getClass.getSimpleName,
       loggerFactory,
-      PackageIdResolver.NO_COMMAND_SUBMISSION,
     )
     waitForUser(initConnection).flatMap(_ => initializeNode(client))
   }

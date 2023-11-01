@@ -83,23 +83,6 @@ object PackageIdResolver {
     def getCoinRulesPayload()(implicit tc: TraceContext): Future[cc.coin.CoinRules]
   }
 
-  /** Resolver that always fails. This is useful for conections that are never used for command submissions
-    * which is often the case during initialization.
-    */
-  // TODO(#8018) Split connection types to avoid the runtime errors if you do call a command submission
-  // on a connection configured with this.
-  def NO_COMMAND_SUBMISSION(implicit ec: ExecutionContext): PackageIdResolver =
-    new PackageIdResolver {
-      override def resolvePackageId(templateId: QualifiedName)(implicit
-          tc: TraceContext
-      ): Future[String] =
-        Future.failed(
-          new IllegalArgumentException(
-            "Package id resolver not configured, use a different connection to submit commands"
-          )
-        )
-    }
-
   /** Package id resolver for direct command submissions in tests.
     * This statically picks a package id.
     */

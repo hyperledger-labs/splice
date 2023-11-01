@@ -48,7 +48,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
   // domain connections and allocation of the primary party.
   @nowarn("cat=unused")
   protected def preInitializeAfterLedgerConnection(
-      connection: CNLedgerConnection,
+      connection: BaseLedgerConnection,
       ledgerClient: CNLedgerClient,
   ): Future[Unit] =
     Future.unit
@@ -63,10 +63,9 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
   ): Future[State] = for {
     _ <- preInitializeBeforeLedgerConnection()
     _ = logger.info(s"Acquiring ledger connection")
-    initConnection = ledgerClient.connection(
+    initConnection = ledgerClient.readOnlyConnection(
       this.getClass.getSimpleName,
       loggerFactory,
-      PackageIdResolver.NO_COMMAND_SUBMISSION,
     )
     _ <- preInitializeAfterLedgerConnection(initConnection, ledgerClient)
     serviceParty <-

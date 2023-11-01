@@ -111,13 +111,13 @@ class ValidatorApp(
   } yield ()
 
   override def preInitializeAfterLedgerConnection(
-      connection: CNLedgerConnection,
+      connection: BaseLedgerConnection,
       ledgerClient: CNLedgerClient,
   ) =
     for {
       _ <- config.appManager.traverse_ { appManagerConfig =>
         connection.ensureIdentityProviderConfig(
-          CNLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID,
+          BaseLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID,
           appManagerConfig.issuerUrl.toString,
           appManagerConfig.jwksUri.toString,
           appManagerConfig.audience,
@@ -141,7 +141,7 @@ class ValidatorApp(
               config.ledgerApiUser,
               config.validatorPartyHint
                 .getOrElse(
-                  CNLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
+                  BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
                 ),
               participantAdminConnection,
             ) whenA !config.svValidator

@@ -28,7 +28,7 @@ import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.{CNLedgerConnection, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{BaseLedgerConnection, PackageIdResolver, RetryProvider}
 import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{
   ConstrainedTemplate,
@@ -846,7 +846,7 @@ object SvSvcStore {
       key: SvStore.Key,
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
-      connection: CNLedgerConnection,
+      connection: BaseLedgerConnection,
       retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext,
