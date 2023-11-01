@@ -64,6 +64,21 @@ class UnassignTrigger[C <: ContractTypeCompanion[_, TCid, _, T], TCid <: Contrac
 
     } yield TaskSuccess(outcome)
   }
+
+  private[automation] override final def additionalRetryableConditions = {
+    import io.grpc.Status
+    import com.daml.error.ErrorCategory.InvalidIndependentOfSystemState
+    import com.daml.network.environment.RetryProvider.Condition
+    /*
+    targeting this error, for which we want to retry (see #8267):
+    category=Some(InvalidIndependentOfSystemState)
+    statusCode=INVALID_ARGUMENT
+    description=INVALID_ARGUMENT(8,5aebaf00): The submitted command has invalid arguments: Cannot transfer-out contract `ContractId(007ccd89ecfe3d1a64bac02fb8d5c5c06e4226c2ff2cdb949c1865b9e85b75ab0dca02122035f2ca0ec64001b3712163b7804b93e9eaff2aa6cf2b472e2cb9b5a60aab66cf)` because it's not active. Current status TransferredAway(global-domain::1220bcde7452...)
+    ErrorInfoDetail(INVALID_ARGUMENT,Map(participant -> aliceParticipant, tid -> 5aebaf00957d76d13cb624aa76aec24e, category -> 8, definite_answer -> false))
+    RequestInfoDetail(5aebaf00957d76d13cb624aa76aec24e) io.grpc.StatusRuntimeException: INVALID_ARGUMENT: INVALID_ARGUMENT(8,5aebaf00): The submitted command has invalid arguments: Cannot transfer-out contract `ContractId(007ccd89ecfe3d1a64bac02fb8d5c5c06e4226c2ff2cdb949c1865b9e85b75ab0dca02122035f2ca0ec64001b3712163b7804b93e9eaff2aa6cf2b472e2cb9b5a60aab66cf)` because it's not active. Current status TransferredAway(global-domain::1220bcde7452...)
+     */
+    Map(Status.Code.INVALID_ARGUMENT -> Condition.Category(InvalidIndependentOfSystemState))
+  }
 }
 
 object UnassignTrigger {
