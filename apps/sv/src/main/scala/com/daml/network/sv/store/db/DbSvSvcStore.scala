@@ -189,7 +189,7 @@ class DbSvSvcStore(
 
   override def listExpiredCnsSubscriptions(
       now: CantonTimestamp,
-      limit: Int,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[SvSvcStore.IdleCnsSubscription]] = waitUntilAcsIngested {
     for {
       joinedRows <- storage
@@ -231,11 +231,11 @@ class DbSvSvcStore(
             )}
                 and      idle.subscription_next_payment_due_at < $now
               order by idle.subscription_next_payment_due_at
-              limit    $limit
+              limit    ${sqlLimit(limit)}
           """.as[(SelectFromAcsTableResult, SelectFromAcsTableResult)],
           "listExpiredCnsSubscriptions",
         )
-    } yield joinedRows.map { case (idleRow, ctxRow) =>
+    } yield applyLimit(limit, joinedRows).map { case (idleRow, ctxRow) =>
       val idleContract = contractFromRow(SubscriptionIdleState.COMPANION)(idleRow)
       val ctxContract = contractFromRow(CnsEntryContext.COMPANION)(ctxRow)
       SvSvcStore.IdleCnsSubscription(idleContract, ctxContract)
@@ -331,7 +331,7 @@ class DbSvSvcStore(
   override def listAppRewardCouponsGroupedByCounterparty(
       roundNumber: Long,
       roundDomain: DomainId,
-      totalCouponsLimit: Long,
+      totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[Seq[AppRewardCoupon.ContractId]]] = waitUntilAcsIngested {
@@ -347,17 +347,19 @@ class DbSvSvcStore(
                 and reward_round = $roundNumber
                 and reward_party is not null -- otherwise index is not used
               group by reward_party
-              limit $totalCouponsLimit
+              limit ${sqlLimit(totalCouponsLimit)}
              """.as[(PartyId, Array[ContractId[AppRewardCoupon]])],
           "listAppRewardCouponsGroupedByCounterparty",
         )
-    } yield result.map(_._2.map(cid => new AppRewardCoupon.ContractId(cid.contractId)).toSeq)
+    } yield applyLimit(totalCouponsLimit, result).map(
+      _._2.map(cid => new AppRewardCoupon.ContractId(cid.contractId)).toSeq
+    )
   }
 
   override def listValidatorRewardCouponsGroupedByCounterparty(
       roundNumber: Long,
       roundDomain: DomainId,
-      totalCouponsLimit: Long,
+      totalCouponsLimit: Limit,
   )(implicit tc: TraceContext): Future[Seq[Seq[ValidatorRewardCoupon.ContractId]]] =
     waitUntilAcsIngested {
       for {
@@ -374,11 +376,11 @@ class DbSvSvcStore(
                   and reward_round = $roundNumber
                   and reward_party is not null -- otherwise index is not used
                 group by reward_party
-                limit $totalCouponsLimit
+                limit ${sqlLimit(totalCouponsLimit)}
                """.as[(PartyId, Array[ContractId[ValidatorRewardCoupon]])],
             "listValidatorRewardCouponsGroupedByCounterparty",
           )
-      } yield result.map(
+      } yield applyLimit(totalCouponsLimit, result).map(
         _._2.map(cid => new ValidatorRewardCoupon.ContractId(cid.contractId)).toSeq
       )
     }
@@ -533,6 +535,7 @@ class DbSvSvcStore(
   override def listInitialPaymentConfirmationByCnsName(
       confirmer: PartyId,
       name: String,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[Contract[Confirmation.ContractId, Confirmation]]] =
     waitUntilAcsIngested {
       for {
@@ -551,11 +554,11 @@ class DbSvSvcStore(
                 )}
                           and cns_entry_name = ${lengthLimited(name)}
                       )
-                    limit ${sqlLimit(Limit.DefaultLimit)};
+                    limit ${sqlLimit(limit)};
                         """).toActionBuilder.as[SelectFromAcsTableResult],
             "listInitialPaymentConfirmationByCnsName",
           )
-        limited = applyLimit(Limit.DefaultLimit, result)
+        limited = applyLimit(limit, result)
       } yield limited.map(contractFromRow(Confirmation.COMPANION)(_))
     }
 
@@ -585,7 +588,8 @@ class DbSvSvcStore(
   }
 
   override def listSvOnboardingRequestsBySvcMembers(
-      svcRules: Contract.Has[SvcRules.ContractId, SvcRules]
+      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[SvOnboardingRequest.ContractId, SvOnboardingRequest]]] =
@@ -606,11 +610,11 @@ class DbSvSvcStore(
                   SvOnboardingRequest.TEMPLATE_ID
                 )}
                    and (sv_candidate_party, sv_candidate_name) in #$svCandidates
-                 limit ${sqlLimit(Limit.DefaultLimit)}
+                 limit ${sqlLimit(limit)}
                """).toActionBuilder.as[SelectFromAcsTableResult],
             "listSvOnboardingRequestsBySvcMembers",
           )
-        limited = applyLimit(Limit.DefaultLimit, result)
+        limited = applyLimit(limit, result)
       } yield limited.map(contractFromRow(SvOnboardingRequest.COMPANION)(_))
     }
 
@@ -637,7 +641,7 @@ class DbSvSvcStore(
                 )}
                     and mining_round is not null
                   order by mining_round desc limit 1)""",
-              orderLimit = sql"""order by mining_round desc limit $limit""",
+              orderLimit = sql"""order by mining_round desc limit ${sqlLimit(limit)}""",
             ),
             "listExpiredRoundBased",
           )
@@ -645,7 +649,7 @@ class DbSvSvcStore(
         } yield assigned
       }
 
-  override def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Long)(
+  override def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Limit)(
       implicit tc: TraceContext
   ): Future[Seq[Contract[MemberTraffic.ContractId, MemberTraffic]]] = waitUntilAcsIngested {
     for {
@@ -656,14 +660,14 @@ class DbSvSvcStore(
                  where store_id = $storeId
                    and template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID)}
                    and member_traffic_member = $memberId
-                 limit $limit
+                 limit ${sqlLimit(limit)}
                """).toActionBuilder.as[SelectFromAcsTableResult],
           "listMemberTrafficContracts",
         )
-    } yield result.map(contractFromRow(MemberTraffic.COMPANION)(_))
+    } yield applyLimit(limit, result).map(contractFromRow(MemberTraffic.COMPANION)(_))
   }
 
-  override def listMemberCoinPriceVotes()(implicit
+  override def listMemberCoinPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[CoinPriceVote.ContractId, CoinPriceVote]]] = waitUntilAcsIngested {
     import scala.jdk.CollectionConverters.*
@@ -681,11 +685,11 @@ class DbSvSvcStore(
                where store_id = $storeId
                  and template_id_qualified_name = ${QualifiedName(CoinPriceVote.TEMPLATE_ID)}
                  and voter in #$voterParties
-               limit ${sqlLimit(Limit.DefaultLimit)}
+               limit ${sqlLimit(limit)}
              """).toActionBuilder.as[SelectFromAcsTableResult],
           "listMemberCoinPriceVotes",
         )
-      limited = applyLimit(Limit.DefaultLimit, result)
+      limited = applyLimit(limit, result)
     } yield limited.map(contractFromRow(CoinPriceVote.COMPANION)(_)).distinctBy(_.payload.sv)
   }
 
@@ -762,7 +766,10 @@ class DbSvSvcStore(
     } yield sum.getOrElse(0L)
   }
 
-  override def listVotesByVoteRequests(voteRequestCids: Seq[VoteRequest.ContractId])(implicit
+  override def listVotesByVoteRequests(
+      voteRequestCids: Seq[VoteRequest.ContractId],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[Vote.ContractId, Vote]]] = waitUntilAcsIngested {
     val voteRequestCidsSql = voteRequestCids
@@ -776,11 +783,11 @@ class DbSvSvcStore(
                  where store_id = $storeId
                    and template_id_qualified_name = ${QualifiedName(Vote.TEMPLATE_ID)}
                    and vote_request_cid in #$voteRequestCidsSql
-                 limit ${sqlLimit(Limit.DefaultLimit)}
+                 limit ${sqlLimit(limit)}
                """).toActionBuilder.as[SelectFromAcsTableResult],
           "listVotesByVoteRequests",
         )
-      limited = applyLimit(Limit.DefaultLimit, result)
+      limited = applyLimit(limit, result)
     } yield limited.map(contractFromRow(Vote.COMPANION)(_))
   }
 
@@ -835,7 +842,10 @@ class DbSvSvcStore(
     )).getOrRaise(offsetExpectedError())
   }
 
-  override def listEligibleVotes(voteRequestId: VoteRequest.ContractId)(implicit
+  override def listEligibleVotes(
+      voteRequestId: VoteRequest.ContractId,
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[Vote.ContractId, Vote]]] = waitUntilAcsIngested {
     for {
@@ -846,11 +856,11 @@ class DbSvSvcStore(
                    where store_id = $storeId
                      and template_id_qualified_name = ${QualifiedName(Vote.TEMPLATE_ID)}
                      and vote_request_cid = $voteRequestId
-                   limit ${sqlLimit(Limit.DefaultLimit)}
+                   limit ${sqlLimit(limit)}
                  """).toActionBuilder.as[SelectFromAcsTableResult],
           "listEligibleVotes",
         )
-      limited = applyLimit(Limit.DefaultLimit, result)
+      limited = applyLimit(limit, result)
     } yield limited.map(contractFromRow(Vote.COMPANION)(_))
   }
 
@@ -927,8 +937,11 @@ class DbSvSvcStore(
     )).getOrRaise(offsetExpectedError())
   }
 
-  override def listElectionRequests(svcRules: AssignedContract[SvcRules.ContractId, SvcRules])(
-      implicit tc: TraceContext
+  override def listElectionRequests(
+      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
+      tc: TraceContext
   ): Future[Seq[Contract[ElectionRequest.ContractId, ElectionRequest]]] = waitUntilAcsIngested {
     import scala.jdk.CollectionConverters.*
     val requesters = svcRules.payload.members.keySet().asScala.mkString("('", "','", "')")
@@ -944,11 +957,11 @@ class DbSvSvcStore(
               )}
                        and requester IN #$requesters
                        and election_request_epoch = $electionRequestEpoch
-                     limit ${sqlLimit(Limit.DefaultLimit)}
+                     limit ${sqlLimit(limit)}
                    """).toActionBuilder.as[SelectFromAcsTableResult],
           "listElectionRequests",
         )
-      limited = applyLimit(Limit.DefaultLimit, result)
+      limited = applyLimit(limit, result)
     } yield limited.map(contractFromRow(ElectionRequest.COMPANION)(_))
   }
 
@@ -981,7 +994,8 @@ class DbSvSvcStore(
   }
 
   override def listExpiredElectionRequests(
-      epoch: Long
+      epoch: Long,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[Contract[
     ElectionRequest.ContractId,
     ElectionRequest,
@@ -996,11 +1010,11 @@ class DbSvSvcStore(
                 ElectionRequest.TEMPLATE_ID
               )}
                          and election_request_epoch < $epoch
-                       limit ${sqlLimit(Limit.DefaultLimit)}
+                       limit ${sqlLimit(limit)}
                      """).toActionBuilder.as[SelectFromAcsTableResult],
           "listExpiredElectionRequests",
         )
-      limited = applyLimit(Limit.DefaultLimit, result)
+      limited = applyLimit(limit, result)
     } yield limited.map(contractFromRow(ElectionRequest.COMPANION)(_))
   }
 
@@ -1120,7 +1134,7 @@ class DbSvSvcStore(
       _requester: Option[String],
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
-      limit: Int,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]] = {
@@ -1157,11 +1171,11 @@ class DbSvSvcStore(
              where store_id = $storeId
                 and index_record_type = ${dbType}
                 """ ++ actionNameCondition ++ executedCondition ++ requesterCondition ++ effectivenessCondition ++ sql"""
-             limit $limit;
+             limit ${sqlLimit(limit)};
            """).toActionBuilder.as[(String, String)],
         "listVoteResults",
       )
-      entries <- rows.traverse { case (eventId, domainId) =>
+      entries <- applyLimit(limit, rows).traverse { case (eventId, domainId) =>
         loadTxLogEntry(txLogReader, eventId, DomainId.tryFromString(domainId), None, dbType)
       }: Future[Seq[SvcTxLogParser.TxLogEntry]]
       recentVoteResults = entries.collect {

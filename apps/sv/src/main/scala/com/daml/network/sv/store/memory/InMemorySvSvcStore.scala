@@ -50,7 +50,8 @@ class InMemorySvSvcStore(
     override protected val
     ec: ExecutionContext
 ) extends InMemoryCNNodeAppStore[SvcTxLogParser.TxLogIndexRecord, SvcTxLogParser.TxLogEntry]
-    with SvSvcStore {
+    with SvSvcStore
+    with LimitHelpers {
   import InMemorySvSvcStore.*
 
   override def listVoteResults(
@@ -59,7 +60,7 @@ class InMemorySvSvcStore(
       requester: Option[String],
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
-      limit: Int,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]] = {
@@ -108,9 +109,9 @@ class InMemorySvSvcStore(
                 Some(entry)
               case _ => None
             }
-          }.flatten.take(limit)
+          }.flatten
         }
-    } yield records
+    } yield applyLimit(limit, records)
   }
 
   override protected def listExpiredRoundBased[Id <: ContractId[T], T <: Template](
@@ -133,7 +134,7 @@ class InMemorySvSvcStore(
                     .coinExpiresAt(coin(e.payload))
                     .number <= latest.payload.round.number - 2,
               )
-          } yield allExpired.view.take(limit).map(AssignedContract(_, domainId)).toSeq
+          } yield allExpired.view.take(limit.limit).map(AssignedContract(_, domainId)).toSeq
         }
       } yield result
 
@@ -167,7 +168,7 @@ class InMemorySvSvcStore(
   override def listAppRewardCouponsGroupedByCounterparty(
       roundNumber: Long,
       roundDomain: DomainId,
-      totalCouponsLimit: Long,
+      totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[Seq[AppRewardCoupon.ContractId]]] = {
@@ -175,7 +176,7 @@ class InMemorySvSvcStore(
       appRewards <- listAppRewardCouponsOnDomain(
         roundNumber,
         roundDomain,
-        PageLimit(totalCouponsLimit),
+        totalCouponsLimit,
       )
       providerToCoupons = appRewards.foldLeft(
         Map[String, Seq[cc.coin.AppRewardCoupon.ContractId]]()
@@ -208,13 +209,13 @@ class InMemorySvSvcStore(
   override def listValidatorRewardCouponsGroupedByCounterparty(
       roundNumber: Long,
       roundDomain: DomainId,
-      totalCouponsLimit: Long,
+      totalCouponsLimit: Limit,
   )(implicit tc: TraceContext): Future[Seq[Seq[ValidatorRewardCoupon.ContractId]]] = {
     for {
       validatorRewards <- listValidatorRewardCouponsOnDomain(
         roundNumber,
         roundDomain,
-        PageLimit(totalCouponsLimit),
+        totalCouponsLimit,
       )
       validatorToCoupons = validatorRewards.foldLeft(
         Map[String, Seq[cc.coin.ValidatorRewardCoupon.ContractId]]()
@@ -288,6 +289,7 @@ class InMemorySvSvcStore(
   override def listInitialPaymentConfirmationByCnsName(
       confirmer: PartyId,
       name: String,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[
     Seq[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]
   ] = {
@@ -298,6 +300,7 @@ class InMemorySvSvcStore(
         confirmingCnsEntry(confirmer) { arcCnsEntryContext =>
           cnsContextCids.contains(arcCnsEntryContext.cnsEntryContextCid)
         },
+        limit,
       )
     } yield result map (_.contract)
   }
@@ -312,7 +315,8 @@ class InMemorySvSvcStore(
     } yield cws map (_ map (_.contract))
 
   override def listSvOnboardingRequestsBySvcMembers(
-      svcRules: Contract.Has[SvcRules.ContractId, SvcRules]
+      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[SvOnboardingRequest.ContractId, SvOnboardingRequest]]] = for {
@@ -322,10 +326,11 @@ class InMemorySvSvcStore(
         svcRules.payload.members.asScala
           .get(co.payload.candidateParty)
           .exists(_.name == co.payload.candidateName),
+      limit,
     )
   } yield svOnboardings map (_.contract)
 
-  override def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Long)(
+  override def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Limit)(
       implicit tc: TraceContext
   ): Future[Seq[Contract[MemberTraffic.ContractId, MemberTraffic]]] = for {
     memberTraffics <- multiDomainAcsStore.filterContractsOnDomain(
@@ -333,15 +338,15 @@ class InMemorySvSvcStore(
       domainId,
       (co: Contract[cc.globaldomain.MemberTraffic.ContractId, cc.globaldomain.MemberTraffic]) =>
         co.payload.memberId == memberId.toProtoPrimitive,
-      PageLimit(limit),
+      limit,
     )
   } yield memberTraffics
 
-  override def listMemberCoinPriceVotes()(implicit
+  override def listMemberCoinPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[CoinPriceVote.ContractId, CoinPriceVote]]] = for {
     svcRules <- getSvcRules()
-    votes <- listAllCoinPriceVotes()
+    votes <- listAllCoinPriceVotes(limit)
   } yield {
     // Only use votes cast by current members, and thereof pick only one
     val eligibleVotes = votes.iterator.collect {
@@ -385,13 +390,15 @@ class InMemorySvSvcStore(
   }
 
   override def listVotesByVoteRequests(
-      voteRequestCids: Seq[VoteRequest.ContractId]
+      voteRequestCids: Seq[VoteRequest.ContractId],
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[Contract[Vote.ContractId, Vote]]] = {
     val cidSet = voteRequestCids.toSet
     multiDomainAcsStore
       .filterContracts(
         cn.svcrules.Vote.COMPANION,
         { co: Contract[?, Vote] => cidSet.contains(co.payload.requestCid) },
+        limit,
       )
       .map(_ map (_.contract))
   }
@@ -422,11 +429,13 @@ class InMemorySvSvcStore(
     * - there must not be any votes cast by the same member
     */
   override def listEligibleVotes(
-      voteRequestId: VoteRequest.ContractId
+      voteRequestId: VoteRequest.ContractId,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[Contract[Vote.ContractId, Vote]]] = for {
     votes <- multiDomainAcsStore.filterContracts(
       cn.svcrules.Vote.COMPANION,
       (c: Contract[?, Vote]) => c.payload.requestCid == voteRequestId,
+      limit,
     )
   } yield votes.distinctBy(_.payload.voter).map(_.contract)
 
@@ -451,7 +460,7 @@ class InMemorySvSvcStore(
 
   override def listExpiredCnsSubscriptions(
       now: CantonTimestamp,
-      limit: Int,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[SvSvcStore.IdleCnsSubscription]] = for {
     dueSubscriptions <- multiDomainAcsStore.filterContracts(
       SubscriptionIdleState.COMPANION,
@@ -467,14 +476,16 @@ class InMemorySvSvcStore(
         )
       }
     // Only deliver the ones referencing an active cns entry context
-    result = subscriptionsWithContext
-      .sortBy(_._1.payload.nextPaymentDueAt)
-      .iterator
-      .collect { case (subscription, Some(context)) =>
-        SvSvcStore.IdleCnsSubscription(subscription.contract, context.contract)
-      }
-      .take(limit)
-      .toSeq
+    result = applyLimit(
+      limit,
+      subscriptionsWithContext
+        .sortBy(_._1.payload.nextPaymentDueAt)
+        .iterator
+        .collect { case (subscription, Some(context)) =>
+          SvSvcStore.IdleCnsSubscription(subscription.contract, context.contract)
+        }
+        .toSeq,
+    )
   } yield result
 
   override def lookupSvOnboardingConfirmedByParty(svParty: PartyId)(implicit
@@ -497,8 +508,11 @@ class InMemorySvSvcStore(
       }
       .map(_ map (_ map (_.contract)))
 
-  override def listElectionRequests(svcRules: AssignedContract[SvcRules.ContractId, SvcRules])(
-      implicit tc: TraceContext
+  override def listElectionRequests(
+      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
+      tc: TraceContext
   ): Future[Seq[Contract[ElectionRequest.ContractId, ElectionRequest]]] =
     multiDomainAcsStore
       .filterContractsOnDomain(
@@ -508,6 +522,7 @@ class InMemorySvSvcStore(
           svcRules.payload.members.keySet
             .contains(c.payload.requester) && c.payload.epoch == svcRules.payload.epoch
         },
+        limit,
       )
       .map(
         _.foldLeft(
@@ -533,7 +548,8 @@ class InMemorySvSvcStore(
   } yield req map (_ map (_.contract))
 
   override def listExpiredElectionRequests(
-      epoch: Long
+      epoch: Long,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[Contract[
     ElectionRequest.ContractId,
     ElectionRequest,
@@ -544,6 +560,7 @@ class InMemorySvSvcStore(
         { co: Contract[?, ElectionRequest] =>
           co.payload.epoch < epoch
         },
+        limit,
       )
     } yield contracts map (_.contract)
 

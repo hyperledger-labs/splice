@@ -24,7 +24,7 @@ import com.daml.network.http.v0.definitions.{
 import com.daml.network.util.JsonUtil
 import com.daml.network.http.v0.sv_admin.SvAdminResource
 import com.daml.network.http.v0.{definitions, sv_admin as v0}
-import com.daml.network.store.CNNodeAppStoreWithIngestion
+import com.daml.network.store.{CNNodeAppStoreWithIngestion, PageLimit}
 import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.store.SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord
@@ -301,7 +301,7 @@ class HttpSvAdminHandler(
           body.requester,
           body.effectiveFrom,
           body.effectiveTo,
-          body.limit.intValue,
+          PageLimit.tryCreate(body.limit.intValue),
         )
       } yield {
         definitions.ListSvcRulesVoteResultsResponse(

@@ -381,7 +381,7 @@ class FoundingNodeInitializer(
           for {
             existingCrates <- svcStore.multiDomainAcsStore.listAssignedContracts(
               cc.coinimport.ImportCrate.COMPANION,
-              PageLimit(10),
+              PageLimit.tryCreate(10),
             )
             _ = if (existingCrates.nonEmpty) {
               logger.error(

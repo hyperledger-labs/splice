@@ -1,19 +1,18 @@
 package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.{
-  TriggerContext,
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
   TaskSuccess,
+  TriggerContext,
 }
 import com.daml.network.codegen.java.cc.coin.UnclaimedReward
 import com.daml.network.codegen.java.cn.svcrules.SvcRules_MergeUnclaimedRewards
+import com.daml.network.store.PageLimit
 import com.daml.network.util.Contract
 import com.daml.network.util.PrettyInstances.*
-
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
-
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -36,7 +35,8 @@ class MergeUnclaimedRewardsTrigger(
     for {
       svcRules <- store.getSvcRules()
       threshold = svcRules.payload.config.numUnclaimedRewardsThreshold
-      unclaimedRewards <- store.listUnclaimedRewards(threshold * 2)
+      limit = PageLimit.tryCreate(threshold.toInt * 2)
+      unclaimedRewards <- store.listUnclaimedRewards(limit)
     } yield
       (
         if (unclaimedRewards.length > threshold) {

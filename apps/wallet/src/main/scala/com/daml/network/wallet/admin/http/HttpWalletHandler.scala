@@ -22,7 +22,7 @@ import com.daml.network.environment.{CommandPriority, RetryProvider}
 import com.daml.network.http.v0.wallet.WalletResource as r0
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.store.Limit
+import com.daml.network.store.{Limit, PageLimit}
 import com.daml.network.util.{CNNodeUtil, Codec, Contract, DisclosedContracts}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.store.UserWalletStore
@@ -123,7 +123,7 @@ class HttpWalletHandler(
     withSpan(s"$workflowId.listAppPaymentRequests") { _ => _ =>
       for {
         userStore <- getUserStore(user)
-        appPaymentRequests <- userStore.listAppPaymentRequests
+        appPaymentRequests <- userStore.listAppPaymentRequests()
       } yield d0.ListAppPaymentRequestsResponse(appPaymentRequests.map(_.toHttp).toVector)
     }
   }
@@ -202,7 +202,7 @@ class HttpWalletHandler(
         userStore <- getUserStore(user)
         validatorRewardCoupons <- walletManager.listValidatorRewardCouponsCollectableBy(
           userStore,
-          Limit.DefaultLimit.limit.toInt,
+          Limit.DefaultLimit,
           None,
         )
       } yield d0.ListValidatorRewardCouponsResponse(
@@ -221,7 +221,10 @@ class HttpWalletHandler(
       for {
         userStore <- getUserStore(user)
         beginAfterId = if (request.beginAfterId.exists(_.isEmpty)) None else request.beginAfterId
-        transactions <- userStore.listTransactions(beginAfterId, request.pageSize.toInt)
+        transactions <- userStore.listTransactions(
+          beginAfterId,
+          PageLimit.tryCreate(request.pageSize.toInt),
+        )
       } yield v0.WalletResource.ListTransactionsResponse.OK(
         d0.ListTransactionsResponse(
           items = transactions.map(_.toResponseItem).toVector

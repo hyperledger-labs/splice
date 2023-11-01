@@ -3,7 +3,12 @@ package com.daml.network.directory.store.memory
 import com.daml.network.codegen.java.cn.directory.{DirectoryEntry, DirectoryInstall}
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{InMemoryCNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.store.{
+  InMemoryCNNodeAppStoreWithoutHistory,
+  Limit,
+  LimitHelpers,
+  MultiDomainAcsStore,
+}
 import MultiDomainAcsStore.ContractState.Assigned
 import MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{Contract, ContractWithState}
@@ -24,7 +29,8 @@ class InMemoryDirectoryStore(
     override protected val retryProvider: RetryProvider,
 )(implicit override protected val ec: ExecutionContext)
     extends InMemoryCNNodeAppStoreWithoutHistory
-    with DirectoryStore {
+    with DirectoryStore
+    with LimitHelpers {
 
   override def lookupInstallByUserWithOffset(user: PartyId)(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[DirectoryInstall.ContractId, DirectoryInstall]]]
@@ -52,17 +58,21 @@ class InMemoryDirectoryStore(
     res = entryContracts.sortBy(_.payload.name).headOption
   } yield res map (_.contract)
 
-  override def listEntries(namePrefix: String, pageSize: Int)(implicit
+  override def listEntries(namePrefix: String, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[DirectoryEntry.ContractId, DirectoryEntry]]] = for {
     list <- multiDomainAcsStore.filterContracts(
       directoryCodegen.DirectoryEntry.COMPANION,
       (entry: Contract[?, directoryCodegen.DirectoryEntry]) =>
         entry.payload.name.startsWith(namePrefix),
+      limit,
     )
-  } yield list.take(pageSize).map(_.contract)
+  } yield applyLimit(limit, list).map(_.contract)
 
-  override def listExpiredDirectorySubscriptions(now: CantonTimestamp, limit: Int)(implicit
+  override def listExpiredDirectorySubscriptions(
+      now: CantonTimestamp,
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
       tc: TraceContext
   ): Future[Seq[DirectoryStore.IdleDirectorySubscription]] = for {
     dueSubscriptions <- multiDomainAcsStore.filterAssignedContracts(
@@ -70,6 +80,7 @@ class InMemoryDirectoryStore(
       filter = { e: Contract[?, subsCodegen.SubscriptionIdleState] =>
         now.toInstant.isAfter(e.payload.nextPaymentDueAt)
       },
+      limit,
     )
     // Join with the DirectoryEntryContexts
     subscriptionsWithContext <- dueSubscriptions.toList
@@ -83,9 +94,11 @@ class InMemoryDirectoryStore(
       }
     // Only deliver the ones referencing an active directory entry context
     // TODO(tech-debt): consider whether this kind of join might be leading to stale subscriptions not being expired.
-    result = subscriptionsWithContext
-      .sortBy(_.state.payload.nextPaymentDueAt)
-      .take(limit)
+    result = applyLimit(
+      limit,
+      subscriptionsWithContext
+        .sortBy(_.state.payload.nextPaymentDueAt),
+    )
   } yield result
 
   override def lookupDirectoryEntryContext(

@@ -6,7 +6,7 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.directory.{DirectoryEntry, DirectoryInstall}
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.MultiDomainAcsStore
+import com.daml.network.store.{Limit, LimitHelpers, MultiDomainAcsStore}
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import AcsQueries.{SelectFromAcsTableResult, SelectFromAcsTableWithStateResult}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
@@ -50,7 +50,8 @@ class DbDirectoryStore(
     with DirectoryStore
     with AcsTables
     with AcsQueries
-    with NamedLogging {
+    with NamedLogging
+    with LimitHelpers {
 
   import storage.DbStorageConverters.setParameterByteArray
   import multiDomainAcsStore.waitUntilAcsIngested
@@ -179,7 +180,7 @@ class DbDirectoryStore(
       } yield row.map(contractFromRow(directoryCodegen.DirectoryEntry.COMPANION)(_))
     }
 
-  override def listEntries(namePrefix: String, pageSize: Int)(implicit
+  override def listEntries(namePrefix: String, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[DirectoryEntry.ContractId, DirectoryEntry]]] = waitUntilAcsIngested {
     val limitedPrefix = lengthLimited(namePrefix)
@@ -194,14 +195,19 @@ class DbDirectoryStore(
               )}
                 and directory_entry_name ^@ $limitedPrefix
               order by directory_entry_name
-              limit $pageSize
+              limit ${sqlLimit(limit)}
           """).toActionBuilder.as[SelectFromAcsTableResult],
           "listEntries",
         )
-    } yield rows.map(contractFromRow(directoryCodegen.DirectoryEntry.COMPANION)(_))
+    } yield applyLimit(limit, rows).map(
+      contractFromRow(directoryCodegen.DirectoryEntry.COMPANION)(_)
+    )
   }
 
-  override def listExpiredDirectorySubscriptions(now: CantonTimestamp, limit: Int)(implicit
+  override def listExpiredDirectorySubscriptions(
+      now: CantonTimestamp,
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
       tc: TraceContext
   ): Future[Seq[DirectoryStore.IdleDirectorySubscription]] = waitUntilAcsIngested {
     for {
@@ -226,11 +232,11 @@ class DbDirectoryStore(
                 and      idle.subscription_next_payment_due_at < $now
                 and      idle.assigned_domain is not null
               order by idle.subscription_next_payment_due_at
-              limit    $limit
+              limit    ${sqlLimit(limit)}
           """.as[(SelectFromAcsTableWithStateResult, SelectFromAcsTableResult)],
           "listExpiredDirectorySubscriptions",
         )
-    } yield joinedRows.map { case (idleRow, ctxRow) =>
+    } yield applyLimit(limit, joinedRows).map { case (idleRow, ctxRow) =>
       val idleContract =
         assignedContractFromRow(subsCodegen.SubscriptionIdleState.COMPANION)(idleRow)
       val ctxContract = contractFromRow(directoryCodegen.DirectoryEntryContext.COMPANION)(ctxRow)

@@ -9,6 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cn.svcrules.SvcRules_MergeMemberTrafficContracts
+import com.daml.network.store.PageLimit
 import com.daml.network.util.{AssignedContract, Contract}
 import com.digitalasset.canton.topology.{DomainId, Member}
 import com.digitalasset.canton.tracing.TraceContext
@@ -40,7 +41,11 @@ class MergeMemberTrafficContractsTrigger(
       threshold = svcRules.payload.config.numMemberTrafficContractsThreshold
       memberId = Member.tryFromProtoPrimitive(memberTraffic.payload.memberId)
       domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
-      memberTraffics <- store.listMemberTrafficContracts(memberId, domainId, 2 * threshold)
+      memberTraffics <- store.listMemberTrafficContracts(
+        memberId,
+        domainId,
+        PageLimit.tryCreate(2 * threshold.toInt),
+      )
       outcome <-
         if (memberTraffics.length > threshold)
           mergeMemberTrafficContracts(memberId, memberTraffics)

@@ -5,7 +5,7 @@ import com.daml.ledger.javaapi.data.{ContractMetadata, DamlRecord}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.AppTransferContext
 import com.daml.network.codegen.java.cc.round.types.Round
-import com.daml.network.codegen.java.cc.coin.{CoinRules_MiningRound_Archive}
+import com.daml.network.codegen.java.cc.coin.CoinRules_MiningRound_Archive
 import com.daml.network.codegen.java.cc.coinimport.importpayload.{IP_Coin, IP_ValidatorLicense}
 import com.daml.network.codegen.java.cc.coinimport.{ImportCrate, ImportPayload}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
@@ -28,9 +28,7 @@ import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiring
   CNSRARC_CollectInitialEntryPayment,
   CNSRARC_RejectEntryInitialPayment,
 }
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.{
-  CRARC_MiningRound_Archive
-}
+import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.codegen.java.cn.svcrules.electionrequestreason.ERR_OtherReason
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
   SRARC_AddMember,
@@ -49,7 +47,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.store.{Limit, StoreTest, TxLogStore}
+import com.daml.network.store.{Limit, PageLimit, StoreTest, TxLogStore}
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.history.SvcRulesExecuteDefiniteVote
 import com.daml.network.sv.store.SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry
@@ -253,7 +251,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listExpiredCoins(CantonTimestamp.now(), 100)(traceContext)
+          result <- store.listExpiredCoins(CantonTimestamp.now(), PageLimit.tryCreate(100))(
+            traceContext
+          )
         } yield {
           val contracts = result.map(_.contract)
           contracts should contain theSameElementsAs Seq(expiresAtRound2, expiresAtRound3)
@@ -269,7 +269,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           _ <- createMiningRoundsTriple(store, startRound = 3L) // oldest is round 3, newest is 5
           _ <- dummy2Domain.create(expiresAtRound2)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(expiresAtRound3)(store.multiDomainAcsStore)
-          result <- store.listExpiredCoins(CantonTimestamp.now(), 100)(traceContext)
+          result <- store.listExpiredCoins(CantonTimestamp.now(), PageLimit.tryCreate(100))(
+            traceContext
+          )
         } yield {
           val contracts = result.map(_.contract)
           contracts should contain theSameElementsAs Seq(expiresAtRound3)
@@ -294,7 +296,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listLockedExpiredCoins(CantonTimestamp.now(), 100)(traceContext)
+          result <- store.listLockedExpiredCoins(CantonTimestamp.now(), PageLimit.tryCreate(100))(
+            traceContext
+          )
         } yield {
           val contracts = result.map(_.contract)
           contracts should contain theSameElementsAs Seq(expiresAtRound2, expiresAtRound3)
@@ -310,7 +314,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           _ <- createMiningRoundsTriple(store, startRound = 3L) // oldest is round 3, newest is 5
           _ <- dummy2Domain.create(expiresAtRound2)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(expiresAtRound3)(store.multiDomainAcsStore)
-          result <- store.listLockedExpiredCoins(CantonTimestamp.now(), 100)(traceContext)
+          result <- store.listLockedExpiredCoins(CantonTimestamp.now(), PageLimit.tryCreate(100))(
+            traceContext
+          )
         } yield {
           val contracts = result.map(_.contract)
           contracts should contain theSameElementsAs Seq(expiresAtRound3)
@@ -331,7 +337,10 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           _ <- Future.traverse(expired ++ notExpired)(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listExpiredVoteRequests()(CantonTimestamp.now(), 100)(traceContext)
+          result <- store.listExpiredVoteRequests()(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(traceContext)
         } yield {
           val contracts = result.map(_.contract)
           contracts should contain theSameElementsAs expired
@@ -434,7 +443,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           result <- store.listAppRewardCouponsGroupedByCounterparty(
             roundNumber = 3,
             roundDomain = dummyDomain,
-            totalCouponsLimit = 1000,
+            totalCouponsLimit = PageLimit.tryCreate(1000),
           )
         } yield {
           result.map(_.toSet).toSet should be(
@@ -472,7 +481,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           result <- store.listValidatorRewardCouponsGroupedByCounterparty(
             roundNumber = 3,
             roundDomain = dummyDomain,
-            totalCouponsLimit = 1000,
+            totalCouponsLimit = PageLimit.tryCreate(1000),
           )
         } yield {
           result.map(_.toSet).toSet should be(
@@ -609,7 +618,10 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           _ <- Future.traverse(expired ++ notExpired)(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listExpiredSvOnboardingRequests(CantonTimestamp.now(), 100)(
+          result <- store.listExpiredSvOnboardingRequests(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
             traceContext
           )
         } yield {
@@ -636,7 +648,10 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           _ <- Future.traverse(expired ++ notExpired)(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listExpiredSvOnboardingConfirmed(CantonTimestamp.now(), 100)(
+          result <- store.listExpiredSvOnboardingConfirmed(
+            CantonTimestamp.now(),
+            PageLimit.tryCreate(100),
+          )(
             traceContext
           )
         } yield {
@@ -798,7 +813,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             .reverse
           eventually() {
             store
-              .listExpiredCnsSubscriptions(CantonTimestamp.now(), limit = 3)
+              .listExpiredCnsSubscriptions(CantonTimestamp.now(), limit = PageLimit.tryCreate(3))
               .futureValue should be(expected)
           }
         }
@@ -899,7 +914,11 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listMemberTrafficContracts(goodMember, dummyDomain, 100)
+          result <- store.listMemberTrafficContracts(
+            goodMember,
+            dummyDomain,
+            PageLimit.tryCreate(100),
+          )
         } yield result should contain theSameElementsAs goodContracts
       }
 
@@ -936,7 +955,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
               None,
               None,
               None,
-              1,
+              PageLimit.tryCreate(1),
             )
             .futureValue
             .toList
@@ -962,7 +981,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
               None,
               None,
               None,
-              1,
+              PageLimit.tryCreate(1),
             )
             .futureValue
             .toList
@@ -974,7 +993,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
               None,
               None,
               None,
-              1,
+              PageLimit.tryCreate(1),
             )
             .futureValue
             .toList
@@ -986,7 +1005,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
               None,
               Some(Instant.now().plusSeconds(3600).toString),
               None,
-              1,
+              PageLimit.tryCreate(1),
             )
             .futureValue
             .toList
@@ -998,7 +1017,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
               None,
               Some(Instant.now().minusSeconds(3600).toString),
               None,
-              1,
+              PageLimit.tryCreate(1),
             )
             .futureValue
             .toList

@@ -383,11 +383,16 @@ class DirectoryIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
           directoryBackend.listEntries("b", 25) should have length 4
           directoryBackend.listEntries("bob-is", 25) should have length 2
           directoryBackend.listEntries("c", 25) should have length 0
-          directoryBackend.listEntries("a", 0) should have length 0
+          loggerFactory.assertLogs(
+            Try(directoryBackend.listEntries("a", 0)).isFailure should be(true),
+            _.errorMessage should include(
+              "Limit must be at least 1."
+            ),
+          )
           loggerFactory.assertLogs(
             Try(directoryBackend.listEntries("a", -1)).isFailure should be(true),
             _.errorMessage should include(
-              "pageSize cannot be negative"
+              "Limit must be at least 1."
             ),
           )
         },

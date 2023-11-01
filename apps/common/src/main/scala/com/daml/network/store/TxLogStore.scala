@@ -36,25 +36,25 @@ trait TxLogStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]] {
 }
 
 object TxLogStore {
-  def firstPage[TXI <: TxLogStore.IndexRecord](log: SeqView[TXI], pageSize: Int)(
+  def firstPage[TXI <: TxLogStore.IndexRecord](log: SeqView[TXI], limit: PageLimit)(
       filter: TXI => Boolean
   ) =
     log
       .filter(filter)
-      .take(pageSize)
+      .take(limit.limit)
       .toSeq
 
   def nextPage[TXI <: TxLogStore.IndexRecord](
       log: SeqView[TXI],
       pageEndEventId: String,
-      pageSize: Int,
+      limit: PageLimit,
   )(
       filter: TXI => Boolean
   ) =
     log
       .filter(txi => filter(txi))
       .dropWhile(_.eventId != pageEndEventId)
-      .slice(1, 1 + pageSize)
+      .slice(1, 1 + limit.limit)
       .toSeq
 
   /** Stores all information about a historical event that is needed to display the event in a frontend.

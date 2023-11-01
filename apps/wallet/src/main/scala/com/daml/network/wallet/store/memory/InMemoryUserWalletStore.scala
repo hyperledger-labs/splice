@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.InMemoryCNNodeAppStore
+import com.daml.network.store.{InMemoryCNNodeAppStore, Limit, LimitHelpers, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.Contract
@@ -27,7 +27,8 @@ class InMemoryUserWalletStore(
       UserWalletStore.TxLogIndexRecord,
       UserWalletStore.TxLogEntry,
     ]
-    with UserWalletStore {
+    with UserWalletStore
+    with LimitHelpers {
 
   override def toString: String = show"InMemoryUserWalletStore(endUserParty=${key.endUserParty})"
 
@@ -37,8 +38,8 @@ class InMemoryUserWalletStore(
     * and optionally filtered by a set of issuing rounds.
     */
   override def listSortedValidatorRewards(
-      limit: Int,
       activeIssuingRoundsO: Option[Set[Long]],
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
   ]] = {
@@ -50,53 +51,57 @@ class InMemoryUserWalletStore(
       rewards <- multiDomainAcsStore.listContracts(
         coinCodegen.ValidatorRewardCoupon.COMPANION
       )
-    } yield rewards.view
-      .filter(rw => filterActiveRounds(rw.payload.round.number))
-      .map(_.contract)
-      .toSeq
-      .sortBy(_.payload.round.number)
-      .take(limit)
+    } yield applyLimit(
+      limit,
+      rewards.view
+        .filter(rw => filterActiveRounds(rw.payload.round.number))
+        .map(_.contract)
+        .toSeq
+        .sortBy(_.payload.round.number),
+    )
   }
 
   /** Returns the validator reward coupon sorted by their round in ascending order and their value in descending order.
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
     */
   override def listSortedAppRewards(
-      limit: Int,
       issuingRoundsMap: Map[Round, IssuingMiningRound],
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
   ]] = for {
     rewards <- multiDomainAcsStore.listContracts(
       coinCodegen.AppRewardCoupon.COMPANION
     )
-  } yield rewards
-    .flatMap { rw =>
-      val issuingO = issuingRoundsMap.get(rw.payload.round)
-      issuingO
-        .map { i =>
-          val quantity = rw.payload.amount.multiply(
-            if (rw.payload.featured)
-              i.issuancePerFeaturedAppRewardCoupon
-            else
-              i.issuancePerUnfeaturedAppRewardCoupon
-          )
-          (rw.contract, BigDecimal(quantity))
-        }
-    }
-    .sorted(
-      Ordering[(Long, BigDecimal)].on(
-        (x: (
-            Contract.Has[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
-            BigDecimal,
-        )) => (x._1.payload.round.number, -x._2)
-      )
-    )
-    .take(limit)
+  } yield applyLimit(
+    limit,
+    rewards
+      .flatMap { rw =>
+        val issuingO = issuingRoundsMap.get(rw.payload.round)
+        issuingO
+          .map { i =>
+            val quantity = rw.payload.amount.multiply(
+              if (rw.payload.featured)
+                i.issuancePerFeaturedAppRewardCoupon
+              else
+                i.issuancePerUnfeaturedAppRewardCoupon
+            )
+            (rw.contract, BigDecimal(quantity))
+          }
+      }
+      .sorted(
+        Ordering[(Long, BigDecimal)].on(
+          (x: (
+              Contract.Has[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
+              BigDecimal,
+          )) => (x._1.payload.round.number, -x._2)
+        )
+      ),
+  )
 
   override def listTransactions(
       beginAfterEventId: Option[String],
-      limit: Int,
+      limit: PageLimit,
   )(implicit
       lc: TraceContext
   ): Future[Seq[UserWalletTxLogParser.TransactionHistoryTxLogEntry]] = {

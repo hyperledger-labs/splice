@@ -6,6 +6,7 @@ import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.store.Limit
 import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
@@ -153,7 +154,7 @@ class UserWalletManager(
   /** Lists the validator reward coupons collectable by the current user (i.e. where they are the validator). */
   def listValidatorRewardCouponsCollectableBy(
       validatorUserStore: UserWalletStore,
-      limit: Int,
+      limit: Limit,
       activeIssuingRounds: Option[Set[Long]],
   )(implicit
       tc: TraceContext
@@ -193,12 +194,12 @@ class UserWalletManager(
                   Future.successful(Seq.empty)
                 case Some(walletOfHostedUser) =>
                   walletOfHostedUser.store
-                    .listSortedValidatorRewards(limit, activeIssuingRounds)
+                    .listSortedValidatorRewards(activeIssuingRounds, limit)
               }
           }
         )
       validatorRewardCoupons <- Future.sequence(validatorRewardCouponsFs)
-    } yield validatorRewardCoupons.flatten.take(limit)
+    } yield validatorRewardCoupons.flatten.take(limit.limit)
 
   override def isHealthy: Boolean = endUserWalletsMap.values.forall(_._2.isHealthy)
 

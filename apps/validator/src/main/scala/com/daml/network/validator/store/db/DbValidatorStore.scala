@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.cn.appmanager.store.AppConfiguration
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topupCodegen
 import com.daml.network.environment.RetryProvider
+import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.AcsTables.ContractStateRowData
@@ -54,7 +55,8 @@ class DbValidatorStore(
     )
     with ValidatorStore
     with AcsTables
-    with AcsQueries {
+    with AcsQueries
+    with LimitHelpers {
 
   override val walletKey = WalletStore.Key(
     key.validatorParty,
@@ -466,7 +468,8 @@ class DbValidatorStore(
   }
 
   override protected def listApprovedReleaseConfigurations(
-      provider: PartyId
+      provider: PartyId,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit traceContext: TraceContext): Future[
     Seq[ContractWithState[
       appManagerCodegen.ApprovedReleaseConfiguration.ContractId,
@@ -484,10 +487,11 @@ class DbValidatorStore(
                 appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID
               )}
               and provider_party = $provider""",
+            orderLimit = sql"limit ${sqlLimit(limit)}",
           ),
           "listApprovedReleaseConfigurations",
         )
-      result = rows.map(
+      result = applyLimit(limit, rows).map(
         contractWithStateFromRow(
           appManagerCodegen.ApprovedReleaseConfiguration.COMPANION
         )(_)

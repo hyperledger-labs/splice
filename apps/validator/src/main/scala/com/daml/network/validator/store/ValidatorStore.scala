@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore}
 import MultiDomainAcsStore.{ConstrainedTemplate, QueryResult}
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
 import com.daml.network.validator.store.db.DbValidatorStore
@@ -64,10 +64,13 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
     ]
   ]
 
-  def listUsers()(implicit tc: TraceContext): Future[Seq[String]] = {
+  def listUsers(
+      limit: Limit = Limit.DefaultLimit
+  )(implicit tc: TraceContext): Future[Seq[String]] = {
     for {
       installs <- multiDomainAcsStore.listContracts(
-        walletCodegen.WalletAppInstall.COMPANION
+        walletCodegen.WalletAppInstall.COMPANION,
+        limit,
       )
     } yield installs.map(i => i.payload.endUserName)
   }
@@ -117,35 +120,36 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
     ]
   ]]
 
-  def listRegisteredApps()(implicit
+  def listRegisteredApps(limit: Limit = Limit.DefaultLimit)(implicit
       traceContext: TraceContext
   ): Future[Seq[ValidatorStore.RegisteredApp]] =
-    multiDomainAcsStore.listContracts(appManagerCodegen.RegisteredApp.COMPANION).flatMap { apps =>
-      apps.toList.traverseFilter { app =>
-        lookupLatestAppConfiguration(
-          PartyId.tryFromProtoPrimitive(app.contract.payload.provider)
-        ).map(config =>
-          config.map(
-            ValidatorStore.RegisteredApp(
-              app,
-              _,
+    multiDomainAcsStore.listContracts(appManagerCodegen.RegisteredApp.COMPANION, limit).flatMap {
+      apps =>
+        apps.toList.traverseFilter { app =>
+          lookupLatestAppConfiguration(
+            PartyId.tryFromProtoPrimitive(app.contract.payload.provider)
+          ).map(config =>
+            config.map(
+              ValidatorStore.RegisteredApp(
+                app,
+                _,
+              )
             )
           )
-        )
-      }
+        }
     }
 
-  def listInstalledApps()(implicit
+  def listInstalledApps(limit: Limit = Limit.DefaultLimit)(implicit
       traceContext: TraceContext
   ): Future[Seq[
     ValidatorStore.InstalledApp
   ]] =
     multiDomainAcsStore
-      .listContracts(appManagerCodegen.InstalledApp.COMPANION)
+      .listContracts(appManagerCodegen.InstalledApp.COMPANION, limit)
       .flatMap(_.toList.traverseFilter { app =>
         val provider = PartyId.tryFromProtoPrimitive(app.contract.payload.provider)
         for {
-          approvedReleaseConfigs <- listApprovedReleaseConfigurations(provider)
+          approvedReleaseConfigs <- listApprovedReleaseConfigurations(provider, limit)
           latestConfigO <- lookupLatestAppConfiguration(provider)
         } yield latestConfigO.map(
           ValidatorStore.InstalledApp(
@@ -156,7 +160,10 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
         )
       })
 
-  protected def listApprovedReleaseConfigurations(provider: PartyId)(implicit
+  protected def listApprovedReleaseConfigurations(
+      provider: PartyId,
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
       traceContext: TraceContext
   ): Future[Seq[
     ContractWithState[

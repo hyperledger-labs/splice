@@ -119,7 +119,7 @@ class ScanApp(
         RetryFor.WaitingOnInitDependency,
         "there is an OpenMiningRound contract",
         store.multiDomainAcsStore
-          .listContracts(roundCodegen.OpenMiningRound.COMPANION, limit = PageLimit(1))
+          .listContracts(roundCodegen.OpenMiningRound.COMPANION, limit = PageLimit.tryCreate(1))
           .map { cs =>
             if (cs.isEmpty) {
               throw Status.NOT_FOUND

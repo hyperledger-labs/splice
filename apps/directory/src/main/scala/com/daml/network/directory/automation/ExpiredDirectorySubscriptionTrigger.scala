@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.store.PageLimit
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -25,7 +26,7 @@ class ExpiredDirectorySubscriptionTrigger(
   override protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[DirectoryStore.IdleDirectorySubscription]] =
-    store.listExpiredDirectorySubscriptions(now, limit)
+    store.listExpiredDirectorySubscriptions(now, PageLimit.tryCreate(limit))
 
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[DirectoryStore.IdleDirectorySubscription]

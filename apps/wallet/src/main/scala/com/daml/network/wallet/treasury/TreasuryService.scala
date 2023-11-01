@@ -34,6 +34,7 @@ import com.daml.network.codegen.java.cn.wallet.install.{
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
 import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.store.PageLimit
 import com.daml.network.util.{AssignedContract, CNNodeUtil, DisclosedContracts, HasHealth}
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.wallet.UserWalletManager
@@ -473,8 +474,8 @@ class TreasuryService(
       validatorRights <- walletManager.store.multiDomainAcsStore
         .listContracts(coinCodegen.ValidatorRight.COMPANION)
       coinInputsAndQuantity <- userStore.listSortedCoinsAndQuantity(
-        maxNumInputs,
         openRound.payload.round.number,
+        PageLimit.tryCreate(maxNumInputs),
       )
       (validatorRewardsCoinQuantity, validatorRewardCouponUsers, validatorRewardInputs) <-
         getValidatorRewardsAndQuantity(
@@ -605,7 +606,7 @@ class TreasuryService(
       validatorRewardCouponsRaw <- walletManager
         .listValidatorRewardCouponsCollectableBy(
           userStore,
-          limit = validatorRewardCouponsLimit,
+          limit = PageLimit.tryCreate(validatorRewardCouponsLimit),
           Some(issuingRoundsMap.keySet.map(_.number)),
         )
       validatorRewardCouponUsers = validatorRewardCouponsRaw
@@ -640,8 +641,8 @@ class TreasuryService(
   ): Future[(BigDecimal, Seq[(Round, BigDecimal, InputAppRewardCoupon)])] =
     for {
       appRewardCouponInputs <- userStore.listSortedAppRewards(
-        maxNumInputs,
         issuingRoundsMap,
+        PageLimit.tryCreate(maxNumInputs),
       )
       appRewardsCoinQuantity = appRewardCouponInputs.map(_._2).sum
       appRewardInputs = appRewardCouponInputs.map(rw =>

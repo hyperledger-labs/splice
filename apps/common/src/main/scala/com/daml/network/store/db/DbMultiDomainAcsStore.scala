@@ -219,8 +219,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     T
   ], T <: Template](companion: C)(expiresAt: T => Instant)(implicit
       companionClass: ContractCompanion[C, TCid, T]
-  ): ListExpiredContracts[TCid, T] = { (now, rawLimit) => implicit traceContext =>
-    val limit = PageLimit(rawLimit.toLong)
+  ): ListExpiredContracts[TCid, T] = { (now, limit) => implicit traceContext =>
     val templateId = companionClass.typeId(companion)
     for {
       _ <- waitUntilAcsIngested()
@@ -307,7 +306,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       .map(assignedContractFromRow(companion)(_))
   }
 
-  private val defaultPageSizeForContractStream = PageLimit(100L)
+  private val defaultPageSizeForContractStream = PageLimit.tryCreate(100)
 
   /** Returns a stream of contracts with their current state.
     * The same contract may appear multiple times in the stream if the contract state changes.

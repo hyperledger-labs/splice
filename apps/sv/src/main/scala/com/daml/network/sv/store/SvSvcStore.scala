@@ -97,7 +97,7 @@ trait SvSvcStore
       requester: Option[String],
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
-      limit: Int,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]]
@@ -292,7 +292,7 @@ trait SvSvcStore
   def listAppRewardCouponsGroupedByCounterparty(
       roundNumber: Long,
       roundDomain: DomainId,
-      totalCouponsLimit: Long,
+      totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[Seq[cc.coin.AppRewardCoupon.ContractId]]]
@@ -308,7 +308,7 @@ trait SvSvcStore
   def listValidatorRewardCouponsGroupedByCounterparty(
       roundNumber: Long,
       roundDomain: DomainId,
-      totalCouponsLimit: Long,
+      totalCouponsLimit: Limit,
   )(implicit tc: TraceContext): Future[Seq[Seq[cc.coin.ValidatorRewardCoupon.ContractId]]]
 
   protected[this] def lookupOldestClosedMiningRound()(implicit
@@ -320,7 +320,9 @@ trait SvSvcStore
     ]]
   ]
 
-  final def getExpiredRewardsForOldestClosedMiningRound(totalCouponsLimit: Long = 100L)(implicit
+  final def getExpiredRewardsForOldestClosedMiningRound(
+      totalCouponsLimit: Limit = PageLimit.tryCreate(100)
+  )(implicit
       tc: TraceContext
   ): Future[Seq[ExpiredRewardCouponsBatch]] = {
     lookupOldestClosedMiningRound()
@@ -356,7 +358,9 @@ trait SvSvcStore
     * Note: The QueryResult in the return value is composed of the closed mining round contract
     * and the offset from the query for the confirmation contract.
     */
-  def listArchivableClosedMiningRounds()(implicit tc: TraceContext): Future[
+  def listArchivableClosedMiningRounds(
+      limit: Limit = Limit.DefaultLimit
+  )(implicit tc: TraceContext): Future[
     Seq[QueryResult[
       AssignedContract[
         cc.round.ClosedMiningRound.ContractId,
@@ -369,18 +373,19 @@ trait SvSvcStore
       closedRounds <- multiDomainAcsStore.listContractsOnDomain(
         cc.round.ClosedMiningRound.COMPANION,
         domain,
+        limit,
       )
       archivableClosedRounds <- closedRounds.traverse(round => {
         for {
           appRewardCoupons <- listAppRewardCouponsOnDomain(
             round.payload.round.number,
             domain,
-            PageLimit(1L),
+            PageLimit.tryCreate(1),
           )
           validatorRewardCoupons <- listValidatorRewardCouponsOnDomain(
             round.payload.round.number,
             domain,
-            PageLimit(1L),
+            PageLimit.tryCreate(1),
           )
           action = new ARC_CoinRules(
             new CRARC_MiningRound_Archive(
@@ -482,7 +487,7 @@ trait SvSvcStore
 
   def listExpiredCnsSubscriptions(
       now: CantonTimestamp,
-      limit: Int,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[SvSvcStore.IdleCnsSubscription]]
 
   def lookupSvOnboardingConfirmedByParty(
@@ -499,7 +504,8 @@ trait SvSvcStore
     lookupSvOnboardingConfirmedByNameWithOffset(svName).map(_.value)
 
   def listSvOnboardingConfirmations(
-      svOnboarding: Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]
+      svOnboarding: Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest],
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]] = {
@@ -512,11 +518,12 @@ trait SvSvcStore
         )
       )
     )
-    listConfirmations(expectedAction)
+    listConfirmations(expectedAction, limit)
   }
 
   def listSvOnboardingRequestsBySvcMembers(
-      svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
+      svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest]]]
@@ -526,18 +533,18 @@ trait SvSvcStore
   )(coin: T => cc.coin.Coin): ListExpiredContracts[Id, T]
 
   final def listUnclaimedRewards(
-      limit: Long
+      limit: Limit
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[UnclaimedReward.ContractId, cc.coin.UnclaimedReward]]] =
     for {
       unclaimedRewards <- multiDomainAcsStore.listContracts(
         cc.coin.UnclaimedReward.COMPANION,
-        limit = PageLimit(limit),
+        limit = limit,
       )
     } yield unclaimedRewards map (_.contract)
 
-  def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Long)(implicit
+  def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Limit)(implicit
       tc: TraceContext
   ): Future[
     Seq[Contract[cc.globaldomain.MemberTraffic.ContractId, cc.globaldomain.MemberTraffic]]
@@ -560,17 +567,20 @@ trait SvSvcStore
     )
 
   /** List all the current coin price votes. */
-  final def listAllCoinPriceVotes()(implicit tc: TraceContext): Future[
+  final def listAllCoinPriceVotes(
+      limit: Limit = Limit.DefaultLimit
+  )(implicit tc: TraceContext): Future[
     Seq[Contract[cn.svc.coinprice.CoinPriceVote.ContractId, cn.svc.coinprice.CoinPriceVote]]
   ] =
     for {
       votes <- multiDomainAcsStore.listContracts(
-        cn.svc.coinprice.CoinPriceVote.COMPANION
+        cn.svc.coinprice.CoinPriceVote.COMPANION,
+        limit,
       )
     } yield votes map (_.contract)
 
   /** List the current coin price votes by the SVC members. */
-  def listMemberCoinPriceVotes()(implicit
+  def listMemberCoinPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
     Seq[Contract[cn.svc.coinprice.CoinPriceVote.ContractId, cn.svc.coinprice.CoinPriceVote]]
@@ -587,31 +597,31 @@ trait SvSvcStore
   ): Future[QueryResult[Option[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]]]]
 
   /** List all ValidatorLicenses */
-  def listValidatorLicenses()(implicit
+  def listValidatorLicenses(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[vl.ValidatorLicense.ContractId, vl.ValidatorLicense]]] =
     multiDomainAcsStore
-      .listContracts(vl.ValidatorLicense.COMPANION)
+      .listContracts(vl.ValidatorLicense.COMPANION, limit)
       .map(_ map (_.contract))
 
   def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
       tc: TraceContext
   ): Future[Long]
 
-  def listCoinPriceVotes()(implicit
+  def listCoinPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
     Seq[Contract[cn.svc.coinprice.CoinPriceVote.ContractId, cn.svc.coinprice.CoinPriceVote]]
   ] =
     multiDomainAcsStore
-      .listContracts(cn.svc.coinprice.CoinPriceVote.COMPANION)
+      .listContracts(cn.svc.coinprice.CoinPriceVote.COMPANION, limit)
       .map(_ map (_.contract))
 
-  def listVoteRequests()(implicit tc: TraceContext): Future[
+  def listVoteRequests(limit: Limit = Limit.DefaultLimit)(implicit tc: TraceContext): Future[
     Seq[Contract[cn.svcrules.VoteRequest.ContractId, cn.svcrules.VoteRequest]]
   ] =
     multiDomainAcsStore
-      .listContracts(cn.svcrules.VoteRequest.COMPANION)
+      .listContracts(cn.svcrules.VoteRequest.COMPANION, limit)
       .map(_ map (_.contract))
 
   def lookupVoteRequest(contractId: cn.svcrules.VoteRequest.ContractId)(implicit
@@ -621,7 +631,10 @@ trait SvSvcStore
       .lookupContractById(cn.svcrules.VoteRequest.COMPANION)(contractId)
       .map(_ map (_.contract))
 
-  def listVotesByVoteRequests(voteRequestCids: Seq[cn.svcrules.VoteRequest.ContractId])(implicit
+  def listVotesByVoteRequests(
+      voteRequestCids: Seq[cn.svcrules.VoteRequest.ContractId],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
       tc: TraceContext
   ): Future[
     Seq[Contract[cn.svcrules.Vote.ContractId, cn.svcrules.Vote]]
@@ -651,8 +664,8 @@ trait SvSvcStore
     * - the vote must be cast by one of the given members
     * - there must not be any votes cast by the same member
     */
-  def listEligibleVotes(voteRequestId: VoteRequest.ContractId)(implicit
-      tc: TraceContext
+  def listEligibleVotes(voteRequestId: VoteRequest.ContractId, limit: Limit = Limit.DefaultLimit)(
+      implicit tc: TraceContext
   ): Future[Seq[Contract[cn.svcrules.Vote.ContractId, cn.svcrules.Vote]]]
 
   def lookupCoinPriceVoteByThisSv()(implicit
@@ -672,7 +685,8 @@ trait SvSvcStore
   ]
 
   def listElectionRequests(
-      svcRules: AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
+      svcRules: AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[
     Seq[Contract[cn.svcrules.ElectionRequest.ContractId, cn.svcrules.ElectionRequest]]
   ]
@@ -687,7 +701,8 @@ trait SvSvcStore
   ]
 
   def listExpiredElectionRequests(
-      epoch: Long
+      epoch: Long,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[Contract[
     cn.svcrules.ElectionRequest.ContractId,
     cn.svcrules.ElectionRequest,
@@ -769,6 +784,7 @@ trait SvSvcStore
   def listInitialPaymentConfirmationByCnsName(
       confirmer: PartyId,
       name: String,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[
     Seq[Contract[cn.svcrules.Confirmation.ContractId, cn.svcrules.Confirmation]]
   ]

@@ -251,9 +251,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
         filterAssignedContracts(
           companion = companion,
           filter = co => now.toInstant isAfter expiresAt(co.payload),
-          limit = PageLimit( // this is called until the result size is 0, effectively paginating
-            limit.toLong
-          ),
+          limit = limit,
         )
 
   private def lookupContractById[T](
@@ -473,10 +471,10 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
   def getQueue: Queue[TXI] = stateVar.txLog
 
-  def filterTxLogIndicesByOffset(limit: Int)(filter: TXI => Boolean): Seq[TXI] =
+  def filterTxLogIndicesByOffset(limit: PageLimit)(filter: TXI => Boolean): Seq[TXI] =
     TxLogStore.firstPage(stateVar.txLog.view, limit)(filter)
 
-  def filterTxLogIndicesAfterEventId(pageEndEventId: String, limit: Int)(
+  def filterTxLogIndicesAfterEventId(pageEndEventId: String, limit: PageLimit)(
       filter: TXI => Boolean
   ): Seq[TXI] =
     TxLogStore.nextPage(stateVar.txLog.view, pageEndEventId, limit)(filter)

@@ -18,6 +18,8 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
 import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem
 import com.daml.network.integration.plugins.UseInMemoryStores
+import com.daml.network.store.Limit
+
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 
 class InMemoryScanIntegrationTest extends ScanIntegrationTest {
@@ -29,7 +31,7 @@ class ScanIntegrationTest
     with ConfigScheduleUtil
     with WalletTestUtil
     with TimeTestUtil {
-  val defaultPageSize = 10000
+  private val defaultPageSize = Limit.MaxPageSize
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition

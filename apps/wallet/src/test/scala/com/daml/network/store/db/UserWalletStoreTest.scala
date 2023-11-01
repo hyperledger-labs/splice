@@ -15,7 +15,7 @@ import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.daml.network.wallet.store.db.DbUserWalletStore
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.daml.network.environment.{DarResources, RetryProvider}
-import com.daml.network.store.StoreTest
+import com.daml.network.store.{Limit, PageLimit, StoreTest}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.TransferOfferStatus
@@ -97,7 +97,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
         } yield {
           def cidsAt(t: CantonTimestamp) = store
-            .listExpiredTransferOffers(t, 10)(TraceContext.empty)
+            .listExpiredTransferOffers(t, PageLimit.tryCreate(10))(TraceContext.empty)
             .futureValue
             .map(_.contract.contractId)
 
@@ -131,7 +131,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
         } yield {
           def cidsAt(t: CantonTimestamp) = store
-            .listExpiredAcceptedTransferOffers(t, 10)(TraceContext.empty)
+            .listExpiredAcceptedTransferOffers(t, PageLimit.tryCreate(10))(TraceContext.empty)
             .futureValue
             .map(_.contract.contractId)
 
@@ -274,7 +274,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
         } yield {
           def cidsAt(t: CantonTimestamp) = store
-            .listExpiredAppPaymentRequests(t, 10)(TraceContext.empty)
+            .listExpiredAppPaymentRequests(t, PageLimit.tryCreate(10))(TraceContext.empty)
             .futureValue
             .map(_.contract.contractId)
 
@@ -340,21 +340,21 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
           eventually() {
             // Listing - user only sees their own request
-            val actual1 = store1.listAppPaymentRequests.futureValue.map(resultCids)
+            val actual1 = store1.listAppPaymentRequests().futureValue.map(resultCids)
             val expected1 = Seq(
               request1.contractId.contractId
             )
             actual1 should contain theSameElementsInOrderAs expected1
 
             // Listing - user only sees their own request
-            val actual2 = store2.listAppPaymentRequests.futureValue.map(resultCids)
+            val actual2 = store2.listAppPaymentRequests().futureValue.map(resultCids)
             val expected2 = Seq(
               request2.contractId.contractId
             )
             actual2 should contain theSameElementsInOrderAs expected2
 
             // Listing - provider doesn't see any request
-            val actualP = storeP.listAppPaymentRequests.futureValue.map(resultCids)
+            val actualP = storeP.listAppPaymentRequests().futureValue.map(resultCids)
             actualP should be(empty)
 
             // Pointwise lookup - only user1 store should see request1
@@ -420,7 +420,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
           eventually() {
             // Listing - only request1 should be visible
-            val actual = store1.listAppPaymentRequests.futureValue.map(resultCids)
+            val actual = store1.listAppPaymentRequests().futureValue.map(resultCids)
             val expected = Seq(
               request1.contractId.contractId
             )
@@ -465,7 +465,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
         } yield {
           def cidsAt(t: CantonTimestamp) = store
-            .listSubscriptionStatesReadyForPayment(t, 10)(TraceContext.empty)
+            .listSubscriptionStatesReadyForPayment(t, PageLimit.tryCreate(10))(TraceContext.empty)
             .futureValue
             .map(_.contract.contractId)
 
@@ -672,7 +672,10 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummyDomain.ingest(mintTransaction(user1, 10.0, 4L, 1.0))(store.multiDomainAcsStore)
         } yield {
           def top3At(round: Long): Seq[Double] =
-            store.listSortedCoinsAndQuantity(3, round).futureValue.map(_._1.toDouble)
+            store
+              .listSortedCoinsAndQuantity(round, PageLimit.tryCreate(3))
+              .futureValue
+              .map(_._1.toDouble)
 
           eventually() {
             // Values of the 4 coins by time:
@@ -703,7 +706,10 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           previousEventId: Option[String] = None,
       ): Unit = {
 
-        val actual = store.listTransactions(previousEventId, limit = 100000).futureValue
+        val actual =
+          store
+            .listTransactions(previousEventId, limit = PageLimit.tryCreate(Limit.MaxPageSize))
+            .futureValue
         actual should have length expected.size.toLong
 
         actual
@@ -719,7 +725,8 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           val paginatedResult = Iterator
             .unfold[Seq[UserWalletTxLogParser.TxLogEntry], Option[String]](previousEventId)(
               beginAfterId => {
-                val entries = store.listTransactions(beginAfterId, limit = 2).futureValue
+                val entries =
+                  store.listTransactions(beginAfterId, limit = PageLimit.tryCreate(2)).futureValue
                 if (entries.isEmpty)
                   None
                 else
@@ -1069,8 +1076,8 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   ): subsCodegen.SubscriptionPayData = {
     new subsCodegen.SubscriptionPayData(
       new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount).setScale(10), currency),
-      new RelTime(paymentIntervalSeconds * 1000L * 1000L),
-      new RelTime(paymentDurationSeconds * 1000L * 1000L),
+      new RelTime(paymentIntervalSeconds * Limit.MaxPageSize * Limit.MaxPageSize),
+      new RelTime(paymentDurationSeconds * Limit.MaxPageSize * Limit.MaxPageSize),
     )
   }
 

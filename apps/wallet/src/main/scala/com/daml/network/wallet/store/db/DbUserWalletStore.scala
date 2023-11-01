@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.RetryProvider
+import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsTables.ContractStateRowData
@@ -57,7 +58,8 @@ class DbUserWalletStore(
     )
     with UserWalletStore
     with AcsTables
-    with AcsQueries {
+    with AcsQueries
+    with LimitHelpers {
 
   import multiDomainAcsStore.waitUntilAcsIngested
   import storage.DbStorageConverters.setParameterByteArray
@@ -132,8 +134,8 @@ class DbUserWalletStore(
     * and optionally filtered by a set of issuing rounds.
     */
   override def listSortedValidatorRewards(
-      limit: Int,
       activeIssuingRoundsO: Option[Set[Long]],
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
   ]] = for {
@@ -141,25 +143,27 @@ class DbUserWalletStore(
     rewards <- multiDomainAcsStore.listContracts(
       coinCodegen.ValidatorRewardCoupon.COMPANION
     )
-  } yield rewards.view
+  } yield applyLimit(
+    limit,
     // TODO(#6119) Perform filter, sort, and limit in the database query
-    .filter(rw =>
-      activeIssuingRoundsO match {
-        case Some(rounds) => rounds.contains(rw.payload.round.number)
-        case None => true
-      }
-    )
-    .map(_.contract)
-    .toSeq
-    .sortBy(_.payload.round.number)
-    .take(limit)
+    rewards.view
+      .filter(rw =>
+        activeIssuingRoundsO match {
+          case Some(rounds) => rounds.contains(rw.payload.round.number)
+          case None => true
+        }
+      )
+      .map(_.contract)
+      .toSeq
+      .sortBy(_.payload.round.number),
+  )
 
   /** Returns the validator reward coupon sorted by their round in ascending order and their value in descending order.
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `issuingRoundsMap`.
     */
   override def listSortedAppRewards(
-      limit: Int,
       issuingRoundsMap: Map[Round, IssuingMiningRound],
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
   ]] = for {
@@ -167,33 +171,35 @@ class DbUserWalletStore(
     rewards <- multiDomainAcsStore.listContracts(
       coinCodegen.AppRewardCoupon.COMPANION
     )
-  } yield rewards
-    // TODO(#6119) Perform filter, sort, and limit in the database query
-    .flatMap { rw =>
-      val issuingO = issuingRoundsMap.get(rw.payload.round)
-      issuingO
-        .map(i => {
-          val quantity =
-            if (rw.payload.featured)
-              rw.payload.amount.multiply(i.issuancePerFeaturedAppRewardCoupon)
-            else
-              rw.payload.amount.multiply(i.issuancePerUnfeaturedAppRewardCoupon)
-          (rw.contract, BigDecimal(quantity))
-        })
-    }
-    .sorted(
-      Ordering[(Long, BigDecimal)].on(
-        (x: (
-            Contract.Has[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
-            BigDecimal,
-        )) => (x._1.payload.round.number, -x._2)
-      )
-    )
-    .take(limit)
+  } yield applyLimit(
+    limit,
+    rewards
+      // TODO(#6119) Perform filter, sort, and limit in the database query
+      .flatMap { rw =>
+        val issuingO = issuingRoundsMap.get(rw.payload.round)
+        issuingO
+          .map(i => {
+            val quantity =
+              if (rw.payload.featured)
+                rw.payload.amount.multiply(i.issuancePerFeaturedAppRewardCoupon)
+              else
+                rw.payload.amount.multiply(i.issuancePerUnfeaturedAppRewardCoupon)
+            (rw.contract, BigDecimal(quantity))
+          })
+      }
+      .sorted(
+        Ordering[(Long, BigDecimal)].on(
+          (x: (
+              Contract.Has[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
+              BigDecimal,
+          )) => (x._1.payload.round.number, -x._2)
+        )
+      ),
+  )
 
   override def listTransactions(
       beginAfterEventIdO: Option[String],
-      limit: Int,
+      limit: PageLimit,
   )(implicit
       lc: TraceContext
   ): Future[Seq[UserWalletTxLogParser.TransactionHistoryTxLogEntry]] = {
@@ -208,7 +214,7 @@ class DbUserWalletStore(
                     where store_id = $storeId
                       and tx_log_id = ${UserWalletTxLogParser.TransactionHistoryTxLogIndexRecord.txLogId}
                     order by entry_number desc
-                    limit $limit
+                    limit ${sqlLimit(limit)}
                   """.as[(String, DomainId, Option[ContractId[Any]])]
             )(beginAfterEventId => sql"""
                     select event_id, domain_id, acs_contract_id
@@ -222,12 +228,13 @@ class DbUserWalletStore(
                           and event_id = ${lengthLimited(beginAfterEventId)}
                       )
                     order by entry_number desc
-                    limit $limit
+                    limit ${sqlLimit(limit)}
                   """.as[(String, DomainId, Option[ContractId[Any]])]),
             "listTransactions",
           )
-        entries <- Future.traverse(events) { case (eventId, domainId, acsContractId) =>
-          txLogReader.loadTxLogEntry(eventId, domainId, acsContractId)
+        entries <- Future.traverse(applyLimit(limit, events)) {
+          case (eventId, domainId, acsContractId) =>
+            txLogReader.loadTxLogEntry(eventId, domainId, acsContractId)
         }
       } yield entries.map {
         case entry: UserWalletTxLogParser.TransactionHistoryTxLogEntry => entry

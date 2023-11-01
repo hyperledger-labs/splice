@@ -1,7 +1,7 @@
 package com.daml.network.scan.admin.http
 
 import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.codegen.java.cc.{coin as coinCodegen}
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -14,7 +14,7 @@ import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.store.MultiDomainAcsStore.ContractState
-import com.daml.network.util.{Codec, Contract, ContractWithState, ContractMetadataUtil}
+import com.daml.network.util.{Codec, Contract, ContractMetadataUtil, ContractWithState}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
@@ -29,10 +29,11 @@ import java.time.{OffsetDateTime, ZoneOffset}
 import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
   DevnetTap,
   Mint,
-  Transfer,
   SvRewardCollected,
+  Transfer,
 }
 import com.daml.network.scan.store.SortOrder
+import com.daml.network.store.PageLimit
 
 class HttpScanHandler(
     store: ScanStore,
@@ -475,7 +476,11 @@ class HttpScanHandler(
         }
 
       for {
-        txs <- store.listTransactions(pageEndEventId, sortOrder, request.pageSize.toInt)
+        txs <- store.listTransactions(
+          pageEndEventId,
+          sortOrder,
+          PageLimit.tryCreate(request.pageSize.intValue()),
+        )
       } yield definitions.TransactionHistoryResponse(
         txs.map(_.toResponseItem).toVector
       )
@@ -494,7 +499,7 @@ class HttpScanHandler(
         transactions <- store.listTransactions(
           beginAfterId,
           SortOrder.Descending,
-          request.pageSize.toInt,
+          PageLimit.tryCreate(request.pageSize.intValue()),
         )
       } yield definitions.ListActivityResponse(
         transactions.map { tx =>

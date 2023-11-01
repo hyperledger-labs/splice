@@ -8,6 +8,7 @@ import io.opentelemetry.api.trace.Tracer
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionIdleState_ExpireSubscription
+import com.daml.network.store.PageLimit
 import com.daml.network.sv.store.SvSvcStore
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -26,7 +27,7 @@ class ExpiredCnsSubscriptionTrigger(
   override protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[SvSvcStore.IdleCnsSubscription]] =
-    store.listExpiredCnsSubscriptions(now, limit)
+    store.listExpiredCnsSubscriptions(now, PageLimit.tryCreate(limit))
 
   override protected def completeTaskAsLeader(
       task: ScheduledTaskTrigger.ReadyTask[SvSvcStore.IdleCnsSubscription]

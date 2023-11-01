@@ -21,7 +21,7 @@ import com.daml.network.directory.store.db.DbDirectoryStore
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.store.StoreTest
+import com.daml.network.store.{PageLimit, StoreTest}
 import com.daml.network.util.{AssignedContract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
@@ -147,7 +147,7 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
             .reverse
           eventually() {
             store
-              .listExpiredDirectorySubscriptions(CantonTimestamp.now(), limit = 3)
+              .listExpiredDirectorySubscriptions(CantonTimestamp.now(), PageLimit.tryCreate(3))
               .futureValue should be(expected)
           }
         }

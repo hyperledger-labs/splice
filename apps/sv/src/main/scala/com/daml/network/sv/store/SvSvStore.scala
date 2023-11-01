@@ -5,11 +5,11 @@ import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore, PageLimit}
-import com.daml.network.store.MultiDomainAcsStore.{QueryResult, ConstrainedTemplate}
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore, PageLimit}
+import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult}
 import com.daml.network.sv.store.db.DbSvSvStore
 import com.daml.network.sv.store.memory.InMemorySvSvStore
-import com.daml.network.util.{Contract, AssignedContract, TemplateJsonDecoder}
+import com.daml.network.util.{AssignedContract, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -55,11 +55,11 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
   ] =
     lookupUsedSecretWithOffset(secret).map(_.value)
 
-  def listValidatorOnboardings()(implicit
+  def listValidatorOnboardings(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[?, vo.ValidatorOnboarding]]] =
     multiDomainAcsStore
-      .listContracts(vo.ValidatorOnboarding.COMPANION)
+      .listContracts(vo.ValidatorOnboarding.COMPANION, limit)
       .map(_ map (_.contract))
 
   def listExpiredValidatorOnboardings()
@@ -85,7 +85,7 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
     multiDomainAcsStore
       .listContracts(
         so.SvOnboardingConfirmed.COMPANION,
-        PageLimit(1),
+        PageLimit.tryCreate(1),
       )
       .map(_.headOption map (_.contract))
 

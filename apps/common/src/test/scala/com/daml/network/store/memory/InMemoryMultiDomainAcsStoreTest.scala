@@ -43,13 +43,13 @@ class InMemoryMultiDomainAcsStoreTest
       _ <- d1.create(c(2))
       round1 <- store.filterContracts(
         AppRewardCoupon.COMPANION,
-        limit = HardLimit(1),
+        limit = HardLimit.tryCreate(1),
         filter =
           (c: Contract[AppRewardCoupon.ContractId, AppRewardCoupon]) => c.payload.round.number == 1,
       )
       round2 <- store.filterContracts(
         AppRewardCoupon.COMPANION,
-        limit = HardLimit(1),
+        limit = HardLimit.tryCreate(1),
         filter =
           (c: Contract[AppRewardCoupon.ContractId, AppRewardCoupon]) => c.payload.round.number == 2,
       )

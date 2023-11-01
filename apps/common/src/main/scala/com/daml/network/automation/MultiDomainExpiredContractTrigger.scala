@@ -1,14 +1,13 @@
 package com.daml.network.automation
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.store.MultiDomainAcsStore
-import com.daml.network.util.{Contract, AssignedContract}
+import com.daml.network.store.{MultiDomainAcsStore, PageLimit}
+import com.daml.network.util.{AssignedContract, Contract}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-
 import MultiDomainAcsStore.ContractState
 
 /** A trigger for processing expired contracts whose expiry archives exactly them.
@@ -33,7 +32,7 @@ abstract class MultiDomainExpiredContractTrigger[
   override final protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[AssignedContract[TCid, T]]] =
-    listExpiredContracts(now, limit)(tc)
+    listExpiredContracts(now, PageLimit.tryCreate(limit))(tc)
 
   override final protected def isStaleTask(
       task: ScheduledTaskTrigger.ReadyTask[AssignedContract[TCid, T]]
@@ -49,5 +48,6 @@ object MultiDomainExpiredContractTrigger {
   type Template[TCid <: ContractId[_], T] =
     MultiDomainExpiredContractTrigger[Contract.Companion.Template[TCid, T], TCid, T]
   type ListExpiredContracts[TCid <: ContractId[_], T] =
-    (CantonTimestamp, Int) => TraceContext => Future[Seq[AssignedContract[TCid, T]]]
+    // we use PageLimit because this is always used in the context of a trigger, where the query will be re-run repeatedly
+    (CantonTimestamp, PageLimit) => TraceContext => Future[Seq[AssignedContract[TCid, T]]]
 }

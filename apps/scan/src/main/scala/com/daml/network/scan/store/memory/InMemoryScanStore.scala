@@ -11,7 +11,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry, TxLogIndexRecord}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.store.{HardLimit, InMemoryCNNodeAppStore}
+import com.daml.network.store.{HardLimit, InMemoryCNNodeAppStore, Limit, PageLimit, TxLogStore}
 import com.daml.network.util.{Contract, ContractWithState}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -22,7 +22,6 @@ import scala.concurrent.*
 import java.time.Instant
 import com.daml.network.scan.store.SortOrder.Ascending
 import com.daml.network.scan.store.SortOrder.Descending
-import com.daml.network.store.TxLogStore
 
 class InMemoryScanStore(
     override val serviceUserPrimaryParty: PartyId,
@@ -40,7 +39,7 @@ class InMemoryScanStore(
   ): Future[Option[ContractWithState[CoinRules.ContractId, CoinRules]]] =
     for {
       contracts <- multiDomainAcsStore
-        .listContracts(cc.coin.CoinRules.COMPANION, HardLimit(1))
+        .listContracts(cc.coin.CoinRules.COMPANION, HardLimit.tryCreate(1))
     } yield contracts.headOption
 
   override def lookupCnsRules()(implicit
@@ -48,7 +47,7 @@ class InMemoryScanStore(
   ): Future[Option[ContractWithState[CnsRules.ContractId, CnsRules]]] =
     for {
       contracts <- multiDomainAcsStore
-        .listContracts(CnsRules.COMPANION, HardLimit(1))
+        .listContracts(CnsRules.COMPANION, HardLimit.tryCreate(1))
     } yield contracts.headOption
 
   override def lookupSvcRules()(implicit
@@ -56,7 +55,7 @@ class InMemoryScanStore(
   ): Future[Option[ContractWithState[SvcRules.ContractId, SvcRules]]] =
     for {
       contracts <- multiDomainAcsStore
-        .listContracts(SvcRules.COMPANION, HardLimit(1))
+        .listContracts(SvcRules.COMPANION, HardLimit.tryCreate(1))
     } yield contracts.headOption
 
   override def getTotalCoinBalance(asOfEndOfRound: Long)(implicit
@@ -231,7 +230,7 @@ class InMemoryScanStore(
   override def listTransactions(
       pageEndEventId: Option[String],
       sortOrder: SortOrder,
-      limit: Int,
+      limit: PageLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[TxLogEntry.TransactionLogEntry]] = {
@@ -265,7 +264,7 @@ class InMemoryScanStore(
         .map {
           _.collect { case entry: TxLogEntry.TransactionLogEntry =>
             entry
-          }.take(limit)
+          }.take(limit.limit)
         }
     } yield records
   }
@@ -345,7 +344,7 @@ class InMemoryScanStore(
     }
   }
 
-  def listImportCrates(receiverParty: PartyId)(implicit
+  def listImportCrates(receiverParty: PartyId, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
     Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]
@@ -354,6 +353,7 @@ class InMemoryScanStore(
       cc.coinimport.ImportCrate.COMPANION,
       (co: Contract[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]) =>
         co.payload.receiver == receiverParty.toProtoPrimitive,
+      limit,
     )
 
   override def findFeaturedAppRight(

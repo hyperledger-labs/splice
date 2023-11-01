@@ -10,7 +10,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.db.ScanTables.{ScanAcsStoreRowData, ScanTxLogRowData}
 import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry, TxLogIndexRecord}
-import com.daml.network.store.{Limit, LimitHelpers}
+import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.util.{ContractWithState, QualifiedName, TemplateJsonDecoder}
@@ -244,7 +244,7 @@ class DbScanStore(
   override def listTransactions(
       pageEndEventId: Option[String],
       sortOrder: SortOrder,
-      limit: Int,
+      limit: PageLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[TxLogEntry.TransactionLogEntry]] =
@@ -253,9 +253,9 @@ class DbScanStore(
       // Literal sort order since Postgres complains when trying to bind it to a parameter
       val (compareEntryNumber, orderLimit) = sortOrder match {
         case Ascending =>
-          (sql" > ", sql""" order by entry_number asc limit $limit;""")
+          (sql" > ", sql""" order by entry_number asc limit ${sqlLimit(limit)};""")
         case Descending =>
-          (sql" < ", sql""" order by entry_number desc limit $limit;""")
+          (sql" < ", sql""" order by entry_number desc limit ${sqlLimit(limit)};""")
       }
 
       for {
@@ -470,7 +470,7 @@ class DbScanStore(
     } yield rows.map((HttpScanAppClient.ValidatorPurchasedTraffic.apply _).tupled)
   }
 
-  override def listImportCrates(receiverParty: PartyId)(implicit
+  override def listImportCrates(receiverParty: PartyId, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[ImportCrate.ContractId, ImportCrate]]] =
     waitUntilAcsIngested {
@@ -483,11 +483,11 @@ class DbScanStore(
               where = sql"""template_id_qualified_name = ${QualifiedName(
                   ImportCrate.TEMPLATE_ID
                 )} and acs.import_crate_receiver = $receiverParty""",
-              orderLimit = sql"""limit ${sqlLimit(Limit.DefaultLimit)}""",
+              orderLimit = sql"""limit ${sqlLimit(limit)}""",
             ),
             "listImportCrates",
           )
-        limited = applyLimit(Limit.DefaultLimit, rows)
+        limited = applyLimit(limit, rows)
         withState = limited.map(
           contractWithStateFromRow(ImportCrate.COMPANION)(_)
         )

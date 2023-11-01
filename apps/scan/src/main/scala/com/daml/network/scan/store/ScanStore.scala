@@ -6,7 +6,13 @@ import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{CNLedgerConnection, PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{CNNodeAppStoreWithHistory, MultiDomainAcsStore, TxLogStore}
+import com.daml.network.store.{
+  CNNodeAppStoreWithHistory,
+  Limit,
+  MultiDomainAcsStore,
+  PageLimit,
+  TxLogStore,
+}
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.store.TxLogStore.TransactionTreeSource
@@ -134,7 +140,7 @@ trait ScanStore
         .baseRateTrafficLimits
     )
 
-  def listImportCrates(receiverParty: PartyId)(implicit
+  def listImportCrates(receiverParty: PartyId, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]]
 
@@ -145,7 +151,7 @@ trait ScanStore
   def listTransactions(
       pageEndEventId: Option[String],
       sortOrder: SortOrder,
-      limit: Int,
+      limit: PageLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[TxLogEntry.TransactionLogEntry]]

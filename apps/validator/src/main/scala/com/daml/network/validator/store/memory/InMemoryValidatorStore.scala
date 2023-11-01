@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cn.appmanager.store.AppConfiguration
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{InMemoryCNNodeAppStoreWithoutHistory, PageLimit}
+import com.daml.network.store.{InMemoryCNNodeAppStoreWithoutHistory, Limit, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.util.{Contract, ContractWithState}
 import com.daml.network.validator.store.ValidatorStore
@@ -202,7 +202,10 @@ class InMemoryValidatorStore(
           c.payload.provider == provider.toProtoPrimitive
       )
 
-  override def listApprovedReleaseConfigurations(provider: PartyId)(implicit
+  override def listApprovedReleaseConfigurations(
+      provider: PartyId,
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
       traceContext: TraceContext
   ): Future[Seq[
     ContractWithState[
@@ -214,6 +217,7 @@ class InMemoryValidatorStore(
       appManagerCodegen.ApprovedReleaseConfiguration.COMPANION,
       (c: Contract[_, appManagerCodegen.ApprovedReleaseConfiguration]) =>
         c.payload.provider == provider.toProtoPrimitive,
+      limit,
     )
 
   override def lookupApprovedReleaseConfiguration(
@@ -244,7 +248,7 @@ class InMemoryValidatorStore(
       maybeContract <- multiDomainAcsStore.filterContracts(
         companion,
         (c: Contract[?, T]) => filter(c.payload),
-        PageLimit(1),
+        PageLimit.tryCreate(1),
       )
     } yield maybeContract.headOption map (_.contract)
 }

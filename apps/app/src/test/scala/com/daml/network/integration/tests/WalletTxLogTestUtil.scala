@@ -3,6 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.lf.data.Numeric
 import com.daml.network.console.WalletAppClientReference
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
+import com.daml.network.store.Limit
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import org.scalatest.Assertion
@@ -24,7 +25,7 @@ trait WalletTxLogTestUtil extends CNNodeTestCommon with WalletTestUtil with Time
   ): Unit = {
 
     val (actual, toCompare) = eventually() {
-      val actual = wallet.listTransactions(None, pageSize = 100000)
+      val actual = wallet.listTransactions(None, pageSize = Limit.MaxPageSize)
       val toCompare = actual
         .takeWhile(e => !previousEventId.contains(e.indexRecord.eventId))
         .filter(!ignore(_))

@@ -6,6 +6,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.store.Limit
 import com.daml.network.sv.config.InitialCnsConfig
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
@@ -1136,7 +1137,8 @@ class WalletTxLogIntegrationTest
     "handle failed automation (direct transfer)" in { implicit env =>
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      val validatorTxLogBefore = aliceValidatorWalletClient.listTransactions(None, 1000)
+      val validatorTxLogBefore =
+        aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
 
       val (offerCid, _) =
         actAndCheck(
@@ -1167,7 +1169,7 @@ class WalletTxLogIntegrationTest
       )
 
       // Only Alice should see notification (note that aliceValidator is shared between tests)
-      val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, 1000)
+      val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
       validatorTxLogBefore should be(validatorTxLogAfter)
       checkTxHistory(bobWalletClient, Seq.empty)
     }
@@ -1235,7 +1237,8 @@ class WalletTxLogIntegrationTest
     "handle failed automation (subscription payment)" in { implicit env =>
       val aliceUserId = aliceWalletClient.config.ledgerApiUser
       val charlieUserId = charlieWalletClient.config.ledgerApiUser
-      val validatorTxLogBefore = aliceValidatorWalletClient.listTransactions(None, 1000)
+      val validatorTxLogBefore =
+        aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
 
       // Note: using Alice and Charlie because manually creating subscriptions requires both
       // the sender and the receiver to be hosted on the same participant.
@@ -1351,7 +1354,8 @@ class WalletTxLogIntegrationTest
           }
 
           // Validator should not see any notification (note that aliceValidator is shared between tests)
-          val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, 1000)
+          val validatorTxLogAfter =
+            aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
           validatorTxLogBefore should be(validatorTxLogAfter)
 
           // Charlie (the provider of the subscription) should see a notification
@@ -1383,7 +1387,7 @@ class WalletTxLogIntegrationTest
 
       // Note: SV1 is reused between tests, ignore TxLog entries created by previous tests
       val previousEventId = sv1WalletClient
-        .listTransactions(None, 10000)
+        .listTransactions(None, Limit.MaxPageSize)
         .headOption
         .map(_.indexRecord.eventId)
 

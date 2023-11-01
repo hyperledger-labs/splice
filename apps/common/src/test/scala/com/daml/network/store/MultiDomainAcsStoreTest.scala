@@ -77,7 +77,7 @@ abstract class MultiDomainAcsStoreTest[
     for {
       actualList <- store.listContracts(
         AppRewardCoupon.COMPANION,
-        limit = HardLimit(expected.size.toLong),
+        limit = HardLimit.tryCreate(expected.size.max(1)),
       )
       _ = actualList shouldBe expected_
       _ <- expected_.traverse_ { c =>
@@ -208,12 +208,12 @@ abstract class MultiDomainAcsStoreTest[
         _ <- d1.create(c(1))
         _ <- d1.create(c(2))
         resultHard <- loggerFactory.assertLogs(
-          store.listContracts(AppRewardCoupon.COMPANION, limit = HardLimit(1)),
+          store.listContracts(AppRewardCoupon.COMPANION, limit = HardLimit.tryCreate(1)),
           _.warningMessage should include(
             "Size of the result exceeded the limit. Result size: 2. Limit: 1"
           ),
         )
-        resultPage <- store.listContracts(AppRewardCoupon.COMPANION, limit = PageLimit(1))
+        resultPage <- store.listContracts(AppRewardCoupon.COMPANION, limit = PageLimit.tryCreate(1))
       } yield {
         resultHard should have size 1
         resultPage should have size 1

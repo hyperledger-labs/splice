@@ -22,12 +22,12 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.TxLogEntry.*
 import com.daml.network.scan.store.TxLogIndexRecord.{
-  TransactionIndexRecord,
   OpenMiningRoundIndexRecord,
+  TransactionIndexRecord,
 }
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{StoreErrors, StoreTest, TxLogStore}
+import com.daml.network.store.{PageLimit, StoreErrors, StoreTest, TxLogStore}
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.util.{
   Contract,
@@ -804,7 +804,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         tag: ClassTag[T]
     ): Future[Seq[T]] = {
       store
-        .listTransactions(beginAfterEventId, sortOrder, limit)
+        .listTransactions(beginAfterEventId, sortOrder, PageLimit.tryCreate(limit))
         .map(_.collect {
           case c if tag.runtimeClass.isInstance(c) => c.asInstanceOf[T]
         }.toSeq)

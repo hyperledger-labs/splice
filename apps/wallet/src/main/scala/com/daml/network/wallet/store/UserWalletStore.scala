@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
-import com.daml.network.store.{CNNodeAppStoreWithHistory, PageLimit}
+import com.daml.network.store.{CNNodeAppStoreWithHistory, Limit, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{
@@ -115,11 +115,14 @@ trait UserWalletStore
       tc: TraceContext
   ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]]]
 
-  final def listAppPaymentRequests(implicit tc: TraceContext): Future[
+  final def listAppPaymentRequests(
+      limit: Limit = Limit.DefaultLimit
+  )(implicit tc: TraceContext): Future[
     Seq[Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]]
   ] = for {
     contracts <- multiDomainAcsStore.listContracts(
-      walletCodegen.AppPaymentRequest.COMPANION
+      walletCodegen.AppPaymentRequest.COMPANION,
+      limit,
     )
   } yield contracts map (_.contract)
 
@@ -144,7 +147,7 @@ trait UserWalletStore
   def listSubscriptionStatesReadyForPayment: ListExpiredContracts[
     subsCodegen.SubscriptionIdleState.ContractId,
     subsCodegen.SubscriptionIdleState,
-  ] = (now: CantonTimestamp, limit: Int) =>
+  ] = (now: CantonTimestamp, limit: PageLimit) =>
     implicit traceContext => {
       def isReadyForPayment(state: subsCodegen.SubscriptionIdleState): Boolean =
         now.toInstant.isAfter(
@@ -157,10 +160,10 @@ trait UserWalletStore
         )
       } yield idleStates
         .filter(s => isReadyForPayment(s.payload))
-        .take(limit)
+        .take(limit.limit)
     }
 
-  final def listSubscriptions()(implicit
+  final def listSubscriptions(limit: Limit = Limit.DefaultLimit)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Seq[Subscription]] = {
@@ -168,13 +171,16 @@ trait UserWalletStore
     // as either idle or payment. This is okay since it'll just refresh in the UI.
     for {
       subscriptions <- multiDomainAcsStore.listContracts(
-        subsCodegen.Subscription.COMPANION
+        subsCodegen.Subscription.COMPANION,
+        limit,
       )
       subscriptionIdleStates <- multiDomainAcsStore.listContracts(
-        subsCodegen.SubscriptionIdleState.COMPANION
+        subsCodegen.SubscriptionIdleState.COMPANION,
+        limit,
       )
       subscriptionPayments <- multiDomainAcsStore.listContracts(
-        subsCodegen.SubscriptionPayment.COMPANION
+        subsCodegen.SubscriptionPayment.COMPANION,
+        limit,
       )
     } yield {
       val mainMap = subscriptions.map(sub => sub.contractId -> sub).toMap
@@ -205,19 +211,19 @@ trait UserWalletStore
     )(cid)
   } yield contract.contract
 
-  final def listSubscriptionRequests()(implicit
+  final def listSubscriptionRequests(limit: Limit = Limit.DefaultLimit)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[
     Seq[Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]]
   ] = for {
-    requests <- multiDomainAcsStore.listContracts(subsCodegen.SubscriptionRequest.COMPANION)
+    requests <- multiDomainAcsStore.listContracts(subsCodegen.SubscriptionRequest.COMPANION, limit)
   } yield requests map (_.contract)
 
   /** List all non-expired coins owned by a user in descending order according to their current amount in the given submitting round. */
   def listSortedCoinsAndQuantity(
-      maxNumInputs: Int,
       submittingRound: Long,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[Seq[(BigDecimal, coinCodegen.transferinput.InputCoin)]] = for {
@@ -235,7 +241,7 @@ trait UserWalletStore
       // negating because largest values should come first.
       quantityAndCoin._1.negate()
     )
-    .take(maxNumInputs)
+    .take(limit.limit)
     .map(quantityAndCoin =>
       (
         quantityAndCoin._1,
@@ -249,8 +255,8 @@ trait UserWalletStore
     * and optionally filtered by a set of issuing rounds.
     */
   def listSortedValidatorRewards(
-      limit: Int,
       activeIssuingRoundsO: Option[Set[Long]],
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
   ]]
@@ -259,8 +265,8 @@ trait UserWalletStore
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
     */
   def listSortedAppRewards(
-      limit: Int,
       issuingRoundsMap: Map[cc.round.types.Round, roundCodegen.IssuingMiningRound],
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
   ]]
@@ -283,10 +289,10 @@ trait UserWalletStore
 
   def listTransactions(
       beginAfterEventId: Option[String],
-      limit: Int,
+      limit: PageLimit,
   )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TransactionHistoryTxLogEntry]]
 
-  def listDirectoryEntries()(implicit tc: TraceContext): Future[
+  def listDirectoryEntries(limit: Limit = Limit.DefaultLimit)(implicit tc: TraceContext): Future[
     Seq[UserWalletStore.DirectoryEntryWithPayData]
   ] = {
     import UserWalletStore.{
@@ -299,12 +305,14 @@ trait UserWalletStore
     for {
       // NOTE: entries and entry contexts are sometimes out of sync so we just filter out entries in such cases
       entries <- multiDomainAcsStore.listContracts(
-        directoryCodegen.DirectoryEntry.COMPANION
+        directoryCodegen.DirectoryEntry.COMPANION,
+        limit,
       )
       entryContexts <- multiDomainAcsStore.listContracts(
-        directoryCodegen.DirectoryEntryContext.COMPANION
+        directoryCodegen.DirectoryEntryContext.COMPANION,
+        limit,
       )
-      subscriptions <- listSubscriptions()
+      subscriptions <- listSubscriptions(limit)
     } yield {
       val entriesWithSubs = entries.foldLeft(Seq.empty[EntryWithSubscriptionContext]) {
         (acc, entry) =>
@@ -381,12 +389,12 @@ trait UserWalletStore
     import cats.data.OptionT, cats.syntax.semigroupk.*, cats.Eval
     OptionT(
       multiDomainAcsStore
-        .listAssignedContracts(companion, PageLimit(1))
+        .listAssignedContracts(companion, PageLimit.tryCreate(1))
         .map(_.headOption.map(_.toContractWithState))
     ).combineKEval(Eval.always {
       OptionT(
         multiDomainAcsStore
-          .listContracts(companion, PageLimit(1))
+          .listContracts(companion, PageLimit.tryCreate(1))
           .map(_.headOption)
       )
     }).value

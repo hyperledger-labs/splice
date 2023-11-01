@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.store.db.DbDirectoryStore
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore}
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -69,7 +69,9 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
   /** List all directory entries that are active as of a specific revision, up to a certain number. */
   // TODO(#300): allow submitting the page token to receive the next page
   // TODO(#300): at the moment, trimming the list to the right size is performed here, that should be moved to the acsStore
-  def listEntries(namePrefix: String, pageSize: Int)(implicit tc: TraceContext): Future[
+  def listEntries(namePrefix: String, limit: Limit = Limit.DefaultLimit)(implicit
+      tc: TraceContext
+  ): Future[
     Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ]
 
@@ -86,7 +88,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
   /** List subscriptions ready for expiry. */
   def listExpiredDirectorySubscriptions(
       now: CantonTimestamp,
-      limit: Int,
+      limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[DirectoryStore.IdleDirectorySubscription]]
 
   def lookupDirectoryEntryContext(
