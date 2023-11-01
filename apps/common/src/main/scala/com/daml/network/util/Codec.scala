@@ -15,6 +15,7 @@ import com.digitalasset.canton.topology.{
   UniqueIdentifier,
 }
 import io.grpc.Status
+import com.daml.network.codegen.java.cc.round.types.Round
 
 /** Trait for values used in our requests.
   * Dec is the Scala representation while Enc is the representation used in code generated for the serialization format, e.g., Codec[BigDecimal, String].
@@ -118,6 +119,12 @@ object Codec {
       def decode(e: Long) = {
         LfTimestamp.fromLong(e).map(CantonTimestamp(_))
       }
+    }
+
+  implicit val roundValue: Codec[Round, Long] =
+    new Codec[Round, Long] {
+      def encode(d: Round) = d.number
+      def decode(e: Long) = Right(new Round(e))
     }
 
   object Timestamp extends CodecCompanion[CantonTimestamp] {

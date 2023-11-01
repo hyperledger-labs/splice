@@ -108,6 +108,7 @@ object TxLogEntry {
         provider = node.argument.value.transfer.provider,
         sender = sender,
         receivers = receivers,
+        round = node.result.value.round,
         coinPrice = coinPrice,
       )
     }
@@ -119,6 +120,7 @@ object TxLogEntry {
       provider: String,
       sender: SenderAmount,
       receivers: Seq[ReceiverAmount],
+      round: cc.round.types.Round,
       coinPrice: BigDecimal,
   ) extends TransactionLogEntry {
     val transactionType = TransactionType.Transfer
@@ -135,6 +137,7 @@ object TxLogEntry {
           receivers = receivers.map(_.toResponse).toVector,
         )
       ),
+      round = Codec.encode(round),
       coinPrice = Codec.encode(coinPrice),
     )
   }
@@ -144,6 +147,7 @@ object TxLogEntry {
       date: Instant,
       coinOwner: String,
       coinAmount: BigDecimal,
+      round: cc.round.types.Round,
       coinPrice: BigDecimal,
   ) extends TransactionLogEntry {
     val transactionType = TransactionType.Tap
@@ -159,6 +163,7 @@ object TxLogEntry {
           coinAmount = Codec.encode(coinAmount),
         )
       ),
+      round = Codec.encode(round),
       coinPrice = Codec.encode(coinPrice),
     )
   }
@@ -168,6 +173,7 @@ object TxLogEntry {
       date: Instant,
       coinOwner: String,
       coinAmount: BigDecimal,
+      round: cc.round.types.Round,
       coinPrice: BigDecimal,
   ) extends TransactionLogEntry {
     val transactionType = TransactionType.Mint
@@ -183,6 +189,7 @@ object TxLogEntry {
           coinAmount = Codec.encode(coinAmount),
         )
       ),
+      round = Codec.encode(round),
       coinPrice = Codec.encode(coinPrice),
     )
   }
@@ -192,6 +199,7 @@ object TxLogEntry {
       date: Instant,
       coinOwner: String,
       coinAmount: BigDecimal,
+      round: cc.round.types.Round,
       coinPrice: BigDecimal,
   ) extends TransactionLogEntry {
     val transactionType = TransactionType.SvRewardCollected
@@ -207,6 +215,7 @@ object TxLogEntry {
           coinAmount = Codec.encode(coinAmount),
         )
       ),
+      round = Codec.encode(round),
       coinPrice = Codec.encode(coinPrice),
     )
   }

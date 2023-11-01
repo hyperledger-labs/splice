@@ -524,6 +524,7 @@ class HttpScanHandler(
             mint = txItem.mint,
             tap = txItem.tap,
             transfer = txItem.transfer,
+            round = txItem.round,
             coinPrice = txItem.coinPrice,
           )
         }.toVector

@@ -45,3 +45,4 @@ template ImportCrate with
               -- NOTE: this price is not the price at which the original coin was created.
               -- We can't restore that as we don't know it, and we accept this imprecision.
               coinPrice = openRound.coinPrice
+              round = openRound.round

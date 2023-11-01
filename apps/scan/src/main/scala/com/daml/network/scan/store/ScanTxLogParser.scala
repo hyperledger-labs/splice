@@ -275,6 +275,7 @@ object ScanTxLogParser {
             coinOwner = coin.owner,
             coinAmount = coin.amount.initialAmount,
             coinPrice = ccsum.coinPrice,
+            round = ccsum.round,
           )
         case TransactionType.Mint =>
           MintLogEntry(
@@ -283,6 +284,7 @@ object ScanTxLogParser {
             coinOwner = coin.owner,
             coinAmount = coin.amount.initialAmount,
             coinPrice = ccsum.coinPrice,
+            round = ccsum.round,
           )
         case TransactionType.SvRewardCollected =>
           SvRewardCollectedLogEntry(
@@ -291,6 +293,7 @@ object ScanTxLogParser {
             coinOwner = coin.owner,
             coinAmount = coin.amount.initialAmount,
             coinPrice = ccsum.coinPrice,
+            round = ccsum.round,
           )
         case unexpected =>
           throw new Exception(

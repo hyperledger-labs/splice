@@ -1180,6 +1180,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         new coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId](
           coinContract.contractId,
           new java.math.BigDecimal(coinPrice),
+          new roundCodegen.types.Round(round),
         )
           .toValue(_.toValue),
       ),

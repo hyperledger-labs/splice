@@ -651,6 +651,7 @@ components:
         - date
         - domain_id
         - coin_price
+        - round
       properties:
         transaction_type:
           description: |
@@ -680,6 +681,11 @@ components:
           description: |
             The id of the domain through which this transaction was sequenced.
           type: string
+        round:
+          description: |
+            The round for which this transaction was registered.
+          type: integer
+          format: int64
         coin_price:
           description: |
             The coin price for the round at which this transfer was executed.
@@ -731,6 +737,7 @@ components:
         - event_id
         - date
         - domain_id
+        - round
         - coin_price
       properties:
         activity_type:
@@ -761,6 +768,11 @@ components:
           description: |
             The id of the domain through which this transaction was sequenced.
           type: string
+        round:
+          description: |
+            The round for which this transaction was registered.
+          type: integer
+          format: int64
         coin_price:
           description: |
             The coin price for the round at which this transfer was executed.

@@ -81,9 +81,14 @@ class ScanIntegrationTest
     )
 
     eventually() {
+      val latestRound =
+        sv1ScanBackend.getLatestOpenMiningRound(CantonTimestamp.now()).contract.payload.round.number
+
       val tapsFirstPageAscending =
         sv1ScanBackend
           .listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, pageSize)
+
+      tapsFirstPageAscending.map(_.round) should contain only latestRound
 
       toCoinAmounts(tapsFirstPageAscending) should be(
         coinAmounts.take(pageSize)
@@ -252,6 +257,8 @@ class ScanIntegrationTest
           bobWalletClient.list().coins should have length 1
         },
       )
+      val openRoundForTransfer =
+        sv1ScanBackend.getLatestOpenMiningRound(CantonTimestamp.now()).contract.payload.round.number
 
       val transferAmount = BigDecimal(10000.0)
       clue("Transfer some CC to alice") {
@@ -283,15 +290,18 @@ class ScanIntegrationTest
       clue("The transfer from Bob to Alice is shown in scan activity") {
         eventually() {
           // only look at activities that bob sent
-          val transfers =
-            sv1ScanBackend.listActivity(None, 10).flatMap(_.transfer).filter { transfer =>
-              PartyId.tryFromProtoPrimitive(
-                transfer.sender.party
-              ) == bobUserParty
-            }
+          val activities =
+            sv1ScanBackend
+              .listActivity(None, 10)
+              .filter(_.transfer.exists { transfer =>
+                PartyId.tryFromProtoPrimitive(
+                  transfer.sender.party
+                ) == bobUserParty
+              })
 
-          transfers should have size (1)
-          val transfer = transfers.head
+          activities should have size (1)
+          activities.loneElement.round shouldBe openRoundForTransfer
+          val transfer = activities.flatMap(_.transfer).loneElement
           val inputCoinAmount =
             transfer.sender.inputCoinAmount.map(BigDecimal(_)).getOrElse(BigDecimal(0))
           val senderChangeFee = BigDecimal(transfer.sender.senderChangeFee)
@@ -488,11 +498,19 @@ class ScanIntegrationTest
       }
 
       eventually() {
-        val svRewardsCollected = sv1ScanBackend
+        val latestRound =
+          sv1ScanBackend
+            .getLatestOpenMiningRound(CantonTimestamp.now())
+            .contract
+            .payload
+            .round
+            .number
+        val activities = sv1ScanBackend
           .listActivity(None, defaultPageSize)
-          .flatMap(_.svRewardCollected)
-        svRewardsCollected should have size (1)
-        val svRewardCollected = svRewardsCollected(0)
+          .filter(_.svRewardCollected.nonEmpty)
+        activities.loneElement.round shouldBe latestRound
+        val svRewardsCollected = activities.flatMap(_.svRewardCollected)
+        val svRewardCollected = svRewardsCollected.loneElement
         val balance = sv1WalletClient.balance().unlockedQty
         BigDecimal(svRewardCollected.coinAmount) shouldBe balance
         svRewardCollected.coinOwner shouldBe sv1Backend.getSvcInfo().svParty.toProtoPrimitive
@@ -525,16 +543,14 @@ class ScanIntegrationTest
           .flatMap(_.sender.inputAppRewardAmount)
           .map(BigDecimal(_))
           .filter(_ != zero)
-        inputAppRewardAmounts should have size (1)
-        val inputAppRewardAmount = inputAppRewardAmounts(0)
+        val inputAppRewardAmount = inputAppRewardAmounts.loneElement
         inputAppRewardAmount shouldBe appRewardAmount
 
         val inputValidatorAmounts = bobTransfers
           .flatMap(_.sender.inputValidatorRewardAmount)
           .map(BigDecimal(_))
           .filter(_ != zero)
-        inputValidatorAmounts should have size (1)
-        val inputValidatorAmount = inputValidatorAmounts(0)
+        val inputValidatorAmount = inputValidatorAmounts.loneElement
         inputValidatorAmount shouldBe validatorRewardAmount
       }
     }

@@ -39,6 +39,7 @@ data CoinExpireSummary = CoinExpireSummary with
 data CoinCreateSummary coinCointractId = CoinCreateSummary with
     coin : coinCointractId -- ^ The new coin that was created
     coinPrice : Decimal -- ^ The coin price at the round the coin was created
+    round: Round -- ^ Round for which this coin was created.
 
 -- | A Canton Coin, which can be locked and whose amount expires over time.
 --
@@ -83,6 +84,7 @@ template LockedCoin
          return CoinCreateSummary with
            coin = coinCid
            coinPrice = openMiningRound.coinPrice
+           round = openMiningRound.round
 
     choice LockedCoin_OwnerExpireLock : CoinCreateSummary (ContractId Coin)
       with
@@ -95,6 +97,7 @@ template LockedCoin
          return CoinCreateSummary with
            coin = coinCid
            coinPrice = openMiningRound.coinPrice
+           round = openMiningRound.round
 
     choice LockedCoin_ExpireCoin : CoinExpireSummary
       with
@@ -360,6 +363,7 @@ template CoinRules
         return CoinCreateSummary with
                   coin
                   coinPrice = openRound.coinPrice
+                  round = openRound.round
 
 
     nonconsuming choice CoinRules_DevNet_Tap: CoinCreateSummary (ContractId Coin)

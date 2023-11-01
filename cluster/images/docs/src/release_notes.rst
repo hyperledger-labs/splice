@@ -17,6 +17,9 @@ Release Notes
 
   * Add brief overview about important :ref:`Identities used by SV nodes on different layers <sv-identities-overview>`.
 
+* The Scan activity and transaction history API's now return the round for which transactions were registered. Please see the Scan OpenAPI specification. 
+  The ``/coin-config-for-round`` API can be used to lookup the holding fees for a specific round.
+
 2023-10-30
 ----------
 

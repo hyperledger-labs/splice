@@ -1,7 +1,7 @@
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Coin.daml ../daml/canton-coin-upgrade/daml/CC/Coin.daml
 --- ../daml/canton-coin/daml/CC/Coin.daml
 +++ ../daml/canton-coin-upgrade/daml/CC/Coin.daml
-@@ -49,6 +49,7 @@
+@@ -50,6 +50,7 @@
      svc : Party
      owner : Party
      amount : ExpiringAmount
@@ -9,7 +9,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Coin.daml
    where
      signatory svc, owner
      ensure validExpiringAmount amount
-@@ -233,6 +234,7 @@
+@@ -236,6 +237,7 @@
      svc : Party
      configSchedule : Schedule Time (CoinConfig USD)
      isDevNet : Bool
@@ -17,7 +17,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Coin.daml
    where
      ensure validSchedule configSchedule validCoinConfig
  
-@@ -965,11 +967,13 @@
+@@ -969,11 +971,13 @@
              svc
              owner = sender
              amount = expiringAmount transferConfigCC.holdingFee summary.senderChangeAmount currentOpenRound.round

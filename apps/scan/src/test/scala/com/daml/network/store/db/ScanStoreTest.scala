@@ -655,6 +655,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       "return the most recent txs in pages" in {
         val limit = 10
         val nrTransfers = 20
+        val round = 1L
         val now = java.time.Instant.EPOCH
         val zero = BigDecimal(0)
         val txs: List[TransferLogEntry] = (1 to nrTransfers).map { i =>
@@ -677,6 +678,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               zero,
             ),
             receivers = Seq(ReceiverAmount(user2.toProtoPrimitive, BigDecimal(i), zero)),
+            round = new roundCodegen.types.Round(round),
             coinPrice = BigDecimal(1.0),
           )
         }.toList
@@ -709,7 +711,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
                 )
               ),
               exerciseResult = mkTransferResult(
-                round = 2,
+                round = round,
                 changeToInitialAmountAsOfRoundZero = 0,
                 changeToHoldingFeesRate = holdingFee,
                 inputCoinAmount = senderAmount.toDouble,
@@ -1013,6 +1015,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         new cc.coin.CoinCreateSummary[coinCodegen.Coin.ContractId](
           coinContract.contractId,
           new java.math.BigDecimal(coinPrice),
+          new roundCodegen.types.Round(round),
         )
           .toValue(_.toValue),
       ),
