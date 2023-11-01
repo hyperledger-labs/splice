@@ -220,13 +220,9 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         ),
       )("ensure SvOnboardingRequest is there", _ => nonEmptyOnSv1(so.SvOnboardingRequest.COMPANION))
 
-      actAndCheck(
-        "create sample ApprovedSvIdentity",
-        exerciseSvc(
-          new so.ApprovedSvIdentity(sv1Party.toProtoPrimitive, "irrelevant name", "irrelevant key")
-            .create()
-        ),
-      )("ensure ApprovedSvIdentity is there", _ => nonEmptyOnSv1(so.ApprovedSvIdentity.COMPANION))
+      createSampleAndEnsurePresence(so.ApprovedSvIdentity.COMPANION)(
+        new so.ApprovedSvIdentity(sv1Party.toProtoPrimitive, "irrelevant name", "irrelevant key")
+      )
 
       createSampleAndEnsurePresence(vo.UsedSecret.COMPANION)(
         new vo.UsedSecret(
@@ -236,32 +232,23 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         )
       )
 
-      actAndCheck(
-        "create sample SvReward",
-        exerciseSvc(
-          new svcr.SvReward(
-            svcParty.toProtoPrimitive,
-            sv1Party.toProtoPrimitive,
-            dummyRound,
-            new java.math.BigDecimal("42"),
-          ).create()
-        ),
-      )("ensure SvReward is there", _ => nonEmptyOnSv1(svcr.SvReward.COMPANION))
+      createSampleAndEnsurePresence(svcr.SvReward.COMPANION)(
+        new svcr.SvReward(
+          svcParty.toProtoPrimitive,
+          sv1Party.toProtoPrimitive,
+          dummyRound,
+          new java.math.BigDecimal("42"),
+        )
+      )
 
-      actAndCheck(
-        "create sample SvOnboardingConfirmed",
-        exerciseSvc(
-          new so.SvOnboardingConfirmed(
-            sv1Party.toProtoPrimitive,
-            "irrelevant name",
-            "observing domain migration",
-            svcParty.toProtoPrimitive,
-            com.daml.lf.data.Time.Timestamp.MaxValue.toInstant,
-          ).create()
-        ),
-      )(
-        "ensure SvOnboardingConfirmed is there",
-        _ => nonEmptyOnSv1(so.SvOnboardingConfirmed.COMPANION),
+      createSampleAndEnsurePresence(so.SvOnboardingConfirmed.COMPANION)(
+        new so.SvOnboardingConfirmed(
+          sv1Party.toProtoPrimitive,
+          "irrelevant name",
+          "observing domain migration",
+          svcParty.toProtoPrimitive,
+          com.daml.lf.data.Time.Timestamp.MaxValue.toInstant,
+        )
       )
     }
 
@@ -271,39 +258,26 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         (rounds.headOption.value, rounds.lastOption.value)
       }
 
-      actAndCheck(
-        "create sample IssuingMiningRound",
-        exerciseSvc(
-          new cc.round.IssuingMiningRound(
-            svcParty.toProtoPrimitive,
-            dummyRound,
-            dummyDecimal,
-            dummyDecimal,
-            dummyDecimal,
-            oldestRound.payload.opensAt,
-            newestRound.payload.targetClosesAt,
-          ).create()
-        ),
-      )(
-        "ensure IssuingMiningRound is there",
-        _ => nonEmptyOnSv1(cc.round.IssuingMiningRound.COMPANION),
+      createSampleAndEnsurePresence(cc.round.IssuingMiningRound.COMPANION)(
+        new cc.round.IssuingMiningRound(
+          svcParty.toProtoPrimitive,
+          dummyRound,
+          dummyDecimal,
+          dummyDecimal,
+          dummyDecimal,
+          oldestRound.payload.opensAt,
+          newestRound.payload.targetClosesAt,
+        )
       )
 
-      actAndCheck(
-        "create sample ClosedMiningRound",
-        exerciseSvc(
-          new cc.round.ClosedMiningRound(
-            svcParty.toProtoPrimitive,
-            dummyRound,
-            dummyDecimal,
-            dummyDecimal,
-            dummyDecimal,
-          )
-            .create()
-        ),
-      )(
-        "ensure ClosedMiningRound is there",
-        _ => nonEmptyOnSv1(cc.round.ClosedMiningRound.COMPANION),
+      createSampleAndEnsurePresence(cc.round.ClosedMiningRound.COMPANION)(
+        new cc.round.ClosedMiningRound(
+          svcParty.toProtoPrimitive,
+          dummyRound,
+          dummyDecimal,
+          dummyDecimal,
+          dummyDecimal,
+        )
       )
 
       actAndCheck(
@@ -311,13 +285,9 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         exerciseSvc(coinRulesCid.exerciseCoinRules_DevNet_FeatureApp(sv1Party.toProtoPrimitive)),
       )("ensure FeaturedAppRight is there", _ => nonEmptyOnSv1(cc.coin.FeaturedAppRight.COMPANION))
 
-      actAndCheck(
-        "create sample UnclaimedReward",
-        exerciseSvc(
-          new cc.coin.UnclaimedReward(svcParty.toProtoPrimitive, dummyDecimal)
-            .create()
-        ),
-      )("ensure UnclaimedReward is there", _ => nonEmptyOnSv1(cc.coin.UnclaimedReward.COMPANION))
+      createSampleAndEnsurePresence(cc.coin.UnclaimedReward.COMPANION)(
+        new cc.coin.UnclaimedReward(svcParty.toProtoPrimitive, dummyDecimal)
+      )
 
       createSampleAndEnsurePresence(cc.coinimport.ImportCrate.COMPANION) {
         val svc = svcParty.toProtoPrimitive
