@@ -2,7 +2,7 @@ package com.daml.network.validator.admin.http
 
 import akka.http.scaladsl.model.Uri
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.environment.{BaseLedgerConnection, CNLedgerConnection}
+import com.daml.network.environment.{BaseLedgerConnection, CNLedgerConnection, RetryFor}
 import com.daml.network.http.v0.{definitions, app_manager as v0}
 import com.daml.network.validator.config.AppManagerConfig
 import com.daml.network.validator.store.AppManagerStore
@@ -72,6 +72,7 @@ class HttpAppManagerHandler(
           _ <- ledgerConnection.ensureUserMetadataAnnotation(
             appUserId,
             Map(PROVIDER_PARTY_USER_METADATA_KEY -> provider, USER_ID_USER_METADATA_KEY -> userId),
+            RetryFor.ClientCalls,
             Some(BaseLedgerConnection.APP_MANAGER_IDENTITY_PROVIDER_ID),
           )
         } yield v0.AppManagerResource.AuthorizeAppResponse.OK

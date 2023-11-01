@@ -2,6 +2,7 @@ package com.daml.network.validator.automation
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.config.BackupDumpConfig
+import com.daml.network.environment.RetryFor
 import com.daml.network.validator.store.ParticipantIdentitiesStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -25,7 +26,8 @@ class PeriodicParticipantIdentitiesBackupTrigger(
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     triggerContext.retryProvider
-      .retryForAutomation(
+      .retry(
+        RetryFor.Automation,
         s"backup participant identities to: ${config.locationDescription}",
         participantIdentitiesStore.backupParticipantIdentities(),
         logger,

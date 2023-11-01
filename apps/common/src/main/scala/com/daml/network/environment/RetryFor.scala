@@ -19,8 +19,7 @@ object RetryFor {
     * eventually. Retries a bounded number of times.
     */
   val Automation: RetryFor = RetryFor(
-    // TODO(#7244) Reduce this from its WaitingOnInitDependency bumping
-    maxRetries = 60,
+    maxRetries = 35,
     initialDelay = 200.millis,
     maxDelay = 5.seconds,
     resetRetriesAfter = None,

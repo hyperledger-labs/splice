@@ -4,7 +4,7 @@ import akka.stream.Materializer
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.daml.network.environment.ParticipantAdminConnection
+import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.topology.PartyId
@@ -67,6 +67,7 @@ class SvOnboardingNamespaceProposalTrigger(
               svcParty.uid.namespace,
               svcMemberParty.uid.namespace,
               svParty.uid.namespace.fingerprint,
+              RetryFor.Automation,
             )
           }
           .map { proposals =>

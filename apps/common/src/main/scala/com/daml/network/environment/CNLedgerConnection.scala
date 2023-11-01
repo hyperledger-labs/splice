@@ -277,19 +277,21 @@ class BaseLedgerConnection(
   ): Future[Unit] =
     client.setUserPrimaryParty(user, party, identityProviderId)
 
-  def ensureUserMetadataAnnotation(userId: String, key: String, value: String)(implicit
-      ec: ExecutionContext
+  def ensureUserMetadataAnnotation(userId: String, key: String, value: String, retryFor: RetryFor)(
+      implicit ec: ExecutionContext
   ): Future[Unit] =
-    ensureUserMetadataAnnotation(userId, Map(key -> value))
+    ensureUserMetadataAnnotation(userId, Map(key -> value), retryFor)
 
   def ensureUserMetadataAnnotation(
       userId: String,
       annotations: Map[String, String],
+      retryFor: RetryFor,
       identityProviderId: Option[String] = None,
   )(implicit
       ec: ExecutionContext
   ): Future[Unit] =
     retryProvider.ensureThatB(
+      retryFor,
       s"user $userId has metadata annotations $annotations",
       client.getUserProto(userId, identityProviderId).map { user =>
         if (!user.hasMetadata)
@@ -466,7 +468,8 @@ class BaseLedgerConnection(
   def ensureIdentityProviderConfig(id: String, issuer: String, jwksUrl: String, audience: String)(
       implicit tc: TraceContext
   ): Future[Unit] =
-    retryProvider.retryForAutomation(
+    retryProvider.retry(
+      RetryFor.WaitingOnInitDependency,
       show"Create identity provider $id",
       client.createIdentityProviderConfig(id, issuer, jwksUrl, audience).recover {
         case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.ALREADY_EXISTS =>

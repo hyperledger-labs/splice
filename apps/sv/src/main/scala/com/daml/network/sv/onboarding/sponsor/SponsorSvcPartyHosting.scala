@@ -5,7 +5,7 @@ import cats.syntax.either.*
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AllProposals
 import com.daml.network.environment.TopologyAdminConnection.{AuthorizedStateChanged, TopologyResult}
-import com.daml.network.environment.{ParticipantAdminConnection, TopologyAdminConnection}
+import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, TopologyAdminConnection}
 import com.daml.network.sv.onboarding.SvcPartyHosting
 import com.daml.network.sv.onboarding.SvcPartyHosting.{
   RequiredProposalNotFound,
@@ -113,6 +113,7 @@ class SponsorSvcPartyHosting(
                     ),
                   )
                 ),
+              RetryFor.ClientCalls,
               signedBy,
               isProposal = true,
               recreateOnAuthorizedStateChange = false,

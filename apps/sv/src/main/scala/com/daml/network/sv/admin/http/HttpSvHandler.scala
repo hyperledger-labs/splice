@@ -446,8 +446,10 @@ class HttpSvHandler(
         globalDomain,
         sequencerId,
         ourParticipant.uid.namespace.fingerprint,
+        RetryFor.ClientCalls,
       )
       _ <- retryProvider.waitUntil(
+        RetryFor.ClientCalls,
         "New sequencer is observed in SequencerDomainState through existing sequencer",
         sequencerAdminConnection
           .getSequencerDomainState(globalDomain)
@@ -533,6 +535,7 @@ class HttpSvHandler(
         mediatorId,
         ourParticipant.uid.namespace.fingerprint,
         svcRulesMembersSize,
+        RetryFor.ClientCalls,
       )
     } yield ()
 

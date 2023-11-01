@@ -209,7 +209,8 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
             loggerFactory,
           )
           () =>
-            retryProvider.retryForAutomation(
+            retryProvider.retry(
+              RetryFor.WaitingOnInitDependency,
               "Acquiring auth token",
               authTokenManager.getToken,
               logger,

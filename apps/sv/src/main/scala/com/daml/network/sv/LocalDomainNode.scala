@@ -99,6 +99,7 @@ final class LocalDomainNode(
       participantAdminConnection: ParticipantAdminConnection,
   )(implicit traceContext: TraceContext) =
     retryProvider.waitUntil(
+      RetryFor.WaitingOnInitDependency,
       show"the identity transactions for $uid are visible",
       participantAdminConnection.getIdentityTransactions(uid, Some(domainId)).map { txs =>
         if (!containsIdentityTransactions(uid, txs)) {
@@ -170,7 +171,8 @@ final class LocalDomainNode(
         identity,
       )
       _ = logger.info(s"Onboarding mediator $mediatorId through sponsoring SV")
-      _ <- retryProvider.retryForAutomation(
+      _ <- retryProvider.retry(
+        RetryFor.WaitingOnInitDependency,
         "Onboarding mediator through sponsoring SV",
         svConnection.onboardSvMediator(mediatorId),
         logger,
@@ -194,7 +196,8 @@ final class LocalDomainNode(
         logger,
       )
       _ = logger.info(s"Initializing mediator $mediatorId")
-      _ <- retryProvider.retryForAutomation(
+      _ <- retryProvider.retry(
+        RetryFor.WaitingOnInitDependency,
         "Initializing mediator",
         mediatorAdminConnection.getStatus.flatMap {
           case NodeStatus.NotInitialized(_) =>
@@ -280,14 +283,16 @@ final class LocalDomainNode(
         identity,
       )
       _ = logger.info(s"Onboarding sequencer $sequencerId through sponsoring SV")
-      snapshot <- retryProvider.retryForAutomation(
+      snapshot <- retryProvider.retry(
+        RetryFor.WaitingOnInitDependency,
         "Onbarding sequencer through sponsoring SV",
         svConnection.onboardSvSequencer(sequencerId),
         logger,
       )
       _ = logger.info(s"Onboarded sequencer $sequencerId")
       _ = logger.info(s"Initializing sequencer $sequencerId")
-      _ <- retryProvider.retryForAutomation(
+      _ <- retryProvider.retry(
+        RetryFor.WaitingOnInitDependency,
         "Initializing sequencer",
         sequencerAdminConnection.getStatus.flatMap {
           case NodeStatus.NotInitialized(_) =>

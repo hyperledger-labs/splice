@@ -4,7 +4,7 @@ import cats.data.EitherT
 import cats.syntax.foldable.*
 import com.daml.error.utils.ErrorDetails
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.onboarding.SvcPartyHosting
 import com.daml.network.sv.onboarding.SvcPartyHosting.SvcPartyMigrationFailure
@@ -95,7 +95,8 @@ class SvcPartyMigration(
       _ <- submitDummyTransaction()
       snapshot <- {
         var acsOffset = authorizedAt
-        retryProvider.retryForAutomation(
+        retryProvider.retry(
+          RetryFor.ClientCalls,
           show"Download ACS snapshot for SVC at $acsOffset",
           participantAdminConnection
             .downloadAcsSnapshot(

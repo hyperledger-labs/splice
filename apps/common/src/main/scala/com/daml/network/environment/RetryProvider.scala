@@ -125,19 +125,6 @@ final class RetryProvider(
       waitUnlessShutdown(waitForSignal.unwrap).onShutdown(UnlessShutdown.AbortedDueToShutdown)
     )
 
-  // @deprecated("TODO (#7244) inline", since = "2023-10-23")
-  def waitUntil(
-      conditionDescription: String,
-      checkCondition: => Future[Unit],
-      logger: TracedLogger,
-  )(implicit ec: ExecutionContext): Future[Unit] =
-    waitUntil(
-      RetryFor.WaitingOnInitDependency,
-      conditionDescription,
-      checkCondition,
-      logger,
-    )
-
   /** Wait for a condition to become true with proper logging.
     *
     * Intended to be used for one-time waits during app init or like processes.
@@ -219,15 +206,6 @@ final class RetryProvider(
           },
         )
     })
-
-  // @deprecated("TODO (#7244) inline", since = "2023-10-23")
-  def ensureThatB(
-      conditionDesc: String,
-      check: => Future[Boolean],
-      establish: => Future[Unit],
-      logger: TracedLogger,
-  )(implicit ec: ExecutionContext): Future[Unit] =
-    ensureThatB(RetryFor.WaitingOnInitDependency, conditionDesc, check, establish, logger)
 
   /** Variant of ensureThat where the check returns only a Boolean. */
   def ensureThatB(
@@ -311,7 +289,8 @@ final class RetryProvider(
         case Right(result) => Future.successful(result)
         case Left(_) =>
           logger.debug(s"Established that $conditionDesc, waiting until it is observable")
-          retryForAutomation(
+          retry(
+            retryFor,
             s"Wait until observing $conditionDesc",
             establishedCheck.map {
               case Right(result) => result
@@ -339,42 +318,6 @@ final class RetryProvider(
         },
       )
     })
-
-  /** A retry intended for automation calls that are expected to succeed eventually. Retries a bounded number of times. */
-  def retryForAutomation[T](
-      operationName: String,
-      task: => Future[T],
-      logger: TracedLogger,
-      additionalCodes: Seq[Status.Code] = Seq.empty,
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): Future[T] =
-    retry(
-      RetryFor.Automation,
-      operationName,
-      task,
-      logger,
-      additionalCodes,
-    )
-
-  /** A retry intended for automation that is expected to run forever, e.g., ledger ingestion. Retries forever. */
-  def retryForLongRunningAutomation[T](
-      operationName: String,
-      task: => Future[T],
-      logger: TracedLogger,
-      additionalCodes: Seq[Status.Code] = Seq.empty,
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): Future[T] =
-    retry(
-      RetryFor.LongRunningAutomation,
-      operationName,
-      task,
-      logger,
-      additionalCodes,
-    )
 
   /** A retry intended for client calls, thus timing out relatively quickly. */
   def retryForClientCalls[T, R: Retryable](

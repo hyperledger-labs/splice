@@ -4,6 +4,7 @@ import com.daml.network.environment.{
   BaseLedgerConnection,
   CNLedgerConnection,
   ParticipantAdminConnection,
+  RetryFor,
 }
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.digitalasset.canton.topology.PartyId
@@ -40,5 +41,6 @@ private[onboarding] object SetupUtil {
     config.ledgerApiUser,
     BaseLedgerConnection.SVC_PARTY_USER_METADATA_KEY,
     svcParty.toProtoPrimitive,
+    RetryFor.WaitingOnInitDependency,
   )
 }

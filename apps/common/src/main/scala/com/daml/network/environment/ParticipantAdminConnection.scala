@@ -267,6 +267,7 @@ class ParticipantAdminConnection(
           logger,
         )
       _ <- retryProvider.waitUntil(
+        retryFor,
         s"Package $packageId is vetted",
         packageIsVetted(packageId),
         logger,
@@ -315,6 +316,7 @@ class ParticipantAdminConnection(
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       _ <- retryProvider.ensureThatB(
+        RetryFor.WaitingOnInitDependency,
         show"Party $partyId is allocated on $participantId",
         listPartyToParticipant(
           TopologyStoreId.AuthorizedStore.filterName,
@@ -328,6 +330,7 @@ class ParticipantAdminConnection(
         logger,
       )
       _ <- retryProvider.waitUntil(
+        RetryFor.WaitingOnInitDependency,
         show"Party allocation of $partyId is visible on all connected domains",
         for {
           domains <- listConnectedDomains()

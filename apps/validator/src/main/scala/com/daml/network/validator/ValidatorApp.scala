@@ -301,7 +301,8 @@ class ValidatorApp(
       secret: String,
   ): Future[Unit] = {
     logger.info(s"Requesting to be onboarded by SV at: ${svConfig.url}")
-    retryProvider.retryForAutomation(
+    retryProvider.retry(
+      RetryFor.WaitingOnInitDependency,
       "request onboarding",
       withSvConnection(svConfig)(_.onboardValidator(validatorParty, secret)),
       logger,

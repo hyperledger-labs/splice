@@ -176,7 +176,8 @@ class SvApp(
     for {
       // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
       // reconnect all domains at the beginning of SV initialization just in case.
-      _ <- retryProvider.retryForAutomation(
+      _ <- retryProvider.retry(
+        RetryFor.WaitingOnInitDependency,
         "Reconnect all domains",
         participantAdminConnection.reconnectAllDomains(),
         logger,
@@ -560,7 +561,8 @@ class SvApp(
       globalDomain: DomainId,
       clock: Clock,
   ): Future[Unit] =
-    retryProvider.retryForAutomation(
+    retryProvider.retry(
+      RetryFor.WaitingOnInitDependency,
       "Create ValidatorOnboarding contract for preconfigured secret",
       SvApp
         .prepareValidatorOnboarding(
@@ -601,7 +603,8 @@ class SvApp(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       globalDomain: DomainId,
   ): Future[Unit] =
-    retryProvider.retryForAutomation(
+    retryProvider.retry(
+      RetryFor.WaitingOnInitDependency,
       "Create ApprovedSvIdentity contract for preconfigured SV identity",
       SvApp.approveSvIdentity(name, key, svStoreWithIngestion, globalDomain, logger).map {
         case Left(reason) => logger.info(s"Failed to approve SV identity: $reason")
@@ -620,7 +623,8 @@ class SvApp(
         logger.info(s"A coin price vote with a defined coin price already exists")
         Future.successful(Right(()))
       case _ =>
-        retryProvider.retryForAutomation(
+        retryProvider.retry(
+          RetryFor.WaitingOnInitDependency,
           "Update coin price vote to configured initial coin price vote",
           SvApp
             .updateCoinPriceVote(
@@ -1191,7 +1195,8 @@ object SvApp {
     } yield ()
 
     retryProvider
-      .retryForAutomation(
+      .retry(
+        RetryFor.WaitingOnInitDependency,
         s"setting domain config for $svParty",
         setConfigIfRequired(),
         logger,
@@ -1216,7 +1221,8 @@ object SvApp {
         retryProvider,
         logger,
       )
-      _ <- retryProvider.retryForAutomation(
+      _ <- retryProvider.retry(
+        RetryFor.WaitingOnInitDependency,
         "Create validator license for SV party",
         for {
           svcRules <- store.getSvcRules()

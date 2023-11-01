@@ -6,7 +6,7 @@ import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.lf.data.Ref
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_ValidatorLicense
-import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}
+import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryFor, RetryProvider}
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.{
@@ -163,7 +163,8 @@ object AcsStoreDump {
     }
 
     retryProvider
-      .retryForAutomation(
+      .retry(
+        RetryFor.WaitingOnInitDependency,
         show"receive shipment of crates for $party",
         getAndReceiveShipment(),
         logger,

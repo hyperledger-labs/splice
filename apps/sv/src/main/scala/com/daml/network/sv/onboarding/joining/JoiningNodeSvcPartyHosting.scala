@@ -2,7 +2,7 @@ package com.daml.network.sv.onboarding.joining
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
-import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound
 import com.daml.network.sv.config.{SvAppClientConfig, SvOnboardingConfig}
@@ -36,7 +36,8 @@ class JoiningNodeSvcPartyHosting(
     getSponsorSvConfig(onboardingConfig) match {
       case Some(sponsorSvConfig) =>
         for {
-          response <- retryProvider.retryForAutomation(
+          response <- retryProvider.retry(
+            RetryFor.WaitingOnInitDependency,
             "Onboard to svc party hosting and unionspace membership",
             SvConnection(
               sponsorSvConfig.adminApi,
@@ -59,7 +60,8 @@ class JoiningNodeSvcPartyHosting(
                 _ <- participantAdminConnection.disconnectFromAllDomains()
                 _ = logger.info("candidate SV participant disconnected from global domain")
                 response <- retryProvider
-                  .retryForAutomation(
+                  .retry(
+                    RetryFor.WaitingOnInitDependency,
                     "authorize svc party hosting on sponsor",
                     svConnection
                       .authorizeSvcPartyHosting(

@@ -65,6 +65,7 @@ class ParticipantInitializer(
         for {
           dump <- getDump(c)
           _ <- retryProvider.ensureThatB(
+            RetryFor.WaitingOnInitDependency,
             "participant is initialized",
             isInitialized(),
             initializeFromDump(dump),

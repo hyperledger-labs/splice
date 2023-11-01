@@ -1,7 +1,7 @@
 package com.daml.network.automation
 
 import akka.Done
-import com.daml.network.environment.{CNLedgerSubscription, RetryProvider}
+import com.daml.network.environment.{CNLedgerSubscription, RetryFor, RetryProvider}
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
@@ -52,7 +52,8 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
       _ => {
         logger.debug(s"Starting ledger ingestion loop")
         val retryLoopF = retryProvider
-          .retryForLongRunningAutomation(
+          .retry(
+            RetryFor.LongRunningAutomation,
             "ledger ingestion loop", {
               newLedgerSubscription().flatMap(subscription => {
                 // Smuggle the current subscription out of the body here, so that we can use
@@ -81,7 +82,7 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
             // couple the lifecycle of retrying to the lifecycle of the UpdateIngestionService
             logger,
             // also retry on the INTERNAL error above
-            additionalCodes = Seq(Status.Code.INTERNAL),
+            Seq(Status.Code.INTERNAL),
           )
         ingestionLoopTerminatedF.set(
           retryLoopF.transform(

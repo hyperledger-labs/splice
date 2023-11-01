@@ -343,6 +343,7 @@ class TopologyAdminConnection(
       description: String,
       check: TopologyTransactionType => EitherT[Future, TopologyResult[M], TopologyResult[M]],
       update: M => Either[String, M],
+      retryFor: RetryFor,
       signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
     ensureTopologyMapping(
@@ -361,6 +362,7 @@ class TopologyAdminConnection(
           )
         },
       update,
+      retryFor,
       signedBy,
       isProposal = true,
     )
@@ -379,11 +381,13 @@ class TopologyAdminConnection(
       description: String,
       check: => EitherT[Future, TopologyResult[M], TopologyResult[M]],
       update: M => Either[String, M],
+      retryFor: RetryFor,
       signedBy: Fingerprint,
       isProposal: Boolean = false,
       recreateOnAuthorizedStateChange: Boolean = true,
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] =
-    retryProvider.retryForAutomation(
+    retryProvider.retry(
+      retryFor,
       description,
       check.foldF(
         { case TopologyResult(beforeEstablishedBaseResult, mapping) =>
@@ -396,7 +400,8 @@ class TopologyAdminConnection(
             isProposal = isProposal,
           )
             .flatMap { _ =>
-              retryProvider.retryForAutomation(
+              retryProvider.retry(
+                retryFor,
                 s"check established $description",
                 check
                   .leftFlatMap[TopologyResult[M], RuntimeException] { currentAuthorizedState =>
@@ -517,6 +522,7 @@ class TopologyAdminConnection(
             ),
           )
         ),
+      RetryFor.WaitingOnInitDependency,
       signedBy,
     )
   }
@@ -563,6 +569,7 @@ class TopologyAdminConnection(
       domainId: DomainId,
       newActiveSequencer: SequencerId,
       signedBy: Fingerprint,
+      retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[SequencerDomainStateX]] = ensureTopologyMapping[SequencerDomainStateX](
@@ -581,6 +588,7 @@ class TopologyAdminConnection(
         newActiveSequencer +: previous.active,
         previous.observers,
       ),
+    retryFor,
     signedBy,
   )
 
@@ -612,6 +620,7 @@ class TopologyAdminConnection(
       newActiveMediator: MediatorId,
       signedBy: Fingerprint,
       svcRulesMembersSize: Int,
+      retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[MediatorDomainStateX]] =
@@ -632,6 +641,7 @@ class TopologyAdminConnection(
           newActiveMediator +: previous.active,
           previous.observers,
         ),
+      retryFor,
       signedBy,
     )
 
@@ -660,6 +670,7 @@ class TopologyAdminConnection(
       unionspace: Namespace,
       newOwner: Namespace,
       signedBy: Fingerprint,
+      retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[UnionspaceDefinitionX]] =
@@ -674,6 +685,7 @@ class TopologyAdminConnection(
           previous.threshold,
           previous.owners.incl(newOwner),
         ),
+      retryFor,
       signedBy,
       isProposal = true,
     )
@@ -696,7 +708,7 @@ class TopologyAdminConnection(
       newTotalExtraTrafficLimit: Long,
       signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[Unit] =
-    retryProvider.ensureThat[Option[TopologyResult[TrafficControlStateX]], Unit](
+    retryProvider.ensureThat(
       RetryFor.WaitingOnInitDependency,
       s"Extra traffic limit for $member on domain $domainId set to $newTotalExtraTrafficLimit (or higher)",
       lookupTrafficControlState(domainId, member).map(result =>
@@ -706,7 +718,7 @@ class TopologyAdminConnection(
           result,
         )
       ),
-      previousOrNone =>
+      (previousOrNone: Option[TopologyResult[TrafficControlStateX]]) =>
         proposeMapping(
           TopologyStoreId.DomainStore(domainId),
           TrafficControlStateX

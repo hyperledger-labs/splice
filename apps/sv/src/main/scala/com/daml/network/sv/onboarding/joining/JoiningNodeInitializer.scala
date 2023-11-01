@@ -159,6 +159,7 @@ class JoiningNodeInitializer(
               )
             _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- retryProvider.ensureThatB(
+              RetryFor.WaitingOnInitDependency,
               show"the SvcRules list the SV party ${svcStore.key.svParty} as a member",
               isOnboarded(svcStore), {
                 withSvStore.startOnboardingWithSvcPartyHosted(
@@ -320,7 +321,8 @@ class JoiningNodeInitializer(
           // Wait on the SVC store to make sure that we atomically see either the SvOnboardingConfirmed contract
           // or the SvcRules contract.
           _ <- waitForSvOnboardingConfirmedInSvcStore()
-          _ <- retryProvider.retryForAutomation(
+          _ <- retryProvider.retry(
+            RetryFor.WaitingOnInitDependency,
             "add member to Svc",
             for {
               (svcRules, coinRules, openMiningRounds, svOnboardingConfirmedOpt) <- (
@@ -378,6 +380,7 @@ class JoiningNodeInitializer(
               svcParty.uid.namespace,
               svParty.uid.namespace,
               svParty.uid.namespace.fingerprint,
+              RetryFor.WaitingOnInitDependency,
             )
         } yield ()
       }
@@ -476,7 +479,8 @@ class JoiningNodeInitializer(
       SvOnboardingToken(name, publicKey, svParty, svcParty).signAndEncode(privateKey) match {
         case Right(token) =>
           logger.info(s"Requesting to be onboarded via SV at: ${sponsorConfig.url}")
-          retryProvider.retryForAutomation(
+          retryProvider.retry(
+            RetryFor.WaitingOnInitDependency,
             "request onboarding",
             withSvConnection(sponsorConfig)(_.startSvOnboarding(token)),
             logger,

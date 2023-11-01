@@ -202,7 +202,7 @@ class HttpAppManagerAdminHandler(
           )
         }
         appUrl <- store.getInstalledAppUrl(providerParty)
-        _ <- release.release.darHashes.traverse_(ensureDar(appUrl, _, RetryFor.ClientCalls))
+        _ <- release.release.darHashes.traverse_(ensureDar(appUrl, _))
         _ <- store.storeApprovedReleaseConfiguration(
           AppManagerStore.ApprovedReleaseConfiguration(
             providerParty,
@@ -217,12 +217,11 @@ class HttpAppManagerAdminHandler(
   private def ensureDar(
       appUrl: AppManagerStore.AppUrl,
       darHash: String,
-      retryFor: RetryFor.ClientCalls.type, // TODO (#7244) remove arg if compiling
   )(implicit
       tc: TraceContext
   ): Future[Unit] =
     retryProvider.ensureThatO(
-      retryFor,
+      RetryFor.ClientCalls,
       show"DAR $darHash is uploaded",
       participantAdminConnection.lookupDar(Hash.tryFromHexString(darHash)).map(_.map(_ => ())),
       for {
@@ -233,7 +232,7 @@ class HttpAppManagerAdminHandler(
             new ByteArrayInputStream(Base64.getDecoder().decode(darResponse.base64Dar)),
           )
           ._1
-        _ <- participantAdminConnection.uploadDarFiles(Seq(dar), retryFor)
+        _ <- participantAdminConnection.uploadDarFiles(Seq(dar), RetryFor.ClientCalls)
       } yield (),
       logger,
     )

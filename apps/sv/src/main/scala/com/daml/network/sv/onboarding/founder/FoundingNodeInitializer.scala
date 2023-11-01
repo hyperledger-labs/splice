@@ -166,6 +166,7 @@ class FoundingNodeInitializer(
       _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
       withSvcStore = new WithSvcStore(svcAutomation, globalDomain)
       _ <- retryProvider.ensureThatB(
+        RetryFor.WaitingOnInitDependency,
         show"the SvcRules and CoinRules are bootstrapped",
         svcStore.lookupSvcRules().map(_.isDefined), {
           withSvcStore.foundCollective()
@@ -317,6 +318,7 @@ class FoundingNodeInitializer(
           logger,
         )
         _ <- retryProvider.ensureThatB(
+          RetryFor.WaitingOnInitDependency,
           "mediator is initialized",
           domainNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
           domainNode.mediatorAdminConnection.initialize(
