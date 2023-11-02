@@ -1200,7 +1200,7 @@ function subcmd_pulumi() {
     esac
 
     case "${pulumi_cmd}" in
-        up|down)
+        up|down|config)
             _uses_pulumi_stack "${pulumi_project}"
             ;;
         *)
