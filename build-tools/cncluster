@@ -1617,6 +1617,42 @@ function subcmd_revive_sv_app() {
     fi
 }
 
+###
+
+subcommand_whitelist[participant_console]='Open a Canton console against a single participant running in the target namespace'
+
+function subcmd_participant_console() {
+    _cluster_must_exist
+
+    namespace="${1-}"
+
+    if [ -z "${namespace}" ]; then
+        _error "Usage: $SCRIPTNAME participant_console <namespace-name>"
+    fi
+
+    app_name="participant"
+    readarray -d ' ' -t matching_pods < <(kubectl get pods -n "$namespace" -l app=$app_name  -o 'jsonpath={.items[*].metadata.name}')
+
+    if [ ${#matching_pods[@]} -eq 0 ]; then
+      _error "No pods running the '$app_name' app found in namespace '$namespace'."
+    elif [ ${#matching_pods[@]} -gt 1 ]; then
+      _error "More than one pods running the '$app_name' app found in namespace '$namespace'."
+    else
+      pod_name=${matching_pods[0]}
+    fi
+
+    _info "Starting port forwarding from '$pod_name'..."
+    kubectl port-forward -n "$namespace" "$pod_name" 5001:5001 5002:5002 &
+    port_forwarding_pid=$!
+
+    _info "Starting Canton console..."
+    _warning "Currently only admin API access is supported."
+    canton -v -c "$REPO_ROOT/build-tools/local-participant.conf"
+
+    _info "Stopping port forwarding."
+    kill $port_forwarding_pid
+}
+
 ################################
 ### Main
 ################################
