@@ -14,7 +14,7 @@ WORKDIR /app
 # move tarball to a static name
 ADD target/canton.tar .
 
-COPY empty.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/logback.xml /app/
+COPY target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/logback.xml /app/
 
 RUN ln -s bin/canton cn-image-bin
 

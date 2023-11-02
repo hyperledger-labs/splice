@@ -5,7 +5,7 @@ app-bundle := ${REPO_ROOT}/apps/app/target/release/cn-node-0.1.0-SNAPSHOT.tar.gz
 
 include ${REPO_ROOT}/cluster/images/common/entrypoint-image.mk
 
-$(dir)/$(docker-build): $(dir)/empty.conf $(dir)/target/entrypoint.sh $(dir)/target/LICENSE.txt $(target-bundle)
+$(dir)/$(docker-build): $(dir)/target/entrypoint.sh $(dir)/target/LICENSE.txt $(target-bundle)
 
 $(dir)/target/LICENSE.txt: LICENSE.txt
 	cp $< $@

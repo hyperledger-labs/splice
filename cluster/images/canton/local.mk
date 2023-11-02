@@ -5,7 +5,7 @@ target-logback := $(dir)/target/logback.xml
 
 include ${REPO_ROOT}/cluster/images/common/entrypoint-image.mk
 
-$(dir)/$(docker-build): $(dir)/empty.conf $(dir)/target/entrypoint.sh $(target-canton) $(target-logback)
+$(dir)/$(docker-build): $(dir)/target/entrypoint.sh $(target-canton) $(target-logback)
 
 $(target-canton):
 	rm -f $@ ;\
