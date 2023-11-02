@@ -92,4 +92,4 @@ spec:
     port: 5432
     protocol: TCP
   selector:
-    app: postgres
+    app: {{ .Release.Name }}
