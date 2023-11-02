@@ -100,6 +100,23 @@ function psql_createdb() {
     >> "$LOG_FILE"
 }
 
+function psql_dropdb() {
+  export PGPASSWORD="$POSTGRES_PASSWORD"
+
+  # see: https://stackoverflow.com/questions/17449420/postgresql-unable-to-drop-database-because-of-some-auto-connections-to-db/68982312
+  echo "Terminating connections to database $1"
+  psql -U "$POSTGRES_USER" -h "$POSTGRES_HOST" -w \
+    -c "SELECT pid, pg_terminate_backend(pid)
+        FROM pg_stat_activity
+        WHERE datname = '$1' AND pid <> pg_backend_pid();" \
+    >> "$LOG_FILE"
+
+  echo "Dropping database $1"
+  psql -U "$POSTGRES_USER" -h "$POSTGRES_HOST" -w \
+    -c "DROP DATABASE $1;" \
+    >> "$LOG_FILE"
+}
+
 case "$1_$2" in
     docker_start)
         docker_start
@@ -136,6 +153,15 @@ case "$1_$2" in
     external_createdb)
         psql_createdb "$3"
     ;;
+    docker_dropdb)
+        psql_dropdb "$3"
+    ;;
+    local_dropdb)
+        psql_dropdb "$3"
+    ;;
+    external_dropdb)
+        psql_dropdb "$3"
+    ;;
     docker_stop)
         docker_stop
     ;;
@@ -159,6 +185,7 @@ case "$1_$2" in
         echo "  COMMAND"
         echo "    start            makes sure the postgres instance is running"
         echo "    createdb <name>  creates a new database with the given name"
+        echo "    dropdb   <name>  drops an existing database with the given name"
         echo "    stop             removes the postgres instance along with all data"
     ;;
 esac
