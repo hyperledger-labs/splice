@@ -638,7 +638,7 @@ class WalletTimeBasedIntegrationTest
       }
 
       grantFeaturedAppRight(aliceValidatorWalletClient)
-      p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
+      p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
       eventually()({
         bobWalletClient.balance().unlockedQty should not be (BigDecimal(0.0))
         aliceValidatorWalletClient.listAppRewardCoupons() should have length (couponsBefore + 1)

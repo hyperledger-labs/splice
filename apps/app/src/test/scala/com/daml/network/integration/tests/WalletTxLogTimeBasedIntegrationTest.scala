@@ -65,7 +65,7 @@ class WalletTxLogTimeBasedIntegrationTest
 
       actAndCheck(
         "Alice transfers some CC to Bob",
-        p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bobUserParty, 40.0),
+        p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 40.0),
       )(
         "Bob has received the CC",
         _ => bobWalletClient.balance().unlockedQty should be > BigDecimal(39.0),
@@ -92,13 +92,7 @@ class WalletTxLogTimeBasedIntegrationTest
 
       actAndCheck(
         "Alice's validator transfers some CC to Bob (using her app & validator rewards)",
-        p2pTransfer(
-          aliceValidatorBackend,
-          aliceValidatorWalletClient,
-          bobWalletClient,
-          bobUserParty,
-          10.0,
-        ),
+        p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0),
       )(
         "Bob has received the CC",
         _ => {

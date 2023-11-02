@@ -1,6 +1,5 @@
 package com.daml.network.util
 
-import com.daml.ledger.javaapi.data.ExercisedEvent
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.fees as feesCodegen
@@ -8,12 +7,13 @@ import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
 import com.daml.network.codegen.java.cn.wallet.{
+  install as walletInstallCodegen,
   payment as paymentCodegen,
   subscriptions as subsCodegen,
-  install as walletInstallCodegen,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{ValidatorAppBackendReference, *}
+import com.daml.network.http.v0.definitions.GetTransferOfferStatusResponse
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
@@ -179,51 +179,48 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   }
 
   def p2pTransfer(
-      senderValidator: ValidatorAppBackendReference,
       senderWallet: WalletAppClientReference,
       receiverWallet: WalletAppClientReference,
       receiver: PartyId,
       amount: BigDecimal,
   ) = {
     val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(1))
-    val transferOfferId =
-      senderWallet.createTransferOffer(
-        receiver,
-        amount,
-        "test transfer",
-        expiration,
-        trackingId = UUID.randomUUID.toString,
-      )
-    eventually() {
-      forExactly(1, receiverWallet.listTransferOffers())(offer =>
-        offer.contractId shouldBe transferOfferId
-      )
-    }
-    val offsetBefore =
-      senderValidator.participantClientWithAdminToken.ledger_api.transactions.end()
-    val acceptedCid = receiverWallet.acceptTransferOffer(transferOfferId)
+    val trackingId = UUID.randomUUID.toString
 
-    val senderParty = PartyId.tryFromProtoPrimitive(senderWallet.userStatus().party)
-
-    eventually() {
-      val offset = senderValidator.participantClientWithAdminToken.ledger_api.transactions.end()
-      val transactions =
-        senderValidator.participantClientWithAdminToken.ledger_api_extensions.transactions
-          .treesJava(
-            Set(senderParty),
-            completeAfter = Int.MaxValue,
-            beginOffset = offsetBefore,
-            endOffset = Some(offset),
-          )
-      forExactly(1, transactions) { transaction =>
-        forExactly(1, transaction.getEventsById.asScala.values)(
-          inside(_) { case event: ExercisedEvent =>
-            event.getContractId shouldBe acceptedCid.contractId
-            event.getChoice shouldBe "AcceptedTransferOffer_Complete"
-          }
+    val (transferOfferId, _) = actAndCheck(
+      "create a transfer offer", {
+        senderWallet.createTransferOffer(
+          receiver,
+          amount,
+          "test transfer",
+          expiration,
+          trackingId,
         )
-      }
-    }
+      },
+    )(
+      "the transfer offer shows up as created",
+      transferOfferId => {
+        val status = senderWallet.getTransferOfferStatus(trackingId)
+        status.status shouldBe GetTransferOfferStatusResponse.Status.Created
+
+        forExactly(1, receiverWallet.listTransferOffers()) { offer =>
+          offer.contractId shouldBe transferOfferId
+          offer.payload.trackingId shouldBe trackingId
+        }
+      },
+    )
+
+    actAndCheck(
+      "the transfer offer is accepted", {
+        receiverWallet.acceptTransferOffer(transferOfferId)
+      },
+    )(
+      "the transfer offer shows up as completed",
+      _ => {
+        val status = senderWallet.getTransferOfferStatus(trackingId)
+        status.status shouldBe GetTransferOfferStatusResponse.Status.Completed
+      },
+    )
   }
 
   /** Collects an accepted app payment request without doing anything useful in return. */

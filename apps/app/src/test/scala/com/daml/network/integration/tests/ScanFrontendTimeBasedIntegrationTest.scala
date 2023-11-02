@@ -49,17 +49,11 @@ class ScanFrontendTimeBasedIntegrationTest
       }
 
       clue("Feature alice's validator and transfer some CC, to generate reward coupons")({
-        p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
+        p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
         advanceRoundsByOneTick
         advanceRoundsByOneTick
         advanceRoundsByOneTick
-        p2pTransfer(
-          aliceValidatorBackend,
-          aliceValidatorWalletClient,
-          bobWalletClient,
-          bobUserParty,
-          10.0,
-        )
+        p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0)
       })
 
       clue("Advance rounds to collect rewards") {

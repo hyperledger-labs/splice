@@ -262,13 +262,7 @@ class ScanIntegrationTest
 
       val transferAmount = BigDecimal(10000.0)
       clue("Transfer some CC to alice") {
-        p2pTransfer(
-          bobValidatorBackend,
-          bobWalletClient,
-          aliceWalletClient,
-          aliceUserParty,
-          transferAmount,
-        )
+        p2pTransfer(bobWalletClient, aliceWalletClient, aliceUserParty, transferAmount)
       }
 
       clue("Alice receives the transfer from bob") {
@@ -336,13 +330,7 @@ class ScanIntegrationTest
       }
       val selfTransferAmount = BigDecimal(1000)
       clue("Self Transfer some CC from/to Bob") {
-        p2pTransfer(
-          bobValidatorBackend,
-          bobWalletClient,
-          bobWalletClient,
-          bobUserParty,
-          selfTransferAmount,
-        )
+        p2pTransfer(bobWalletClient, bobWalletClient, bobUserParty, selfTransferAmount)
       }
       clue("Bob receives self-transfer") {
         eventually() {
@@ -480,7 +468,7 @@ class ScanIntegrationTest
       bobWalletClient.tap(50)
       actAndCheck(
         "Transfer from Bob to Alice",
-        p2pTransfer(bobValidatorBackend, bobWalletClient, aliceWalletClient, alice, 30.0),
+        p2pTransfer(bobWalletClient, aliceWalletClient, alice, 30.0),
       )(
         "Bob's validator will receive some rewards",
         _ => {

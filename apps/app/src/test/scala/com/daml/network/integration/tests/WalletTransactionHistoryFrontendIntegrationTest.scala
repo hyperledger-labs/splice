@@ -83,16 +83,9 @@ class WalletTransactionHistoryFrontendIntegrationTest
             )
             // charlie -> alice
             charlieWalletClient.tap(50)
-            p2pTransfer(
-              aliceValidatorBackend,
-              charlieWalletClient,
-              aliceWalletClient,
-              aliceUserParty,
-              BigDecimal("1.07"),
-            )
+            p2pTransfer(charlieWalletClient, aliceWalletClient, aliceUserParty, BigDecimal("1.07"))
             // alice -> charlie
             p2pTransfer(
-              aliceValidatorBackend,
               aliceWalletClient,
               charlieWalletClient,
               charlieUserParty,
@@ -241,13 +234,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         actAndCheck(
           "Alice makes transfers to bob", {
             transferAmounts.foreach(amount =>
-              p2pTransfer(
-                aliceValidatorBackend,
-                aliceWalletClient,
-                bobWalletClient,
-                bobUserParty,
-                BigDecimal(amount),
-              )
+              p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, BigDecimal(amount))
             )
           },
         )(

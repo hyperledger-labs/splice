@@ -42,7 +42,6 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
       actAndCheck(
         "Provide some initial coin balance to aliceValidator",
         p2pTransfer(
-          sv1ValidatorBackend,
           sv1WalletClient,
           aliceValidatorWalletClient,
           aliceValidatorBackend.getValidatorPartyId(),

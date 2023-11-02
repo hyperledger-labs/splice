@@ -146,11 +146,11 @@ class WalletPaymentIntegrationTest
       }
 
       clue("Alice transfers 39") {
-        p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bob, 39)
+        p2pTransfer(aliceWalletClient, bobWalletClient, bob, 39)
         checkWallet(alice, aliceWalletClient, Seq((30, 31)))
       }
       clue("Alice transfers 19") {
-        p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bob, 19)
+        p2pTransfer(aliceWalletClient, bobWalletClient, bob, 19)
         checkWallet(alice, aliceWalletClient, Seq((11, 12)))
       }
     }

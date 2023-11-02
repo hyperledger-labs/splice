@@ -48,7 +48,7 @@ class TimeBasedTestNetPreviewIntegrationTest
 
     actAndCheck(
       "Transfer from SV1 wallet to Bob wallet",
-      p2pTransfer(sv1ValidatorBackend, sv1WalletClient, bobWalletClient, bobParty, amountToTransfer),
+      p2pTransfer(sv1WalletClient, bobWalletClient, bobParty, amountToTransfer),
     )(
       "Check balances",
       _ => {

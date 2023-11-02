@@ -127,53 +127,29 @@ class ScanTimeBasedIntegrationTest
       )
     })
     clue("Transfer some CC, to generate reward coupons")({
-      p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
-      p2pTransfer(bobValidatorBackend, bobWalletClient, aliceWalletClient, aliceUserParty, 100.0)
+      p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 40.0)
+      p2pTransfer(bobWalletClient, aliceWalletClient, aliceUserParty, 100.0)
     })
     clue(
       "Advance a round and generate some more reward coupons - this time with alice's validator being featured"
     )({
       advanceRoundsByOneTick
       grantFeaturedAppRight(aliceValidatorWalletClient)
-      p2pTransfer(aliceValidatorBackend, aliceWalletClient, bobWalletClient, bobUserParty, 41.0)
-      p2pTransfer(bobValidatorBackend, bobWalletClient, aliceWalletClient, aliceUserParty, 101.0)
+      p2pTransfer(aliceWalletClient, bobWalletClient, bobUserParty, 41.0)
+      p2pTransfer(bobWalletClient, aliceWalletClient, aliceUserParty, 101.0)
     })
     clue("Advance 2 ticks for the first coupons to be collectable")({
       advanceRoundsByOneTick
       advanceRoundsByOneTick
     })
     clue("Alice's and Bob's validators use their app&validator rewards when transfering CC")({
-      p2pTransfer(
-        aliceValidatorBackend,
-        aliceValidatorWalletClient,
-        bobWalletClient,
-        bobUserParty,
-        10.0,
-      )
-      p2pTransfer(
-        bobValidatorBackend,
-        bobValidatorWalletClient,
-        aliceWalletClient,
-        aliceUserParty,
-        10.0,
-      )
+      p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0)
+      p2pTransfer(bobValidatorWalletClient, aliceWalletClient, aliceUserParty, 10.0)
     })
     clue("Some more transfers collect more rewards in round 5 (issued in round 1)")({
       advanceRoundsByOneTick
-      p2pTransfer(
-        aliceValidatorBackend,
-        aliceValidatorWalletClient,
-        bobWalletClient,
-        bobUserParty,
-        10.0,
-      )
-      p2pTransfer(
-        bobValidatorBackend,
-        bobValidatorWalletClient,
-        aliceWalletClient,
-        aliceUserParty,
-        10.0,
-      )
+      p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0)
+      p2pTransfer(bobValidatorWalletClient, aliceWalletClient, aliceUserParty, 10.0)
     })
     val baseRoundWithLatestData = clue(
       "Advance 1 more tick to make sure we capture at least one round change in the tx history"
