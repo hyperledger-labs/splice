@@ -117,6 +117,10 @@ class FoundingNodeInitializer(
       svcParty <- setupSvcParty(initConnection, namespace)
       // founder does not need to lock here
       svParty <- SetupUtil.setupSvParty(initConnection, config, participantAdminConnection)
+      _ <- participantAdminConnection.uploadDarFiles(
+        requiredDars,
+        RetryFor.WaitingOnInitDependency,
+      )
       storeKey = SvStore.Key(svParty, svcParty)
       svStore = newSvStore(storeKey)
       svcStore = newSvcStore(svStore.key)
@@ -345,21 +349,12 @@ class FoundingNodeInitializer(
     private val svParty = svcStore.key.svParty
 
     /** The one and only entry-point: found a fresh collective, given a properly allocated SVC party */
-    def foundCollective(): Future[Unit] = {
-      for {
-        // Founder does not need to lock
-        _ <- participantAdminConnection.uploadDarFiles(
-          requiredDars,
-          RetryFor.WaitingOnInitDependency,
-        )
-        _ <- retryProvider.retry(
-          RetryFor.WaitingOnInitDependency,
-          "bootstrapping SVC",
-          bootstrapSvc(),
-          logger,
-        )
-      } yield ()
-    }
+    def foundCollective(): Future[Unit] = retryProvider.retry(
+      RetryFor.WaitingOnInitDependency,
+      "bootstrapping SVC",
+      bootstrapSvc(),
+      logger,
+    )
 
     def reconcileSequencerConfigIfRequired(
         localDomainNode: Option[LocalDomainNode]

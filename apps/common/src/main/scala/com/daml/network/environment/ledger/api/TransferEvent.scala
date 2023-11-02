@@ -9,10 +9,13 @@ import com.daml.ledger.api.v2.reassignment as multidomain
 import com.daml.ledger.api.v2.state_service
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
+import com.google.protobuf.ByteString
+
 object IncompleteReassignmentEvent {
   case class Unassign(
       reassignmentEvent: ReassignmentEvent.Unassign,
       createdEvent: CreatedEvent,
+      createdEventBlob: ByteString,
   )
   case class Assign(
       reassignmentEvent: ReassignmentEvent.Assign
@@ -24,6 +27,7 @@ object IncompleteReassignmentEvent {
       reassignmentEvent = ReassignmentEvent.Unassign.fromProto(proto.getUnassignedEvent),
       createdEvent =
         CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
+      createdEventBlob = proto.getCreatedEvent.createdEventBlob,
     )
 
   def fromProto(
@@ -86,6 +90,7 @@ object ReassignmentEvent {
       override val target: DomainId,
       unassignId: String,
       createdEvent: CreatedEvent,
+      createdEventBlob: ByteString,
       override val counter: Long,
   ) extends ReassignmentEvent {
     def pretty: Pretty[this.type] =
@@ -108,6 +113,7 @@ object ReassignmentEvent {
         unassignId = proto.unassignId,
         createdEvent =
           CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
+        createdEventBlob = proto.getCreatedEvent.createdEventBlob,
         counter = proto.reassignmentCounter,
       )
     }

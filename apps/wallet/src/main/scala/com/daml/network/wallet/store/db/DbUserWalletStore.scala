@@ -25,6 +25,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.google.protobuf.ByteString
 import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -68,10 +69,11 @@ class DbUserWalletStore(
 
   override def ingestionAcsInsert(
       createdEvent: CreatedEvent,
+      createdEventBlob: ByteString,
       contractState: ContractStateRowData,
   )(implicit tc: TraceContext) = {
     UserWalletAcsStoreRowData
-      .fromCreatedEvent(createdEvent)
+      .fromCreatedEvent(createdEvent, createdEventBlob)
       .map {
         case UserWalletAcsStoreRowData(
               contract,
@@ -81,21 +83,16 @@ class DbUserWalletStore(
           val templateId = contract.identifier
           val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
           val createArguments = payloadJsonFromContract(contract.payload)
-          val createArgumentsValue =
-            payloadValueJsonStringFromRecord(contract.mandatoryPayloadValue)
-          val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
-          val contractMetadataContractKeyHash =
-            lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)
-          val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
+          val createdAt = Timestamp.assertFromInstant(contract.mandatoryCreatedAt)
           sqlu"""
-              insert into user_wallet_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, create_arguments_value, contract_metadata_created_at,
-                                        contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
+              insert into user_wallet_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, created_event_blob,
+                                        created_at, contract_expires_at,
                                         assigned_domain, reassignment_counter, reassignment_target_domain,
                                         reassignment_source_domain, reassignment_submitter, reassignment_unassign_id)
               values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
               templateId
-            )}, $createArguments, $createArgumentsValue, $contractMetadataCreatedAt,
-                      $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
+            )}, $createArguments, $createdEventBlob,
+                      $createdAt, $contractExpiresAt,
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId})
               on conflict do nothing

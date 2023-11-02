@@ -1,6 +1,5 @@
 package com.daml.network.store.db
 
-import com.daml.ledger.javaapi.data.ContractMetadata
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cn.directory as dirCodegen
@@ -873,7 +872,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new installCodegen.WalletAppInstall.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -899,7 +897,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new transferOffersCodegen.TransferOffer.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -925,7 +922,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new transferOffersCodegen.AcceptedTransferOffer.ContractId(cid),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -955,7 +951,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new paymentCodegen.AppPaymentRequest.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -979,7 +974,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new subsCodegen.Subscription.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -1000,7 +994,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new subsCodegen.SubscriptionIdleState.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -1028,7 +1021,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new subsCodegen.SubscriptionPayment.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -1094,7 +1086,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new subsCodegen.SubscriptionRequest.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -1118,7 +1109,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new dirCodegen.DirectoryEntry.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -1144,7 +1134,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new dirCodegen.DirectoryEntryContext.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 

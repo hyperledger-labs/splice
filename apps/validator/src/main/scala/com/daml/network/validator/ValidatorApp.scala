@@ -429,6 +429,15 @@ class ValidatorApp(
         clock,
       )
       _ <- setupWalletDars(participantAdminConnection)
+      // Upload the DAR bfeore starting automation. Otherwise ingestion will fail
+      // due to an unknown template.
+      _ <- config.appManager.traverse_ { _ =>
+        val dar = UploadablePackage.fromResource(DarResources.appManager.bootstrap)
+        participantAdminConnection.uploadDarFiles(
+          Seq(dar),
+          RetryFor.WaitingOnInitDependency,
+        )
+      }
       participantIdentitiesStore = new ParticipantIdentitiesStore(
         participantAdminConnection,
         config.participantIdentitiesBackup,
@@ -455,6 +464,7 @@ class ValidatorApp(
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
         svcParty = svcParty,
+        appManagerEnabled = config.appManager.isDefined,
       )
       store = ValidatorStore(
         key,
@@ -595,18 +605,14 @@ class ValidatorApp(
 
       appManagerHandlersO <-
         config.appManager.traverse { config =>
-          val dar = UploadablePackage.fromResource(DarResources.appManager.bootstrap)
+          val service = new AppManagerService(
+            validatorParty,
+            automation.connection,
+            participantAdminConnection,
+            automation.appManagerStore,
+          )
+
           for {
-            _ <- participantAdminConnection.uploadDarFiles(
-              Seq(dar),
-              RetryFor.WaitingOnInitDependency,
-            )
-            service = new AppManagerService(
-              validatorParty,
-              automation.connection,
-              participantAdminConnection,
-              automation.appManagerStore,
-            )
             _ <- config.initialRegisteredApps.values.toList.traverse { app =>
               service.registerApp(
                 app.providerUserId,

@@ -34,14 +34,9 @@ create table acs_store_template(
     contract_id text not null,
     template_id_package_id text not null,
     template_id_qualified_name text not null,
-    -- TODO(#7963) Reconsider storage duplication between create_arguments and create_arguments_value
     create_arguments jsonb not null,
-    create_arguments_value jsonb not null,
-
-    -- contract metadata for explicit disclosure
-    contract_metadata_created_at bigint not null,
-    contract_metadata_contract_key_hash text not null,
-    contract_metadata_driver_internal bytea not null,
+    created_event_blob bytea not null,
+    created_at bigint not null,
 
     -- expiry time of expiring contracts in micros since unix epoch
     -- part of the template as we expect all stores to support expiry

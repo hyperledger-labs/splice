@@ -1,5 +1,6 @@
 package com.daml.network.scan.admin.http
 
+import com.daml.lf.data.Time.Timestamp
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.{
@@ -14,7 +15,7 @@ import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.store.MultiDomainAcsStore.ContractState
-import com.daml.network.util.{Codec, Contract, ContractMetadataUtil, ContractWithState}
+import com.daml.network.util.{Codec, Contract, ContractWithState}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
@@ -104,8 +105,9 @@ class HttpScanHandler(
     val microseconds: Seq[Long] = (openRounds.map(r =>
       r.payload.tickDuration.microseconds.toLong
     ) ++ summarizingRounds.map(_.payload.tickDuration.microseconds.toLong) ++ issuingRounds.map(r =>
-      (ContractMetadataUtil.instantToMicros(r.payload.targetClosesAt) - ContractMetadataUtil
-        .instantToMicros(r.payload.opensAt)) / 2
+      (Timestamp
+        .assertFromInstant(r.payload.targetClosesAt)
+        .micros - Timestamp.assertFromInstant(r.payload.opensAt).micros) / 2
     ))
     // using the potentially-throwing `min` on-purpose as we don't want to accidentally set a very large TTL.
     microseconds.min

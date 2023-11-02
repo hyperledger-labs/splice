@@ -5,6 +5,7 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.store.db.AcsTables
 import com.daml.network.util.{Contract, QualifiedName}
+import com.google.protobuf.ByteString
 
 object SvTables extends AcsTables {
 
@@ -16,20 +17,24 @@ object SvTables extends AcsTables {
   )
 
   object SvAcsStoreRowData {
-    def fromCreatedEvent(createdEvent: CreatedEvent): Either[String, SvAcsStoreRowData] = {
+    def fromCreatedEvent(
+        createdEvent: CreatedEvent,
+        createdEventBlob: ByteString,
+    ): Either[String, SvAcsStoreRowData] = {
       // TODO(#8125) Switch to map lookups instead
       QualifiedName(createdEvent.getTemplateId) match {
         case t if t == QualifiedName(vo.ValidatorOnboarding.TEMPLATE_ID) =>
-          tryToDecode(vo.ValidatorOnboarding.COMPANION, createdEvent) { contract =>
-            SvAcsStoreRowData(
-              contract,
-              contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
-              onboardingSecret = Some(contract.payload.candidateSecret),
-              svCandidateName = None,
-            )
+          tryToDecode(vo.ValidatorOnboarding.COMPANION, createdEvent, createdEventBlob) {
+            contract =>
+              SvAcsStoreRowData(
+                contract,
+                contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+                onboardingSecret = Some(contract.payload.candidateSecret),
+                svCandidateName = None,
+              )
           }
         case t if t == QualifiedName(vo.UsedSecret.TEMPLATE_ID) =>
-          tryToDecode(vo.UsedSecret.COMPANION, createdEvent) { contract =>
+          tryToDecode(vo.UsedSecret.COMPANION, createdEvent, createdEventBlob) { contract =>
             SvAcsStoreRowData(
               contract,
               contractExpiresAt = None,
@@ -38,7 +43,7 @@ object SvTables extends AcsTables {
             )
           }
         case t if t == QualifiedName(so.ApprovedSvIdentity.TEMPLATE_ID) =>
-          tryToDecode(so.ApprovedSvIdentity.COMPANION, createdEvent) { contract =>
+          tryToDecode(so.ApprovedSvIdentity.COMPANION, createdEvent, createdEventBlob) { contract =>
             SvAcsStoreRowData(
               contract,
               contractExpiresAt = None,
@@ -47,13 +52,14 @@ object SvTables extends AcsTables {
             )
           }
         case t if t == QualifiedName(so.SvOnboardingConfirmed.TEMPLATE_ID) =>
-          tryToDecode(so.SvOnboardingConfirmed.COMPANION, createdEvent) { contract =>
-            SvAcsStoreRowData(
-              contract,
-              contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
-              onboardingSecret = None,
-              svCandidateName = Some(contract.payload.svName),
-            )
+          tryToDecode(so.SvOnboardingConfirmed.COMPANION, createdEvent, createdEventBlob) {
+            contract =>
+              SvAcsStoreRowData(
+                contract,
+                contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+                onboardingSecret = None,
+                svCandidateName = Some(contract.payload.svName),
+              )
           }
         case t =>
           Left(s"Template $t cannot be decoded as an entry for the SV store.")

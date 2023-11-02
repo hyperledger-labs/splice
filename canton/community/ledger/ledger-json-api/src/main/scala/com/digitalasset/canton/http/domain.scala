@@ -26,7 +26,7 @@ import scalaz.syntax.traverse.*
 import scalaz.{-\/, @@, Applicative, Bitraverse, Functor, NonEmptyList, Tag, Traverse, \/, \/-}
 import scalaz.syntax.tag.*
 
-import scala.annotation.tailrec
+import scala.annotation.{nowarn, tailrec}
 
 package object domain {
 
@@ -307,6 +307,7 @@ package domain {
       )
   }
 
+  @nowarn("cat=deprecation")
   object DisclosedContract {
     type LAV = DisclosedContract[ContractTypeId.Template.RequiredPkg, lav1.value.Record]
 

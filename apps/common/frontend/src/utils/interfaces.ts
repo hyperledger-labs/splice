@@ -8,19 +8,12 @@ import { z } from 'zod';
 import { DisclosedContract } from '@daml/ledger';
 import { ContractId, ContractTypeCompanion, Template } from '@daml/types';
 
-// The generated OpenAPI def is a class which doesn't match react-query’s default
-// structural sharing logic so we define our own.
-export interface ContractMetadata {
-  createdAt: string;
-  keyHash: string;
-  driverMetadata: string;
-}
-
 export interface Contract<T> {
   templateId: string;
   contractId: ContractId<T>;
   payload: T;
-  metadata: ContractMetadata;
+  createdEventBlob?: string;
+  createdAt: string;
 }
 
 export interface AssignedContract<T> {
@@ -37,11 +30,8 @@ export const Contract = {
     templateId: c.template_id,
     contractId: c.contract_id as ContractId<T>,
     payload: tmpl.decoder.runWithException(c.payload),
-    metadata: {
-      createdAt: c.metadata.createdAt,
-      keyHash: c.metadata.contractKeyHash,
-      driverMetadata: c.metadata.driverMetadata,
-    },
+    createdEventBlob: c.created_event_blob,
+    createdAt: c.created_at!,
   }),
   toDisclosedContract: <T extends object, K>(
     tmpl: Template<T, K>,
@@ -49,8 +39,7 @@ export const Contract = {
   ): DisclosedContract => ({
     templateId: c.templateId,
     contractId: c.contractId,
-    payload: tmpl.encode(c.payload),
-    metadata: c.metadata,
+    createdEventBlob: c.createdEventBlob!,
   }),
   fromUnknown: <T extends object, K, I extends string>(
     data: unknown,
@@ -63,11 +52,8 @@ export const Contract = {
       // for some reason, TS cant infer types correctly if we in-line the generic custom payload schema here,
       // so we'll just validate it separately
       payload: z.any(),
-      metadata: z.object({
-        createdAt: z.string(),
-        keyHash: z.string(),
-        driverMetadata: z.string(),
-      }),
+      createdEventBlob: z.string(),
+      createdAt: z.string(),
     });
 
     const contract = contractSchema.parse(data);

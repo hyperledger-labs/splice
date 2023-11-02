@@ -107,17 +107,6 @@ components:
     ContractId:
       type: string
 
-    ContractMetadata:
-      type: object
-      required: ["createdAt", "driverMetadata", "contractKeyHash"]
-      properties:
-        createdAt:
-          type: string # ISO 8601
-        contractKeyHash:
-          type: string # base-16 encoded.
-        driverMetadata:
-          type: string # base-64 encoded.
-
     Contract:
       type: object
       properties:
@@ -127,16 +116,15 @@ components:
           type: string
         payload:
           type: object
-        payload_value:
-          type: object
-        metadata:
-          $ref: "#/components/schemas/ContractMetadata"
+        created_event_blob:
+          type: string
+        created_at:
+          type: string
       required:
         [
           "template_id",
           "contract_id",
           "payload",
-          "metadata",
         ]
 
     ErrorResponse:

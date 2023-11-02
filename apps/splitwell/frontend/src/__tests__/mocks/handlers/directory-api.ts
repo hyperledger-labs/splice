@@ -31,12 +31,8 @@ export const buildDirectoryMock = (directoryUrl: string): RestHandler[] => [
                 expiresAt: '2024-01-07T14:50:26.364476Z',
                 user: alicePartyId,
               }),
-              payload_value: {},
-              metadata: {
-                createdAt: '2023-10-09T14:50:26.364476Z',
-                contractKeyHash: '',
-                driverMetadata: 'CiYKJAgBEiCA3Xq2jwcJPurU0kuu6VzhIA-rIPA7p_Uw3UROVcjXYw==',
-              },
+              created_event_blob: '',
+              created_at: '2023-10-09T14:50:26.364476Z',
             },
           })
         );
@@ -59,12 +55,8 @@ export const buildDirectoryMock = (directoryUrl: string): RestHandler[] => [
                 expiresAt: '2024-01-07T14:50:26.364476Z',
                 user: bobPartyId,
               }),
-              payload_value: {},
-              metadata: {
-                createdAt: '2023-10-09T14:50:26.364476Z',
-                contractKeyHash: '',
-                driverMetadata: 'CiYKJAgBEiCA3Xq2jwcJPurU0kuu6VzhIA-rIPA7p_Uw3UROVcjXYw==',
-              },
+              created_event_blob: '',
+              created_at: '2023-10-09T14:50:26.364476Z',
             },
           })
         );

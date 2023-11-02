@@ -185,7 +185,7 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
     multiDomainAcsStore.listAssignedContractsNotOnDomainN(
       coinRules.domain,
-      templatesMovedByMyAutomation: _*
+      templatesMovedByMyAutomation(key.appManagerEnabled): _*
     )
 }
 
@@ -239,6 +239,7 @@ object ValidatorStore {
       validatorParty: PartyId,
       /** The party-id of the SVC issuing CC managed by this wallet. */
       svcParty: PartyId,
+      appManagerEnabled: Boolean,
   ) extends PrettyPrinting {
     override def pretty: Pretty[Key] = prettyOfClass(
       param("validatorParty", _.validatorParty),
@@ -246,16 +247,21 @@ object ValidatorStore {
     )
   }
 
-  private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
+  private[network] def templatesMovedByMyAutomation(
+      appManagerEnabled: Boolean
+  ): Seq[ConstrainedTemplate] =
     Seq[ConstrainedTemplate](
       walletCodegen.WalletAppInstall.COMPANION,
       coinCodegen.ValidatorRight.COMPANION,
-      appManagerCodegen.AppConfiguration.COMPANION,
-      appManagerCodegen.AppRelease.COMPANION,
-      appManagerCodegen.RegisteredApp.COMPANION,
-      appManagerCodegen.InstalledApp.COMPANION,
-      appManagerCodegen.ApprovedReleaseConfiguration.COMPANION,
-    )
+    ) ++ (if (appManagerEnabled)
+            Seq[ConstrainedTemplate](
+              appManagerCodegen.AppConfiguration.COMPANION,
+              appManagerCodegen.AppRelease.COMPANION,
+              appManagerCodegen.RegisteredApp.COMPANION,
+              appManagerCodegen.InstalledApp.COMPANION,
+              appManagerCodegen.ApprovedReleaseConfiguration.COMPANION,
+            )
+          else Seq.empty)
 
   /** Contract of a wallet store for a specific validator party. */
   def contractFilter(key: Key): MultiDomainAcsStore.ContractFilter = {
@@ -287,22 +293,25 @@ object ValidatorStore {
           co.payload.svc == svc &&
             co.payload.owner == validator
         ),
-        mkFilter(appManagerCodegen.AppConfiguration.COMPANION)(co =>
-          co.payload.validatorOperator == validator
-        ),
-        mkFilter(appManagerCodegen.AppRelease.COMPANION)(co =>
-          co.payload.validatorOperator == validator
-        ),
-        mkFilter(appManagerCodegen.RegisteredApp.COMPANION)(co =>
-          co.payload.validatorOperator == validator
-        ),
-        mkFilter(appManagerCodegen.InstalledApp.COMPANION)(co =>
-          co.payload.validatorOperator == validator
-        ),
-        mkFilter(appManagerCodegen.ApprovedReleaseConfiguration.COMPANION)(co =>
-          co.payload.validatorOperator == validator
-        ),
-      ),
+      ) ++ (if (key.appManagerEnabled)
+              Map(
+                mkFilter(appManagerCodegen.AppConfiguration.COMPANION)(co =>
+                  co.payload.validatorOperator == validator
+                ),
+                mkFilter(appManagerCodegen.AppRelease.COMPANION)(co =>
+                  co.payload.validatorOperator == validator
+                ),
+                mkFilter(appManagerCodegen.RegisteredApp.COMPANION)(co =>
+                  co.payload.validatorOperator == validator
+                ),
+                mkFilter(appManagerCodegen.InstalledApp.COMPANION)(co =>
+                  co.payload.validatorOperator == validator
+                ),
+                mkFilter(appManagerCodegen.ApprovedReleaseConfiguration.COMPANION)(co =>
+                  co.payload.validatorOperator == validator
+                ),
+              )
+            else Map.empty),
     )
   }
 

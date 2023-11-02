@@ -83,7 +83,7 @@ describe('alice can', () => {
     await user.click(copyInviteButton);
 
     await expect(window.navigator.clipboard.readText()).resolves.toBe(
-      `{"templateId":"cbca8a4f8d6170f38cd7a5c9cc0371cc3ccb4fb5bf5daf0702aa2c3849ac6bde:CN.Splitwell:GroupInvite","contractId":"008a4f445f23361cf92ffd48bf8556429921060a40c7169dc11c5a28717d7750e3ca021220bcce6356513ce1790a1c525f5e7709be50336235d2c08be698a581a4e2bc2c6d","payload":{"group":{"owner":"${alicePartyId}","svc":"svc::122065980b045703ed871be9b93afb28b61c874b667434259d1df090096837e3ffd0","members":[],"id":{"unpack":"${groupName}"},"provider":"${splitwellProviderPartyId}","acceptDuration":{"microseconds":"300000000"}}},"metadata":{"createdAt":"2023-10-06T13:24:12.679640Z","keyHash":"","driverMetadata":"CiYKJAgBEiBiT5xszvznNqxlhONdO9hqlEBSewW-lCCKBEiU1m_9Mw=="},"domainId":"${splitwellDomainId}"}`
+      `{"templateId":"cbca8a4f8d6170f38cd7a5c9cc0371cc3ccb4fb5bf5daf0702aa2c3849ac6bde:CN.Splitwell:GroupInvite","contractId":"008a4f445f23361cf92ffd48bf8556429921060a40c7169dc11c5a28717d7750e3ca021220bcce6356513ce1790a1c525f5e7709be50336235d2c08be698a581a4e2bc2c6d","payload":{"group":{"owner":"${alicePartyId}","svc":"svc::122065980b045703ed871be9b93afb28b61c874b667434259d1df090096837e3ffd0","members":[],"id":{"unpack":"${groupName}"},"provider":"${splitwellProviderPartyId}","acceptDuration":{"microseconds":"300000000"}}},"createdEventBlob":"","createdAt":"2023-10-06T13:24:12.679640Z","domainId":"${splitwellDomainId}"}`
     );
   });
 

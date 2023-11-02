@@ -113,9 +113,10 @@ object GlobalDomainMigrationCoverageTest {
           ValidatorStore.Key(
             svcParty = dummyParty,
             validatorParty = dummyParty,
+            appManagerEnabled = true,
           )
         ),
-        ValidatorStore.templatesMovedByMyAutomation,
+        ValidatorStore.templatesMovedByMyAutomation(true),
       ),
       (
         SvSvcStore,

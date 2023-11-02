@@ -24,6 +24,7 @@ import com.daml.ledger.javaapi.data.{
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.auth.AuthToken
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
+import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
 import com.daml.network.util.DisclosedContracts
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.DomainAlias
@@ -507,28 +508,16 @@ object LedgerClient {
     }
   }
 
-  private def filterForParty(partyId: PartyId): lapi.transaction_filter.TransactionFilter = {
-
-    val filters = com.daml.ledger.api.v1.transaction_filter.Filters(
-      Some(com.daml.ledger.api.v1.transaction_filter.InclusiveFilters(Nil, Nil))
-    )
-
-    lapi.transaction_filter.TransactionFilter(
-      Map(partyId.toLf -> filters)
-    )
-
-  }
-
   final case class GetUpdatesRequest(
       begin: ParticipantOffset,
       end: Option[ParticipantOffset],
-      party: PartyId,
+      filter: IngestionFilter,
   ) {
     private[LedgerClient] def toProto: lapi.update_service.GetUpdatesRequest =
       lapi.update_service.GetUpdatesRequest(
         beginExclusive = Some(begin),
         endInclusive = end,
-        filter = Some(filterForParty(party)),
+        filter = Some(filter.toTransactionFilter),
       )
   }
 
@@ -590,9 +579,10 @@ object LedgerClient {
           // TODO(#5713) Avoid having to convert to the old Java bindings type.
           import io.scalaland.chimney.dsl.*
           val treeV1 = tree.into[com.daml.ledger.api.v1.transaction.TransactionTree].transform
-
+          val treeProto = scalapbToJava(treeV1)(_.companion)
           val update = TransactionTreeUpdate(
-            TransactionTree fromProto scalapbToJava(treeV1)(_.companion)
+            TransactionTree.fromProto(treeProto),
+            treeProto,
           )
           GetTreeUpdatesResponse(update, DomainId.tryFromString(tree.domainId))
 

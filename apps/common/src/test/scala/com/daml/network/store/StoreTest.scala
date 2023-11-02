@@ -45,6 +45,7 @@ import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.protocol.LfContractId
+import com.google.protobuf.ByteString
 
 import java.time.{Duration, Instant}
 import java.util.Optional
@@ -98,7 +99,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       identifier = templateId,
       contractId = new coinCodegen.CoinRules.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -117,7 +117,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       identifier = templateId,
       contractId = new cnsCodegen.CnsRules.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -140,7 +139,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       roundCodegen.OpenMiningRound.TEMPLATE_ID,
       new roundCodegen.OpenMiningRound.ContractId(round.toString),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -157,7 +155,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       roundCodegen.ClosedMiningRound.TEMPLATE_ID,
       new roundCodegen.ClosedMiningRound.ContractId(nextCid()),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -177,7 +174,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       identifier = templateId,
       contractId = new coinCodegen.Coin.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -197,7 +193,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       identifier = templateId,
       contractId = new coinCodegen.LockedCoin.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -218,7 +213,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         amount,
         new Round(round),
       ),
-      metadata = ContractMetadata.Empty(),
     )
 
   protected def numeric(value: BigDecimal, scale: Int = 10) = {
@@ -242,7 +236,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         amount,
         new Round(round),
       ),
-      metadata = ContractMetadata.Empty(),
     )
 
   protected def subscriptionInitialPayment(
@@ -277,7 +270,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       subCodegen.SubscriptionInitialPayment.TEMPLATE_ID,
       paymentId,
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -290,7 +282,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       FeaturedAppRight.TEMPLATE_ID,
       new FeaturedAppRight.ContractId(contractId),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -309,7 +300,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         new Round(round),
         amount,
       ),
-      metadata = ContractMetadata.Empty(),
     )
 
   protected def svcReward(
@@ -325,7 +315,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         new Round(round),
         amount,
       ),
-      metadata = ContractMetadata.Empty(),
     )
 
   protected def toCreatedEvent[TCid <: ContractId[T], T](
@@ -340,7 +329,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       templateId = contract.identifier,
       arguments = contract.payload.toValue,
       createArgumentsBlob = protobuf.Any.getDefaultInstance,
-      contractMetadata = contract.metadata,
+      contractMetadata = ContractMetadata.Empty(),
       witnessParties = Seq.empty.asJava,
       signatories = signatories.map(_.toProtoPrimitive).asJava,
       observers = Seq.empty.asJava,
@@ -372,7 +361,12 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contract: Contract[TCid, T],
       counter: Long,
   ): ActiveContract =
-    ActiveContract(domain, toCreatedEvent(contract, Seq(svcParty)), counter)
+    ActiveContract(
+      domain,
+      toCreatedEvent(contract, Seq(svcParty)),
+      contract.mandatoryCreatedEventBlob,
+      counter,
+    )
 
   protected def exercisedEvent[TCid <: ContractId[T], T](
       contractId: String,
@@ -471,6 +465,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       counter,
     ),
     toCreatedEvent(contract, Seq(svcParty)),
+    contract.mandatoryCreatedEventBlob,
   )
 
   protected def toIncompleteAssign[TCid <: ContractId[T], T](
@@ -517,6 +512,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     source = source,
     target = target,
     createdEvent = toCreatedEvent(contract, Seq(svcParty)),
+    createdEventBlob = contract.mandatoryCreatedEventBlob,
     counter = counter,
   )
 
@@ -551,7 +547,12 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     _ <- store.ingestionSink.ingestAcs(
       acsOffset,
       acs.map { case (contract, domain, counter) =>
-        ActiveContract(domain, toCreatedEvent(contract, Seq(svcParty)), counter)
+        ActiveContract(
+          domain,
+          toCreatedEvent(contract, Seq(svcParty)),
+          contract.mandatoryCreatedEventBlob,
+          counter,
+        )
       },
       incompleteOut.map { case (c, sourceDomain, targetDomain, tfid, counter) =>
         toIncompleteUnassign(
@@ -593,7 +594,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       store.ingestionSink
         .ingestUpdate(
           domain,
-          TransactionTreeUpdate(tx),
+          TransactionTreeUpdate(tx, tx.toProto),
         )
         .map(_ => tx)
     }
@@ -610,7 +611,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         txEffectiveAt,
         createdEventSignatories,
       )
-      val txUpdate = TransactionTreeUpdate(tx)
+      val txUpdate = TransactionTreeUpdate(tx, tx.toProto)
       // Note: runs the futures sequentially in order to get deterministic tests
       stores
         .foldLeft(Future.unit) { (acc, store) =>
@@ -631,7 +632,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         .ingestUpdate(
           domain,
           TransactionTreeUpdate(
-            tx
+            tx,
+            tx.toProto,
           ),
         )
         .map(_ => tx)
@@ -645,7 +647,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         .ingestUpdate(
           domain,
           TransactionTreeUpdate(
-            tx
+            tx,
+            tx.toProto,
           ),
         )
         .map(_ => tx)
@@ -655,7 +658,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         makeTx: String => TransactionTree
     )(implicit stores: Seq[MultiDomainAcsStore]): Future[TransactionTree] = {
       val tx = makeTx(nextOffset)
-      val txUpdate = TransactionTreeUpdate(tx)
+      val txUpdate = TransactionTreeUpdate(tx, tx.toProto)
       // Note: runs the futures sequentially in order to get deterministic tests
       stores
         .foldLeft(Future.unit) { (acc, store) =>
@@ -732,7 +735,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       store.ingestionSink
         .ingestUpdate(
           domain,
-          TransactionTreeUpdate(tx),
+          TransactionTreeUpdate(tx, tx.toProto),
         )
         .map(_ => tx)
     }
@@ -822,13 +825,12 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       identifier: Identifier,
       contractId: TCid & ContractId[_],
       payload: T & CodegenDamlRecord[_],
-      metadata: ContractMetadata,
   ): Contract[TCid, T] = Contract(
     identifier,
     contractId,
     payload,
-    Some(payload.toValue),
-    metadata,
+    Some(ByteString.EMPTY),
+    Some(Instant.EPOCH),
   )
 }
 

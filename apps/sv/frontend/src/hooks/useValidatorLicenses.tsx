@@ -12,7 +12,7 @@ export const useValidatorLicenses = (): UseQueryResult<Contract<ValidatorLicense
     queryKey: ['listValidatorLicenses'],
     queryFn: async () => {
       const { validator_licenses } = await listValidatorLicenses();
-      return validator_licenses;
+      return validator_licenses.map(c => Contract.decodeOpenAPI(c, ValidatorLicense));
     },
   });
 };

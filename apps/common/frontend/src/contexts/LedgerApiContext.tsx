@@ -164,11 +164,8 @@ export class LedgerApiClient {
       payload: ev.payload,
       // For now, we set dummy values here because the JSON API does not
       // yet expose this properly.
-      metadata: {
-        createdAt: '',
-        keyHash: '',
-        driverMetadata: '',
-      },
+      createdEventBlob: '',
+      createdAt: '',
     };
   }
 }

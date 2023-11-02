@@ -1,6 +1,6 @@
 package com.daml.network.store.db
 
-import com.daml.ledger.javaapi.data.{ContractMetadata, DamlRecord, Unit as damlUnit}
+import com.daml.ledger.javaapi.data.{DamlRecord, Unit as damlUnit}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.PaymentTransferContext
 import com.daml.network.codegen.java.cc.coin.Coin
@@ -1056,7 +1056,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       ImportCrate.TEMPLATE_ID,
       new ImportCrate.ContractId(s"${receiver.toProtoPrimitive}::$n"),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -1109,7 +1108,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       identifier = templateId,
       contractId = new svcrulesCodegen.SvcRules.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 

@@ -11,8 +11,11 @@ import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.crypto.Salt
 import com.digitalasset.canton.protocol.{DriverContractMetadata, LfContractId}
 
+import scala.annotation.nowarn
+
 /** Wrapper class to make scalapb LedgerApi classes more convenient to access
   */
+@nowarn("cat=deprecation")
 object LedgerApiTypeWrappers {
 
   /*

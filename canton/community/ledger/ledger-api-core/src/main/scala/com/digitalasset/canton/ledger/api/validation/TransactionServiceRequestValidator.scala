@@ -18,10 +18,13 @@ import com.digitalasset.canton.ledger.api.messages.transaction
 import com.digitalasset.canton.ledger.api.messages.transaction.GetTransactionTreesRequest
 import io.grpc.StatusRuntimeException
 
+import scala.annotation.nowarn
+
 object TransactionServiceRequestValidator {
   type Result[X] = Either[StatusRuntimeException, X]
 
 }
+@nowarn("cat=deprecation")
 class TransactionServiceRequestValidator(
     ledgerId: LedgerId,
     partyValidator: PartyValidator,

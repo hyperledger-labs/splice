@@ -95,7 +95,7 @@ export const ListVoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> =
     action: getAction(request.payload.action, staled),
     requester: svcRules.payload.members.get(request.payload.requester)?.name!,
     expiresAt: new Date(request.payload.expiresAt),
-    createdAt: request.metadata.createdAt,
+    createdAt: request.createdAt,
     voteStatus: request.contractId,
     idx: index,
     staled: staled,

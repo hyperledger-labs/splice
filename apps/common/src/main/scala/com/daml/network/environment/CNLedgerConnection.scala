@@ -101,7 +101,7 @@ class BaseLedgerConnection(
     val activeContractsRequest = client.activeContracts(
       lapi.state_service.GetActiveContractsRequest(
         activeAtOffset = offset.value,
-        filter = Some(filter.toTransactionFilterAllContractsScala),
+        filter = Some(filter.toTransactionFilter),
       )
     )
     for {
@@ -130,10 +130,10 @@ class BaseLedgerConnection(
 
   def updates(
       beginOffset: ParticipantOffset,
-      party: PartyId,
+      filter: IngestionFilter,
   ): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] =
     client
-      .updates(LedgerClient.GetUpdatesRequest(beginOffset, None, party))
+      .updates(LedgerClient.GetUpdatesRequest(beginOffset, None, filter))
 
   def tryGetTransactionTreeByEventId(
       parties: Seq[PartyId],

@@ -1,7 +1,7 @@
 package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.ledger.javaapi.data.{ContractMetadata, DamlRecord}
+import com.daml.ledger.javaapi.data.DamlRecord
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.AppTransferContext
 import com.daml.network.codegen.java.cc.round.types.Round
@@ -1225,7 +1225,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       VoteRequest.TEMPLATE_ID,
       new VoteRequest.ContractId(nextCid()),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -1246,7 +1245,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       Vote.TEMPLATE_ID,
       new Vote.ContractId(nextCid()),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -1261,7 +1259,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       Confirmation.TEMPLATE_ID,
       new Confirmation.ContractId(validContractId(n)),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -1297,7 +1294,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       SvcRules.TEMPLATE_ID,
       new SvcRules.ContractId(validContractId(1)),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -1320,7 +1316,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       MemberTraffic.TEMPLATE_ID,
       new MemberTraffic.ContractId(nextCid()),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -1337,7 +1332,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       ElectionRequest.TEMPLATE_ID,
       new ElectionRequest.ContractId(nextCid()),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -1355,7 +1349,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       CnsEntry.TEMPLATE_ID,
       new CnsEntry.ContractId(nextCid()),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -1373,7 +1366,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       CnsEntryContext.TEMPLATE_ID,
       new CnsEntryContext.ContractId(validContractId(n, "cc")),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -1404,7 +1396,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new SubscriptionIdleState.ContractId(s"$domain#$n"),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -1427,7 +1418,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       SvOnboardingRequest.TEMPLATE_ID,
       new SvOnboardingRequest.ContractId(nextCid()),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -1448,7 +1438,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       SvOnboardingConfirmed.TEMPLATE_ID,
       new SvOnboardingConfirmed.ContractId(nextCid()),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -1463,7 +1452,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       ImportCrate.TEMPLATE_ID,
       new ImportCrate.ContractId(nextCid()),
       template,
-      ContractMetadata.Empty(),
     )
   }
 

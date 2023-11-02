@@ -24,6 +24,7 @@ import cats.implicits.*
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.store.db.AcsTables.ContractStateRowData
 
+import com.google.protobuf.ByteString
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -64,10 +65,14 @@ class DbScanStore(
 
   def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionAcsInsert(createdEvent: CreatedEvent, contractState: ContractStateRowData)(
-      implicit tc: TraceContext
+  override def ingestionAcsInsert(
+      createdEvent: CreatedEvent,
+      createdEventBlob: ByteString,
+      contractState: ContractStateRowData,
+  )(implicit
+      tc: TraceContext
   ) = {
-    ScanAcsStoreRowData.fromCreatedEvent(createdEvent).map {
+    ScanAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob).map {
       case ScanAcsStoreRowData(
             contract,
             contractExpiresAt,
@@ -81,22 +86,18 @@ class DbScanStore(
         val templateId = contract.identifier
         val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
         val createArguments = payloadJsonFromContract(contract.payload)
-        val createArgumentsValue = payloadValueJsonStringFromRecord(contract.mandatoryPayloadValue)
-        val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
-        val contractMetadataContractKeyHash =
-          lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)
-        val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
+        val createdAt = Timestamp.assertFromInstant(contract.mandatoryCreatedAt)
         val safeImportCrateReceiverName = importCrateReceiverName.map(lengthLimited)
         sqlu"""
-              insert into scan_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, create_arguments_value, contract_metadata_created_at,
-              contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
+              insert into scan_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, created_event_blob,
+              created_at, contract_expires_at,
               assigned_domain, reassignment_counter, reassignment_target_domain,
               reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
               round, validator, amount, import_crate_receiver, featured_app_right_provider)
               values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
             templateId
-          )}, $createArguments, $createArgumentsValue, $contractMetadataCreatedAt,
-                      $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
+          )}, $createArguments, $createdEventBlob,
+                      $createdAt, $contractExpiresAt,
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
                       $round, $validator, $amount, $safeImportCrateReceiverName, $featuredAppRightProvider)

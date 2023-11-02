@@ -111,6 +111,10 @@ class JoiningNodeInitializer(
           )
         } yield svParty,
       ).tupled
+      _ <- participantAdminConnection.uploadDarFiles(
+        requiredDars,
+        RetryFor.WaitingOnInitDependency,
+      )
       storeKey = SvStore.Key(svParty, svcPartyId)
       svStore = newSvStore(storeKey)
       svcStore = newSvcStore(svStore.key)
@@ -411,10 +415,6 @@ class JoiningNodeInitializer(
           SvUtil.keyPairMatches(publicKey, privateKey) match {
             case Right(privateKey_) =>
               for {
-                _ <- participantAdminConnection.uploadDarFiles(
-                  requiredDars,
-                  RetryFor.WaitingOnInitDependency,
-                )
                 _ <- requestOnboarding(
                   svClient.adminApi,
                   name,

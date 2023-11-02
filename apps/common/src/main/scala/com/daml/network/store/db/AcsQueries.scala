@@ -24,6 +24,7 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json
 import io.grpc.Status
 import slick.jdbc.canton.SQLActionBuilder
+import com.google.protobuf.ByteString
 
 trait AcsQueries extends AcsJdbcTypes {
 
@@ -47,10 +48,8 @@ trait AcsQueries extends AcsJdbcTypes {
           <<[String],
           <<[QualifiedName],
           <<[Json],
-          <<[Json],
-          <<[Timestamp],
-          <<[String],
           <<[Array[Byte]],
+          <<[Timestamp],
           <<[Option[Timestamp]],
         )
       )
@@ -110,10 +109,8 @@ trait AcsQueries extends AcsJdbcTypes {
          template_id_package_id,
          template_id_qualified_name,
          create_arguments,
-         create_arguments_value,
-         contract_metadata_created_at,
-         contract_metadata_contract_key_hash,
-         contract_metadata_driver_internal,
+         created_event_blob,
+         created_at,
          contract_expires_at
        from store_descriptors sd
            left join #$tableName
@@ -131,8 +128,6 @@ trait AcsQueries extends AcsJdbcTypes {
       storeIdFromAcsRow.map { storeId =>
         AcsQueries.SelectFromAcsTableResult(
           storeId,
-          pp.<<,
-          pp.<<,
           pp.<<,
           pp.<<,
           pp.<<,
@@ -163,10 +158,8 @@ trait AcsQueries extends AcsJdbcTypes {
          acs.template_id_package_id,
          acs.template_id_qualified_name,
          acs.create_arguments,
-         acs.create_arguments_value,
-         acs.contract_metadata_created_at,
-         acs.contract_metadata_contract_key_hash,
-         acs.contract_metadata_driver_internal,
+         acs.created_event_blob,
+         acs.created_at,
          acs.contract_expires_at,
          acs.state_number,
          acs.assigned_domain,
@@ -193,8 +186,6 @@ trait AcsQueries extends AcsJdbcTypes {
           AcsQueries.SelectFromAcsTableWithStateResult(
             AcsQueries.SelectFromAcsTableResult(
               storeId,
-              pp.<<,
-              pp.<<,
               pp.<<,
               pp.<<,
               pp.<<,
@@ -318,10 +309,8 @@ object AcsQueries {
       templateIdPackageId: String,
       templateIdQualifiedName: QualifiedName,
       createArguments: Json,
-      createArgumentsValue: Json,
-      contractMetadataCreatedAt: Timestamp,
-      contractMetadataContractKeyHash: String,
-      contractMetadataDriverInternal: Array[Byte],
+      createdEventBlob: Array[Byte],
+      createdAt: Timestamp,
       contractExpiresAt: Option[Timestamp],
   ) {
     def toContract[C, TCId <: ContractId[_], T](companion: C)(implicit
@@ -337,10 +326,8 @@ object AcsQueries {
           ),
           contractId.contractId,
           createArguments,
-          createArgumentsValue,
-          contractMetadataCreatedAt.toInstant,
-          contractMetadataContractKeyHash,
-          contractMetadataDriverInternal,
+          ByteString.copyFrom(createdEventBlob),
+          createdAt.toInstant,
         )
         .fold(
           err => throw new IllegalStateException(s"Stored a contract that cannot be decoded: $err"),
@@ -357,10 +344,8 @@ object AcsQueries {
           ${qualifier}template_id_package_id,
           ${qualifier}template_id_qualified_name,
           ${qualifier}create_arguments,
-          ${qualifier}create_arguments_value,
-          ${qualifier}contract_metadata_created_at,
-          ${qualifier}contract_metadata_contract_key_hash,
-          ${qualifier}contract_metadata_driver_internal,
+          ${qualifier}created_event_blob,
+          ${qualifier}created_at,
           ${qualifier}contract_expires_at"""
   }
 

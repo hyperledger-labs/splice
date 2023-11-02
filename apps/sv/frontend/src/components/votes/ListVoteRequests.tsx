@@ -145,8 +145,8 @@ const ListVoteRequests: React.FC = () => {
   }
 
   const voteRequests = listVoteRequestsQuery.data.sort((a, b) => {
-    const createdAtA = a.metadata.createdAt;
-    const createdAtB = b.metadata.createdAt;
+    const createdAtA = a.createdAt;
+    const createdAtB = b.createdAt;
     if (createdAtA === createdAtB) {
       return 0;
     } else if (createdAtA < createdAtB) {

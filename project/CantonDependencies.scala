@@ -10,7 +10,7 @@ object CantonDependencies {
   val daml_libraries_version = version
   val daml_compiler_version = version
   // TODO(#8069) Revert this back to daml_libraries_version.
-  val daml_java_codegen_version = "2.8.0-snapshot.20231016.12209.0.v28eadc6e"
+  val daml_java_codegen_version = "2.8.0-snapshot.20231031.12282.0.v59992d63"
   val use_custom_daml_version = false
 
   lazy val osClassifier: String =
@@ -107,7 +107,7 @@ object CantonDependencies {
   lazy val daml_jwt = "com.daml" %% "jwt" % daml_libraries_version
   lazy val daml_ports = "com.daml" %% "ports" % daml_libraries_version
   lazy val daml_struct_spray_json = "com.daml" %% "struct-spray-json" % daml_libraries_version
-  lazy val daml_bindings_scala = "com.daml" %% "bindings-scala" % daml_libraries_version
+  lazy val daml_bindings_scala = "com.daml" %% "bindings-scala" % daml_java_codegen_version
   lazy val daml_ledger_resources = "com.daml" %% "ledger-resources" % daml_libraries_version
   lazy val daml_timer_utils = "com.daml" %% "timer-utils" % daml_libraries_version
   lazy val daml_rs_grpc_akka = "com.daml" %% "rs-grpc-akka" % daml_libraries_version

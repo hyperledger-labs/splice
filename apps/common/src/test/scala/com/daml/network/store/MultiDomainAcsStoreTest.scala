@@ -1,7 +1,7 @@
 package com.daml.network.store
 
 import cats.syntax.foldable.*
-import com.daml.ledger.javaapi.data.{ContractMetadata, Identifier}
+import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.coin.{AppRewardCoupon, Coin, ValidatorRewardCoupon}
 import com.daml.network.codegen.java.cn.splitwell.*
@@ -141,7 +141,6 @@ abstract class MultiDomainAcsStoreTest[
         Seq.empty.asJava,
         paymentRequest,
       ),
-      metadata = ContractMetadata.Empty(),
     )
 
   protected val d1: DomainId = DomainId.tryFromString("domain1::domain")

@@ -13,6 +13,10 @@ import scalaz.std.either.*
 import scalaz.std.list.*
 import scalaz.syntax.traverse.*
 
+import scala.annotation.nowarn
+
+
+@nowarn("cat=deprecation")
 class TransactionFilterValidator(
     resolveTemplateIds: Ref.QualifiedName => ContextualizedErrorLogger => Either[
       StatusRuntimeException,

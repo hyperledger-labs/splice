@@ -1,6 +1,5 @@
 package com.daml.network.store
 
-import com.daml.ledger.javaapi.data.ContractMetadata
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
@@ -427,7 +426,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
         } yield {
           val actual = tfResult.map(_.contract.identifier.getEntityName)
           val expected =
-            ValidatorStore.templatesMovedByMyAutomation.map(_.TEMPLATE_ID.getEntityName)
+            ValidatorStore.templatesMovedByMyAutomation(true).map(_.TEMPLATE_ID.getEntityName)
           actual should contain theSameElementsAs expected
         }
       }
@@ -444,6 +443,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   protected lazy val storeKey = ValidatorStore.Key(
     svcParty = svcParty,
     validatorParty = validator,
+    appManagerEnabled = true,
   )
 
   private def walletInstall(endUserParty: PartyId, endUserName: String) = {
@@ -458,7 +458,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new walletCodegen.WalletAppInstall.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -473,7 +472,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new validatorLicenseCodegen.ValidatorLicense.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -488,7 +486,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new coinCodegen.ValidatorRight.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -506,7 +503,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new topUpCodegen.ValidatorTopUpState.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -528,7 +524,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new appManagerCodegen.AppConfiguration.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -545,7 +540,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new appManagerCodegen.AppRelease.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -559,7 +553,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new appManagerCodegen.RegisteredApp.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -575,7 +568,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new appManagerCodegen.InstalledApp.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -594,7 +586,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new appManagerCodegen.ApprovedReleaseConfiguration.ContractId(nextCid()),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 

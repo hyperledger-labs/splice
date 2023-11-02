@@ -6,10 +6,12 @@ import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.daml.ledger.api.v2.state_service as lapi
 import com.digitalasset.canton.topology.DomainId
+import com.google.protobuf.ByteString
 
 final case class ActiveContract(
     domainId: DomainId,
     createdEvent: CreatedEvent,
+    createdEventBlob: ByteString,
     reassignmentCounter: Long,
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
@@ -25,6 +27,7 @@ object ActiveContract {
     ActiveContract(
       DomainId.tryFromString(proto.domainId),
       CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
+      proto.getCreatedEvent.createdEventBlob,
       proto.reassignmentCounter,
     )
   }

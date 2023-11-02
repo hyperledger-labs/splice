@@ -24,8 +24,8 @@ const ValidatorLicenses: React.FC = () => {
   }
 
   const validatorLicenses = validatorLicensesQuery.data.sort((a, b) => {
-    const createdAtA = a.metadata.createdAt;
-    const createdAtB = b.metadata.createdAt;
+    const createdAtA = a.createdAt;
+    const createdAtB = b.createdAt;
     if (createdAtA === createdAtB) {
       return 0;
     } else if (createdAtA < createdAtB) {
@@ -56,7 +56,7 @@ const ValidatorLicenses: React.FC = () => {
                   key={`${license.payload.validator}-${license.payload.sponsor}`}
                   validator={license.payload.validator}
                   sponsor={license.payload.sponsor}
-                  createdAt={new Date(parseInt(license.metadata.createdAt) / 1000)}
+                  createdAt={new Date(license.createdAt)}
                   sv={svcInfosQuery.data!.svPartyId}
                 />
               );

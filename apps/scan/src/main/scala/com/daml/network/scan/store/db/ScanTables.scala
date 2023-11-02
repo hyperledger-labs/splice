@@ -11,6 +11,8 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.daml.network.scan.store.TxLogIndexRecord
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 
+import com.google.protobuf.ByteString
+
 object ScanTables extends AcsTables {
 
   case class ScanAcsStoreRowData(
@@ -26,12 +28,13 @@ object ScanTables extends AcsTables {
   object ScanAcsStoreRowData {
 
     def fromCreatedEvent(
-        createdEvent: CreatedEvent
+        createdEvent: CreatedEvent,
+        createdEventBlob: ByteString,
     ): Either[String, ScanAcsStoreRowData] = {
       // TODO(#8125) Switch to map lookups instead
       QualifiedName(createdEvent.getTemplateId) match {
         case t if t == QualifiedName(cc.coin.CoinRules.TEMPLATE_ID) =>
-          tryToDecode(cc.coin.CoinRules.COMPANION, createdEvent) { contract =>
+          tryToDecode(cc.coin.CoinRules.COMPANION, createdEvent, createdEventBlob) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
               contractExpiresAt = None,
@@ -43,7 +46,7 @@ object ScanTables extends AcsTables {
             )
           }
         case t if t == QualifiedName(cn.cns.CnsRules.TEMPLATE_ID) =>
-          tryToDecode(cn.cns.CnsRules.COMPANION, createdEvent) { contract =>
+          tryToDecode(cn.cns.CnsRules.COMPANION, createdEvent, createdEventBlob) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
               contractExpiresAt = None,
@@ -55,7 +58,7 @@ object ScanTables extends AcsTables {
             )
           }
         case t if t == QualifiedName(cn.svcrules.SvcRules.TEMPLATE_ID) =>
-          tryToDecode(cn.svcrules.SvcRules.COMPANION, createdEvent) { contract =>
+          tryToDecode(cn.svcrules.SvcRules.COMPANION, createdEvent, createdEventBlob) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
               contractExpiresAt = None,
@@ -67,70 +70,75 @@ object ScanTables extends AcsTables {
             )
           }
         case t if t == QualifiedName(cc.round.OpenMiningRound.TEMPLATE_ID) =>
-          tryToDecode(cc.round.OpenMiningRound.COMPANION, createdEvent) { contract =>
-            ScanAcsStoreRowData(
-              contract = contract,
-              contractExpiresAt =
-                Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
-              round = Some(contract.payload.round.number),
-              validator = None,
-              amount = None,
-              importCrateReceiver = None,
-              featuredAppRightProvider = None,
-            )
+          tryToDecode(cc.round.OpenMiningRound.COMPANION, createdEvent, createdEventBlob) {
+            contract =>
+              ScanAcsStoreRowData(
+                contract = contract,
+                contractExpiresAt =
+                  Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
+                round = Some(contract.payload.round.number),
+                validator = None,
+                amount = None,
+                importCrateReceiver = None,
+                featuredAppRightProvider = None,
+              )
           }
         case t if t == QualifiedName(cc.round.ClosedMiningRound.TEMPLATE_ID) =>
-          tryToDecode(cc.round.ClosedMiningRound.COMPANION, createdEvent) { contract =>
-            ScanAcsStoreRowData(
-              contract = contract,
-              contractExpiresAt = None,
-              round = Some(contract.payload.round.number),
-              validator = None,
-              amount = None,
-              importCrateReceiver = None,
-              featuredAppRightProvider = None,
-            )
+          tryToDecode(cc.round.ClosedMiningRound.COMPANION, createdEvent, createdEventBlob) {
+            contract =>
+              ScanAcsStoreRowData(
+                contract = contract,
+                contractExpiresAt = None,
+                round = Some(contract.payload.round.number),
+                validator = None,
+                amount = None,
+                importCrateReceiver = None,
+                featuredAppRightProvider = None,
+              )
           }
         case t if t == QualifiedName(cc.round.IssuingMiningRound.TEMPLATE_ID) =>
-          tryToDecode(cc.round.IssuingMiningRound.COMPANION, createdEvent) { contract =>
-            ScanAcsStoreRowData(
-              contract = contract,
-              contractExpiresAt =
-                Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
-              round = Some(contract.payload.round.number),
-              validator = None,
-              amount = None,
-              importCrateReceiver = None,
-              featuredAppRightProvider = None,
-            )
+          tryToDecode(cc.round.IssuingMiningRound.COMPANION, createdEvent, createdEventBlob) {
+            contract =>
+              ScanAcsStoreRowData(
+                contract = contract,
+                contractExpiresAt =
+                  Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
+                round = Some(contract.payload.round.number),
+                validator = None,
+                amount = None,
+                importCrateReceiver = None,
+                featuredAppRightProvider = None,
+              )
           }
         case t if t == QualifiedName(cc.round.SummarizingMiningRound.TEMPLATE_ID) =>
-          tryToDecode(cc.round.SummarizingMiningRound.COMPANION, createdEvent) { contract =>
-            ScanAcsStoreRowData(
-              contract = contract,
-              contractExpiresAt = None,
-              round = Some(contract.payload.round.number),
-              validator = None,
-              amount = None,
-              importCrateReceiver = None,
-              featuredAppRightProvider = None,
-            )
+          tryToDecode(cc.round.SummarizingMiningRound.COMPANION, createdEvent, createdEventBlob) {
+            contract =>
+              ScanAcsStoreRowData(
+                contract = contract,
+                contractExpiresAt = None,
+                round = Some(contract.payload.round.number),
+                validator = None,
+                amount = None,
+                importCrateReceiver = None,
+                featuredAppRightProvider = None,
+              )
           }
         case t if t == QualifiedName(cc.coin.FeaturedAppRight.TEMPLATE_ID) =>
-          tryToDecode(cc.coin.FeaturedAppRight.COMPANION, createdEvent) { contract =>
-            ScanAcsStoreRowData(
-              contract = contract,
-              contractExpiresAt = None,
-              round = None,
-              validator = None,
-              amount = None,
-              importCrateReceiver = None,
-              featuredAppRightProvider =
-                Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
-            )
+          tryToDecode(cc.coin.FeaturedAppRight.COMPANION, createdEvent, createdEventBlob) {
+            contract =>
+              ScanAcsStoreRowData(
+                contract = contract,
+                contractExpiresAt = None,
+                round = None,
+                validator = None,
+                amount = None,
+                importCrateReceiver = None,
+                featuredAppRightProvider =
+                  Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+              )
           }
         case t if t == QualifiedName(cc.coin.Coin.TEMPLATE_ID) =>
-          tryToDecode(cc.coin.Coin.COMPANION, createdEvent) { contract =>
+          tryToDecode(cc.coin.Coin.COMPANION, createdEvent, createdEventBlob) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
               contractExpiresAt = None,
@@ -142,7 +150,7 @@ object ScanTables extends AcsTables {
             )
           }
         case t if t == QualifiedName(cc.coin.LockedCoin.TEMPLATE_ID) =>
-          tryToDecode(cc.coin.LockedCoin.COMPANION, createdEvent) { contract =>
+          tryToDecode(cc.coin.LockedCoin.COMPANION, createdEvent, createdEventBlob) { contract =>
             ScanAcsStoreRowData(
               contract = contract,
               contractExpiresAt =
@@ -155,16 +163,17 @@ object ScanTables extends AcsTables {
             )
           }
         case t if t == QualifiedName(cc.coinimport.ImportCrate.TEMPLATE_ID) =>
-          tryToDecode(cc.coinimport.ImportCrate.COMPANION, createdEvent) { contract =>
-            ScanAcsStoreRowData(
-              contract = contract,
-              contractExpiresAt = None,
-              round = None,
-              validator = None,
-              amount = None,
-              importCrateReceiver = Some(contract.payload.receiver),
-              featuredAppRightProvider = None,
-            )
+          tryToDecode(cc.coinimport.ImportCrate.COMPANION, createdEvent, createdEventBlob) {
+            contract =>
+              ScanAcsStoreRowData(
+                contract = contract,
+                contractExpiresAt = None,
+                round = None,
+                validator = None,
+                amount = None,
+                importCrateReceiver = Some(contract.payload.receiver),
+                featuredAppRightProvider = None,
+              )
           }
         case t =>
           Left(s"Template $t cannot be decoded as an entry for the scan store.")

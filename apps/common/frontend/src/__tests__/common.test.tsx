@@ -8,11 +8,8 @@ test('decode contracts from old and new model', async () => {
   const base = {
     template_id: 'foobar',
     contract_id: 'dummyContractId',
-    metadata: {
-      createdAt: 'dummyCreatedAt',
-      contractKeyHash: '',
-      driverMetadata: 'dummyDriverMetadata',
-    },
+    created_event_blob: '',
+    created_at: 'dummyCreatedAt',
   };
   const oldPayload = {
     svc: 'svc',

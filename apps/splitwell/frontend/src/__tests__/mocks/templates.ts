@@ -26,12 +26,8 @@ export const makeGroupInvite = (provider: string, owner: string, groupName: stri
       },
     },
   }),
-  payload_value: {},
-  metadata: {
-    createdAt: '2023-10-06T13:24:12.679640Z',
-    contractKeyHash: '',
-    driverMetadata: 'CiYKJAgBEiBiT5xszvznNqxlhONdO9hqlEBSewW-lCCKBEiU1m_9Mw==',
-  },
+  created_event_blob: '',
+  created_at: '2023-10-06T13:24:12.679640Z',
 });
 
 export const makeAcceptedGroupInvite = (
@@ -54,12 +50,8 @@ export const makeAcceptedGroupInvite = (
     },
     invitee: invitee,
   }),
-  payload_value: {},
-  metadata: {
-    createdAt: '2023-10-09T15:14:28.412766Z',
-    contractKeyHash: '',
-    driverMetadata: 'CiYKJAgBEiDtAV9pVocUfA2KD3I24A9deHI51c1ePu3nxw-ut4bJBQ==',
-  },
+  created_event_blob: '',
+  created_at: '2023-10-09T15:14:28.412766Z',
 });
 
 export const makeBalanceUpdate = (
@@ -87,10 +79,6 @@ export const makeBalanceUpdate = (
     },
     update: update,
   }),
-  payload_value: {},
-  metadata: {
-    createdAt: '2023-10-09T15:00:35.324749Z',
-    contractKeyHash: '',
-    driverMetadata: 'CiYKJAgBEiDdDpicMK4e_zzeZzEidYVT9FfXt4Z-2DWpEAP6zhvtvQ==',
-  },
+  created_event_blob: '',
+  created_at: '2023-10-09T15:00:35.324749Z',
 });

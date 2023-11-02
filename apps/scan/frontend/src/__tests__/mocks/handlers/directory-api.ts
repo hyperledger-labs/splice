@@ -27,12 +27,8 @@ export const buildDirectoryMock = (directoryUrl: string): RestHandler[] => [
                 expiresAt: '2024-01-04T07:37:05.004139Z',
                 user: 'google-oauth2_007c106265882859845879513::122033667ff9ec083bf5a6b512655bd7986dfc4d6644978c944129a0f46489bc41d4',
               }),
-              payload_value: {},
-              metadata: {
-                createdAt: '2023-10-06T07:37:05.004139Z',
-                contractKeyHash: '',
-                driverMetadata: 'CiYKJAgBEiCXgBoBsVAjxBQQBHjwClCXH2Q36rFqPdR9wr9OKphDqQ==',
-              },
+              created_event_blob: '',
+              created_at: '2023-10-06T07:37:05.004139Z',
             },
           })
         );

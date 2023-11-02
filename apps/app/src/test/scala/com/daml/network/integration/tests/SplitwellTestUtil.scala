@@ -78,14 +78,19 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       _ => aliceSplitwellClient.listGroups() should have size 1,
     )
 
-    val invite = clue("create a generic invite for 'group1'") {
-      // Wait for the group contract to be visible to Alice's Ledger API
-      aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
-        .awaitJava(splitwellCodegen.Group.COMPANION)(aliceUserParty)
+    // Wait for the group contract to be visible to Alice's Ledger API
+    aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
+      .awaitJava(splitwellCodegen.Group.COMPANION)(aliceUserParty)
+
+    val (_, invite) = actAndCheck(
+      "create a generic invite for 'group1'",
       aliceSplitwellClient.createGroupInvite(
         group
-      )
-    }
+      ),
+    )(
+      "alice observes the invite",
+      _ => aliceSplitwellClient.listGroupInvites().loneElement.toAssignedContract.value,
+    )
 
     actAndCheck("bob asks to join 'group1'", bobSplitwellClient.acceptInvite(invite))(
       "Alice sees the accepted invite",

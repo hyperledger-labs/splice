@@ -1,6 +1,5 @@
 package com.daml.network.store.db
 
-import com.daml.ledger.javaapi.data.ContractMetadata
 import com.daml.network.codegen.java.cn.directory.{
   DirectoryEntry,
   DirectoryEntryContext,
@@ -197,7 +196,6 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new DirectoryInstall.ContractId(s"$domain#$n"),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -223,7 +221,6 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new DirectoryEntry.ContractId(s"$domain#$cId"),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -247,7 +244,6 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new DirectoryEntryContext.ContractId(validContractId(n, "dc")),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -278,7 +274,6 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new SubscriptionIdleState.ContractId(s"$domain#$n"),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 

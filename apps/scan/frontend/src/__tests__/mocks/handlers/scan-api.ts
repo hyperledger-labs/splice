@@ -212,12 +212,8 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
               isDevNet: true,
               upgrade: null,
             }),
-            payload_value: {},
-            metadata: {
-              createdAt: '2023-10-06T08:12:16.481271Z',
-              contractKeyHash: '',
-              driverMetadata: 'CiYKJAgBEiBqc5xj84d-yWt2ckLRXUenjSJJfLRVnaBMBsn_3IApMg==',
-            },
+            created_event_blob: '',
+            created_at: '2023-10-06T08:12:16.481271Z',
           },
           domain_id:
             'global-domain::1220af85fa0c58e7f551de289be22793993ce7672cb0751afa2f2de397ce4a695677',

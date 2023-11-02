@@ -68,7 +68,7 @@ class UpdateIngestionService(
           Future.successful(MultiDomainAcsStore.toParticipantOffset(offset))
       }
     } yield new CNLedgerSubscription(
-      source = connection.updates(subscribeFrom, filter.primaryParty),
+      source = connection.updates(subscribeFrom, filter),
       mapOperator = Flow[GetTreeUpdatesResponse].mapAsync(1)(process),
       retryProvider = retryProvider,
       loggerFactory = baseLoggerFactory.append("subsClient", this.getClass.getSimpleName),

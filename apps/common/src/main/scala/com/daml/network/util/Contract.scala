@@ -5,8 +5,8 @@ package com.daml.network.util
 
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.ledger.api.v1.{CommandsOuterClass, value as scalaValue, ValueOuterClass}
-import com.daml.ledger.javaapi.data.{ContractMetadata, CreatedEvent, Identifier, Value}
+import com.daml.ledger.api.v1.{CommandsOuterClass, value as scalaValue}
+import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Value}
 import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion,
   ContractId,
@@ -17,6 +17,7 @@ import com.daml.ledger.javaapi.data.codegen.{
 }
 import com.daml.lf.value as lf
 import com.daml.lf.data.Ref.Identifier as LfIdentifier
+import com.daml.lf.data.Time.Timestamp
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.http.v0.definitions.MaybeCachedContract
@@ -26,9 +27,11 @@ import com.digitalasset.canton.ledger.api.validation.NoLoggingValueValidator
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.util.ErrorUtil
-import com.google.protobuf.util.JsonFormat
+import com.google.protobuf.ByteString
 import io.circe.{Json, parser as circe}
 
+import java.time.Instant
+import java.util.Base64
 import scala.util.Try
 
 /** A class representing a Daml contract of a specific type (Daml
@@ -40,9 +43,7 @@ import scala.util.Try
   *
   * @param contractId Contract ID.
   * @param payload    Contract instance as defined in Daml template (without `contractId` and `agreementText`).
-  * @param payloadValue The raw protobuf value of the payload. This is required for contracts that are used through
-  *   explicit disclosure as that requires passing the original payload which we cannot recover from payload as that may
-  *   have been extended with optional fields.
+  * @param createEventsPayload The createEventsPayload bytestring required for explicit disclosure.
   * @tparam T Contract template type parameter.
   */
 final case class Contract[TCid, T](
@@ -50,29 +51,33 @@ final case class Contract[TCid, T](
     override val contractId: TCid & ContractId[_],
     override val payload: T & DamlRecord[_],
     // TODO(#7965) Make this mandatory
-    val payloadValue: Option[com.daml.ledger.javaapi.data.DamlRecord],
-    metadata: ContractMetadata,
+    val createdEventBlob: Option[ByteString],
+    // TODO(#7965) Make this mandatory
+    val createdAt: Option[Instant],
 ) extends PrettyPrinting
     with Contract.Has[TCid, T] {
 
   // TODO(#7965) Remove this.
   // We only need to be able to decode old contract so we can already exploit the fact that this field is mandatory in most places.
   // In particular, it is safe to use this for writes to stores.
-  def mandatoryPayloadValue: com.daml.ledger.javaapi.data.DamlRecord =
-    payloadValue.getOrElse(
+  def mandatoryCreatedEventBlob: ByteString =
+    createdEventBlob.getOrElse(
       throw new IllegalStateException(
-        show"Called mandatory payload value on contract that did not have it set: $this"
+        show"Called mandatoryCreatedEventBlob on contract that did not have it set: $this"
+      )
+    )
+
+  // TODO(#7965) Remove this.
+  // We only need to be able to decode old contract so we can already exploit the fact that this field is mandatory in most places.
+  // In particular, it is safe to use this for writes to stores.
+  def mandatoryCreatedAt: Instant =
+    createdAt.getOrElse(
+      throw new IllegalStateException(
+        show"Called mandatoryCreatedAt on contract that did not have it set: $this"
       )
     )
 
   def toHttp(implicit elc: ErrorLoggingContext): http.Contract = {
-    val payloadValueJson = payloadValue.map { v =>
-      val payloadValueBuilder = new java.lang.StringBuilder()
-      JsonFormat.printer().appendTo(v.toProtoRecord, payloadValueBuilder)
-      circe
-        .parse(payloadValueBuilder.toString)
-        .valueOr(err => ErrorUtil.invalidState(s"Failed to convert payload value to JSON: $err"))
-    }
     http.Contract(
       templateId =
         s"${identifier.getPackageId}:${identifier.getModuleName}:${identifier.getEntityName}",
@@ -84,18 +89,18 @@ final case class Contract[TCid, T](
             .compactPrint
         )
         .valueOr(err => ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")),
-      payloadValue = payloadValueJson,
-      metadata = ContractMetadataUtil.toHttp(metadata),
+      createdEventBlob =
+        createdEventBlob.map(bs => Base64.getEncoder.encodeToString(bs.toByteArray)),
+      createdAt = createdAt.map(Timestamp.assertFromInstant(_).toString),
     )
   }
 
   def toDisclosedContract: CommandsOuterClass.DisclosedContract = {
     com.daml.ledger.api.v1.CommandsOuterClass.DisclosedContract
       .newBuilder()
-      .setCreateArguments(mandatoryPayloadValue.toProtoRecord)
+      .setCreatedEventBlob(mandatoryCreatedEventBlob)
       .setContractId(contractId.contractId)
       .setTemplateId(identifier.toProto)
-      .setMetadata(metadata.toProto)
       .build()
   }
 
@@ -107,8 +112,8 @@ final case class Contract[TCid, T](
       param("contractId", _.contractId),
       param("templateId", _.identifier),
       param("payload", _.payload),
-      param("payloadValue", _.payloadValue),
-      param("contractMetadata", _.metadata),
+      param("createdEventBlob", _.createdEventBlob),
+      param("createdAt", _.createdAt),
     )
   }
 
@@ -169,7 +174,6 @@ object Contract {
       decodePayload: Json => T,
       contract: http.Contract,
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
-    val metadata = ContractMetadataUtil.fromHttp(contract.metadata)
     for {
       templateId <- LfIdentifier
         .fromString(contract.templateId)
@@ -180,26 +184,17 @@ object Contract {
         templateId.qualifiedName.module.dottedName,
         templateId.qualifiedName.name.dottedName,
       )
+      createdAt <- contract.createdAt
+        .traverse(Timestamp.fromString(_))
+        .left
+        .map(ProtoDeserializationError.ValueConversionError("createdAt", _))
       result <- fromHttp(companionTemplateId, contractId, decodePayload)(
         javaTemplateId,
         contract.payload,
-        contract.payloadValue,
-        metadata,
+        contract.createdEventBlob.map(s => ByteString.copyFrom(Base64.getDecoder.decode(s))),
+        createdAt.map(_.toInstant),
       )
     } yield result
-  }
-
-  private def decodePayloadValue(
-      json: Json
-  ): Either[ProtoDeserializationError, com.daml.ledger.javaapi.data.DamlRecord] = {
-    val builder = ValueOuterClass.Record.newBuilder
-    Try(JsonFormat.parser().merge(new java.io.StringReader(json.noSpaces), builder)).toEither
-      .bimap(
-        ex =>
-          ProtoDeserializationError
-            .ValueConversionError("payloadValue", s"Failed to decode payload value: $ex"),
-        _ => com.daml.ledger.javaapi.data.DamlRecord.fromProto(builder.build),
-      )
   }
 
   def fromHttp[TCid <: ContractId[?], T <: DamlRecord[?]](
@@ -209,8 +204,8 @@ object Contract {
   )(
       javaTemplateId: Identifier,
       payload: Json,
-      payloadValue: Option[Json],
-      metadata: ContractMetadata,
+      createdEventBlob: Option[ByteString],
+      createdAt: Option[Instant],
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
     for {
       _ <- Either.cond(
@@ -226,13 +221,12 @@ object Contract {
       payload <- Try(decodePayload(payload)).toEither.left.map(ex =>
         ProtoDeserializationError.ValueConversionError("payload", s"Failed to decode payload: $ex")
       )
-      payloadValue <- payloadValue.traverse(decodePayloadValue(_))
     } yield Contract[TCid, T](
       identifier = javaTemplateId,
       contractId = contractId,
       payload = payload,
-      payloadValue = payloadValue,
-      metadata = metadata,
+      createdEventBlob = createdEventBlob,
+      createdAt = createdAt,
     )
   }
 
@@ -263,28 +257,24 @@ object Contract {
   private def fromCodegenContract[TCid <: ContractId[?], T <: DamlRecord[?]](
       contract: CodegenContract[TCid, T],
       ev: CreatedEvent,
+      // TODO(#8392) Remove this and read it from CreatedEvent
+      createdEventBlob: ByteString,
   ): Contract[TCid, T] = {
     Contract(
       identifier = ev.getTemplateId,
       contractId = contract.id,
       payload = contract.data,
-      payloadValue = Some(ev.getArguments),
-      metadata = ev.getContractMetadata,
+      createdEventBlob = Some(createdEventBlob),
+      createdAt = Some(ev.getContractMetadata.createdAt),
     )
   }
 
   def fromCreatedEvent[TCid <: ContractId[?], T <: DamlRecord[?]](
       companion: Companion.Template[TCid, T]
-  )(ev: CreatedEvent): Option[Contract[TCid, T]] = {
+      // TODO(#8392) Remove the blob and read it from CreatedEvent
+  )(ev: CreatedEvent, createdEventBlob: ByteString): Option[Contract[TCid, T]] = {
     JavaDecodeUtil
       .decodeCreated(companion)(ev)
-      .map(fromCodegenContract(_, ev))
+      .map(fromCodegenContract(_, ev, createdEventBlob))
   }
-
-  def fromCreatedEvent[Id <: ContractId[?], View <: DamlRecord[?]](
-      companion: InterfaceCompanion[?, Id, View]
-  )(ev: CreatedEvent): Option[Contract[Id, View]] =
-    JavaDecodeUtil
-      .decodeCreated(companion)(ev)
-      .map(fromCodegenContract(_, ev))
 }

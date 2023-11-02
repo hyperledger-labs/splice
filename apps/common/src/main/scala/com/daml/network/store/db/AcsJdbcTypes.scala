@@ -21,6 +21,8 @@ import spray.json.{JsString, JsValue, JsonFormat, deserializationError}
 
 import java.sql.{PreparedStatement, ResultSet}
 
+import com.google.protobuf.ByteString
+
 trait AcsJdbcTypes {
   import AcsJdbcTypes.JsonString
 
@@ -30,6 +32,11 @@ trait AcsJdbcTypes {
 
   protected implicit lazy val byteArrayGetResult: GetResult[Array[Byte]] =
     GetResult { rs => rs.nextBytes() }
+
+  protected implicit def byteStringSetParameter(implicit
+      setParameterByteArray: SetParameter[Array[Byte]]
+  ): SetParameter[ByteString] =
+    (bs: ByteString, pp: PositionedParameters) => setParameterByteArray.apply(bs.toByteArray, pp)
 
   protected implicit lazy val timestampJdbcType: JdbcType[Timestamp] =
     MappedColumnType.base[Timestamp, Long](_.micros, Timestamp.assertFromLong)
@@ -251,11 +258,12 @@ trait AcsJdbcTypes {
   protected def tryToDecode[TCid <: ContractId[?], T <: DamlRecord[?], D](
       companion: Companion.Template[TCid, T],
       createdEvent: CreatedEvent,
+      createdEventBlob: ByteString,
   )(
       toData: Contract[TCid, T] => D
   ): Either[String, D] = {
     Contract
-      .fromCreatedEvent(companion)(createdEvent)
+      .fromCreatedEvent(companion)(createdEvent, createdEventBlob)
       .map(toData)
       .toRight(
         s"Failed to decode ${companion.TEMPLATE_ID} from CreatedEvent of contract id ${createdEvent.getContractId}."

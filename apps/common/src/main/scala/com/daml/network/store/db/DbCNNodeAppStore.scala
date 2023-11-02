@@ -13,6 +13,8 @@ import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 
 import scala.concurrent.ExecutionContext
 
+import com.google.protobuf.ByteString
+
 abstract class DbCNNodeAppStore[
     TXI <: TxLogStore.IndexRecord,
     TXE <: TxLogStore.Entry[TXI],
@@ -40,7 +42,7 @@ abstract class DbCNNodeAppStore[
       acsContractFilter,
       txLogParser,
       retryProvider,
-      (evt, csr, tc) => ingestionAcsInsert(evt, csr)(tc),
+      (evt, createdEventBlob, csr, tc) => ingestionAcsInsert(evt, createdEventBlob, csr)(tc),
       (evt, tc) => ingestionTxLogInsert(evt)(tc),
     )
 
@@ -59,7 +61,11 @@ abstract class DbCNNodeAppStore[
       retryProvider,
     )
 
-  def ingestionAcsInsert(createdEvent: CreatedEvent, contractState: ContractStateRowData)(implicit
+  def ingestionAcsInsert(
+      createdEvent: CreatedEvent,
+      createdEventBlob: ByteString,
+      contractState: ContractStateRowData,
+  )(implicit
       tc: TraceContext
   ): Either[String, DBIOAction[?, NoStream, Effect.Write]]
 

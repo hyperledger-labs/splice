@@ -1,6 +1,5 @@
 package com.daml.network.store.db
 
-import com.daml.ledger.javaapi.data.ContractMetadata
 import com.daml.network.codegen.java.cn.svonboarding.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.codegen.java.cn.validatoronboarding.UsedSecret
@@ -131,7 +130,6 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
       identifier = templateId,
       contractId = new vo.ValidatorOnboarding.ContractId(s"$domain#$n"),
       payload = template,
-      metadata = ContractMetadata.Empty(),
     )
   }
 
@@ -145,7 +143,6 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
       templateId,
       new UsedSecret.ContractId(validContractId(1)),
       template,
-      ContractMetadata.Empty(),
     )
   }
 
@@ -156,7 +153,6 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
       ApprovedSvIdentity.TEMPLATE_ID,
       new ApprovedSvIdentity.ContractId(validContractId(1)),
       template,
-      ContractMetadata.Empty(),
     )
   }
 

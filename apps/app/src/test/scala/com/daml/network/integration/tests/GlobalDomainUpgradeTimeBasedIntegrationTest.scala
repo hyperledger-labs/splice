@@ -17,7 +17,10 @@ import com.daml.network.codegen.java.cn.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.config.CNNodeConfigTransforms.updateAllAutomationConfigs
+import com.daml.network.config.CNNodeConfigTransforms.{
+  updateAllAutomationConfigs,
+  updateAllValidatorConfigs,
+}
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.util.{
   AssignedContract,
@@ -26,6 +29,7 @@ import com.daml.network.util.{
   ConfigScheduleUtil,
   ContractWithState,
 }
+import com.daml.network.validator.config.AppManagerConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.PartyId
@@ -38,29 +42,42 @@ import scala.jdk.CollectionConverters.*
 class GlobalDomainUpgradeTimeBasedIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
     with ConfigScheduleUtil {
-  private val appManagerDarPath = "daml/app-manager/.daml/dist/app-manager-0.1.0.dar"
 
   override def environmentDefinition =
     super.environmentDefinition
-      .addConfigTransforms { (_, config) =>
-        updateAllAutomationConfigs(c =>
-          c.copy(
-            // Need to disable triggers so workflows stay open
-            enableSvcGovernance = false,
-            enableClosedRoundArchival = false,
-            enableSvRewards = false,
-          )
-        )(config)
-      }
-      .withAdditionalSetup { implicit env =>
-        // without this addition:
-        //  com.digitalasset.canton.console.CommandFailure: Command execution
-        //      failed. Request failed for remote participant for `sv1`, with admin token.
-        //  GrpcRequestRefusedByServer: NOT_FOUND/PACKAGE_NOT_FOUND(11,e47bfb78):
-        //      Couldn't find package 07537a7db6... while looking for template
-        //      or interface 07537a7d...:CN.AppManager.Store:AppRelease
-        sv1Backend.participantClient.upload_dar_unless_exists(appManagerDarPath)
-      }
+      .addConfigTransforms(
+        (_, config) =>
+          updateAllAutomationConfigs(c =>
+            c.copy(
+              // Need to disable triggers so workflows stay open
+              enableSvcGovernance = false,
+              enableClosedRoundArchival = false,
+              enableSvRewards = false,
+            )
+          )(config),
+        (_, config) =>
+          updateAllValidatorConfigs { case (name, c) =>
+            // Enable app manager so migration kicks in.
+            // We don't actually use app maager functionality so the URLs are stubs.
+            if (name == "sv1Validator") {
+              c.copy(
+                appManager = Some(
+                  AppManagerConfig(
+                    issuerUrl = "https://example.com",
+                    appManagerUiUrl = "https://example.com",
+                    appManagerApiUrl = "https://example.com",
+                    jsonApiUrl = "https://example.com",
+                    audience = "https://example.com",
+                    initialRegisteredApps = Map.empty,
+                    initialInstalledApps = Map.empty,
+                  )
+                )
+              )
+            } else {
+              c
+            }
+          }(config),
+      )
 
   private[this] val globalUpgradeDomain = DomainAlias.tryCreate("global-upgrade")
 
@@ -356,7 +373,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         new appManagerCodegen.InstalledApp(
           validator.toProtoPrimitive,
           provider.toProtoPrimitive,
-          "https://example.com",
+          "https://example.com/apps/registered/provider::00000",
         )
       )
 
@@ -589,7 +606,9 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
     clue("see whether coin/wallet contracts signed by validator follow coinrules") {
       val sv1ValidatorParty = sv1ValidatorBackend.getValidatorPartyId()
       import com.daml.network.validator.store.ValidatorStore.templatesMovedByMyAutomation as templatesMovedByValidatorAutomation
-      allContractsMigrated(templatesMovedByValidatorAutomation map (c(_, sv1ValidatorParty)): _*)
+      allContractsMigrated(
+        templatesMovedByValidatorAutomation(true) map (c(_, sv1ValidatorParty)): _*
+      )
     }
 
     clue("see whether coin/wallet contracts signed by wallet user follow coinrules") {

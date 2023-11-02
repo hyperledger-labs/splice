@@ -26,6 +26,9 @@ import scala.util.Try
 
 import FieldValidator.*
 
+import scala.annotation.nowarn
+
+@nowarn("cat=deprecation")
 class ValidateDisclosedContracts(explicitDisclosureFeatureEnabled: Boolean) {
   def apply(commands: ProtoCommands)(implicit
       contextualizedErrorLogger: ContextualizedErrorLogger

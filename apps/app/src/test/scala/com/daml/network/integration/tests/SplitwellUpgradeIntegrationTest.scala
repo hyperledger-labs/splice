@@ -133,8 +133,14 @@ class SplitwellUpgradeIntegrationTest
             group
           },
       )
-      val invite = aliceSplitwellClient.createGroupInvite(
-        "group1"
+      val (_, invite) = actAndCheck(
+        "Alice creates invite",
+        aliceSplitwellClient.createGroupInvite(
+          "group1"
+        ),
+      )(
+        "alice observes the invite",
+        _ => aliceSplitwellClient.listGroupInvites().loneElement.toAssignedContract.value,
       )
       val acceptedInvite = bobSplitwellClient.acceptInvite(invite)
       val contractDomains =
@@ -236,9 +242,15 @@ class SplitwellUpgradeIntegrationTest
               ),
           )
 
-        val invite = clue(s"alice invites bob to $abGroupName, and bob accepts") {
-          aliceSplitwellClient.createGroupInvite(abGroupName)
-        }
+        val (_, invite) = actAndCheck(
+          "Alice creates invite",
+          aliceSplitwellClient.createGroupInvite(
+            abGroupName
+          ),
+        )(
+          "alice observes the invite",
+          _ => aliceSplitwellClient.listGroupInvites().loneElement.toAssignedContract.value,
+        )
         val (acceptedInvite, _) =
           actAndCheck(
             s"bob accepts invite to $abGroupName",

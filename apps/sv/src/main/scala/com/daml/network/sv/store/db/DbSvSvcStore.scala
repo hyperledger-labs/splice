@@ -44,6 +44,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
 import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -84,11 +85,12 @@ class DbSvSvcStore(
 
   override def ingestionAcsInsert(
       createdEvent: javab.CreatedEvent,
+      createdEventBlob: ByteString,
       contractState: ContractStateRowData,
   )(implicit
       tc: TraceContext
   ) = {
-    SvcAcsStoreRowData.fromCreatedEvent(createdEvent).map {
+    SvcAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob).map {
       case SvcAcsStoreRowData(
             contract,
             contractExpiresAt,
@@ -121,18 +123,14 @@ class DbSvSvcStore(
         val templateId = contract.identifier
         val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
         val createArguments = payloadJsonFromContract(contract.payload)
-        val createArgumentsValue = payloadValueJsonStringFromRecord(contract.mandatoryPayloadValue)
-        val contractMetadataCreatedAt = Timestamp.assertFromInstant(contract.metadata.createdAt)
-        val contractMetadataContractKeyHash =
-          lengthLimited(contract.metadata.contractKeyHash.toStringUtf8)
-        val contractMetadataDriverInternal = contract.metadata.driverMetadata.toByteArray
+        val createdAt = Timestamp.assertFromInstant(contract.mandatoryCreatedAt)
         val safeSvOnboardingToken = svOnboardingToken.map(lengthLimited)
         val safeSvCandidateName = svCandidateName.map(lengthLimited)
         val safeCnsEntryName = cnsEntryName.map(lengthLimited)
         val safeActionCnsEntryContextArcType = actionCnsEntryContextArcType.map(lengthLimited)
         sqlu"""
-              insert into svc_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, create_arguments_value, contract_metadata_created_at,
-                                        contract_metadata_contract_key_hash, contract_metadata_driver_internal, contract_expires_at,
+              insert into svc_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, created_event_blob,
+                                        created_at, contract_expires_at,
                                         assigned_domain, reassignment_counter, reassignment_target_domain,
                                         reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
                                         coin_round_of_expiry, reward_round, reward_party, mining_round, action_requiring_confirmation,
@@ -143,8 +141,8 @@ class DbSvSvcStore(
                                         subscription_next_payment_due_at, featured_app_right_provider)
               values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
             templateId
-          )}, $createArguments, $createArgumentsValue, $contractMetadataCreatedAt,
-                      $contractMetadataContractKeyHash, $contractMetadataDriverInternal, $contractExpiresAt,
+          )}, $createArguments, $createdEventBlob,
+                      $createdAt, $contractExpiresAt,
                       ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
                       ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
                       $coinRoundOfExpiry, $rewardRound, $rewardParty, $miningRound, $actionRequiringConfirmation,
@@ -202,10 +200,8 @@ class DbSvSvcStore(
                        idle.template_id_package_id,
                        idle.template_id_qualified_name,
                        idle.create_arguments,
-                       idle.create_arguments_value,
-                       idle.contract_metadata_created_at,
-                       idle.contract_metadata_contract_key_hash,
-                       idle.contract_metadata_driver_internal,
+                       idle.created_event_blob,
+                       idle.created_at,
                        idle.contract_expires_at,
                        ctx.store_id,
                        ctx.event_number,
@@ -213,10 +209,8 @@ class DbSvSvcStore(
                        ctx.template_id_package_id,
                        ctx.template_id_qualified_name,
                        ctx.create_arguments,
-                       ctx.create_arguments_value,
-                       ctx.contract_metadata_created_at,
-                       ctx.contract_metadata_contract_key_hash,
-                       ctx.contract_metadata_driver_internal,
+                       ctx.created_event_blob,
+                       ctx.created_at,
                        ctx.contract_expires_at
               from     svc_acs_store idle
               join     svc_acs_store ctx
