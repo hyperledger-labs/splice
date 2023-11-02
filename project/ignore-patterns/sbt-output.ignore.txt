@@ -90,4 +90,7 @@ stderr: Finishing shakeRun .*exception: AsyncCancelled
 # (proxied through sbt) issue this warning sometimes.
 sh: warning: setlocale: LC_ALL: cannot change locale \(C\.UTF-8\)
 
+# auth0_user_cleanup job retrying auth0 API calls
+Auth0 exception raised, triggering retry
+
 # Make sure to have a trailing newline

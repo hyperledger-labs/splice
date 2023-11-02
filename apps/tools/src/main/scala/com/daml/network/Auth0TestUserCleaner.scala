@@ -4,7 +4,6 @@ import com.auth0.client.mgmt.filter.UserFilter
 import com.auth0.exception.Auth0Exception
 import java.time.{ZonedDateTime, ZoneId}
 import java.time.format.DateTimeFormatter
-import java.time.Duration
 
 import com.daml.network.util.Auth0Util
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -30,43 +29,42 @@ object Auth0TestUserCleaner {
   }
 
   def removeTestUsers(util: Auth0Util)(implicit tc: TraceContext): Unit = {
-    // set up a global timeout in case there are silent issues with user deletion that prevent the user.length from ever reaching 0
-    val startTime = ZonedDateTime.now();
-    val timeout = 30; // seconds
+    // The default value, see https://auth0.com/docs/manage-users/user-search/view-search-results-by-page#limitation
+    val usersPerPage: Int = 50
 
-    def checkTimeout() = {
-      if (Duration.between(startTime, ZonedDateTime.now()).getSeconds() > timeout) {
-        throw new Error(s"User deletion loop timed out after $timeout seconds, bailing...")
-      }
+    val userCount = retryAuth0Calls(
+      util.listUsers(unusedTestUserFilter.withPage(0, usersPerPage))
+    ).total
+    val pageCount = (userCount / usersPerPage) + 1
+    println(s"Found ${userCount} stale test users")
+    val staleUsers =
+      Range(0, pageCount).foldLeft(List.empty[com.auth0.json.mgmt.users.User])((users, page) => {
+        println(s"Fetching page ${page}...")
+        users ++ retryAuth0Calls(
+          util.listUsers(unusedTestUserFilter.withPage(page, usersPerPage))
+        ).users
+      })
+    staleUsers.foreach(u => {
+      val uid = u.getId()
+      val name = u.getName()
+      val createdAt = u.getCreatedAt()
+
+      println(s"Deleting user $name created on $createdAt with id $uid")
+      retryAuth0Calls(util.deleteUser(uid))
+    })
+
+    // Sometimes the call to delete a user succeeds, but the user won't disappear from the list of users.
+    val remainingUsers = retryAuth0Calls(
+      util.listUsers(unusedTestUserFilter.withPage(0, 10))
+    )
+    if (remainingUsers.total > 0) {
+      println(
+        s"Note: ${remainingUsers.total} users are still listed after being deleted. Examples:\n  ${remainingUsers.users
+            .map(_.getName())
+            .mkString("\n  ")}"
+      )
     }
-
-    // auth0's list users endpoint is paginated, so we need to loop until there are no more results
-    def processPage(): Unit = {
-      val users = retryAuth0Calls(util.listUsers(unusedTestUserFilter))
-
-      if (users.length > 0) {
-        println(s"Found ${users.length} remaining stale test users, deleting...")
-
-        users.foreach(u => {
-          val uid = u.getId()
-          val name = u.getName()
-          val createdAt = u.getCreatedAt()
-
-          println(s"Deleting user $name created on $createdAt with id $uid")
-          retryAuth0Calls(util.deleteUser(uid))
-        })
-
-        checkTimeout()
-        println(s"One page done, processing next page...")
-        Thread.sleep(1000) // sleep for Auth0 API rate-limiting before continuing
-
-        processPage();
-      } else {
-        println(s"Success: 0 stale test users remaining")
-      }
-    }
-
-    processPage()
+    println("Success: all stale users deleted")
   }
 
   // Super simple retrier
@@ -80,9 +78,8 @@ object Auth0TestUserCleaner {
     } catch {
       case auth0Exception: Auth0Exception => {
         println(
-          s"Auth0 exception raised, triggering retry: $retryCount attempts remaining..."
+          s"Auth0 exception raised, triggering retry: $retryCount attempts remaining...\n  ${auth0Exception.getMessage}"
         )
-        Thread.sleep(1000)
         retryAuth0Calls(f, retryCount - 1)
       }
       case ex: Throwable => throw ex // throw anything else

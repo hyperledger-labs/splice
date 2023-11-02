@@ -1909,6 +1909,7 @@ jobs:
             --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET
             --keep ARTIFACTORY_USER
             --keep ARTIFACTORY_PASSWORD"
+          timeout: "10m"
       - save_sbt_cache
       - save_compiled_classes
 
