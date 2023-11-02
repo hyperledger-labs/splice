@@ -193,31 +193,37 @@ To configure `Auth0 <https://auth0.com>`_ as your validator's OIDC provider, per
     b. Under the Permissions tab in the new API, add a permission with scope ``daml_ledger_api``, and a description of your choice.
     c. On the Settings tab, scroll down to "Access Settings" and enable "Allow Offline Access", for automatic token refreshing.
 
-3. Create an Auth0 Application for the validator backend:
+3. (Optional) If you want to configure a different audience to your APIs, you can do so by creating new Auth0 APIs with an identifier set to the audience of your choice. For example,
+
+    a. Create another API by setting name to ``Validator App API``,
+       set identifier for the Validator backend app e.g. ``https://validator.example.com/api``.
+
+4. Create an Auth0 Application for the validator backend:
 
     a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button.
     b. Name it ``Validator app backend``, choose "Machine to Machine Applications", and click Create.
     c. Choose the ``Daml Ledger API`` API you created in step 2 in the "Authorize Machine to Machine Application" dialog and click Authorize.
 
-4. Create an Auth0 Application for the wallet web UI.
-   Repeat all steps described in step 5, with following modifications:
+5. Create an Auth0 Application for the wallet web UI.
 
-   - In step b, use ``Wallet web UI`` as the name of your application.
-   - In steps c and d, use the URL for your validator's *wallet* UI.
-     If you're using the ingress configuration of this runbook, that would be ``https://wallet.validator.YOUR_HOSTNAME``.
+    a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button.
+    b. Choose "Single Page Web Applications", call it ``Wallet web UI``, and click Create.
+    c. Determine the URL for your validator's wallet UI.
+       If you're using the ingress configuration of this runbook, that would be ``https://wallet.validator.YOUR_HOSTNAME``.
+    d. In the Auth0 application settings, add the SV URL to the following:
 
-5. Create an Auth0 Application for the directory web UI.
+       - "Allowed Callback URLs"
+       - "Allowed Logout URLs"
+       - "Allowed Web Origins"
+       - "Allowed Origins (CORS)"
+    e. Save your application settings.
+
+6. Create an Auth0 Application for the directory web UI.
    Repeat all steps described in step 5, with following modifications:
 
    - In step b, use ``Directory web UI`` as the name of your application.
    - In steps c and d, use the URL for your validator's *directory* UI.
      If you're using the ingress configuration of this runbook, that would be ``https://directory.validator.YOUR_HOSTNAME``.
-
-6. (Optional) Similarly to the ledger API above, the default audience is set to ``https://canton.network.global``.
-    If you want to configure a different audience to your APIs, you can do so by creating new Auth0 APIs with an identifier set to the audience of your choice. For example,
-
-    a. Create another API by setting name to ``Validator App API``,
-       set identifier for the Validator backend app e.g. ``https://validator.example.com/api``.
 
 Please refer to Auth0's `own documentation on user management <https://auth0.com/docs/manage-users>`_ for pointers on how to set up end-user accounts for the two web UI applications you created.
 Note that you will need to create at least one such user account for completing the steps in :ref:`helm-validator-install` - for being able to log in as your Validator node's administrator.
