@@ -3,6 +3,14 @@
 Release Notes
 =============
 
+2023-11-13
+----------
+
+* Deployment updates:
+
+  * Revising the SVC governance formula, using n := ceil( (n + f + 1) / 2.0 ) with n SVs and f := floor ( (n - 1) / 3.0 ) maximum supported number of faulty SVs for safe operation.
+  * Removing the special voting threshold for DevNet aligning with the one used in TestNet
+
 2023-11-06
 ----------
 
@@ -17,7 +25,7 @@ Release Notes
 
   * Add brief overview about important :ref:`Identities used by SV nodes on different layers <sv-identities-overview>`.
 
-* The Scan activity and transaction history API's now return the round for which transactions were registered. Please see the Scan OpenAPI specification. 
+* The Scan activity and transaction history API's now return the round for which transactions were registered. Please see the Scan OpenAPI specification.
   The ``/coin-config-for-round`` API can be used to lookup the holding fees for a specific round.
 
 2023-10-30

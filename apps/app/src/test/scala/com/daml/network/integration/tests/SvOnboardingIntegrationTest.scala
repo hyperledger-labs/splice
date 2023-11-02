@@ -11,9 +11,6 @@ import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
-import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRules_ConfirmSvOnboarding}
-import com.daml.network.console.SvAppBackendReference
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardingStatus
 import com.daml.network.sv.util.SvOnboardingToken
 import com.digitalasset.canton.console.CommandFailure
@@ -559,53 +556,6 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       )
   }
 
-  "At most 4 SV confirmations are required in devnet" in { implicit env =>
-    clue("Initialize SVC with 4 SVs") {
-      initSvc()
-      eventually() {
-        sv1Backend.getSvcInfo().svcRules.payload.members should have size 4
-      }
-    }
-
-    actAndCheck(
-      "Add 3 phantom SVs to SVC", {
-        for { i <- 1 to 3 } {
-          val name = s"phantom sv$i"
-          val partyId = allocateRandomSvParty(name)
-          addSvMember(partyId, name, sv1Backend.participantClient.id)
-        }
-      },
-    )(
-      "There should be 7 SVC members in total now",
-      _ => {
-        sv1Backend.getSvcInfo().svcRules.payload.members should have size 7
-      },
-    )
-
-    actAndCheck(
-      "SV1 to SV4 create confirmation to Confirm SVX", {
-        val svcRules = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
-          .head
-        val newMemberName = "Canton-Foundation-X"
-        val newMemberPartyId = allocateRandomSvParty(newMemberName)
-        createSvOnboardingConfirmation(svcRules, sv1Backend, newMemberPartyId, newMemberName)
-        createSvOnboardingConfirmation(svcRules, sv2Backend, newMemberPartyId, newMemberName)
-        createSvOnboardingConfirmation(svcRules, sv3Backend, newMemberPartyId, newMemberName)
-        createSvOnboardingConfirmation(svcRules, sv4Backend, newMemberPartyId, newMemberName)
-      },
-    )(
-      "There are 7 SVC members in total but only 4 confirmations are required to confirm a SV",
-      _ =>
-        inside(
-          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(svcParty)
-        ) { case Seq(svOnboardingConfirmed) =>
-          svOnboardingConfirmed.data.svName shouldBe "Canton-Foundation-X"
-        },
-    )
-  }
-
   "The election request succeeds if one SV is onboarded in the middle of an election request" in {
     implicit env =>
       clue("Initialize SVC with 2 SVs") {
@@ -667,32 +617,5 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
           })
         },
       )
-
-  }
-
-  private def createSvOnboardingConfirmation(
-      svcRules: SvcRules.Contract,
-      svApp: SvAppBackendReference,
-      newMemberParty: PartyId,
-      newMemberName: String,
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
-    val svParty = svApp.getSvcInfo().svParty
-    svApp.participantClient.ledger_api_extensions.commands.submitWithResult(
-      svApp.config.ledgerApiUser,
-      actAs = Seq(svParty),
-      readAs = Seq(svcParty),
-      update = svcRules.id.exerciseSvcRules_ConfirmAction(
-        svParty.toProtoPrimitive,
-        new ARC_SvcRules(
-          new SRARC_ConfirmSvOnboarding(
-            new SvcRules_ConfirmSvOnboarding(
-              newMemberParty.toProtoPrimitive,
-              newMemberName,
-              "because",
-            )
-          )
-        ),
-      ),
-    )
   }
 }

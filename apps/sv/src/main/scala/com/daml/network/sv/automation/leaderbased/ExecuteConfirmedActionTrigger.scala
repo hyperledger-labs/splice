@@ -23,8 +23,8 @@ import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfir
   CRARC_MiningRound_StartIssuing,
 }
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.config.CNThresholds
 import com.daml.network.sv.SvApp.{isDevNet, isSvcMemberName, isSvcMemberParty}
-import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.topology.PartyId
@@ -64,7 +64,7 @@ class ExecuteConfirmedActionTrigger(
       else
         for {
           svcRules <- store.getSvcRules()
-          requiredNumConfirmations = SvUtil.requiredNumVotes(svcRules)
+          requiredNumConfirmations = CNThresholds.requiredNumVotes(svcRules)
           confirmations <- store.listConfirmations(action)
           uniqueConfirmations = confirmations.distinctBy(_.payload.confirmer)
           taskOutcome <-

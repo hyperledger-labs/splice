@@ -14,7 +14,7 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
   MediatorConfig,
   SequencerConfig,
 }
-import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRulesConfig}
+import com.daml.network.codegen.java.cn.svcrules.{SvcRulesConfig}
 import com.daml.network.codegen.java.cn.{cometbft, svc}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.BackupDumpConfig
@@ -24,7 +24,7 @@ import com.daml.network.store.MultiDomainAcsStore.JsonAcsSnapshot
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.{BackupDump, Contract}
+import com.daml.network.util.{BackupDump}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.time.Clock
@@ -237,18 +237,6 @@ object SvUtil {
     } catch {
       case e: Exception => Left(s"could not parse private key: ${e.getMessage()}")
     }
-  }
-
-  def requiredNumVotes(svcRules: Contract.Has[SvcRules.ContractId, SvcRules]): Int = {
-    val memberNum = svcRules.payload.members.size
-    // as per `SvcRules` / `summarizeCollective`
-    val f = (memberNum - 1) / 3
-    val superMajoritySize = 2 * f + 1
-    val adjustedSuperMajoritySize =
-      if (svcRules.payload.isDevNet) superMajoritySize min 4
-      else superMajoritySize
-    val majoritySize = memberNum / 2 + 1
-    majoritySize.max(adjustedSuperMajoritySize)
   }
 
   def generateRandomOnboardingSecret(): String = {

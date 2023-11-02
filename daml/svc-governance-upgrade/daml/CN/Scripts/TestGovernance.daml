@@ -67,14 +67,14 @@ testVoteRequest = do
   votes <- query @Vote svc
   length votes === 2
 
-  -- sv3 rejects
+  -- sv3 accepts
   submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
     voter = sv3
     requestCid
-    accept = False
-    reason = Reason with url = ""; body = "I disagree that they've earned that right."
+    accept = True
+    reason = Reason with url = ""; body = "I agree!"
 
-  -- there are now three votes, out of which two accept, which are enough to grant the right
+  -- there are now three votes in favor of the change, which are enough to grant the right
   executeAllDefinitiveVotes app
   [(rightCid, right)] <- query @FeaturedAppRight provider
   right === FeaturedAppRight with svc; provider

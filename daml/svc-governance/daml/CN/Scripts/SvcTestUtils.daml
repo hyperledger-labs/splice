@@ -269,12 +269,15 @@ executeAllDefinitiveVotes app = do
   requests <- query @VoteRequest app.svc
   forA_ requests $ \(requestCid, _) -> do
     -- fetch the corresponding votes
-    votes <- queryFilter @Vote app.svc (\vote -> vote.requestCid == requestCid)
-    when (length votes >= s.requiredNumVotes) $
+    voteContracts <- queryFilter @Vote app.svc (\vote -> vote.requestCid == requestCid)
+    let votes = map (\(_, v) -> v) voteContracts
+    let numYays = length $ filter (.accept) votes
+    let numNays = length $ filter (\vote -> not vote.accept) votes
+    when (numYays >= s.requiredNumVotes || numNays >= s.requiredNumVotes) $
       void $ submitMulti [s.leader] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ExecuteDefiniteVote with
         requestCid
         coinRulesCid = Some coinRulesCid
-        voteCids = map fst votes
+        voteCids = map fst voteContracts
 
 initateAndAcceptVote : CCApp -> [Party] -> ActionRequiringConfirmation -> Script ()
 initateAndAcceptVote _ [] _ = error "initiateAndAcceptVote: require at least one party"

@@ -7,6 +7,7 @@ import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
+import com.daml.network.config.CNThresholds
 import com.daml.network.environment.*
 import com.daml.network.http.v0.definitions.{
   CometBftNodeStatusResponse,
@@ -23,8 +24,8 @@ import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.onboarding.SvcPartyHosting
 import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.SvUtil.{generateRandomOnboardingSecret, requiredNumVotes}
-import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
+import com.daml.network.sv.util.SvOnboardingToken
+import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -249,7 +250,7 @@ class HttpSvHandler(
         svUser = svUserName,
         svPartyId = svParty.toProtoPrimitive,
         svcPartyId = svcParty.toProtoPrimitive,
-        votingThreshold = requiredNumVotes(svcRules),
+        votingThreshold = CNThresholds.requiredNumVotes(svcRules),
         latestMiningRound = latestOpenMiningRound.contract.toHttp,
         coinRules = coinRules.toHttp,
         svcRules = svcRules.contract.toHttp,
@@ -631,7 +632,7 @@ class HttpSvHandler(
       name = Some(svOnboardingRequest.payload.candidateName),
       contractId = Some(Codec.encodeContractId(svOnboardingRequest.contractId)),
       confirmedBy = Some(confirmedBy),
-      requiredNumConfirmations = Some(SvUtil.requiredNumVotes(svcRules)),
+      requiredNumConfirmations = Some(CNThresholds.requiredNumVotes(svcRules)),
     )
   }
 

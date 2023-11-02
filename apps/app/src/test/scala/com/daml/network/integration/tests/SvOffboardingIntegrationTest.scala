@@ -11,7 +11,7 @@ class InMemorySvOffboardingIntegrationTest extends SvOffboardingIntegrationTest 
 
 class SvOffboardingIntegrationTest extends SvIntegrationTestBase {
 
-  "At least 3 SV votes are required to remove a member in devnet" in { implicit env =>
+  "At least 4 SV votes are required to remove a member in a 5 members quorum" in { implicit env =>
     clue("Initialize SVC with 4 SVs") {
       initSvc()
       eventually() {
@@ -69,8 +69,8 @@ class SvOffboardingIntegrationTest extends SvIntegrationTestBase {
     )
 
     actAndCheck(
-      "SV3 refuses to remove sv5", {
-        sv3Backend.castVote(voteRequestCid, false, "url", "description")
+      "SV3 votes on removing sv5", {
+        sv3Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
       "The majority has voted but without an acceptance majority, the trigger should not remove sv5",

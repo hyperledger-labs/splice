@@ -686,8 +686,6 @@ template SvcRules with
         ensureNotExpired request.expiresAt
         -- validate and archive votes
         let s = summarizeCollective this
-        let numVotes = length voteCids
-        require "Enough votes" (numVotes >= s.requiredNumVotes)
         votes <- forA voteCids $ \voteCid -> do
           vote <- fetch voteCid
           archive voteCid
@@ -696,12 +694,14 @@ template SvcRules with
           require "Confirmer is (still) a collective member" (vote.voter `Map.member` members)
           ensureNotExpired vote.expiresAt
           pure vote
+        let numYays = length $ filter (.accept) votes
+        let numNays = length $ filter (\vote -> not vote.accept) votes
+        require "A majority was reached" (numYays >= s.requiredNumVotes || numNays >= s.requiredNumVotes)
         -- we expect honest voters to cast at most one vote,
         -- and we expect the leader to pick at most one vote in case there are multiple
         require "No duplicate voters" (unique $ map (.voter) votes)
         -- determine outcome and execute action if required
-        let numYays = length $ filter (.accept) votes
-        let execute = numYays > numVotes - numYays
+        let execute = numYays >= s.requiredNumVotes
         when execute $
           executeActionRequiringConfirmation self coinRulesCid request.action
         -- store the result of this vote on the return value of the choice
@@ -1098,21 +1098,19 @@ summarizeCollective svcRules = CollectiveSummary with
     numMembers
     requiredNumVotes =
       -- NOTE:
-      --   * We require at least majority of votes to ensure that every definite
-      --     vote or confirmed action can be executed at most once. Otherwise, we'd fail
-      --     to properly propagate the command-deduplication done by SV's when they submit
-      --     confirmations.
-      --     This adjustment is only relevant for the cases where `f == 0` (i.e., numMembers \in {2,3})
-      --     or when we adjust the requiredNumVotes for DevNet and `numMembers >= 8`
-      --   * We require `2 * f + 1` confirmations instead of only `f + 1` confirmations, as otherwise
-      --     the confirmations for adding members can be abused by an `f + 1` minority to change the
-      --     consortium composition to onboard fake SVs that boost the votes of that minority.
-      max (numMembers / 2 + 1) (adjustForDevNet (2 * f + 1))
+      --   For a vote with n members and f = floor((n - 1) /3) byzantine members, we want to have the following properties:
+      --     *availability*: f operators abstaining, won’t stop the vote
+      --        ⇒ numRequiredVotes <= n - f
+      --     *tolerate leader selecting the votes*: the threshold must be independent of the number of votes cast
+      --     *integrity*: f operators cannot boost their voting power for future votes by collaborating
+      --        ⇒ implies f < threshold-for-accepting-an-action
+      --     *result acceptance*: outcome is accepted by SV operators
+      --        ⇒ we can pick between requiring numYays >= n / 2 + 1 (simple majority) and requiring numYays >= numRequiredVotes (super-majority)
+      --   We favor the following threshold that agrees with our preference of having both integrity and availability.
+      ceiling ((intToDecimal (numMembers + f + 1)) / 2.0)
   where
     numMembers = Map.size svcRules.members
-    f = (numMembers - 1) / 3
-    -- TODO(M3-57): remove the adjustment for dev-net once the SVs have proven to be operationally stable
-    adjustForDevNet = if svcRules.isDevNet then min 4 else identity
+    f = floor ((intToDecimal (numMembers - 1)) / 3.0)
 
 -- | Execute an action which requires certain number of confirmations from SVs.
 -- Each confirmed action can at most be executed once.

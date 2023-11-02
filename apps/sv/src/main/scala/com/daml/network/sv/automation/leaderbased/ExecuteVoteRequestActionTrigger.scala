@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.svcrules.Vote
-import com.daml.network.sv.util.SvUtil
+import com.daml.network.config.CNThresholds
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -49,7 +49,7 @@ class ExecuteVoteRequestActionTrigger(
         else
           for {
             svcRules <- store.getSvcRules()
-            requiredNumVotes = SvUtil.requiredNumVotes(svcRules)
+            requiredNumVotes = CNThresholds.requiredNumVotes(svcRules)
             votes <- store.listEligibleVotes(voteRequestId)
             acceptVotes = votes.count(_.payload.accept == true)
             rejectVotes = votes.count(_.payload.accept == false)

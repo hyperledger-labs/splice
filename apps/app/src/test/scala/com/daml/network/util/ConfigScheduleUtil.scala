@@ -14,13 +14,13 @@ import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfir
   CRARC_RemoveFutureCoinConfigSchedule,
 }
 import com.daml.network.codegen.java.da.types.Tuple2
+import com.daml.network.config.CNThresholds
 import com.daml.network.console.SvAppBackendReference
 import com.daml.network.integration.tests.CNNodeTests
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.CNNodeUtil.defaultCoinConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.DomainId
@@ -150,7 +150,8 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
           sv match {
             case sv: SvAppBackendReference =>
               if (
-                sv.is_running && sv.name != "sv1" && voteCount < SvUtil.requiredNumVotes(svcRules)
+                sv.is_running && sv.name != "sv1" && voteCount < CNThresholds
+                  .requiredNumVotes(svcRules)
               ) {
                 eventually() {
                   sv.listVoteRequests()

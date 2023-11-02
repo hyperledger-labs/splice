@@ -1,6 +1,10 @@
 package com.daml.network.config
 
+import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.util.Contract
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+
+import scala.math.{ceil, floor}
 
 @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
 object CNThresholds {
@@ -32,5 +36,12 @@ object CNThresholds {
   def getSequencerConnectionsSizeThreshold(sequencersSize: Int): PositiveInt = FPlus1Threshold(
     sequencersSize
   )
+
+  def requiredNumVotes(svcRules: Contract.Has[SvcRules.ContractId, SvcRules]): Int = {
+    val memberNum = svcRules.payload.members.size
+    // as per `SvcRules` / `summarizeCollective`
+    val f = floor((memberNum - 1) / 3.0).toInt
+    ceil((memberNum + f + 1) / 2.0).toInt
+  }
 
 }

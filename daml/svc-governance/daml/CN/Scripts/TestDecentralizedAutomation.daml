@@ -114,29 +114,21 @@ testUnclaimedRewardsMerging = do
 -- Testing confirmations
 ------------------------
 
-testRequiredNumOfConfirmationInDevNet : Script ()
-testRequiredNumOfConfirmationInDevNet = do
-  (app, svc, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
+testRequiredNumOfConfirmation : Script ()
+testRequiredNumOfConfirmation = do
+  (app, svc, (sv1, sv2, sv3, _)) <- initDevNetCollective
 
   coinConfig <- getCoinConfig app
   let domainId = coinConfig.globalDomain.activeDomain
 
-  -- add 3 phamton SVs
-  forA_ [5 .. 7] $ \i -> do
-    [(svcRulesCid, _)] <- query @SvcRules svc
-    let svName = "sv" <> show i
-    phamtonSv <- allocateParty $ svName
-    submit svc $ exerciseCmd svcRulesCid $
-      SvcRules_AddMember phamtonSv svName (svName <> "-participant-id") (Round 3) domainId
-
   [(coinRulesCid, _)] <- query @CoinRules svc
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
 
-  Map.size svcRules.members === 7
+  Map.size svcRules.members === 4
 
   svX <- allocateParty "svX"
 
-  -- create 4 confirmations
+  -- create 3 confirmations
   let action = ARC_SvcRules with
         svcAction = SRARC_AddMember $ SvcRules_AddMember with
           newMemberParty = svX
@@ -144,16 +136,15 @@ testRequiredNumOfConfirmationInDevNet = do
           newMemberParticipantId = "svX-participant-id"
           joinedAsOfRound = (Round 3)
           domainId
-  confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
+  confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
     submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = svParty
       action
 
   confirmations <- query @Confirmation svc
-  length confirmations === 4
+  length confirmations === 3
 
-  -- There are 7 SVC members in total, which implies f = 2 and thus 5 confirmations are required in a non-DevNet.
-  -- However, in DevNet only 4 confirmations are required to run a confirmed action
+  -- There are 4 SVC members in total, which implies f = 1 and thus 3 confirmations are required.
   submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
     SvcRules_ExecuteConfirmedAction with
       action

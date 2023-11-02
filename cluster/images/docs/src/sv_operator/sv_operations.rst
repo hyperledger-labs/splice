@@ -79,7 +79,6 @@ Participant identity
   - Quorums for confirmation-based SVC Daml workflows (>⅔ of onboarded SVs; on DevNet instead usually >½)
 
   .. TODO(#7746): remove "once activated"
-  .. TODO(#8249): remove DevNet special case
 
 - In general, participant identities *can't* be reused on the same global domain,
   i.e., without the network being reset/redeployed.

@@ -8,9 +8,9 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.svcrules.ElectionRequest
+import com.daml.network.config.CNThresholds
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
@@ -45,7 +45,7 @@ class ElectionRequestTrigger(
       currentLeader = svcRules.payload.leader
       self = store.key.svParty.toProtoPrimitive
 
-      requiredNumRequests = SvUtil.requiredNumVotes(svcRules)
+      requiredNumRequests = CNThresholds.requiredNumVotes(svcRules)
       requestCids <- store.listElectionRequests(svcRules).map(_.map(_.contractId))
       taskOutcome <-
         if (requestCids.size >= requiredNumRequests) {
