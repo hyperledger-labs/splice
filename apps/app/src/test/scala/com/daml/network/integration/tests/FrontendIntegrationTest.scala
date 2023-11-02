@@ -18,9 +18,9 @@ import org.openqa.selenium.{
   By,
   JavascriptExecutor,
   OutputType,
-  StaleElementReferenceException,
   TakesScreenshot,
   WebDriver,
+  WebDriverException,
   WebElement,
 }
 import org.openqa.selenium.html5.WebStorage
@@ -354,9 +354,14 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     }
   }
 
-  // We override eventually to also retry on StaleElementReferenceException
-  // because that’s very common in frontend tests and having
-  // each call site try to catch that seems unlikely to be reliable.
+  /** Specialized version of eventually() for frontend tests.
+    *
+    * super.eventually() only retries on TestFailedException, thrown for example by in "foo should be(1)".
+    * In frontend tests, we want to additionally retry every failure related to Selenium,
+    * i.e., any subclass of WebDriverException.
+    *
+    * It's the responsibility of the caller to make sure the test code wrapped in eventually() is idempotent.
+    */
   override def eventually[T](
       timeUntilSuccess: FiniteDuration = 20.seconds,
       maxPollInterval: FiniteDuration = 100.millis,
@@ -364,14 +369,18 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     try {
       testCode
     } catch {
-      case e: StaleElementReferenceException =>
-        // StaleElementReferenceException usually happens when the test is interacting with the web page
-        // while the web page is being redrawn. Often these redraws can be optimized away in React, so we record them here.
+      // Some of WebDriverException subclasses represent non-retryable errors, we rely on the timeout
+      // to avoid blocking indefinitely.
+      // Of particular interest is StaleElementReferenceException, which usually happens when the test
+      // is interacting with the web page while the web page is being redrawn. Often these redraws
+      // can be optimized away in React, so we record them here.
+      case e: WebDriverException =>
         logger.debug(
-          s"Retrying StaleElementReferenceException\n${e.getStackTrace.map("  at " + _.toString).mkString("\n")}"
+          s"Retrying ${e.getClass.getSimpleName}\n${e.getStackTrace.map("  at " + _.toString).mkString("\n")}"
         )(TraceContext.empty)
         fail(e)
     }
+
   }
 
   protected def waitForQuery(query: Query, timeUntilSuccess: Option[FiniteDuration] = None)(implicit
