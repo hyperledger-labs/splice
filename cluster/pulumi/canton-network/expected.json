@@ -1580,7 +1580,7 @@
           }
         ],
         "fixedTokens": false,
-        "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
+        "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "metrics": {
           "enable": true,
@@ -2448,7 +2448,7 @@
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
           "enable": true,
-          "sequencerPublicUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008"
+          "sequencerPublicUrl": "https://sequencer.sv-1.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [
           {
@@ -2576,7 +2576,7 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
-        "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
+        "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "metrics": {
           "enable": true,
@@ -3353,7 +3353,7 @@
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
           "enable": true,
-          "sequencerPublicUrl": "http://sequencer.sv-2.svc.mock.network.canton.global:5008"
+          "sequencerPublicUrl": "https://sequencer.sv-2.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
@@ -3453,7 +3453,7 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
-        "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
+        "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "metrics": {
           "enable": true,
@@ -4145,7 +4145,7 @@
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
           "enable": true,
-          "sequencerPublicUrl": "http://sequencer.sv-3.svc.mock.network.canton.global:5008"
+          "sequencerPublicUrl": "https://sequencer.sv-3.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
@@ -4245,7 +4245,7 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
-        "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
+        "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "metrics": {
           "enable": true,
@@ -4937,7 +4937,7 @@
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
           "enable": true,
-          "sequencerPublicUrl": "http://sequencer.sv-4.svc.mock.network.canton.global:5008"
+          "sequencerPublicUrl": "https://sequencer.sv-4.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
@@ -5037,7 +5037,7 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
-        "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
+        "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "metrics": {
           "enable": true,
@@ -5538,7 +5538,7 @@
           }
         ],
         "fixedTokens": false,
-        "globalDomainUrl": "http://sequencer.sv-1.svc.mock.network.canton.global:5008",
+        "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "metrics": {
           "enable": true,

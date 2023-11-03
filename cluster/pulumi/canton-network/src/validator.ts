@@ -94,7 +94,7 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       additionalUsers: config.additionalUsers || [],
       validatorPartyHint: config.validatorPartyHint,
       appDars: config.appDars || [],
-      globalDomainUrl: `http://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global:5008`,
+      globalDomainUrl: `https://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
       extraDomains: config.extraDomains,
       validatorWalletUser: config.validatorWalletUser,
       svSponsorAddress: config.svSponsorAddress,

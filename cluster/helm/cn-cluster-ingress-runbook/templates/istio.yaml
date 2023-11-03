@@ -154,28 +154,14 @@ spec:
   hosts:
     - "sequencer.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
   gateways:
-    - cluster-ingress/cn-apps-gateway
+    - cluster-ingress/cn-http-gateway
   http:
   - match:
-    - port: 5008
+      - port: 443
     route:
     - destination:
         port:
           number: 5008
-        host: global-domain-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
-  - match:
-    - port: 5009
-    route:
-    - destination:
-        port:
-          number: 5009
-        host: global-domain-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
-  - match:
-    - port: 10313
-    route:
-    - destination:
-        port:
-          number: 10313
         host: global-domain-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 {{- end }}
 ---

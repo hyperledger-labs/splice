@@ -10,6 +10,7 @@ Release Notes
 
   * Revising the SVC governance formula, using n := ceil( (n + f + 1) / 2.0 ) with n SVs and f := floor ( (n - 1) / 3.0 ) maximum supported number of faulty SVs for safe operation.
   * Removing the special voting threshold for DevNet aligning with the one used in TestNet
+  * The URL of the global domain sequencer hosted by the Canton Foundation has changed to `https://sequencer.sv-1.svc.<TARGET_CLUSTER>.network.canton.global`. This change is reflected in the values specified in `participant-values.yaml`, `validator-values.yaml` and `sv-values.yaml`.
 
 2023-11-06
 ----------

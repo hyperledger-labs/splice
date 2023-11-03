@@ -25,7 +25,7 @@ To start the validator node, first start the validator participant using the Can
 
 .. parsed-literal::
 
-    DOMAIN_URL=http://sequencer.sv-1.svc.|cn_cluster|.network.canton.global:5008 ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
+    DOMAIN_URL=https://sequencer.sv-1.svc.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
 
 Before starting the splitwell backend, some setup is required:
 
@@ -131,7 +131,7 @@ Next, in a separate terminal, start the participant again using the same command
 
 .. parsed-literal::
 
-    DOMAIN_URL=http://sequencer.sv-1.svc.|cn_cluster|.network.canton.global:5008 ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
+    DOMAIN_URL=https://sequencer.sv-1.svc.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
 
 Once the console opened, connect it to the domain you started earlier ::
 

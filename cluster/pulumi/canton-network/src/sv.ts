@@ -195,7 +195,7 @@ export async function installSvNode(config: SvConfig): Promise<{
       // because helm does not distinguish between an empty object and unset.
       {
         enable: config.withDomainNode,
-        sequencerPublicUrl: `http://sequencer.${config.nodename}.svc.${CLUSTER_BASENAME}.network.canton.global:5008`,
+        sequencerPublicUrl: `https://sequencer.${config.nodename}.svc.${CLUSTER_BASENAME}.network.canton.global`,
       },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
       expiresIn: onboarding.expiresIn,

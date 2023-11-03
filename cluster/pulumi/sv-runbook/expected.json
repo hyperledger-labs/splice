@@ -272,7 +272,7 @@
         "enableHealthProbes": true,
         "globalDomain": {
           "alias": "global",
-          "url": "http://sequencer.sv-1.svc.svrun.network.com.network.canton.global:5008"
+          "url": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": "postgres",
@@ -392,9 +392,9 @@
         },
         "domain": {
           "enable": true,
-          "sequencerPublicUrl": "http://sequencer.sv.svc.svrun.network.canton.global:5008"
+          "sequencerPublicUrl": "https://sequencer.sv.svc.svrun.network.canton.global"
         },
-        "globalDomainUrl": "http://sequencer.sv-1.svc.svrun.network.com.network.canton.global:5008",
+        "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global/api/v0/sv"
@@ -451,7 +451,7 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "svrun.network.com.network.canton.global",
-        "globalDomainUrl": "http://sequencer.sv-1.svc.svrun.network.com.network.canton.global:5008",
+        "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
         "scanAddress": "https://scan.sv-1.svc.svrun.network.com.network.canton.global/api/v0/scan",

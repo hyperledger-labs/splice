@@ -143,7 +143,7 @@
         "enableHealthProbes": true,
         "globalDomain": {
           "alias": "global",
-          "url": "http://sequencer.sv-1.svc.validatorrun.network.com.network.canton.global:5008"
+          "url": "https://sequencer.sv-1.svc.validatorrun.network.com.network.canton.global"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAdminUserNameFrom": {
@@ -223,7 +223,7 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "validatorrun.network.com.network.canton.global",
-        "globalDomainUrl": "http://sequencer.sv-1.svc.validatorrun.network.com.network.canton.global:5008",
+        "globalDomainUrl": "https://sequencer.sv-1.svc.validatorrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "onboardingSecretFrom": {
           "secretKeyRef": {
