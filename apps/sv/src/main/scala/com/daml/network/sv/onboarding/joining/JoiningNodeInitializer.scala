@@ -45,7 +45,7 @@ class JoiningNodeInitializer(
     joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
     cometBftNode: Option[CometBftNode],
     requiredDars: Seq[UploadablePackage],
-    override protected val loggerFactory: NamedLoggerFactory,
+    namedLoggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     ledgerClient: CNLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
@@ -62,6 +62,9 @@ class JoiningNodeInitializer(
     tc: TraceContext,
     tracer: Tracer,
 ) extends NamedLogging {
+
+  override protected val loggerFactory: NamedLoggerFactory =
+    namedLoggerFactory.append("workflow", "onboarding")
 
   def joinCollectiveAndOnboardNodes(): Future[
     (
