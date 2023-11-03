@@ -296,6 +296,7 @@ class GlobalDomainMigrationIntegrationTest extends SvIntegrationTestBase with Pr
                 svcPartyUnionspace,
                 _ => NonEmpty(Set, sv2Party.uid.namespace),
                 sv2Party.uid.namespace.fingerprint,
+                RetryFor.WaitingOnInitDependency,
               )
               .futureValue
               .discard

@@ -682,6 +682,7 @@ class TopologyAdminConnection(
       unionspace,
       _.incl(newOwner),
       signedBy,
+      retryFor,
     )
 
   def ensureUnionspaceDefinitionOwnerChangeProposalAccepted(
@@ -690,6 +691,7 @@ class TopologyAdminConnection(
       unionspace: Namespace,
       ownerChange: NonEmpty[Set[Namespace]] => NonEmpty[Set[Namespace]],
       signedBy: Fingerprint,
+      retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[UnionspaceDefinitionX]] =
