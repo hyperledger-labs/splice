@@ -56,7 +56,7 @@ final class ScanConnection private (
     mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends HttpAppConnection(config.adminApi, retryProvider, loggerFactory)
+) extends HttpAppConnection(config.adminApi, "/api/scan", retryProvider, loggerFactory)
     with PackageIdResolver.HasCoinRulesPayload {
   import ScanConnection.GetCoinRulesDomain
 
@@ -438,7 +438,7 @@ class MinimalScanConnection(
     mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends HttpAppConnection(config.adminApi, retryProvider, loggerFactory) {
+) extends HttpAppConnection(config.adminApi, "/api/scan", retryProvider, loggerFactory) {
   override def serviceName: String = "scan"
 }
 object MinimalScanConnection {

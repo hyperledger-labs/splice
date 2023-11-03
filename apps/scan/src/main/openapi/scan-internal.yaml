@@ -4,6 +4,8 @@ info:
   version: 0.0.1
 tags:
   - name: scan
+servers:
+  - url: https://example.com/api/scan
 paths:
   /readyz:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
@@ -13,7 +15,7 @@ paths:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1status"
   /version:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
-  /svc-party-id:
+  /v0/svc-party-id:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -25,7 +27,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetSvcPartyIdResponse"
-  /closed-rounds:
+  /v0/closed-rounds:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -37,7 +39,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetClosedRoundsResponse"
-  /open-and-issuing-mining-rounds:
+  /v0/open-and-issuing-mining-rounds:
     post:
       tags: [scan]
       x-jvm-package: scan
@@ -55,7 +57,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetOpenAndIssuingMiningRoundsResponse"
-  /coin-rules:
+  /v0/coin-rules:
     post:
       tags: [scan]
       x-jvm-package: scan
@@ -73,7 +75,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetCoinRulesResponse"
-  /cns-rules:
+  /v0/cns-rules:
     post:
       tags: [scan]
       x-jvm-package: scan
@@ -91,7 +93,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetCnsRulesResponse"
-  /featured-apps:
+  /v0/featured-apps:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -103,7 +105,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListFeaturedAppRightsResponse"
-  /featured-apps/{provider_party_id}:
+  /v0/featured-apps/{provider_party_id}:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -121,7 +123,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/LookupFeaturedAppRightResponse"
-  /total-coin-balance:
+  /v0/total-coin-balance:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -140,7 +142,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetTotalCoinBalanceResponse"
-  /coin-config-for-round:
+  /v0/coin-config-for-round:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -161,7 +163,7 @@ paths:
                 "$ref": "#/components/schemas/GetCoinConfigForRoundResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /round-of-latest-data:
+  /v0/round-of-latest-data:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -175,7 +177,7 @@ paths:
                 $ref: "#/components/schemas/GetRoundOfLatestDataResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /rewards-collected:
+  /v0/rewards-collected:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -196,7 +198,7 @@ paths:
                 $ref: "#/components/schemas/GetRewardsCollectedResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /top-providers-by-app-rewards:
+  /v0/top-providers-by-app-rewards:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -225,7 +227,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /top-validators-by-validator-rewards:
+  /v0/top-validators-by-validator-rewards:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -254,7 +256,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /top-validators-by-purchased-traffic:
+  /v0/top-validators-by-purchased-traffic:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -283,7 +285,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /bootstrap/import-crates:
+  /v0/bootstrap/import-crates:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -301,7 +303,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListImportCratesResponse"
-  /svc-sequencers:
+  /v0/svc-sequencers:
     get:
       tags: [scan]
       x-jvm-package: scan
@@ -313,7 +315,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListSvcSequencersResponse"
-  /activities:
+  /v0/activities:
     post:
       tags: [scan]
       x-jvm-package: scan
@@ -337,7 +339,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /transactions:
+  /v0/transactions:
     post:
       tags: [scan]
       x-jvm-package: scan
@@ -357,13 +359,13 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TransactionHistoryResponse"
-        "400":        
+        "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  
+
 components:
   schemas:
     GetSvcPartyIdResponse:
@@ -619,7 +621,7 @@ components:
             Note that all transactions carry some monotonically-increasing event_id.
             Omit this page_end_event_id to start reading the first page, from the beginning or the end of the ledger, depending on the sort_order column.
             A subsequent request can fill the page_end_event_id with the last event_id of the TransactionHistoryResponse to continue reading in the same sort_order.
-            The transaction with event_id == page_end_event_id will be skipped in the next response, making it possible to continuously read pages in the same sort_order. 
+            The transaction with event_id == page_end_event_id will be skipped in the next response, making it possible to continuously read pages in the same sort_order.
         sort_order:
           description: |
             Sort order for the transactions. For ascending order, from beginning to the end of the ledger, use "asc".

@@ -12,14 +12,14 @@ import { CoinRules } from '@daml.js/canton-coin/lib/CC/Coin/module';
 import damlTypes from '@daml/types';
 
 export const buildScanMock = (scanUrl: string): RestHandler[] => [
-  rest.get(`${scanUrl}/svc-party-id`, (_, res, ctx) => {
+  rest.get(`${scanUrl}/v0/svc-party-id`, (_, res, ctx) => {
     return res(
       ctx.json<GetSvcPartyIdResponse>({
         svc_party_id: 'svc::1220809612f787469c92b924ad1d32f1cbc0bdbd4eeda55a50469250bcf64b8becf2',
       })
     );
   }),
-  rest.post(`${scanUrl}/activities`, (_, res, ctx) => {
+  rest.post(`${scanUrl}/v0/activities`, (_, res, ctx) => {
     return res(
       ctx.json<ListActivityResponse>({
         activities: [
@@ -53,16 +53,16 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
       })
     );
   }),
-  rest.get(`${scanUrl}/round-of-latest-data`, (_, res, ctx) => {
+  rest.get(`${scanUrl}/v0/round-of-latest-data`, (_, res, ctx) => {
     return res(ctx.json<GetRoundOfLatestDataResponse>({ round: 1, effectiveAt: new Date() }));
   }),
-  rest.get(`${scanUrl}/rewards-collected`, (_, res, ctx) => {
+  rest.get(`${scanUrl}/v0/rewards-collected`, (_, res, ctx) => {
     return res(ctx.json<GetRewardsCollectedResponse>({ amount: '0.0' }));
   }),
-  rest.get(`${scanUrl}/total-coin-balance`, (_, res, ctx) => {
+  rest.get(`${scanUrl}/v0/total-coin-balance`, (_, res, ctx) => {
     return res(ctx.json<GetTotalCoinBalanceResponse>({ total_balance: '66605.2180742781' }));
   }),
-  rest.post(`${scanUrl}/coin-rules`, (_, res, ctx) => {
+  rest.post(`${scanUrl}/v0/coin-rules`, (_, res, ctx) => {
     return res(
       ctx.json<GetCoinRulesResponse>({
         coin_rules_update: {

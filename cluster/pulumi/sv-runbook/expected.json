@@ -454,7 +454,7 @@
         "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
-        "scanAddress": "https://scan.sv-1.svc.svrun.network.com.network.canton.global/api/v0/scan",
+        "scanAddress": "https://scan.sv-1.svc.svrun.network.com.network.canton.global",
         "svValidator": true,
         "topup": {
           "enabled": true,

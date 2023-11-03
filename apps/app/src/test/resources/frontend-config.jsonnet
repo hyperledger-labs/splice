@@ -47,7 +47,7 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
     wallet: { uiUrl: "http://localhost:3000" },
     splitwell: { url: "http://localhost:5113" },
     directory: { url: "http://localhost:5110" },
-    scan: { url: "http://localhost:5012" },
+    scan: { url: "http://localhost:5012/api/scan" },
   },
   bob: {
     jsonApiBackend: { url: "http://127.0.0.1:6301" },
@@ -57,7 +57,7 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
     wallet: { uiUrl: "http://localhost:3001" },
     splitwell: { url: "http://localhost:5113" },
     directory: { url: "http://localhost:5110" },
-    scan: { url: "http://localhost:5012" },
+    scan: { url: "http://localhost:5012/api/scan" },
   },
   splitwell: {
     validator: { url: "http://localhost:5403/api/validator" },
@@ -67,7 +67,7 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
     jsonApi: { url: "http://unused.com/" },
     splitwell: { url: "http://localhost:5113" },
     directory: { url: "http://localhost:5110" },
-    scan: { url: "http://localhost:5012" },
+    scan: { url: "http://localhost:5012/api/scan" },
   },
   preflight: {
     jsonApiBackend: { url: "http://127.0.0.1:7575" },
@@ -77,35 +77,35 @@ local validatorNodes(clusterProtocol, clusterAddress, port) = {
     wallet: { uiUrl: "http://localhost:3000" },
     splitwell: { url: "http://localhost:5113" },
     directory: { url: clusterProtocol + "://" + "directory.sv-1.svc." + clusterAddress + "/api/v0/directory" },
-    scan: { url: clusterProtocol + "://" + "scan.sv-1.svc." + clusterAddress + "/api/v0/scan" },
+    scan: { url: clusterProtocol + "://" + "scan.sv-1.svc." + clusterAddress + "/api/scan" },
   },
   scan: {
-    scan: { url: "http://localhost:5012" },
+    scan: { url: "http://localhost:5012/api/scan" },
     directory: { url: "http://localhost:5110" },
   },
   sv1: {
     sv: { url: "http://localhost:5014" },
     validator: { url: "http://localhost:5003/api/validator" },
     directory: { url: "http://localhost:5110" },
-    scan: { url: "http://localhost:5012" },
+    scan: { url: "http://localhost:5012/api/scan" },
   },
   sv2: {
     sv: { url: "http://localhost:5614" },
     validator: { url: "http://localhost:5003/api/validator" },
     directory: { url: "http://localhost:5110" },
-    scan: { url: "http://localhost:5012" },
+    scan: { url: "http://localhost:5012/api/scan" },
   },
   sv3: {
     sv: { url: "http://localhost:5714" },
     validator: { url: "http://localhost:5003/api/validator" },
     directory: { url: "http://localhost:5110" },
-    scan: { url: "http://localhost:5012" },
+    scan: { url: "http://localhost:5012/api/scan" },
   },
   sv4: {
     sv: { url: "http://localhost:5814" },
     validator: { url: "http://localhost:5003/api/validator" },
     directory: { url: "http://localhost:5110" },
-    scan: { url: "http://localhost:5012" },
+    scan: { url: "http://localhost:5012/api/scan" },
   },
 };
 

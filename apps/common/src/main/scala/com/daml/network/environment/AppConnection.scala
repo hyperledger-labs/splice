@@ -115,6 +115,8 @@ abstract class AppConnection(
   */
 abstract class HttpAppConnection(
     config: NetworkAppClientConfig,
+    // TODO(#7873): once sv's APIs have also been migrated to /api/sv, consider deriving commonApisPrefix from serviceName, i.e. assuming /api/<serviceName>
+    commonApisPrefix: String,
     override protected[this] val retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -134,7 +136,7 @@ abstract class HttpAppConnection(
 
   def getStatus(): Future[NodeStatus[CNNodeStatus]] =
     runHttpCmd(
-      config.url,
+      config.url.copy(path = Uri.Path(commonApisPrefix) ++ config.url.path),
       HttpAdminAppClient.GetHealthStatus[CNNodeStatus](CNNodeStatus.fromHttp),
     )
 
@@ -148,17 +150,26 @@ abstract class HttpAppConnection(
       }
     }
 
-  private def getHttpAppVersionInfo(url: Uri): Future[HttpAdminAppClient.VersionInfo] =
+  private def getHttpAppVersionInfo(url: Uri): Future[HttpAdminAppClient.VersionInfo] = {
+    val prefixedUrl = url.copy(path = Uri.Path(commonApisPrefix) ++ url.path)
+
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
-      s"app version of $url",
-      runHttpCmd(url, HttpAdminAppClient.GetVersion(), List()),
+      s"app version of $url (from $prefixedUrl)",
+      runHttpCmd(
+        prefixedUrl,
+        HttpAdminAppClient.GetVersion(),
+        List(),
+      ),
       logger,
     )
+  }
 
   def checkVersionCompatibility(): Future[Unit] = {
     for {
-      versionInfo <- getHttpAppVersionInfo(config.url)
+      versionInfo <- getHttpAppVersionInfo(
+        config.url
+      )
     } yield {
       logger.debug(s"Found app version: ${versionInfo}")(TraceContext.empty)
       val myVersion = BuildInfo.compiledVersion

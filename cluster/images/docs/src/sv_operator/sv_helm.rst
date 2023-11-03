@@ -600,10 +600,10 @@ The following routes should be configured in your cluster ingress
 controller. Note that most of the paths should be stripped and only the suffix
 under ``*`` should end up at the pod. So for example
 ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/v0/sv/foobar`` should get routed to
-``http://sv-app.sv:5014/foobar``. Currently the only exception to that rule is
-``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator``, which no longer require rewriting,
-and ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator/foobar`` should be forwarded to
-``http://validator-app:5003/api/validator/foobar``. In the future, the other rewrite requirements
+``http://sv-app.sv:5014/foobar``. Currently the only exceptions to that rule are
+``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator`` and ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan``, which no longer require rewriting.
+That is, ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator/foobar`` should be forwarded to
+``http://validator-app:5003/api/validator/foobar``, and similarly for ``/api/scan``. In the future, the other rewrite requirements
 will also be removed.
 
 * ``https://wallet.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``sv`` namespace
@@ -611,7 +611,7 @@ will also be removed.
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``sv-web-ui`` in the ``sv`` namespace
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/v0/sv/*`` should be routed to port 5014 of service ``sv-app`` in the ``sv`` namespace
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``scan-web-ui`` in the ``sv`` namespace
-* ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/v0/scan/*`` should be routed to port 5012 in service ``scan-app`` in the ``sv`` namespace
+* ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan`` should be routed to ``/api/scan`` at port 5012 in service ``scan-app`` in the ``sv`` namespace. (As mentioned above, no url rewrite is required for this rule)
 * ``cometbft.sv.svc.<YOUR_HOSTNAME>:26656`` should be routed to port 26656 of service ``cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol
 * ``https://directory.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``directory-web-ui`` in the ``sv`` namespace
 * ``https://directory.sv.svc.<YOUR_HOSTNAME>/api/json-api/*`` should be routed to port 7575 in service ``participant`` in the ``sv`` namespace

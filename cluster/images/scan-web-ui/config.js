@@ -3,7 +3,7 @@ window.canton_network_config = {
   services: {
     scan: {
       // URL of scan backend.
-      url: `https://${window.location.hostname}/api/v0/scan`,
+      url: `https://${window.location.hostname}/api/scan`,
     },
     directory: {
       // URL of the directory backend.

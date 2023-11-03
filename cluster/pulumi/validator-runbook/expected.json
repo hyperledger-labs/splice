@@ -233,7 +233,7 @@
           }
         },
         "participantAddress": "participant",
-        "scanAddress": "https://scan.sv-1.svc.validatorrun.network.com.network.canton.global/api/v0/scan",
+        "scanAddress": "https://scan.sv-1.svc.validatorrun.network.com.network.canton.global",
         "svSponsorAddress": "http://sv-app.sv-1:5014",
         "topup": {
           "enabled": true,

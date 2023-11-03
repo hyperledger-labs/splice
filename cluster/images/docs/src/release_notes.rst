@@ -6,11 +6,22 @@ Release Notes
 2023-11-13
 ----------
 
+* Revising the SVC governance formula, using n := ceil( (n + f + 1) / 2.0 ) with n SVs and f := floor ( (n - 1) / 3.0 ) maximum supported number of faulty SVs for safe operation.
+
+* Removing the special voting threshold for DevNet aligning with the one used in TestNet
+
 * Deployment updates:
 
-  * Revising the SVC governance formula, using n := ceil( (n + f + 1) / 2.0 ) with n SVs and f := floor ( (n - 1) / 3.0 ) maximum supported number of faulty SVs for safe operation.
-  * Removing the special voting threshold for DevNet aligning with the one used in TestNet
   * The URL of the global domain sequencer hosted by the Canton Foundation has changed to `https://sequencer.sv-1.svc.<TARGET_CLUSTER>.network.canton.global`. This change is reflected in the values specified in `participant-values.yaml`, `validator-values.yaml` and `sv-values.yaml`.
+  * The requirement for url rewriting in another one of the rules as been removed:
+    ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan`` no longer requires rewriting
+    (and also has been modified from `/api/v0/scan` to `/api/scan`).
+    For example, ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/scan/foobar`` should be forwarded to
+    ``http://validator-app:5003/api/scan/foobar``. In the future, the other rewrite requirements
+    will also be removed.
+
+  * The url configuration for the foundation's Scan app in `validator-values.yaml` has been updated to be
+    ``https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global``. Similarly, in the config files in the self-hosted validator section.
 
 2023-11-06
 ----------

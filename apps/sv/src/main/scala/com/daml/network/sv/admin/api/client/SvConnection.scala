@@ -22,7 +22,7 @@ final class SvConnection private (
     mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends HttpAppConnection(config, retryProvider, loggerFactory) {
+) extends HttpAppConnection(config, "", retryProvider, loggerFactory) {
 
   override val serviceName = "sv"
 

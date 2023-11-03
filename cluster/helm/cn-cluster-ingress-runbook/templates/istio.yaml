@@ -84,9 +84,7 @@ spec:
   - match:
     - port: 443
       uri:
-        prefix: "/api/v0/scan/"
-    rewrite:
-      uri: "/"
+        prefix: "/api/scan/"
     route:
     - destination:
         port:
