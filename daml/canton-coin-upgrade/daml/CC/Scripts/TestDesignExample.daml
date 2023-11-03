@@ -56,6 +56,7 @@ template Escrow
                      lock = None
                      receiverFeeRatio = 1.0
                  ]
+               upgrade = Some ()
          exerciseAppTransfer transferContext transfer
 
 -- | This matches the example in the design doc

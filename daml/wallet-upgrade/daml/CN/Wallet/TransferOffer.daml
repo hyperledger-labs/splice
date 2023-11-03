@@ -98,6 +98,7 @@ template AcceptedTransferOffer
                   lock = None
                   receiverFeeRatio = 0.0
               ]
+            upgrade = Some ()
         result <- exercisePaymentTransfer transferContext transfer
         archive self
         pure ((result, TransferOfferTrackingInfo { .. }), result.senderChangeCoin)

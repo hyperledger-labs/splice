@@ -836,6 +836,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       receiver.toProtoPrimitive,
       java.util.List.of(mkInputCoin()),
       java.util.List.of(mkTransferOutput(receiver, amount)),
+      Optional.empty(),
     )
 
   private def mkTransferContext() = new cc.coin.TransferContext(
@@ -856,6 +857,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       provider.toProtoPrimitive,
       transferInputs.asJava,
       transferOutputs.asJava,
+      Optional.empty(),
     )
 
   private def mkCoinRules_Transfer(transfer: cc.coin.Transfer) =
@@ -910,6 +912,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         coinPrice,
       ),
       java.util.List.of(),
+      Optional.empty(),
       Optional.empty(),
     ).toValue
 

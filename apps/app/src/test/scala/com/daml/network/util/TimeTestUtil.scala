@@ -1,5 +1,6 @@
 package com.daml.network.util
 
+import com.daml.ledger.javaapi.data.{Command, DamlRecord, ExerciseCommand}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.{SvcReward, TransferOutput}
 import com.daml.network.codegen.java.cc.expiry.TimeLock
@@ -7,6 +8,7 @@ import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRou
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cn.svcrules.SvReward
 import com.daml.network.console.*
+import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
@@ -19,6 +21,7 @@ import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 
 import java.time.Duration
+import java.util.Optional
 import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -147,6 +150,27 @@ trait TimeTestUtil extends CNNodeTestCommon {
     )
   }
 
+  // TODO(#8424) Remove the hacky workarounds for downgrading the choice arg.
+  private def downgradeCoinRulesTransfer(command: Command): Command =
+    command match {
+      case ex: ExerciseCommand =>
+        val oldTransfer = ex.getChoiceArgument.asRecord.get.getFields.get(0).getValue
+        val newTransfer = new DamlRecord(
+          oldTransfer.asRecord.get.getFields.subList(0, 4)
+        )
+        val arg = new DamlRecord(
+          new DamlRecord.Field(newTransfer),
+          ex.getChoiceArgument.asRecord.get.getFields.get(1),
+        )
+        new ExerciseCommand(
+          ex.getTemplateId,
+          ex.getContractId,
+          ex.getChoice,
+          arg,
+        )
+      case _ => throw new IllegalArgumentException(s"Unsupported command $command")
+    }
+
   def lockCoins(
       userValidator: ValidatorAppBackendReference,
       userParty: PartyId,
@@ -184,6 +208,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
                   expiredDuration,
                 )
               ).asJava,
+              Optional.empty(),
             ),
             new cc.coin.TransferContext(
               transferContext.openMiningRound,
@@ -195,6 +220,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
           )
           .commands
           .asScala
+          .map(downgradeCoinRulesTransfer(_))
           .toSeq,
         disclosedContracts = DisclosedContracts(coinRules, openRound).toLedgerApiDisclosedContracts,
       )
@@ -221,11 +247,11 @@ trait TimeTestUtil extends CNNodeTestCommon {
 
     val disclosure = DisclosedContracts(coinRules, openRound)
 
-    userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
-      userId = userId,
+    userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+      applicationId = userId,
       actAs = authorizers.distinct,
       readAs = Seq.empty,
-      update = transferContext.coinRules
+      commands = transferContext.coinRules
         .exerciseCoinRules_Transfer(
           new cc.coin.Transfer(
             userParty.toProtoPrimitive,
@@ -236,6 +262,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
               )
             ).asJava,
             outputs.asJava,
+            Optional.empty(),
           ),
           new cc.coin.TransferContext(
             transferContext.openMiningRound,
@@ -244,9 +271,14 @@ trait TimeTestUtil extends CNNodeTestCommon {
             // note: we don't provide a featured app right as sender == provider
             None.toJava,
           ),
-        ),
-      domainId = Some(disclosure.assignedDomain),
+        )
+        .commands
+        .asScala
+        .map(downgradeCoinRulesTransfer(_))
+        .toSeq,
+      workflowId = CNLedgerConnection.domainIdToWorkflowId(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
+      optTimeout = None,
     )
   }
 

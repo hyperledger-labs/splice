@@ -59,6 +59,7 @@ testRewardComputation = do
                     amount = 8.0
                     lock = None
                 ]
+      upgrade = Some ()
     context = context.context
 
   issuingMiningRounds <- queryFilter @IssuingMiningRound app.svc (\r -> r.round == Round 0)

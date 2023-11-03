@@ -19,12 +19,15 @@ class ModelUpgradeIntegrationTest
 
   "daml model upgrade" should {
     "support switching to new svc-governance version" in { implicit env =>
-      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
       aliceWalletClient.tap(10)
       val coin = aliceWalletClient.list().coins.loneElement.contract
       coin.identifier.getPackageId shouldBe DarResources.cantonCoin_0_1_0.packageId
       BigDecimal(coin.payload.amount.initialAmount) shouldBe 10.0
+
+      p2pTransfer(aliceWalletClient, bobWalletClient, bob, 5.0)
 
       val svcRules = sv1Backend.getSvcInfo().svcRules
       svcRules.identifier.getPackageId shouldBe DarResources.svcGovernance_0_1_0.packageId
@@ -113,18 +116,51 @@ class ModelUpgradeIntegrationTest
         },
       )
 
-      clue("Alice taps after upgrade") {
+      actAndCheck(
+        "Alice taps after upgrade",
         eventuallySucceeds() {
           aliceWalletClient.tap(20)
-        }
-      }
-      clue("Old and new coin get merged together into a new coin") {
-        eventually() {
+        },
+      )(
+        "Old and new coin get merged together into a new coin",
+        _ => {
           val coin = aliceWalletClient.list().coins.loneElement.contract
           coin.identifier.getPackageId shouldBe DarResources.cantonCoin_0_2_0.packageId
-          BigDecimal(coin.payload.amount.initialAmount) should beWithin(30 - smallAmount, 30)
+          BigDecimal(coin.payload.amount.initialAmount) should beWithin(25 - smallAmount, 25)
+        },
+      )
+      // This is just to invalidate the coin rules cache on Bob’s side. In a real upgrade, the upgrade will be announced days or weeks in advance
+      // while cache expiration is a few minutes so this is a non-issue.
+      clue("Bob taps after upgrade") {
+        eventuallySucceeds() {
+          bobWalletClient.tap(5)
         }
       }
+      actAndCheck(
+        "Alice makes p2p transfer after upgrade",
+        eventuallySucceeds() {
+          p2pTransfer(aliceWalletClient, bobWalletClient, bob, 4.0)
+        },
+      )(
+        "old and new transfers appear in scan tx log",
+        _ => {
+          val txs = sv1ScanBackend.listActivity(pageEndEventId = None, pageSize = 50)
+          // new transfer
+          forExactly(1, txs) { tx =>
+            val tf = tx.transfer.value
+            tf.sender.party shouldBe alice.toProtoPrimitive
+            tf.receivers.loneElement.party shouldBe bob.toProtoPrimitive
+            BigDecimal(tf.receivers.loneElement.amount) shouldBe 4.0
+          }
+          // old transfer
+          forExactly(1, txs) { tx =>
+            val tf = tx.transfer.value
+            tf.sender.party shouldBe alice.toProtoPrimitive
+            tf.receivers.loneElement.party shouldBe bob.toProtoPrimitive
+            BigDecimal(tf.receivers.loneElement.amount) shouldBe 5.0
+          }
+        },
+      )
     }
   }
 }

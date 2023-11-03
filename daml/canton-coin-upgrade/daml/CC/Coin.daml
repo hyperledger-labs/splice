@@ -292,6 +292,7 @@ template CoinRules
                             receiverFeeRatio = 0.0
                             lock = None
                         ]
+              upgrade = Some ()
         result <- exercisePaymentTransfer context transfer
         let [TransferResultCoin coin] = result.createdCoins
         -- burn the coin created for the SVC
@@ -720,6 +721,7 @@ executeTransfer context svc t = do
   return TransferResult with
     round = csum.openRound.round
     summary = summary
+    upgrade = Some ()
     ..
 
 data TransferContextSummary = TransferContextSummary with
@@ -1092,6 +1094,7 @@ data Transfer = Transfer with
     provider : Party
     inputs : [TransferInput]
     outputs : [TransferOutput]
+    upgrade : Optional ()
   deriving (Eq, Ord, Show)
 
 -- | An individual output for a batch transfer.
@@ -1117,6 +1120,7 @@ data TransferResult
     senderChangeCoin: Optional (ContractId Coin)
       -- ^ Optional reference to the coin for the change returned to the sender.
       -- Only created if there was some change to be returned after deducting the fee for returning change.
+    upgrade : Optional ()
   deriving (Show, Eq)
 
 -- | Summary of input and output amounts and fees paid.

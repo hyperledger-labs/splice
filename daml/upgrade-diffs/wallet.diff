@@ -1,3 +1,25 @@
+diff -ur -x '*~' -x target -x dar -x .daml ../daml/wallet/daml/CN/Wallet/Install.daml ../daml/wallet-upgrade/daml/CN/Wallet/Install.daml
+--- ../daml/wallet/daml/CN/Wallet/Install.daml
++++ ../daml/wallet-upgrade/daml/CN/Wallet/Install.daml
+@@ -137,6 +137,7 @@
+         provider = endUserP
+         inputs = inputs
+         outputs = []
++        upgrade = Some ()
+   transfer
+ 
+ -- Enum of the possible ways coins can be manipulated through the wallet.
+diff -ur -x '*~' -x target -x dar -x .daml ../daml/wallet/daml/CN/Wallet/TransferOffer.daml ../daml/wallet-upgrade/daml/CN/Wallet/TransferOffer.daml
+--- ../daml/wallet/daml/CN/Wallet/TransferOffer.daml
++++ ../daml/wallet-upgrade/daml/CN/Wallet/TransferOffer.daml
+@@ -98,6 +98,7 @@
+                   lock = None
+                   receiverFeeRatio = 0.0
+               ]
++            upgrade = Some ()
+         result <- exercisePaymentTransfer transferContext transfer
+         archive self
+         pure ((result, TransferOfferTrackingInfo { .. }), result.senderChangeCoin)
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/wallet/daml.yaml ../daml/wallet-upgrade/daml.yaml
 --- ../daml/wallet/daml.yaml
 +++ ../daml/wallet-upgrade/daml.yaml

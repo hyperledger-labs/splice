@@ -313,6 +313,7 @@ payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio = do
               receiverFeeRatio = transferFeeRatio
               lock = None
           ]
+        upgrade = Some ()
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
   void $ submitExerciseCoinRulesByKey app [sender.primaryParty, recipient] readAs
@@ -341,6 +342,7 @@ lockTo1 app sender lockHolder coinAmount lockDuration = do
                 expiresAt = now `addRelTime` lockDuration
               receiverFeeRatio = 0.0
           ]
+        upgrade = Some ()
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
   void $ submitExerciseCoinRulesByKey app [sender.primaryParty, lockHolder] readAs
@@ -386,6 +388,7 @@ runCoinDepositBots app = do
               map (InputValidatorRewardCoupon . fst) validatorRewardCoupons ++
               coins
           outputs = []
+          upgrade = Some ()
     when (not (null appRewardCoupons) || not (null validatorRewardCoupons) || length coins > 1) $ void $
       submitExerciseCoinRulesByKey app [user] readAs CoinRules_Transfer with
         transfer

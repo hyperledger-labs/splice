@@ -17,7 +17,23 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Coin.daml
    where
      ensure validSchedule configSchedule validCoinConfig
  
-@@ -969,11 +971,13 @@
+@@ -290,6 +292,7 @@
+                             receiverFeeRatio = 0.0
+                             lock = None
+                         ]
++              upgrade = Some ()
+         result <- exercisePaymentTransfer context transfer
+         let [TransferResultCoin coin] = result.createdCoins
+         -- burn the coin created for the SVC
+@@ -718,6 +721,7 @@
+   return TransferResult with
+     round = csum.openRound.round
+     summary = summary
++    upgrade = Some ()
+     ..
+ 
+ data TransferContextSummary = TransferContextSummary with
+@@ -969,11 +973,13 @@
              svc
              owner = sender
              amount = expiringAmount transferConfigCC.holdingFee summary.senderChangeAmount currentOpenRound.round
@@ -31,6 +47,22 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Coin.daml
  
        case out.lock of
          None -> TransferResultCoin <$> create coin
+@@ -1088,6 +1094,7 @@
+     provider : Party
+     inputs : [TransferInput]
+     outputs : [TransferOutput]
++    upgrade : Optional ()
+   deriving (Eq, Ord, Show)
+ 
+ -- | An individual output for a batch transfer.
+@@ -1113,6 +1120,7 @@
+     senderChangeCoin: Optional (ContractId Coin)
+       -- ^ Optional reference to the coin for the change returned to the sender.
+       -- Only created if there was some change to be returned after deducting the fee for returning change.
++    upgrade : Optional ()
+   deriving (Show, Eq)
+ 
+ -- | Summary of input and output amounts and fees paid.
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/CoinImport.daml ../daml/canton-coin-upgrade/daml/CC/CoinImport.daml
 --- ../daml/canton-coin/daml/CC/CoinImport.daml
 +++ ../daml/canton-coin-upgrade/daml/CC/CoinImport.daml
@@ -54,10 +86,81 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/T
    newCoins <- query @Coin newApp.svc
    map snd newCoins === [newCoin]
  
+diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/TestCoinRulesTransfer.daml ../daml/canton-coin-upgrade/daml/CC/Scripts/TestCoinRulesTransfer.daml
+--- ../daml/canton-coin/daml/CC/Scripts/TestCoinRulesTransfer.daml
++++ ../daml/canton-coin-upgrade/daml/CC/Scripts/TestCoinRulesTransfer.daml
+@@ -68,6 +68,7 @@
+                       holders = [alice.primaryParty, bob.primaryParty, bob.primaryParty] -- duplicates get removed
+ 
+                 ]
++      upgrade = Some ()
+     context = context.context
+ 
+   normalizedBalanceAfterTransfer <- getNormalizedBalance app.svc
+@@ -145,6 +146,7 @@
+                       amount = 10.0
+                       lock = None
+                       receiverFeeRatio = 0.4 ]
++        upgrade = Some ()
+       context = contextWithRound1.context
+ 
+   -- Input amount is exactly 100.0.
+@@ -223,4 +225,5 @@
+                       amount
+                       lock = None
+                       receiverFeeRatio = 1.0]
++        upgrade = Some ()
+       context = transferContext
+diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/TestCoinRulesTransferLimits.daml ../daml/canton-coin-upgrade/daml/CC/Scripts/TestCoinRulesTransferLimits.daml
+--- ../daml/canton-coin/daml/CC/Scripts/TestCoinRulesTransferLimits.daml
++++ ../daml/canton-coin-upgrade/daml/CC/Scripts/TestCoinRulesTransferLimits.daml
+@@ -44,6 +44,7 @@
+           provider = alice.primaryParty
+           inputs = inputCoins
+           outputs = []
++          upgrade = Some ()
+         context = context
+         expectedError = "More than the maximum number of inputs"
+     return ()
+@@ -63,6 +64,7 @@
+           provider = alice.primaryParty
+           inputs = [InputCoin coin]
+           outputs = outputCoins
++          upgrade = Some ()
+         context = context
+         expectedError = "More than the maximum number of outputs"
+     return ()
+@@ -94,6 +96,7 @@
+                 expiresAt = now `addRelTime` (minutes 1)
+               receiverFeeRatio = 0.0
+           ]
++        upgrade = Some ()
+       context = context
+       expectedError = "Fewer than the allowed number of lock holders"
+     return ()
+diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/TestComputeFees.daml ../daml/canton-coin-upgrade/daml/CC/Scripts/TestComputeFees.daml
+--- ../daml/canton-coin/daml/CC/Scripts/TestComputeFees.daml
++++ ../daml/canton-coin-upgrade/daml/CC/Scripts/TestComputeFees.daml
+@@ -123,6 +123,7 @@
+                       amount = 10.0
+                       lock = None
+                       receiverFeeRatio = 1.0]
++        upgrade = Some ()
+       context = context.context
+ 
+   -- Actual holding fee should be based on the coin price when the coin was created, not the current one
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/TestDesignExample.daml ../daml/canton-coin-upgrade/daml/CC/Scripts/TestDesignExample.daml
 --- ../daml/canton-coin/daml/CC/Scripts/TestDesignExample.daml
 +++ ../daml/canton-coin-upgrade/daml/CC/Scripts/TestDesignExample.daml
-@@ -183,10 +183,12 @@
+@@ -56,6 +56,7 @@
+                      lock = None
+                      receiverFeeRatio = 1.0
+                  ]
++               upgrade = Some ()
+          exerciseAppTransfer transferContext transfer
+ 
+ -- | This matches the example in the design doc
+@@ -183,10 +184,12 @@
        svc = app.svc
        owner = alice.primaryParty
        amount = expiringAmount transferConfig.holdingFee 1000.25 c2.round
@@ -70,7 +173,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/T
  
    payment === Coin with
      svc = app.svc
-@@ -194,6 +196,7 @@
+@@ -194,6 +197,7 @@
      amount =
        let amount = arbiterPaymentAmount - transferredCoinFee
        in expiringAmount transferConfig.holdingFee amount c2.round
@@ -78,6 +181,82 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/T
  
    -- check app reward issued by the escrow refresh
    [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 50002)
+diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/TestLockAndCoinExpiry.daml ../daml/canton-coin-upgrade/daml/CC/Scripts/TestLockAndCoinExpiry.daml
+--- ../daml/canton-coin/daml/CC/Scripts/TestLockAndCoinExpiry.daml
++++ ../daml/canton-coin-upgrade/daml/CC/Scripts/TestLockAndCoinExpiry.daml
+@@ -124,7 +124,7 @@
+ 
+   -- Lock is not yet expired
+   -- svc fails to expire the coin
+-  testChoiceFailed [app.svc] [app.svc] $ 
++  testChoiceFailed [app.svc] [app.svc] $
+     exerciseCmd cid (LockedCoin_ExpireCoin roundCid)
+ 
+   -- Current round is 4
+@@ -133,7 +133,7 @@
+   -- Coin is not yet expired
+   -- 2 rounds before current round = 4 - 2 = 2 which is before round 3 when the coin expires
+   -- svc fails to expire the coin
+-  testChoiceFailed [app.svc] [app.svc] $ 
++  testChoiceFailed [app.svc] [app.svc] $
+     exerciseCmd cid (LockedCoin_ExpireCoin roundCid)
+ 
+   -- Current round is 5
+@@ -144,7 +144,7 @@
+   -- Coin is expired
+   -- 2 rounds before current round => 5 - 2 = 3 which is equal to round 3 when the coin expires
+   -- svc expires the coin
+-  expireSummary <- testChoice [app.svc] [app.svc] $ 
++  expireSummary <- testChoice [app.svc] [app.svc] $
+     exerciseCmd cid (LockedCoin_ExpireCoin roundCid)
+ 
+   normalizedBalanceAfterExpiry <- getNormalizedBalance app.svc
+@@ -176,7 +176,7 @@
+ 
+   -- 2 rounds before latest active round = 3 - 2 = 1 which is before round 3 when the coin expires
+   -- svc fails to expire the coin
+-  testChoiceFailed [app.svc] [app.svc] $ 
++  testChoiceFailed [app.svc] [app.svc] $
+     exerciseCmd cid (Coin_Expire latestActiveRoundCid)
+ 
+   -- current latest active round is 4
+@@ -194,7 +194,7 @@
+ 
+   -- 2 rounds before current latest active round => 5 - 2 = 3 which is equal to round 3 when the coin expires
+   -- svc expires the coin
+-  expireSummary <- testChoice [app.svc] [app.svc] $ 
++  expireSummary <- testChoice [app.svc] [app.svc] $
+     exerciseCmd cid (Coin_Expire latestActiveRoundCid)
+ 
+   normalizedBalanceAfterExpiry <- getNormalizedBalance app.svc
+@@ -230,7 +230,7 @@
+ 
+ testChoiceFailed : [Party] -> [Party] -> Commands a -> Script ()
+ testChoiceFailed actAs readAs buildCommand = do
+-  submitMultiMustFail actAs readAs buildCommand 
++  submitMultiMustFail actAs readAs buildCommand
+   pure ()
+ 
+ getLockedCoinCmd : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (Commands TransferResult)
+@@ -250,6 +250,7 @@
+                 expiresAt = now `addRelTime` lockDuration
+               receiverFeeRatio = 0.0
+           ]
++        upgrade = Some ()
+   (openRound, _) <- getLatestOpenRound app
+   featuredAppRight <- getFeaturedAppRight app owner.primaryParty
+ 
+diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/TestRewardComputation.daml ../daml/canton-coin-upgrade/daml/CC/Scripts/TestRewardComputation.daml
+--- ../daml/canton-coin/daml/CC/Scripts/TestRewardComputation.daml
++++ ../daml/canton-coin-upgrade/daml/CC/Scripts/TestRewardComputation.daml
+@@ -59,6 +59,7 @@
+                     amount = 8.0
+                     lock = None
+                 ]
++      upgrade = Some ()
+     context = context.context
+ 
+   issuingMiningRounds <- queryFilter @IssuingMiningRound app.svc (\r -> r.round == Round 0)
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/Util.daml ../daml/canton-coin-upgrade/daml/CC/Scripts/Util.daml
 --- ../daml/canton-coin/daml/CC/Scripts/Util.daml
 +++ ../daml/canton-coin-upgrade/daml/CC/Scripts/Util.daml
@@ -89,6 +268,30 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/U
      ..
  
    submitExerciseCoinRulesByKey app [svc] [] CoinRules_Bootstrap_Rounds with
+@@ -312,6 +313,7 @@
+               receiverFeeRatio = transferFeeRatio
+               lock = None
+           ]
++        upgrade = Some ()
+   (openRound, _) <- getLatestOpenRound app
+   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
+   void $ submitExerciseCoinRulesByKey app [sender.primaryParty, recipient] readAs
+@@ -340,6 +342,7 @@
+                 expiresAt = now `addRelTime` lockDuration
+               receiverFeeRatio = 0.0
+           ]
++        upgrade = Some ()
+   (openRound, _) <- getLatestOpenRound app
+   featuredAppRight <- getFeaturedAppRight app sender.primaryParty
+   void $ submitExerciseCoinRulesByKey app [sender.primaryParty, lockHolder] readAs
+@@ -385,6 +388,7 @@
+               map (InputValidatorRewardCoupon . fst) validatorRewardCoupons ++
+               coins
+           outputs = []
++          upgrade = Some ()
+     when (not (null appRewardCoupons) || not (null validatorRewardCoupons) || length coins > 1) $ void $
+       submitExerciseCoinRulesByKey app [user] readAs CoinRules_Transfer with
+         transfer
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml.yaml ../daml/canton-coin-upgrade/daml.yaml
 --- ../daml/canton-coin/daml.yaml
 +++ ../daml/canton-coin-upgrade/daml.yaml
