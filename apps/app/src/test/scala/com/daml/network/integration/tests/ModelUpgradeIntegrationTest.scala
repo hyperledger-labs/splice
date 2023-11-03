@@ -17,9 +17,15 @@ class ModelUpgradeIntegrationTest
     with ConfigScheduleUtil
     with WalletTestUtil {
 
-  // TODO(#8214) Extend this test with a `tap` to test explicit disclosure.
   "daml model upgrade" should {
     "support switching to new svc-governance version" in { implicit env =>
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+
+      aliceWalletClient.tap(10)
+      val coin = aliceWalletClient.list().coins.loneElement.contract
+      coin.identifier.getPackageId shouldBe DarResources.cantonCoin_0_1_0.packageId
+      BigDecimal(coin.payload.amount.initialAmount) shouldBe 10.0
+
       val svcRules = sv1Backend.getSvcInfo().svcRules
       svcRules.identifier.getPackageId shouldBe DarResources.svcGovernance_0_1_0.packageId
       val coinRules = sv1ScanBackend.getCoinRules()
@@ -106,6 +112,19 @@ class ModelUpgradeIntegrationTest
           newSvcRules.identifier.getPackageId shouldBe DarResources.svcGovernance_0_2_0.packageId
         },
       )
+
+      clue("Alice taps after upgrade") {
+        eventuallySucceeds() {
+          aliceWalletClient.tap(20)
+        }
+      }
+      clue("Old and new coin get merged together into a new coin") {
+        eventually() {
+          val coin = aliceWalletClient.list().coins.loneElement.contract
+          coin.identifier.getPackageId shouldBe DarResources.cantonCoin_0_2_0.packageId
+          BigDecimal(coin.payload.amount.initialAmount) should beWithin(30 - smallAmount, 30)
+        }
+      }
     }
   }
 }
