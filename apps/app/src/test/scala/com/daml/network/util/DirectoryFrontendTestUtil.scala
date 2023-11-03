@@ -66,6 +66,8 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
       click on goToDirectoryEntriesButton
 
+      // slowness observed in #8421, but we're not bumping the timeout as it could just be the CPU hiccups
+      // see: https://github.com/DACH-NY/canton-network-node/pull/8423#issuecomment-1792530571
       eventually() {
         val row = findAll(className("entries-table-row"))
           .find(

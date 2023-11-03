@@ -8,7 +8,7 @@ import { useProviderParty } from '..';
 const useDirectoryEntryContexts = (
   refetchInterval: false | number
 ): UseQueryResult<Contract<DirectoryEntryContext>[]> => {
-  const operationName = 'querySubscriptions';
+  const operationName = 'queryDirectoryEntryContexts';
   const ledgerApi = useLedgerApiClient();
   const { data: primaryPartyId } = usePrimaryParty();
   const { data: providerPartyId } = useProviderParty();
