@@ -8,8 +8,8 @@ import json.JsonProtocol.LfValueCodec.{apiValueToJsValue, jsValueToApiValue}
 import com.daml.lf.data.{Decimal, ImmArray, Numeric, Ref, SortedLookupList, Time}
 import ImmArray.ImmArraySeq
 import com.daml.lf.typesig
-import com.daml.lf.value.{Value => V}
-import com.daml.lf.value.test.TypedValueGenerators.{genAddendNoListMap, ValueAddend => VA}
+import com.daml.lf.value.{Value as V}
+import com.daml.lf.value.test.TypedValueGenerators.{genAddendNoListMap, ValueAddend as VA}
 import com.daml.lf.value.test.ValueGenerators.coidGen
 import org.scalacheck.Arbitrary
 import org.scalactic.source
@@ -18,7 +18,7 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import org.scalatest.Inside
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import spray.json._
+import spray.json.*
 
 @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
 class ValuePredicateTest
@@ -30,19 +30,19 @@ class ValuePredicateTest
   type Cid = V.ContractId
   private[this] implicit val arbCid: Arbitrary[Cid] = Arbitrary(coidGen)
 
-  import Ref.QualifiedName.{assertFromString => qn}
+  import Ref.QualifiedName.{assertFromString as qn}
 
   private[this] val dummyPackageId = Ref.PackageId assertFromString "dummy-package-id"
 
   private[this] val (tuple3Id, (tuple3DDT, tuple3VA)) = {
-    import shapeless.record.{Record => HRecord}
+    import shapeless.record.{Record as HRecord}
     val sig = HRecord(_1 = VA.int64, _2 = VA.text, _3 = VA.bool)
     val id = Ref.Identifier(dummyPackageId, qn("Foo:Tuple3"))
     (id, VA.record(id, sig))
   }
 
   private[this] def eitherT = {
-    import shapeless.record.{Record => HRecord}
+    import shapeless.record.{Record as HRecord}
     val sig = HRecord(Left = VA.int64, Right = VA.text)
     val id = Ref.Identifier(dummyPackageId, qn("Foo:Either"))
     (id, VA.variant(id, sig))

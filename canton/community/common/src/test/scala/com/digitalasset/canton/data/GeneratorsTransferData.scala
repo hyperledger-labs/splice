@@ -34,6 +34,10 @@ object GeneratorsTransferData {
   import org.scalatest.EitherValues.*
 
   @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
+  /*
+   Execution context is needed for crypto operations. Since wiring a proper ec would be
+   too complex here, using the global one.
+   */
   private implicit val ec = ExecutionContext.global
 
   implicit val transferInCommonData: Arbitrary[TransferInCommonData] = Arbitrary(
@@ -265,11 +269,8 @@ object GeneratorsTransferData {
 
       submitterMetadata <- transferOutSubmitterMetadataGen(sourceProtocolVersion)
 
-      contractId <- Arbitrary.arbitrary[LfContractId]
-      templateId <- defaultValueGen(
-        sourceProtocolVersion.v,
-        TransferOutView.templateIdDefaultValue,
-      )(implicitly[Arbitrary[LfTemplateId]])
+      creatingTransactionId <- Arbitrary.arbitrary[TransactionId]
+      contract <- GeneratorsProtocol.serializableContractGen(sourceProtocolVersion.v)
 
       targetDomain <- Arbitrary.arbitrary[TargetDomainId]
       timeProof <- Arbitrary.arbitrary[TimeProof]
@@ -281,15 +282,14 @@ object GeneratorsTransferData {
       .create(hashOps)(
         salt,
         submitterMetadata,
-        contractId,
-        templateId,
+        creatingTransactionId,
+        contract,
         targetDomain,
         timeProof,
         sourceProtocolVersion,
         targetProtocolVersion,
         transferCounter,
       )
-      .value
   )
 
 }

@@ -17,7 +17,11 @@ import com.digitalasset.canton.domain.initialization.TopologyManagementInitializ
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.TopologyManagementErrorGroup.TopologyDispatchingErrorGroup
-import com.digitalasset.canton.health.{ComponentHealthState, HealthComponent}
+import com.digitalasset.canton.health.{
+  AtomicHealthComponent,
+  CloseableHealthComponent,
+  ComponentHealthState,
+}
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
@@ -801,7 +805,10 @@ private[domain] object DomainTopologyDispatcher {
 
 }
 
-trait DomainTopologySender extends FlagCloseable with HealthComponent with NamedLogging {
+trait DomainTopologySender
+    extends CloseableHealthComponent
+    with AtomicHealthComponent
+    with NamedLogging {
   def maxBatchSize: Int
   def sendTransactions(
       snapshot: DomainSnapshotSyncCryptoApi,
@@ -828,7 +835,7 @@ object DomainTopologySender extends TopologyDispatchingErrorGroup {
       extends DomainTopologySender {
 
     override val name: String = TopologyManagementInitialization.topologySenderHealthName
-    override protected val initialHealthState: ComponentHealthState = ComponentHealthState.Ok()
+    override protected def initialHealthState: ComponentHealthState = ComponentHealthState.Ok()
 
     private val currentJob =
       new AtomicReference[Option[Promise[UnlessShutdown[Either[String, Unit]]]]](None)
@@ -848,8 +855,7 @@ object DomainTopologySender extends TopologyDispatchingErrorGroup {
           recipients: Recipients,
       )(maxSequencingTime: CantonTimestamp) =
         DomainTopologyTransactionMessage
-          .create(batch.toList, snapshot, domainId, maxSequencingTime, protocolVersion)
-          .leftMap(_.toString)
+          .create(batch.toList, snapshot, domainId, Some(maxSequencingTime), protocolVersion)
           .map(batchMessage =>
             Batch(
               List(
@@ -938,7 +944,7 @@ object DomainTopologySender extends TopologyDispatchingErrorGroup {
 
       lazy val callback: SendCallback = {
         case UnlessShutdown.Outcome(_: SendResult.Success) =>
-          if (getState.isOk) resolveUnhealthy_
+          if (getState.isOk) resolveUnhealthy()
           logger.debug(s"Successfully registered $message with the sequencer.")
           finalizeCurrentJob(UnlessShutdown.Outcome(Right(())))
         case UnlessShutdown.Outcome(SendResult.Error(error)) =>

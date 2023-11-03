@@ -11,7 +11,7 @@ import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.SequencerSubscriptionErrorGroup
-import com.digitalasset.canton.health.{ComponentHealthState, HealthComponent}
+import com.digitalasset.canton.health.{CloseableAtomicHealthComponent, ComponentHealthState}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.SerializedEventHandler
@@ -23,7 +23,7 @@ import com.digitalasset.canton.sequencing.client.SequencerClientSubscriptionErro
 import com.digitalasset.canton.sequencing.client.transports.SequencerClientTransport
 import com.digitalasset.canton.sequencing.handlers.{CounterCapture, HasReceivedEvent}
 import com.digitalasset.canton.sequencing.protocol.SubscriptionRequest
-import com.digitalasset.canton.topology.{DomainId, Member}
+import com.digitalasset.canton.topology.{DomainId, Member, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.util.{DelayUtil, FutureUtil, LoggerUtil}
@@ -60,11 +60,11 @@ class ResilientSequencerSubscription[HandlerError](
 )(implicit executionContext: ExecutionContext)
     extends SequencerSubscription[HandlerError]
     with NamedLogging
-    with FlagCloseableAsync
-    with HealthComponent {
+    with CloseableAtomicHealthComponent
+    with FlagCloseableAsync {
   override val name: String = SequencerClient.healthName
   override val initialHealthState: ComponentHealthState = ComponentHealthState.Ok()
-  override val closingState: ComponentHealthState =
+  override def closingState: ComponentHealthState =
     ComponentHealthState.failed("Disconnected from domain")
   private val nextSubscriptionRef =
     new AtomicReference[Option[SequencerSubscription[HandlerError]]](None)
@@ -92,7 +92,7 @@ class ResilientSequencerSubscription[HandlerError](
         // register resolution
         FutureUtil.doNotAwait(
           hasReceivedEvent.awaitEvent.map { _ =>
-            resolveUnhealthy
+            resolveUnhealthy()
           },
           "has received event failed",
         )
@@ -165,12 +165,12 @@ class ResilientSequencerSubscription[HandlerError](
     val logMessage = s"Waiting ${LoggerUtil.roundDurationForHumans(delay)} before reconnecting"
     if (delay < retryDelayRule.warnDelayDuration) {
       logger.debug(logMessage)
-    } else if (isFailed && getState != ComponentHealthState.NotInitializedState) {
+    } else if (isFailed) {
       logger.info(logMessage)
     } else if (!isClosing) {
       TraceContext.withNewTraceContext { tx =>
         this.failureOccurred(
-          LostSequencerSubscription.Warn(domainId)(this.errorLoggingContext(tx))
+          LostSequencerSubscription.Warn(SequencerId(domainId))(this.errorLoggingContext(tx))
         )
       }
     }
@@ -355,11 +355,11 @@ object ResilientSequencerSubscription extends SequencerSubscriptionErrorGroup {
         ErrorCategory.BackgroundProcessDegradationWarning,
       ) {
 
-    final case class Warn(domain: DomainId, _logOnCreation: Boolean = true)(implicit
+    final case class Warn(sequencer: SequencerId, _logOnCreation: Boolean = true)(implicit
         val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause =
-            s"Lost subscription to domain ${domain.toString}. Will try to recover automatically."
+            s"Lost subscription to sequencer ${sequencer.toString}. Will try to recover automatically."
         ) {
       override def logOnCreation: Boolean = _logOnCreation
     }

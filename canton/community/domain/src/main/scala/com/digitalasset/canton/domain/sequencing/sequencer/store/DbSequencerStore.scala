@@ -69,11 +69,6 @@ class DbSequencerStore(
   import storage.api.*
   import storage.converters.*
 
-  override def onClosed(): Unit = {
-    super.onClosed()
-    closeContext.flagCloseable.close()
-  }
-
   implicit val closeContext: CloseContext =
     overrideCloseContext
       .map(CloseContext.combineUnsafe(_, CloseContext(this), timeouts, logger)(TraceContext.empty))
@@ -202,6 +197,7 @@ class DbSequencerStore(
       signingTimestampO: Option[CantonTimestamp] = None,
       errorMessageO: Option[String256M] = None,
       traceContext: TraceContext,
+      errorO: Option[ByteString],
   ) {
     lazy val asStoreEvent: Either[String, Sequenced[P]] =
       for {
@@ -231,7 +227,14 @@ class DbSequencerStore(
         messageId <- messageIdO.toRight("message-id not set for deliver error")
         sender <- senderO.toRight("sender not set for deliver error")
         errorMessage <- errorMessageO.toRight("error-message not set for deliver error")
-      } yield DeliverErrorStoreEvent(sender, messageId, errorMessage, traceContext)
+        event <- DeliverErrorStoreEvent.create(
+          sender,
+          messageId,
+          errorMessage,
+          errorO,
+          traceContext,
+        )
+      } yield event
 
   }
 
@@ -259,8 +262,9 @@ class DbSequencerStore(
             payloadO = Some(payloadId),
             signingTimestampO = signingTimestampO,
             traceContext = traceContext,
+            errorO = None,
           )
-        case DeliverErrorStoreEvent(sender, messageId, message, traceContext) =>
+        case DeliverErrorStoreEvent(sender, messageId, message, errorO, traceContext) =>
           DeliverStoreEventRow(
             storeEvent.timestamp,
             instanceIndex,
@@ -271,6 +275,7 @@ class DbSequencerStore(
               Some(NonEmpty(SortedSet, sender)), // must be set for sender to receive value
             errorMessageO = Some(message),
             traceContext = traceContext,
+            errorO = errorO,
           )
       }
   }
@@ -299,6 +304,7 @@ class DbSequencerStore(
     val payloadGetter = implicitly[GetResult[Option[Payload]]]
     val errorMessageGetter = implicitly[GetResult[Option[String256M]]]
     val traceContextGetter = implicitly[GetResult[SerializableTraceContext]]
+    val errorOGetter = implicitly[GetResult[Option[ByteString]]]
 
     GetResult { r =>
       val row = DeliverStoreEventRow[Payload](
@@ -312,6 +318,7 @@ class DbSequencerStore(
         timestampOGetter(r),
         errorMessageGetter(r),
         traceContextGetter(r).unwrap,
+        errorOGetter(r),
       )
 
       row.asStoreEvent
@@ -538,11 +545,12 @@ class DbSequencerStore(
       traceContext: TraceContext
   ): Future[Unit] = {
     val saveSql = storage.profile match {
-      case _: H2 | _: Postgres => """insert into sequencer_events (
+      case _: H2 | _: Postgres =>
+        """insert into sequencer_events (
                                     |  ts, node_index, event_type, message_id, sender, recipients,
-                                    |  payload_id, signing_timestamp, error_message, trace_context
+                                    |  payload_id, signing_timestamp, error_message, trace_context, error
                                     |)
-                                    |  values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    |  values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                                     |  on conflict do nothing""".stripMargin
       case _: Oracle =>
         """merge /*+ INDEX ( sequencer_events ( ts ) ) */
@@ -551,8 +559,8 @@ class DbSequencerStore(
           |on (sequencer_events.ts = input.ts)
           |when not matched then
           |  insert (ts, node_index, event_type, message_id, sender, recipients, payload_id, signing_timestamp,
-          |          error_message, trace_context)
-          |  values (input.ts, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".stripMargin
+          |          error_message, trace_context, error)
+          |  values (input.ts, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""".stripMargin
     }
 
     storage.queryAndUpdate(
@@ -568,6 +576,7 @@ class DbSequencerStore(
           signingTimestampO,
           errorMessage,
           traceContext,
+          errorO,
         ) = DeliverStoreEventRow(instanceIndex, event)
 
         pp >> timestamp
@@ -580,6 +589,7 @@ class DbSequencerStore(
         pp >> signingTimestampO
         pp >> errorMessage
         pp >> SerializableTraceContext(traceContext)
+        pp >> errorO
       },
       functionFullName,
     )
@@ -747,7 +757,7 @@ class DbSequencerStore(
     ) = sql"""
         select events.ts, events.node_index, events.event_type, events.message_id, events.sender,
           events.recipients, payloads.id, payloads.content, events.signing_timestamp,
-          events.error_message, events.trace_context
+          events.error_message, events.trace_context, events.error
         from sequencer_events events
         left join sequencer_payloads payloads
           on events.payload_id = payloads.id
@@ -792,7 +802,7 @@ class DbSequencerStore(
           sql"""
           select events.ts, events.node_index, events.event_type, events.message_id, events.sender,
             events.recipients, payloads.id, payloads.content, events.signing_timestamp,
-            events.error_message, events.trace_context
+            events.error_message, events.trace_context, events.error
           from sequencer_events events
           left join sequencer_payloads payloads
             on events.payload_id = payloads.id
@@ -856,7 +866,7 @@ class DbSequencerStore(
 
     EitherT {
       val CounterCheckpoint(counter, ts, latestTopologyClientTimestamp) = checkpoint
-      CloseContext.withCombinedContextF(closeContext, externalCloseContext, timeouts, logger)(
+      CloseContext.withCombinedContext(closeContext, externalCloseContext, timeouts, logger)(
         combinedCloseContext =>
           storage.queryAndUpdate(
             for {

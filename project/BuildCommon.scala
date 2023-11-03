@@ -405,7 +405,8 @@ object BuildCommon {
         Test / damlTest := Seq(),
         Compile / damlProjectVersionOverride := Some("0.0.1"),
         Compile / damlEnableScalaCodegen := true,
-        Compile / damlEnableJavaCodegen := false,
+        Compile / damlEnableJavaCodegen := true,
+        Compile / damlCodegenUseProject := false,
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //      addProtobufFilesToHeaderCheck(Compile),
         //      addFilesToHeaderCheck("*.sh", "../pack", Compile),
@@ -697,7 +698,8 @@ object BuildCommon {
         },
         Test / damlTest := Seq(),
         Compile / damlEnableScalaCodegen := true,
-        Compile / damlEnableJavaCodegen := false,
+        Compile / damlEnableJavaCodegen := true,
+        Compile / damlCodegenUseProject := false,
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //    addProtobufFilesToHeaderCheck(Compile),
         //    addFilesToHeaderCheck("*.daml", "daml", Compile),
@@ -799,7 +801,8 @@ object BuildCommon {
             ),
           ),
         Compile / damlEnableScalaCodegen := true,
-        Compile / damlEnableJavaCodegen := false,
+        Compile / damlEnableJavaCodegen := true,
+        Compile / damlCodegenUseProject := false,
         damlFixedDars := Seq("AdminWorkflows.dar"),
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //      addProtobufFilesToHeaderCheck(Compile),

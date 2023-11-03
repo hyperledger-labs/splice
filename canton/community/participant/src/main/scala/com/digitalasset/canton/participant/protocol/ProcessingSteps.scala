@@ -23,7 +23,6 @@ import com.digitalasset.canton.participant.protocol.submission.InFlightSubmissio
 import com.digitalasset.canton.participant.protocol.submission.{
   ChangeIdHash,
   SubmissionTrackingData,
-  UnsequencedSubmission,
 }
 import com.digitalasset.canton.participant.protocol.transfer.TransferInProcessingSteps.PendingTransferIn
 import com.digitalasset.canton.participant.protocol.transfer.TransferOutProcessingSteps.PendingTransferOut
@@ -38,6 +37,7 @@ import com.digitalasset.canton.participant.sync.TimestampedEvent
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.store.SessionKeyStore
 import com.digitalasset.canton.topology.MediatorRef
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
@@ -222,7 +222,7 @@ trait ProcessingSteps[
     def embedInFlightSubmissionTrackerError(error: InFlightSubmissionTrackerError): SubmissionError
 
     /** The submission tracking data to be used in case command deduplication failed */
-    def commandDeduplicationFailure(failure: DeduplicationFailed): UnsequencedSubmission
+    def commandDeduplicationFailure(failure: DeduplicationFailed): SubmissionTrackingData
 
     /** Phase 1, step 1a
       *
@@ -240,7 +240,8 @@ trait ProcessingSteps[
     def prepareBatch(
         actualDeduplicationOffset: DeduplicationPeriod.DeduplicationOffset,
         maxSequencingTime: CantonTimestamp,
-    ): EitherT[Future, UnsequencedSubmission, PreparedBatch]
+        sessionKeyStore: SessionKeyStore,
+    ): EitherT[Future, SubmissionTrackingData, PreparedBatch]
 
     /** Produce a `SubmissionError` to be returned by the [[com.digitalasset.canton.participant.protocol.ProtocolProcessor.submit]] method
       * to indicate that a shutdown has happened during in-flight registration.
@@ -274,7 +275,7 @@ trait ProcessingSteps[
       */
     def submissionErrorTrackingData(error: SubmissionSendError)(implicit
         traceContext: TraceContext
-    ): UnsequencedSubmission
+    ): SubmissionTrackingData
   }
 
   /** Phase 1, step 2:
@@ -317,6 +318,7 @@ trait ProcessingSteps[
   def decryptViews(
       batch: NonEmpty[Seq[OpenEnvelope[EncryptedViewMessage[RequestViewType]]]],
       snapshot: DomainSnapshotSyncCryptoApi,
+      sessionKeyStore: SessionKeyStore,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, RequestError, DecryptedViews]
@@ -329,14 +331,14 @@ trait ProcessingSteps[
     */
   case class DecryptedViews(
       views: Seq[(WithRecipients[DecryptedView], Option[Signature])],
-      decryptionErrors: Seq[EncryptedViewMessageError[RequestViewType]],
+      decryptionErrors: Seq[EncryptedViewMessageError],
   )
 
   object DecryptedViews {
     def apply(
-        all: Seq[Either[EncryptedViewMessageError[
-          RequestViewType
-        ], (WithRecipients[DecryptedView], Option[Signature])]]
+        all: Seq[
+          Either[EncryptedViewMessageError, (WithRecipients[DecryptedView], Option[Signature])]
+        ]
     ): DecryptedViews = {
       val (errors, views) = all.separate
       DecryptedViews(views, errors)
@@ -359,8 +361,8 @@ trait ProcessingSteps[
     *                                     and their respective signatures
     * @param malformedPayloads The decryption errors and decrypted views with a wrong root hash
     * @param snapshot Snapshot of the topology state at the request timestamp
-    * @return The activeness set and the pending contracts to add to the
-    *         [[com.digitalasset.canton.participant.store.StoredContractManager]],
+    * @return The activeness set and
+    *         the contracts to store with the [[com.digitalasset.canton.participant.store.ContractStore]] in Phase 7,
     *         and the arguments for step 2.
     */
   def computeActivenessSetAndPendingContracts(
@@ -416,13 +418,10 @@ trait ProcessingSteps[
   /** Phase 3
     *
     * @param activenessSet              The activeness set for the activeness check
-    * @param pendingContracts           The pending contracts to be added to the [[com.digitalasset.canton.participant.store.StoredContractManager]],
-    *                                   along with the [[com.digitalasset.canton.protocol.TransactionId]] that created the contract
     * @param pendingDataAndResponseArgs The implementation-specific arguments needed to create the pending data and response
     */
   case class CheckActivenessAndWritePendingContracts(
       activenessSet: ActivenessSet,
-      pendingContracts: Seq[WithTransactionId[SerializableContract]],
       pendingDataAndResponseArgs: PendingDataAndResponseArgs,
   )
 
@@ -437,8 +436,7 @@ trait ProcessingSteps[
     *
     * @param pendingDataAndResponseArgs Implementation-specific data passed from [[decryptViews]]
     * @param transferLookup             Read-only interface of the [[com.digitalasset.canton.participant.store.memory.TransferCache]]
-    * @param contractLookup             Read-only interface to the [[com.digitalasset.canton.participant.store.StoredContractManager]],
-    *                                   which includes the pending contracts
+    * @param contractLookup             Read-only interface to the [[com.digitalasset.canton.participant.store.ContractStore]]
     * @param activenessResultFuture     Future of the result of the activeness check<
     * @param pendingCursor              Future to complete when the [[com.digitalasset.canton.participant.protocol.RequestJournal]]'s
     *                                   cursor for the [[com.digitalasset.canton.participant.protocol.RequestJournal.RequestState.Pending]]
@@ -450,7 +448,7 @@ trait ProcessingSteps[
   def constructPendingDataAndResponse(
       pendingDataAndResponseArgs: PendingDataAndResponseArgs,
       transferLookup: TransferLookup,
-      contractLookup: ContractLookup,
+      contractLookup: ContractLookup, // TODO(i9014): remove after DAML 3.0
       activenessResultFuture: FutureUnlessShutdown[ActivenessResult],
       pendingCursor: Future[Unit],
       mediator: MediatorRef,
@@ -525,7 +523,7 @@ trait ProcessingSteps[
     */
   case class CommitAndStoreContractsAndPublishEvent(
       commitSet: Option[Future[CommitSet]],
-      contractsToBeStored: Set[LfContractId],
+      contractsToBeStored: Seq[WithTransactionId[SerializableContract]],
       maybeEvent: Option[TimestampedEvent],
   )
 
@@ -609,15 +607,14 @@ object ProcessingSteps {
   trait PendingRequestData {
     def requestCounter: RequestCounter
     def requestSequencerCounter: SequencerCounter
-    def pendingContracts: Set[LfContractId]
     def mediator: MediatorRef
   }
 
   object PendingRequestData {
     def unapply(
         arg: PendingRequestData
-    ): Some[(RequestCounter, SequencerCounter, Set[LfContractId], MediatorRef)] = {
-      Some((arg.requestCounter, arg.requestSequencerCounter, arg.pendingContracts, arg.mediator))
+    ): Some[(RequestCounter, SequencerCounter, MediatorRef)] = {
+      Some((arg.requestCounter, arg.requestSequencerCounter, arg.mediator))
     }
   }
 }

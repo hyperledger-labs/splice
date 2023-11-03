@@ -27,7 +27,11 @@ import com.digitalasset.canton.topology.client.{
 import com.digitalasset.canton.topology.store.TopologyStore.Change
 import com.digitalasset.canton.topology.store.ValidatedTopologyTransactionX.GenericValidatedTopologyTransactionX
 import com.digitalasset.canton.topology.store.{TopologyStoreId, TopologyStoreX}
-import com.digitalasset.canton.topology.transaction.{DomainParametersStateX, TopologyChangeOpX}
+import com.digitalasset.canton.topology.transaction.{
+  DomainParametersStateX,
+  TopologyChangeOpX,
+  ValidatingTopologyMappingXChecks,
+}
 import com.digitalasset.canton.topology.{DomainId, TopologyStateProcessorX}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.version.ProtocolVersion
@@ -38,7 +42,7 @@ class TopologyTransactionProcessorX(
     domainId: DomainId,
     crypto: Crypto,
     store: TopologyStoreX[TopologyStoreId.DomainStore],
-    acsCommitmentScheduleEffectiveTime: Traced[CantonTimestamp] => Unit,
+    acsCommitmentScheduleEffectiveTime: Traced[EffectiveTime] => Unit,
     enableTopologyTransactionValidation: Boolean,
     futureSupervisor: FutureSupervisor,
     timeouts: ProcessingTimeout,
@@ -59,6 +63,7 @@ class TopologyTransactionProcessorX(
     store,
     None,
     enableTopologyTransactionValidation,
+    new ValidatingTopologyMappingXChecks(store, loggerFactory),
     crypto,
     loggerFactory,
   )

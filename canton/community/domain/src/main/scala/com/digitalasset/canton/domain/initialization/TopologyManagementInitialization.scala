@@ -109,10 +109,10 @@ object TopologyManagementInitialization {
                     transactions.toList,
                     recentSnapshot,
                     id,
-                    maxSequencingTime,
+                    Some(maxSequencingTime),
                     protocolVersion,
                   )
-                  .leftMap(err => SendAsyncClientError.RequestInvalid(err.toString))
+                  .leftMap(SendAsyncClientError.RequestInvalid)
               batch = domainMembers.map(member =>
                 OpenEnvelope(content, Recipients.cc(member))(protocolVersion)
               )
@@ -129,7 +129,7 @@ object TopologyManagementInitialization {
           delay = 1.second,
           sendDescription = "Send initial topology transaction to domain members",
           errMsg = "Failed to send initial topology transactions to domain members",
-          flagCloseable = client,
+          performUnlessClosing = client,
         )
         .onShutdown(
           logger.debug("sequenceInitialTopology aborted due to shutdown")

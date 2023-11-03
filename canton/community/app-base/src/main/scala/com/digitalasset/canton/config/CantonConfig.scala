@@ -955,6 +955,8 @@ object CantonConfig {
       deriveReader[PartyNotificationConfig]
     lazy implicit val cacheConfigReader: ConfigReader[CacheConfig] =
       deriveReader[CacheConfig]
+    lazy implicit val cacheConfigWithTimeoutReader: ConfigReader[CacheConfigWithTimeout] =
+      deriveReader[CacheConfigWithTimeout]
     lazy implicit val cachingConfigsReader: ConfigReader[CachingConfigs] =
       deriveReader[CachingConfigs]
     lazy implicit val adminWorkflowConfigReader: ConfigReader[AdminWorkflowConfig] =
@@ -1320,6 +1322,8 @@ object CantonConfig {
       deriveWriter[PartyNotificationConfig]
     lazy implicit val cacheConfigWriter: ConfigWriter[CacheConfig] =
       deriveWriter[CacheConfig]
+    lazy implicit val cacheConfigWithTimeoutWriter: ConfigWriter[CacheConfigWithTimeout] =
+      deriveWriter[CacheConfigWithTimeout]
     lazy implicit val cachingConfigsWriter: ConfigWriter[CachingConfigs] =
       deriveWriter[CachingConfigs]
     lazy implicit val adminWorkflowConfigWriter: ConfigWriter[AdminWorkflowConfig] =

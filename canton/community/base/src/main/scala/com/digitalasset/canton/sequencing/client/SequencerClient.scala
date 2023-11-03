@@ -15,9 +15,9 @@ import com.digitalasset.canton.config.*
 import com.digitalasset.canton.crypto.{CryptoPureApi, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.health.{
+  CloseableHealthComponent,
   ComponentHealthState,
   DelegatingMutableHealthComponent,
-  HealthComponent,
 }
 import com.digitalasset.canton.lifecycle.Lifecycle.toCloseableOption
 import com.digitalasset.canton.lifecycle.*
@@ -105,7 +105,7 @@ trait SequencerClient extends SequencerClientSend with FlagCloseable {
       sequencerCounterTrackerStore: SequencerCounterTrackerStore,
       eventHandler: PossiblyIgnoredApplicationHandler[ClosedEnvelope],
       timeTracker: DomainTimeTracker,
-      onCleanHandler: Traced[SequencerCounterCursorPrehead] => Future[Unit] = _ => Future.unit,
+      onCleanHandler: Traced[SequencerCounterCursorPrehead] => Unit = _ => (),
   )(implicit traceContext: TraceContext): Future[Unit]
 
   /** Create a subscription for sequenced events for this member,
@@ -161,7 +161,7 @@ trait SequencerClient extends SequencerClientSend with FlagCloseable {
   @VisibleForTesting
   def flush(): Future[Unit]
 
-  def healthComponent: HealthComponent
+  def healthComponent: CloseableHealthComponent
 
   /** Acknowledge that we have successfully processed all events up to and including the given timestamp.
     * The client should then never subscribe for events from before this point.
@@ -239,37 +239,18 @@ class SequencerClientImpl(
     close()
   }
 
-  private def aggregateHealthResult(
-      healthResult: Map[SequencerId, ComponentHealthState]
-  ): ComponentHealthState =
-    if (healthResult.sizeIs == 1) {
-      healthResult.headOption.map(_._2).getOrElse(ComponentHealthState.Ok())
-    } else {
-      if (healthResult.values.count(_.isOk) >= sequencerTransports.sequencerToTransportMap.size) {
-        ComponentHealthState.Ok()
-      } else {
-        val unhealthySequencers = healthResult
-          .collect {
-            case (sequencerId, health) if !health.isOk => sequencerId
-          }
-        ComponentHealthState.Degraded(
-          ComponentHealthState.UnhealthyState(
-            Some(s"Unhealthy sequencer subscriptions for [${unhealthySequencers.mkString(",")}]")
-          )
-        )
-      }
-    }
-
   private lazy val deferredSubscriptionHealth =
     new DelegatingMutableHealthComponent[SequencerId](
       loggerFactory,
       SequencerClient.healthName,
       timeouts,
-      ComponentHealthState.ShutdownState,
-      aggregateHealthResult,
+      states =>
+        SequencerAggregator
+          .aggregateHealthResult(states, sequencersTransportState.getSequencerTrustThreshold),
+      ComponentHealthState.failed("Disconnected from domain"),
     )
 
-  val healthComponent: HealthComponent = deferredSubscriptionHealth
+  val healthComponent: CloseableHealthComponent = deferredSubscriptionHealth
 
   private val periodicAcknowledgementsRef =
     new AtomicReference[Option[PeriodicAcknowledgements]](None)
@@ -566,7 +547,7 @@ class SequencerClientImpl(
       sequencerCounterTrackerStore: SequencerCounterTrackerStore,
       eventHandler: PossiblyIgnoredApplicationHandler[ClosedEnvelope],
       timeTracker: DomainTimeTracker,
-      onCleanHandler: Traced[SequencerCounterCursorPrehead] => Future[Unit] = _ => Future.unit,
+      onCleanHandler: Traced[SequencerCounterCursorPrehead] => Unit = _ => (),
   )(implicit traceContext: TraceContext): Future[Unit] = {
     sequencerCounterTrackerStore.preheadSequencerCounter.flatMap { cleanPrehead =>
       val priorTimestamp = cleanPrehead.fold(CantonTimestamp.MinValue)(
@@ -651,7 +632,7 @@ class SequencerClientImpl(
       fetchCleanTimestamp: PeriodicAcknowledgements.FetchCleanTimestamp,
       requiresAuthentication: Boolean,
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    val eventHandler = ThrottlingApplicationEventHandler.throttle(
+    val throttledEventHandler = ThrottlingApplicationEventHandler.throttle(
       config.maximumInFlightEventBatches,
       nonThrottledEventHandler,
       metrics,
@@ -708,26 +689,36 @@ class SequencerClientImpl(
         _ = replayEvents.lastOption
           .orElse(initialPriorEventO)
           .foreach(event => timeTracker.subscriptionResumesAfter(event.timestamp))
-        _ <- eventHandler.subscriptionStartsAt(subscriptionStartsAt, timeTracker)
+        _ <- throttledEventHandler.subscriptionStartsAt(subscriptionStartsAt, timeTracker)
 
         eventBatches = replayEvents.grouped(config.eventInboxSize.unwrap)
         _ <- FutureUnlessShutdown.outcomeF(
           MonadUtil
-            .sequentialTraverse_(eventBatches)(processEventBatch(eventHandler, _))
+            .sequentialTraverse_(eventBatches)(processEventBatch(throttledEventHandler, _))
             .valueOr(err => throw SequencerClientSubscriptionException(err))
         )
       } yield {
-        sequencerTransports.sequencerIdToTransportMap.keySet
-          .foreach { sequencerId =>
-            createSubscription(
-              sequencerId,
-              replayEvents,
-              initialPriorEventO,
-              requiresAuthentication,
-              timeTracker,
-              eventHandler,
-            ).discard
-          }
+        val preSubscriptionEvent = replayEvents.lastOption.orElse(initialPriorEventO)
+        // previously seen counter takes precedence over the lower bound
+        val firstCounter = preSubscriptionEvent.fold(initialCounterLowerBound)(_.counter + 1)
+        val monotonicityChecker = new SequencedEventMonotonicityChecker(
+          firstCounter,
+          preSubscriptionEvent.fold(CantonTimestamp.MinValue)(_.timestamp),
+          loggerFactory,
+        )
+        val eventHandler = monotonicityChecker.handler(
+          StoreSequencedEvent(sequencedEventStore, domainId, loggerFactory).apply(
+            timeTracker.wrapHandler(throttledEventHandler)
+          )
+        )
+        sequencerTransports.sequencerIdToTransportMap.keySet.foreach { sequencerId =>
+          createSubscription(
+            sequencerId,
+            preSubscriptionEvent,
+            requiresAuthentication,
+            eventHandler,
+          ).discard
+        }
 
         // periodically acknowledge that we've successfully processed up to the clean counter
         // We only need to it setup once; the sequencer client will direct the acknowledgements to the
@@ -765,23 +756,15 @@ class SequencerClientImpl(
 
   private def createSubscription(
       sequencerId: SequencerId,
-      replayEvents: Seq[PossiblyIgnoredSerializedEvent],
-      initialPriorEventO: Option[PossiblyIgnoredSerializedEvent],
+      preSubscriptionEvent: Option[PossiblyIgnoredSerializedEvent],
       requiresAuthentication: Boolean,
-      timeTracker: DomainTimeTracker,
-      eventHandler: PossiblyIgnoredApplicationHandler[ClosedEnvelope],
-  )(implicit traceContext: TraceContext) = {
-    val lastEvent = replayEvents.lastOption
-    val preSubscriptionEvent = lastEvent.orElse(initialPriorEventO)
-
-    val nextCounter =
-      // previously seen counter takes precedence over the lower bound
-      preSubscriptionEvent.fold(initialCounterLowerBound)(_.counter)
-
-    val eventValidator = eventValidatorFactory.create(
-      unauthenticated = !requiresAuthentication
-    )
-
+      eventHandler: OrdinaryApplicationHandler[ClosedEnvelope],
+  )(implicit
+      traceContext: TraceContext
+  ): ResilientSequencerSubscription[SequencerClientSubscriptionError] = {
+    // previously seen counter takes precedence over the lower bound
+    val nextCounter = preSubscriptionEvent.fold(initialCounterLowerBound)(_.counter)
+    val eventValidator = eventValidatorFactory.create(unauthenticated = !requiresAuthentication)
     logger.info(
       s"Starting subscription for alias=$sequencerId at timestamp ${preSubscriptionEvent
           .map(_.timestamp)}; next counter $nextCounter"
@@ -789,8 +772,7 @@ class SequencerClientImpl(
 
     val eventDelay: DelaySequencedEvent = {
       val first = testingConfig.testSequencerClientFor.find(elem =>
-        elem.memberName == member.uid.id.unwrap
-          &&
+        elem.memberName == member.uid.id.unwrap &&
           elem.domainName == domainId.unwrap.id.unwrap
       )
 
@@ -806,9 +788,7 @@ class SequencerClientImpl(
     }
 
     val subscriptionHandler = new SubscriptionHandler(
-      StoreSequencedEvent(sequencedEventStore, domainId, loggerFactory).apply(
-        timeTracker.wrapHandler(eventHandler)
-      ),
+      eventHandler,
       eventValidator,
       eventDelay,
       preSubscriptionEvent,
@@ -1303,7 +1283,7 @@ object SequencerClient {
       delay: FiniteDuration,
       sendDescription: String,
       errMsg: String,
-      flagCloseable: FlagCloseable,
+      performUnlessClosing: PerformUnlessClosing,
   )(implicit
       ec: ExecutionContext,
       loggingContext: ErrorLoggingContext,
@@ -1324,7 +1304,7 @@ object SequencerClient {
       } yield ()
     }
     retry
-      .Pause(loggingContext.logger, flagCloseable, maxRetries, delay, sendDescription)
+      .Pause(loggingContext.logger, performUnlessClosing, maxRetries, delay, sendDescription)
       .unlessShutdown(doSend(), AllExnRetryable)(
         retry.Success.always,
         ec,

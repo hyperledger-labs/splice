@@ -31,7 +31,7 @@ import com.digitalasset.canton.sequencing.{
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
+import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.util.retry.RetryUtil.NoExnRetryable
 import com.digitalasset.canton.util.{MonadUtil, retry}
 import com.digitalasset.canton.version.ProtocolVersion
@@ -173,7 +173,7 @@ class SequencerInfoLoader(
       retry
         .Pause(
           logger,
-          flagCloseable = closeContext.flagCloseable,
+          performUnlessClosing = closeContext.context,
           maxRetries = retries,
           delay = timeouts.sequencerInfo.asFiniteApproximation.div(retries.toLong),
           operationName = functionFullName,

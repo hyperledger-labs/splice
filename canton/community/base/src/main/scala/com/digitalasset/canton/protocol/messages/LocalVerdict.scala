@@ -46,11 +46,11 @@ object LocalVerdict extends HasProtocolVersionedCompanion[LocalVerdict] {
     SupportedProtoVersions(
       ProtoVersion(0) -> VersionedProtoConverter(ProtocolVersion.v3)(v0.LocalVerdict)(
         supportedProtoVersion(_)(fromProtoV0),
-        _.toByteString,
+        _.toProtoV0.toByteString,
       ),
       ProtoVersion(1) -> VersionedProtoConverter(ProtocolVersion.v4)(v1.LocalVerdict)(
         supportedProtoVersion(_)(fromProtoV1),
-        _.toByteString,
+        _.toProtoV1.toByteString,
       ),
     )
 
@@ -521,9 +521,8 @@ object LocalReject extends LocalRejectionGroup {
     @Resolution("""In the first instance, resubmit your transaction.
         | If the rejection still appears spuriously, consider increasing the `participantResponseTimeout` or
         | `mediatorReactionTimeout` values in the `DynamicDomainParameters`.
-        | If the rejection appears unrelated to timeout settings, validate that all other Canton components
-        |   which take part in the transaction also function correctly and that, e.g., messages are not stuck at the
-        |   sequencer.
+        | If the rejection appears unrelated to timeout settings, validate that the sequencer and mediator
+        | function correctly.
         |""")
     object LocalTimeout
         extends LocalRejectErrorCode(
@@ -563,9 +562,7 @@ object LocalReject extends LocalRejectionGroup {
           override val representativeProtocolVersion: RepresentativeProtocolVersion[
             LocalVerdict.type
           ]
-      ) extends Malformed(
-            _causePrefix = ""
-          )
+      ) extends Malformed(_causePrefix = "")
 
       object Reject {
         def apply(details: String, protocolVersion: ProtocolVersion): Reject =
@@ -800,6 +797,7 @@ object LocalReject extends LocalRejectionGroup {
   }
 
   /** Fallback for deserializing local rejects that are not known to the current Canton version.
+    * Should not be serialized.
     */
   final case class GenericReject(
       override val _causePrefix: String,

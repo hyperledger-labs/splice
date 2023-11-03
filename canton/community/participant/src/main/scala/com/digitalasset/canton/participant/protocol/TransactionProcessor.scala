@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.participant.protocol
 
-import cats.data.{EitherT, NonEmptyChain}
-import com.daml.error.{ContextualizedErrorLogger, ErrorCategory, ErrorCode, Explanation, Resolution}
+import cats.data.EitherT
+import com.daml.error.*
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -40,7 +40,7 @@ import com.digitalasset.canton.participant.protocol.validation.{
   InternalConsistencyChecker,
   ModelConformanceChecker,
 }
-import com.digitalasset.canton.participant.store.{DuplicateContract, SyncDomainEphemeralState}
+import com.digitalasset.canton.participant.store.SyncDomainEphemeralState
 import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.protocol.*
@@ -99,7 +99,7 @@ class TransactionProcessor(
         ),
         staticDomainParameters,
         crypto,
-        ephemeral.storedContractManager,
+        ephemeral.contractStore,
         metrics,
         buildAuthenticator(crypto),
         new AuthenticationValidator(),
@@ -214,6 +214,27 @@ object TransactionProcessor {
           )
     }
 
+    @Explanation(
+      """This error occurs if a transaction was submitted referring to a contract that
+        |is not known on the domain. This can occur in case of race conditions between a transaction and
+        |an archival or transfer-out."""
+    )
+    @Resolution(
+      """Check domain for submission and/or re-submit the transaction."""
+    )
+    object UnknownContractDomain
+        extends ErrorCode(
+          id = "UNKNOWN_CONTRACT_DOMAIN",
+          ErrorCategory.InvalidGivenCurrentSystemStateOther,
+        ) {
+      final case class Error(contractId: LfContractId)
+          extends TransactionErrorImpl(
+            cause = "Not all receiving participants have the contract in their contract store",
+            // Reported asynchronously after in-flight submission checking, so covered by the rank guarantee
+            definiteAnswer = true,
+          )
+    }
+
     // TODO(#7348) Add the submission rank of the in-flight submission
     final case class SubmissionAlreadyInFlight(
         changeId: ChangeId,
@@ -301,6 +322,7 @@ object TransactionProcessor {
       """Resubmit if the delay is caused by high load.
         |If the command requires substantial processing on the participant,
         |specify a higher minimum ledger time with the command submission so that a higher max sequencing time is derived.
+        |Alternatively, you can increase the dynamic domain parameter ledgerTimeRecordTimeTolerance.
         |"""
     )
     object TimeoutError
@@ -379,12 +401,6 @@ object TransactionProcessor {
     )
   }
 
-  final case class FailedToStoreContract(error: NonEmptyChain[DuplicateContract])
-      extends TransactionProcessorError {
-    override def pretty: Pretty[FailedToStoreContract] = prettyOfClass(
-      unnamedParam(_.error.toChain.toList)
-    )
-  }
   final case class FieldConversionError(field: String, error: String)
       extends TransactionProcessorError {
     override def pretty: Pretty[FieldConversionError] = prettyOfClass(

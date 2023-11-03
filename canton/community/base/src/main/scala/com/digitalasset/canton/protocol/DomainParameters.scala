@@ -583,6 +583,12 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       supportedProtoVersion(_)(fromProtoV1),
       _.toProtoV1.toByteString,
     ),
+    ProtoVersion(2) -> VersionedProtoConverter(ProtocolVersion.CNTestNet)(
+      protoV2.DynamicDomainParametersX
+    )(
+      supportedProtoVersion(_)(fromProtoV2),
+      _.toProtoV2.toByteString,
+    ),
   )
 
   override def name: String = "dynamic domain parameters"
@@ -601,7 +607,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
   lazy val defaultTrafficControlParametersUntil = DefaultValueUntilExclusive(
     _.trafficControlParameters,
     "trafficControlParameters",
-    rpv4,
+    rpvCNTestNet,
     None,
   )
 

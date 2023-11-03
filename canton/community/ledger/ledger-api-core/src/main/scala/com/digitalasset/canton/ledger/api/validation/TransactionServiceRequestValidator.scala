@@ -18,13 +18,10 @@ import com.digitalasset.canton.ledger.api.messages.transaction
 import com.digitalasset.canton.ledger.api.messages.transaction.GetTransactionTreesRequest
 import io.grpc.StatusRuntimeException
 
-import scala.annotation.nowarn
-
 object TransactionServiceRequestValidator {
   type Result[X] = Either[StatusRuntimeException, X]
 
 }
-@nowarn("cat=deprecation")
 class TransactionServiceRequestValidator(
     ledgerId: LedgerId,
     partyValidator: PartyValidator,
@@ -179,6 +176,8 @@ class TransactionServiceRequestValidator(
     }
   }
 
+  // Allow using deprecated Protobuf fields for backwards compatibility
+  @annotation.nowarn("cat=deprecation&origin=com\\.daml\\.ledger\\.api\\.v1\\.transaction_filter.*")
   private def transactionFilterToPartySet(
       transactionFilter: TransactionFilter
   )(implicit contextualizedErrorLogger: ContextualizedErrorLogger) =

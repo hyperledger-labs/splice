@@ -7,7 +7,11 @@ import cats.Eval
 import cats.syntax.flatMap.*
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
-import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, UnlessShutdown}
+import com.digitalasset.canton.lifecycle.{
+  FutureUnlessShutdown,
+  PerformUnlessClosing,
+  UnlessShutdown,
+}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -56,7 +60,7 @@ object Policy {
   /** Repeatedly execute the task until it doesn't throw an exception or the `flagCloseable` is closing. */
   def noisyInfiniteRetry[A](
       task: => Future[A],
-      flagCloseable: FlagCloseable,
+      performUnlessClosing: PerformUnlessClosing,
       retryInterval: FiniteDuration,
       operationName: String,
       actionable: String,
@@ -66,7 +70,7 @@ object Policy {
   ): FutureUnlessShutdown[A] =
     noisyInfiniteRetryUS(
       FutureUnlessShutdown.outcomeF(task),
-      flagCloseable,
+      performUnlessClosing,
       retryInterval,
       operationName,
       actionable,
@@ -75,7 +79,7 @@ object Policy {
   /** Repeatedly execute the task until it returns an abort due to shutdown, doesn't throw an exception, or the `flagCloseable` is closing. */
   def noisyInfiniteRetryUS[A](
       task: => FutureUnlessShutdown[A],
-      flagCloseable: FlagCloseable,
+      performUnlessClosing: PerformUnlessClosing,
       retryInterval: FiniteDuration,
       operationName: String,
       actionable: String,
@@ -85,7 +89,7 @@ object Policy {
   ): FutureUnlessShutdown[A] =
     Pause(
       loggingContext.logger,
-      flagCloseable,
+      performUnlessClosing,
       maxRetries = Int.MaxValue,
       retryInterval,
       operationName = operationName,
@@ -105,7 +109,7 @@ abstract class RetryWithDelay(
     initialDelay: FiniteDuration,
     totalMaxRetries: Int,
     resetRetriesAfter: Option[FiniteDuration],
-    flagCloseable: FlagCloseable,
+    performUnlessClosing: PerformUnlessClosing,
     retryLogLevel: Option[Level],
     suspendRetries: Eval[FiniteDuration],
 ) extends Policy(logger) {
@@ -197,7 +201,7 @@ abstract class RetryWithDelay(
               )
               Future.successful(RetryOutcome(succ, RetryTermination.Success))
 
-            case outcome if flagCloseable.isClosing =>
+            case outcome if performUnlessClosing.isClosing =>
               logger.debug(
                 s"Giving up on retrying the operation '$operationName' due to shutdown. Last attempt was $lastErrorKind"
               )
@@ -226,7 +230,7 @@ abstract class RetryWithDelay(
                     s"Suspend retrying the operation '$operationName' for $suspendDuration."
                   )
                   DelayUtil
-                    .delayIfNotClosing(operationName, suspendDuration, flagCloseable)
+                    .delayIfNotClosing(operationName, suspendDuration, performUnlessClosing)
                     .onShutdown(())(directExecutionContext)
                     .flatMap(_ => run(previousResult, 0, errorKind, 0, initialDelay))(
                       directExecutionContext
@@ -251,7 +255,8 @@ abstract class RetryWithDelay(
                     // No need to log the exception in outcome, as this has been logged by retryable.retryOk.
                   )
 
-                  val delayedF = DelayUtil.delayIfNotClosing(operationName, delay, flagCloseable)
+                  val delayedF =
+                    DelayUtil.delayIfNotClosing(operationName, delay, performUnlessClosing)
                   delayedF
                     .flatMap { _ =>
                       logOnThrow {
@@ -262,11 +267,10 @@ abstract class RetryWithDelay(
                         // Run the task again on the normal execution context as the task might take a long time.
                         // `performUnlessClosingF` guards against closing the execution context.
                         val nextRunUnlessShutdown =
-                          flagCloseable
-                            .performUnlessClosingF(operationName)(runTask())(
-                              executionContext,
-                              traceContext,
-                            )
+                          performUnlessClosing.performUnlessClosingF(operationName)(runTask())(
+                            executionContext,
+                            traceContext,
+                          )
                         @SuppressWarnings(Array("org.wartremover.warts.TryPartial"))
                         val nextRunF = nextRunUnlessShutdown
                           .onShutdown {
@@ -386,7 +390,7 @@ object RetryWithDelay {
 /** Retry immediately after failure for a max number of times */
 final case class Directly(
     logger: TracedLogger,
-    flagCloseable: FlagCloseable,
+    performUnlessClosing: PerformUnlessClosing,
     maxRetries: Int,
     operationName: String,
     longDescription: String = "",
@@ -400,7 +404,7 @@ final case class Directly(
       Duration.Zero,
       maxRetries,
       resetRetriesAfter = None,
-      flagCloseable,
+      performUnlessClosing,
       retryLogLevel,
       suspendRetries,
     ) {
@@ -411,7 +415,7 @@ final case class Directly(
 /** Retry with a pause between attempts for a max number of times */
 final case class Pause(
     logger: TracedLogger,
-    flagCloseable: FlagCloseable,
+    performUnlessClosing: PerformUnlessClosing,
     maxRetries: Int,
     delay: FiniteDuration,
     operationName: String,
@@ -427,7 +431,7 @@ final case class Pause(
       delay,
       maxRetries,
       resetRetriesAfter = None,
-      flagCloseable,
+      performUnlessClosing,
       retryLogLevel,
       suspendRetries,
     ) {
@@ -470,7 +474,7 @@ final case class Pause(
   */
 final case class Backoff(
     logger: TracedLogger,
-    flagCloseable: FlagCloseable,
+    flagCloseable: PerformUnlessClosing,
     maxRetries: Int,
     initialDelay: FiniteDuration,
     maxDelay: Duration,

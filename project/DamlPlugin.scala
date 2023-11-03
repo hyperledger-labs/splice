@@ -52,6 +52,10 @@ object DamlPlugin extends AutoPlugin {
       settingKey[Boolean]("Enable Java codegen")
     val damlEnableScalaCodegen =
       settingKey[Boolean]("Enable Scala codegen")
+    // Canton is setup such that CLI arguments need to be passed explicitly instead of read from daml.yaml
+    // so we set this flag to false for Canton.
+    val damlCodegenUseProject =
+      settingKey[Boolean]("Read config from daml.yaml")
 
     val damlGenerateCode = taskKey[Seq[File]]("Generate scala code from Daml")
     val damlDependencies = taskKey[Seq[File]]("Paths to DARs that this project depends on")
@@ -80,6 +84,7 @@ object DamlPlugin extends AutoPlugin {
       damlCodeGeneration := Seq(),
       damlEnableScalaCodegen := false,
       damlEnableJavaCodegen := true,
+      damlCodegenUseProject := true,
       damlGenerateCode := {
         // for the time being we assume if we're using code generation then the DARs must first be built
         val dars = damlBuild.value
@@ -91,6 +96,7 @@ object DamlPlugin extends AutoPlugin {
         val log = streams.value.log
         val enableJavaCodegen = damlEnableJavaCodegen.value
         val enableScalaCodegen = damlEnableScalaCodegen.value
+        val enableUseProject = damlCodegenUseProject.value
 
         val cache = FileFunction.cached(cacheDirectory, FileInfo.hash) { input =>
           val codegens =
@@ -109,6 +115,7 @@ object DamlPlugin extends AutoPlugin {
                   outputDirectory,
                   damlCompilerVersion.value,
                   damlJavaCodegenVersion.value,
+                  enableUseProject,
                 )
               }
           }.toSet
@@ -505,6 +512,7 @@ object DamlPlugin extends AutoPlugin {
       managedSourceDir: File,
       damlVersion: String,
       damlJavaCodegenVersion: String,
+      damlCodegenUseProject: Boolean,
   ): Seq[File] = {
     if (!darFile.exists())
       throw new MessageOnlyException(
@@ -542,29 +550,40 @@ object DamlPlugin extends AutoPlugin {
 
     language match {
       case Codegen.Java =>
-        val damlYaml = readDamlYaml(projectDir / "daml.yaml")
-        // We don't have a JSON library easily accessible in SBT code so we opt for the rather hacky option here to drill down fields.
-        val codegenDir = Try(
-          damlYaml
-            .get("codegen")
-            .asInstanceOf[JMap[String, Object]]
-            .get("java")
-            .asInstanceOf[JMap[String, Object]]
-            .get("output-directory")
-            .asInstanceOf[String]
-        ) match {
-          case Success(dir) => dir
-          case Failure(e) =>
-            log.error(s"Failed to parse codegen config in daml.yaml file: $damlYaml")
-            throw e
+        if (damlCodegenUseProject) {
+          val damlYaml = readDamlYaml(projectDir / "daml.yaml")
+          // We don't have a JSON library easily accessible in SBT code so we opt for the rather hacky option here to drill down fields.
+          val codegenDir = Try(
+            damlYaml
+              .get("codegen")
+              .asInstanceOf[JMap[String, Object]]
+              .get("java")
+              .asInstanceOf[JMap[String, Object]]
+              .get("output-directory")
+              .asInstanceOf[String]
+          ) match {
+            case Success(dir) => dir
+            case Failure(e) =>
+              log.error(s"Failed to parse codegen config in daml.yaml file: $damlYaml")
+              throw e
+          }
+          IO.delete(projectDir / codegenDir)
+          BuildUtil.runCommand(
+            Seq("java", "-jar", codegenJarPath, "java"),
+            log,
+            optCwd = Some(projectDir),
+            extraEnv = Seq(("DAML_PROJECT", projectDir.toString)),
+          )
+        } else {
+          BuildUtil.runCommand(
+            "java" +: "-jar" +: codegenJarPath +: Seq(
+              "java",
+              s"${darFile.getAbsolutePath}=$basePackageName.java",
+              s"--output-directory=${managedSourceDir.getAbsolutePath}",
+            ),
+            log,
+          )
         }
-        IO.delete(projectDir / codegenDir)
-        BuildUtil.runCommand(
-          Seq("java", "-jar", codegenJarPath, "java"),
-          log,
-          optCwd = Some(projectDir),
-          extraEnv = Seq(("DAML_PROJECT", projectDir.toString)),
-        )
       case Codegen.Scala =>
         BuildUtil.runCommand(
           "java" +: "-jar" +: codegenJarPath +: Seq(

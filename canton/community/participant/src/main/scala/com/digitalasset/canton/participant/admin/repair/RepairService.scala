@@ -5,6 +5,7 @@ package com.digitalasset.canton.participant.admin.repair
 
 import cats.Eval
 import cats.data.{EitherT, OptionT}
+import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.functorFilter.*
@@ -48,9 +49,10 @@ import com.digitalasset.canton.participant.sync.{
 }
 import com.digitalasset.canton.participant.util.DAMLe.ContractWithMetadata
 import com.digitalasset.canton.participant.util.{DAMLe, TimeOfChange}
-import com.digitalasset.canton.participant.{ParticipantNodeParameters, RichRequestCounter}
+import com.digitalasset.canton.participant.{ParticipantNodeParameters, RequestOffset}
 import com.digitalasset.canton.platform.participant.util.LfEngineToApi
-import com.digitalasset.canton.protocol.{LfChoiceName, LfGlobalKey, *}
+import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
+import com.digitalasset.canton.protocol.{LfChoiceName, *}
 import com.digitalasset.canton.resource.TransactionalStoreUpdate
 import com.digitalasset.canton.store.{
   CursorPrehead,
@@ -139,7 +141,6 @@ final class RepairService(
     val contractId = repairContract.contract.contractId
     acsState match {
       case None =>
-        // TODO(#13573): we should pass the transfer counter in as part of the RepairRequest
         keyState
           .traverse(_.checkAssignable(domain))
           .map { keyToAssign =>
@@ -179,7 +180,6 @@ final class RepairService(
             )
           }
         }
-
       case Some(ActiveContractStore.Archived) =>
         EitherT.leftT(
           log(
@@ -191,21 +191,36 @@ final class RepairService(
           s"Marking contract ${repairContract.contract.contractId} previously transferred-out to $targetDomain as " +
             s"transferred-in from $targetDomain (even though contract may have been transferred to yet another domain since)."
         ).discard
-        // TODO(#13573): we should pass the transfer counter in as part of the RepairRequest
-        keyState
-          .traverse(_.checkAssignable(domain))
-          .map { keyToAssign =>
-            Option(
-              ContractToAdd(
-                repairContract.contract,
-                repairContract.witnesses.map(_.toLf),
-                transferCounter.flatMap(_.increment.toOption),
-                Option(SourceDomainId(targetDomain.unwrap)),
-                keyToAssign,
+
+        val isTransferCounterIncreasing = (transferCounter, repairContract.transferCounter)
+          .mapN { case (tc, repairTc) => repairTc > tc }
+          .getOrElse(true)
+
+        if (isTransferCounterIncreasing) {
+          keyState
+            .traverse(_.checkAssignable(domain))
+            .map { keyToAssign =>
+              Option(
+                ContractToAdd(
+                  repairContract.contract,
+                  repairContract.witnesses.map(_.toLf),
+                  repairContract.transferCounter,
+                  Option(SourceDomainId(targetDomain.unwrap)),
+                  keyToAssign,
+                )
               )
+            }
+            .toEitherT[Future]
+        } else {
+          EitherT.leftT(
+            log(
+              s"The transfer counter ${repairContract.transferCounter} of the contract " +
+                s"${repairContract.contract.contractId} needs to be strictly larger than the transfer counter " +
+                s"$transferCounter at the time of the transfer-out."
             )
-          }
-          .toEitherT[Future]
+          )
+        }
+
     }
   }
 
@@ -318,112 +333,113 @@ final class RepairService(
     logger.info(
       s"Adding ${contracts.length} contracts to domain ${domain} with ignoreAlreadyAdded=${ignoreAlreadyAdded} and ignoreStakeholderCheck=${ignoreStakeholderCheck}"
     )
-    lockAndAwaitEitherT(
-      "repair.add", {
-        for {
-          // Ensure domain is configured but not connected to avoid race conditions.
-          domainId <- aliasToUnconnectedDomainId(domain)
-          _ <- EitherT.cond[Future](contracts.nonEmpty, (), "No contracts to add specified")
+    if (contracts.isEmpty) {
+      Either.right(logger.info("No contracts to add specified"))
+    } else {
+      lockAndAwaitEitherT(
+        "repair.add", {
+          for {
+            // Ensure domain is configured but not connected to avoid race conditions.
+            domainId <- aliasToUnconnectedDomainId(domain)
 
-          domain <- readDomainData(domainId)
+            domain <- readDomainData(domainId)
 
-          filteredContracts <- contracts.parTraverseFilter(
-            readRepairContractCurrentState(domain, _, ignoreAlreadyAdded)
-          )
+            filteredContracts <- contracts.parTraverseFilter(
+              readRepairContractCurrentState(domain, _, ignoreAlreadyAdded)
+            )
 
-          contractsByCreation = filteredContracts
-            .groupBy(_.contract.ledgerCreateTime)
-            .toList
-            .sortBy { case (ts, _) =>
-              ts
-            }
+            contractsByCreation = filteredContracts
+              .groupBy(_.contract.ledgerCreateTime)
+              .toList
+              .sortBy { case (ledgerCreateTime, _) => ledgerCreateTime }
 
-          _ <- PositiveInt
-            .create(contractsByCreation.size)
-            .fold(
-              _ => EitherT.rightT[Future, String](logger.info("No contract needs to be added")),
-              requestCountersToAllocate => {
-                for {
-                  repair <- initRepairRequestAndVerifyPreconditions(
-                    domain,
-                    requestCountersToAllocate,
-                  )
-
-                  contractsToAdd = repair.timesOfChange.zip(contractsByCreation)
-
-                  // All referenced templates known and vetted
-                  _packagesVetted <- filteredContracts
-                    .map(
-                      _.contract.rawContractInstance.contractInstance.unversioned.template.packageId
+            _ <- PositiveInt
+              .create(contractsByCreation.size)
+              .fold(
+                _ => EitherT.rightT[Future, String](logger.info("No contract needs to be added")),
+                requestCountersToAllocate => {
+                  for {
+                    repair <- initRepairRequestAndVerifyPreconditions(
+                      domain,
+                      requestCountersToAllocate,
                     )
-                    .distinct
-                    .parTraverse_(packageVetted)
 
-                  _uniqueKeysWithHostedMaintainerInContractsToAdd <- EitherTUtil.ifThenET(
-                    repair.domain.parameters.uniqueContractKeys
-                  ) {
-                    val keysWithContractIdsF = filteredContracts
-                      .parTraverseFilter { repairContractWithCurrentState =>
-                        val contract = repairContractWithCurrentState.contract
-                        // Only check for duplicates where the participant hosts a maintainer
-                        getKeyIfOneMaintainerIsLocal(
-                          repair.domain.topologySnapshot,
-                          contract.metadata.maybeKeyWithMaintainers,
-                          participantId,
-                        ).map { lfKeyO =>
-                          lfKeyO.flatMap(_ => contract.metadata.maybeKeyWithMaintainers).map {
-                            keyWithMaintainers =>
-                              keyWithMaintainers.globalKey -> contract.contractId
+                    contractsToAdd = repair.timesOfChange.zip(contractsByCreation)
+
+                    // All referenced templates known and vetted
+                    _packagesVetted <- filteredContracts
+                      .map(
+                        _.contract.rawContractInstance.contractInstance.unversioned.template.packageId
+                      )
+                      .distinct
+                      .parTraverse_(packageVetted)
+
+                    _uniqueKeysWithHostedMaintainerInContractsToAdd <- EitherTUtil.ifThenET(
+                      repair.domain.parameters.uniqueContractKeys
+                    ) {
+                      val keysWithContractIdsF = filteredContracts
+                        .parTraverseFilter { repairContractWithCurrentState =>
+                          val contract = repairContractWithCurrentState.contract
+                          // Only check for duplicates where the participant hosts a maintainer
+                          getKeyIfOneMaintainerIsLocal(
+                            repair.domain.topologySnapshot,
+                            contract.metadata.maybeKeyWithMaintainers,
+                            participantId,
+                          ).map { lfKeyO =>
+                            lfKeyO.flatMap(_ => contract.metadata.maybeKeyWithMaintainers).map {
+                              keyWithMaintainers =>
+                                keyWithMaintainers.globalKey -> contract.contractId
+                            }
                           }
                         }
-                      }
-                      .map(x => x.groupBy { case (globalKey, _) => globalKey })
-                    EitherT(keysWithContractIdsF.map { keysWithContractIds =>
-                      val duplicates = keysWithContractIds.mapFilter { keyCoids =>
-                        if (keyCoids.lengthCompare(1) > 0) Some(keyCoids.map(_._2)) else None
-                      }
-                      Either.cond(
-                        duplicates.isEmpty,
-                        (),
-                        log(show"Cannot add multiple contracts for the same key(s): $duplicates"),
-                      )
-                    })
-                  }
+                        .map(x => x.groupBy { case (globalKey, _) => globalKey })
+                      EitherT(keysWithContractIdsF.map { keysWithContractIds =>
+                        val duplicates = keysWithContractIds.mapFilter { keyCoids =>
+                          if (keyCoids.lengthCompare(1) > 0) Some(keyCoids.map(_._2)) else None
+                        }
+                        Either.cond(
+                          duplicates.isEmpty,
+                          (),
+                          log(show"Cannot add multiple contracts for the same key(s): $duplicates"),
+                        )
+                      })
+                    }
 
-                  hostedParties <- EitherT.right(
-                    filteredContracts
-                      .flatMap(_.witnesses)
-                      .distinct
-                      .parFilterA(hostsParty(repair.domain.topologySnapshot, participantId))
-                      .map(_.toSet)
-                  )
+                    hostedParties <- EitherT.right(
+                      filteredContracts
+                        .flatMap(_.witnesses)
+                        .distinct
+                        .parFilterA(hostsParty(repair.domain.topologySnapshot, participantId))
+                        .map(_.toSet)
+                    )
 
-                  _ = logger.debug(s"Publishing ${filteredContracts.size} added contracts")
+                    _ = logger.debug(s"Publishing ${filteredContracts.size} added contracts")
 
-                  contractsWithTimeOfChange = contractsToAdd.flatMap { case (toc, (_, cs)) =>
-                    cs.map(_ -> toc)
-                  }
+                    contractsWithTimeOfChange = contractsToAdd.flatMap { case (toc, (_, cs)) =>
+                      cs.map(_ -> toc)
+                    }
 
-                  // Note the following purposely fails if any contract fails which results in not all contracts being processed.
-                  _ <- MonadUtil.sequentialTraverse(contractsWithTimeOfChange) {
-                    case (contract, timeOfChange) =>
-                      addContract(repair, ignoreStakeholderCheck)(contract, timeOfChange)
-                  }
+                    // Note the following purposely fails if any contract fails which results in not all contracts being processed.
+                    _ <- MonadUtil.sequentialTraverse(contractsWithTimeOfChange) {
+                      case (contract, timeOfChange) =>
+                        addContract(repair, ignoreStakeholderCheck)(contract, timeOfChange)
+                    }
 
-                  // Publish added contracts upstream as created via the ledger api.
-                  _ <- EitherT.right(
-                    writeContractsAddedEvents(repair, hostedParties, contractsToAdd)
-                  )
+                    // Publish added contracts upstream as created via the ledger api.
+                    _ <- EitherT.right(
+                      writeContractsAddedEvents(repair, hostedParties, contractsToAdd)
+                    )
 
-                  // If all has gone well, bump the clean head, effectively committing the changes to the domain.
-                  _ <- commitRepairs(repair)
+                    // If all has gone well, bump the clean head, effectively committing the changes to the domain.
+                    _ <- commitRepairs(repair)
 
-                } yield ()
-              },
-            )
-        } yield ()
-      },
-    )
+                  } yield ()
+                },
+              )
+          } yield ()
+        },
+      )
+    }
   }
 
   /** Participant repair utility for manually purging (archiving) contracts in an offline fashion.
@@ -945,7 +961,7 @@ final class RepairService(
       repair: RepairRequest,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     val transactionId = repair.transactionId.tryAsLedgerTransactionId
-    val offset = repair.tryExactlyOneRequestCounter.asLocalOffset
+    val offset = RequestOffset(repair.timestamp, repair.tryExactlyOneRequestCounter)
     val event =
       TimestampedEvent(
         LedgerSyncEvent.ContractsPurged(
@@ -972,11 +988,11 @@ final class RepairService(
       repair: RepairRequest,
       hostedParties: Set[LfPartyId],
       requestCounter: RequestCounter,
-      timestamp: CantonTimestamp,
+      ledgerCreateTime: LedgerCreateTime,
       contractsAdded: Seq[ContractToAdd],
   )(implicit traceContext: TraceContext): Future[Unit] = {
     val transactionId = randomTransactionId(syncCrypto).tryAsLedgerTransactionId
-    val offset = requestCounter.asLocalOffset
+    val offset = RequestOffset(repair.timestamp, requestCounter)
     val contractMetadata = contractsAdded.view
       .map(c => c.contract.contractId -> c.driverMetadata(repair.domain.parameters.protocolVersion))
       .toMap
@@ -987,7 +1003,7 @@ final class RepairService(
           contracts = contractsAdded.map(_.contract.toLf),
           domainId = repair.domain.id,
           recordTime = repair.timestamp.toLf,
-          ledgerTime = timestamp.toLf,
+          ledgerTime = ledgerCreateTime.toLf,
           hostedWitnesses = contractsAdded.flatMap(_.witnesses.intersect(hostedParties)),
           contractMetadata = contractMetadata,
         ),
@@ -1016,7 +1032,7 @@ final class RepairService(
   private def writeContractsAddedEvents(
       repair: RepairRequest,
       hostedParties: Set[LfPartyId],
-      contractsAdded: Seq[(TimeOfChange, (CantonTimestamp, Seq[ContractToAdd]))],
+      contractsAdded: Seq[(TimeOfChange, (LedgerCreateTime, Seq[ContractToAdd]))],
   )(implicit traceContext: TraceContext): Future[Unit] =
     MonadUtil.sequentialTraverse_(contractsAdded) {
       case (timeOfChange, (timestamp, contractsToAdd)) =>
@@ -1154,7 +1170,7 @@ final class RepairService(
         (),
         log(
           s"""Cannot apply a repair command as events have been published up to
-             |${domain.startingPoints.eventPublishingNextLocalOffset} offset exclusive
+             |${domain.startingPoints.lastPublishedLocalOffset} offset inclusive
              |and the repair command would be assigned the offset ${domain.startingPoints.processing.nextRequestCounter}.
              |Reconnect to the domain to reprocess the dirty requests and retry repair afterwards.""".stripMargin
         ),
@@ -1377,7 +1393,7 @@ object RepairService {
           ContractMetadata
             .tryCreate(signatoriesAsParties, signatoriesAsParties ++ observersAsParties, None)
         ),
-        ledgerCreateTime = time,
+        ledgerCreateTime = LedgerCreateTime(time),
         contractSalt = contractSalt,
       )
     }
@@ -1386,7 +1402,7 @@ object RepairService {
         contract: SerializableContract
     ): Either[
       String,
-      (Identifier, Record, Set[String], Set[String], LfContractId, Option[Salt], CantonTimestamp),
+      (Identifier, Record, Set[String], Set[String], LfContractId, Option[Salt], LedgerCreateTime),
     ] = {
       val contractInstance = contract.rawContractInstance.contractInstance
       LfEngineToApi

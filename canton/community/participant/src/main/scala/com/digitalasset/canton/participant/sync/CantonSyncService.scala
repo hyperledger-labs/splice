@@ -35,7 +35,7 @@ import com.digitalasset.canton.data.{
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.SyncServiceErrorGroup
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.InjectionErrorGroup
 import com.digitalasset.canton.error.*
-import com.digitalasset.canton.health.{BaseMutableHealthComponent, MutableHealthComponent}
+import com.digitalasset.canton.health.MutableHealthComponent
 import com.digitalasset.canton.ledger.api.health.HealthStatus
 import com.digitalasset.canton.ledger.configuration.*
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
@@ -169,26 +169,20 @@ class CantonSyncService(
   import ShowUtil.*
 
   val syncDomainHealth: MutableHealthComponent =
-    BaseMutableHealthComponent(loggerFactory, SyncDomain.healthName, timeouts)
+    MutableHealthComponent(loggerFactory, SyncDomain.healthName, timeouts)
   val ephemeralHealth: MutableHealthComponent =
-    BaseMutableHealthComponent(loggerFactory, SyncDomainEphemeralState.healthName, timeouts)
+    MutableHealthComponent(loggerFactory, SyncDomainEphemeralState.healthName, timeouts)
   val sequencerClientHealth: MutableHealthComponent =
-    BaseMutableHealthComponent(loggerFactory, SequencerClient.healthName, timeouts)
+    MutableHealthComponent(loggerFactory, SequencerClient.healthName, timeouts)
 
   val maxDeduplicationDuration: NonNegativeFiniteDuration =
     participantNodePersistentState.value.settingsStore.settings.maxDeduplicationDuration
       .getOrElse(throw new RuntimeException("Max deduplication duration is not available"))
 
-  private val excludedPackageIds = if (parameters.excludeInfrastructureTransactions) {
-    Set(
-      workflows.PackageID.PingPong,
-      workflows.PackageID.DarDistribution,
-      workflows.PackageID.PingPongVacuum,
-    )
-      .map(Ref.PackageId.assertFromString)
-  } else {
-    Set.empty[Ref.PackageId]
-  }
+  val eventTranslationStrategy = new EventTranslationStrategy(
+    multiDomainLedgerAPIEnabled = multiDomainLedgerAPIEnabled,
+    excludeInfrastructureTransactions = parameters.excludeInfrastructureTransactions,
+  )
 
   type ConnectionListener = DomainAlias => Unit
 
@@ -576,46 +570,15 @@ class CantonSyncService(
           beginStartingAt =>
             participantNodePersistentState.value.multiDomainEventLog
               .subscribe(beginStartingAt)
-              .map { case (offset, tracedEvent) =>
-                tracedEvent
-                  .map(augmentTransactionStatistics)
-                  .map(_.toDamlUpdate(populateTransfers = multiDomainLedgerAPIEnabled))
-                  .sequence
-                  .map { tracedUpdate =>
-                    implicit val traceContext: TraceContext = tracedEvent.traceContext
-                    logger
-                      .debug(show"Emitting event at offset $offset. Event: ${tracedEvent.value}")
-                    (UpstreamOffsetConvert.fromGlobalOffset(offset), tracedUpdate)
+              .mapConcat { case (offset, event) =>
+                event
+                  .traverse(eventTranslationStrategy.translate)
+                  .map { e =>
+                    logger.debug(show"Emitting event at offset $offset. Event: ${event.value}")
+                    (UpstreamOffsetConvert.fromGlobalOffset(offset), e)
                   }
-              }
-              .collect { case Some(tuple) => tuple },
+              },
         )
-    }
-
-  // Augment event with transaction statistics "as late as possible" as stats are redundant data and so that
-  // we don't need to persist stats and deal with versioning stats changes. Also every event is usually consumed
-  // only once.
-  private[sync] def augmentTransactionStatistics(event: LedgerSyncEvent): LedgerSyncEvent =
-    event match {
-      case ta @ LedgerSyncEvent.TransactionAccepted(
-            Some(completionInfo),
-            _transactionMeta,
-            transaction,
-            _transactionId,
-            _recordTime,
-            _divulgedContracts,
-            _blindingInfo,
-            _hostedWitnesses,
-            _contractMetadata,
-          ) =>
-        ta.copy(completionInfoO =
-          Some(
-            completionInfo.copy(statistics =
-              Some(LedgerTransactionNodeStatistics(transaction, excludedPackageIds))
-            )
-          )
-        )
-      case event => event
     }
 
   override def allocateParty(
@@ -1162,6 +1125,8 @@ class CantonSyncService(
 
         persistent = domainHandle.domainPersistentState
         domainId = domainHandle.domainId
+        domainCrypto = syncCrypto.tryForDomain(domainId, Some(domainAlias))
+
         ephemeral <- EitherT.right[SyncServiceError](
           FutureUnlessShutdown.outcomeF(
             syncDomainStateFactory
@@ -1179,13 +1144,13 @@ class CantonSyncService(
                     loggerFactory,
                   ),
                 domainMetrics,
+                parameters.cachingConfigs.sessionKeyCache,
                 participantId,
               )
           )
         )
         domainLoggerFactory = loggerFactory.append("domainId", domainId.toString)
 
-        domainCrypto = syncCrypto.tryForDomain(domainId, Some(domainAlias))
         missingKeysAlerter = new MissingKeysAlerter(
           participantId,
           domainId,
@@ -1242,7 +1207,7 @@ class CantonSyncService(
         _ = syncDomainHealth.set(syncDomain)
         _ = ephemeralHealth.set(syncDomain.ephemeral)
         _ = sequencerClientHealth.set(syncDomain.sequencerClient.healthComponent)
-        _ = syncDomain.resolveUnhealthy
+        _ = syncDomain.resolveUnhealthy()
 
         // Start sequencer client subscription only after sync domain has been added to connectedDomainsMap, e.g. to
         // prevent sending PartyAddedToParticipantEvents before the domain is available for command submission. (#2279)
