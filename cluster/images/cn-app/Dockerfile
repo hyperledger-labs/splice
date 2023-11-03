@@ -15,7 +15,7 @@ WORKDIR /app
 # move tarball to a static name
 ADD target/cn-node-0.1.0-SNAPSHOT.tar.gz .
 
-COPY target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/LICENSE.txt /app/
+COPY target/metrics.conf target/entrypoint.sh target/bootstrap-entrypoint.sc target/tools.sh target/LICENSE.txt /app/
 
 RUN ln -s cn-node-0.1.0-SNAPSHOT/bin/cn-node cn-image-bin
 

@@ -30,6 +30,10 @@ for cfg in ${!ADDITIONAL_CONFIG@}; do
    echo "${!cfg}"
 done >> /app/additional-config.conf
 
+if [ -s "/app/metrics.conf" ]; then
+   ARGS+=( --config /app/metrics.conf )
+fi
+
 if [ -s "/app/additional-config.conf" ]; then
    ARGS+=( --config /app/additional-config.conf )
 fi
