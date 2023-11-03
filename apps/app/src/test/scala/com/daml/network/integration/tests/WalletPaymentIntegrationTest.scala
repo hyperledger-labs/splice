@@ -25,6 +25,8 @@ class WalletPaymentIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
+      // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
+      .withSequencerConnectionsFromScanDisabled
 
   "A wallet" should {
     "fail to get a non-existent payment request" in { implicit env =>

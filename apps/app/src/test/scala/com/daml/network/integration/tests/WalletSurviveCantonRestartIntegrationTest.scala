@@ -59,6 +59,8 @@ class WalletSurviveCantonRestartIntegrationTest
       // Do not allocate validator users here, as we deal with all of them manually
       .withAllocatedUsers(extraIgnoredValidatorPrefixes = Seq(""))
       .withManualStart
+      // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
+      .withSequencerConnectionsFromScanDisabled
   }
 
   "Wallet" should {

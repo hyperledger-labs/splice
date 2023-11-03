@@ -175,6 +175,9 @@ final case class SvSequencerConfig(
     adminApi: ClientConfig,
     internalApi: ClientConfig,
     externalPublicApiUrl: String,
+    // The default value of 60 seconds is based on https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
+    // TODO (#8282): consider reading config value from participant instead of configuring here
+    sequencerAvailabilityDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(60),
 )
 
 final case class SvMediatorConfig(

@@ -93,8 +93,6 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
             .withDisclosedContracts(dislosedContracts)
             .yieldResult()
       }
-
     } yield result
   }
-
 }

@@ -150,6 +150,7 @@ class SvApp(
             ),
           config.sequencer.internalApi,
           config.sequencer.externalPublicApiUrl,
+          config.sequencer.sequencerAvailabilityDelay.asJava,
           loggerFactory,
           retryProvider,
         )
@@ -1166,15 +1167,21 @@ object SvApp {
             Option(memberInfo.domainNodes.get(domainId.toProtoPrimitive))
               .map(_.cometBft)
               .getOrElse(SvUtil.emptyCometBftConfig),
-            localSequencerConfig.map(c =>
+            localSequencerConfig.map { c =>
+              val sequencerAvailabilityDelay =
+                localDomainNode
+                  .map(_.sequencerAvailabilityDelay)
+                  .getOrElse(
+                    sys.error(
+                      "localDomainNode is not expected to be empty."
+                    )
+                  )
               new SequencerConfig(
                 c.sequencerId,
                 c.url,
-                // TODO(#7717) Don't use now here, calculate the available time as described in
-                // https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
-                clock.now.toInstant,
+                clock.now.toInstant.plus(sequencerAvailabilityDelay),
               )
-            ),
+            },
             localMediatorConfig.map(c =>
               new MediatorConfig(
                 c.mediatorId

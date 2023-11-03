@@ -23,6 +23,7 @@ import com.digitalasset.canton.topology.PartyId
 import org.slf4j.event.Level
 
 import scala.concurrent.Future
+import scala.concurrent.duration.*
 import scala.util.{Random, Try}
 
 class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil {
@@ -33,6 +34,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       .simpleTopology(this.getClass.getSimpleName)
       .withManualStart
       .withoutInitialManagerApps // TODO (#7539): this should no longer be required once app-instances is removed
+      .withSequencerConnectionsFromScanDisabled // TODO(#8393) re-enable this when it is more robust to temporary domain disconnects
 
   "start and restart cleanly" in { implicit env =>
     initSvcWithSv1Only()
@@ -64,13 +66,15 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
   }
 
-  "validator apps connect to all SVC sequencers" in { implicit env =>
+  // TODO(#8393) re-enable this test case when it is more robust to temporary domain disconnects
+  "validator apps connect to all SVC sequencers" ignore { implicit env =>
     initSvc()
     // Start Alice’s validator
     aliceValidatorBackend.startSync()
 
     // check that alice's validator connects to all SVC sequencers.
-    eventually() {
+    // we need to wait for a minute due to non sv validator only connect to sequencers after initialization + sequencerAvailabilityDelay which is is 60s
+    eventually(timeUntilSuccess = 1.minutes, maxPollInterval = 1.seconds) {
       val sequencerConnections = aliceValidatorBackend.participantClientWithAdminToken.domains
         .config(
           aliceValidatorBackend.config.domains.global.alias

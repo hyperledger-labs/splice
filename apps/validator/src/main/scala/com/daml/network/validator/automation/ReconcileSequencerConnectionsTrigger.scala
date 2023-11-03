@@ -13,8 +13,9 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnection,
   SequencerConnections,
 }
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status.Code
+import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -23,7 +24,6 @@ class ReconcileSequencerConnectionsTrigger(
     override protected val context: TriggerContext,
     participantAdminConnection: ParticipantAdminConnection,
     scanConnection: ScanConnection,
-    clock: Clock,
     globalDomainAlias: DomainAlias,
 )(implicit
     override val ec: ExecutionContext,
@@ -31,15 +31,39 @@ class ReconcileSequencerConnectionsTrigger(
 ) extends PollingTrigger {
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      sequencerConnections <- ValidatorApp.getSequencerConnectionsFromScan(
-        scanConnection,
-        clock,
-        logger,
-      )
-      _ <- participantAdminConnection.modifyDomainConnectionConfig(
-        globalDomainAlias,
-        modifySequencerConnections(sequencerConnections),
-      )
+      maybeDomainTime <- participantAdminConnection
+        .getDomainTime(globalDomainAlias, timeouts.default)
+        .map(domainTime => Some(domainTime.timestamp))
+        .recover {
+          // Time tracker for domain not found. the domainTime is not yet available.
+          case ex: StatusRuntimeException
+              if ex.getStatus.getCode == Code.INVALID_ARGUMENT &&
+                ex.getStatus.getDescription.contains("Time tracker for domain") =>
+            None
+        }
+      _ <- maybeDomainTime match {
+        case Some(domainTime) =>
+          for {
+            sequencerConnections <- ValidatorApp.getSequencerConnectionsFromScan(
+              scanConnection,
+              logger,
+              domainTime,
+            )
+            isModified <- participantAdminConnection.modifyDomainConnectionConfig(
+              globalDomainAlias,
+              modifySequencerConnections(sequencerConnections),
+            )
+            _ <-
+              if (isModified) {
+                // reconnect to the domain for new sequencer configuration to take effect
+                participantAdminConnection.reconnectDomain(globalDomainAlias)
+              } else Future.unit
+          } yield ()
+        case None =>
+          logger.debug("time tracker from the domain is not yet available, skipping")
+          Future.unit
+      }
+
     } yield false
   }
 

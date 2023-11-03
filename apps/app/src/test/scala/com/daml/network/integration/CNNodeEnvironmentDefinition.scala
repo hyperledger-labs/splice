@@ -239,6 +239,15 @@ case class CNNodeEnvironmentDefinition(
       )(config)
     )
 
+  def withSequencerConnectionsFromScanDisabled: CNNodeEnvironmentDefinition =
+    addConfigTransform((_, config) =>
+      CNNodeConfigTransforms.updateAllValidatorConfigs_(config =>
+        config
+          .focus(_.useSequencerConnectionsFromScan)
+          .replace(false)
+      )(config)
+    )
+
   def withCoinPrice(price: BigDecimal): CNNodeEnvironmentDefinition =
     addConfigTransforms((_, conf) => CNNodeConfigTransforms.setCoinPrice(price)(conf))
 
@@ -297,6 +306,7 @@ case class CNNodeEnvironmentDefinition(
         CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
       )
       .withTrafficTopupsDisabled
+      .withSequencerConnectionsFromScanDisabled
 
   override lazy val environmentFactory: EnvironmentFactory[CNNodeEnvironmentImpl] =
     CNNodeEnvironmentFactory

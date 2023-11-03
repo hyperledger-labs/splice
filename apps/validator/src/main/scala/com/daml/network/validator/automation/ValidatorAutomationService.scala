@@ -39,7 +39,7 @@ class ValidatorAutomationService(
     backupDumpConfig: Option[BackupDumpConfig],
     buyExtraTrafficConfig: BuyExtraTrafficConfig,
     appManagerConfig: Option[AppManagerConfig],
-    svValidator: Boolean,
+    sequencerConnectionFromScan: Boolean,
     prevetDuration: NonNegativeFiniteDuration,
     globalDomainAlias: DomainAlias,
     clock: Clock,
@@ -131,13 +131,12 @@ class ValidatorAutomationService(
     )
   )
   registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.validatorParty))
-  if (!svValidator)
+  if (sequencerConnectionFromScan)
     registerTrigger(
       new ReconcileSequencerConnectionsTrigger(
         triggerContext,
         participantAdminConnection,
         scanConnection,
-        clock,
         globalDomainAlias,
       )
     )

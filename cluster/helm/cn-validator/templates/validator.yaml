@@ -86,6 +86,10 @@ spec:
         - name: CN_APP_VALIDATOR_SV_VALIDATOR
           value: "true"
         {{ end }}
+        {{ if not .Values.useSequencerConnectionsFromScan }}
+        - name: CN_APP_VALIDATOR_SEQUENCER_CONNECTIONS_FROM_SCAN
+          value: "false"
+        {{ end }}
         - name: CN_APP_VALIDATOR_GLOBAL_DOMAIN_URL
           value: {{ .Values.globalDomainUrl | quote }}
         {{- range $ii, $domain := .Values.extraDomains }}

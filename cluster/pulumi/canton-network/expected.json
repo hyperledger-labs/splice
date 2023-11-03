@@ -1609,7 +1609,8 @@
           "enabled": true,
           "minTopupInterval": "1m",
           "targetThroughput": 33330
-        }
+        },
+        "useSequencerConnectionsFromScan": true
       }
     },
     "name": "helm-splitwell-validator-splitwell",
@@ -2604,6 +2605,7 @@
           "minTopupInterval": "1m",
           "targetThroughput": 33330
         },
+        "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc0956a97fe9577249d7"
       }
     },
@@ -3481,6 +3483,7 @@
           "minTopupInterval": "1m",
           "targetThroughput": 33330
         },
+        "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
       }
     },
@@ -4273,6 +4276,7 @@
           "minTopupInterval": "1m",
           "targetThroughput": 33330
         },
+        "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
       }
     },
@@ -5065,6 +5069,7 @@
           "minTopupInterval": "1m",
           "targetThroughput": 33330
         },
+        "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc720e20777e46fff490"
       }
     },
@@ -5574,6 +5579,7 @@
           "minTopupInterval": "1m",
           "targetThroughput": 33330
         },
+        "useSequencerConnectionsFromScan": true,
         "validatorPartyHint": "validator1_validator_service_user",
         "validatorWalletUser": "auth0|63e3d75ff4114d87a2c1e4f5"
       }

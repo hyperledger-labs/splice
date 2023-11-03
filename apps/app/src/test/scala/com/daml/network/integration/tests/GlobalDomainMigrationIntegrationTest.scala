@@ -49,6 +49,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.util.Using
+import java.time.Duration as JavaDuration
 
 class GlobalDomainMigrationIntegrationTest extends SvIntegrationTestBase with ProcessTestUtil {
 
@@ -107,6 +108,7 @@ class GlobalDomainMigrationIntegrationTest extends SvIntegrationTestBase with Pr
           staticParams,
           ClientConfig(port = Port.tryCreate(5908)),
           "",
+          JavaDuration.ZERO,
           loggerFactory,
           retryProvider,
         )
@@ -230,7 +232,7 @@ class GlobalDomainMigrationIntegrationTest extends SvIntegrationTestBase with Pr
             )
             .futureValue
             .discard
-          eventually() {
+          eventuallySucceeds() {
             upgradeDomainNode.sequencerAdminConnection.getStatus.futureValue.successOption
               .valueOrFail("not initialized")
           }
@@ -243,7 +245,7 @@ class GlobalDomainMigrationIntegrationTest extends SvIntegrationTestBase with Pr
               upgradeDomainNode.sequencerConnection,
             )
             .futureValue
-          eventually() {
+          eventuallySucceeds() {
             upgradeDomainNode.mediatorAdminConnection.getStatus.futureValue.successOption
               .valueOrFail("not initialized")
           }
@@ -265,10 +267,10 @@ class GlobalDomainMigrationIntegrationTest extends SvIntegrationTestBase with Pr
 
         sv2ParticipantAdminConnection
           .connectDomain(upgradeDomainAlias)
-          .futureValue shouldBe true
+          .futureValue shouldBe ()
 
         withClue("unionspace is replicated on the new global domain") {
-          eventually(timeUntilSuccess = 1.minute) {
+          eventuallySucceeds(timeUntilSuccess = 1.minute) {
             upgradeDomainNode.sequencerAdminConnection.getStatus.futureValue.successOption.value.domainId shouldBe upgradeDomainId
             upgradeDomainNode.sequencerAdminConnection.getStatus.futureValue.successOption.value.connectedParticipants should not be empty
             sv2ParticipantAdminConnection
@@ -288,7 +290,7 @@ class GlobalDomainMigrationIntegrationTest extends SvIntegrationTestBase with Pr
           }
         }
         withClue("unionspace can be modified on the new domain") {
-          eventually() {
+          eventuallySucceeds() {
             sv2ParticipantAdminConnection
               .ensureUnionspaceDefinitionOwnerChangeProposalAccepted(
                 "keep just sv2",

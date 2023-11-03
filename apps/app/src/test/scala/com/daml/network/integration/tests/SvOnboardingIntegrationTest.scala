@@ -376,7 +376,8 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     sv4Backend.waitForInitialization()
     sv4ValidatorBackend.waitForInitialization()
 
-    eventually() {
+    // we need to wait for a minute due to non sv validator only connect to sequencers after initialization + sequencerAvailabilityDelay which is is 60s
+    eventually(timeUntilSuccess = 1.minutes, maxPollInterval = 1.second) {
       val membersInfoFromSvcRules = sv1Backend.getSvcInfo().svcRules.payload.members
 
       forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { svBackend =>

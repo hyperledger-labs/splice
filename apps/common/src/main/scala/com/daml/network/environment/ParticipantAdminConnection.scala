@@ -5,18 +5,19 @@ import cats.syntax.traverse.*
 import com.daml.lf.archive.DarParser
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.admin.api.client.commands.{
+  DomainTimeCommands,
   ParticipantAdminCommands,
   StatusAdminCommands,
   VaultAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.ListConnectedDomainsResult
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.health.admin.data.{NodeStatus, ParticipantStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.admin.v0.ExportAcsResponse
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.time.{Clock, FetchTimeResponse, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -64,6 +65,10 @@ class ParticipantAdminConnection(
   def getStatus()(implicit traceContext: TraceContext): Future[NodeStatus[ParticipantStatus]] =
     runCmd(participantStatusCommand)
 
+  def getDomainId(domainAlias: DomainAlias)(implicit
+      traceContext: TraceContext
+  ): Future[DomainId] = runCmd(ParticipantAdminCommands.DomainConnectivity.GetDomainId(domainAlias))
+
   def reconnectAllDomains()(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
@@ -88,8 +93,19 @@ class ParticipantAdminConnection(
 
   def connectDomain(alias: DomainAlias)(implicit
       traceContext: TraceContext
-  ): Future[Boolean] =
-    runCmd(ParticipantAdminCommands.DomainConnectivity.ConnectDomain(alias, retry = false))
+  ): Future[Unit] =
+    runCmd(ParticipantAdminCommands.DomainConnectivity.ConnectDomain(alias, retry = false)).map(
+      isConnected =>
+        if (!isConnected) {
+          val msg = s"failed to connect to ${alias}"
+          throw Status.Code.FAILED_PRECONDITION.toStatus.withDescription(msg).asRuntimeException()
+        }
+    )
+
+  def disconnectDomain(alias: DomainAlias)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    runCmd(ParticipantAdminCommands.DomainConnectivity.DisconnectDomain(alias))
 
   def ensureDomainRegistered(
       config: DomainConnectionConfig,
@@ -111,12 +127,18 @@ class ParticipantAdminConnection(
       retryFor,
       s"participant is connected to ${config.domain}",
       // We're slightly abusing 'waitUntil' here, using a side-effecting condition. It's idempotent though, so all good.
-      connectDomain(config.domain).map(isConnected =>
-        if (!isConnected) {
-          val msg = s"failed to connect to ${config.domain}"
-          throw Status.Code.FAILED_PRECONDITION.toStatus.withDescription(msg).asRuntimeException()
-        }
-      ),
+      connectDomain(config.domain),
+      logger,
+    )
+  } yield ()
+
+  def reconnectDomain(alias: DomainAlias)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = for {
+    _ <- disconnectDomain(alias)
+    _ <- retryProvider.retryForClientCalls(
+      s"participant is connected to $alias",
+      connectDomain(alias),
       logger,
     )
   } yield ()
@@ -191,19 +213,19 @@ class ParticipantAdminConnection(
   def modifyDomainConnectionConfig(
       domain: DomainAlias,
       f: DomainConnectionConfig => Option[DomainConnectionConfig],
-  )(implicit traceContext: TraceContext): Future[Unit] =
+  )(implicit traceContext: TraceContext): Future[Boolean] =
     for {
       oldConfig <- getDomainConnectionConfig(domain)
       newConfig = f(oldConfig)
-      _ <- newConfig match {
+      isModified <- newConfig match {
         case None =>
           logger.trace("No update to domain connection config required")
-          Future.unit
+          Future.successful(false)
         case Some(config) =>
           logger.info(s"Updating to new domain connection config for domain $domain")
-          setDomainConnectionConfig(config)
+          setDomainConnectionConfig(config).map(_ => true)
       }
-    } yield ()
+    } yield isModified
 
   def uploadDarFiles(
       pkgs: Seq[UploadablePackage],
@@ -363,6 +385,26 @@ class ParticipantAdminConnection(
   ): Future[Unit] = {
     runCmd(VaultAdminCommands.ImportKeyPair(ByteString.copyFrom(keyPair), name))
   }
+
+  def getDomainTime(domainAlias: DomainAlias, timeout: NonNegativeDuration)(implicit
+      traceContext: TraceContext
+  ): Future[FetchTimeResponse] = {
+    for {
+      domainId <- getDomainId(domainAlias)
+      res <- getDomainTime(domainId, timeout)
+    } yield res
+  }
+
+  def getDomainTime(domainId: DomainId, timeout: NonNegativeDuration)(implicit
+      traceContext: TraceContext
+  ): Future[FetchTimeResponse] =
+    runCmd(
+      DomainTimeCommands.FetchTime(
+        Some(domainId),
+        NonNegativeFiniteDuration.Zero,
+        timeout,
+      )
+    )
 }
 
 object ParticipantAdminConnection {

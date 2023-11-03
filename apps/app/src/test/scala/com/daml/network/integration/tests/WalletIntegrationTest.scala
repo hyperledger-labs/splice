@@ -52,6 +52,8 @@ class WalletIntegrationTest
           )
         )
       )
+      // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
+      .withSequencerConnectionsFromScanDisabled
   }
 
   "A wallet" should {

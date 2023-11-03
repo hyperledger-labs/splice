@@ -52,6 +52,8 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
             .replace(true)
         }(config)
       )
+      // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
+      .withSequencerConnectionsFromScanDisabled
 
   "all nodes become validators" in { implicit env =>
     forAll(env.svs.local) { sv =>

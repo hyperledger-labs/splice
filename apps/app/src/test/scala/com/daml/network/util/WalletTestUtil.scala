@@ -455,7 +455,10 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       directory.ledgerApi.ledger_api_extensions.acs
         .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty)
     }
-    directory.requestDirectoryEntry(entryName, entryUrl, entryDescription)
+    // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
+    retryCommandSubmission(
+      directory.requestDirectoryEntry(entryName, entryUrl, entryDescription)
+    )
   }
 
   def paymentAmount(
@@ -536,15 +539,17 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val receiverAmounts = Seq(
       receiverAmount(userParty, amount, currency)
     )
-
-    createPaymentRequest(
-      participantClientWithAdminToken,
-      userId,
-      userParty,
-      receiverAmounts,
-      expirationTime,
-      domainId,
-      description,
+    // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
+    retryCommandSubmission(
+      createPaymentRequest(
+        participantClientWithAdminToken,
+        userId,
+        userParty,
+        receiverAmounts,
+        expirationTime,
+        domainId,
+        description,
+      )
     )
   }
 
@@ -958,5 +963,4 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       }
     }
   }
-
 }

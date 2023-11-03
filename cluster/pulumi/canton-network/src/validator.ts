@@ -116,6 +116,7 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
         ? { secretName: participantBootstrapDumpSecretName }
         : undefined,
       svValidator: config.svValidator,
+      useSequencerConnectionsFromScan: !config.svValidator,
       metrics: {
         enable: true,
       },

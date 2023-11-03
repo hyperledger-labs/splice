@@ -28,6 +28,9 @@ import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.participant.sync.TransactionRoutingError.ConfigurationErrors.SubmissionDomainNotReady
+import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors.UnknownInformees
+import com.digitalasset.canton.participant.traffic.TrafficStateController.TrafficControlError.DomainIdNotFound
 import com.digitalasset.canton.protocol.messages.LocalReject
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
 import com.digitalasset.canton.tracing.TraceContext
@@ -259,23 +262,27 @@ class HttpWalletHandler(
   )(tuser: TracedUser): Future[r0.AcceptTransferOfferResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.acceptTransferOffer") { implicit traceContext => _ =>
-      exerciseWalletAction((installCid, _) => {
-        val requestCid =
-          Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
-            contractId
+      retryProvider.retryForClientCalls(
+        "accept transfer offer",
+        exerciseWalletAction((installCid, _) => {
+          val requestCid =
+            Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
+              contractId
+            )
+          Future.successful(
+            installCid
+              .exerciseWalletAppInstall_TransferOffer_Accept(requestCid)
+              .map { cid =>
+                d0.AcceptTransferOfferResponse(
+                  Codec.encodeContractId(cid.exerciseResult)
+                ): r0.AcceptTransferOfferResponse
+              }
           )
-        Future.successful(
-          installCid
-            .exerciseWalletAppInstall_TransferOffer_Accept(requestCid)
-            .map { cid =>
-              d0.AcceptTransferOfferResponse(
-                Codec.encodeContractId(cid.exerciseResult)
-              ): r0.AcceptTransferOfferResponse
-            }
-        )
-      })(
-        user,
-        priority = CommandPriority.High,
+        })(
+          user,
+          priority = CommandPriority.High,
+        ),
+        logger,
       )
     }
   }
@@ -284,20 +291,24 @@ class HttpWalletHandler(
   )(tuser: TracedUser): Future[r0.RejectTransferOfferResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.rejectTransferOffer") { implicit traceContext => _ =>
-      exerciseWalletAction[r0.RejectTransferOfferResponse]((installCid, _) => {
-        val requestCid =
-          Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
-            contractId
-          )
-        Future.successful(
-          installCid
-            .exerciseWalletAppInstall_TransferOffer_Reject(
-              requestCid
+      retryProvider.retryForClientCalls(
+        "reject transfer offer",
+        exerciseWalletAction[r0.RejectTransferOfferResponse]((installCid, _) => {
+          val requestCid =
+            Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
+              contractId
             )
-            .map(_ => r0.RejectTransferOfferResponseOK)
-        )
-      })(
-        user
+          Future.successful(
+            installCid
+              .exerciseWalletAppInstall_TransferOffer_Reject(
+                requestCid
+              )
+              .map(_ => r0.RejectTransferOfferResponseOK)
+          )
+        })(
+          user
+        ),
+        logger,
       )
     }
   }
@@ -307,23 +318,27 @@ class HttpWalletHandler(
   )(tuser: TracedUser): Future[r0.WithdrawTransferOfferResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.withdrawTransferOffer") { implicit traceContext => _ =>
-      exerciseWalletAction[r0.WithdrawTransferOfferResponse]((installCid, _) => {
-        val requestCid =
-          Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
-            contractId
-          )
-        Future.successful(
-          installCid
-            .exerciseWalletAppInstall_TransferOffer_Withdraw(
-              requestCid,
-              // This is used for withdrawn_reason in the status response.
-              // In the future, it could come from the request payload.
-              "Withdrawn by sender",
+      retryProvider.retryForClientCalls(
+        "withdraw transfer offer",
+        exerciseWalletAction[r0.WithdrawTransferOfferResponse]((installCid, _) => {
+          val requestCid =
+            Codec.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
+              contractId
             )
-            .map(_ => r0.WithdrawTransferOfferResponseOK)
-        )
-      })(
-        user
+          Future.successful(
+            installCid
+              .exerciseWalletAppInstall_TransferOffer_Withdraw(
+                requestCid,
+                // This is used for withdrawn_reason in the status response.
+                // In the future, it could come from the request payload.
+                "Withdrawn by sender",
+              )
+              .map(_ => r0.WithdrawTransferOfferResponseOK)
+          )
+        })(
+          user
+        ),
+        logger,
       )
     }
   }
@@ -676,6 +691,12 @@ object HttpWalletHandler {
           s"The operation $operationName failed with a nonspecifc INVALID_ARGUMENT error $ex."
         )
         TransientErrorKind
+      // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
+      case Failure(ex: io.grpc.StatusRuntimeException) if isDomainNotConnected(ex) =>
+        logger.info(
+          s"The operation $operationName failed due to the domain is not connected $ex."
+        )
+        TransientErrorKind
       case Failure(ex) =>
         logThrowable(ex, logger)
         FatalErrorKind
@@ -697,6 +718,20 @@ object HttpWalletHandler {
       case ErrorInfoDetail(LocalReject.ConsistencyRejections.LockedContracts.id, _) => true
       case _ => false
     }
+  }
+
+  private def isDomainNotConnected(ex: io.grpc.StatusRuntimeException): Boolean = {
+    (ex.getStatus.getCode == Status.Code.FAILED_PRECONDITION &&
+      ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
+        case ErrorInfoDetail(DomainIdNotFound.id, _) => true
+        case _ => false
+      }) ||
+    (ex.getStatus.getCode == Status.Code.NOT_FOUND &&
+      ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
+        case ErrorInfoDetail(SubmissionDomainNotReady.id, _) => true
+        case ErrorInfoDetail(UnknownInformees.id, _) => true
+        case _ => false
+      })
   }
 
   private def isNonspecificInvalidArgument(ex: io.grpc.StatusRuntimeException): Boolean = {
