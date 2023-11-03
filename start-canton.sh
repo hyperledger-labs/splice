@@ -119,6 +119,9 @@ any_time_db_names=(
   "participant_alice"
   "participant_bob"
   "participant_splitwell"
+  "sequencer_driver_global_upgrade"
+  "sequencer_global_upgrade"
+  "mediator_global_upgrade"
 )
 
 db_names=()
@@ -134,14 +137,6 @@ if [ $simtime -eq 1 ]; then
   IFS=' ' read -r -a simtime_db_names <<< \
       "$(echo "${any_time_db_names[@]}" | sed -Ee 's/( |$)/_simtime\1/g')"
   db_names+=("${simtime_db_names[@]}")
-
-  if [ $globalUpgradeDomain -eq 1 ]; then
-    db_names+=(
-      "sequencer_driver_global_upgrade_simtime"
-      "sequencer_global_upgrade_simtime"
-      "mediator_global_upgrade_simtime"
-    )
-  fi
 fi
 
 # Create the DB's in parallel

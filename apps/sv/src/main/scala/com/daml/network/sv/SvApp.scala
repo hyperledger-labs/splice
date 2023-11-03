@@ -2,7 +2,7 @@ package com.daml.network.sv
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.HttpMethods
+import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse}
 import akka.http.scaladsl.server.Directives.*
 import cats.data.OptionT
 import cats.implicits.catsSyntaxTuple2Semigroupal
@@ -419,6 +419,8 @@ class SvApp(
         binding,
         logger,
         timeouts,
+        httpClient,
+        templateDecoder,
       )
     }
   }
@@ -649,6 +651,8 @@ object SvApp {
       binding: Http.ServerBinding,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
+      httpClient: HttpRequest => Future[HttpResponse],
+      decoder: TemplateJsonDecoder,
   )(implicit el: ErrorLoggingContext)
       extends FlagCloseableAsync
       with HasHealth {

@@ -434,11 +434,13 @@ class TopologyAdminConnection(
       logger,
     )
 
-  protected def proposeInitialPartyToParticipant(
+  def proposeInitialPartyToParticipant(
       partyId: PartyId,
       participantId: ParticipantId,
       signedBy: Fingerprint,
-  )(implicit traceContext: TraceContext): Future[Unit] =
+  )(implicit
+      traceContext: TraceContext
+  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, PartyToParticipantX]] =
     proposeMapping(
       TopologyStoreId.AuthorizedStore,
       PartyToParticipantX(
@@ -456,7 +458,7 @@ class TopologyAdminConnection(
       signedBy = signedBy,
       serial = PositiveInt.one,
       isProposal = false,
-    ).map(_ => ())
+    )
 
   // TODO(#7884): handle threshold update for sv off-boarding
   def ensurePartyToParticipantProposal(
@@ -674,16 +676,33 @@ class TopologyAdminConnection(
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[UnionspaceDefinitionX]] =
+    ensureUnionspaceDefinitionOwnerChangeProposalAccepted(
+      show"Namespace $newOwner is in owners of UnionspaceDefinition",
+      domainId,
+      unionspace,
+      _.incl(newOwner),
+      signedBy,
+    )
+
+  def ensureUnionspaceDefinitionOwnerChangeProposalAccepted(
+      description: String,
+      domainId: DomainId,
+      unionspace: Namespace,
+      ownerChange: NonEmpty[Set[Namespace]] => NonEmpty[Set[Namespace]],
+      signedBy: Fingerprint,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[TopologyResult[UnionspaceDefinitionX]] =
     ensureTopologyMapping[UnionspaceDefinitionX](
       TopologyStoreId.DomainStore(domainId),
-      show"Namespace $newOwner is in owners of UnionspaceDefinition",
-      unionspaceDefinitionForNamespace(domainId, unionspace, newOwner),
+      description,
+      unionspaceDefinitionForNamespace(domainId, unionspace, ownerChange),
       previous =>
         // constructor is not exposed so no copy
         UnionspaceDefinitionX.create(
           previous.unionspace,
           previous.threshold,
-          previous.owners.incl(newOwner),
+          ownerChange(previous.owners),
         ),
       retryFor,
       signedBy,
@@ -693,11 +712,11 @@ class TopologyAdminConnection(
   private def unionspaceDefinitionForNamespace(
       domainId: DomainId,
       unionspace: Namespace,
-      owner: Namespace,
+      ownerChange: NonEmpty[Set[Namespace]] => NonEmpty[Set[Namespace]],
   )(implicit tc: TraceContext) = {
     EitherT(
       getUnionspaceDefinition(domainId, unionspace).map(result =>
-        Either.cond(result.mapping.owners.contains(owner), result, result)
+        Either.cond(result.mapping.owners == ownerChange(result.mapping.owners), result, result)
       )
     )
   }

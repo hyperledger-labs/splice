@@ -326,7 +326,7 @@ class ParticipantAdminConnection(
           partyId,
           participantId,
           signedBy,
-        ),
+        ).map(_ => ()),
         logger,
       )
       _ <- retryProvider.waitUntil(

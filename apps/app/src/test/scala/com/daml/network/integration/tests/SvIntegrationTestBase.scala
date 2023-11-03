@@ -10,7 +10,6 @@ import com.daml.network.util.SvTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 trait SvIntegrationTestBase extends CNNodeIntegrationTest with SvTestUtil {
-  this: CNNodeIntegrationTest =>
 
   protected val cantonCoinDarPath =
     "daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar"
