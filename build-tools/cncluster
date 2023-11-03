@@ -1630,27 +1630,103 @@ function subcmd_participant_console() {
         _error "Usage: $SCRIPTNAME participant_console <namespace-name>"
     fi
 
-    app_name="participant"
-    readarray -d ' ' -t matching_pods < <(kubectl get pods -n "$namespace" -l app=$app_name  -o 'jsonpath={.items[*].metadata.name}')
-
-    if [ ${#matching_pods[@]} -eq 0 ]; then
-      _error "No pods running the '$app_name' app found in namespace '$namespace'."
-    elif [ ${#matching_pods[@]} -gt 1 ]; then
-      _error "More than one pods running the '$app_name' app found in namespace '$namespace'."
-    else
-      pod_name=${matching_pods[0]}
+    if ! participant_pod=$(_get_single_pod "$namespace" "participant"); then
+      _error "No participant found in namespace '$namespace'."
     fi
 
-    _info "Starting port forwarding from '$pod_name'..."
-    kubectl port-forward -n "$namespace" "$pod_name" 5001:5001 5002:5002 &
+    if [ ! "${LEDGER_API_AUTH_TOKEN-}" ] && sv_app_pod=$(_get_single_pod "$namespace" "sv-app"); then
+      if LEDGER_API_AUTH_TOKEN=$(_get_env_value "$namespace" "$sv_app_pod" CN_APP_SV_LEDGER_API_AUTH_TOKEN); then
+        _info "Using Ledger API token from '$sv_app_pod'..."
+      else
+        _info "Getting Ledger API Auth0 credentials from '$sv_app_pod'..."
+        if \
+          client_id=$(_get_env_value "$namespace" "$sv_app_pod" CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID) && \
+          client_secret=$(_get_env_value "$namespace" "$sv_app_pod" CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET) && \
+          url=$(_get_env_value "$namespace" "$sv_app_pod" CN_APP_SV_LEDGER_API_AUTH_URL) && \
+          audience=$(_get_env_value "$namespace" "$participant_pod" AUTH_TARGET_AUDIENCE)
+        then
+          _info "Getting Ledger API auth token from Auth0 using Ledger API Auth0 credentials from '$sv_app_pod'..."
+          LEDGER_API_AUTH_TOKEN=$(_get_ledger_api_auth_token_from_auth0 "$client_id" "$client_secret" "$url" "$audience")
+        else
+          _info "Failed getting Ledger API Auth0 credentials from '$sv_app_pod'..."
+        fi
+      fi
+    elif validator_app_pod=$(_get_single_pod "$namespace" "validator-app"); then
+      if LEDGER_API_AUTH_TOKEN=$(_get_env_value "$namespace" "$validator_app_pod" CN_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN); then
+        _info "Using Ledger API token from '$validator_app_pod'..."
+      else
+        _info "Getting Ledger API Auth0 credentials from '$validator_app_pod'..."
+        if \
+          client_id=$(_get_env_value "$namespace" "$validator_app_pod" CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID) && \
+          client_secret=$(_get_env_value "$namespace" "$validator_app_pod" CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET) && \
+          url=$(_get_env_value "$namespace" "$validator_app_pod" CN_APP_VALIDATOR_LEDGER_API_AUTH_URL) && \
+          audience=$(_get_env_value "$namespace" "$participant_pod" AUTH_TARGET_AUDIENCE)
+        then
+          _info "Getting Ledger API auth token from Auth0 using Ledger API Auth0 credentials from '$validator_app_pod'..."
+          LEDGER_API_AUTH_TOKEN=$(_get_ledger_api_auth_token_from_auth0 "$client_id" "$client_secret" "$url" "$audience")
+        else
+          _info "Failed getting Ledger API Auth0 credentials from '$validator_app_pod'..."
+        fi
+      fi
+    fi
+    if [ "${LEDGER_API_AUTH_TOKEN-}" ]; then
+      _info "Using Ledger API token \"$LEDGER_API_AUTH_TOKEN\"".
+      export LEDGER_API_AUTH_TOKEN
+    else
+      _warning "No Ledger API token found/set. Only the admin API will work."
+    fi
+
+    _info "Starting port forwarding from '$participant_pod'..."
+    kubectl port-forward -n "$namespace" "$participant_pod" 5001:5001 5002:5002 &
     port_forwarding_pid=$!
 
     _info "Starting Canton console..."
-    _warning "Currently only admin API access is supported."
     canton -v -c "$REPO_ROOT/build-tools/local-participant.conf"
 
     _info "Stopping port forwarding."
     kill $port_forwarding_pid
+}
+
+function _get_single_pod() {
+    namespace="${1-}"
+    app_name="${2-}"
+    readarray -d ' ' -t matching_pods < <(kubectl get pods -n "$namespace" -l app="$app_name"  -o 'jsonpath={.items[*].metadata.name}')
+
+    if [ ${#matching_pods[@]} -gt 1 ]; then
+      _error "More than one pods running the '$app_name' app found in namespace '$namespace'."
+    elif [ ${#matching_pods[@]} -eq 1 ]; then
+      echo "${matching_pods[0]}"
+    else
+      return 1
+    fi
+}
+
+function _get_env_value() {
+    namespace=$1
+    pod_name=$2
+    env_name=$3
+
+    if output=$(kubectl exec -n "$namespace" "$pod_name" -- printenv "$env_name" 2>&1); then
+      echo "$output"
+    else
+      return 1
+    fi
+}
+
+function _get_ledger_api_auth_token_from_auth0() {
+    LEDGER_API_AUTH_CLIENT_ID=$1
+    LEDGER_API_AUTH_CLIENT_SECRET=$2
+    LEDGER_API_AUTH_URL=$3
+    LEDGER_API_AUTH_AUDIENCE=$4
+
+    TOKEN_URL=${LEDGER_API_AUTH_URL//\/.well-known\/openid-configuration/\/oauth\/token/}
+
+    curl --request POST \
+      --url "$TOKEN_URL" \
+      --header "content-type: application/json" \
+      --data "{\"client_id\":\"$LEDGER_API_AUTH_CLIENT_ID\",\"client_secret\":\"$LEDGER_API_AUTH_CLIENT_SECRET\",\"audience\":\"$LEDGER_API_AUTH_AUDIENCE\",\"grant_type\":\"client_credentials\"}" \
+      | jq '.access_token' \
+      | sed s/\"//g
 }
 
 ################################
