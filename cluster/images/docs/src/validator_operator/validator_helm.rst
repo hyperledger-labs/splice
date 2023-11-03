@@ -310,7 +310,7 @@ To configure the validator app, please modify the file ``cn-node-0.1.0-SNAPSHOT/
 - Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the validator operator party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
-You also need to specify a URL for the an existing SV that will sponsor the onboarding of your validator. To do so, please update the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml`` by replacing ``SPONSOR_SV_URL`` with this URL, e.g. ``http://sv.sv-1.svc.dev.canton.network.global:5014``
+You also need to specify a URL for the an existing SV that will sponsor the onboarding of your validator. To do so, please update the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml`` by replacing ``SPONSOR_SV_URL`` with this URL, e.g. ``https://sv.sv-1.svc.dev.network.canton.global/api/v0/sv``
 
 .. _validator-participant-identities-restore:
 

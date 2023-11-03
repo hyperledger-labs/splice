@@ -8,7 +8,6 @@ import {
   exactNamespace,
   ExactNamespace,
   REPO_ROOT,
-  auth0UserNameEnvVarSource,
   directoryUiSecret,
   fixedTokens,
   setupBootstrapping,
@@ -21,7 +20,6 @@ import {
   ValidatorOnboarding,
   domainFeesConfig,
   ValidatorTopupConfig,
-  validatorOnboardingSecretName,
   validatorSecrets,
   installValidatorOnboardingSecret,
   installLoopback,
@@ -180,9 +178,12 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       TARGET_CLUSTER: TARGET_CLUSTER,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
     }),
+    ...loadYamlFromFile(
+      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
+      {}
+    ),
     postgresPassword: password,
     disableAutoInit: !!participantBootstrapDumpSecret,
-    participantAdminUserNameFrom: auth0UserNameEnvVarSource('validator'),
   };
 
   const participantValuesWithSpecifiedAud: ChartValues = {
@@ -221,18 +222,13 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
     }),
+    ...loadYamlFromFile(
+      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
+      {
+        SPONSOR_SV_URL: `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global/api/v0/sv`,
+      }
+    ),
     participantIdentitiesDumpPeriodicBackup: backupConfig,
-    svSponsorAddress: 'http://sv-app.sv-1:5014',
-    onboardingSecretFrom: onboarding
-      ? {
-          secretKeyRef: {
-            name: validatorOnboardingSecretName(onboarding),
-            key: 'secret',
-            optional: false,
-          },
-        }
-      : undefined,
-    validatorPartyHint: 'validator_validator_service_user',
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {
