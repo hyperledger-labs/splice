@@ -105,7 +105,6 @@ class ScanApp(
         store,
         config.ingestFromParticipantBegin,
       )
-      _ <- store.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
         "there is an OpenMiningRound contract",

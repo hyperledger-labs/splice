@@ -409,8 +409,6 @@ object CNNodeConfig {
       deriveReader[ScanAppClientConfig]
     implicit val domainConfigReader: ConfigReader[DomainConfig] =
       deriveReader[DomainConfig]
-    implicit val globalOnlyDomainConfigReader: ConfigReader[GlobalOnlyDomainConfig] =
-      deriveReader[GlobalOnlyDomainConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
       deriveReader[ScanAppBackendConfig]
 
@@ -707,8 +705,6 @@ object CNNodeConfig {
       deriveWriter[SharedCNNodeAppParameters]
     implicit val domainConfigWriter: ConfigWriter[DomainConfig] =
       deriveWriter[DomainConfig]
-    implicit val globalOnlyDomainConfigWriter: ConfigWriter[GlobalOnlyDomainConfig] =
-      deriveWriter[GlobalOnlyDomainConfig]
 
     implicit val validatorOnboardingConfigWriter: ConfigWriter[ValidatorOnboardingConfig] =
       confidentialWriter[ValidatorOnboardingConfig](ValidatorOnboardingConfig.hideConfidential)

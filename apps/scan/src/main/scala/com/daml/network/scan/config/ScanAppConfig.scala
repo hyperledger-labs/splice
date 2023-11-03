@@ -17,7 +17,6 @@ case class ScanAppBackendConfig(
     override val storage: CNDbConfig,
     svUser: String,
     override val participantClient: CNParticipantClientConfig,
-    domains: ScanDomainConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     ingestFromParticipantBegin: Boolean = false,
 ) extends CNNodeBackendConfig

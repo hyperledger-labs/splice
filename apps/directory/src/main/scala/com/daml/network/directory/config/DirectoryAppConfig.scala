@@ -11,7 +11,6 @@ case class DirectoryAppBackendConfig(
     override val participantClient: CNParticipantClientConfig,
     scanClient: ScanAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
-    domains: DirectoryDomainConfig,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "directory"
 
