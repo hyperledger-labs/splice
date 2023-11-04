@@ -391,8 +391,7 @@
           "enabled": true
         },
         "domain": {
-          "enable": true,
-          "sequencerPublicUrl": "https://sequencer.sv.svc.svrun.network.canton.global"
+          "enable": true
         },
         "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",

@@ -507,6 +507,7 @@ For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/exa
 - If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the `auth.audience` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Update the ``auth.jwksUrl`` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
+- Please set `domain.sequencerPublicUrl` to the URL to your sequencer service in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
 
 Your SV node will also be configured with a set of SV identities for your node to auto-approve as peer SVC members. The bundled artifacts consist of the lists of recommended values as follows:
 
@@ -615,11 +616,31 @@ will also be removed.
 * ``cometbft.sv.svc.<YOUR_HOSTNAME>:26656`` should be routed to port 26656 of service ``cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol
 * ``https://directory.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``directory-web-ui`` in the ``sv`` namespace
 * ``https://directory.sv.svc.<YOUR_HOSTNAME>/api/json-api/*`` should be routed to port 7575 in service ``participant`` in the ``sv`` namespace
+* ``https://sequencer.sv.svc.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-sequencer`` in the ``sv`` namespace
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of an SV node ingress, we have
 provided a Helm chart that configures the above cluster according to the routes above, as detailed in the sections below.
 
+Your SV node should be configured with a url to your ``global-domain-sequencer`` so that other validators can subscribe to it.
+
+Make sure your cluster's ingress is correctly configured for the sequencer service and can be accessed through the provided URL.
+To check whether the sequencer is accessible, we can use the command below with the `grpcurl tool <https://github.com/fullstorydev/grpcurl>`_ :
+
+.. code-block:: bash
+
+    grpcurl <sequencer host>:<sequencer port> grpc.health.v1.Health/Check
+
+If you are using the ingress configuration of this runbook, the ``<sequencer host>:<sequencer port>`` should be ``sequencer.sv.svc.YOUR_HOSTNAME:443``
+Please replace ``YOUR_HOSTNAME`` with your host name.
+
+If you see the response below, it means the sequencer is up and accessible through the URL.
+
+.. code-block:: bash
+
+    {
+      "status": "SERVING"
+    }
 
 Requirements
 ++++++++++++

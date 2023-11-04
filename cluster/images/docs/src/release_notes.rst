@@ -13,6 +13,8 @@ Release Notes
 * Deployment updates:
 
   * The URL of the global domain sequencer hosted by the Canton Foundation has changed to `https://sequencer.sv-1.svc.<TARGET_CLUSTER>.network.canton.global`. This change is reflected in the values specified in `participant-values.yaml`, `validator-values.yaml` and `sv-values.yaml`.
+  * Add documentation for a new required ingress rule to expose ``global-domain-sequencer`` in :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`.
+  * Add documentation for configuring the SV node to publish the URL of this sequencer, so that other validators can subscribe to it.
   * The requirement for url rewriting in another one of the rules as been removed:
     ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan`` no longer requires rewriting
     (and also has been modified from `/api/v0/scan` to `/api/scan`).

@@ -18,3 +18,9 @@ cometBFT:
 # participantIdentitiesDumpImport:
 #  secretName: participant-identities-dump
 # PARTICIPANT_BOOTSTRAP_END
+
+# Please make the ``global-domain-sequencer`` service accessible for other validators to subscribe to, and set the URL below to your sequencer service.
+# Make sure your cluster's ingress is correctly configured for the sequencer service and can be accessed through the provided URL.
+domain:
+  sequencerPublicUrl: "https://sequencer.sv.svc.YOUR_HOSTNAME"
+  sequencerAvailabilityDelay: "60 seconds"

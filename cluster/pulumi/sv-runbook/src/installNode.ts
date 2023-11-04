@@ -254,6 +254,7 @@ async function installSvAndValidator(config: SvConfig) {
       TARGET_CLUSTER: TARGET_CLUSTER,
       YOUR_SV_NAME: onboardingName,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+      YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
     }),
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
@@ -261,7 +262,6 @@ async function installSvAndValidator(config: SvConfig) {
     approvedSvIdentities,
     domain: {
       enable: includesCometBftGlobalDomainNode,
-      sequencerPublicUrl: `https://sequencer.sv.svc.${CLUSTER_BASENAME}.network.canton.global`,
     },
     cometBFT: {
       enabled: true,
