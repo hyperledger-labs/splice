@@ -35,6 +35,7 @@ abstract class ValidatorAppReference(
     override val name: String,
 ) extends HttpCNNodeAppReference {
 
+  override def basePath = "/api/validator"
   override protected val instanceType = "Validator"
 
   @Help.Summary("Get validator user info")
@@ -313,6 +314,7 @@ final case class AppManagerAppClientReference(
 ) extends HttpCNNodeAppReference
     with BaseInspection[ParticipantNode] {
 
+  override def basePath = "/api/validator"
   override def httpClientConfig = config.adminApi
 
   override def token: Option[String] = {

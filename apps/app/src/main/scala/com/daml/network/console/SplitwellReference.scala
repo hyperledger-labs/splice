@@ -35,6 +35,7 @@ abstract class SplitwellAppReference(
     override val name: String,
 ) extends HttpCNNodeAppReference {
 
+  override def basePath = ""
   // We go through BaseLedgerApiAdministration here rather than creating a
   // ledger connection since that one is already setup to be easily used
   // from the console.

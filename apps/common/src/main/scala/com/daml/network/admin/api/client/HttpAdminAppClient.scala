@@ -3,38 +3,60 @@ package com.daml.network.admin.api.client
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import cats.data.EitherT
-
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.environment.CNNodeStatus
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.external.common_admin as externalHttp
+import com.daml.network.http.v0.external.common_admin.CommonAdminClient
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.tracing.TraceContext
+
 import java.time.OffsetDateTime
 import scala.concurrent.{ExecutionContext, Future}
 
-object HttpAdminAppClient {
-  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
-    override type Client = externalHttp.CommonAdminClient
+object PrefixedCommonAdminClient {
+  def apply(host: String, basePath: String)(implicit
+      httpClient: HttpRequest => Future[HttpResponse],
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): PrefixedCommonAdminClient = new PrefixedCommonAdminClient(host, basePath)(httpClient, ec, mat)
 
-    def createClient(host: String)(implicit
+  def httpClient(httpClient: HttpRequest => Future[HttpResponse], host: String, basePath: String)(
+      implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+  ): PrefixedCommonAdminClient = new PrefixedCommonAdminClient(host, basePath)(httpClient, ec, mat)
+}
+class PrefixedCommonAdminClient(host: String, override val basePath: String)(implicit
+    httpClient: HttpRequest => Future[HttpResponse],
+    ec: ExecutionContext,
+    mat: Materializer,
+) extends CommonAdminClient(host) {}
+
+object HttpAdminAppClient {
+  abstract class BaseCommand[Res, Result](basePath: String) extends HttpCommand[Res, Result] {
+    override type Client = PrefixedCommonAdminClient
+
+    override def createClient(host: String)(implicit
         httpClient: HttpRequest => Future[HttpResponse],
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      externalHttp.CommonAdminClient.httpClient(
+      PrefixedCommonAdminClient.httpClient(
         HttpClientBuilder().buildClient(),
         host,
+        basePath,
       )
   }
 
   case class GetHealthStatus[S <: NodeStatus.Status](
-      deserialize: definitions.Status => Either[String, S]
-  ) extends BaseCommand[externalHttp.GetHealthStatusResponse, NodeStatus[S]] {
+      basePath: String,
+      deserialize: definitions.Status => Either[String, S],
+  ) extends BaseCommand[externalHttp.GetHealthStatusResponse, NodeStatus[S]](basePath) {
     override def submitRequest(
-        client: externalHttp.CommonAdminClient,
+        client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], externalHttp.GetHealthStatusResponse] =
       client.getHealthStatus(headers)
@@ -48,9 +70,10 @@ object HttpAdminAppClient {
 
   case class VersionInfo(version: String, commitTs: OffsetDateTime)
 
-  case class GetVersion() extends BaseCommand[externalHttp.GetVersionResponse, VersionInfo] {
+  case class GetVersion(basePath: String)
+      extends BaseCommand[externalHttp.GetVersionResponse, VersionInfo](basePath) {
     override def submitRequest(
-        client: externalHttp.CommonAdminClient,
+        client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], externalHttp.GetVersionResponse] =
       client.getVersion(headers)
@@ -61,9 +84,10 @@ object HttpAdminAppClient {
     }
   }
 
-  case object IsLive extends BaseCommand[externalHttp.IsLiveResponse, Boolean] {
+  case class IsLive(basePath: String)
+      extends BaseCommand[externalHttp.IsLiveResponse, Boolean](basePath) {
     override def submitRequest(
-        client: externalHttp.CommonAdminClient,
+        client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], externalHttp.IsLiveResponse] =
       client.isLive(headers)
@@ -75,9 +99,10 @@ object HttpAdminAppClient {
         Right(false)
     }
   }
-  case object IsReady extends BaseCommand[externalHttp.IsReadyResponse, Boolean] {
+  case class IsReady(basePath: String)
+      extends BaseCommand[externalHttp.IsReadyResponse, Boolean](basePath) {
     override def submitRequest(
-        client: externalHttp.CommonAdminClient,
+        client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], externalHttp.IsReadyResponse] =
       client.isReady(headers)

@@ -115,8 +115,7 @@ abstract class AppConnection(
   */
 abstract class HttpAppConnection(
     config: NetworkAppClientConfig,
-    // TODO(#7873): once sv's APIs have also been migrated to /api/sv, consider deriving commonApisPrefix from serviceName, i.e. assuming /api/<serviceName>
-    commonApisPrefix: String,
+    override val serviceName: String,
     override protected[this] val retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -130,14 +129,16 @@ abstract class HttpAppConnection(
     with FlagCloseableAsync
     with NamedLogging {
 
+  val basePath = s"/api/${serviceName}"
+
   @SuppressWarnings(Array("org.wartremover.warts.Product"))
   implicit private val versionInfoPretty: Pretty[HttpAdminAppClient.VersionInfo] =
     Pretty.adHocPrettyInstance
 
   def getStatus(): Future[NodeStatus[CNNodeStatus]] =
     runHttpCmd(
-      config.url.copy(path = Uri.Path(commonApisPrefix) ++ config.url.path),
-      HttpAdminAppClient.GetHealthStatus[CNNodeStatus](CNNodeStatus.fromHttp),
+      config.url,
+      HttpAdminAppClient.GetHealthStatus[CNNodeStatus](basePath, CNNodeStatus.fromHttp),
     )
 
   // Fails the future if the node is not active for easy use in waitUntil
@@ -151,14 +152,12 @@ abstract class HttpAppConnection(
     }
 
   private def getHttpAppVersionInfo(url: Uri): Future[HttpAdminAppClient.VersionInfo] = {
-    val prefixedUrl = url.copy(path = Uri.Path(commonApisPrefix) ++ url.path)
-
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
-      s"app version of $url (from $prefixedUrl)",
+      s"app version of $url",
       runHttpCmd(
-        prefixedUrl,
-        HttpAdminAppClient.GetVersion(),
+        url,
+        HttpAdminAppClient.GetVersion(basePath),
         List(),
       ),
       logger,

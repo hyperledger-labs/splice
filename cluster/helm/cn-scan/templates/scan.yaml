@@ -51,7 +51,7 @@ spec:
           protocol: TCP
         livenessProbe:
           httpGet:
-            path: /livez
+            path: /api/scan/livez
             port: 5012
           initialDelaySeconds: 60
           periodSeconds: 60
@@ -59,7 +59,7 @@ spec:
           timeoutSeconds: 10
         readinessProbe:
           httpGet:
-            path: /readyz
+            path: /api/scan/readyz
             port: 5012
           initialDelaySeconds: 5
           periodSeconds: 5

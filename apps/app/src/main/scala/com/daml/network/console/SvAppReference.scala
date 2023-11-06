@@ -33,6 +33,7 @@ abstract class SvAppReference(
     override val name: String,
 ) extends HttpCNNodeAppReference {
 
+  override def basePath = "/api/sv"
   override protected val instanceType = "SV Client"
 
   def onboardValidator(validator: PartyId, secret: String): Unit =

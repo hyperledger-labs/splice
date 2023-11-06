@@ -21,6 +21,9 @@ Release Notes
     For example, ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan/foobar`` should be forwarded to
     ``http://validator-app:5012/api/scan/foobar``.
     Note that URL rewriting is now required only in the ingress rule of the JSON API used by the directory frontend. This rule will be completely removed in the future.
+  * Note that the readiness and liveness endpoints of Validator, Scan and SV apps have all been moved to
+    `/api/<app>/readyz` and `/api/<app>/livez`, with `<app>` being `validator`, `scan` or `sv`, respectively.
+    The corresponding Helm charts have been updated to reflect this change.
 
   * The url configuration for the foundation's Scan app in `validator-values.yaml` has been updated to be
     ``https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global``. Similarly, in the config files in the self-hosted validator section.

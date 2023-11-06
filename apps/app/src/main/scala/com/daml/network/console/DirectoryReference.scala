@@ -18,6 +18,8 @@ abstract class DirectoryAppReference(
     override val name: String,
 ) extends HttpCNNodeAppReference {
 
+  override def basePath = ""
+
   @Help.Summary("List directory entries")
   @Help.Description(
     "Lists all directory entries whose name is prefixed with the given prefix, up to a given number of entries"

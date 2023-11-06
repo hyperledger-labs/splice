@@ -32,6 +32,8 @@ abstract class ScanAppReference(
     override val name: String,
 ) extends HttpCNNodeAppReference {
 
+  override def basePath = "/api/scan"
+
   def getSvcPartyId(): PartyId =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetSvcPartyId(List()))

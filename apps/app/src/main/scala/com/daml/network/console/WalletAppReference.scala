@@ -27,6 +27,7 @@ abstract class WalletAppReference(
     override val name: String,
 ) extends HttpCNNodeAppReference {
 
+  override def basePath = "/api/validator"
   override protected val instanceType = "Wallet user"
 
   @Help.Summary("List all coins associated with the configured user")

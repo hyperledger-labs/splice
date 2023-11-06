@@ -22,9 +22,7 @@ final class SvConnection private (
     mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends HttpAppConnection(config, "/api/sv", retryProvider, loggerFactory) {
-
-  override val serviceName = "sv"
+) extends HttpAppConnection(config, "sv", retryProvider, loggerFactory) {
 
   /** Ask the SV to onboard a validator identified by its validator party.
     */

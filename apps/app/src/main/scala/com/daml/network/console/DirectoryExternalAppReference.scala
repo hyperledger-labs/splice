@@ -13,6 +13,7 @@ abstract class DirectoryExternalAppReference(
     override val name: String,
 ) extends HttpCNNodeAppReference {
 
+  override def basePath = ""
   override protected val instanceType = "Directory user"
 
   @Help.Summary("Create Directory Entry")

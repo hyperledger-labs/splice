@@ -730,7 +730,9 @@ class ValidatorApp(
                     publicHandler,
                     _ => provide(()),
                   ),
-                  CommonAdminResource.routes(commonAdminHandler, _ => provide(traceContext)),
+                  pathPrefix("api" / "validator")(
+                    CommonAdminResource.routes(commonAdminHandler, _ => provide(traceContext))
+                  ),
                 ) ++
                   appManagerHandlersO.toList.flatMap {
                     case (adminHandler, handler, publicHandler, jsonApiHandler) =>

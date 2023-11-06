@@ -56,7 +56,7 @@ final class ScanConnection private (
     mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends HttpAppConnection(config.adminApi, "/api/scan", retryProvider, loggerFactory)
+) extends HttpAppConnection(config.adminApi, "scan", retryProvider, loggerFactory)
     with PackageIdResolver.HasCoinRulesPayload {
   import ScanConnection.GetCoinRulesDomain
 
@@ -64,8 +64,6 @@ final class ScanConnection private (
   coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedCoinRulesCache)
   // and the rounds cache
   coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedRoundsCache)
-
-  override def serviceName: String = "scan"
 
   /** We cache the CoinRules contract, but it may be come outdated if, e.g., the SVC updates the config schedule.
     * The inactive-contracts error message that the ledger returns does not specify the template-id, thus we need
@@ -438,9 +436,7 @@ class MinimalScanConnection(
     mat: Materializer,
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
-) extends HttpAppConnection(config.adminApi, "/api/scan", retryProvider, loggerFactory) {
-  override def serviceName: String = "scan"
-}
+) extends HttpAppConnection(config.adminApi, "scan", retryProvider, loggerFactory) {}
 object MinimalScanConnection {
   def apply(
       config: ScanAppClientConfig,

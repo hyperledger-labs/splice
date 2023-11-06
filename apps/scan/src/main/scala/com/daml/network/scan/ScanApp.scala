@@ -142,8 +142,6 @@ class ScanApp(
               HttpErrorHandler(loggerFactory)(traceContext) {
                 concat(
                   ScanResource.routes(handler, _ => provide(traceContext)),
-                  CommonAdminResource.routes(adminHandler, _ => provide(traceContext)),
-                  // We expose the common routes also under /api/scan, to be accessible in a k8s deployment
                   pathPrefix("api" / "scan")(
                     CommonAdminResource.routes(adminHandler, _ => provide(traceContext))
                   ),

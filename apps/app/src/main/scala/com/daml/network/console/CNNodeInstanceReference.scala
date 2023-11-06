@@ -120,6 +120,8 @@ trait CNNodeAppReference extends InstanceReference {
 
 trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
 
+  def basePath: String
+
   // TODO (#4606): Refactor so that these two methods don't need to be implemented
   override def keys: KeyAdministrationGroup = noGrpcError()
 
@@ -156,7 +158,7 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
       ConsoleCommandResult.fromEither(
         Right(
           httpCommand(
-            HttpAdminAppClient.GetHealthStatus[CNNodeStatus](CNNodeStatus.fromHttp)
+            HttpAdminAppClient.GetHealthStatus[CNNodeStatus](basePath, CNNodeStatus.fromHttp)
           ).toEither.fold(err => NodeStatus.Failure(err), success => success)
         )
       )
@@ -168,7 +170,7 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
   def httpLive: Boolean = {
     Try(
       consoleEnvironment.run {
-        httpCommand(HttpAdminAppClient.IsLive)
+        httpCommand(HttpAdminAppClient.IsLive(basePath))
       }
     ).getOrElse(false)
   }
@@ -178,7 +180,7 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
   def httpReady: Boolean = {
     Try(
       consoleEnvironment.run {
-        httpCommand(HttpAdminAppClient.IsReady)
+        httpCommand(HttpAdminAppClient.IsReady(basePath))
       }
     ).getOrElse(false)
   }
@@ -186,7 +188,7 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
   @Help.Summary("Get the version of the node")
   def version: HttpAdminAppClient.VersionInfo =
     consoleEnvironment.run {
-      httpCommand(HttpAdminAppClient.GetVersion())
+      httpCommand(HttpAdminAppClient.GetVersion(basePath))
     }
 
   // Override topology to avoid using grpc status check
