@@ -61,4 +61,8 @@ Synchronous event processing failed for event batch with sequencer counters.*
 # Detailed API logging is extremely useful for debugging so we turn this on in our tests.
 Your detailed API event logging is turned on but you are doing quite a few concurrent requests.
 
+# TODO(#8406): Remove this once fixed by canton
+# Sometimes DomainOutboxQueue Pending is not empty even though it requires to be. Will be fixed by canton #15061.
+.*tried to dequeue while pending wasn't empty.*
+
 # Make sure to have a trailing newline
