@@ -59,6 +59,10 @@
       - [Approving via SV API](#approving-via-sv-api)
       - [Approving via SV config](#approving-via-sv-config)
   - [Interacting with Canton Network UIs](#interacting-with-canton-network-uis)
+  - [Interacting with Canton Network APIs](#interacting-with-canton-network-apis)
+      - [Canton Participant APIs](#canton-participant-apis)
+      - [App APIs without authentication](#app-apis-without-authentication)
+      - [App APIs with authentication](#app-apis-with-authentication)
   - [Configuring a New GCP Project](#configuring-a-new-gcp-project)
   - [Cluster Data Dumps](#cluster-data-dumps)
     - [Test and CircleCI setup](#test-and-circleci-setup)
@@ -458,6 +462,10 @@ Here are a few strategies and techniques that can be useful for speeding up the 
   1. Instead of `main`, select a branch that corresponds to the commit you need published artifacts for.
   Please make sure that the branch refers to an actual commit on `main`, for example by creating a new branch at the target commit.
   2. As an argument for `run-job`, use `publish-public-artifacts`.
+- If you believe that the problem can be fixed (or at least better understood)
+  by interacting with a Canton or Canton Network API on some node deployed on the problematic cluster,
+  see the section on [Interacting with Canton Network APIs](#interacting-with-canton-network-apis)
+  below for pointers on accessing such APIs.
 
 Once you have successfully recovered from a `TestNet` or `DevNet` deployment failure,
 please make sure that our SV partners are informed about your resolution as well,
@@ -1042,8 +1050,8 @@ To uninstall a single Helm chart, and have Pulumi reinstall it with whatever mod
 Alternatively, you can also modify an installed chart, e.g. to change the values with which it is installed, or simply to reinstall it to apply local changes to the chart:
 1. Run `helm list -A` to see a list of all deployed Helm chart in all namespaces, and find the one of interest
 1. Run `helm get values -n <namespace> <name> > vals.yaml` to get the values with which the chart is currently installed
-1. Edit `vals.yaml`: delete the first line ("USER-SUPPLIED VALUES:"), and modify whatever values you with to change
-1. Run `helm upgrade -n <namespace> <name> $REPO_ROOT/cluster/helm/target/<your-helm-chart>.tgz -f vals.yaml
+1. Edit `vals.yaml`: delete the first line ("USER-SUPPLIED VALUES:"), and modify whatever values you wish to change
+1. Run `helm upgrade -n <namespace> <name> $REPO_ROOT/cluster/helm/target/<your-helm-chart>.tgz -f vals.yaml`
 
 ### Manual Cleanup for an Interrupted Deployment
 
@@ -1282,6 +1290,92 @@ To login to the following UIs use our test credentials from [our list of passwor
 | `https://sv.sv-1.svc.<CLUSTER>.network.canton.global/`     | Admin user interface for Sv Operator to find information about the collective and perform admin tasks. |
 | `https://wallet.sv-1.svc.<CLUSTER>.network.canton.global/` | User interface for the validators to transfer money and manage applications.                           |
 
+
+## Interacting with Canton Network APIs
+
+It is possible, although not always convenient, to access Canton and app APIs deployed on our cluster.
+This can be useful for debugging, for checking network state not yet exposed in other ways, as well as for
+[fixing a running network](#strategies-for-reacting-to-a-failed-testnet-or-devnet-deployment).
+
+### Canton Participant APIs
+
+1. `cd` into a cluster directory of your choice.
+2. Run `cncluster participant_console <namespace>`,
+   substituting `<namespace>` with the namespace in which your target participant is running in.
+
+This will attempt to obtain a Ledger API token from Auth0,
+set up k8s port forwarding of relevant ports to your local machine,
+and start a local Canton console that connects to these ports.
+You can also set the `LEDGER_API_AUTH_TOKEN` environment variable manually (see [below](#app-apis-with-authentication))
+before running the command,
+in case obtaining a ledger API auth token automatically fails.
+
+What you get in the end is a Canton console with one `participant` reference that you can use for accessing admin API and ledger API functionality.
+For example, you can check which mediators are currently onboarded as per topology state:
+
+```
+@ participant.topology.mediators.list()
+```
+
+Or you can use the ledger API to archive a contract:
+
+```
+// Get the svParty
+val svParty = participant.ledger_api.parties.list().filter(_.isLocal).filter(_.party.toProtoPrimitive.startsWith("Canton"))(0).party
+
+// Get the contract to archive (double check that it's the one you want)
+val contract = participant.ledger_api.acs.of_party(svParty, filterTemplates=Seq(TemplateId("", "CN.SvOnboarding", "ApprovedSvIdentity")))(0)
+
+// Build the archival command
+import com.daml.ledger.javaapi.data._
+val archiveCommand = new ExerciseCommand(new Identifier("", "CN.SvOnboarding", "ApprovedSvIdentity"), contract.event.contractId, "Archive", new DamlRecord())
+
+// Submit it (getting an error here doesn't have to mean that this failed)
+participant.ledger_api.commands.submit(actAs=Seq(svParty), commands=Seq(com.daml.ledger.api.v1.commands.Command.fromJavaProto(archiveCommand.toProtoCommand)))
+
+// Verify that the contract is gone
+participant.ledger_api.acs.of_party(svParty, filterTemplates=Seq(TemplateId("", "CN.SvOnboarding", "ApprovedSvIdentity"))).filter(_ == contract)
+```
+
+Note that above example will likely not work out of the box by the time you attempt to replicate it.
+In addition to the documentation available from within the Canton console (try hitting Tab after spelling out a command name),
+the `LedgerApiAdministration.scala` and `ParticipantAdministration.scala` files in the Canton source tree (/ our fork)
+contain helpful pointers for interacting with the Canton APIs.
+
+### App APIs without authentication
+
+Just use `curl`! For example, here is how to get the current SVC members (as per the `SvcRules`) from SV1 on DevNet:
+
+```
+curl https://sv.sv-1.svc.dev.network.canton.global/api/v0/sv/svc | jq '.svc_rules.payload.members'
+```
+
+### App APIs with authentication
+
+We again use `curl`, but this time we also need an auth token from Auth0.
+See [`scripts/approve-sv.sh`](/scripts/approve-sv.sh) and the implementation of `cncluster participant_console` for ideas on how to obtain this programmatically.
+
+For obtaining a token manually, you can use the Auth0 dashboard.
+Here is one way:
+
+1. On the Auth0 website, navigate to the [tenant](#auth0-tenantsapplications) that is relevant to the cluster and API you want to access.
+2. Go to APIs -> Ledger API (the tokens we get here can be used for our apps too) -> Test
+3. Select an appropriate application in the dropdown menu.
+   For accessing the SV API of SV1, for example, you might want to choose an application with a name like "SV1 backend".
+4. This page now shows code snippets for obtaining a compatible token from Auth0,
+   and even an actual token that you can just copy paste.
+
+Assuming that you saved your token in the `$TOKEN` environmant variable, you can now, for example,
+prepare a validator onboarding via SV1's SV API:
+
+```
+export TOKEN="What you got from Auth0"
+curl -sSL --fail-with-body "https://sv.sv-1.svc.dev.network.canton.global/api/v0/sv/admin/validator/onboarding/prepare" -d "{\"expires_in\": \"1000\"}" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"
+```
+
+For quickly obtaining a token for the SV API or the validator API on a (non-SV) validator,
+you can currently also use [`cncluster participant_console`](#canton-participant-apis),
+which prints a compatible token as part of its startup.
 
 ## Configuring a New GCP Project
 

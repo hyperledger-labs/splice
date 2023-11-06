@@ -53,7 +53,6 @@
     1. [Running the Wallet and Splitwell Frontend](#running-the-wallet-and-splitwell-frontend)
     1. [NPM Lock file issues](#npm-lock-file-issues)
 1. [Auth0 Configuration](#auth0-configuration)
-    1. [Tenant & Application Layout](#tenant-application-layout)
 1. [CircleCI Configuration](#circleci-configuration)
 1. [CircleCI Tokens](#circleci-tokens)
     1. [Auth0 Tokens](#auth0-tokens)
