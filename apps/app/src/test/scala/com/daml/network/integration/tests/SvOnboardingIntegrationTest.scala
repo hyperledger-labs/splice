@@ -33,7 +33,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     implicit val sys = env.actorSystem
     registerHttpConnectionPoolsCleanup(env)
 
-    val registerGet = Get(s"${sv1Backend.httpClientConfig.url}/admin/authorization")
+    val registerGet = Get(s"${sv1Backend.httpClientConfig.url}/api/sv/v0/admin/authorization")
 
     def tokenHeader(token: String) = Seq(Authorization(OAuth2BearerToken(token)))
 

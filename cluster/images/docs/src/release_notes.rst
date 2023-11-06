@@ -15,12 +15,12 @@ Release Notes
   * The URL of the global domain sequencer hosted by the Canton Foundation has changed to `https://sequencer.sv-1.svc.<TARGET_CLUSTER>.network.canton.global`. This change is reflected in the values specified in `participant-values.yaml`, `validator-values.yaml` and `sv-values.yaml`.
   * Add documentation for a new required ingress rule to expose ``global-domain-sequencer`` in :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`.
   * Add documentation for configuring the SV node to publish the URL of this sequencer, so that other validators can subscribe to it.
-  * The requirement for url rewriting in another one of the rules as been removed:
-    ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan`` no longer requires rewriting
-    (and also has been modified from `/api/v0/scan` to `/api/scan`).
-    For example, ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/scan/foobar`` should be forwarded to
-    ``http://validator-app:5003/api/scan/foobar``. In the future, the other rewrite requirements
-    will also be removed.
+  * The requirement for url rewriting in the rules for Scan and SV apps has been removed:
+    ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan`` and ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/sv`` no longer requires rewriting
+    (and also has been modified from `/api/v0/scan` to `/api/scan` and from `/api/v0/sv` to `/api/sv`).
+    For example, ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan/foobar`` should be forwarded to
+    ``http://validator-app:5012/api/scan/foobar``.
+    Note that URL rewriting is now required only in the ingress rule of the JSON API used by the directory frontend. This rule will be completely removed in the future.
 
   * The url configuration for the foundation's Scan app in `validator-values.yaml` has been updated to be
     ``https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global``. Similarly, in the config files in the self-hosted validator section.

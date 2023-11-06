@@ -4,12 +4,14 @@ info:
   version: 0.0.1
 tags:
   - name: sv
+servers:
+  - url: https://example.com/api/sv
 paths:
   /readyz:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
   /livez:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
-  /admin/validator/onboarding/ongoing:
+  /v0/admin/validator/onboarding/ongoing:
     get:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -21,7 +23,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListOngoingValidatorOnboardingsResponse"
-  /admin/validator/onboarding/prepare:
+  /v0/admin/validator/onboarding/prepare:
     post:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -41,7 +43,7 @@ paths:
                 "$ref": "#/components/schemas/PrepareValidatorOnboardingResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /admin/validator/licenses:
+  /v0/admin/validator/licenses:
     get:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -53,7 +55,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListValidatorLicensesResponse"
-  /admin/domain/cometbft/status:
+  /v0/admin/domain/cometbft/status:
     get:
       tags: [sv]
       x-jvm-package: sv
@@ -74,7 +76,7 @@ paths:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /admin/domain/cometbft/debug:
+  /v0/admin/domain/cometbft/debug:
     get:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -94,7 +96,7 @@ paths:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /admin/domain/sequencer/status:
+  /v0/admin/domain/sequencer/status:
     get:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -112,7 +114,7 @@ paths:
             application/json:
               schema:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
-  /admin/domain/mediator/status:
+  /v0/admin/domain/mediator/status:
     get:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -130,7 +132,7 @@ paths:
             application/json:
               schema:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
-  /admin/sv/identity/approve:
+  /v0/admin/sv/identity/approve:
     post:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -146,7 +148,7 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /admin/sv/voterequests:
+  /v0/admin/sv/voterequests:
     get:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -158,7 +160,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListSvcRulesVoteRequestsResponse"
-  /admin/sv/voteresults:
+  /v0/admin/sv/voteresults:
     post:
       tags: [ sv ]
       x-jvm-package: sv_admin
@@ -176,7 +178,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListSvcRulesVoteResultsResponse"
-  /admin/sv/voterequests/{vote_request_contract_id}:
+  /v0/admin/sv/voterequests/{vote_request_contract_id}:
     get:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -200,7 +202,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/LookupSvcRulesVoteRequestResponse"
-  /admin/sv/electionrequests/create:
+  /v0/admin/sv/electionrequests/create:
     post:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -216,7 +218,7 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /admin/sv/electionrequests/get:
+  /v0/admin/sv/electionrequests/get:
     get:
       tags: [ sv ]
       x-jvm-package: sv_admin
@@ -230,7 +232,7 @@ paths:
                 "$ref": "#/components/schemas/GetElectionRequestResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /admin/sv/votes:
+  /v0/admin/sv/votes:
     post:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -267,7 +269,7 @@ paths:
             application/json:
               schema:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
-  /admin/sv/votes-by-request-ids:
+  /v0/admin/sv/votes-by-request-ids:
     post:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -285,7 +287,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListVotesResponse"
-  /admin/sv/voterequest/create:
+  /v0/admin/sv/voterequest/create:
     post:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -301,7 +303,7 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /admin/sv/coin-price/votes:
+  /v0/admin/sv/coin-price/votes:
     get:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -313,7 +315,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListCoinPriceVotesResponse"
-  /admin/sv/open-mining-rounds:
+  /v0/admin/sv/open-mining-rounds:
     get:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -325,7 +327,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListOpenMiningRoundsResponse"
-  /admin/sv/coin-price/vote:
+  /v0/admin/sv/coin-price/vote:
     put:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -341,7 +343,7 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /svc/trigger-acs-store-dump:
+  /v0/svc/trigger-acs-store-dump:
     post:
       tags: [ sv ]
       x-jvm-package: sv_admin
@@ -355,7 +357,7 @@ paths:
                 "$ref": "#/components/schemas/TriggerAcsDumpResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /svc/get-acs-store-dump:
+  /v0/svc/get-acs-store-dump:
     get:
       tags: [ sv ]
       x-jvm-package: sv_admin
@@ -369,7 +371,7 @@ paths:
                 "$ref": "#/components/schemas/GetAcsStoreDumpResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /admin/authorization:
+  /v0/admin/authorization:
     get:
       tags: [sv]
       x-jvm-package: sv_admin
@@ -379,7 +381,7 @@ paths:
           description: ok
         "403":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/403"
-  /onboard/validator:
+  /v0/onboard/validator:
     post:
       tags: [sv]
       x-jvm-package: sv
@@ -397,7 +399,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "401":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
-  /onboard/sv/start:
+  /v0/onboard/sv/start:
     post:
       tags: [sv]
       x-jvm-package: sv
@@ -415,7 +417,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "401":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
-  /onboard/sv/status/{candidate_party_id_or_name}:
+  /v0/onboard/sv/status/{candidate_party_id_or_name}:
     get:
       tags: [sv]
       x-jvm-package: sv
@@ -437,7 +439,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /onboard/sv/party-migration/authorize:
+  /v0/onboard/sv/party-migration/authorize:
     post:
       tags: [sv]
       x-jvm-package: sv
@@ -463,7 +465,7 @@ paths:
                 "$ref": "#/components/schemas/OnboardSvPartyMigrationAuthorizeErrorResponse"
         "401":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/401"
-  /onboard/sv/sequencer:
+  /v0/onboard/sv/sequencer:
     post:
       tags: [sv]
       x-jvm-package: sv
@@ -483,7 +485,7 @@ paths:
                 "$ref": "#/components/schemas/OnboardSvSequencerResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /onboard/sv/mediator:
+  /v0/onboard/sv/mediator:
     post:
       tags: [sv]
       x-jvm-package: sv
@@ -499,7 +501,7 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /devnet/onboard/validator/prepare:
+  /v0/devnet/onboard/validator/prepare:
     post:
       tags: [sv]
       x-jvm-package: sv
@@ -516,7 +518,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
         "501":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
-  /svc:
+  /v0/svc:
     get:
       tags: [sv]
       x-jvm-package: sv

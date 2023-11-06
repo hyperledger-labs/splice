@@ -1,5 +1,5 @@
 joinWithKeyOnboarding:
-  sponsorApiUrl: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/sv"
+  sponsorApiUrl: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global"
 # Replace YOUR_SV_NAME with the name you provided for your SV identity
 onboardingName: YOUR_SV_NAME
 globalDomainUrl: "https://sequencer.sv-1.svc.TARGET_CLUSTER.network.canton.global"

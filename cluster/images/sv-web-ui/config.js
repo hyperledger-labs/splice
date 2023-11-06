@@ -9,7 +9,7 @@ window.canton_network_config = {
   },
   services: {
     sv: {
-      url: "https://" + window.location.hostname + "/api/v0/sv",
+      url: "https://" + window.location.hostname + "/api/sv",
     }
   },
 };

@@ -58,7 +58,7 @@ function approve_sv() {
 
     echo "Sending new key to SV $PREFIX API"
 
-    curl -sSL --fail-with-body "https://$PREFIX.$GCP_CLUSTER_BASENAME.network.canton.global/api/v0/sv/admin/sv/identity/approve" -d "{\"candidateName\": \"$candidateName\", \"candidateKey\": \"$candidateKey\"}" -H "Authorization: Bearer $sv_token" -H "Content-Type: application/json"
+    curl -sSL --fail-with-body "https://$PREFIX.$GCP_CLUSTER_BASENAME.network.canton.global/api/sv/admin/sv/identity/approve" -d "{\"candidateName\": \"$candidateName\", \"candidateKey\": \"$candidateKey\"}" -H "Authorization: Bearer $sv_token" -H "Content-Type: application/json"
 }
 
 for i in 1 2 3 4

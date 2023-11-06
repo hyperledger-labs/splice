@@ -11,7 +11,7 @@ window.canton_network_config = {
 
   services: {
     sv: {
-      url: 'http://localhost:5014',
+      url: 'http://localhost:5014/api/sv',
     },
   },
 };

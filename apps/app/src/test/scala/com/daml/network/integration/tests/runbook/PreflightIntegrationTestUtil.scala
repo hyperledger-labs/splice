@@ -60,7 +60,7 @@ trait PreflightIntegrationTestUtil {
 
     val request = HttpRequest
       .newBuilder()
-      .uri(URI.create(s"$url/devnet/onboard/validator/prepare"))
+      .uri(URI.create(s"$url/api/sv/v0/devnet/onboard/validator/prepare"))
       .header("content-type", "text/plain")
       .POST(HttpRequest.BodyPublishers.ofString("{\"expires_in\":3600}"))
       .build()

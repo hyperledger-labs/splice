@@ -225,7 +225,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
       {
-        SPONSOR_SV_URL: `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global/api/v0/sv`,
+        SPONSOR_SV_URL: `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
       }
     ),
     participantIdentitiesDumpPeriodicBackup: backupConfig,

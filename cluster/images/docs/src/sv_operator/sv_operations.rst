@@ -22,7 +22,7 @@ and copy the last generated `onboarding secret`.
   :alt: Generate an onboarding secret in the SV UI.
 
 Using the secret, you can now create ``validator-onboarding-conf`` by replacing it in the template below and specifying the URL of
-your SV there, as it will be the onboarding sponsor of the new validator (e.g. *https://sv.sv.svc.your_domain.com/api/v0/sv/*):
+your SV there, as it will be the onboarding sponsor of the new validator (e.g. *https://sv.sv.svc.your_domain.com/*):
 
 ::
 

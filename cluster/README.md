@@ -1347,7 +1347,7 @@ contain helpful pointers for interacting with the Canton APIs.
 Just use `curl`! For example, here is how to get the current SVC members (as per the `SvcRules`) from SV1 on DevNet:
 
 ```
-curl https://sv.sv-1.svc.dev.network.canton.global/api/v0/sv/svc | jq '.svc_rules.payload.members'
+curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/svc | jq '.svc_rules.payload.members'
 ```
 
 ### App APIs with authentication
@@ -1370,7 +1370,7 @@ prepare a validator onboarding via SV1's SV API:
 
 ```
 export TOKEN="What you got from Auth0"
-curl -sSL --fail-with-body "https://sv.sv-1.svc.dev.network.canton.global/api/v0/sv/admin/validator/onboarding/prepare" -d "{\"expires_in\": \"1000\"}" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"
+curl -sSL --fail-with-body "https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/admin/validator/onboarding/prepare" -d "{\"expires_in\": \"1000\"}" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"
 ```
 
 For quickly obtaining a token for the SV API or the validator API on a (non-SV) validator,

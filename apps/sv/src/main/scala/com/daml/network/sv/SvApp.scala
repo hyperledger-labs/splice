@@ -392,6 +392,10 @@ class SvApp(
                   ),
                 ),
                 CommonAdminResource.routes(commonAdminHandler, _ => provide(traceContext)),
+                // We expose the common routes also under /api/scan, to be accessible in a k8s deployment
+                pathPrefix("api" / "sv")(
+                  CommonAdminResource.routes(commonAdminHandler, _ => provide(traceContext))
+                ),
               )
             }
           }

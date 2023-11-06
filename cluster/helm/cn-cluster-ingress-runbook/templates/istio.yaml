@@ -41,9 +41,7 @@ spec:
   - match:
     - port: 443
       uri:
-        prefix: "/api/v0/sv/"
-    rewrite:
-      uri: "/"
+        prefix: "/api/sv/"
     route:
     - destination:
         port:
