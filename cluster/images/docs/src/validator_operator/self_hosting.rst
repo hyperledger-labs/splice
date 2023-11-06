@@ -471,7 +471,7 @@ Once you obtained the token, obtaining the data can be done as follows:
 
 .. code-block:: bash
 
-    curl -H "Authorization: Bearer <YOUR_TOKEN>" <YOUR_VALIDATOR_API_URL>/admin/participant/identities > participant-dump.json
+    curl -H "Authorization: Bearer <YOUR_TOKEN>" <YOUR_VALIDATOR_API_URL>/v0/admin/participant/identities > participant-dump.json
 
 If your are following this runbook, you can replace ``YOUR_VALIDATOR_API_URL`` with ``http://localhost:5003/api/validator``.
 If you are following the :ref:`Kubernetes-based SV runbook <sv-helm>`, you can replace it with ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator``.
