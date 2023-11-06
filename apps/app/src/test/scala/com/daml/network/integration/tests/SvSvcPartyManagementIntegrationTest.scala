@@ -132,7 +132,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         val sv4Party = sv4Backend.getSvcInfo().svParty
 
         val coinRules = sv4Participant.ledger_api_extensions.acs
-          .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
+          .filterJava(cc.coinrules.CoinRules.COMPANION)(svcParty)
           .head
 
         val openRound = sv4Participant.ledger_api_extensions.acs

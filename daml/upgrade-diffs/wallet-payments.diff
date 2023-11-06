@@ -1,7 +1,7 @@
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/wallet-payments/daml/CN/Wallet/Payment.daml ../daml/wallet-payments-upgrade/daml/CN/Wallet/Payment.daml
 --- ../daml/wallet-payments/daml/CN/Wallet/Payment.daml
 +++ ../daml/wallet-payments-upgrade/daml/CN/Wallet/Payment.daml
-@@ -110,6 +110,7 @@
+@@ -109,6 +109,7 @@
                        expiresAt = expiresAt
                      receiverFeeRatio = 0.0
                  ]
@@ -9,7 +9,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/wallet-payments/daml/CN/Walle
           result <- exercisePaymentTransfer context transfer
           let [TransferResultLockedCoin lockedCoin] = result.createdCoins
           let round = result.round
-@@ -180,6 +181,7 @@
+@@ -179,6 +180,7 @@
                provider
                inputs = [InputCoin ccsum.coin]
                outputs = map mkReceiverOutput ccReceiverAmounts
@@ -20,7 +20,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/wallet-payments/daml/CN/Walle
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/wallet-payments/daml/CN/Wallet/Subscriptions.daml ../daml/wallet-payments-upgrade/daml/CN/Wallet/Subscriptions.daml
 --- ../daml/wallet-payments/daml/CN/Wallet/Subscriptions.daml
 +++ ../daml/wallet-payments-upgrade/daml/CN/Wallet/Subscriptions.daml
-@@ -330,6 +330,7 @@
+@@ -329,6 +329,7 @@
                 expiresAt = expiresAt
               receiverFeeRatio = 0.0
           ]
@@ -28,7 +28,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/wallet-payments/daml/CN/Walle
  
    result <- exercisePaymentTransfer context transfer
    let [TransferResultLockedCoin lockedCoin] = result.createdCoins
-@@ -348,6 +349,7 @@
+@@ -347,6 +348,7 @@
          provider
          inputs = [InputCoin ccsum.coin]
          outputs = [mkTransferOutput receiver targetAmount]

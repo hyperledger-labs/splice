@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.coin.CoinRules_AddFutureCoinConfigSchedule
+import com.daml.network.codegen.java.cc.coinrules.CoinRules_AddFutureCoinConfigSchedule
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, TransferConfig, USD}
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{

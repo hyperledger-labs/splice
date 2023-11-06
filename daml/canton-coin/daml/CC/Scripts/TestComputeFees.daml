@@ -7,6 +7,7 @@ import Daml.Script
 import CC.Scripts.Util
 
 import CC.Coin
+import CC.CoinRules
 import CC.Expiry
 import CC.Fees
 

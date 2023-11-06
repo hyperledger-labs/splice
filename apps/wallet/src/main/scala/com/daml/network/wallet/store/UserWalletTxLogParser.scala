@@ -7,8 +7,8 @@ import com.daml.ledger.javaapi.data.*
 import com.daml.ledger.javaapi.data.codegen.Choice
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.CoinCreateSummary
-import com.daml.network.codegen.java.cc.coin.InvalidTransferReason
-import com.daml.network.codegen.java.cc.coin.invalidtransferreason.{
+import com.daml.network.codegen.java.cc.coinrules.InvalidTransferReason
+import com.daml.network.codegen.java.cc.coinrules.invalidtransferreason.{
   ITR_InsufficientFunds,
   ITR_Other,
 }
@@ -26,7 +26,6 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
   COO_Error,
   COO_MergeTransferInputs,
 }
-import com.daml.network.codegen.java.cc.coin as coinv1
 import com.daml.network.codegen.java.cn.wallet.transferoffer as transferCodegen
 import com.daml.network.history.{
   CoinArchive,
@@ -1450,7 +1449,7 @@ object UserWalletTxLogParser {
     ): State = {
       val trackingInfo = node.result.value._1._2
       val receiverCoinContractId = node.result.value._1._1.createdCoins.asScala.toList match {
-        case (coin: coinv1.createdcoin.TransferResultCoin) :: Nil =>
+        case (coin: cc.coinrules.createdcoin.TransferResultCoin) :: Nil =>
           coin.contractIdValue
         case x =>
           throw new RuntimeException(
@@ -1698,8 +1697,8 @@ object UserWalletTxLogParser {
   }
 
   private def parseSender(
-      arg: cc.coin.CoinRules_Transfer,
-      res: cc.coin.TransferResult,
+      arg: cc.coinrules.CoinRules_Transfer,
+      res: cc.coinrules.TransferResult,
   ): (String, BigDecimal) = {
     val sender = arg.transfer.sender
 
@@ -1721,8 +1720,8 @@ object UserWalletTxLogParser {
 
   /** Returns a list of receivers and their net balance changes */
   private def parseReceivers(
-      arg: cc.coin.CoinRules_Transfer,
-      res: cc.coin.TransferResult,
+      arg: cc.coinrules.CoinRules_Transfer,
+      res: cc.coinrules.TransferResult,
   ): Seq[(String, BigDecimal)] = {
     def netBalanceChange(o: OutputWithFees) =
       if (o.output.lock.isEmpty) {
@@ -1750,14 +1749,14 @@ object UserWalletTxLogParser {
     * @param receiverFee Actual amount of fees paid by the receiver.
     */
   private final case class OutputWithFees(
-      output: cc.coin.TransferOutput,
+      output: cc.coinrules.TransferOutput,
       senderFee: BigDecimal,
       receiverFee: BigDecimal,
   )
 
   private def parseOutputAmounts(
-      arg: cc.coin.CoinRules_Transfer,
-      res: cc.coin.TransferResult,
+      arg: cc.coinrules.CoinRules_Transfer,
+      res: cc.coinrules.TransferResult,
   ): Seq[OutputWithFees] = {
     assert(
       arg.transfer.outputs.size() == res.summary.outputFees.size(),

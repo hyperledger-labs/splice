@@ -8,13 +8,13 @@ import com.daml.ledger.javaapi.data.codegen.Exercised
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.round.types.Round
-import com.daml.network.codegen.java.cc.coin.{
+import com.daml.network.codegen.java.cc.coin.{ValidatorRight}
+import com.daml.network.codegen.java.cc.coinrules.{
   PaymentTransferContext,
   TransferContext,
   TransferInput,
-  ValidatorRight,
 }
-import com.daml.network.codegen.java.cc.coin.transferinput.{
+import com.daml.network.codegen.java.cc.coinrules.transferinput.{
   InputAppRewardCoupon,
   InputCoin,
   InputValidatorRewardCoupon,
@@ -450,9 +450,9 @@ class TreasuryService(
       ec: ExecutionContext,
   ): Future[Option[
     (
-        Seq[cc.coin.TransferInput],
+        Seq[cc.coinrules.TransferInput],
         Set[PartyId],
-        cc.coin.PaymentTransferContext,
+        cc.coinrules.PaymentTransferContext,
         DisclosedContracts.NE,
     )
   ]] = {
@@ -625,7 +625,7 @@ class TreasuryService(
         (
           rw._2.payload.round,
           rw._3,
-          new cc.coin.transferinput.InputValidatorRewardCoupon(
+          new cc.coinrules.transferinput.InputValidatorRewardCoupon(
             rw._2.contractId
           ),
         )
@@ -649,7 +649,7 @@ class TreasuryService(
         (
           rw._1.payload.round,
           rw._2,
-          new cc.coin.transferinput.InputAppRewardCoupon(
+          new cc.coinrules.transferinput.InputAppRewardCoupon(
             rw._1.contractId
           ),
         )

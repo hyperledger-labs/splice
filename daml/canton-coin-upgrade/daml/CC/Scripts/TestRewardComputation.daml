@@ -5,6 +5,7 @@ import Daml.Script
 
 import DA.List.Total
 import CC.Coin
+import CC.CoinRules
 import CC.Round
 import CC.Round.Types
 import CC.Scripts.Util

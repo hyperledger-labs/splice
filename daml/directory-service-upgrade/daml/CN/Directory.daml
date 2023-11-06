@@ -3,6 +3,7 @@ module CN.Directory where
 import DA.Time
 
 import CC.Coin
+import CC.CoinRules
 import CN.Util.Assert
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions

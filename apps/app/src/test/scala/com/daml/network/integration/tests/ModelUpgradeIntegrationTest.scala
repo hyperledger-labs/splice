@@ -54,7 +54,7 @@ class ModelUpgradeIntegrationTest
         ),
         List.of[da.types.Tuple2[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]]](),
       )
-      val newCoinRules = new cc.coin.CoinRules(
+      val newCoinRules = new cc.coinrules.CoinRules(
         coinRules.payload.svc,
         newSchedule,
         coinRules.payload.isDevNet,

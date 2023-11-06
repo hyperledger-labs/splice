@@ -33,17 +33,18 @@ object ScanTables extends AcsTables {
     ): Either[String, ScanAcsStoreRowData] = {
       // TODO(#8125) Switch to map lookups instead
       QualifiedName(createdEvent.getTemplateId) match {
-        case t if t == QualifiedName(cc.coin.CoinRules.TEMPLATE_ID) =>
-          tryToDecode(cc.coin.CoinRules.COMPANION, createdEvent, createdEventBlob) { contract =>
-            ScanAcsStoreRowData(
-              contract = contract,
-              contractExpiresAt = None,
-              round = None,
-              validator = None,
-              amount = None,
-              importCrateReceiver = None,
-              featuredAppRightProvider = None,
-            )
+        case t if t == QualifiedName(cc.coinrules.CoinRules.TEMPLATE_ID) =>
+          tryToDecode(cc.coinrules.CoinRules.COMPANION, createdEvent, createdEventBlob) {
+            contract =>
+              ScanAcsStoreRowData(
+                contract = contract,
+                contractExpiresAt = None,
+                round = None,
+                validator = None,
+                amount = None,
+                importCrateReceiver = None,
+                featuredAppRightProvider = None,
+              )
           }
         case t if t == QualifiedName(cn.cns.CnsRules.TEMPLATE_ID) =>
           tryToDecode(cn.cns.CnsRules.COMPANION, createdEvent, createdEventBlob) { contract =>

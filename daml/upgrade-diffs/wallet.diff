@@ -1,7 +1,7 @@
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/wallet/daml/CN/Wallet/Install.daml ../daml/wallet-upgrade/daml/CN/Wallet/Install.daml
 --- ../daml/wallet/daml/CN/Wallet/Install.daml
 +++ ../daml/wallet-upgrade/daml/CN/Wallet/Install.daml
-@@ -137,6 +137,7 @@
+@@ -138,6 +138,7 @@
          provider = endUserP
          inputs = inputs
          outputs = []
@@ -12,7 +12,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/wallet/daml/CN/Wallet/Install
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/wallet/daml/CN/Wallet/TransferOffer.daml ../daml/wallet-upgrade/daml/CN/Wallet/TransferOffer.daml
 --- ../daml/wallet/daml/CN/Wallet/TransferOffer.daml
 +++ ../daml/wallet-upgrade/daml/CN/Wallet/TransferOffer.daml
-@@ -98,6 +98,7 @@
+@@ -99,6 +99,7 @@
                    lock = None
                    receiverFeeRatio = 0.0
                ]

@@ -2,7 +2,11 @@ package com.daml.network.wallet.store
 
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.{
+  coin as coinCodegen,
+  coinrules as coinrulesCodegen,
+  round as roundCodegen,
+}
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
@@ -226,7 +230,7 @@ trait UserWalletStore
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[(BigDecimal, coinCodegen.transferinput.InputCoin)]] = for {
+  ): Future[Seq[(BigDecimal, coinrulesCodegen.transferinput.InputCoin)]] = for {
     coins <- multiDomainAcsStore.listContracts(coinCodegen.Coin.COMPANION)
   } yield coins
     .map(c =>
@@ -245,7 +249,7 @@ trait UserWalletStore
     .map(quantityAndCoin =>
       (
         quantityAndCoin._1,
-        new coinCodegen.transferinput.InputCoin(
+        new coinrulesCodegen.transferinput.InputCoin(
           quantityAndCoin._2.contractId
         ),
       )

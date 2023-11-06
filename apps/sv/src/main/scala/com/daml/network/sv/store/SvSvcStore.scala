@@ -5,10 +5,10 @@ import com.daml.ledger.javaapi.data as javab
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
-import com.daml.network.codegen.java.cc.coin.{
+import com.daml.network.codegen.java.cc.coin.UnclaimedReward
+import com.daml.network.codegen.java.cc.coinrules.{
   AppTransferContext,
   CoinRules_MiningRound_Archive,
-  UnclaimedReward,
 }
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.validatorlicense as vl
@@ -154,27 +154,27 @@ trait SvSvcStore
 
   def lookupCoinRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[
-      AssignedContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]
+      AssignedContract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]
     ]]
   ] = multiDomainAcsStore
-    .findAnyContractWithOffset(cc.coin.CoinRules.COMPANION)
+    .findAnyContractWithOffset(cc.coinrules.CoinRules.COMPANION)
     .map(_.map(_.flatMap(_.toAssignedContract)))
 
   def lookupCoinRules()(implicit
       tc: TraceContext
-  ): Future[Option[AssignedContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
+  ): Future[Option[AssignedContract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]]] =
     lookupCoinRulesWithOffset().map(_.value)
 
   def getCoinRules()(implicit
       tc: TraceContext
-  ): Future[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
+  ): Future[Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]] =
     lookupCoinRules().map(
       _.map(_.contract).getOrElse(
         throw Status.NOT_FOUND.withDescription("No active CoinRules contract").asRuntimeException()
       )
     )
 
-  def getCoinRulesPayload()(implicit tc: TraceContext): Future[cc.coin.CoinRules] =
+  def getCoinRulesPayload()(implicit tc: TraceContext): Future[cc.coinrules.CoinRules] =
     getCoinRules().map(_.payload)
 
   def lookupCnsRulesWithOffset()(implicit tc: TraceContext): Future[
@@ -738,7 +738,7 @@ trait SvSvcStore
 
   def listCoinRulesTransferFollowers()(implicit
       tc: TraceContext
-  ): Future[Seq[FollowTask[cc.coin.CoinRules.ContractId, cc.coin.CoinRules, ?, ?]]] = {
+  ): Future[Seq[FollowTask[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules, ?, ?]]] = {
     lookupCoinRules().flatMap(_.map { coinRules =>
       multiDomainAcsStore
         .listAssignedContractsNotOnDomainN(
@@ -913,7 +913,7 @@ object SvSvcStore {
     (svcRulesFollowers ++ coinRulesFollowers) ++ Seq[ConstrainedTemplate](
       // CoinRules and SvcRules are specially handled, so not listed in followers
       cn.svcrules.SvcRules.COMPANION,
-      cc.coin.CoinRules.COMPANION,
+      cc.coinrules.CoinRules.COMPANION,
     )
 
   /** Contract filter of an sv acs store for a specific acs party. */
@@ -939,7 +939,7 @@ object SvSvcStore {
         ),
         mkFilter(so.SvOnboardingRequest.COMPANION)(co => co.payload.svc == svc),
         mkFilter(so.SvOnboardingConfirmed.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coinrules.CoinRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),

@@ -80,7 +80,7 @@ abstract class PackageIdResolver()(implicit ec: ExecutionContext) {
 
 object PackageIdResolver {
   trait HasCoinRulesPayload {
-    def getCoinRulesPayload()(implicit tc: TraceContext): Future[cc.coin.CoinRules]
+    def getCoinRulesPayload()(implicit tc: TraceContext): Future[cc.coinrules.CoinRules]
   }
 
   /** Package id resolver for direct command submissions in tests.
@@ -129,7 +129,7 @@ object PackageIdResolver {
 
     override val loggerFactory = loggerFactory0
 
-    private def fromCoinRules(coinRules: cc.coin.CoinRules, name: QualifiedName): String = {
+    private def fromCoinRules(coinRules: cc.coinrules.CoinRules, name: QualifiedName): String = {
       val schedule = CoinConfigSchedule(coinRules)
       val config = schedule.getConfigAsOf(clock.now)
       val pkg = modulePackages
@@ -211,6 +211,7 @@ object PackageIdResolver {
   // Map from module name to package containing that module
   private val modulePackages: Map[String, Package] = Map(
     "CC.Coin" -> Package.CantonCoin,
+    "CC.CoinRules" -> Package.CantonCoin,
     "CC.CoinImport" -> Package.CantonCoin,
     "CC.GlobalDomain" -> Package.CantonCoin,
     "CC.ValidatorLicense" -> Package.CantonCoin,

@@ -7,6 +7,7 @@ import DA.Traversable (forA)
 import DA.Optional (isSome)
 
 import CC.Coin
+import CC.CoinRules
 import CC.GlobalDomain
 
 import CN.Wallet.Payment

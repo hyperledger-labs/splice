@@ -47,7 +47,7 @@ class AcceptedAppPaymentRequestsTrigger(
     val round = payment.payload.round
     def rejectPayment(
         reason: String,
-        transferContext: cc.coin.AppTransferContext,
+        transferContext: cc.coinrules.AppTransferContext,
         disclosedContracts: DisclosedContracts.NE,
     ) = {
       logger.warn(s"rejecting accepted app payment: $reason")

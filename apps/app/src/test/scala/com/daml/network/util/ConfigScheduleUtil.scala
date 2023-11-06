@@ -1,7 +1,7 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coin.{
+import com.daml.network.codegen.java.cc.coinrules.{
   CoinRules_AddFutureCoinConfigSchedule,
   CoinRules_RemoveFutureCoinConfigSchedule,
 }

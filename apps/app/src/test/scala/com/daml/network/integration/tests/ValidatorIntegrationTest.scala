@@ -47,7 +47,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     initSvcWithSv1Only()
     // Check that there is exactly one CoinRule and OpenMiningRound
     val coinRules = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .filterJava(cc.coin.CoinRules.COMPANION)(svcParty)
+      .filterJava(cc.coinrules.CoinRules.COMPANION)(svcParty)
     coinRules should have length 1
 
     val openRounds = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs

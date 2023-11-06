@@ -4,8 +4,8 @@ import DA.Foldable (forA_)
 import DA.List (sortOn)
 import qualified DA.Map as Map
 
-import CC.Coin
 import CC.CoinConfig
+import CC.CoinRules
 import CC.GlobalDomain (initialMemberTraffic)
 import CC.Round
 import CC.Schedule

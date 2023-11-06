@@ -3,8 +3,9 @@ package com.daml.network.scan.store.db
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
-import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
+import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient

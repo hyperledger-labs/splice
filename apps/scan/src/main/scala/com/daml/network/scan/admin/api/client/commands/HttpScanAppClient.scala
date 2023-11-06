@@ -6,8 +6,8 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.coinrules.{AppTransferContext, CoinRules}
 import com.daml.network.codegen.java.cc.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -62,7 +62,7 @@ object HttpScanAppClient {
     * (2) this class has no featuredAppRight contract.
     */
   case class TransferContextWithInstances(
-      coinRules: ContractWithState[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules],
+      coinRules: ContractWithState[CoinRules.ContractId, CoinRules],
       latestOpenMiningRound: ContractWithState[
         OpenMiningRound.ContractId,
         OpenMiningRound,
@@ -73,7 +73,7 @@ object HttpScanAppClient {
   ) {
     def toUnfeaturedAppTransferContext() = {
       val openMiningRound = latestOpenMiningRound
-      new cc.coin.AppTransferContext(
+      new AppTransferContext(
         coinRules.contractId,
         openMiningRound.contractId,
         None.toJava,
@@ -166,7 +166,7 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetCoinRulesResponse.OK(response) =>
         for {
-          coinRules <- ContractWithState.handleMaybeCached(coinCodegen.CoinRules.COMPANION)(
+          coinRules <- ContractWithState.handleMaybeCached(CoinRules.COMPANION)(
             cachedCoinRules,
             response.coinRulesUpdate,
           )

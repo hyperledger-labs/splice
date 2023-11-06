@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
+  coinrules as coinrulesCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
@@ -54,8 +55,8 @@ object ValidatorTables extends AcsTables {
                 userName = Some(contract.payload.endUserName),
               )
           )
-        case t if t == QualifiedName(coinCodegen.CoinRules.TEMPLATE_ID) =>
-          tryToDecode(coinCodegen.CoinRules.COMPANION, createdEvent, createdEventBlob)(noIndex)
+        case t if t == QualifiedName(coinrulesCodegen.CoinRules.TEMPLATE_ID) =>
+          tryToDecode(coinrulesCodegen.CoinRules.COMPANION, createdEvent, createdEventBlob)(noIndex)
         case t if t == QualifiedName(coinCodegen.Coin.COMPANION.TEMPLATE_ID) =>
           tryToDecode(coinCodegen.Coin.COMPANION, createdEvent, createdEventBlob)(noIndex)
         case t if t == QualifiedName(validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID) =>

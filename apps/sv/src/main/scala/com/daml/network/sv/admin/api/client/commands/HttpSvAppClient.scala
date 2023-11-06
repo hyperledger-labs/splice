@@ -4,7 +4,7 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, StatusCo
 import akka.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.cc.coin.CoinRules
+import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}

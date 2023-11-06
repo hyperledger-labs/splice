@@ -8,7 +8,7 @@ import {
   ListActivityResponse,
 } from 'scan-openapi';
 
-import { CoinRules } from '@daml.js/canton-coin/lib/CC/Coin/module';
+import { CoinRules } from '@daml.js/canton-coin/lib/CC/CoinRules/module';
 import damlTypes from '@daml/types';
 
 export const buildScanMock = (scanUrl: string): RestHandler[] => [

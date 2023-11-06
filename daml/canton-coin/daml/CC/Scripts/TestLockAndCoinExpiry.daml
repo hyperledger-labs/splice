@@ -5,6 +5,7 @@ import DA.Assert
 import Daml.Script
 
 import CC.Coin
+import CC.CoinRules
 import CC.Fees
 import CC.Expiry
 import CC.Round
@@ -124,7 +125,7 @@ testExpireLockedCoin = do
 
   -- Lock is not yet expired
   -- svc fails to expire the coin
-  testChoiceFailed [app.svc] [app.svc] $ 
+  testChoiceFailed [app.svc] [app.svc] $
     exerciseCmd cid (LockedCoin_ExpireCoin roundCid)
 
   -- Current round is 4
@@ -133,7 +134,7 @@ testExpireLockedCoin = do
   -- Coin is not yet expired
   -- 2 rounds before current round = 4 - 2 = 2 which is before round 3 when the coin expires
   -- svc fails to expire the coin
-  testChoiceFailed [app.svc] [app.svc] $ 
+  testChoiceFailed [app.svc] [app.svc] $
     exerciseCmd cid (LockedCoin_ExpireCoin roundCid)
 
   -- Current round is 5
@@ -144,7 +145,7 @@ testExpireLockedCoin = do
   -- Coin is expired
   -- 2 rounds before current round => 5 - 2 = 3 which is equal to round 3 when the coin expires
   -- svc expires the coin
-  expireSummary <- testChoice [app.svc] [app.svc] $ 
+  expireSummary <- testChoice [app.svc] [app.svc] $
     exerciseCmd cid (LockedCoin_ExpireCoin roundCid)
 
   normalizedBalanceAfterExpiry <- getNormalizedBalance app.svc
@@ -176,7 +177,7 @@ testExpireCoin = do
 
   -- 2 rounds before latest active round = 3 - 2 = 1 which is before round 3 when the coin expires
   -- svc fails to expire the coin
-  testChoiceFailed [app.svc] [app.svc] $ 
+  testChoiceFailed [app.svc] [app.svc] $
     exerciseCmd cid (Coin_Expire latestActiveRoundCid)
 
   -- current latest active round is 4
@@ -194,7 +195,7 @@ testExpireCoin = do
 
   -- 2 rounds before current latest active round => 5 - 2 = 3 which is equal to round 3 when the coin expires
   -- svc expires the coin
-  expireSummary <- testChoice [app.svc] [app.svc] $ 
+  expireSummary <- testChoice [app.svc] [app.svc] $
     exerciseCmd cid (Coin_Expire latestActiveRoundCid)
 
   normalizedBalanceAfterExpiry <- getNormalizedBalance app.svc
@@ -230,7 +231,7 @@ testChoice actAs readAs buildCommand = do
 
 testChoiceFailed : [Party] -> [Party] -> Commands a -> Script ()
 testChoiceFailed actAs readAs buildCommand = do
-  submitMultiMustFail actAs readAs buildCommand 
+  submitMultiMustFail actAs readAs buildCommand
   pure ()
 
 getLockedCoinCmd : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (Commands TransferResult)

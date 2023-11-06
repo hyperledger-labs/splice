@@ -221,8 +221,8 @@ object TxLogEntry {
   }
 
   private def parseSenderAmount(
-      arg: cc.coin.CoinRules_Transfer,
-      res: cc.coin.TransferResult,
+      arg: cc.coinrules.CoinRules_Transfer,
+      res: cc.coinrules.TransferResult,
   ): SenderAmount = {
     val sender = arg.transfer.sender
     val senderFee = parseOutputAmounts(arg, res)
@@ -242,8 +242,8 @@ object TxLogEntry {
   }
 
   private def parseReceiverAmounts(
-      arg: cc.coin.CoinRules_Transfer,
-      res: cc.coin.TransferResult,
+      arg: cc.coinrules.CoinRules_Transfer,
+      res: cc.coinrules.TransferResult,
   ): Seq[ReceiverAmount] = {
 
     // Note: the same receiver party can appear multiple times in the transfer result
@@ -278,14 +278,14 @@ object TxLogEntry {
     * @param receiverFee Actual amount of fees paid by the receiver.
     */
   private final case class OutputWithFees(
-      output: cc.coin.TransferOutput,
+      output: cc.coinrules.TransferOutput,
       senderFee: BigDecimal,
       receiverFee: BigDecimal,
   )
 
   private def parseOutputAmounts(
-      arg: cc.coin.CoinRules_Transfer,
-      res: cc.coin.TransferResult,
+      arg: cc.coinrules.CoinRules_Transfer,
+      res: cc.coinrules.TransferResult,
   ): Seq[OutputWithFees] = {
     assert(
       arg.transfer.outputs.size() == res.summary.outputFees.size(),

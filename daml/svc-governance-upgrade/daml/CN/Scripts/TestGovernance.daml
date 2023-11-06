@@ -8,6 +8,7 @@ import Daml.Script
 import DA.Time
 
 import CC.Coin
+import CC.CoinRules
 import CC.Round
 import CC.Schedule
 

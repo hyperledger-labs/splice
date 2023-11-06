@@ -56,11 +56,11 @@ trait ScanStore
 
   def lookupCoinRules()(implicit
       tc: TraceContext
-  ): Future[Option[ContractWithState[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
+  ): Future[Option[ContractWithState[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]]]
 
   private def getCoinRules()(implicit
       tc: TraceContext
-  ): Future[ContractWithState[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
+  ): Future[ContractWithState[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]] =
     lookupCoinRules().map(
       _.getOrElse(
         throw Status.NOT_FOUND
@@ -69,7 +69,7 @@ trait ScanStore
       )
     )
 
-  def getCoinRulesPayload()(implicit tc: TraceContext): Future[cc.coin.CoinRules] =
+  def getCoinRulesPayload()(implicit tc: TraceContext): Future[cc.coinrules.CoinRules] =
     getCoinRules().map(_.contract.payload)
 
   def lookupCnsRules()(implicit
@@ -234,7 +234,7 @@ object ScanStore {
     MultiDomainAcsStore.SimpleContractFilter(
       svcParty,
       Map(
-        mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coinrules.CoinRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),

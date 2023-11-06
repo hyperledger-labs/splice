@@ -10,6 +10,7 @@ import qualified DA.Text as T
 import DA.Time
 
 import CC.Coin
+import CC.CoinRules
 
 import CC.Round
 import CC.Round.Types

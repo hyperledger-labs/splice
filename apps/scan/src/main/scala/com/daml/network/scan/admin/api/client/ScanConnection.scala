@@ -3,8 +3,8 @@ package com.daml.network.scan.admin.api.client
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.Materializer
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.{coin as coinCodegen}
-import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.coinrules.{AppTransferContext, CoinRules}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.environment.{
@@ -264,7 +264,7 @@ final class ScanConnection private (
       tc: TraceContext,
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[(coinCodegen.AppTransferContext, DisclosedContracts.NE)] = {
+  ): Future[(AppTransferContext, DisclosedContracts.NE)] = {
     for {
       context <- getTransferContextWithInstances()
       featured <- lookupFeaturedAppRight(providerPartyId)
@@ -272,7 +272,7 @@ final class ScanConnection private (
       val coinRules = context.coinRules
       val openMiningRound = context.latestOpenMiningRound
       (
-        new coinCodegen.AppTransferContext(
+        new AppTransferContext(
           coinRules.contractId,
           openMiningRound.contractId,
           featured.map(_.contractId).toJava,
@@ -287,7 +287,7 @@ final class ScanConnection private (
       ec: ExecutionContext,
       mat: Materializer,
   ): Future[
-    Either[String, (coinCodegen.AppTransferContext, DisclosedContracts.NE)]
+    Either[String, (AppTransferContext, DisclosedContracts.NE)]
   ] = {
     for {
       context <- getTransferContextWithInstances()
@@ -298,7 +298,7 @@ final class ScanConnection private (
         case Some(openMiningRound) =>
           Right(
             (
-              new coinCodegen.AppTransferContext(
+              new AppTransferContext(
                 coinRules.contractId,
                 openMiningRound.contractId,
                 featured.map(_.contractId).toJava,

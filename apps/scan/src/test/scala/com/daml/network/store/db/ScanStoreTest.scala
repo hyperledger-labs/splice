@@ -2,10 +2,10 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.{DamlRecord, Unit as damlUnit}
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coin.PaymentTransferContext
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_Coin
+import com.daml.network.codegen.java.cc.coinrules.PaymentTransferContext
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, svcrules as svcrulesCodegen}
@@ -62,7 +62,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           coinRulesContract = coinRules()
           _ <- dummyDomain.exercise(
             coinRulesContract,
-            interfaceId = Some(cc.coin.CoinRules.TEMPLATE_ID),
+            interfaceId = Some(cc.coinrules.CoinRules.TEMPLATE_ID),
             Transfer.choice.name,
             mkCoinRulesTransfer(user1, coinAmount),
             mkTransferResult(2, coinAmount, holdingFee),
@@ -190,7 +190,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             case ((appAmount, validatorAmount), round) =>
               dummyDomain.exercise(
                 coinRules(),
-                Some(cc.coin.CoinRules.TEMPLATE_ID),
+                Some(cc.coinrules.CoinRules.TEMPLATE_ID),
                 Transfer.choice.name,
                 mkCoinRulesTransfer(user1, 1.0),
                 mkTransferResult(
@@ -231,7 +231,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           _ <- Future.traverse(appRewards.zipWithIndex) { case (amount, round) =>
             dummyDomain.exercise(
               coinRules(),
-              Some(cc.coin.CoinRules.TEMPLATE_ID),
+              Some(cc.coinrules.CoinRules.TEMPLATE_ID),
               Transfer.choice.name,
               mkCoinRulesTransfer(user1, amount),
               mkTransferResult(
@@ -245,7 +245,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           _ <- Future.traverse(validatorRewards.zipWithIndex) { case (amount, round) =>
             dummyDomain.exercise(
               coinRules(),
-              Some(cc.coin.CoinRules.TEMPLATE_ID),
+              Some(cc.coinrules.CoinRules.TEMPLATE_ID),
               Transfer.choice.name,
               mkCoinRulesTransfer(user1, amount),
               mkTransferResult(
@@ -404,7 +404,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         rewardTxs <- Future.traverse(providerRewardRounds) { case (provider, amount, round) =>
           dummyDomain.exercise(
             coinRules(),
-            Some(cc.coin.CoinRules.TEMPLATE_ID),
+            Some(cc.coinrules.CoinRules.TEMPLATE_ID),
             Transfer.choice.name,
             mkCoinRulesTransfer(provider, amount),
             mkTransferResultForTest(
@@ -689,7 +689,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 
         def transferFromTransaction(
             store: ScanStore,
-            coinRulesContract: Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules],
+            coinRulesContract: Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules],
             tx: TransferLogEntry,
             offset: String,
         ) = {
@@ -700,7 +700,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           dummyDomain
             .exercise(
               contract = coinRulesContract,
-              interfaceId = Some(cc.coin.CoinRules.TEMPLATE_ID),
+              interfaceId = Some(cc.coinrules.CoinRules.TEMPLATE_ID),
               choiceName = Transfer.choice.name,
               choiceArgument = mkCoinRules_Transfer(
                 mkTransferInputOutput(
@@ -813,7 +813,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     }
   }
   private def mkInputCoin() = {
-    new cc.coin.transferinput.InputCoin(
+    new cc.coinrules.transferinput.InputCoin(
       new cc.coin.Coin.ContractId(nextCid())
     )
   }
@@ -822,8 +822,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       receiver: PartyId,
       amount: BigDecimal,
       receiverFeeRatio: BigDecimal = BigDecimal(0.0),
-  ): cc.coin.TransferOutput =
-    new cc.coin.TransferOutput(
+  ): cc.coinrules.TransferOutput =
+    new cc.coinrules.TransferOutput(
       receiver.toProtoPrimitive,
       receiverFeeRatio.bigDecimal,
       amount.bigDecimal,
@@ -831,7 +831,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     )
 
   private def mkTransfer(receiver: PartyId, amount: Double) =
-    new cc.coin.Transfer(
+    new cc.coinrules.Transfer(
       receiver.toProtoPrimitive,
       receiver.toProtoPrimitive,
       java.util.List.of(mkInputCoin()),
@@ -839,7 +839,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       Optional.empty(),
     )
 
-  private def mkTransferContext() = new cc.coin.TransferContext(
+  private def mkTransferContext() = new cc.coinrules.TransferContext(
     new roundCodegen.OpenMiningRound.ContractId(nextCid()),
     java.util.Map.of(),
     java.util.Map.of(),
@@ -849,10 +849,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
   private def mkTransferInputOutput(
       sender: PartyId,
       provider: PartyId,
-      transferInputs: List[cc.coin.TransferInput],
-      transferOutputs: List[cc.coin.TransferOutput],
-  ): cc.coin.Transfer =
-    new cc.coin.Transfer(
+      transferInputs: List[cc.coinrules.TransferInput],
+      transferOutputs: List[cc.coinrules.TransferOutput],
+  ): cc.coinrules.Transfer =
+    new cc.coinrules.Transfer(
       sender.toProtoPrimitive,
       provider.toProtoPrimitive,
       transferInputs.asJava,
@@ -860,14 +860,14 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       Optional.empty(),
     )
 
-  private def mkCoinRules_Transfer(transfer: cc.coin.Transfer) =
-    new cc.coin.CoinRules_Transfer(
+  private def mkCoinRules_Transfer(transfer: cc.coinrules.Transfer) =
+    new cc.coinrules.CoinRules_Transfer(
       transfer,
       mkTransferContext(),
     ).toValue
 
   private def mkCoinRulesTransfer(receiver: PartyId, amount: Double) =
-    new cc.coin.CoinRules_Transfer(
+    new cc.coinrules.CoinRules_Transfer(
       mkTransfer(receiver, amount),
       mkTransferContext(),
     ).toValue
@@ -879,7 +879,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       inputValidatorRewardAmount: Double,
       inputCoinAmount: Double,
       coinPrice: Double,
-  ) = new cc.coin.TransferSummary(
+  ) = new cc.coinrules.TransferSummary(
     new java.math.BigDecimal(inputAppRewardAmount),
     new java.math.BigDecimal(inputValidatorRewardAmount),
     new java.math.BigDecimal(inputCoinAmount),
@@ -901,7 +901,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       inputCoinAmount: Double = 0.0,
       coinPrice: Double = 0.0,
   ) =
-    new cc.coin.TransferResult(
+    new cc.coinrules.TransferResult(
       new cc.round.types.Round(round),
       mkTransferSummary(
         changeToInitialAmountAsOfRoundZero,
@@ -930,8 +930,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 
     val transfer = exercisedEvent(
       coinRulesCid,
-      coinCodegen.CoinRules.TEMPLATE_ID,
-      Some(cc.coin.CoinRules.TEMPLATE_ID),
+      cc.coinrules.CoinRules.TEMPLATE_ID,
+      Some(cc.coinrules.CoinRules.TEMPLATE_ID),
       Transfer.choice.name,
       consuming = false,
       mkCoinRulesTransfer(provider, ccSpent),
@@ -954,14 +954,14 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       offset,
       exercisedEvent(
         coinRulesCid,
-        coinCodegen.CoinRules.TEMPLATE_ID,
+        cc.coinrules.CoinRules.TEMPLATE_ID,
         None,
-        coinCodegen.CoinRules.CHOICE_CoinRules_BuyMemberTraffic.name,
+        cc.coinrules.CoinRules.CHOICE_CoinRules_BuyMemberTraffic.name,
         consuming = false,
-        new coinCodegen.CoinRules_BuyMemberTraffic(
+        new cc.coinrules.CoinRules_BuyMemberTraffic(
           java.util.List.of(),
           new PaymentTransferContext(
-            new cc.coin.CoinRules.ContractId(coinRulesCid),
+            new cc.coinrules.CoinRules.ContractId(coinRulesCid),
             mkTransferContext(),
           ),
           provider.toProtoPrimitive,
@@ -1006,11 +1006,11 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       offset,
       exercisedEvent(
         coinRulesCid,
-        coinCodegen.CoinRules.TEMPLATE_ID,
+        cc.coinrules.CoinRules.TEMPLATE_ID,
         None,
-        coinCodegen.CoinRules.CHOICE_CoinRules_Mint.name,
+        cc.coinrules.CoinRules.CHOICE_CoinRules_Mint.name,
         consuming = false,
-        new coinCodegen.CoinRules_Mint(
+        new cc.coinrules.CoinRules_Mint(
           receiver.toProtoPrimitive,
           coinContract.payload.amount.initialAmount,
           new roundCodegen.OpenMiningRound.ContractId(openMiningRoundCid),

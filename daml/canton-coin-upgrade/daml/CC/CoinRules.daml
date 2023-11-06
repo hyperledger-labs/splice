@@ -1,0 +1,944 @@
+module CC.CoinRules where
+
+import Prelude hiding (forA)
+
+import DA.Action (void, foldlA)
+import DA.Exception
+import DA.Foldable (forA_)
+import DA.List (dedupSort)
+import DA.Map (Map)
+import qualified DA.Map as Map
+import DA.Set (Set)
+import qualified DA.Set as Set
+import DA.Traversable (forA)
+import DA.Time
+
+import CC.Coin
+import CC.CoinConfig
+import CC.Schedule
+import CC.Expiry
+import CC.Fees
+import CC.Issuance
+import CC.Round
+import CC.Round.Types
+import CC.GlobalDomain
+
+import CN.Util.Assert
+
+-- | The rules governing how CC users can modify the CC state
+-- managed by the SVC.
+template CoinRules
+  with
+    svc : Party
+    configSchedule : Schedule Time (CoinConfig USD)
+    isDevNet : Bool
+    upgrade : Optional ()
+  where
+    ensure validSchedule configSchedule validCoinConfig
+
+    signatory svc
+
+    nonconsuming choice CoinRules_ComputeFees : [Decimal]
+      -- ^ Compute the output fees for transfer against the given context
+      with
+        context : TransferContext
+        sender : Party
+        outputs : [TransferOutput]
+     controller sender
+     do computeFees svc context sender outputs
+
+    nonconsuming choice CoinRules_Transfer : TransferResult
+      with
+        transfer : Transfer
+        context : TransferContext
+       controller Set.toList (transferControllers transfer)
+       do executeTransfer context svc transfer
+
+    -- Global domain usage
+    ----------------------
+
+    -- TODO(#3742): consider also declaring this method in the CoinRules interface
+    nonconsuming choice CoinRules_BuyMemberTraffic
+      : (ContractId MemberTraffic, Optional (ContractId Coin))
+      with
+        inputs : [TransferInput]
+        context : PaymentTransferContext
+        provider : Party
+        memberId : Text
+        domainId : Text
+        trafficAmount : Int
+      controller provider
+      do
+        -- validate choice parameters
+        now <- getTime
+        let configUsd = getValueAsOf now configSchedule
+        require "Known domain-id" (domainId `Set.member` configUsd.globalDomain.requiredDomains)
+        let minTopupAmount = configUsd.globalDomain.fees.minTopupAmount
+        require ("trafficAmount " <> show trafficAmount <> " is at least as much as the configured minTopupAmount " <> show minTopupAmount)
+          (trafficAmount >= minTopupAmount)
+        (trafficCostCc, trafficCostUsd) <- computeDomainFees provider trafficAmount this context
+        let transfer = Transfer with
+              sender = provider
+              provider
+              inputs
+              outputs = [ TransferOutput with
+                            receiver = svc
+                            amount = trafficCostCc
+                            receiverFeeRatio = 0.0
+                            lock = None
+                        ]
+              upgrade = Some ()
+        result <- exercisePaymentTransfer context transfer
+        let [TransferResultCoin coin] = result.createdCoins
+        -- burn the coin created for the SVC
+        _ <- archive coin
+        -- create a new MemberTraffic contract for the purchased traffic
+        newTraffic <- create MemberTraffic with
+              svc
+              memberId
+              domainId
+              totalPurchased = trafficAmount
+              numPurchases = 1
+              ccSpent = trafficCostCc
+              usdSpent =  trafficCostUsd
+        return (newTraffic, result.senderChangeCoin)
+
+    nonconsuming choice CoinRules_MergeMemberTrafficContracts : ContractId MemberTraffic
+      with
+        trafficCids : [ContractId MemberTraffic]
+      controller svc
+      do
+        -- fetch, validate and archive all given contracts
+        let firstCid::remainingCids = trafficCids
+        first <- fetch firstCid
+        archive firstCid
+        require "SVC matches" (first.svc == svc)
+        rest <- forA remainingCids $ \trafficCid -> do
+          traffic <- fetch trafficCid
+          require "SVC matches" (traffic.svc == svc)
+          require "Member-id matches" (traffic.memberId == first.memberId)
+          require "Domain-id matches" (traffic.domainId == first.domainId)
+          archive trafficCid
+          pure traffic
+        let traffics = first::rest
+
+        -- create a new aggregated member traffic contract.
+        let mergedTraffic = foldl (\acc traffic -> MemberTraffic with
+                svc
+                memberId = acc.memberId
+                domainId = acc.domainId
+                totalPurchased = acc.totalPurchased + traffic.totalPurchased
+                numPurchases = acc.numPurchases + traffic.numPurchases
+                usdSpent = acc.usdSpent + traffic.usdSpent
+                ccSpent = acc.ccSpent + traffic.ccSpent
+              ) (initialMemberTraffic svc first.memberId first.domainId 0) traffics
+        create mergedTraffic
+
+    -- Coin usage
+    -------------
+
+    -- A choice for the SVC to mint coin for the cases where the
+    -- collective rules allow for that; e.g., when redeeming SVC rewards.
+    nonconsuming choice CoinRules_Mint: CoinCreateSummary (ContractId Coin)
+      with
+        receiver: Party
+        amount: Decimal
+        openRound: ContractId OpenMiningRound
+      controller svc, receiver
+      do
+        openRound <- fetch openRound
+        let transferConfigCC = transferConfigCCFromOpenRound openRound
+            expiringAmount = ExpiringAmount with
+                        initialAmount = amount
+                        createdAt = openRound.round
+                        ratePerRound = transferConfigCC.holdingFee
+        coin <- create Coin with
+                  owner = receiver
+                  amount = expiringAmount
+                  upgrade = Some ()
+                  ..
+        return CoinCreateSummary with
+                  coin
+                  coinPrice = openRound.coinPrice
+                  round = openRound.round
+
+
+    nonconsuming choice CoinRules_DevNet_Tap: CoinCreateSummary (ContractId Coin)
+      with
+        receiver: Party
+        amount: Decimal
+        openRound: ContractId OpenMiningRound
+      controller receiver
+      do
+        require "isDevNet flag is true" isDevNet
+        exercise self CoinRules_Mint with ..
+
+    nonconsuming choice CoinRules_DevNet_FeatureApp : ContractId FeaturedAppRight
+      with
+        provider : Party
+      controller provider
+      do
+        require "isDevNet flag is true" isDevNet
+        create FeaturedAppRight with svc; provider
+
+    -- Bootstrap the open mining rounds by creating
+    -- - one immediately open-mining-round with 1 tick left
+    -- - one immediately open-mining-round with 2 ticks left
+    -- - one open-mining round that opens in 1 tick
+    -- Should only be called ONCE at network genesis.
+    nonconsuming choice CoinRules_Bootstrap_Rounds
+      : ContractId OpenMiningRound
+      with
+        coinPrice : Decimal
+      controller svc
+      do
+        now <- getTime
+        let configUsd = getValueAsOf now configSchedule
+        let tickDuration = configUsd.tickDuration
+        let opensAt0 = now
+        let opensAt1 = now
+        let opensAt2 = addRelTime now tickDuration
+
+        let targetClosesAt0 = addRelTime now tickDuration
+        let targetClosesAt1 = addRelTime targetClosesAt0 tickDuration
+        let targetClosesAt2 = addRelTime targetClosesAt1 tickDuration
+
+        -- We accept that round 0 will only be open for one tickDuration in contrast to all other ones.
+        -- Its SVC rewards are compensation for the extra effort of bootstrapping.
+        let issuingFor0 = days 0
+        let issuingFor1 = issuingFor0 + tickDuration
+        let issuingFor2 = issuingFor1 + tickDuration
+
+        let issuanceConfig0 = getValueAsOf issuingFor0 configUsd.issuanceCurve
+        let issuanceConfig1 = getValueAsOf issuingFor1 configUsd.issuanceCurve
+        let issuanceConfig2 = getValueAsOf issuingFor2 configUsd.issuanceCurve
+
+        let transferConfigUsd = configUsd.transferConfig
+
+        create OpenMiningRound with
+          svc; round = Round 0; coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
+        create OpenMiningRound with
+          svc; round = Round 1; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
+        create OpenMiningRound with
+          svc; round = Round 2; coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
+
+    nonconsuming choice CoinRules_AdvanceOpenMiningRounds
+      : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)
+      with
+        coinPrice : Decimal
+        roundToArchiveCid : ContractId OpenMiningRound
+        middleRoundCid : ContractId OpenMiningRound
+        latestRoundCid : ContractId OpenMiningRound
+      controller svc
+      do
+        roundToArchive <- fetch roundToArchiveCid
+        middleRound <- fetch middleRoundCid
+        latestRound <- fetch latestRoundCid
+
+        now <- getTime
+        require "middleRound is one after roundToArchive" (middleRound.round.number == roundToArchive.round.number + 1)
+        require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
+        require "roundToArchive is past targetCloseAt" (roundToArchive.targetClosesAt <= now)
+        require "latestRound is open" (latestRound.opensAt <= now)
+        require "middle round has been open for >= 1 tick" (addRelTime middleRound.opensAt middleRound.tickDuration <= now)
+
+        -- archive and create the rounds
+        archive roundToArchiveCid
+        newSummarizingRound <- create SummarizingMiningRound with
+            svc
+            round = roundToArchive.round
+            issuanceConfig = roundToArchive.issuanceConfig
+            tickDuration = roundToArchive.tickDuration
+        newOpenRound <- do
+          let configUsd = getValueAsOf now configSchedule
+              tickDuration = configUsd.tickDuration
+              -- round is in pre-fetchable state for at least 1 tick and can only open with 1-tick difference between latestRound's opensAt
+              opensAt = addRelTime (max now latestRound.opensAt) tickDuration
+              newOpenRoundIssuingFor = latestRound.issuingFor + latestRound.tickDuration
+          create OpenMiningRound with
+              svc
+              round = Round (latestRound.round.number + 1)
+              coinPrice
+              opensAt
+              -- round is open for two ticks.
+              targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
+              -- We advance the time for which the SVC has been issuing independent of how real world advances.
+              -- Note that given the checks above the real time can only be slower.
+              issuingFor = newOpenRoundIssuingFor
+              transferConfigUsd = configUsd.transferConfig
+              issuanceConfig = getValueAsOf newOpenRoundIssuingFor configUsd.issuanceCurve
+              tickDuration
+        return (newSummarizingRound, newOpenRound)
+
+    nonconsuming choice CoinRules_MiningRound_StartIssuing
+      : ContractId IssuingMiningRound
+      with
+        miningRoundCid : ContractId SummarizingMiningRound
+        -- The amount of coin burned in this round.
+        summary : OpenMiningRoundSummary
+      controller svc
+      do
+        -- archive summarizing mining round
+        miningRound <- fetch miningRoundCid
+        archive miningRoundCid
+        require "SVC matches" (miningRound.svc == svc)
+        validateOpenMiningRoundSummary summary
+
+        let params = computeIssuingRoundParameters miningRound.tickDuration miningRound.issuanceConfig summary
+
+        -- record reward for the SVC
+        create SvcReward with
+          svc
+          round = miningRound.round
+          amount = params.coinsToIssueToSvc
+
+        -- record unclaimed reward contract
+        create UnclaimedReward with
+          svc
+          amount = params.unclaimedValidatorRewards + params.unclaimedAppRewards
+
+        -- create issuing round
+        now <- getTime
+        let tickDuration = miningRound.tickDuration
+        let opensAt = addRelTime now tickDuration
+        let targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
+
+        create IssuingMiningRound with
+          svc
+          round = miningRound.round
+          opensAt = opensAt
+          targetClosesAt = targetClosesAt
+          issuancePerValidatorRewardCoupon = params.issuancePerValidatorRewardCoupon
+          issuancePerFeaturedAppRewardCoupon = params.issuancePerFeaturedAppRewardCoupon
+          issuancePerUnfeaturedAppRewardCoupon = params.issuancePerUnfeaturedAppRewardCoupon
+
+
+    nonconsuming choice CoinRules_MiningRound_Close
+      : ContractId ClosedMiningRound
+      with
+        issuingRoundCid : ContractId IssuingMiningRound
+      controller svc
+      do
+        -- archive issuing mining round
+        now <- getTime
+        issuingRound <- fetch issuingRoundCid
+        archive issuingRoundCid
+        require "SVC matches" (issuingRound.svc == svc)
+        require "Mining round is past targetClosesAt" (issuingRound.targetClosesAt <= now)
+
+        -- create closed round
+        create ClosedMiningRound with
+          svc
+          issuancePerValidatorRewardCoupon = issuingRound.issuancePerValidatorRewardCoupon
+          issuancePerFeaturedAppRewardCoupon = issuingRound.issuancePerFeaturedAppRewardCoupon
+          issuancePerUnfeaturedAppRewardCoupon = issuingRound.issuancePerUnfeaturedAppRewardCoupon
+          round = issuingRound.round
+
+    nonconsuming choice CoinRules_MiningRound_Archive
+      : ()
+      with
+        closedRoundCid : ContractId ClosedMiningRound
+      controller svc
+      do
+        -- archive closed mining round
+        miningRound <- fetch closedRoundCid
+        archive closedRoundCid
+        require "SVC matches" (miningRound.svc == svc)
+
+    -- Batch expiry of unclaimed rewards for a specific claimed round
+    nonconsuming choice CoinRules_ClaimExpiredRewards
+      : Optional (ContractId UnclaimedReward)
+      with
+        closedRoundCid : ContractId ClosedMiningRound
+        validatorCouponCids : [ContractId ValidatorRewardCoupon]
+        appCouponCids : [ContractId AppRewardCoupon]
+      controller svc
+      do
+        -- retrieve round
+        closedRound <- fetch closedRoundCid
+        require "SVC matches" (closedRound.svc == svc)
+
+        -- expire validator rewards and compute their unclaimed rewards
+        expiredValidatorRewards <- forA validatorCouponCids $ \validatorCouponCid -> do
+          exercise validatorCouponCid ValidatorRewardCoupon_SvcExpire with closedRoundCid
+
+        let validatorRewards = sum expiredValidatorRewards
+
+        -- expire app rewards and compute their unclaimed rewards
+        expiredAppRewards <- forA appCouponCids $ \appCouponCid -> do
+          exercise appCouponCid AppRewardCoupon_SvcExpire with closedRoundCid
+
+        let featuredAppRewards = sum [ amount | (featured, amount) <- expiredAppRewards, featured ]
+        let unfeaturedAppRewards = sum [ amount | (featured, amount) <- expiredAppRewards, not featured ]
+
+        -- create unclaimed reward for the total
+        let amount =
+              validatorRewards * closedRound.issuancePerValidatorRewardCoupon +
+              featuredAppRewards * closedRound.issuancePerFeaturedAppRewardCoupon +
+              unfeaturedAppRewards * closedRound.issuancePerUnfeaturedAppRewardCoupon
+        if (amount <= 0.0)
+          then pure None
+          else Some <$> create UnclaimedReward with svc; amount
+
+    -- Batch merge of unclaimed rewards
+    nonconsuming choice CoinRules_MergeUnclaimedRewards
+      : ContractId UnclaimedReward
+      with
+        unclaimedRewardCids : [ContractId UnclaimedReward]
+      controller svc
+      do
+        require "More than one unclaimed reward contracts" (length unclaimedRewardCids > 1)
+
+        -- fetch and archive all given rewards
+        archivedAmounts <- forA unclaimedRewardCids $ \unclaimedRewardCid -> do
+          unclaimedReward <- fetch unclaimedRewardCid
+          archive unclaimedRewardCid
+          require "SVC matches" (unclaimedReward.svc == svc)
+          pure unclaimedReward.amount
+
+        -- create a new unclaimed reward over the total
+        create UnclaimedReward with
+          svc
+          amount = sum archivedAmounts
+
+    -- This allows fetchByKey-style fetches if you have readAs
+    -- but not actAs claims.
+    nonconsuming choice CoinRules_Fetch
+      : (ContractId CoinRules, CoinRules)
+      with
+        p : Party
+      controller p
+      do
+        pure (self, this)
+
+    -- This inserts a new CoinConfig Schedule into the future Schedules
+    choice CoinRules_AddFutureCoinConfigSchedule: ContractId CoinRules
+      with
+        newScheduleItem : (Time, CoinConfig USD)
+      controller svc
+      do
+        now <- getTime
+        require "The insertion is scheduled in the future" (now < newScheduleItem._1)
+        create this with configSchedule = prune now (insert newScheduleItem this.configSchedule)
+
+    -- This removes a CoinConfig Schedule defined in the future Schedules
+    choice CoinRules_RemoveFutureCoinConfigSchedule: ContractId CoinRules
+      with
+        scheduleTime: Time
+      controller svc
+      do
+        now <- getTime
+        require "The removal is scheduled in the future" (now < scheduleTime)
+        create this with configSchedule = prune now (remove scheduleTime this.configSchedule)
+
+    -- This updates a CoinConfig Schedule defined in the future Schedules
+    choice CoinRules_UpdateFutureCoinConfigSchedule: ContractId CoinRules
+      with
+        scheduleItem: (Time, CoinConfig USD)
+      controller svc
+      do
+        now <- getTime
+        require "The update is scheduled in the future" (now < scheduleItem._1)
+        create this with configSchedule = prune now (update scheduleItem this.configSchedule)
+
+-- Transfer logic
+-- ==============
+
+-- | The controllers for a transfer.
+transferControllers : Transfer -> Set Party
+transferControllers t =
+    foldl addOutputController (Set.fromList [t.sender, t.provider]) t.outputs
+  where
+    addOutputController s (TransferOutput with receiver; lock; ..) =
+      Set.insert receiver $ optional s (foldl (flip Set.insert) s) (holders <$> lock)
+
+scaleCoinConfig : Decimal -> CoinConfig USD -> CoinConfig CC
+scaleCoinConfig coinPrice config = CoinConfig with
+  transferConfig = scaleFees (1.0 / coinPrice) config.transferConfig
+  globalDomain = config.globalDomain
+  issuanceCurve = config.issuanceCurve
+  tickDuration = config.tickDuration
+  packageConfig = config.packageConfig
+
+computeFees : Party -> TransferContext -> Party -> [TransferOutput] -> Update [Decimal]
+computeFees svc context sender outputs = do
+  openRound <- fetch context.openMiningRound
+  require ("mining round matches svc") (openRound.svc == svc)
+  let transferConfigCC = transferConfigCCFromOpenRound openRound
+  return $ map (computeOutputFee transferConfigCC sender) outputs
+
+computeOutputFee : TransferConfig CC -> Party -> TransferOutput -> Decimal
+computeOutputFee transferConfigCC sender out =
+    transferConfigCC.createFee.fee + lockingFee + transferFee
+  where
+    lockingFee = optional 0.0 (\l -> transferConfigCC.lockHolderFee.fee * intToDecimal (length l.holders)) out.lock
+    transferFee
+      | sender == out.receiver = 0.0
+      | otherwise = chargeSteppedRate transferConfigCC.transferFee out.amount
+
+data InvalidTransferReason
+  = ITR_InsufficientFunds with missingAmount : Decimal
+  | ITR_Other with description : Text
+  deriving (Eq, Show)
+
+exception InvalidTransfer
+  with
+    reason : InvalidTransferReason
+  where
+    message show reason
+
+checkTransferConstraints: Transfer -> TransferSummary -> TransferConfig CC -> Either InvalidTransferReason ()
+checkTransferConstraints transfer summary transferConfigCC
+    | length transfer.inputs > transferConfigCC.maxNumInputs = Left $ ITR_Other $ "More than the maximum number of inputs"
+    | length transfer.outputs > transferConfigCC.maxNumOutputs = Left $ ITR_Other $ "More than the maximum number of outputs"
+    | summary.senderChangeFee < 0.0 = Left $ ITR_InsufficientFunds with missingAmount = summary.senderChangeFee * (-1.0)
+    | otherwise = Right ()
+
+-- | Execute a transfer.
+--
+executeTransfer : TransferContext -> Party -> Transfer -> Update TransferResult
+executeTransfer context svc t = do
+  -- compute summaries
+  csum <- summarizeAndValidateContext context svc t
+  isum <- summarizeAndConsumeInputs csum svc t.sender t.inputs
+  osum <- preprocessOutputs csum.config t.sender t.outputs
+  summary <- summarizeTransfer csum.openRound csum.config isum osum
+  -- check that overall transfer constraints are satisfied
+  case checkTransferConstraints t summary csum.config of
+    Left err -> throw (InvalidTransfer err)
+    Right _ -> pure ()
+
+  -- issue rewards for burns
+  issueRewards csum t.sender t.provider summary
+  -- record outputs
+  (createdCoins, senderChangeCoin) <-
+    createTransferOutputs csum.openRound csum.config svc t.sender summary osum
+
+  return TransferResult with
+    round = csum.openRound.round
+    summary = summary
+    upgrade = Some ()
+    ..
+
+data TransferContextSummary = TransferContextSummary with
+    featuredAppProvider : Optional Party
+    config : TransferConfig CC
+    openRound : OpenMiningRound
+    issuingMiningRounds : Map Round IssuingMiningRound
+    validatorRights : Map Party (ContractId ValidatorRight)
+  deriving (Eq, Show)
+
+data TransferInputsSummary = TransferInputsSummary with
+    totalCoinAmount : Decimal
+    totalAppRewardAmount : Decimal
+    totalValidatorRewardAmount : Decimal
+    totalHoldingFees : Decimal
+    amountArchivedAsOfRoundZero : Decimal
+    changeToHoldingFeesRate : Decimal
+  deriving (Eq, Show)
+
+type TransferOutputsSummary = [PreprocessedTransferOutput]
+
+data PreprocessedTransferOutput = PreprocessedTransferOutput with
+    owner : Party -- ^ Owner of the output
+    outputFee : Decimal -- ^ Fee charged to create this output
+    amount : Decimal -- ^ Amount of coin held by this output (after deducting fees)
+    lock : Optional TimeLock -- ^ Whether to lock the coin or not
+  deriving (Eq, Show)
+
+summarizeAndValidateContext : TransferContext -> Party -> Transfer -> Update TransferContextSummary
+summarizeAndValidateContext context svc tf = do
+  now <- getTime
+  -- check that the current mining round is open and issued by the svc
+  openRound <- fetch context.openMiningRound
+  require ("mining round matches svc") (openRound.svc == svc)
+  require ("mining round is open: " <> show openRound) (openRound.opensAt <= now)
+
+  -- check the featured app right, if present
+  featuredAppProvider <- forA context.featuredAppRight $ \featuredAppRightCid -> do
+    featuredAppRight <- fetch featuredAppRightCid
+    require "featured app right must match" (featuredAppRight == FeaturedAppRight with svc; provider = tf.provider)
+    pure featuredAppRight.provider
+
+  -- pre-resolve issuing mining rounds
+  issuingMiningRounds <- forA (Map.toList context.issuingMiningRounds) $ \(round, issuingRoundCid) -> do
+    issuingRound <- fetch issuingRoundCid
+    require "SVC matches" (issuingRound.svc == svc)
+    require "Round matches" (issuingRound.round == round)
+    now <- getTime
+    require "issuing round is open" (issuingRound.opensAt <= now)
+    pure (round, issuingRound)
+
+  -- pre-resolve validator rights
+  validatorRights <- forA (Map.toList context.validatorRights) $ \(user, rightCid) -> do
+      right <-fetch rightCid
+      let expectedRight = ValidatorRight with
+            svc
+            validator = tf.sender
+            user
+      require "ValidatorRight matches" (right == expectedRight)
+      pure (user, rightCid)
+
+  return TransferContextSummary with
+    config = scaleFees (1.0 / openRound.coinPrice) openRound.transferConfigUsd
+    featuredAppProvider
+    openRound = openRound
+    issuingMiningRounds = Map.fromList issuingMiningRounds
+    validatorRights = Map.fromList validatorRights
+
+getValidatorRight : TransferContextSummary -> Party -> Update (ContractId ValidatorRight)
+getValidatorRight csum user =
+  case Map.lookup user csum.validatorRights of
+    None -> abort $ "TransferContext did contain validator right for user: " <> show user
+    Some rightCid -> pure rightCid
+
+getIssuingMiningRound : TransferContextSummary -> Round -> Update IssuingMiningRound
+getIssuingMiningRound csum round = do
+  case Map.lookup round csum.issuingMiningRounds of
+    None -> abort $ "TransferContext did not contain issuing mining round found for " <> show round
+    Some issuingRound -> pure issuingRound
+
+summarizeAndConsumeInputs
+  : TransferContextSummary -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
+summarizeAndConsumeInputs csum svc sender inps = do
+    foldlA (summarizeAndConsumeInput csum.openRound.round) initialSummary inps
+  where
+    initialSummary = TransferInputsSummary with
+      totalCoinAmount = 0.0
+      totalAppRewardAmount = 0.0
+      totalValidatorRewardAmount = 0.0
+      totalHoldingFees = 0.0
+      amountArchivedAsOfRoundZero = 0.0
+      changeToHoldingFeesRate = 0.0
+
+    summarizeAndConsumeInput round s (InputCoin coinCid) = do
+      -- fetch and archive
+      coin <- fetch coinCid
+      archive coinCid
+      -- check validity
+      require "SVC matches" (svc == coin.svc)
+      require "Sender matches owner" (sender == coin.owner)
+      -- compute balance change
+      let amount = actualAmount round coin.amount
+          holdingFee = coin.amount.initialAmount - amount
+      return TransferInputsSummary with
+        totalCoinAmount = s.totalCoinAmount + coin.amount.initialAmount
+        totalAppRewardAmount = s.totalAppRewardAmount
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalHoldingFees = s.totalHoldingFees + holdingFee
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero + getValueAsOfRound0 coin.amount
+        changeToHoldingFeesRate = s.changeToHoldingFeesRate - coin.amount.ratePerRound.rate
+
+    summarizeAndConsumeInput _round s (InputAppRewardCoupon couponCid) = do
+      -- fetch and archive
+      coupon <- fetch couponCid
+      archive couponCid
+      -- check validity
+      require "SVC matches" (svc == coupon.svc)
+      require "Sender matches app provider" (sender == coupon.provider)
+      -- compute balance change
+      miningRound <- getIssuingMiningRound csum coupon.round
+      let issuancePerCoupon
+            | coupon.featured = miningRound.issuancePerFeaturedAppRewardCoupon
+            | otherwise = miningRound.issuancePerUnfeaturedAppRewardCoupon
+      return TransferInputsSummary with
+        totalCoinAmount = s.totalCoinAmount
+        totalAppRewardAmount = s.totalAppRewardAmount + coupon.amount * issuancePerCoupon
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalHoldingFees = s.totalHoldingFees
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
+        changeToHoldingFeesRate = s.changeToHoldingFeesRate
+
+    summarizeAndConsumeInput _round s (InputValidatorRewardCoupon couponCid) = do
+      -- fetch and archive
+      coupon <- fetch couponCid
+      do
+        -- we must use the validator right to actually archive the coupon of the user
+        rightCid <- getValidatorRight csum coupon.user
+        exercise couponCid ValidatorRewardCoupon_ArchiveAsValidator with
+          validator = sender
+          rightCid
+      -- check coupon
+      require "SVC matches" (svc == coupon.svc)
+      -- compute balance change
+      miningRound <- getIssuingMiningRound csum coupon.round
+      return TransferInputsSummary with
+        totalCoinAmount = s.totalCoinAmount
+        totalAppRewardAmount = s.totalAppRewardAmount
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount + coupon.amount * miningRound.issuancePerValidatorRewardCoupon
+        totalHoldingFees = s.totalHoldingFees
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
+        changeToHoldingFeesRate = s.changeToHoldingFeesRate
+
+preprocessOutputs : TransferConfig CC -> Party -> [TransferOutput] -> Update TransferOutputsSummary
+preprocessOutputs transferConfigCC sender outs =
+    mapA (preprocessOutput . dedupOutputLockHolders) outs
+  where
+    -- deduplicate lock-holders to store them and charge for them at most once
+    dedupOutputLockHolders out = out with lock = fmap (dedupLockHolders out.receiver) out.lock
+
+    dedupLockHolders : Party -> TimeLock -> TimeLock
+    dedupLockHolders receiver (TimeLock with expiresAt; holders) =
+      TimeLock with
+        expiresAt
+        holders = dedupSort $ filter (receiver /=) holders
+
+    preprocessOutput out@(TransferOutput with receiver; amount; lock; receiverFeeRatio)
+      | not (0.0 <= receiverFeeRatio && receiverFeeRatio <= 1.0) =
+          error $ "Receiver fee ratio " <> show receiverFeeRatio <> " is not between 0.0 and 1.0"
+      | otherwise = do
+          -- check validity of locking request
+          forA_ lock $ \l -> do
+            now <- getTime
+            let lockDuration = subTime l.expiresAt now
+            require "Positive lock duration" (days 0 <= lockDuration)
+            require "Fewer than the allowed number of lock holders"
+              (length l.holders <= transferConfigCC.maxNumLockHolders)
+          -- compute output
+          let outputFee = computeOutputFee transferConfigCC sender out
+              receiverOutputFee = outputFee * receiverFeeRatio
+          require "Amount is larger than receiver output fee" (receiverOutputFee < amount)
+          return PreprocessedTransferOutput with
+            owner = receiver
+            outputFee = outputFee
+            amount = amount - receiverOutputFee
+            lock
+
+summarizeTransfer : OpenMiningRound -> TransferConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update TransferSummary
+summarizeTransfer openRound transferConfigCC inp preprocessedOutputs = do
+    -- These traces are shown in the tx view in Daml studio, and greatly aid debugging fee calculations
+    trace summary $ trace preprocessedOutputs $ trace inp $ pure summary
+  where
+    outputFees = map (.outputFee) preprocessedOutputs
+    totalOutputAmount = sum $ map (.amount) preprocessedOutputs
+    leftOverAmount =
+      inp.totalCoinAmount + inp.totalAppRewardAmount + inp.totalValidatorRewardAmount
+      - inp.totalHoldingFees - totalOutputAmount - sum outputFees
+    senderChangeFee = min transferConfigCC.createFee.fee leftOverAmount
+    senderChangeAmount = leftOverAmount - senderChangeFee
+    numOutputs = intToDecimal (length preprocessedOutputs + (if senderChangeAmount > 0.0 then 1 else 0))
+
+    summary = TransferSummary with
+      inputCoinAmount = inp.totalCoinAmount
+      inputAppRewardAmount = inp.totalAppRewardAmount
+      inputValidatorRewardAmount = inp.totalValidatorRewardAmount
+      holdingFees = inp.totalHoldingFees
+      outputFees
+      senderChangeFee
+      senderChangeAmount
+      coinPrice = openRound.coinPrice
+      changeToInitialAmountAsOfRoundZero = totalOutputAmount
+        + senderChangeAmount
+        + intToDecimal openRound.round.number *  numOutputs * transferConfigCC.holdingFee.rate
+        - inp.amountArchivedAsOfRoundZero
+      changeToHoldingFeesRate = numOutputs * transferConfigCC.holdingFee.rate + inp.changeToHoldingFeesRate
+
+issueRewards : TransferContextSummary -> Party -> Party -> TransferSummary -> Update ()
+issueRewards csum sender provider summary
+  | usageFees <= 0.0 = pure ()
+  | otherwise = do
+      void $ create ValidatorRewardCoupon with
+        svc = csum.openRound.svc
+        user = sender
+        amount = usageFees
+        round = csum.openRound.round
+
+      void $ create AppRewardCoupon with
+        svc = csum.openRound.svc
+        provider
+        featured
+        amount = usageFees
+        round = csum.openRound.round
+  where
+    usageFees = sum summary.outputFees
+    -- note: we do not create featured app rewards in case the app provider uses their own app
+    featured = Some provider == csum.featuredAppProvider && sender /= provider
+
+createTransferOutputs
+  : OpenMiningRound -> TransferConfig CC -> Party -> Party -> TransferSummary -> TransferOutputsSummary
+  -> Update ([CreatedCoin], Optional (ContractId Coin))
+createTransferOutputs currentOpenRound transferConfigCC svc sender summary preprocessedOutputs = do
+    outputCoins <- mapA createOutput preprocessedOutputs
+    senderChangeCoin <- createSenderChange
+    return (outputCoins, senderChangeCoin)
+  where
+    createSenderChange
+      | summary.senderChangeAmount <= 0.0 = return None
+      | otherwise =
+          Some <$> create Coin with
+            svc
+            owner = sender
+            amount = expiringAmount transferConfigCC.holdingFee summary.senderChangeAmount currentOpenRound.round
+            upgrade = Some ()
+    createOutput out = do
+      let coin = Coin with
+            svc
+            owner = out.owner
+            amount = expiringAmount transferConfigCC.holdingFee out.amount currentOpenRound.round
+            upgrade = Some ()
+
+      case out.lock of
+        None -> TransferResultCoin <$> create coin
+        Some lock -> do
+          -- We require the lock to expire before the coin to allow CN app authors to
+          -- assume that a locked coin is never archived by the SVC while the lock is held.
+          require "lock expires before coin"
+            (doesLockExpireBeforeCoin currentOpenRound lock coin.amount currentOpenRound.tickDuration)
+          TransferResultLockedCoin <$> create LockedCoin with coin; lock
+
+-- | Scale the 'CoinConfig' such that the fees charged are scaled by the same scale factor.
+scaleFees : Decimal -> TransferConfig USD -> TransferConfig CC
+scaleFees s c = TransferConfig with
+    createFee = scaleFixedFee s c.createFee
+    holdingFee = scaleRatePerRound s c.holdingFee
+    lockHolderFee = scaleFixedFee s c.lockHolderFee
+    transferFee = scaleSteppedRate s c.transferFee
+    maxNumInputs = c.maxNumInputs
+    maxNumOutputs = c.maxNumOutputs
+    maxNumLockHolders = c.maxNumLockHolders
+
+transferConfigCCFromOpenRound : OpenMiningRound -> TransferConfig CC
+transferConfigCCFromOpenRound openRound = scaleFees (1.0 / openRound.coinPrice) openRound.transferConfigUsd
+
+-- | Computing domain fees
+computeDomainFees : Party -> Int -> CoinRules -> PaymentTransferContext -> Update (Decimal, Decimal)
+computeDomainFees validator trafficAmount coinRules context = do
+  -- compute traffic cost in USD
+  now <- getTime
+  let configUsd = getValueAsOf now coinRules.configSchedule
+  let extraTrafficPrice = configUsd.globalDomain.fees.extraTrafficPrice
+  let trafficCostUsd = intToDecimal trafficAmount / 1e6 * extraTrafficPrice
+  -- compute traffic cost in CC
+  contextMiningRound <- exercise context.context.openMiningRound (OpenMiningRound_Fetch validator)
+  let trafficCostCc = trafficCostUsd / contextMiningRound.coinPrice
+  pure (trafficCostCc, trafficCostUsd)
+
+data AppTransferContext = AppTransferContext
+  with
+    coinRules : ContractId CoinRules
+    openMiningRound : ContractId OpenMiningRound
+    featuredAppRight : Optional (ContractId FeaturedAppRight)
+  deriving (Show, Eq)
+
+exerciseAppTransfer : AppTransferContext -> Transfer -> Update TransferResult
+exerciseAppTransfer AppTransferContext{..} transfer =
+  exercise coinRules CoinRules_Transfer with
+    transfer
+    context = coinTransferContext openMiningRound featuredAppRight
+
+exercisePaymentTransfer : PaymentTransferContext -> Transfer -> Update TransferResult
+exercisePaymentTransfer PaymentTransferContext{..} transfer =
+  exercise coinRules CoinRules_Transfer with
+    transfer
+    context
+
+exerciseComputeFees : PaymentTransferContext -> Party -> [TransferOutput] -> Update [Decimal]
+exerciseComputeFees PaymentTransferContext{..} sender outputs =
+  exercise coinRules CoinRules_ComputeFees with
+    context
+    sender
+    outputs
+
+data PaymentTransferContext = PaymentTransferContext
+  with
+    coinRules : ContractId CoinRules
+    context : TransferContext
+  deriving (Eq, Show)
+
+-- | Contracts that need to be passed in to a Transfer so that
+-- we can reference them by contract id instead of by key.
+data TransferContext = TransferContext
+  with
+    openMiningRound : ContractId OpenMiningRound
+    issuingMiningRounds : Map Round (ContractId IssuingMiningRound)
+    validatorRights : Map Party (ContractId ValidatorRight) -- ^ Map from user to ValidatorRight contract.
+    featuredAppRight : Optional (ContractId FeaturedAppRight) -- ^ Optional proof that the provider is a featured app provider.
+  deriving (Show, Eq)
+
+-- | Helper to construct transfer context with only coin inputs
+coinTransferContext : ContractId OpenMiningRound -> Optional (ContractId FeaturedAppRight) -> TransferContext
+coinTransferContext openMiningRound featuredAppRight = TransferContext with
+  openMiningRound
+  featuredAppRight
+  issuingMiningRounds = Map.empty
+  validatorRights = Map.empty
+
+data CreatedCoin
+  = TransferResultCoin (ContractId Coin)
+  | TransferResultLockedCoin (ContractId LockedCoin)
+  deriving (Show, Eq, Ord)
+
+-- | An individual input for a batch transfer.
+data TransferInput
+  = InputAppRewardCoupon (ContractId AppRewardCoupon)
+  | InputValidatorRewardCoupon (ContractId ValidatorRewardCoupon)
+  | InputCoin (ContractId Coin)
+  deriving (Eq, Ord, Show)
+
+-- | Representation of a batch transfer.
+data Transfer = Transfer with
+    sender : Party
+    provider : Party
+    inputs : [TransferInput]
+    outputs : [TransferOutput]
+    upgrade : Optional ()
+  deriving (Eq, Ord, Show)
+
+-- | An individual output for a batch transfer.
+data TransferOutput = TransferOutput with
+    receiver : Party -- ^ The reciver who will own the created output coin.
+    receiverFeeRatio : Decimal
+      -- ^ The ratio of the output fee paid from receiver's output amount.
+      -- 1.0 means the whole fee is deducted from the specified output amount,
+      -- 0.0 the whole fee is deducted from the sender's input balance.
+      --
+      -- If a receiver's fee is not covered by the specified output amount, the transfer is aborted.
+    amount : Decimal
+      -- ^ The amount of coin to receive, before deducting the receiver's part of the output fee.
+    lock : Optional TimeLock -- ^ The lock to be added, if any.
+  deriving (Eq, Ord, Show)
+
+data TransferResult
+  = TransferResult
+  with
+    round: Round -- ^ Round for which this transfer was registered.
+    summary: TransferSummary -- ^ Summary of amount input and outputs, and fees paid.
+    createdCoins: [CreatedCoin] -- ^ References to the created output coins.
+    senderChangeCoin: Optional (ContractId Coin)
+      -- ^ Optional reference to the coin for the change returned to the sender.
+      -- Only created if there was some change to be returned after deducting the fee for returning change.
+    upgrade : Optional ()
+  deriving (Show, Eq)
+
+-- | Summary of input and output amounts and fees paid.
+-- This summary is intended to be used together with the `Transfer` specification
+-- used to initiate the transfer when displaying a transaction summary. Its fields are intended to
+-- provide shortcuts for key numbers that are complex to compute off-ledger.
+--
+-- All amounts are denominated in CC.
+data TransferSummary = TransferSummary with
+    inputAppRewardAmount : Decimal -- ^ Total amount of app rewards input into this transfer.
+    inputValidatorRewardAmount : Decimal -- ^ Total amount of validator rewards input into this transfer.
+    inputCoinAmount : Decimal -- ^ Total input amount of coin input into this transfer, before deducting holding fees.
+    holdingFees : Decimal -- ^ Holding fees paid by the sender on their input coins.
+    outputFees : [Decimal] -- ^ Fees paid for the individual output coins in the order they were specified.
+    senderChangeFee : Decimal
+      -- ^ Fee charged for returning change to the sender, which is the smaller of the
+      -- left-over balance after paying for all outputs or one coin create fee.
+      --
+      -- In case the left-over balance after paying for all outputs is smaller than a create fee,
+      -- all of that balance is consumed by the fee for returning change, and no actual coin is
+      -- created for the sender, i.e., the `senderChangeAmount` is zero. The transfer does though succeed.
+      --
+      -- For transfers that do not allow returning change to the sender, the left-over balance
+      -- after paying for all outputs must be zero, and thus the `senderChangeFee` must be zero as well.
+    senderChangeAmount : Decimal
+      -- ^ The final amount of coin returned to the sender after paying for all outputs and fees.
+      -- If it is zero, then no coin is created for the sender.
+    coinPrice : Decimal -- ^ The coin price at the round this transfer was executed.
+    changeToInitialAmountAsOfRoundZero : Decimal
+      -- ^ The change to the total balance introduced by this transfer, normalized to round zero, i.e.,
+      -- a coin created in round 3 is treated as a coin created in round 0 with a higher initial amount.
+    changeToHoldingFeesRate : Decimal
+      -- ^ The change of total holding fees introduced by this transfer.
+  deriving (Show, Eq)

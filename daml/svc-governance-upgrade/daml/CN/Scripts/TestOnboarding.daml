@@ -19,7 +19,8 @@ import CC.Scripts.Util
 import CC.Scripts.Parameters
 import CN.Scripts.SvcTestUtils
 import CC.GlobalDomain (MemberTraffic, initialMemberTraffic)
-import CC.Coin (CoinRules, Coin)
+import CC.Coin (Coin)
+import CC.CoinRules (CoinRules)
 import CC.Round
 import CC.Round.Types
 import CC.Schedule

@@ -7,6 +7,7 @@ import Daml.Script
 import DA.List
 
 import CC.Coin
+import CC.CoinRules
 import CC.Round.Types
 import CC.Schedule
 import CC.GlobalDomain

@@ -1,6 +1,10 @@
 package com.daml.network.store.db
 
-import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.{
+  coin as coinCodegen,
+  coinrules as coinrulesCodegen,
+  round as roundCodegen,
+}
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.wallet.{
@@ -1157,11 +1161,11 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       offset,
       exercisedEvent(
         coinRulesCid,
-        coinCodegen.CoinRules.TEMPLATE_ID,
+        coinrulesCodegen.CoinRules.TEMPLATE_ID,
         None,
-        coinCodegen.CoinRules.CHOICE_CoinRules_Mint.name,
+        coinrulesCodegen.CoinRules.CHOICE_CoinRules_Mint.name,
         consuming = false,
-        new coinCodegen.CoinRules_Mint(
+        new coinrulesCodegen.CoinRules_Mint(
           receiver.toProtoPrimitive,
           coinContract.payload.amount.initialAmount,
           new roundCodegen.OpenMiningRound.ContractId(openMiningRoundCid),

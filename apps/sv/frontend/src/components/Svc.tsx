@@ -16,7 +16,7 @@ import { CometBftNodeDumpOrErrorResponse, NodeStatus } from 'sv-openapi';
 import { Box, Tab, Table, TableBody, TableRow, Tabs, Typography } from '@mui/material';
 import TableCell from '@mui/material/TableCell';
 
-import { CoinRules } from '@daml.js/canton-coin/lib/CC/Coin';
+import { CoinRules } from '@daml.js/canton-coin/lib/CC/CoinRules';
 import { SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { useSvcInfos } from '../contexts/SvContext';

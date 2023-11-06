@@ -3,7 +3,8 @@ import BigNumber from 'bignumber.js';
 import React, { useContext, useMemo } from 'react';
 import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi';
 
-import { CoinRules, FeaturedAppRight } from '@daml.js/canton-coin/lib/CC/Coin';
+import { FeaturedAppRight } from '@daml.js/canton-coin/lib/CC/Coin';
+import { CoinRules } from '@daml.js/canton-coin/lib/CC/CoinRules';
 import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
 import { Party } from '@daml/types';
 

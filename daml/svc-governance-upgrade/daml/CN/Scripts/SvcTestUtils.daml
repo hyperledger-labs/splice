@@ -10,6 +10,7 @@ import Daml.Script
 import DA.Time
 
 import CC.Coin
+import CC.CoinRules
 import CC.Issuance
 import CC.Round
 import CC.Round.Types

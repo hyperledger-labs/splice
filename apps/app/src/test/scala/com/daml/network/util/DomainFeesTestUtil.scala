@@ -117,9 +117,9 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
         )
     ) { case Seq(install) => install }
     val executeBatchCmd = walletInstall.id.exerciseWalletAppInstall_ExecuteBatch(
-      new cc.coin.PaymentTransferContext(
+      new cc.coinrules.PaymentTransferContext(
         transferContext.coinRules.contract.contractId,
-        new cc.coin.TransferContext(
+        new cc.coinrules.TransferContext(
           transferContext.latestOpenMiningRound.contract.contractId,
           Map.empty[Round, IssuingMiningRound.ContractId].asJava,
           Map.empty[String, cc.coin.ValidatorRight.ContractId].asJava,
@@ -128,8 +128,8 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
       ),
       inputCoins
         .map(_.contract.contractId.contractId)
-        .map[cc.coin.TransferInput](cid =>
-          new cc.coin.transferinput.InputCoin(new cc.coin.Coin.ContractId(cid))
+        .map[cc.coinrules.TransferInput](cid =>
+          new cc.coinrules.transferinput.InputCoin(new cc.coin.Coin.ContractId(cid))
         )
         .asJava,
       List[CoinOperation](

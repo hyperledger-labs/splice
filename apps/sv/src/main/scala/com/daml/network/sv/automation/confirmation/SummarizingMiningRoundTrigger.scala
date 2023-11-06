@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coin.CoinRules_MiningRound_StartIssuing
+import com.daml.network.codegen.java.cc.coinrules.CoinRules_MiningRound_StartIssuing
 import com.daml.network.codegen.java.cc.issuance.OpenMiningRoundSummary
 import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation

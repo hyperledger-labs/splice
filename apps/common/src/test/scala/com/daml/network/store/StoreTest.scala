@@ -15,6 +15,7 @@ import com.daml.ledger.javaapi.data.{
 import com.google.protobuf
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
+  coinrules as coinrulesCodegen,
   expiry as expiryCodegen,
   fees as feesCodegen,
   round as roundCodegen,
@@ -87,9 +88,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       dummyDomain,
     )
   protected def coinRules() = {
-    val templateId = coinCodegen.CoinRules.TEMPLATE_ID
+    val templateId = coinrulesCodegen.CoinRules.TEMPLATE_ID
 
-    val template = new coinCodegen.CoinRules(
+    val template = new coinrulesCodegen.CoinRules(
       svcParty.toProtoPrimitive,
       schedule,
       false,
@@ -97,7 +98,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
     contract(
       identifier = templateId,
-      contractId = new coinCodegen.CoinRules.ContractId(nextCid()),
+      contractId = new coinrulesCodegen.CoinRules.ContractId(nextCid()),
       payload = template,
     )
   }

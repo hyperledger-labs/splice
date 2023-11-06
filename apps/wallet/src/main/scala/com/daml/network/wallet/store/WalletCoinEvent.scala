@@ -2,6 +2,7 @@ package com.daml.network.wallet.store
 
 import com.daml.ledger.javaapi.data.DamlOptional
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.coinrules as coinrulesCodegen
 import com.daml.network.codegen.java.cn.svcrules as svcCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
@@ -116,7 +117,7 @@ object AcceptedTransferOffer_Complete extends ExerciseNodeCompanion {
   override type Tpl = transferCodegen.AcceptedTransferOffer
   override type Arg = transferCodegen.AcceptedTransferOffer_Complete
   override type Res = daTypes.Tuple2[
-    daTypes.Tuple2[coinCodegen.TransferResult, transferCodegen.TransferOfferTrackingInfo],
+    daTypes.Tuple2[coinrulesCodegen.TransferResult, transferCodegen.TransferOfferTrackingInfo],
     java.util.Optional[
       coinCodegen.Coin.ContractId
     ],
@@ -130,7 +131,7 @@ object AcceptedTransferOffer_Complete extends ExerciseNodeCompanion {
 
   override val resDecoder = daTypes.Tuple2.valueDecoder(
     daTypes.Tuple2.valueDecoder(
-      coinCodegen.TransferResult.valueDecoder(),
+      coinrulesCodegen.TransferResult.valueDecoder(),
       transferCodegen.TransferOfferTrackingInfo.valueDecoder(),
     ),
     x =>

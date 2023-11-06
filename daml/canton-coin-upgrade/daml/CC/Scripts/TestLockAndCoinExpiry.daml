@@ -5,6 +5,7 @@ import DA.Assert
 import Daml.Script
 
 import CC.Coin
+import CC.CoinRules
 import CC.Fees
 import CC.Expiry
 import CC.Round

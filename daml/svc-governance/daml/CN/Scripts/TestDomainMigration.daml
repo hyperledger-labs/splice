@@ -7,8 +7,8 @@ import Daml.Script
 import DA.Time
 import DA.List
 
-import CC.Coin
 import CC.CoinConfig
+import CC.CoinRules
 import CC.Schedule
 import CC.Scripts.Util
 

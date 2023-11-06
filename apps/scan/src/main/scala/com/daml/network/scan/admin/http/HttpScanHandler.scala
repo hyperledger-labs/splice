@@ -2,7 +2,8 @@ package com.daml.network.scan.admin.http
 
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -152,7 +153,7 @@ class HttpScanHandler(
           body.cachedCoinRulesContractId match {
             case Some(cachedContractId) if cachedContractId == coinRules.contractId.contractId =>
               logger.debug(
-                show"Not sending ${PrettyContractId(coinCodegen.CoinRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
+                show"Not sending ${PrettyContractId(CoinRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
               )
               None
             case Some(_) // else: coin rules are cached but outdated.
@@ -222,7 +223,7 @@ class HttpScanHandler(
     withSpan(s"$workflowId.listFeaturedAppRights") { _ => _ =>
       for {
         apps <- store.multiDomainAcsStore.listContracts(
-          coinCodegen.FeaturedAppRight.COMPANION
+          FeaturedAppRight.COMPANION
         )
       } yield {
         definitions.ListFeaturedAppRightsResponse(apps.toVector.map(a => a.contract.toHttp))

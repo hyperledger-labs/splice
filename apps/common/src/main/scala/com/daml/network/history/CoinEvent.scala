@@ -19,38 +19,38 @@ import scala.jdk.OptionConverters.*
 
 case class Transfer(
     node: ExerciseNode[
-      cc.coin.CoinRules_Transfer,
-      cc.coin.TransferResult,
+      cc.coinrules.CoinRules_Transfer,
+      cc.coinrules.TransferResult,
     ]
 )
 
 object Transfer extends ExerciseNodeCompanion {
-  override type Tpl = cc.coin.CoinRules
-  override type Arg = cc.coin.CoinRules_Transfer
-  override type Res = cc.coin.TransferResult
+  override type Tpl = cc.coinrules.CoinRules
+  override type Arg = cc.coinrules.CoinRules_Transfer
+  override type Res = cc.coinrules.TransferResult
 
-  override val template = cc.coin.CoinRules.COMPANION
-  override val choice = cc.coin.CoinRules.CHOICE_CoinRules_Transfer
+  override val template = cc.coinrules.CoinRules.COMPANION
+  override val choice = cc.coinrules.CoinRules.CHOICE_CoinRules_Transfer
 
-  override val argDecoder = cc.coin.CoinRules_Transfer.valueDecoder()
-  override def argToValue(arg: cc.coin.CoinRules_Transfer) = arg.toValue
+  override val argDecoder = cc.coinrules.CoinRules_Transfer.valueDecoder()
+  override def argToValue(arg: cc.coinrules.CoinRules_Transfer) = arg.toValue
 
-  override val resDecoder = cc.coin.TransferResult.valueDecoder
-  override def resToValue(res: cc.coin.TransferResult) = res.toValue
+  override val resDecoder = cc.coinrules.TransferResult.valueDecoder
+  override def resToValue(res: cc.coinrules.TransferResult) = res.toValue
 }
 
-case class Tap(node: ExerciseNode[coinCodegen.CoinRules_DevNet_Tap, coinCodegen.Coin.ContractId])
+case class Tap(node: ExerciseNode[cc.coinrules.CoinRules_DevNet_Tap, coinCodegen.Coin.ContractId])
 
 object Tap extends ExerciseNodeCompanion {
-  override type Tpl = coinCodegen.CoinRules
-  override type Arg = coinCodegen.CoinRules_DevNet_Tap
+  override type Tpl = cc.coinrules.CoinRules
+  override type Arg = cc.coinrules.CoinRules_DevNet_Tap
   override type Res = cc.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
-  override val template = coinCodegen.CoinRules.COMPANION
-  override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_DevNet_Tap
+  override val template = cc.coinrules.CoinRules.COMPANION
+  override val choice = cc.coinrules.CoinRules.CHOICE_CoinRules_DevNet_Tap
 
-  override val argDecoder = coinCodegen.CoinRules_DevNet_Tap.valueDecoder()
-  override def argToValue(arg: coinCodegen.CoinRules_DevNet_Tap) = arg.toValue
+  override val argDecoder = cc.coinrules.CoinRules_DevNet_Tap.valueDecoder()
+  override def argToValue(arg: cc.coinrules.CoinRules_DevNet_Tap) = arg.toValue
 
   override val resDecoder =
     cc.coin.CoinCreateSummary.valueDecoder(cid =>
@@ -60,14 +60,14 @@ object Tap extends ExerciseNodeCompanion {
 }
 
 object Mint extends ExerciseNodeCompanion {
-  override type Tpl = coinCodegen.CoinRules
-  override type Arg = coinCodegen.CoinRules_Mint
+  override type Tpl = cc.coinrules.CoinRules
+  override type Arg = cc.coinrules.CoinRules_Mint
   override type Res = cc.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]
 
-  override val template = coinCodegen.CoinRules.COMPANION
-  override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_Mint
+  override val template = cc.coinrules.CoinRules.COMPANION
+  override val choice = cc.coinrules.CoinRules.CHOICE_CoinRules_Mint
 
-  override val argDecoder = coinCodegen.CoinRules_Mint.valueDecoder()
+  override val argDecoder = cc.coinrules.CoinRules_Mint.valueDecoder()
   override def argToValue(arg: Arg) = arg.toValue
 
   override val resDecoder =
@@ -172,13 +172,13 @@ object LockedCoinExpireCoin extends ExerciseNodeCompanion {
 }
 
 object CoinRules_BuyMemberTraffic extends ExerciseNodeCompanion {
-  override type Tpl = coinCodegen.CoinRules
-  override type Arg = coinCodegen.CoinRules_BuyMemberTraffic
+  override type Tpl = cc.coinrules.CoinRules
+  override type Arg = cc.coinrules.CoinRules_BuyMemberTraffic
   override type Res =
     Tuple2[MemberTraffic.ContractId, Optional[cc.coin.Coin.ContractId]]
-  override val choice = coinCodegen.CoinRules.CHOICE_CoinRules_BuyMemberTraffic
-  override val template = coinCodegen.CoinRules.COMPANION
-  override val argDecoder = coinCodegen.CoinRules_BuyMemberTraffic.valueDecoder()
+  override val choice = cc.coinrules.CoinRules.CHOICE_CoinRules_BuyMemberTraffic
+  override val template = cc.coinrules.CoinRules.COMPANION
+  override val argDecoder = cc.coinrules.CoinRules_BuyMemberTraffic.valueDecoder()
 
   override def argToValue(arg: Arg): Value = arg.toValue
 

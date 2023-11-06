@@ -5,7 +5,7 @@ import DA.Text as Text
 import DA.Time
 import DA.Exception
 import Daml.Script
-import CC.Coin
+import CC.CoinRules
 import CC.Expiry
 import CC.Scripts.Util
 import CC.Schedule

@@ -641,9 +641,9 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
   }
 
   private[this] def cleanAndAddNewSchedule(
-      start: AssignedContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules],
+      start: AssignedContract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules],
       newSchedule: Tuple2[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]],
-  )(implicit fp: FixtureParam): cc.coin.CoinRules.ContractId = {
+  )(implicit fp: FixtureParam): cc.coinrules.CoinRules.ContractId = {
     sv1ScanBackend
       .getCoinRules()
       .payload

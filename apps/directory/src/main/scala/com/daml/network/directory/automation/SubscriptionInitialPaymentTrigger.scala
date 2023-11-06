@@ -46,7 +46,7 @@ class SubscriptionInitialPaymentTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     def rejectPayment(
         reason: String,
-        transferContext: cc.coin.AppTransferContext,
+        transferContext: cc.coinrules.AppTransferContext,
         disclosedContracts: DisclosedContracts.NE,
     ) = {
       logger.warn(s"rejecting initial subscription payment: $reason")
@@ -62,7 +62,7 @@ class SubscriptionInitialPaymentTrigger(
         contextId: directoryCodegen.DirectoryEntryContext.ContractId,
         entryName: String,
         deduplicationOffset: String,
-        transferContext: cc.coin.AppTransferContext,
+        transferContext: cc.coinrules.AppTransferContext,
         disclosedContracts: DisclosedContracts.NE,
     ) = {
       val cmd =

@@ -9,7 +9,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc.coin.invalidtransferreason
+import com.daml.network.codegen.java.cc.coinrules.invalidtransferreason
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   transferoffer as transferOffersCodegen,

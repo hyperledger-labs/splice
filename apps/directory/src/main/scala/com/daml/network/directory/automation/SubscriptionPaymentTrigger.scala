@@ -48,7 +48,7 @@ class SubscriptionPaymentTrigger(
     val provider = store.providerParty
     def rejectPayment(
         reason: String,
-        transferContext: cc.coin.AppTransferContext,
+        transferContext: cc.coinrules.AppTransferContext,
         disclosedContracts: DisclosedContracts.NE,
         log: String => Unit = logger.warn(_),
     ) = {
@@ -68,7 +68,7 @@ class SubscriptionPaymentTrigger(
           directoryCodegen.DirectoryEntry,
         ],
         deduplicationOffset: String,
-        transferContext: cc.coin.AppTransferContext,
+        transferContext: cc.coinrules.AppTransferContext,
         disclosedContracts: DisclosedContracts.NE,
     ) = {
       val cmd =

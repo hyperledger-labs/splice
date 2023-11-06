@@ -3,6 +3,7 @@ module CN.Wallet.TransferOffer where
 import DA.Text
 
 import CC.Coin
+import CC.CoinRules
 import CC.Round
 import CN.Util.Assert
 import CN.Wallet.Payment
@@ -84,7 +85,7 @@ template AcceptedTransferOffer
         now <- getTime
         require "Offer has not expired" (now < expiresAt)
         contextRound <- exercise @OpenMiningRound transferContext.context.openMiningRound (OpenMiningRound_Fetch sender)
-        ccAmount <- paymentAmountToCC svc sender contextRound amount
+        ccAmount <- paymentAmountToCC svc contextRound amount
         let
           transfer = Transfer with
             sender

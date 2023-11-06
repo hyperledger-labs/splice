@@ -3,6 +3,7 @@ module CN.Cns where
 import DA.Time
 
 import CC.Coin
+import CC.CoinRules
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 import CN.Util.Assert

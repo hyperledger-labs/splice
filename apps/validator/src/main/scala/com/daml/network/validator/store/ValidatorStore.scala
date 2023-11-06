@@ -3,6 +3,7 @@ package com.daml.network.validator.store
 import cats.syntax.traverseFilter.*
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
+  coinrules as coinrulesCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
@@ -181,7 +182,7 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
   ]]]]
 
   final def listCoinRulesTransferFollowers(
-      coinRules: AssignedContract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]
+      coinRules: AssignedContract[coinrulesCodegen.CoinRules.ContractId, coinrulesCodegen.CoinRules]
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
     multiDomainAcsStore.listAssignedContractsNotOnDomainN(
       coinRules.domain,

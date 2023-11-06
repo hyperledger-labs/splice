@@ -5,6 +5,7 @@ import DA.Time
 import Daml.Script
 
 import CC.Coin
+import CC.CoinRules
 import CC.Scripts.Util
 import CN.Cns
 import CN.Scripts.CnsRulesParameters

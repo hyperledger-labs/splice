@@ -77,7 +77,10 @@ class AdvanceOpenMiningRoundTrigger(
     (for {
       _ <- OptionT(
         store.multiDomainAcsStore
-          .lookupContractByIdOnDomain(cc.coin.CoinRules.COMPANION)(domainId, task.work.coinRulesId)
+          .lookupContractByIdOnDomain(cc.coinrules.CoinRules.COMPANION)(
+            domainId,
+            task.work.coinRulesId,
+          )
       )
       _ <- task.work.openRounds.toSeq.traverse(co =>
         OptionT(
@@ -94,7 +97,7 @@ class AdvanceOpenMiningRoundTrigger(
 
 object AdvanceOpenMiningRoundTrigger {
   case class Task(
-      coinRulesId: cc.coin.CoinRules.ContractId,
+      coinRulesId: cc.coinrules.CoinRules.ContractId,
       openRounds: SvSvcStore.OpenMiningRoundTriple,
   ) extends PrettyPrinting {
 

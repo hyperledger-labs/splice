@@ -4,7 +4,7 @@ import DA.Assert
 import DA.Time
 import Daml.Script
 
-import CC.Coin
+import CC.CoinRules
 import CC.CoinConfig
 import CC.Fees
 import CC.Schedule

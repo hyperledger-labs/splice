@@ -165,8 +165,8 @@ object SvcTables extends AcsTables with NamedLogging {
                 svCandidateName = Some(contract.payload.svName),
               )
           }
-        case t if t == QualifiedName(cc.coin.CoinRules.TEMPLATE_ID) =>
-          tryToDecode(cc.coin.CoinRules.COMPANION, createdEvent, createdEventBlob)(
+        case t if t == QualifiedName(cc.coinrules.CoinRules.TEMPLATE_ID) =>
+          tryToDecode(cc.coinrules.CoinRules.COMPANION, createdEvent, createdEventBlob)(
             SvcAcsStoreRowData(_)
           )
         case t if t == QualifiedName(cc.coin.Coin.TEMPLATE_ID) =>

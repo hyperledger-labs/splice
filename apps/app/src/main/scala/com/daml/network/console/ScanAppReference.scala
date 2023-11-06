@@ -3,7 +3,8 @@ package com.daml.network.console
 import akka.actor.ActorSystem
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.round.types.Round
-import com.daml.network.codegen.java.cc.coin.{CoinRules, FeaturedAppRight}
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.coinrules.{AppTransferContext, CoinRules}
 import com.daml.network.codegen.java.cc.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -92,7 +93,7 @@ abstract class ScanAppReference(
   @Help.Summary(
     "Returns the transfer context required for third-party apps."
   )
-  def getUnfeaturedAppTransferContext(now: CantonTimestamp): cc.coin.AppTransferContext = {
+  def getUnfeaturedAppTransferContext(now: CantonTimestamp): AppTransferContext = {
     getTransferContextWithInstances(now).toUnfeaturedAppTransferContext()
   }
 

@@ -4,7 +4,7 @@ import cats.implicits.*
 import cats.kernel.Monoid
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.coin.CoinRules
+import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
@@ -39,7 +39,7 @@ class InMemoryScanStore(
   ): Future[Option[ContractWithState[CoinRules.ContractId, CoinRules]]] =
     for {
       contracts <- multiDomainAcsStore
-        .listContracts(cc.coin.CoinRules.COMPANION, HardLimit.tryCreate(1))
+        .listContracts(CoinRules.COMPANION, HardLimit.tryCreate(1))
     } yield contracts.headOption
 
   override def lookupCnsRules()(implicit

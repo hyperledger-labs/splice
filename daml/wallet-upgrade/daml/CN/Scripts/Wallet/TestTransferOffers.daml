@@ -5,6 +5,7 @@ import DA.Time
 import Daml.Script
 
 import CC.Coin
+import CC.CoinRules
 import CN.Wallet.Install
 import CN.Wallet.Payment
 

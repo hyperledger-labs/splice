@@ -6,7 +6,7 @@ import DA.Assert
 import DA.Foldable (forA_)
 import DA.Time
 import DA.Set qualified as Set
-import CC.Coin (AppTransferContext(..))
+import CC.CoinRules (AppTransferContext(..))
 import CC.Round
 import CN.Util.Assert
 import CN.Wallet.Payment
