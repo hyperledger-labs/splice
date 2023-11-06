@@ -70,7 +70,7 @@ export const UserProvider: React.FC<{
     );
     const error = auth?.error;
     if (error) {
-      console.warn(`Auth0 login error: ${error.message}`);
+      console.warn(`oidc login error: ${error.message}`);
     }
   }
 
