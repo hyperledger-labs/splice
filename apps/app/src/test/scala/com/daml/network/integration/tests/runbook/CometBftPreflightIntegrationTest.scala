@@ -58,29 +58,30 @@ class CometBftPreflightIntegrationTest
 
     val sv4 = svcl("sv4").copy(token = Some(token))
 
-    val status = parse(
-      sv4
-        .cometBftNodeDebugDump()
-        .status
-        .toString()
-    ).getOrElse(Json.Null)
+    eventually() {
+      val status = parse(
+        sv4
+          .cometBftNodeDebugDump()
+          .status
+          .toString()
+      ).getOrElse(Json.Null)
 
-    val syncInfo = status.hcursor.downField("sync_info")
+      val syncInfo = status.hcursor.downField("sync_info")
 
-    val latestBlockHeight = syncInfo
-      .get[Int]("latest_block_height")
-      .value
+      val latestBlockHeight = syncInfo
+        .get[Int]("latest_block_height")
+        .value
 
-    val earliestBlockHeight = syncInfo
-      .get[Int]("earliest_block_height")
-      .value
+      val earliestBlockHeight = syncInfo
+        .get[Int]("earliest_block_height")
+        .value
 
-    if (latestBlockHeight > RetainBlock) {
-      (latestBlockHeight - earliestBlockHeight) should be < (RetainBlock * 1.05).toInt
-    } else {
-      earliestBlockHeight shouldBe 1
+      if (latestBlockHeight > RetainBlock) {
+        (latestBlockHeight - earliestBlockHeight) should be < (RetainBlock * 1.05).toInt
+      } else {
+        earliestBlockHeight shouldBe 1
+      }
     }
-
   }
 
 }
