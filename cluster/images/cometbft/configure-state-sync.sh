@@ -26,20 +26,14 @@ function _configure_state_sync() {
   echo "  trust_height = $trust_height"
   echo "  trust_hash = \"$trust_hash\""
   echo "  trust_period = \"$trust_period\""
+  echo
 
   # Update CometBFT config
-  cp "${config_file}" "${config_file}.orig"  # copy config before making changes for later comparison
   sed -i "s|STATE_SYNC_ENABLE|${enable}|" "${config_file}"
   sed -i "s|STATE_SYNC_RPC_SERVERS|\"${rpc_servers}\"|" "${config_file}"
   sed -i "s|STATE_SYNC_TRUST_HEIGHT|${trust_height}|" "${config_file}"
   sed -i "s|STATE_SYNC_TRUST_HASH|\"${trust_hash}\"|" "${config_file}"
   sed -i "s|STATE_SYNC_TRUST_PERIOD|\"${trust_period}\"|" "${config_file}"
-
-  # Log config diff after update (to aid debugging)
-  echo
-  echo "Configuration changes made:"
-  diff -u "${config_file}.orig" "${config_file}" || :
-  rm "${config_file}.orig"
 }
 
 enable="${STATE_SYNC_ENABLE:-false}"

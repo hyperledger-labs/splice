@@ -21,41 +21,6 @@ spec:
         app: {{ $fullName }}
     spec:
       containers:
-        # Temporarily added container to allow configuring CometBFT state sync dynamically
-        # TODO(#7779): Move this logic into a pre-bootstrap script in the main container once the drivers team
-        #   publishes a new CometBFT image with the required tooling.
-        - name: "{{ $fullName }}-init"
-          image: "{{ $.Values.imageRepo }}/cometbft-init:{{ $.Values.cluster.imageTag }}"
-          imagePullPolicy: Always
-          volumeMounts:
-            - mountPath: /initial-config
-              name: initial-config
-            - mountPath: /config
-              name: config
-          command:
-            - /bin/sh
-            - -c
-            - -x
-            - |
-              # Copy over root CA certs to make them available to the CometBFT container
-              # This is needed to enable state sync over HTTPS
-              cp -a /etc/ssl/certs /config/
-              # Configure state sync and signal when done
-              cp -a /initial-config/. /config/
-              /configure-state-sync.sh /config/config.toml \
-                && touch /config/config_done \
-                && sleep infinity
-          env:
-            - name: STATE_SYNC_ENABLE
-              value: "{{ and $.Values.stateSync.enable (ne $.Values.founder.nodeId $.Values.node.id) }}"
-            - name: STATE_SYNC_RPC_SERVERS
-              value: "{{ $.Values.stateSync.rpcServers }}"
-            # the trust height will be set to these many blocks earlier than the latest block height
-            # this should always be at least as much as the height interval b/w snapshots
-            - name: STATE_SYNC_MIN_TRUST_HEIGHT_AGE
-              value: "{{ $.Values.stateSync.minTrustHeightAge | default $.Values.node.snapshotHeightDelta }}"
-            - name: STATE_SYNC_TRUST_PERIOD
-              value: "{{ $.Values.stateSync.trustPeriod }}"
         - name: {{ $fullName }}
           image: "{{ $.Values.imageRepo }}/{{ $.Values.imageName }}:{{ $.Values.cluster.imageTag }}"
           imagePullPolicy: Always
@@ -75,9 +40,10 @@ spec:
               path: /health
               port: rpc
           volumeMounts:
+            - mountPath: /cometbft/initial-config
+              name: initial-config
             - mountPath: /cometbft/config
               name: config
-              readOnly: true
             - mountPath: /cometbft/initial-data
               name: initial-data
             - mountPath: /cometbft/data
@@ -87,16 +53,25 @@ spec:
           env:
             - name: HOME
               value: /cometbft
-            - name: SSL_CERT_DIR
-              value: /cometbft/config/certs
+            - name: STATE_SYNC_ENABLE
+              value: "{{ and $.Values.stateSync.enable (ne $.Values.founder.nodeId $.Values.node.id) }}"
+            - name: STATE_SYNC_RPC_SERVERS
+              value: "{{ $.Values.stateSync.rpcServers }}"
+            # the trust height will be set to these many blocks earlier than the latest block height
+            # this should always be at least as much as the height interval b/w snapshots
+            - name: STATE_SYNC_MIN_TRUST_HEIGHT_AGE
+              value: "{{ $.Values.stateSync.minTrustHeightAge | default $.Values.node.snapshotHeightDelta }}"
+            - name: STATE_SYNC_TRUST_PERIOD
+              value: "{{ $.Values.stateSync.trustPeriod }}"
           command:
             - /bin/sh
             - -c
             - -x
+            - -e
             - |
-              cp -n "${HOME}"/initial-data/* "${HOME}"/data
-              # Wait for configuration to be done
-              [ -f "$HOME"/config/config_done ] && \
+              cp -a "${HOME}"/initial-config/. "${HOME}"/config/
+              "${HOME}"/configure-state-sync.sh "${HOME}"/config/config.toml
+              cp -n "${HOME}"/initial-data/* "${HOME}"/data || :
               cometbft-canton-network start \
               {{ include "cliArgs" (list $ .) | indent 14 | trim }}
           {{- with $.Values.resources }}

@@ -6,7 +6,6 @@ images := \
 	canton-mediator \
 	canton-cometbft-sequencer \
 	cometbft \
-	cometbft-init \
 	\
 	cn-app \
 	sv-app \
