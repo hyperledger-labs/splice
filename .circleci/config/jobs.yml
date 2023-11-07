@@ -322,7 +322,7 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Apply Pulumi configuration to cluster
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID --keep SLACK_ACCESS_TOKEN"
           gce_authenticate: true
           cmd: |
             if [[ << parameters.restore_cluster >> == true ]]; then

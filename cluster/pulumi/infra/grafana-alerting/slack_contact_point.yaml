@@ -1,0 +1,19 @@
+apiVersion: 1
+contactPoints:
+  - name: cn-ci-channel-notification
+    disable_resolve_message: false
+    default: true
+    receivers:
+      - uid: cn-ci
+        type: slack
+        settings:
+          recipient: C05DT77QF5M
+          token: $SLACK_ACCESS_TOKEN
+          username: grafana
+          # <string>
+          title: |
+            {{ template "slack_title" . }}
+          text: |
+            {{ template "slack_message" . }}
+deleteContactPoints:
+  - uid: grafana-default-email

@@ -1,6 +1,10 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { CLUSTER_DNS_NAME } from 'cn-pulumi-common';
+import * as fs from 'fs';
+import { local } from '@pulumi/command';
+import { Input } from '@pulumi/pulumi';
+import { CLUSTER_BASENAME, CLUSTER_DNS_NAME } from 'cn-pulumi-common';
+import { REPO_ROOT } from 'cn-pulumi-common';
 
 import { clusterBasename } from './config';
 import { createGrafanaDashboards } from './grafana-dashboards';
@@ -44,6 +48,9 @@ function istioVirtualService(
   );
 }
 
+const grafanaExternalUrl = `https://grafana.${CLUSTER_DNS_NAME}`;
+const enableAlerts = process.env.GCP_CLUSTER_PROD_LIKE == 'true';
+
 export function configureObservability(dependsOn: pulumi.Resource[] = []): void {
   const namespace = new k8s.core.v1.Namespace(
     'observabilty',
@@ -55,10 +62,10 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     { dependsOn }
   );
   const namespaceName = namespace.metadata.name;
-  new k8s.helm.v3.Release('observability-metrics', {
+  const prometheusStack = new k8s.helm.v3.Release('observability-metrics', {
     name: 'prometheus-grafana-monitoring',
     chart: 'kube-prometheus-stack',
-    version: '48.2.0',
+    version: '52.1.0',
     namespace: namespaceName,
     repositoryOpts: {
       repo: 'https://prometheus-community.github.io/helm-charts',
@@ -87,6 +94,9 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
       },
       alertmanager: {
         enabled: false, // not required yet
+      },
+      coreDns: {
+        enabled: false,
       },
       prometheusOperator: {
         admissionWebhooks: {
@@ -136,6 +146,14 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             folderAnnotation: 'folder',
             provider: { foldersFromFilesStructure: true, allowUiUpdates: true },
           },
+          alerts: {
+            enabled: true,
+          },
+        },
+        'grafana.ini': {
+          server: {
+            root_url: grafanaExternalUrl,
+          },
         },
         adminUser: 'cn-admin',
         adminPassword: 'canton_network_!password',
@@ -149,9 +167,83 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     },
   });
 
+  // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
+  const prometheusStackCrdVersion = '0.68.0';
+  new local.Command(
+    `update-prometheus-crd-${prometheusStackCrdVersion}`,
+    {
+      create: `bash prometheus-crd-update.sh ${prometheusStackCrdVersion}`,
+    },
+    { dependsOn: prometheusStack }
+  );
+
   istioVirtualService(namespace, 'prometheus', 'prometheus-prometheus', 9090);
   istioVirtualService(namespace, 'grafana', 'grafana', 80);
   // In the observability cluster, we install a version of the dashboards with a filter
   // that prevents running expensive queries when the dashboard just loads
   createGrafanaDashboards(namespaceName, clusterBasename == 'observability');
+  // enable the slack alerts only for "prod" clusters
+  if (enableAlerts) {
+    createGrafanaContactPoints(namespaceName);
+  }
+  createGrafanaAlerting(namespaceName);
+}
+
+function createGrafanaContactPoints(namespace: Input<string>) {
+  new k8s.core.v1.Secret(
+    'slack-alert-notification-channel',
+    {
+      metadata: {
+        namespace: namespace,
+        labels: {
+          grafana_alert: '',
+        },
+      },
+      data: {
+        'slackContactPoint.yaml': Buffer.from(
+          readFile('slack_contact_point.yaml').replaceAll(
+            '$SLACK_ACCESS_TOKEN',
+            process.env.SLACK_ACCESS_TOKEN as string
+          )
+        ).toString('base64'),
+      },
+    },
+    {
+      // the sidecar reacts to k8s events, so if it deletes it afterward, as it has the same name it will just delete the file
+      deleteBeforeReplace: true,
+    }
+  );
+}
+
+function createGrafanaAlerting(namespace: Input<string>) {
+  new k8s.core.v1.ConfigMap(
+    'grafana-alerting',
+    {
+      metadata: {
+        namespace: namespace,
+        labels: {
+          grafana_alert: '',
+        },
+      },
+      data: {
+        ...(enableAlerts
+          ? { 'notification_policies.yaml': readFile('notification_policies.yaml') }
+          : {}),
+        ...{
+          'cometbft_alerts.yaml': readFile('cometbft_alerts.yaml'),
+          'templates.yaml': readFile('templates.yaml')
+            .replaceAll('$CLUSTER_BASENAME', CLUSTER_BASENAME)
+            .replaceAll('$GRAFANA_EXTERNAL_URL', grafanaExternalUrl),
+        },
+      },
+    },
+    {
+      // the sidecar reacts to k8s events, so if it deletes it afterward, as it has the same name it will just delete the file
+      deleteBeforeReplace: true,
+    }
+  );
+}
+
+function readFile(file: string) {
+  return fs.readFileSync(`${REPO_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`, 'utf-8');
 }

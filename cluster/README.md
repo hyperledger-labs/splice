@@ -747,6 +747,7 @@ We collect metrics from various components in the system into Prometheus, which 
 - Mediators (the component in the Canton domain responsible for collecting and verifying confirmations from participants)
 - CometBFT (the replication service currently used to create a BFT sequencing service)
 - PostgreSQL
+- All our apps
 
 Prometheus may be configured to collect more metrics by deploying `ServiceMonitor` resources in k8s. We typically do that as part of the Helm chart of the corresponding component. To access and see the raw collected data in Prometheus, browse to `prometheus.<CLUSTER_DNS>`
 
@@ -786,6 +787,45 @@ Our policies can be configured and extended via the
 When an alert triggers, we are notified over Slack on the `#team-canton-network-internal-ci` channel.
 At the time of writing, we have only configured alerts on unexpectedly high CPU usage and
 disk volume utilization beyond 80%.
+
+##### Grafana Alerts
+
+In the `grafana-alerting` folder we configure the alerting system for grafana, with the following alerts being sent over slack:
+
+- CometBFT available voting power <= 2/3 of the total voting power
+
+**Note**
+
+The Grafana alerting UI will also show the existing alerts that are configured in prometheus itself.
+It will also show the state of the alert (firing/pending).
+These alerts will not trigger notifications through the grafana alert manager.
+This is not something that grafana will support (https://github.com/grafana/grafana/issues/73447).
+For those alerts to actually trigger a notification we will have to configure the prometheus alert manager.
+
+###### Creating an alert
+
+Creating a new alert can be done through the UI.
+- Follow all the steps and configure the alert as you wish
+- Save the new alert
+- View the alert after saving it
+- Click `View Yaml`
+- Copy the yaml in a new/existing provisioning file in the `grafana-alerting` folder
+
+###### Updating an alert
+
+Updating a grafana alert is not that straightforward, as the UI doesn't let us edit it if it's provisioned through files.
+To edit an alert follow the following steps:
+- Go to the alert and click Copy
+- Accept the warning that it will not be copied as a provisioned rule
+- Edit the alert as you wish
+- Set a new `Evaluation group`. This is required so that we can save the alert.
+- Save the new alert
+- View the new alert, and click `View Yaml`
+- Copy the yaml in the repository overwriting the existing alert
+- Revert the changes to the alert title, uid and evaluation group
+
+This can be simplified in the future if we change to use a database for the grafana storage. Allowing us to manually `unmark` the alerts as
+provisioned.
 
 ### Checking Pod Node Assignments and Memory Usage
 
@@ -1573,4 +1613,3 @@ When [deploying via CI](#manually-deploying-via-ci), you can use the `bootstrapp
   * [Conceptual Overview](https://www.pulumi.com/docs/concepts/)
   * [Google Cloud Objects](https://www.pulumi.com/registry/packages/gcp/api-docs/)
   * [Kubernetes Objects](https://www.pulumi.com/registry/packages/kubernetes/api-docs/)
-

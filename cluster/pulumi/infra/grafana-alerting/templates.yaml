@@ -1,0 +1,31 @@
+# config file version
+apiVersion: 1
+
+# List of templates to import or update
+# source https://community.grafana.com/t/working-configuration-example-for-alerts-templating-telegram-and-slack/80988
+templates:
+  - name: slack
+    template: |
+      {{ define "slack_title" }}
+        {{ if gt (len .Alerts.Firing) 0 }} 🔥 $CLUSTER_BASENAME {{ len .Alerts.Firing }} alert(s) firing {{ end }}
+        {{ if gt (len .Alerts.Resolved) 0 }} ✅ $CLUSTER_BASENAME {{ len .Alerts.Resolved }} alert(s) resolved {{ end }}
+      {{ end }}
+
+      {{ define "slack_message" }}
+        {{ if gt (len .Alerts.Firing) 0 }} {{ range .Alerts.Firing }} {{ template "slack_alert_firing" .}} {{ end }} {{ end }}
+        {{ if gt (len .Alerts.Resolved) 0 }} {{ range .Alerts.Resolved }} {{ template "slack_alert_resolved" .}} {{ end }} {{ end }}
+      {{ end }}
+
+      {{ define "slack_alert_firing" }}
+        Severity: *{{ .Annotations.severity }}*
+        *{{ .Labels.alertname }}*
+        {{ .Annotations.summary }}
+        {{ .Annotations.description }}
+        {{ .Labels.service }}
+      {{ end }}
+
+      {{ define "slack_alert_resolved" }}
+        *Resolved {{ .Labels.alertname }}*
+        {{ .Annotations.summary }}
+        {{ .Annotations.description }}
+      {{ end }}
