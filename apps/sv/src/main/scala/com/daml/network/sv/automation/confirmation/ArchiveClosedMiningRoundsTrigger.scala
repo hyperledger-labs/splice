@@ -109,7 +109,8 @@ class ArchiveClosedMiningRoundsTrigger(
     val domainId = closedRound.domain
     for {
       // lookup closed mining round once again in the ACS to check if it was
-      // archived or reassigned
+      // archived or reassigned; if the latter, listArchivableClosedMiningRounds
+      // can give us a corrected task with the new assignment
       closedRoundExists <- store.multiDomainAcsStore
         .lookupContractByIdOnDomain(cc.round.ClosedMiningRound.COMPANION)(
           domainId,

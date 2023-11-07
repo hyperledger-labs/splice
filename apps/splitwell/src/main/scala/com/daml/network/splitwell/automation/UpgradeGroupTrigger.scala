@@ -73,7 +73,9 @@ private[automation] class UpgradeGroupTrigger(
   )(implicit tc: TraceContext): Future[Boolean] = {
     val (groupId, domainId) = task
     for {
-      // lookup group once again in the source domain to check if it is assigned there
+      // lookup group once again in the source domain to check if it is assigned there;
+      // as reassignment is the purpose of this trigger, we need a new task even
+      // if domainId is wrong for any reason but success of this trigger
       groupExists <- store.multiDomainAcsStore
         .lookupContractByIdOnDomain(splitwellCodegen.Group.COMPANION)(domainId, groupId)
         .map(_.isDefined)

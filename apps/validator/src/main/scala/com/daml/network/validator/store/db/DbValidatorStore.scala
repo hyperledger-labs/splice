@@ -539,7 +539,6 @@ class DbValidatorStore(
     topupCodegen.ValidatorTopUpState,
   ]]]] = waitUntilAcsIngested {
     for {
-      // TODO(#4913): read from all domains in the global domain
       resultWithOffset <- storage
         .querySingle(
           selectFromAcsTableWithOffset(

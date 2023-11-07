@@ -110,6 +110,8 @@ class ExecuteConfirmedActionTrigger(
       confirmation: AssignedContract[Confirmation.ContractId, Confirmation]
   )(implicit tc: TraceContext): Future[Boolean] = {
     // Add new cases as we port more triggers which require confirmation
+    // we check *OnDomain below because we expect to get retriggered with the
+    // corrected domain if the contract in question is being reassigned
     confirmation.payload.action match {
       case arcCoinRules: ARC_CoinRules =>
         arcCoinRules.coinRulesAction match {

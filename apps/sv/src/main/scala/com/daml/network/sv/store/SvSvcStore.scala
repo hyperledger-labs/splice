@@ -336,6 +336,8 @@ trait SvSvcStore
   )(implicit
       tc: TraceContext
   ): Future[Seq[ExpiredRewardCouponsBatch]] = {
+    // the below restrict by domain because a batch can be operated on only if
+    // they share a domain with svcrules and the round
     lookupOldestClosedMiningRound()
       .flatMap {
         case Some(closedRound) =>
@@ -369,7 +371,7 @@ trait SvSvcStore
     * Note: The QueryResult in the return value is composed of the closed mining round contract
     * and the offset from the query for the confirmation contract.
     */
-  def listArchivableClosedMiningRounds(
+  final def listArchivableClosedMiningRounds(
       limit: Limit = Limit.DefaultLimit
   )(implicit tc: TraceContext): Future[
     Seq[QueryResult[
@@ -381,6 +383,10 @@ trait SvSvcStore
   ] = {
     for {
       domain <- getSvcRules().map(_.domain)
+      // we limit to the SvcRules domain because this is used by a polling trigger,
+      // which exercises on SvcRules, so all operands must share its domain.
+      // There's no harm "missing" closed rounds awaiting reassignment, because
+      // they'll be seen on the next poll
       closedRounds <- multiDomainAcsStore.listContractsOnDomain(
         cc.round.ClosedMiningRound.COMPANION,
         domain,

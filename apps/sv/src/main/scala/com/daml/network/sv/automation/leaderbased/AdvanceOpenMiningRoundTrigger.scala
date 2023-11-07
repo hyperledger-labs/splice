@@ -75,6 +75,9 @@ class AdvanceOpenMiningRoundTrigger(
 
     val domainId = task.work.openRounds.domain
     (for {
+      // lookupOpenMiningRoundTriple and lookupCoinRules will yield corrected
+      // domains on next task listing if these have been invalidated by
+      // domain reassignment
       _ <- OptionT(
         store.multiDomainAcsStore
           .lookupContractByIdOnDomain(cc.coinrules.CoinRules.COMPANION)(

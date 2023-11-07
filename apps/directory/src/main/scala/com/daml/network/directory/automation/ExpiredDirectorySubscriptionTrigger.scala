@@ -47,6 +47,9 @@ class ExpiredDirectorySubscriptionTrigger(
       task: ScheduledTaskTrigger.ReadyTask[DirectoryStore.IdleDirectorySubscription]
   )(implicit tc: TraceContext): Future[Boolean] =
     (for {
+      // if the contracts are no longer on state's domain, we should remove the
+      // task and wait for listExpiredDirectorySubscriptions to return it again
+      // once it's been migrated, with a corrected domain
       _ <- OptionT(
         store.multiDomainAcsStore.lookupContractByIdOnDomain(
           subsCodegen.SubscriptionIdleState.COMPANION

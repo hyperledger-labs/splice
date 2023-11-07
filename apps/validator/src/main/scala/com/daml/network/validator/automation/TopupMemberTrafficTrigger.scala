@@ -210,6 +210,8 @@ class TopupMemberTrafficTrigger(
             .withDomainId(activeDomainId)
             .yieldResult()
             .flatMap(ev =>
+              // topping up is tied to the domain in scope here, which was
+              // picked from the on-ledger domain config
               store.multiDomainAcsStore.getContractByIdOnDomain(ValidatorTopUpState.COMPANION)(
                 activeDomainId,
                 ev.contractId,

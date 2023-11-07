@@ -75,27 +75,6 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
     }
   })
 
-  // Variant of lookupContractByIdOnDomain that will fail the future
-  // if the contract is active but not in state ContractState.Assigned(domain).
-  // This is particularly useful in automation where this will ensure it retries until
-  // all contracts have finished transferring.
-  def lookupContractByIdOnDomainOrRetry[C, TCid <: ContractId[_], T](
-      companion: C
-  )(domain: DomainId, id: ContractId[_])(implicit
-      ec: ExecutionContext,
-      companionClass: ContractCompanion[C, TCid, T],
-      traceContext: TraceContext,
-  ): Future[Option[Contract[TCid, T]]] =
-    lookupContractById(companion)(id).map(_.map { c =>
-      if (c.state == ContractState.Assigned(domain)) {
-        c.contract
-      } else {
-        throw Status.FAILED_PRECONDITION
-          .withDescription(show"Contract $id is active but not on domain $domain: ${c.state}")
-          .asRuntimeException()
-      }
-    })
-
   /** Like `#lookupContractById` but only returns the [[ContractState]], not the
     * full decoded contract.
     */
