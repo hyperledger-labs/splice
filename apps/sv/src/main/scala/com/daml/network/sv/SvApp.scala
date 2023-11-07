@@ -319,7 +319,6 @@ class SvApp(
       // ---------------------------------------
 
       handler = new HttpSvHandler(
-        globalDomain,
         config.ledgerApiUser,
         svAutomation,
         svcAutomation,
@@ -329,7 +328,6 @@ class SvApp(
         localDomainNode,
         retryProvider,
         new SvcPartyMigration(
-          globalDomain,
           svAutomation,
           svcAutomation,
           participantAdminConnection,
@@ -342,7 +340,6 @@ class SvApp(
       )
 
       adminHandler = new HttpSvAdminHandler(
-        globalDomain,
         config.acsStoreDump,
         svAutomation,
         svcAutomation,

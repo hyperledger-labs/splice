@@ -27,7 +27,6 @@ import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DomainId
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -41,7 +40,6 @@ class SvSvcAutomationService(
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
-    domainId: DomainId,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -89,7 +87,6 @@ class SvSvcAutomationService(
           svcStore,
           connection,
           node,
-          domainId,
         )
       )
       registerTrigger(
@@ -97,7 +94,6 @@ class SvSvcAutomationService(
           triggerContext,
           svcStore,
           node,
-          domainId,
         )
       )
     }

@@ -46,12 +46,11 @@ class DirectoryInstallRequestTrigger(
   )
 
   override def completeTask(
-      reqReady: AssignedContract[
+      req: AssignedContract[
         directoryCodegen.DirectoryInstallRequest.ContractId,
         directoryCodegen.DirectoryInstallRequest,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val AssignedContract(req, domainId) = reqReady
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
     for {
@@ -62,7 +61,6 @@ class DirectoryInstallRequestTrigger(
           val cmd = req.exercise(_.exerciseDirectoryInstallRequest_Reject())
           connection
             .submit(Seq(provider), Seq(), cmd)
-            .withDomainId(domainId)
             .noDedup
             .yieldUnit()
             .map(_ => TaskSuccess("rejected request for already existing installation."))
@@ -88,7 +86,6 @@ class DirectoryInstallRequestTrigger(
               ),
               deduplicationOffset = offset,
             )
-            .withDomainId(domainId)
             .yieldUnit()
             .map(_ => TaskSuccess("accepted install request."))
       }

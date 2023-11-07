@@ -328,6 +328,7 @@ class ValidatorApp(
       participantAdminConnection: ParticipantAdminConnection,
       scanConnection: ScanConnection,
   ): Future[Unit] = {
+    // TODO (#8450) config.domains.global.alias is wrong if global has migrated
     if (config.useSequencerConnectionsFromScan)
       ensureDomainRegisteredFromScan(
         config.domains.global.alias,
@@ -484,7 +485,6 @@ class ValidatorApp(
       walletManager =
         new UserWalletManager(
           ledgerClient,
-          config.domains.global.alias,
           store,
           config.ledgerApiUser,
           config.automation,
@@ -601,18 +601,8 @@ class ValidatorApp(
         retryProvider,
       )
 
-      // Adding retry here due to the domain could be disconnected by `ReconcileSequencerConnectionsTrigger`
-      // during sequencer connection being modified.
-      storeDomain <- retryProvider.retryForClientCalls(
-        "get connected domain id",
-        store.domains.getDomainId(config.domains.global.alias),
-        logger,
-      )
-
       directoryExternalHandler = new HttpExternalDirectoryHandler(
         walletManager,
-        storeDomain,
-        config.domains.global.alias,
         svcParty, // making an assumption here that the SVC party is the Directory provider party
         retryProvider,
         loggerFactory,

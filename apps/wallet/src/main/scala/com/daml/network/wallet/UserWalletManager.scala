@@ -10,7 +10,6 @@ import com.daml.network.store.Limit
 import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.lifecycle.{RunOnShutdown, *}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
@@ -27,7 +26,6 @@ import scala.concurrent.{ExecutionContext, Future}
 /** Manages all services comprising an end-user wallets. */
 class UserWalletManager(
     ledgerClient: CNLedgerClient,
-    val globalDomain: DomainAlias,
     val store: WalletStore,
     val validatorUser: String,
     automationConfig: AutomationConfig,

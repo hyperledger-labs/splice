@@ -42,7 +42,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 class HttpSvHandler(
-    globalDomain: DomainId,
     svUserName: String,
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
@@ -210,15 +209,19 @@ class HttpSvHandler(
       if (isDevNet) {
         val secret = generateRandomOnboardingSecret()
         val expiresIn = NonNegativeFiniteDuration.ofHours(1)
-        SvApp
-          .prepareValidatorOnboarding(
-            secret,
-            expiresIn,
-            svStoreWithIngestion,
-            globalDomain,
-            clock,
-            logger,
-          )
+        svcStore
+          .getSvcRules()
+          .flatMap { svcRules =>
+            SvApp
+              .prepareValidatorOnboarding(
+                secret,
+                expiresIn,
+                svStoreWithIngestion,
+                svcRules.domain,
+                clock,
+                logger,
+              )
+          }
           .flatMap {
             case Left(reason) =>
               Future.failed(
@@ -297,7 +300,7 @@ class HttpSvHandler(
           isCandidateMember = SvApp.isSvcMemberParty(candidateParty, svcRules)
           isCandidatePartyHostedOnParticipant <- participantAdminConnection
             .listPartyToParticipant(
-              globalDomain.filterString,
+              svcRules.domain.filterString,
               filterParty = candidateParty.filterString,
               filterParticipant = participantId.toProtoPrimitive,
             )
@@ -443,6 +446,7 @@ class HttpSvHandler(
     logger.info("Proposing new sequencer")
     for {
       ourParticipant <- participantAdminConnection.getParticipantId()
+      globalDomain <- svcStore.getSvcRules().map(_.domain)
       _ <- participantAdminConnection.ensureSequencerDomainState(
         globalDomain,
         sequencerId,
@@ -512,6 +516,7 @@ class HttpSvHandler(
       // to test for this.
       _ <- dummyTopologyTransaction(sequencerAdminConnection)
       _ = logger.info(s"Downloading topology and sequencer snapshot")
+      globalDomain <- svcStore.getSvcRules().map(_.domain)
       // TODO(#5339) Check if we need to be careful at which offset we query our snapshot.
       topologySnapshot <- sequencerAdminConnection.getTopologySnapshot(globalDomain)
       sequencerSnapshot <- sequencerAdminConnection.getSequencerSnapshot(
@@ -531,6 +536,7 @@ class HttpSvHandler(
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       ourParticipant <- participantAdminConnection.getParticipantId()
+      globalDomain <- svcStore.getSvcRules().map(_.domain)
       _ <- participantAdminConnection.ensureMediatorDomainState(
         globalDomain,
         mediatorId,
@@ -546,6 +552,7 @@ class HttpSvHandler(
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       ourParticipant <- participantAdminConnection.getParticipantId()
+      globalDomain <- svcStore.getSvcRules().map(_.domain)
       _ <- participantAdminConnection.ensureTrafficControlState(
         globalDomain,
         mediatorId,

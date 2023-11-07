@@ -31,8 +31,9 @@ class ReconcileSequencerConnectionsTrigger(
 ) extends PollingTrigger {
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
+      globalDomain <- coinRulesDomain()
       maybeDomainTime <- participantAdminConnection
-        .getDomainTime(globalDomainAlias, timeouts.default)
+        .getDomainTime(globalDomain, timeouts.default)
         .map(domainTime => Some(domainTime.timestamp))
         .recover {
           // Time tracker for domain not found. the domainTime is not yet available.
@@ -50,13 +51,13 @@ class ReconcileSequencerConnectionsTrigger(
               domainTime,
             )
             isModified <- participantAdminConnection.modifyDomainConnectionConfig(
-              globalDomainAlias,
+              globalDomainAlias, // TODO (#8450) how?
               modifySequencerConnections(sequencerConnections),
             )
             _ <-
               if (isModified) {
                 // reconnect to the domain for new sequencer configuration to take effect
-                participantAdminConnection.reconnectDomain(globalDomainAlias)
+                participantAdminConnection.reconnectDomain(globalDomainAlias) // TODO (#8450) how?
               } else Future.unit
           } yield ()
         case None =>
@@ -66,6 +67,9 @@ class ReconcileSequencerConnectionsTrigger(
 
     } yield false
   }
+
+  private[this] def coinRulesDomain()(implicit tc: TraceContext) =
+    scanConnection.getCoinRulesDomain()(tc)
 
   private def modifySequencerConnections(
       sequencerConnections: Seq[GrpcSequencerConnection]

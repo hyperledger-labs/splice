@@ -5,6 +5,7 @@ import cats.implicits.toTraverseOps
 import com.daml.network.codegen.java.cn as daml
 import com.daml.network.codegen.java.cn.svcrules.{MemberInfo, SvcRules}
 import com.daml.network.sv.config.CometBftConfig
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.drivers as proto
 import com.digitalasset.canton.drivers.cometbft.SvNodeConfig
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
@@ -36,15 +37,14 @@ class CometBftNode(
     */
   def reconcileNetworkConfig(
       owningSvNode: String,
-      target: daml.svcrules.SvcRules,
-      domainId: DomainId,
+      target: AssignedContract[?, daml.svcrules.SvcRules],
   )(implicit tc: TraceContext): Future[Unit] = for {
     actualConfig <- cometBftClient.readNetworkConfig()
     networkConfigChanges = diffNetworkConfig(
       owningSvNode,
-      target.members,
+      target.payload.members,
       actualConfig,
-      domainId,
+      target.domain,
       logger,
     )
     // We minimize latency by issuing updates and deletes in parallel, which is safe as we expect <= 16 SV nodes
@@ -53,9 +53,9 @@ class CometBftNode(
       if (networkConfigChanges.requests.nonEmpty) {
         val summary = CometBftNode.NetworkDiffSummary(
           actualConfig,
-          target.members,
+          target.payload.members,
           networkConfigChanges.requests,
-          domainId,
+          target.domain,
         )
         // TODO(#4925): select the governance key to use for submitting the change requests comparing the KMS (Canton ;-)) against the configured state
         val ourGovernanceKey =

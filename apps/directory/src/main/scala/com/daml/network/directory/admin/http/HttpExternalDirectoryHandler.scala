@@ -6,11 +6,11 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.http.v0.external
 import com.daml.network.http.v0.external.directory.DirectoryResource as r0
 import com.daml.network.http.v0.{definitions as d0}
+import com.daml.network.util.AssignedContract
 import com.daml.network.wallet.admin.http.HttpWalletHandlerUtil
 import com.daml.network.wallet.UserWalletManager
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry.RetryUtil
 import io.opentelemetry.api.trace.Tracer
@@ -21,8 +21,6 @@ import scala.util.Try
 
 class HttpExternalDirectoryHandler(
     override val walletManager: UserWalletManager,
-    domainId: DomainId,
-    val globalDomain: DomainAlias,
     directoryProvider: PartyId,
     retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
@@ -44,10 +42,9 @@ class HttpExternalDirectoryHandler(
       val connection = getUserWallet(user).connection
       for {
         partyId <- connection.getPrimaryParty(user)
-        installContractId <- getInstallContract(user)
-        update <- Future.successful {
-          installContractId
-            .exerciseDirectoryInstall_RequestEntry(body.name, body.url, body.description)
+        install <- getInstallContract(user)
+        update = install.exercise(
+          _.exerciseDirectoryInstall_RequestEntry(body.name, body.url, body.description)
             .map { e =>
               r0.CreateDirectoryEntryResponse.OK(
                 d0.CreateDirectoryEntryResponse(
@@ -59,10 +56,9 @@ class HttpExternalDirectoryHandler(
                 )
               )
             }
-        }
+        )
         res <- connection
           .submit(Seq(partyId), Seq(partyId), update)
-          .withDomainId(domainId)
           .noDedup
           .yieldResult()
       } yield res
@@ -105,9 +101,11 @@ class HttpExternalDirectoryHandler(
     implicit val TracedUser(user, traceContext) = tuser
 
     withSpan(s"$workflowId.createDirectoryInstall") { implicit traceContext => _ =>
-      val connection = getUserWallet(user).connection
+      val userWallet = getUserWallet(user)
+      val connection = userWallet.connection
       for {
         partyId <- connection.getPrimaryParty(user)
+        domainId <- userWallet.store.getInstall() map (_.domain)
         create <- connection
           .submit(
             Seq(partyId),
@@ -161,12 +159,11 @@ class HttpExternalDirectoryHandler(
   private def getInstallContract(user: String)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[DirectoryInstall.ContractId] = {
+  ): Future[AssignedContract[DirectoryInstall.ContractId, ?]] =
     retryProvider.retryForClientCalls(
       "fetchInstallContract",
-      getUserStore(user).flatMap(_.getDirectoryInstall().map(_.contractId)),
+      getUserStore(user).flatMap(_.getDirectoryInstall()),
       logger,
       DirectoryInstallNotFound(_),
     )
-  }
 }

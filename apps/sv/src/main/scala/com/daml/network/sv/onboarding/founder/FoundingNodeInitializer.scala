@@ -164,7 +164,6 @@ class FoundingNodeInitializer(
         svcStore,
         ledgerClient,
         cometBftNode,
-        globalDomain,
       )
       _ = svcAutomation.registerPostOnboardingTriggers()
       _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
@@ -621,7 +620,6 @@ class FoundingNodeInitializer(
       svcStore: SvSvcStore,
       ledgerClient: CNLedgerClient,
       cometBftNode: Option[CometBftNode],
-      domainId: DomainId,
   ) =
     new SvSvcAutomationService(
       clock,
@@ -632,7 +630,6 @@ class FoundingNodeInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
-      domainId,
       loggerFactory,
     )
 

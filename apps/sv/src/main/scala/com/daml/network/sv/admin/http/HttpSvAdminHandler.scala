@@ -36,7 +36,6 @@ import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -47,7 +46,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 class HttpSvAdminHandler(
-    globalDomain: DomainId,
     optAcsDumpConfig: Option[BackupDumpConfig],
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
@@ -112,15 +110,19 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.prepareValidatorOnboarding") { _ => _ =>
       val secret = generateRandomOnboardingSecret()
       val expiresIn = NonNegativeFiniteDuration.ofSeconds(body.expiresIn.toLong)
-      SvApp
-        .prepareValidatorOnboarding(
-          secret,
-          expiresIn,
-          svStoreWithIngestion,
-          globalDomain,
-          clock,
-          logger,
-        )
+      svcStore
+        .getSvcRules()
+        .flatMap { svcRules =>
+          SvApp
+            .prepareValidatorOnboarding(
+              secret,
+              expiresIn,
+              svStoreWithIngestion,
+              svcRules.domain,
+              clock,
+              logger,
+            )
+        }
         .flatMap {
           case Left(reason) =>
             Future.failed(
@@ -139,14 +141,18 @@ class HttpSvAdminHandler(
   )(tuser: TracedUser): Future[v0.SvAdminResource.ApproveSvIdentityResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.approveSvIdentity") { _ => _ =>
-      SvApp
-        .approveSvIdentity(
-          body.candidateName,
-          body.candidateKey,
-          svStoreWithIngestion,
-          globalDomain,
-          logger,
-        )
+      svcStore
+        .getSvcRules()
+        .flatMap { svcRules =>
+          SvApp
+            .approveSvIdentity(
+              body.candidateName,
+              body.candidateKey,
+              svStoreWithIngestion,
+              svcRules.domain,
+              logger,
+            )
+        }
         .flatMap {
           case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
           case Right(()) => Future.successful(v0.SvAdminResource.ApproveSvIdentityResponseOK)

@@ -34,8 +34,6 @@ class PublishLocalCometBftNodeConfigTrigger(
     store: SvSvcStore,
     connection: CNLedgerConnection,
     cometBftNode: CometBftNode,
-    // TODO (#4901) reconcile cometBft networks for multiple domains instead using one default domain id here.
-    domainId: DomainId,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -52,6 +50,8 @@ class PublishLocalCometBftNodeConfigTrigger(
         CometBftNode.extractSvNodeMemberInfo(svcRules.payload, store.key.svParty)
       )
       localSvNodeConfig <- OptionT.liftF(cometBftNode.getLocalNodeConfig())
+      // TODO (#4901) reconcile cometBft networks for multiple domains instead using one default domain id here.
+      domainId = svcRules.domain
       domainNodeConfig = svNodeMemberInfo.domainNodes.asScala.get(domainId.toProtoPrimitive)
       // create a task if the local config is different than the one we have published to the SVC
       // or if no domain bft is configured

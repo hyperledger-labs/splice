@@ -52,7 +52,7 @@ private[automation] class UpgradeGroupTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val (groupId, domainId) = task
     for {
-      preferredDomain <- store.domains.waitForDomainConnection(store.defaultAcsDomain)
+      preferredDomain <- store.defaultAcsDomainIdF
       _ <- connection.submitReassignmentAndWaitNoDedup(
         submitter = store.providerParty,
         command = ReassignmentCommand.Unassign(

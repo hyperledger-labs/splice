@@ -21,7 +21,6 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class SvcPartyMigration(
-    globalDomain: DomainId,
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     participantAdminConnection: ParticipantAdminConnection,
@@ -53,7 +52,7 @@ class SvcPartyMigration(
       // this will wait until the PartyToParticipant state change completed
       authorizedAt <- partyHosting
         .authorizeSvcPartyToParticipant(
-          globalDomain,
+          svcRules.domain,
           participantId,
           svcMembersSize,
           ourParticipant.uid.namespace.fingerprint,
@@ -61,7 +60,7 @@ class SvcPartyMigration(
       _ = logger.info(
         s"SVC party was authorized on $participantId, downloading snapshot at time $authorizedAt."
       )
-      acsBytes <- EitherT.liftF(downloadSnapshotFromTime(authorizedAt))
+      acsBytes <- EitherT.liftF(downloadSnapshotFromTime(authorizedAt, svcRules.domain))
     } yield {
       acsBytes
     }
@@ -69,7 +68,8 @@ class SvcPartyMigration(
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private def downloadSnapshotFromTime(
-      authorizedAt: Instant
+      authorizedAt: Instant,
+      globalDomain: DomainId,
   )(implicit tc: TraceContext): Future[ByteString] = {
     def submitDummyTransaction(): Future[Unit] =
       svStoreWithIngestion.connection

@@ -10,7 +10,6 @@ import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
-  ConfiguredDefaultDomain,
   TxLogStore,
 }
 import com.daml.network.util.{Contract, ContractWithState, AssignedContract}
@@ -22,13 +21,17 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
-trait SplitwellStore extends CNNodeAppStoreWithoutHistory with ConfiguredDefaultDomain {
+trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   import MultiDomainAcsStore.QueryResult
 
   def providerParty: PartyId
 
   protected[this] def domainConfig: SplitwellDomainConfig
-  override final def defaultAcsDomain = domainConfig.splitwell.preferred.alias
+
+  private[this] final def defaultAcsDomain = domainConfig.splitwell.preferred.alias
+
+  private[splitwell] final def defaultAcsDomainIdF(implicit tc: TraceContext): Future[DomainId] =
+    domains.waitForDomainConnection(defaultAcsDomain)
 
   override def multiDomainAcsStore: InMemoryMultiDomainAcsStore[
     TxLogStore.IndexRecord,

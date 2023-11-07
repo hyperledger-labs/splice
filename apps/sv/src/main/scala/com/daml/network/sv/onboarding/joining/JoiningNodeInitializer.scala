@@ -162,7 +162,6 @@ class JoiningNodeInitializer(
                 svcStore,
                 ledgerClient,
                 cometBftNode,
-                globalDomain,
               )
             _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- retryProvider.ensureThatB(
@@ -521,7 +520,6 @@ class JoiningNodeInitializer(
         participantAdminConnection,
         retryProvider,
         cometBftNode,
-        domainId,
         loggerFactory,
       )
   }
@@ -567,7 +565,6 @@ class JoiningNodeInitializer(
       svcStore: SvSvcStore,
       ledgerClient: CNLedgerClient,
       cometBftNode: Option[CometBftNode],
-      domainId: DomainId,
   ) =
     new SvSvcAutomationService(
       clock,
@@ -578,7 +575,6 @@ class JoiningNodeInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
-      domainId,
       loggerFactory,
     )
 

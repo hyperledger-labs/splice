@@ -29,6 +29,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{BaseLedgerConnection, PackageIdResolver, RetryProvider}
+import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
 import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{
   ConstrainedTemplate,
@@ -176,6 +177,16 @@ trait SvSvcStore
 
   def getCoinRulesPayload()(implicit tc: TraceContext): Future[cc.coinrules.CoinRules] =
     getCoinRules().map(_.payload)
+
+  def getCoinRulesDomain: GetCoinRulesDomain = { () => implicit tc =>
+    lookupCoinRules().map(
+      _.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription("No active CoinRules contract")
+          .asRuntimeException()
+      ).domain
+    )
+  }
 
   def lookupCnsRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[AssignedContract[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]]]
