@@ -38,7 +38,7 @@ function get_remote_trigger_id_by_name {
     local trigger_id
     trigger_id=$(curl -s "$cci_api_all_schedules" \
         -H "Content-Type: application/json" \
-        -H "circle-token: $CIRCLECI_TOKEN" | jq -r '.items[] | select(.name | contains($tn)) | .id' --arg tn "$trigger_name")
+        -H "circle-token: $CIRCLECI_TOKEN" | jq -r '.items[] | select(.name == $tn) | .id' --arg tn "$trigger_name")
 
     echo "$trigger_id"
 }
