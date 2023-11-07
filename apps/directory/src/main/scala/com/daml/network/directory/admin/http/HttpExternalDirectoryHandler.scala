@@ -1,7 +1,7 @@
 package com.daml.network.directory.admin.http
 
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.codegen.java.cn.directory.DirectoryInstall
+import com.daml.network.codegen.java.cn.directory.{DirectoryInstall, DirectoryInstallRequest}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.http.v0.external
 import com.daml.network.http.v0.external.directory.DirectoryResource as r0
@@ -10,7 +10,7 @@ import com.daml.network.wallet.admin.http.HttpWalletHandlerUtil
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry.RetryUtil
 import io.opentelemetry.api.trace.Tracer
@@ -23,6 +23,7 @@ class HttpExternalDirectoryHandler(
     override val walletManager: UserWalletManager,
     domainId: DomainId,
     val globalDomain: DomainAlias,
+    directoryProvider: PartyId,
     retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -91,6 +92,59 @@ class HttpExternalDirectoryHandler(
                   )
                 )
                 .toVector
+            )
+          )
+        }
+      } yield res
+    }
+  }
+
+  def createDirectoryInstall(respond: r0.CreateDirectoryInstallResponse.type)()(
+      tuser: TracedUser
+  ): Future[r0.CreateDirectoryInstallResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+
+    withSpan(s"$workflowId.createDirectoryInstall") { implicit traceContext => _ =>
+      val connection = getUserWallet(user).connection
+      for {
+        partyId <- connection.getPrimaryParty(user)
+        create <- connection
+          .submit(
+            Seq(partyId),
+            Seq(partyId),
+            new DirectoryInstallRequest(
+              directoryProvider.toProtoPrimitive,
+              partyId.toProtoPrimitive,
+            ).create,
+          )
+          .withDomainId(domainId)
+          .noDedup
+          .yieldResult()
+        res <- Future.successful {
+          r0.CreateDirectoryInstallResponse.OK(
+            d0.CreateDirectoryInstallResponse(
+              create.contractId.contractId
+            )
+          )
+        }
+      } yield res
+    }
+  }
+
+  def fetchDirectoryInstall(
+      respond: r0.FetchDirectoryInstallResponse.type
+  )()(tuser: TracedUser): Future[r0.FetchDirectoryInstallResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+
+    withSpan(s"$workflowId.fetchDirectoryInstall") { implicit traceContext => _ =>
+      for {
+        installContract <- getUserStore(user).flatMap(_.getDirectoryInstall())
+        res <- Future.successful {
+          r0.FetchDirectoryInstallResponse.OK(
+            d0.FetchDirectoryInstallResponse(
+              contractId = installContract.contractId.toString(),
+              entryFee = installContract.payload.entryFee.toString(),
+              entryLifetime = installContract.payload.entryLifetime.microseconds.toString(),
             )
           )
         }

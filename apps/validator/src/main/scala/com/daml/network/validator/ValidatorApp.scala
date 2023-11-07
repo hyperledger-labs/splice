@@ -613,6 +613,7 @@ class ValidatorApp(
         walletManager,
         storeDomain,
         config.domains.global.alias,
+        svcParty, // making an assumption here that the SVC party is the Directory provider party
         retryProvider,
         loggerFactory,
       )

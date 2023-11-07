@@ -114,6 +114,56 @@ object HttpDirectoryAppClient {
     }
   }
 
+  case class CreateDirectoryInstall()
+      extends ExternalBaseCommand[
+        externalHttp.CreateDirectoryInstallResponse,
+        definitions.CreateDirectoryInstallResponse,
+      ] {
+
+    override def submitRequest(
+        client: externalHttp.DirectoryClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], externalHttp.CreateDirectoryInstallResponse] =
+      client.createDirectoryInstall(headers = headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[externalHttp.CreateDirectoryInstallResponse, Either[
+      String,
+      definitions.CreateDirectoryInstallResponse,
+    ]] = { case externalHttp.CreateDirectoryInstallResponse.OK(res) =>
+      Right(res)
+    }
+  }
+
+  case class FetchDirectoryInstall()
+      extends ExternalBaseCommand[
+        externalHttp.FetchDirectoryInstallResponse,
+        definitions.FetchDirectoryInstallResponse,
+      ] {
+
+    override def submitRequest(
+        client: externalHttp.DirectoryClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], externalHttp.FetchDirectoryInstallResponse] = client.fetchDirectoryInstall(headers = headers)
+
+    override protected def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[externalHttp.FetchDirectoryInstallResponse, Either[
+      String,
+      definitions.FetchDirectoryInstallResponse,
+    ]] = { case externalHttp.FetchDirectoryInstallResponse.OK(res) =>
+      Right(res)
+    }
+
+  }
+
   case class ListEntries(
       namePrefix: String,
       pageSize: Int,
