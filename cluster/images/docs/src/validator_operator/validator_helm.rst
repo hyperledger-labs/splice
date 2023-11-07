@@ -464,7 +464,7 @@ To install it, run the following (assuming environment variable `YOUR_HOSTNAME` 
 
 .. code-block:: bash
 
-    helm install cluster-gateway canton-network-helm/cn-istio-gateway -n cluster-ingress --set cluster.hostname=$YOUR_HOSTNAME
+    helm install cluster-gateway canton-network-helm/cn-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.hostname=$YOUR_HOSTNAME
 
 
 This gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
@@ -474,7 +474,7 @@ Another reference Helm chart is provided for that, which can be installed using:
 
 .. code-block:: bash
 
-    helm install cluster-ingress-validator canton-network-helm/cn-cluster-ingress-runbook -n cluster-ingress --set cluster.hostname=$YOUR_HOSTNAME --set cluster.svNamespace=validator --set withSv=false --set withScan=false --set withDomainNode=false
+    helm install cluster-ingress-validator canton-network-helm/cn-cluster-ingress-runbook -n cluster-ingress --version ${CHART_VERSION} --set cluster.hostname=$YOUR_HOSTNAME --set cluster.svNamespace=validator --set withSv=false --set withScan=false --set withDomainNode=false
 
 
 .. _helm-validator-wallet-ui:
