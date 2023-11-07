@@ -35,10 +35,10 @@
   "app_hash": "",
   "app_state": {
     "sv_node_id":
-    {{ if .Values.isDevNet }}
-        "Canton-Foundation-1",
-    {{ else }}
-        "Canton-Foundation",
+    {{- if eq (include "isTestNet" .) "true" }}
+      "Canton-Foundation",
+    {{- else }}
+      "Canton-Foundation-1",
     {{ end }}
     "governance_keys": [
       {

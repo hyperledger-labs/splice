@@ -196,10 +196,9 @@
           "externalAddress": "svrun.network.com.network.canton.global:26656"
         },
         "genesis": {
-          "chainId": "svrun.network.com"
+          "chainId": "svrun"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "isDevNet": true,
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",

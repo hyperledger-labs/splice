@@ -27,6 +27,9 @@ Release Notes
 
   * The url configuration for the foundation's Scan app in `validator-values.yaml` has been updated to be
     ``https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global``. Similarly, in the config files in the self-hosted validator section.
+  * The `isDevNet` flag has been removed from the `cn-cometbft` helm chart in order to eliminate its potential for accidental misconfiguration.
+    Instead, the chart now relies on the value of `genesis.chainId` in `cometbft-values.yaml` to determine whether it is a TestNet or DevNet deployment.
+
 
 2023-11-06
 ----------

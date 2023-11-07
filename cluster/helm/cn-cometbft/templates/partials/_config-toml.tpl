@@ -495,10 +495,10 @@ namespace = "cometbft"
 
 # current strategy:
 # enable it only on devnet for testing purposes
-{{- if .Values.isDevNet }}
-retain_blocks = {{ $.Values.node.retainBlocks }}
-{{- else }}
+{{- if eq (include "isTestNet" .) "true" }}
 retain_blocks = 0
+{{- else }}
+retain_blocks = {{ $.Values.node.retainBlocks }}
 {{- end }}
 
 # Interval in which a new snapshot should be generated, in order to assist new peers to sync quickly.

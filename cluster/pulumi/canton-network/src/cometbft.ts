@@ -120,7 +120,6 @@ export function installCometBftNode(
           externalAddress: p2pServiceAddress(`cometbft-${svName}`, svName),
         };
       }),
-    isDevNet: isDevNet,
     stateSync: {
       rpcServers:
         rpcServiceAddress('cometbft-sv-1', 'sv-1') +
@@ -128,7 +127,9 @@ export function installCometBftNode(
         rpcServiceAddress('cometbft-sv-1', 'sv-1'),
     },
     genesis: {
-      chainId: `${CLUSTER_BASENAME}`,
+      // for TestNet-like deployments on scratchnet, set the chainId to 'test'
+      chainId:
+        `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet ? 'test' : `${CLUSTER_BASENAME}`,
     },
     metrics: {
       enable: true,

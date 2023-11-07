@@ -1689,7 +1689,6 @@
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "isDevNet": true,
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -2685,7 +2684,6 @@
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "isDevNet": true,
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -3563,7 +3561,6 @@
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "isDevNet": true,
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -4356,7 +4353,6 @@
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "isDevNet": true,
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
