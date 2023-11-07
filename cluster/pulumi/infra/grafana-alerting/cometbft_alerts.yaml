@@ -163,7 +163,7 @@ groups:
         panelId: 48
         noDataState: NoData
         execErrState: Error
-        for: 1m
+        for: 10m
         annotations:
           __dashboardUid__: UJyurCTWz
           __panelId__: "48"
@@ -283,7 +283,7 @@ groups:
         panelId: 66
         noDataState: NoData
         execErrState: Error
-        for: 1m
+        for: 10m
         annotations:
           __dashboardUid__: UJyurCTWz
           __panelId__: "66"
