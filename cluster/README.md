@@ -802,6 +802,16 @@ These alerts will not trigger notifications through the grafana alert manager.
 This is not something that grafana will support (https://github.com/grafana/grafana/issues/73447).
 For those alerts to actually trigger a notification we will have to configure the prometheus alert manager.
 
+**NoData alerts**
+
+During our cluster resets, all the alerts would trigger with state no data.
+The No Data alerts would trigger immediately and ignore the pending period as set.
+Tracking issue in grafana: https://github.com/grafana/grafana/issues/16290
+
+Because of the issue above we have disabled alerts when the state is NoData. This should be reverted if the grafana
+issue is fixed.
+
+
 ###### Creating an alert
 
 Creating a new alert can be done through the UI.

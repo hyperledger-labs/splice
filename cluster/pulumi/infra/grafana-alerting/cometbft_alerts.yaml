@@ -161,7 +161,7 @@ groups:
               type: math
         dashboardUid: UJyurCTWz
         panelId: 48
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 10m
         annotations:
