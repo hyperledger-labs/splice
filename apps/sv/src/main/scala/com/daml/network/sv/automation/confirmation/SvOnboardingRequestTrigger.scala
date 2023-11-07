@@ -90,23 +90,16 @@ class SvOnboardingRequestTrigger(
         if (SvApp.isSvcMember(name, party, svcRules)) {
           Future.successful(
             TaskSuccess(
-              s"skipping as SV is already an SVC member"
+              s"skipping as SV $name is already an SVC member"
             )
           )
-        } else if (SvApp.isSvcMemberParty(party, svcRules)) {
-          Future.failed(
-            Status.ALREADY_EXISTS
-              .withDescription("An SV with that party ID already exists.")
-              .asRuntimeException()
-          )
-        } else if (!SvApp.isDevNet(svcRules) && SvApp.isSvcMemberName(name, svcRules)) {
-          Future.failed(
-            Status.ALREADY_EXISTS
-              .withDescription("An SV with that name already exists.")
-              .asRuntimeException()
-          )
         } else {
-          confirm(party, name, svOnboarding.payload.token, svcRules)
+          SvApp.validateCandidateSv(party, name, svcRules) match {
+            case Left(err) =>
+              Future.failed(err.asRuntimeException())
+            case Right(_) =>
+              confirm(party, name, svOnboarding.payload.token, svcRules)
+          }
         }
     } yield outcome
   }

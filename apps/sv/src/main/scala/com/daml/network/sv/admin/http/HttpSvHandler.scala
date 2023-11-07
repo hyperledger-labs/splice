@@ -1,6 +1,6 @@
 package com.daml.network.sv.admin.http
 
-import cats.data.OptionT
+import cats.data.{EitherT, OptionT}
 import cats.syntax.applicative.*
 import cats.syntax.option.*
 import com.daml.network.admin.http.HttpErrorHandler
@@ -708,38 +708,33 @@ class HttpSvHandler(
             logger.info("An SV onboarding contract for this token already exists.")
             Future.successful(Right(()))
           case QueryResult(offset, None) =>
-            if (SvApp.isSvcMemberParty(candidateParty, svcRules)) {
-              Future.successful(
-                Left("An SV with that party ID already exists.")
+            EitherT
+              .fromEither[Future](
+                SvApp.validateCandidateSv(candidateParty, candidateName, svcRules)
               )
-            } else if (
-              !SvApp.isDevNet(svcRules) && SvApp.isSvcMemberName(candidateName, svcRules)
-            ) {
-              Future.successful(
-                Left("An SV with that name already exists.")
-              )
-            } else {
-              val cmd = svcRules.exercise(
-                _.exerciseSvcRules_StartSvOnboarding(
-                  candidateName,
-                  candidateParty.toProtoPrimitive,
-                  token,
-                  svParty.toProtoPrimitive,
+              .leftMap(_.getDescription)
+              .semiflatMap { _ =>
+                val cmd = svcRules.exercise(
+                  _.exerciseSvcRules_StartSvOnboarding(
+                    candidateName,
+                    candidateParty.toProtoPrimitive,
+                    token,
+                    svParty.toProtoPrimitive,
+                  )
                 )
-              )
-              svcStoreWithIngestion.connection
-                .submit(actAs = Seq(svParty), readAs = Seq(svcParty), cmd)
-                .withDedup(
-                  commandId = CNLedgerConnection.CommandId(
-                    "com.daml.network.sv.startSvOnboarding",
-                    Seq(svParty),
-                    s"$token",
-                  ),
-                  deduplicationOffset = offset,
-                )
-                .yieldUnit()
-                .map { _ => Right(()) }
-            }
+                svcStoreWithIngestion.connection
+                  .submit(actAs = Seq(svParty), readAs = Seq(svcParty), cmd)
+                  .withDedup(
+                    commandId = CNLedgerConnection.CommandId(
+                      "com.daml.network.sv.startSvOnboarding",
+                      Seq(svParty),
+                      s"$token",
+                    ),
+                    deduplicationOffset = offset,
+                  )
+                  .yieldUnit()
+              }
+              .value
         }
       } yield outcome
     }

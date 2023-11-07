@@ -1123,6 +1123,34 @@ object SvApp {
       .map(_.name == name)
       .getOrElse(false)
 
+  private[sv] def validateCandidateSv(
+      candidateParty: PartyId,
+      candidateName: String,
+      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
+  ): Either[Status, Unit] = {
+    for {
+      _ <- Either.cond(
+        !SvApp.isSvcMemberParty(candidateParty, svcRules),
+        (),
+        Status.ALREADY_EXISTS.withDescription(
+          s"An SV with party ID $candidateParty already exists."
+        ),
+      )
+      _ <-
+        if (!SvApp.isDevNet(svcRules)) {
+          SvApp
+            .getSvcPartyFromName(candidateName, svcRules)
+            .toLeft(())
+            .leftMap(partyId =>
+              Status.ALREADY_EXISTS
+                .withDescription(
+                  s"Candidate SV $candidateParty cannot use name `$candidateName` because it's used by SV with party ID $partyId."
+                )
+            )
+        } else Right(())
+    } yield ()
+  }
+
   private[sv] def isSvcMemberParty(
       party: PartyId,
       svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
@@ -1131,7 +1159,16 @@ object SvApp {
   private[sv] def isSvcMemberName(
       name: String,
       svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
-  ): Boolean = svcRules.payload.members.values.asScala.exists(_.name == name)
+  ): Boolean = getSvcPartyFromName(name, svcRules).isDefined
+
+  private[sv] def getSvcPartyFromName(
+      name: String,
+      svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+  ): Option[String] = {
+    svcRules.payload.members.asScala.collectFirst {
+      case (partyId, memberInfo) if memberInfo.name == name => partyId
+    }
+  }
 
   private[sv] def isDevNet(
       svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
