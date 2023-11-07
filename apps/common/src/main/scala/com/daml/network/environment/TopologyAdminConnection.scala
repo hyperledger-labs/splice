@@ -4,13 +4,12 @@ import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.config.CNThresholds
-import com.daml.network.config.CNThresholds.getPartyToParticipantThreshold
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
+import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import com.daml.network.environment.TopologyAdminConnection.{
   AuthorizedStateChanged,
   TopologyTransactionType,
 }
-import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommandsX
@@ -440,6 +439,15 @@ class TopologyAdminConnection(
       signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
+  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, PartyToParticipantX]] = {
+    proposeInitialPartyToParticipant(partyId, Seq(participantId), signedBy)
+  }
+  def proposeInitialPartyToParticipant(
+      partyId: PartyId,
+      participants: Seq[ParticipantId],
+      signedBy: Fingerprint,
+  )(implicit
+      traceContext: TraceContext
   ): Future[SignedTopologyTransactionX[TopologyChangeOpX, PartyToParticipantX]] =
     proposeMapping(
       TopologyStoreId.AuthorizedStore,
@@ -447,9 +455,9 @@ class TopologyAdminConnection(
         partyId,
         None,
         PositiveInt.one,
-        Seq(
+        participants.map(
           HostingParticipant(
-            participantId,
+            _,
             ParticipantPermissionX.Submission,
           )
         ),
@@ -481,10 +489,11 @@ class TopologyAdminConnection(
               .find(proposal =>
                 proposal.mapping.participantIds.contains(
                   newParticipant
-                ) && proposal.mapping.threshold == getPartyToParticipantThreshold(
-                  svcRulesMembersSize,
-                  proposal.mapping.participantIds.size - 1,
-                )
+                ) && proposal.mapping.threshold == CNThresholds
+                  .partyToParticipantThresholdWithNewMember(
+                    svcRulesMembersSize,
+                    proposal.mapping.participantIds.size - 1,
+                  )
               )
               .getOrElse(
                 throw Status.NOT_FOUND
@@ -518,7 +527,7 @@ class TopologyAdminConnection(
               newParticipant,
               ParticipantPermissionX.Submission,
             ) +: previous.participants,
-            threshold = getPartyToParticipantThreshold(
+            threshold = CNThresholds.partyToParticipantThresholdWithNewMember(
               svcRulesMembersSize,
               previous.participants.length,
             ),
@@ -639,7 +648,8 @@ class TopologyAdminConnection(
         MediatorDomainStateX.create(
           previous.domain,
           previous.group,
-          CNThresholds.getMediatorDomainStateThreshold(svcRulesMembersSize, previous.active.size),
+          CNThresholds
+            .mediatorDomainStateThresholdWithNewMember(svcRulesMembersSize, previous.active.size),
           newActiveMediator +: previous.active,
           previous.observers,
         ),
@@ -699,13 +709,17 @@ class TopologyAdminConnection(
       TopologyStoreId.DomainStore(domainId),
       description,
       unionspaceDefinitionForNamespace(domainId, unionspace, ownerChange),
-      previous =>
+      previous => {
         // constructor is not exposed so no copy
+        val newOwners = ownerChange(previous.owners)
         UnionspaceDefinitionX.create(
           previous.unionspace,
-          previous.threshold,
-          ownerChange(previous.owners),
-        ),
+          CNThresholds.unionspaceThreshold(
+            newOwners.size
+          ),
+          newOwners,
+        )
+      },
       retryFor,
       signedBy,
       isProposal = true,

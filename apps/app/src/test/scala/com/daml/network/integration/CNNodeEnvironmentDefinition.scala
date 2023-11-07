@@ -127,15 +127,25 @@ case class CNNodeEnvironmentDefinition(
                   logger.info("Resetting unionspace to contain only sv1")(
                     TraceContext.empty
                   )
-                  if (existingUnionspace.item.owners.exists(_ != svParty))
-                    sv1.participantClientWithAdminToken.topology.unionspaces
-                      .propose(
-                        Set(svParty.fingerprint),
-                        PositiveInt.one,
-                        store,
-                        serial = Some(existingUnionspace.context.serial + PositiveInt.one),
-                      )
-                      .discard
+                  val ownersThatMustBeRemoved = existingUnionspace.item.owners.diff(Set(svParty))
+                  if (ownersThatMustBeRemoved.nonEmpty) {
+                    def proposeUnionspaceReset(client: CNParticipantClientReference): Unit = {
+                      client.topology.unionspaces
+                        .propose(
+                          Set(svParty.fingerprint),
+                          PositiveInt.one,
+                          store,
+                          serial = Some(existingUnionspace.context.serial + PositiveInt.one),
+                        )
+                        .discard
+                    }
+                    existingUnionspace.item.owners.foreach { owner =>
+                      svs.local
+                        .map(_.participantClientWithAdminToken)
+                        .find(_.id.uid.namespace == owner)
+                        .foreach(proposeUnionspaceReset)
+                    }
+                  }
                 }
             }
         }

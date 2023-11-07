@@ -388,7 +388,7 @@ class ValidatorApp(
             alias,
             SequencerConnections.many(
               nonEmptyConnections,
-              CNThresholds.getSequencerConnectionsSizeThreshold(nonEmptyConnections.size),
+              CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
             ),
           )
       }

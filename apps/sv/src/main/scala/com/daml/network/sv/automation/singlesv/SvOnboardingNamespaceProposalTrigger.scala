@@ -48,7 +48,8 @@ class SvOnboardingNamespaceProposalTrigger(
     participantAdminConnection
       .getUnionspaceDefinition(task.domain, svcParty.uid.namespace)
       .flatMap { unionspace =>
-        task.contract.payload.members
+        val svcRulesPayload = task.contract.payload
+        svcRulesPayload.members
           .keySet()
           .asScala
           .map(PartyId.tryFromProtoPrimitive)

@@ -1,6 +1,7 @@
 package com.daml.network.util
 
 import com.daml.network.console.{
+  AppManagerAppClientReference,
   DirectoryAppBackendReference,
   DirectoryAppClientReference,
   ScanAppBackendReference,
@@ -12,15 +13,17 @@ import com.daml.network.console.{
   ValidatorAppBackendReference,
   ValidatorAppClientReference,
   WalletAppClientReference,
-  AppManagerAppClientReference,
 }
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.daml.network.console.DirectoryExternalAppClientReference
 
 // TODO(#736): these should eventually be defined analogue to Canton's `participant1` references etc
 // however, this is likely only possible once we depend on Canton as a library
 trait CommonCNNodeAppInstanceReferences {
+
+  def globalDomainId(implicit env: CNNodeTestConsoleEnvironment): DomainId =
+    sv1Backend.participantClientWithAdminToken.domains.id_of(sv1Backend.config.domains.global.alias)
 
   def svcParty(implicit env: CNNodeTestConsoleEnvironment): PartyId = sv1ScanBackend.getSvcPartyId()
 

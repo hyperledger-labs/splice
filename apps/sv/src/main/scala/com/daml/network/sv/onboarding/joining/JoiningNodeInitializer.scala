@@ -328,7 +328,7 @@ class JoiningNodeInitializer(
           // Wait on the SVC store to make sure that we atomically see either the SvOnboardingConfirmed contract
           // or the SvcRules contract.
           _ <- waitForSvOnboardingConfirmedInSvcStore()
-          _ <- retryProvider.retry(
+          svcRules <- retryProvider.retry(
             RetryFor.WaitingOnInitDependency,
             "add member to Svc",
             for {
@@ -377,7 +377,7 @@ class JoiningNodeInitializer(
                       .yieldUnit()
                   }
               }
-            } yield (),
+            } yield svcRules,
             logger,
           )
           _ = logger.info("Adding member to the unionspace.")

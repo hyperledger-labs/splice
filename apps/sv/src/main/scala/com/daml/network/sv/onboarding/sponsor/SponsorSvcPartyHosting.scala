@@ -107,7 +107,7 @@ class SponsorSvcPartyHosting(
                       newParticipant,
                       ParticipantPermissionX.Submission,
                     ) +: previous.participants,
-                    threshold = CNThresholds.getPartyToParticipantThreshold(
+                    threshold = CNThresholds.partyToParticipantThresholdWithNewMember(
                       svcRulesMembersSize,
                       previous.participants.length,
                     ),
@@ -147,7 +147,7 @@ class SponsorSvcPartyHosting(
         .flatMap { proposals =>
           partyToParticipantAcceptedState
             .map(acceptedState =>
-              CNThresholds.getPartyToParticipantThreshold(
+              CNThresholds.partyToParticipantThresholdWithNewMember(
                 svcMembersSize,
                 acceptedState.mapping.participantIds.size,
               )

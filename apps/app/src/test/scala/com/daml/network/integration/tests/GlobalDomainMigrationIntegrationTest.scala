@@ -2,18 +2,14 @@ package com.daml.network.integration.tests
 
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import better.files.*
+import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.environment.{
-  CNLedgerConnection,
-  MediatorAdminConnection,
-  RetryFor,
-  RetryProvider,
-  SequencerAdminConnection,
-}
+import com.daml.network.environment.*
+import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.util.{ProcessTestUtil, TemplateJsonDecoder}
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.{
@@ -41,6 +37,7 @@ import com.digitalasset.canton.topology.transaction.{
   UnionspaceDefinitionX,
 }
 import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 import org.scalatest.concurrent.PatienceConfiguration
 import org.scalatest.time.Span
@@ -200,13 +197,15 @@ class GlobalDomainMigrationIntegrationTest extends SvIntegrationTestBase with Pr
             .futureValue
 
         val sv2Party = sv2Backend.appState.svStore.key.svParty
-        val partyHosting = sv2ParticipantAdminConnection
-          .proposeInitialPartyToParticipant(
-            svcParty,
-            sv2Backend.participantClientWithAdminToken.id,
-            sv2Party.uid.namespace.fingerprint,
-          )
-          .futureValue
+        val partyHosting = withClue("host svc party on new domain") {
+          sv2ParticipantAdminConnection
+            .proposeInitialPartyToParticipant(
+              svcParty,
+              svs.map(_.participantClientWithAdminToken.id),
+              sv2Party.uid.namespace.fingerprint,
+            )
+            .futureValue
+        }
         withClue("sequencer is initialized") {
           upgradeDomainNode.sequencerAdminConnection
             .initialize(
@@ -251,84 +250,95 @@ class GlobalDomainMigrationIntegrationTest extends SvIntegrationTestBase with Pr
           }
         }
 
-        sv2ParticipantAdminConnection
-          .ensureDomainRegistered(
-            DomainConnectionConfig(
-              upgradeDomainAlias,
-              SequencerConnections.single(
-                GrpcSequencerConnection.tryCreate("http://localhost:5908")
-              ),
-              manualConnect = true,
-              domainId = Some(upgradeDomainId),
-            ),
-            RetryFor.Automation,
-          )
-          .futureValue(PatienceConfiguration.Timeout(Span.convertDurationToSpan(2.minutes)))
+        def proposeOnAllSvs[T](run: ParticipantAdminConnection => Future[T]) =
+          svs.map(_.appState.participantAdminConnection).parTraverse(run)
 
-        sv2ParticipantAdminConnection
-          .connectDomain(upgradeDomainAlias)
-          .futureValue shouldBe ()
+        bracket(
+          (),
+          svs.map(_.participantClientWithAdminToken).foreach { client =>
+            client.domains.disconnect(upgradeDomainAlias)
+          },
+        ) {
+          proposeOnAllSvs { connection =>
+            connection
+              .ensureDomainRegistered(
+                DomainConnectionConfig(
+                  upgradeDomainAlias,
+                  SequencerConnections.single(
+                    GrpcSequencerConnection.tryCreate("http://localhost:5908")
+                  ),
+                  manualConnect = true,
+                  domainId = Some(upgradeDomainId),
+                ),
+                RetryFor.Automation,
+              )
+              .flatMap(_ => connection.connectDomain(upgradeDomainAlias))
+          }.futureValue(PatienceConfiguration.Timeout(Span.convertDurationToSpan(2.minutes)))
 
-        withClue("unionspace is replicated on the new global domain") {
-          eventuallySucceeds(timeUntilSuccess = 1.minute) {
-            upgradeDomainNode.sequencerAdminConnection.getStatus.futureValue.successOption.value.domainId shouldBe upgradeDomainId
-            upgradeDomainNode.sequencerAdminConnection.getStatus.futureValue.successOption.value.connectedParticipants should not be empty
-            sv2ParticipantAdminConnection
-              .getUnionspaceDefinition(
-                upgradeDomainId,
-                svcPartyUnionspace,
-              )
-              .futureValue
-              .mapping shouldBe globalDomainUnionspaceDefinition.mapping
-            upgradeDomainNode.sequencerAdminConnection
-              .getUnionspaceDefinition(
-                upgradeDomainId,
-                svcPartyUnionspace,
-              )
-              .futureValue
-              .mapping shouldBe globalDomainUnionspaceDefinition.mapping
+          withClue("unionspace is replicated on the new global domain") {
+            eventuallySucceeds(timeUntilSuccess = 1.minute) {
+              upgradeDomainNode.sequencerAdminConnection.getStatus.futureValue.successOption.value.domainId shouldBe upgradeDomainId
+              upgradeDomainNode.sequencerAdminConnection.getStatus.futureValue.successOption.value.connectedParticipants should not be empty
+              sv2ParticipantAdminConnection
+                .getUnionspaceDefinition(
+                  upgradeDomainId,
+                  svcPartyUnionspace,
+                )
+                .futureValue
+                .mapping shouldBe globalDomainUnionspaceDefinition.mapping
+              upgradeDomainNode.sequencerAdminConnection
+                .getUnionspaceDefinition(
+                  upgradeDomainId,
+                  svcPartyUnionspace,
+                )
+                .futureValue
+                .mapping shouldBe globalDomainUnionspaceDefinition.mapping
+            }
           }
-        }
-        withClue("unionspace can be modified on the new domain") {
-          eventuallySucceeds() {
-            sv2ParticipantAdminConnection
-              .ensureUnionspaceDefinitionOwnerChangeProposalAccepted(
-                "keep just sv2",
-                upgradeDomainId,
-                svcPartyUnionspace,
-                _ => NonEmpty(Set, sv2Party.uid.namespace),
-                sv2Party.uid.namespace.fingerprint,
-                RetryFor.WaitingOnInitDependency,
-              )
-              .futureValue
-              .discard
+          withClue("unionspace can be modified on the new domain") {
+            eventuallySucceeds() {
+              proposeOnAllSvs { connection =>
+                for {
+                  id <- connection.getId()
+                  _ <- connection.ensureUnionspaceDefinitionOwnerChangeProposalAccepted(
+                    "keep just sv2",
+                    upgradeDomainId,
+                    svcPartyUnionspace,
+                    _ => NonEmpty(Set, sv2Party.uid.namespace),
+                    id.namespace.fingerprint,
+                    RetryFor.WaitingOnInitDependency,
+                  )
+                } yield {}
+              }.futureValue.discard
 
-            sv2ParticipantAdminConnection
-              .getUnionspaceDefinition(
-                upgradeDomainId,
-                svcPartyUnionspace,
-              )
-              .futureValue
-              .mapping
-              .owners shouldBe Set(sv2Party.uid.namespace)
+              sv2ParticipantAdminConnection
+                .getUnionspaceDefinition(
+                  upgradeDomainId,
+                  svcPartyUnionspace,
+                )
+                .futureValue
+                .mapping
+                .owners shouldBe Set(sv2Party.uid.namespace)
+            }
           }
-        }
-        withClue("submit dummy transaction to the new domain to validate it") {
-          sv2ParticipantClientWithAdminToken.ledger_api_extensions.commands
-            .submitJava(
-              actAs = Seq(svcParty),
-              readAs = Seq(sv2Party),
-              commands =
-                new FeaturedAppRight(svcParty.toProtoPrimitive, sv2Party.toProtoPrimitive).createAnd
+          withClue("submit dummy transaction to the new domain to validate it") {
+            sv2ParticipantClientWithAdminToken.ledger_api_extensions.commands
+              .submitJava(
+                actAs = Seq(svcParty),
+                readAs = Seq(sv2Party),
+                commands = new FeaturedAppRight(
+                  svcParty.toProtoPrimitive,
+                  sv2Party.toProtoPrimitive,
+                ).createAnd
                   .exerciseArchive()
                   .commands()
                   .asScala
                   .toSeq,
-              workflowId = CNLedgerConnection.domainIdToWorkflowId(upgradeDomainId),
-              optTimeout = None,
-            )
+                workflowId = CNLedgerConnection.domainIdToWorkflowId(upgradeDomainId),
+                optTimeout = None,
+              )
+          }
         }
-        sv2ParticipantClientWithAdminToken.domains.disconnect(upgradeDomainAlias)
       }
     }
   }

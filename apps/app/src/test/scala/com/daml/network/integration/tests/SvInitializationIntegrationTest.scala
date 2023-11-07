@@ -5,6 +5,7 @@ import com.daml.network.console.{
   SvAppBackendReference,
   ValidatorAppBackendReference,
 }
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 
 import scala.jdk.CollectionConverters.*
 
@@ -83,6 +84,16 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     startSv(2, sv2Backend, sv2ValidatorBackend, Some(sv2ScanBackend))
     startSv(3, sv3Backend, sv3ValidatorBackend)
     startSv(4, sv4Backend, sv4ValidatorBackend)
+    withClue("validate party to participant threshold") {
+      // validate here as well when onboarding is sequential
+      /// as this onboarding happens before the member is added to the svc members
+      sv1Backend.appState.participantAdminConnection
+        .getPartyToParticipant(globalDomainId, svcParty)
+        .futureValue
+        .mapping
+        .threshold
+        .value shouldBe 2
+    }
   }
 
   "The SVC is bootstrapped correctly" in { implicit env =>
@@ -106,6 +117,35 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
         sv1Backend.listOpenMiningRounds() should have size 3
         sv1ScanBackend.getOpenAndIssuingMiningRounds()._1 should have size 3
         sv2ScanBackend.getOpenAndIssuingMiningRounds()._1 should have size 3
+      }
+    }
+    clue("thresholds are set as expected") {
+      eventually() {
+        val participantAdminConnection = sv1Backend.appState.participantAdminConnection
+        participantAdminConnection
+          .getUnionspaceDefinition(
+            globalDomainId,
+            svcParty.uid.namespace,
+          )
+          .futureValue
+          .mapping
+          .threshold shouldBe PositiveInt.tryCreate(3)
+        participantAdminConnection
+          .getSequencerDomainState(globalDomainId)
+          .futureValue
+          .mapping
+          .threshold shouldBe PositiveInt.tryCreate(1)
+        participantAdminConnection
+          .getMediatorDomainState(globalDomainId)
+          .futureValue
+          .mapping
+          .threshold shouldBe PositiveInt.tryCreate(2)
+        participantAdminConnection
+          .getPartyToParticipant(globalDomainId, svcParty)
+          .futureValue
+          .mapping
+          .threshold
+          .value should (be >= 1 and be <= 2)
       }
     }
   }

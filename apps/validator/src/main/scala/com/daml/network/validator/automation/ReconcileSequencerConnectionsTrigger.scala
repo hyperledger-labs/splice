@@ -87,7 +87,7 @@ class ReconcileSequencerConnectionsTrigger(
               conf.copy(
                 sequencerConnections = SequencerConnections.many(
                   nonEmptyConnections,
-                  CNThresholds.getSequencerConnectionsSizeThreshold(nonEmptyConnections.size),
+                  CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
                 )
               )
             )
