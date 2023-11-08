@@ -8,16 +8,14 @@ Release Notes
 
 * CometBft pruning is now enabled, with approximately 7 days of history retained by default.
 
-* Revising the SVC governance formula, using n := ceil( (n + f + 1) / 2.0 ) with n SVs and f := floor ( (n - 1) / 3.0 ) maximum supported number of faulty SVs for safe operation.
+* Revised the SVC governance formula, so that we now need `ceil( (n + f + 1) / 2.0 )` SVs to form a quorum, where `f := floor ( (n - 1) / 3.0 )` is the maximum supported number of faulty SVs for safe operation.
 
-* Removing the special voting threshold for DevNet aligning with the one used in TestNet
+* Removing the adjustment of SVC governance thresholds for DevNet, aligning it with the one used in TestNet.
 
 * Deployment updates:
 
   * The URL of the global domain sequencer hosted by the Canton Foundation has changed to `https://sequencer.sv-1.svc.<TARGET_CLUSTER>.network.canton.global`. This change is reflected in the values specified in `participant-values.yaml`, `validator-values.yaml` and `sv-values.yaml`.
-  * Add documentation for a new required ingress rule to expose ``global-domain-sequencer`` in :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`.
-  * Add documentation for configuring the SV node to publish the URL of this sequencer, so that other validators can subscribe to it.
-  * The requirement for url rewriting in the rules for Scan and SV apps has been removed:
+  * The requirement for URL rewriting in the rules for Scan and SV apps has been removed:
     ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan`` and ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/sv`` no longer requires rewriting
     (and also has been modified from `/api/v0/scan` to `/api/scan` and from `/api/v0/sv` to `/api/sv`).
     For example, ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan/foobar`` should be forwarded to
@@ -27,10 +25,15 @@ Release Notes
     `/api/<app>/readyz` and `/api/<app>/livez`, with `<app>` being `validator`, `scan` or `sv`, respectively.
     The corresponding Helm charts have been updated to reflect this change.
 
-  * The url configuration for the foundation's Scan app in `validator-values.yaml` has been updated to be
+  * The URL configuration for the foundation's Scan app in `validator-values.yaml` has been updated to be
     ``https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global``. Similarly, in the config files in the self-hosted validator section.
   * The `isDevNet` flag has been removed from the `cn-cometbft` helm chart in order to eliminate its potential for accidental misconfiguration.
     Instead, the chart now relies on the value of `genesis.chainId` in `cometbft-values.yaml` to determine whether it is a TestNet or DevNet deployment.
+
+* Documentation:
+
+  * Add documentation for configuring the SV node to publish the URL of its sequencer, so that other validators can subscribe to it.
+  * Add documentation for a new required ingress rule to expose ``global-domain-sequencer`` in :ref:`Configuring the Cluster Ingress <helm-sv-ingress>`.
 
 
 2023-11-06
