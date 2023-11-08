@@ -35,7 +35,7 @@ abstract class PackageVettingTrigger
       schedule = CoinConfigSchedule(coinRules)
       now = context.clock.now.plus(prevetDuration.asJava)
       currentConfig = schedule.getConfigAsOf(now)
-      _ <- vetCurrentConfig(schedule.initialConfig)
+      _ <- vetCurrentConfig(currentConfig)
       _ <- schedule.futureConfigs.traverse_ { case (time, config) =>
         val timestamp = CantonTimestamp.assertFromInstant(time)
         if (timestamp > now) {

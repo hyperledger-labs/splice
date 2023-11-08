@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.{cc, da}
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_SetConfig
 import com.daml.network.codegen.java.cn.svcrules.SvcRules_SetConfig
@@ -8,8 +8,8 @@ import com.daml.network.environment.DarResources
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{ConfigScheduleUtil, WalletTestUtil}
 
-import java.util.List
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 
 class ModelUpgradeIntegrationTest
@@ -43,16 +43,35 @@ class ModelUpgradeIntegrationTest
           coinConfig.globalDomain,
           coinConfig.tickDuration,
           new cc.coinconfig.PackageConfig(
-            "0.2.0",
-            "0.2.0",
-            "0.2.0",
-            "0.2.0",
             "0.1.0",
-            "0.2.0",
-            "0.2.0",
+            "0.1.0",
+            "0.1.0",
+            "0.1.0",
+            "0.1.0",
+            "0.1.0",
+            "0.1.0",
           ),
         ),
-        List.of[da.types.Tuple2[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]]](),
+        Seq(
+          new com.daml.network.codegen.java.da.types.Tuple2(
+            Instant.now().minus(3, ChronoUnit.SECONDS),
+            new cc.coinconfig.CoinConfig(
+              coinConfig.transferConfig,
+              coinConfig.issuanceCurve,
+              coinConfig.globalDomain,
+              coinConfig.tickDuration,
+              new cc.coinconfig.PackageConfig(
+                "0.2.0",
+                "0.2.0",
+                "0.2.0",
+                "0.2.0",
+                "0.1.0",
+                "0.2.0",
+                "0.2.0",
+              ),
+            ),
+          )
+        ).asJava,
       )
       val newCoinRules = new cc.coinrules.CoinRules(
         coinRules.payload.svc,
