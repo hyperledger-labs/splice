@@ -1,0 +1,31 @@
+{
+  "name": "DevNet Preflight",
+  "description": "Hourly Preflight of DevNet",
+  "attribution-actor": "system",
+  "parameters": {
+    "branch": "deployment/devnet",
+    "run-job": "healthcheck-devnet"
+  },
+  "timetable": {
+    "per-hour": 1,
+    "hours-of-day": [
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23
+    ],
+    "days-of-week": ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
+    "days-of-month": [],
+    "months": [
+      "JAN",
+      "FEB",
+      "MAR",
+      "APR",
+      "MAY",
+      "JUN",
+      "JUL",
+      "AUG",
+      "SEP",
+      "OCT",
+      "NOV",
+      "DEC"
+    ]
+  }
+}
