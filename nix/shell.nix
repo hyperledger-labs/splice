@@ -40,13 +40,16 @@ in pkgs.mkShell {
     openjdk11
     pigz
     popeye
-    postgresql_11
+    postgresql_14
     pre-commit
     procps
     ps
     pulumi-bin
     python3
-    python3Packages.datadog
+    (python3Packages.datadog.overrideAttrs (old: {
+                                             doCheck = false;
+                                             doInstallCheck = false;
+                                     }))
     python3Packages.sphinx_rtd_theme
     python3Packages.sphinx-copybutton
     python3.pkgs.sphinx-reredirects

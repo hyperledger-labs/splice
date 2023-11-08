@@ -283,13 +283,13 @@
 
         <!-- Disable warning related to image pulling for testcontainers (data continuity tests) -->
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>🐳 [postgres:11]</logger>
+            <logger>🐳 [postgres:14]</logger>
             <maxLevel>INFO</maxLevel>
             <contains>Retrying pull for image: postgres</contains>
             <testing>true</testing>
         </rewrite>
         <rewrite class="com.digitalasset.canton.logging.Rewrite">
-            <logger>🐳 [postgres:11]</logger>
+            <logger>🐳 [postgres:14]</logger>
             <maxLevel>INFO</maxLevel>
             <contains>Docker image pull has not made progress in</contains>
             <testing>true</testing>
