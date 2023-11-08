@@ -460,7 +460,7 @@ that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-
 
 .. _helm-configure-global-domain:
 
-**For DevNet only** Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml`` as follows:
+Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml`` as follows:
 
 - Set `postgresPassword` entry to the value you set in ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values.yaml``.
 
@@ -772,8 +772,6 @@ and you should see all peer SV members listed as peers (their human-friendly nam
 .. _sv-ui-global-domain:
 
 The SV UI also presents the status of your global domain node. To see it, click on the "Domain Node Status" tab.
-**For DevNet only:** If your global domain node is configured correctly then the sequencer and the mediator components should appear as active.
-
 
 .. _helm-scan-web-ui:
 
