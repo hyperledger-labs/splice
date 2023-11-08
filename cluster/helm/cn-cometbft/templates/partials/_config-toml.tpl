@@ -492,14 +492,7 @@ namespace = "cometbft"
 # Number of blocks that should be retained in memory at all time, anything older than this value will be locally pruned,
 # unless retainReq have been configured with a rpc call.
 # 0 - keep all blocks.
-
-# current strategy:
-# enable it only on devnet for testing purposes
-{{- if eq (include "isTestNet" .) "true" }}
-retain_blocks = 0
-{{- else }}
 retain_blocks = {{ $.Values.node.retainBlocks }}
-{{- end }}
 
 # Interval in which a new snapshot should be generated, in order to assist new peers to sync quickly.
 snapshot_height_delta = {{ $.Values.node.snapshotHeightDelta }}

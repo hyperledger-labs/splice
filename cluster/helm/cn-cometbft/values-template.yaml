@@ -38,7 +38,8 @@ node:
   # Identifier used to prefix created resources and as part of the optional Istio ingress
   identifier:
   # Number of blocks to keep, used for pruning. 0 -> keep all blocks.
-  retainBlocks: 0
+  # Number of blocks to keep for 7 days. 700k -> at least 7 days pruning
+  retainBlocks: 700000
   # Interval in which a new snapshot should be generated, in order to assist new peers to sync quickly.
   # A value below 1000 is not recommended.
   snapshotHeightDelta: 1000

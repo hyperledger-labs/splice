@@ -6,6 +6,8 @@ Release Notes
 2023-11-13
 ----------
 
+* CometBft pruning is now enabled, with approximately 7 days of history retained by default.
+
 * Revising the SVC governance formula, using n := ceil( (n + f + 1) / 2.0 ) with n SVs and f := floor ( (n - 1) / 3.0 ) maximum supported number of faulty SVs for safe operation.
 
 * Removing the special voting threshold for DevNet aligning with the one used in TestNet
