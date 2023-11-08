@@ -18,6 +18,7 @@
     1. [Unused Import Warnings](#unused-import-warnings)
     1. [TODO Comments](#todo-comments)
     1. [Configuration](#configuration)
+    1. [DB migrations](#db-migrations)
     1. [Daml Numerics](#daml-numerics)
     1. [Protobuf and GRPC Guidelines](#protobuf-and-grpc-guidelines)
     1. [Editing Daml](#editing-daml)
@@ -468,6 +469,10 @@ config file, with includes and substitutions resolved and comments stripped.
 **NOTE:** Although in some cases, the use of system props may work, only environment variables are fully supported
 across the stack. As a result, please ensure that you use environment variables for all overrides.
 
+
+### DB migrations
+
+Refer to [the main README on migrations](apps/common/src/main/resources/db/migration/README.md).
 
 ### Daml Numerics
 
