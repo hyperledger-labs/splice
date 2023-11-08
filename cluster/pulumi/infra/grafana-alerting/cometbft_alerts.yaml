@@ -153,8 +153,7 @@ groups:
                 name: Expression
                 type: __expr__
                 uid: __expr__
-              expression: ${current_invalid_voting_power} >= ${acceptable_invalid_voting_power}
-              hide: false
+              expression: ${current_invalid_voting_power} >= ${acceptable_invalid_voting_power} && ${current_invalid_voting_power} > 0
               intervalMs: 1000
               maxDataPoints: 43200
               refId: threshold
