@@ -12,6 +12,9 @@ import com.digitalasset.canton.config.*
 
 trait BaseScanAppConfig {}
 
+/** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
+  *                                            By default depends on the `tickDuration` of rounds. This setting overrides that.
+  */
 case class ScanAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CNDbConfig,
@@ -19,6 +22,7 @@ case class ScanAppBackendConfig(
     override val participantClient: CNParticipantClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     ingestFromParticipantBegin: Boolean = false,
+    miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
 ) extends CNNodeBackendConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
     {

@@ -27,8 +27,11 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
             _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
           )(config),
         (_, config) =>
-          CNNodeConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(
-            _.copy(initialTickDuration = NonNegativeFiniteDuration.ofSeconds(5))
+          CNNodeConfigTransforms.updateAllScanAppConfigs_(
+            // This avoids the values being cached for so long that we never try to fetch the CoinRules
+            _.copy(miningRoundsCacheTimeToLiveOverride =
+              Some(NonNegativeFiniteDuration.ofSeconds(5))
+            )
           )(config),
       )
 

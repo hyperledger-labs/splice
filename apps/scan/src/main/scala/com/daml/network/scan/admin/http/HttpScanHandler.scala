@@ -36,9 +36,11 @@ import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.Trans
 }
 import com.daml.network.scan.store.SortOrder
 import com.daml.network.store.PageLimit
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 class HttpScanHandler(
     store: ScanStore,
+    miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -103,15 +105,28 @@ class HttpScanHandler(
       summarizingRounds: Seq[Contract.Has[?, SummarizingMiningRound]],
       issuingRounds: Seq[Contract.Has[?, IssuingMiningRound]],
   ) = {
-    val microseconds: Seq[Long] = (openRounds.map(r =>
-      r.payload.tickDuration.microseconds.toLong
-    ) ++ summarizingRounds.map(_.payload.tickDuration.microseconds.toLong) ++ issuingRounds.map(r =>
-      (Timestamp
-        .assertFromInstant(r.payload.targetClosesAt)
-        .micros - Timestamp.assertFromInstant(r.payload.opensAt).micros) / 2
-    ))
+    val microseconds: Seq[Long] =
+      (openRounds.map(r => r.payload.tickDuration.microseconds.toLong) ++ summarizingRounds.map(
+        _.payload.tickDuration.microseconds.toLong
+      ) ++ issuingRounds.map(r =>
+        (Timestamp
+          .assertFromInstant(r.payload.targetClosesAt)
+          .micros - Timestamp.assertFromInstant(r.payload.opensAt).micros) / 2
+      ))
     // using the potentially-throwing `min` on-purpose as we don't want to accidentally set a very large TTL.
-    microseconds.min
+    val ttlFromTickDuration = microseconds.min
+
+    miningRoundsCacheTimeToLiveOverride match {
+      case Some(value) =>
+        val ttlFromConfig = value.duration.toMicros
+        if (ttlFromConfig < ttlFromTickDuration) ttlFromConfig
+        else
+          throw new IllegalArgumentException(
+            "`miningRoundsCacheTimeToLiveOverride` cannot be greater than the tick duration."
+          )
+      case None =>
+        ttlFromTickDuration
+    }
   }
 
   private def selectRoundsToRespondWith[TCid, T](
