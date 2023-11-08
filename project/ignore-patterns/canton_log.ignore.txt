@@ -68,4 +68,7 @@ Your detailed API event logging is turned on but you are doing quite a few concu
 # Sometimes DomainOutboxQueue Pending is not empty even though it requires to be. Will be fixed by canton #15061.
 .*tried to dequeue while pending wasn't empty.*
 
+# TODO(#8295): Remove this once fixed in Canton
+UNAUTHORIZED_TOPOLOGY_TRANSACTION
+
 # Make sure to have a trailing newline
