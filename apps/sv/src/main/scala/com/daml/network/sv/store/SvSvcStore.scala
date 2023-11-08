@@ -923,6 +923,9 @@ object SvSvcStore {
     cc.coin.UnclaimedReward.COMPANION,
     cc.coinimport.ImportCrate.COMPANION,
     cc.validatorlicense.ValidatorLicense.COMPANION,
+    cn.cns.CnsEntry.COMPANION,
+    cn.cns.CnsEntryContext.COMPANION,
+    cn.cns.CnsRules.COMPANION,
     cn.svc.coinprice.CoinPriceVote.COMPANION,
   )
 

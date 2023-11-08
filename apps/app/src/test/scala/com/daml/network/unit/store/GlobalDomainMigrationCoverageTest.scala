@@ -98,6 +98,7 @@ class GlobalDomainMigrationCoverageTest
 
 object GlobalDomainMigrationCoverageTest {
   import directory.store.DirectoryStore
+  import scan.store.ScanStore
   import sv.store.{SvStore, SvSvStore, SvSvcStore}
   import validator.store.ValidatorStore
   import wallet.store.UserWalletStore
@@ -140,6 +141,7 @@ object GlobalDomainMigrationCoverageTest {
         DirectoryStore.contractFilter(dummyParty),
         DirectoryStore.templatesMovedByMyAutomation,
       ),
+      (ScanStore, ScanStore.contractFilter(dummyParty), Seq.empty),
     )
 
   // How do we ensure that new templates get migration added somewhere?  If
@@ -153,20 +155,10 @@ object GlobalDomainMigrationCoverageTest {
   //
   // and (hopefully) forestall overlooked required changes that way.
 
-  private def todoCns(referencingStores: Object*) = reason(
-    "TODO (#8357) make directory/cns contracts follow CoinRules;"
-      + " global domain migration will break the cns if this is not done",
-    referencingStores: _*
-  )
-
   private val knownNotHandled = {
     import codegen.java.cc.globaldomain
-    import codegen.java.cn.cns as cnsCodegen
     import codegen.java.cn.wallet.topupstate as topUpCodegen
     Seq(
-      cnsCodegen.CnsEntry.COMPANION -> todoCns(SvSvcStore),
-      cnsCodegen.CnsEntryContext.COMPANION -> todoCns(SvSvcStore),
-      cnsCodegen.CnsRules.COMPANION -> todoCns(SvSvcStore),
       globaldomain.MemberTraffic.COMPANION ->
         reason("tied to a specific domainId, never migrated", SvSvcStore),
       topUpCodegen.ValidatorTopUpState.COMPANION ->

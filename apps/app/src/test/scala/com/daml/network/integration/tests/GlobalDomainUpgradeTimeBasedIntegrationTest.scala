@@ -9,6 +9,7 @@ import com.daml.ledger.javaapi.data.codegen.{
 }
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.{
+  cns,
   directory as dir,
   svcrules as svcr,
   svonboarding as so,
@@ -80,6 +81,8 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       )
 
   private[this] val globalUpgradeDomain = DomainAlias.tryCreate("global-upgrade")
+
+  private[this] val mostDistantPossibleExpiry = com.daml.lf.data.Time.Timestamp.MaxValue.toInstant
 
   "scheduled global domain upgrade happens" in { implicit env =>
     initSvcWithSv1Only() withClue "spin up Svc"
@@ -265,7 +268,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           "irrelevant name",
           "observing domain migration",
           svcParty.toProtoPrimitive,
-          com.daml.lf.data.Time.Timestamp.MaxValue.toInstant,
+          mostDistantPossibleExpiry,
         )
       )
     }
@@ -391,7 +394,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
     def protectAppRewardCoupons = sv1Backend.leaderBasedAutomation
       .trigger[com.daml.network.sv.automation.leaderbased.ExpireRewardCouponsTrigger]
 
-    clue("create user wallet contracts of various kinds") {
+    val subscriptionRequestCid = clue("create user wallet contracts of various kinds") {
       val svc = svcParty.toProtoPrimitive
       val validator = sv1ValidatorBackend.getValidatorPartyId()
       val provider = sv1WalletUser
@@ -507,6 +510,40 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           dummyPaymentAmount,
           maxTimestamp,
           "irrelevant tracking id",
+        )
+      )
+
+      subscriptionRequestCid
+    }
+
+    clue("create svc-signed Cns contracts of various kinds") {
+      import com.daml.network.util.CNNodeUtil.defaultCnsConfig
+
+      val svc = svcParty.toProtoPrimitive
+
+      createSampleAndEnsurePresence(cns.CnsRules.COMPANION)(
+        new cns.CnsRules(svc, defaultCnsConfig())
+      )
+
+      createSampleAndEnsurePresence(cns.CnsEntry.COMPANION)(
+        new cns.CnsEntry(
+          svc,
+          svc,
+          "irrelevant name",
+          "urn:example.com",
+          "irrelevant description",
+          mostDistantPossibleExpiry,
+        )
+      )
+
+      createSampleAndEnsurePresence(cns.CnsEntryContext.COMPANION)(
+        new cns.CnsEntryContext(
+          svc,
+          svc,
+          "irrelevant name",
+          "urn:example.com",
+          "irrelevant description",
+          subscriptionRequestCid,
         )
       )
     }
