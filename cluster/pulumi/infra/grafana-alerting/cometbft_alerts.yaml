@@ -280,7 +280,7 @@ groups:
               type: threshold
         dashboardUid: UJyurCTWz
         panelId: 66
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 10m
         annotations:
@@ -467,7 +467,7 @@ groups:
               type: reduce
         dashboardUid: UJyurCTWz
         panelId: 66
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 5m
         annotations:
