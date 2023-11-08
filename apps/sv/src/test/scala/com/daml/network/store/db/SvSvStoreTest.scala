@@ -1,6 +1,6 @@
 package com.daml.network.store.db
 
-import com.daml.network.codegen.java.cn.svonboarding.ApprovedSvIdentity
+import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.codegen.java.cn.validatoronboarding.UsedSecret
 import com.daml.network.environment.{DarResources, RetryProvider}
@@ -196,7 +196,9 @@ class DbSvSvStoreTest
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         DarResources.cantonCoin.all ++
           DarResources.validatorLifecycle.all ++
-          DarResources.svcGovernance.all
+          DarResources.svcGovernance.all ++
+          DarResources.svcGovernance.all ++
+          DarResources.svLocal.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)

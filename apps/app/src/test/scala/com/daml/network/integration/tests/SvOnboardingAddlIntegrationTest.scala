@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.sv.util.SvOnboardingToken
@@ -33,7 +34,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase {
     clue("Simulate that sv3 hasn't approved sv4 by archiving the respective `ApprovedSvIdentity`") {
       inside(
         sv3Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(
+          .filterJava(ApprovedSvIdentity.COMPANION)(
             sv3Backend.getSvcInfo().svParty,
             c => c.data.candidateName == "Canton-Foundation-4",
           )

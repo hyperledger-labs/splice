@@ -2,16 +2,6 @@ module CN.SvOnboarding where
 
 import CN.Util.Assert
 
--- | Template used by a ("approving") SV node to "approve" a not-yet-onboarded ("candidate") SV,
--- in the sense that once the candidate authenticates via providing a signature that matches the
--- registered key the approver will actively confirm the candidate's onboarding.
-template ApprovedSvIdentity with
-    approvingSv : Party         -- ^ The approver.
-    candidateName : Text        -- ^ Human-readable name of the SV candidate.
-    candidateKey : Text         -- ^ Public key of the SV candidate.
-  where
-    signatory approvingSv
-
 -- | Template used by the SV collective to collect confirmations for the onboarding of an SV candidate.
 -- The existence of this contract triggers SV automation that creates confirmation contracts for
 -- the candidate if the token is a valid `SvOnboardingToken` and matches an `ApprovedSvIdentity`.

@@ -1,13 +1,13 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIdentity
 
 class SvIdentityIntegrationTest extends SvIntegrationTestBase {
 
   "SV Identity can be approved at runtime" in { implicit env =>
     initSvc()
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(
+      .filterJava(ApprovedSvIdentity.COMPANION)(
         sv1Backend.getSvcInfo().svParty
       ) should have length 3
     val svXName = "Canton-Foundation-X"
@@ -16,7 +16,7 @@ class SvIdentityIntegrationTest extends SvIntegrationTestBase {
     sv1Backend.approveSvIdentity(svXName, svXKey)
     inside(
       sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-        .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1Backend.getSvcInfo().svParty)
+        .filterJava(ApprovedSvIdentity.COMPANION)(sv1Backend.getSvcInfo().svParty)
     ) {
       case approvedSvIds => {
         approvedSvIds should have size 4
@@ -33,7 +33,7 @@ class SvIdentityIntegrationTest extends SvIntegrationTestBase {
     clue("SV1 has created an ApprovedSvIdentity contract as it's configured to.") {
       inside(
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svonboarding.ApprovedSvIdentity.COMPANION)(sv1Backend.getSvcInfo().svParty)
+          .filterJava(ApprovedSvIdentity.COMPANION)(sv1Backend.getSvcInfo().svParty)
       ) {
         case approvedSvIds => {
           // if this check fails:

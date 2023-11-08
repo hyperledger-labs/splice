@@ -1,6 +1,6 @@
 package com.daml.network.sv.store.memory
 
-import com.daml.network.codegen.java.cn.svonboarding.ApprovedSvIdentity
+import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding.{UsedSecret, ValidatorOnboarding}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{InMemoryCNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
@@ -9,7 +9,7 @@ import com.daml.network.sv.store.{SvStore, SvSvStore}
 import com.daml.network.util.{Contract, ContractWithState}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
-import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
+import com.daml.network.codegen.java.cn.validatoronboarding as vo
 
 import scala.concurrent.*
 
@@ -50,8 +50,8 @@ class InMemorySvSvStore(
     Contract[ApprovedSvIdentity.ContractId, ApprovedSvIdentity]
   ]]] =
     multiDomainAcsStore
-      .findContractWithOffset(so.ApprovedSvIdentity.COMPANION)(
-        (_: Contract[?, so.ApprovedSvIdentity]).payload.candidateName == name
+      .findContractWithOffset(ApprovedSvIdentity.COMPANION)(
+        (_: Contract[?, ApprovedSvIdentity]).payload.candidateName == name
       )
       .map(onlyContractResult)
 }

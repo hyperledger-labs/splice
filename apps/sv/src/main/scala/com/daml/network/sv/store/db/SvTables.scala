@@ -2,7 +2,7 @@ package com.daml.network.sv.store.db
 
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.lf.data.Time.Timestamp
-import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
+import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo, svlocal}
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import com.daml.network.util.{Contract, QualifiedName}
 import com.google.protobuf.ByteString
@@ -47,8 +47,12 @@ object SvTables extends AcsTables {
               svCandidateName = None,
             )
           }
-        case t if t == QualifiedName(so.ApprovedSvIdentity.TEMPLATE_ID) =>
-          tryToDecode(so.ApprovedSvIdentity.COMPANION, createdEvent, createdEventBlob) { contract =>
+        case t if t == QualifiedName(svlocal.approvedsvidentity.ApprovedSvIdentity.TEMPLATE_ID) =>
+          tryToDecode(
+            svlocal.approvedsvidentity.ApprovedSvIdentity.COMPANION,
+            createdEvent,
+            createdEventBlob,
+          ) { contract =>
             SvAcsStoreRowData(
               contract,
               contractExpiresAt = None,

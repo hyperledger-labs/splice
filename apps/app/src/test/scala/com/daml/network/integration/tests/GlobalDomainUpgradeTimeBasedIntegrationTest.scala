@@ -12,6 +12,7 @@ import com.daml.network.codegen.java.cn.{
   cns,
   directory as dir,
   svcrules as svcr,
+  svlocal,
   svonboarding as so,
   validatoronboarding as vo,
   wallet as cnw,
@@ -241,8 +242,12 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         ),
       )("ensure SvOnboardingRequest is there", _ => nonEmptyOnSv1(so.SvOnboardingRequest.COMPANION))
 
-      createSampleAndEnsurePresence(so.ApprovedSvIdentity.COMPANION)(
-        new so.ApprovedSvIdentity(sv1Party.toProtoPrimitive, "irrelevant name", "irrelevant key")
+      createSampleAndEnsurePresence(svlocal.approvedsvidentity.ApprovedSvIdentity.COMPANION)(
+        new svlocal.approvedsvidentity.ApprovedSvIdentity(
+          sv1Party.toProtoPrimitive,
+          "irrelevant name",
+          "irrelevant key",
+        )
       )
 
       createSampleAndEnsurePresence(vo.UsedSecret.COMPANION)(

@@ -4,6 +4,7 @@ import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpired
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
+import com.daml.network.codegen.java.cn.svlocal
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult}
@@ -69,14 +70,20 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
   def lookupApprovedSvIdentityByNameWithOffset(
       name: String
   )(implicit tc: TraceContext): Future[
-    QueryResult[Option[Contract[so.ApprovedSvIdentity.ContractId, so.ApprovedSvIdentity]]]
+    QueryResult[Option[Contract[
+      svlocal.approvedsvidentity.ApprovedSvIdentity.ContractId,
+      svlocal.approvedsvidentity.ApprovedSvIdentity,
+    ]]]
   ]
 
   def lookupApprovedSvIdentityByName(
       name: String
   )(implicit
       tc: TraceContext
-  ): Future[Option[Contract[so.ApprovedSvIdentity.ContractId, so.ApprovedSvIdentity]]] =
+  ): Future[Option[Contract[
+    svlocal.approvedsvidentity.ApprovedSvIdentity.ContractId,
+    svlocal.approvedsvidentity.ApprovedSvIdentity,
+  ]]] =
     lookupApprovedSvIdentityByNameWithOffset(name).map(_.value)
 
   def lookupSvOnboardingConfirmed()(implicit tc: TraceContext): Future[
@@ -128,7 +135,7 @@ object SvSvStore {
     Seq[ConstrainedTemplate](
       vo.UsedSecret.COMPANION,
       vo.ValidatorOnboarding.COMPANION,
-      so.ApprovedSvIdentity.COMPANION,
+      svlocal.approvedsvidentity.ApprovedSvIdentity.COMPANION,
     )
 
   /** Contract filter of an sv acs store for a specific acs party. */
@@ -141,7 +148,9 @@ object SvSvStore {
       Map(
         mkFilter(vo.ValidatorOnboarding.COMPANION)(co => co.payload.sv == sv),
         mkFilter(vo.UsedSecret.COMPANION)(co => co.payload.sv == sv),
-        mkFilter(so.ApprovedSvIdentity.COMPANION)(co => co.payload.approvingSv == sv),
+        mkFilter(svlocal.approvedsvidentity.ApprovedSvIdentity.COMPANION)(co =>
+          co.payload.approvingSv == sv
+        ),
         mkFilter(so.SvOnboardingConfirmed.COMPANION)(co => co.payload.svParty == sv),
       ),
     )

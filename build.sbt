@@ -70,6 +70,7 @@ lazy val root = (project in file("."))
     `splitwell-daml`,
     `svc-governance-daml`,
     `svc-governance-upgrade-daml`,
+    `sv-local-daml`,
     `validator-lifecycle-daml`,
     `app-manager-daml`,
     `build-tools-dar-lock-checker`,
@@ -223,6 +224,14 @@ lazy val `svc-governance-upgrade-daml` =
           (`wallet-payments-upgrade-daml` / Compile / damlBuild).value,
     )
 
+lazy val `sv-local-daml` =
+  project
+    .in(file("daml/sv-local"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings
+    )
+
 lazy val `validator-lifecycle-daml` =
   project
     .in(file("daml/validator-lifecycle"))
@@ -367,6 +376,7 @@ lazy val `apps-common` =
       `directory-upgrade-daml`,
       `splitwell-daml`,
       `splitwell-upgrade-daml`,
+      `sv-local-daml`,
       `svc-governance-daml`,
       `svc-governance-upgrade-daml`,
       `validator-lifecycle-daml`,
@@ -473,6 +483,7 @@ lazy val `apps-sv` =
       `apps-directory`, // Required for the SvSvcStore to also store all CNS entries and related contracts
       `validator-lifecycle-daml`,
       `svc-governance-daml`,
+      `sv-local-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(

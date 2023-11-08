@@ -107,7 +107,7 @@ class SvApp(
     .filter(_.enabled)
 
   override def packages =
-    super.packages ++ DarResources.svcGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.directoryService.all ++ DarResources.cantonNameService.all
+    super.packages ++ DarResources.svcGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.directoryService.all ++ DarResources.cantonNameService.all ++ DarResources.svLocal.all
 
   override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
@@ -433,6 +433,7 @@ class SvApp(
       SvApp.svcGovernancePackage,
       SvApp.validatorLifecyclePackage,
       SvApp.directoryPackage,
+      SvApp.svLocal,
     )
 
   private def newTrafficBalanceService(participantAdminConnection: ParticipantAdminConnection) = {
@@ -1012,7 +1013,7 @@ object SvApp {
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
     val svParty = svStoreWithIngestion.store.key.svParty
-    val approvedSvIdentity = new cn.svonboarding.ApprovedSvIdentity(
+    val approvedSvIdentity = new cn.svlocal.approvedsvidentity.ApprovedSvIdentity(
       svParty.toProtoPrimitive,
       name,
       key,
@@ -1333,4 +1334,6 @@ object SvApp {
     UploadablePackage.fromResource(DarResources.validatorLifecycle.bootstrap)
   val directoryPackage: UploadablePackage =
     UploadablePackage.fromResource(DarResources.directoryService.bootstrap)
+  val svLocal: UploadablePackage =
+    UploadablePackage.fromResource(DarResources.svLocal.bootstrap)
 }
