@@ -71,4 +71,7 @@ Your detailed API event logging is turned on but you are doing quite a few concu
 # TODO(#8295): Remove this once fixed in Canton
 UNAUTHORIZED_TOPOLOGY_TRANSACTION
 
+# TODO(#8507): investigate and decide if we want to remove it once fixed
+Late processing \(or clock skew\) of batch with counter.*after sequencing
+
 # Make sure to have a trailing newline
