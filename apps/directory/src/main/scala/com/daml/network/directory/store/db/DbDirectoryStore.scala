@@ -1,13 +1,11 @@
 package com.daml.network.directory.store.db
 
 import com.daml.ledger.javaapi.data.CreatedEvent
-import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.directory.{DirectoryEntry, DirectoryInstall}
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{Limit, LimitHelpers, MultiDomainAcsStore}
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
+import com.daml.network.store.db.{AcsQueries, AcsRowData, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import AcsQueries.{SelectFromAcsTableResult, SelectFromAcsTableWithStateResult}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -21,7 +19,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.store.db.DirectoryTables.DirectoryAcsStoreRowData
-import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.google.protobuf.ByteString
 import io.circe.Json
@@ -54,52 +51,14 @@ class DbDirectoryStore(
     with NamedLogging
     with LimitHelpers {
 
-  import storage.DbStorageConverters.setParameterByteArray
   import multiDomainAcsStore.waitUntilAcsIngested
 
   private def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionAcsInsert(
-      createdEvent: CreatedEvent,
-      createdEventBlob: ByteString,
-      contractState: ContractStateRowData,
-  )(implicit tc: TraceContext) = {
-    DirectoryAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob).map {
-      case DirectoryAcsStoreRowData(
-            contract,
-            contractExpiresAt,
-            directoryInstallUser,
-            directoryEntryName,
-            directoryEntryOwner,
-            subscriptionReferenceContractId,
-            subscriptionNextPaymentDueAt,
-          ) =>
-        val safeDirectoryName = directoryEntryName.map(lengthLimited)
-        val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
-        val templateId = contract.identifier
-        val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
-        val createArguments = payloadJsonFromContract(contract.payload)
-        val createdAt = Timestamp.assertFromInstant(contract.mandatoryCreatedAt)
-        sqlu"""
-              insert into directory_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, created_event_blob,
-                                        created_at, contract_expires_at,
-                                        assigned_domain, reassignment_counter, reassignment_target_domain,
-                                        reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
-                                        directory_install_user, directory_entry_name,
-                                        directory_entry_owner, subscription_reference_contract_id,
-                                        subscription_next_payment_due_at)
-              values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
-            templateId
-          )}, $createArguments, $createdEventBlob,
-                      $createdAt, $contractExpiresAt,
-                      ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
-                      ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
-                      $directoryInstallUser, $safeDirectoryName,
-                      $directoryEntryOwner, $subscriptionReferenceContractId,
-                      $subscriptionNextPaymentDueAt)
-              on conflict do nothing
-            """
-    }
+  override def getAcsRowData(createdEvent: CreatedEvent, createdEventBlob: ByteString)(implicit
+      tc: TraceContext
+  ): Either[String, AcsRowData] = {
+    DirectoryAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob)
   }
 
   override def lookupInstallByUserWithOffset(user: PartyId)(implicit tc: TraceContext): Future[

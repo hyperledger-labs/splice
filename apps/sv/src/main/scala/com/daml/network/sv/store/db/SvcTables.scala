@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.directory.store.db.DirectoryTables.DirectoryAcsStoreRowData
-import com.daml.network.store.db.AcsTables
+import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import com.daml.network.sv.store.SvcTxLogParser
 import com.daml.network.util.{CNNodeUtil, Contract, QualifiedName}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
@@ -51,7 +51,34 @@ object SvcTables extends AcsTables with NamedLogging {
       subscriptionReferenceContractId: Option[sub.SubscriptionRequest.ContractId] = None,
       subscriptionNextPaymentDueAt: Option[Timestamp] = None,
       featuredAppRightProvider: Option[PartyId] = None,
-  )
+  ) extends AcsRowData {
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
+      "coin_round_of_expiry" -> coinRoundOfExpiry,
+      "reward_round" -> rewardRound,
+      "reward_party" -> rewardParty,
+      "mining_round" -> miningRound,
+      "action_requiring_confirmation" -> actionRequiringConfirmation,
+      "confirmer" -> confirmer,
+      "sv_onboarding_token" -> svOnboardingToken.map(lengthLimited),
+      "sv_candidate_party" -> svCandidateParty,
+      "sv_candidate_name" -> svCandidateName.map(lengthLimited),
+      "validator" -> validator,
+      "total_traffic_purchased" -> totalTrafficPurchased,
+      "voter" -> voter,
+      "vote_request_cid" -> voteRequestCid,
+      "requester" -> requester,
+      "election_request_epoch" -> electionRequestEpoch,
+      "import_crate_receiver" -> importCrateReceiver,
+      "member_traffic_member" -> memberTrafficMember,
+      "cns_entry_name" -> cnsEntryName.map(lengthLimited),
+      "action_cns_entry_context_cid" -> actionCnsEntryContextCid,
+      "action_cns_entry_context_payment_id" -> actionCnsEntryContextPaymentId,
+      "action_cns_entry_context_arc_type" -> actionCnsEntryContextArcType.map(lengthLimited),
+      "subscription_reference_contract_id" -> subscriptionReferenceContractId,
+      "subscription_next_payment_due_at" -> subscriptionNextPaymentDueAt,
+      "featured_app_right_provider" -> featuredAppRightProvider,
+    )
+  }
 
   object SvcAcsStoreRowData {
     def fromCreatedEvent(

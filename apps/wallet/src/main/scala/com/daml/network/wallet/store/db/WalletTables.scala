@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.store.db.AcsTables
+import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import com.daml.network.util.{Contract, QualifiedName}
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.config.CantonRequireTypes.String3
@@ -23,7 +23,9 @@ object WalletTables extends AcsTables {
   case class UserWalletAcsStoreRowData(
       contract: Contract[?, ?],
       contractExpiresAt: Option[Timestamp],
-  )
+  ) extends AcsRowData {
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
+  }
 
   object UserWalletAcsStoreRowData {
     def fromCreatedEvent(

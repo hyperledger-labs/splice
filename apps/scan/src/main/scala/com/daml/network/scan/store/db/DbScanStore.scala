@@ -2,7 +2,6 @@ package com.daml.network.scan.store.db
 
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
@@ -13,7 +12,7 @@ import com.daml.network.scan.store.db.ScanTables.{ScanAcsStoreRowData, ScanTxLog
 import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry, TxLogIndexRecord}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
+import com.daml.network.store.db.{AcsQueries, AcsRowData, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.util.{ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -23,9 +22,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import cats.implicits.*
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.daml.network.store.db.AcsTables.ContractStateRowData
-
 import com.google.protobuf.ByteString
+
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -61,50 +59,14 @@ class DbScanStore(
     with NamedLogging
     with LimitHelpers {
 
-  import storage.DbStorageConverters.setParameterByteArray
   import multiDomainAcsStore.waitUntilAcsIngested
 
   def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionAcsInsert(
-      createdEvent: CreatedEvent,
-      createdEventBlob: ByteString,
-      contractState: ContractStateRowData,
-  )(implicit
+  override def getAcsRowData(createdEvent: CreatedEvent, createdEventBlob: ByteString)(implicit
       tc: TraceContext
-  ) = {
-    ScanAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob).map {
-      case ScanAcsStoreRowData(
-            contract,
-            contractExpiresAt,
-            round,
-            validator,
-            amount,
-            importCrateReceiverName,
-            featuredAppRightProvider,
-          ) =>
-        val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
-        val templateId = contract.identifier
-        val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
-        val createArguments = payloadJsonFromContract(contract.payload)
-        val createdAt = Timestamp.assertFromInstant(contract.mandatoryCreatedAt)
-        val safeImportCrateReceiverName = importCrateReceiverName.map(lengthLimited)
-        sqlu"""
-              insert into scan_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, created_event_blob,
-              created_at, contract_expires_at,
-              assigned_domain, reassignment_counter, reassignment_target_domain,
-              reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
-              round, validator, amount, import_crate_receiver, featured_app_right_provider)
-              values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
-            templateId
-          )}, $createArguments, $createdEventBlob,
-                      $createdAt, $contractExpiresAt,
-                      ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
-                      ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
-                      $round, $validator, $amount, $safeImportCrateReceiverName, $featuredAppRightProvider)
-              on conflict do nothing
-              """
-    }
+  ): Either[String, AcsRowData] = {
+    ScanAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob)
   }
 
   override def ingestionTxLogInsert(record: TxLogIndexRecord)(implicit

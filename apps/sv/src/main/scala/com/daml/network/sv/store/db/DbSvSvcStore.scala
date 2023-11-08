@@ -3,8 +3,8 @@ package com.daml.network.sv.store.db
 import cats.data.OptionT
 import cats.implicits.*
 import com.daml.ledger.javaapi.data as javab
+import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.*
@@ -24,8 +24,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
-import com.daml.network.store.db.AcsTables.ContractStateRowData
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
+import com.daml.network.store.db.{AcsQueries, AcsRowData, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.store.{AcsStoreDump, Limit, LimitHelpers, MultiDomainAcsStore}
 import com.daml.network.sv.store.db.SvcTables.{SvcAcsStoreRowData, SvcTxLogRowData}
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
@@ -78,82 +77,14 @@ class DbSvSvcStore(
     with LimitHelpers
     with NamedLogging {
 
-  import storage.DbStorageConverters.setParameterByteArray
   import multiDomainAcsStore.waitUntilAcsIngested
 
   def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionAcsInsert(
-      createdEvent: javab.CreatedEvent,
-      createdEventBlob: ByteString,
-      contractState: ContractStateRowData,
-  )(implicit
+  override def getAcsRowData(createdEvent: CreatedEvent, createdEventBlob: ByteString)(implicit
       tc: TraceContext
-  ) = {
-    SvcAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob).map {
-      case SvcAcsStoreRowData(
-            contract,
-            contractExpiresAt,
-            coinRoundOfExpiry,
-            rewardRound,
-            rewardParty,
-            miningRound,
-            actionRequiringConfirmation,
-            confirmer,
-            svOnboardingToken,
-            svCandidateParty,
-            svCandidateName,
-            validator,
-            totalTrafficPurchased,
-            voter,
-            voteRequestCid,
-            requester,
-            electionRequestEpoch,
-            importCrateReceiver,
-            memberTrafficMember,
-            cnsEntryName,
-            actionCnsEntryContextCid,
-            actionCnsEntryContextPaymentId,
-            actionCnsEntryContextArcType,
-            subscriptionReferenceContractId,
-            subscriptionNextPaymentDueAt,
-            featuredAppRightProvider,
-          ) =>
-        val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
-        val templateId = contract.identifier
-        val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
-        val createArguments = payloadJsonFromContract(contract.payload)
-        val createdAt = Timestamp.assertFromInstant(contract.mandatoryCreatedAt)
-        val safeSvOnboardingToken = svOnboardingToken.map(lengthLimited)
-        val safeSvCandidateName = svCandidateName.map(lengthLimited)
-        val safeCnsEntryName = cnsEntryName.map(lengthLimited)
-        val safeActionCnsEntryContextArcType = actionCnsEntryContextArcType.map(lengthLimited)
-        sqlu"""
-              insert into svc_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, created_event_blob,
-                                        created_at, contract_expires_at,
-                                        assigned_domain, reassignment_counter, reassignment_target_domain,
-                                        reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
-                                        coin_round_of_expiry, reward_round, reward_party, mining_round, action_requiring_confirmation,
-                                        confirmer, sv_onboarding_token, sv_candidate_party, sv_candidate_name, validator,
-                                        total_traffic_purchased, voter, vote_request_cid, requester, election_request_epoch,
-                                        import_crate_receiver, member_traffic_member, cns_entry_name, action_cns_entry_context_cid,
-                                        action_cns_entry_context_payment_id, action_cns_entry_context_arc_type, subscription_reference_contract_id,
-                                        subscription_next_payment_due_at, featured_app_right_provider)
-              values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
-            templateId
-          )}, $createArguments, $createdEventBlob,
-                      $createdAt, $contractExpiresAt,
-                      ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
-                      ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
-                      $coinRoundOfExpiry, $rewardRound, $rewardParty, $miningRound, $actionRequiringConfirmation,
-                      $confirmer, $safeSvOnboardingToken, $svCandidateParty, $safeSvCandidateName, $validator,
-                      $totalTrafficPurchased, $voter, $voteRequestCid, $requester, $electionRequestEpoch,
-                      $importCrateReceiver, $memberTrafficMember, $safeCnsEntryName, $actionCnsEntryContextCid,
-                      $actionCnsEntryContextPaymentId, $safeActionCnsEntryContextArcType, $subscriptionReferenceContractId,
-                      $subscriptionNextPaymentDueAt, $featuredAppRightProvider)
-              on conflict do nothing
-            """
-    }
+  ): Either[String, AcsRowData] = {
+    SvcAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob)
   }
 
   override def ingestionTxLogInsert(record: SvcTxLogParser.TxLogIndexRecord)(implicit

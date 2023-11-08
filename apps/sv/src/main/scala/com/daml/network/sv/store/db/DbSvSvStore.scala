@@ -1,15 +1,12 @@
 package com.daml.network.sv.store.db
 
 import com.daml.ledger.javaapi.data.CreatedEvent
-import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.svonboarding.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding.{UsedSecret, ValidatorOnboarding}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{MultiDomainAcsStore, StoreErrors}
 import MultiDomainAcsStore.QueryResult
-import com.daml.network.store.db.AcsTables.ContractStateRowData
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
+import com.daml.network.store.db.{AcsQueries, AcsRowData, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.sv.store.db.SvTables.SvAcsStoreRowData
 import com.daml.network.sv.store.{SvStore, SvSvStore}
 import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
@@ -49,43 +46,14 @@ class DbSvSvStore(
     with StoreErrors
     with NamedLogging {
 
-  import storage.DbStorageConverters.setParameterByteArray
   import multiDomainAcsStore.waitUntilAcsIngested
 
   def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionAcsInsert(
-      createdEvent: CreatedEvent,
-      createdEventBlob: ByteString,
-      contractState: ContractStateRowData,
-  )(implicit
+  override def getAcsRowData(createdEvent: CreatedEvent, createdEventBlob: ByteString)(implicit
       tc: TraceContext
-  ) = {
-    SvAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob).map {
-      case SvAcsStoreRowData(contract, contractExpiresAt, onboardingSecret, svCandidateName) =>
-        val safeSecret = onboardingSecret.map(lengthLimited)
-        val safeCandidateName = svCandidateName.map(lengthLimited)
-        val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
-        val templateId = contract.identifier
-        val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
-        val createArguments = payloadJsonFromContract(contract.payload)
-        val createdAt = Timestamp.assertFromInstant(contract.mandatoryCreatedAt)
-        sqlu"""
-              insert into sv_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, created_event_blob,
-                                       created_at, contract_expires_at,
-                                       assigned_domain, reassignment_counter, reassignment_target_domain,
-                                       reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
-                                       onboarding_secret, sv_candidate_name)
-              values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
-            templateId
-          )}, $createArguments, $createdEventBlob,
-                      $createdAt, $contractExpiresAt,
-                      ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
-                      ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
-                      $safeSecret, $safeCandidateName)
-              on conflict do nothing
-            """
-    }
+  ): Either[String, AcsRowData] = {
+    SvAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob)
   }
 
   override def lookupValidatorOnboardingBySecretWithOffset(

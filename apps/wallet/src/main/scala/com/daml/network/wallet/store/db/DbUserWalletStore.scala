@@ -2,7 +2,6 @@ package com.daml.network.wallet.store.db
 
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
@@ -10,9 +9,8 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.store.db.AcsTables.ContractStateRowData
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
-import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
+import com.daml.network.store.db.{AcsQueries, AcsRowData, AcsTables, DbCNNodeAppStoreWithHistory}
+import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletStore.TxLogIndexRecord
 import com.daml.network.wallet.store.db.WalletTables.{
   UserWalletAcsStoreRowData,
@@ -63,41 +61,13 @@ class DbUserWalletStore(
     with LimitHelpers {
 
   import multiDomainAcsStore.waitUntilAcsIngested
-  import storage.DbStorageConverters.setParameterByteArray
 
   def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionAcsInsert(
-      createdEvent: CreatedEvent,
-      createdEventBlob: ByteString,
-      contractState: ContractStateRowData,
-  )(implicit tc: TraceContext) = {
-    UserWalletAcsStoreRowData
-      .fromCreatedEvent(createdEvent, createdEventBlob)
-      .map {
-        case UserWalletAcsStoreRowData(
-              contract,
-              contractExpiresAt,
-            ) =>
-          val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
-          val templateId = contract.identifier
-          val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
-          val createArguments = payloadJsonFromContract(contract.payload)
-          val createdAt = Timestamp.assertFromInstant(contract.mandatoryCreatedAt)
-          sqlu"""
-              insert into user_wallet_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, created_event_blob,
-                                        created_at, contract_expires_at,
-                                        assigned_domain, reassignment_counter, reassignment_target_domain,
-                                        reassignment_source_domain, reassignment_submitter, reassignment_unassign_id)
-              values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
-              templateId
-            )}, $createArguments, $createdEventBlob,
-                      $createdAt, $contractExpiresAt,
-                      ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
-                      ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId})
-              on conflict do nothing
-            """
-      }
+  override def getAcsRowData(createdEvent: CreatedEvent, createdEventBlob: ByteString)(implicit
+      tc: TraceContext
+  ): Either[String, AcsRowData] = {
+    UserWalletAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob)
   }
 
   override def ingestionTxLogInsert(record: TxLogIndexRecord)(implicit

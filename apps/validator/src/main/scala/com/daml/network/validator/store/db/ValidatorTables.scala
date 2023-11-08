@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cc.{
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
-import com.daml.network.store.db.AcsTables
+import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import com.daml.network.util.{Contract, QualifiedName}
 import com.daml.network.http.v0.definitions
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -31,7 +31,19 @@ object ValidatorTables extends AcsTables {
       appConfigurationName: Option[String] = None,
       appReleaseVersion: Option[String] = None,
       jsonHash: Option[String] = None,
-  )
+  ) extends AcsRowData {
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
+      "user_party" -> userParty,
+      "user_name" -> userName.map(lengthLimited),
+      "provider_party" -> providerParty,
+      "validator_party" -> validatorParty,
+      "traffic_domain_id" -> trafficDomainId,
+      "app_configuration_version" -> appConfigurationVersion,
+      "app_configuration_name" -> appConfigurationName.map(lengthLimited),
+      "app_release_version" -> appReleaseVersion.map(lengthLimited),
+      "json_hash" -> jsonHash.map(lengthLimited),
+    )
+  }
 
   object ValidatorAcsStoreRowData {
     def fromCreatedEvent(

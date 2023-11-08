@@ -5,12 +5,11 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn
-import com.daml.network.store.db.AcsTables
+import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import com.daml.network.util.{Contract, QualifiedName}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.daml.network.scan.store.TxLogIndexRecord
 import com.digitalasset.canton.config.CantonRequireTypes.String3
-
 import com.google.protobuf.ByteString
 
 object ScanTables extends AcsTables {
@@ -23,7 +22,15 @@ object ScanTables extends AcsTables {
       amount: Option[BigDecimal],
       importCrateReceiver: Option[String],
       featuredAppRightProvider: Option[PartyId],
-  )
+  ) extends AcsRowData {
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
+      "round" -> round,
+      "validator" -> validator,
+      "amount" -> amount,
+      "import_crate_receiver" -> importCrateReceiver.map(lengthLimited),
+      "featured_app_right_provider" -> featuredAppRightProvider,
+    )
+  }
 
   object ScanAcsStoreRowData {
 

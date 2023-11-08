@@ -7,6 +7,7 @@ import cats.implicits.*
 import com.daml.ledger.api.v1.TransactionOuterClass
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.{
@@ -37,7 +38,6 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
-import scala.annotation.unused
 import scala.collection.immutable.{SortedMap, VectorMap}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -60,13 +60,12 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: MultiDomainAcsStore.ContractFilter,
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
-    @unused retryProvider: RetryProvider,
-    ingestAcsInsert: (
+    retryProvider: RetryProvider,
+    getAcsRowData: (
         CreatedEvent,
         ByteString,
-        ContractStateRowData,
         TraceContext,
-    ) => Either[String, DBIOAction[?, NoStream, Effect.Write]],
+    ) => Either[String, AcsRowData],
     ingestTxLogInsert: (TXI, TraceContext) => Either[String, DBIOAction[?, NoStream, Effect.Write]],
 )(implicit
     ec: ExecutionContext,
@@ -957,15 +956,58 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     )(implicit
         tc: TraceContext
     ) = {
-      ingestAcsInsert(createdEvent, createdEventBlob, stateData, tc) match {
+      getAcsRowData(createdEvent, createdEventBlob, tc) match {
         case Left(err) =>
           val errMsg =
-            s"Item at offset ${offset} with contract id ${createdEvent.getContractId} cannot be ingested: $err"
+            s"Item at offset $offset with contract id ${createdEvent.getContractId} cannot be ingested: $err"
           logger.error(errMsg)
           throw new IllegalArgumentException(errMsg)
-        case Right(action) =>
+        case Right(rowData) =>
           summary.ingestedCreatedEvents.addOne(createdEvent)
-          action
+
+          val contract = rowData.contract
+          val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
+          val templateId = contract.identifier
+          val templateIdQualifiedName = QualifiedName(templateId)
+          val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
+          val createArguments = payloadJsonFromContract(contract.payload)
+          val createdAt = Timestamp.assertFromInstant(contract.mandatoryCreatedAt)
+          val contractExpiresAt = rowData.contractExpiresAt
+          val ContractStateRowData(
+            assignedDomain,
+            reassignmentCounter,
+            reassignmentTargetDomain,
+            reassignmentSourceDomain,
+            reassignmentSubmitter,
+            reassignmentUnassignId,
+          ) = stateData
+
+          // the column names are hardcoded so they're safe to interpolate raw
+          val indexColumnNames =
+            if (rowData.indexColumns.isEmpty) ""
+            else rowData.indexColumns.map(_._1).mkString(",", ", ", "")
+
+          val indexColumnNameValues = rowData.indexColumns
+            .map(_._2)
+            .map(v => sql"$v")
+            .reduceOption { (acc, next) =>
+              (acc ++ sql"," ++ next).toActionBuilder
+            }
+            .map(s => (sql"," ++ s).toActionBuilder)
+            .getOrElse(sql"")
+
+          import storage.DbStorageConverters.setParameterByteArray
+          (sql"""
+                insert into #$acsTableName(store_id, contract_id, template_id_package_id, template_id_qualified_name,
+                                           create_arguments, created_event_blob, created_at, contract_expires_at,
+                                           assigned_domain, reassignment_counter, reassignment_target_domain,
+                                           reassignment_source_domain, reassignment_submitter, reassignment_unassign_id
+                                           #$indexColumnNames)
+                values ($storeId, $contractId, $templateIdPackageId, $templateIdQualifiedName,
+                        $createArguments, $createdEventBlob, $createdAt, $contractExpiresAt,
+                        $assignedDomain, $reassignmentCounter, $reassignmentTargetDomain,
+                        $reassignmentSourceDomain, $reassignmentSubmitter, $reassignmentUnassignId
+              """ ++ indexColumnNameValues ++ sql") on conflict do nothing").toActionBuilder.asUpdate
       }
     }
 

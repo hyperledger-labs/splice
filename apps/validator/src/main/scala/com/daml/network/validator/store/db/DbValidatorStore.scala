@@ -2,8 +2,6 @@ package com.daml.network.validator.store.db
 
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.CreatedEvent
-import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
@@ -16,8 +14,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
-import com.daml.network.store.db.AcsTables.ContractStateRowData
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
+import com.daml.network.store.db.{AcsQueries, AcsRowData, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
@@ -66,59 +63,14 @@ class DbValidatorStore(
 
   override lazy val acsContractFilter = ValidatorStore.contractFilter(key)
 
-  import storage.DbStorageConverters.setParameterByteArray
   import multiDomainAcsStore.waitUntilAcsIngested
 
   private def storeId: Int = multiDomainAcsStore.storeId
 
-  override def ingestionAcsInsert(
-      createdEvent: CreatedEvent,
-      createdEventBlob: ByteString,
-      contractState: ContractStateRowData,
-  )(implicit
+  override def getAcsRowData(createdEvent: CreatedEvent, createdEventBlob: ByteString)(implicit
       tc: TraceContext
-  ) = {
-    ValidatorAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob).map {
-      case ValidatorAcsStoreRowData(
-            contract,
-            contractExpiresAt,
-            userParty,
-            userName,
-            providerParty,
-            validatorParty,
-            trafficDomainId,
-            appConfigurationVersion,
-            appConfigurationName,
-            appReleaseVersion,
-            jsonHash,
-          ) =>
-        val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
-        val templateId = contract.identifier
-        val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
-        val createArguments = payloadJsonFromContract(contract.payload)
-        val createdAt = Timestamp.assertFromInstant(contract.mandatoryCreatedAt)
-        val safeUserName = userName.map(lengthLimited)
-        val safeAppConfigurationName = appConfigurationName.map(lengthLimited)
-        val safeAppReleaseVersion = appReleaseVersion.map(lengthLimited)
-        val safeJsonHash = jsonHash.map(lengthLimited)
-        sqlu"""
-              insert into validator_acs_store(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, created_event_blob,
-                                        created_at, contract_expires_at,
-                                        assigned_domain, reassignment_counter, reassignment_target_domain,
-                                        reassignment_source_domain, reassignment_submitter, reassignment_unassign_id,
-                                        user_party, user_name, provider_party, validator_party,
-                                        traffic_domain_id, app_configuration_version, app_configuration_name, app_release_version, json_hash)
-              values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
-            templateId
-          )}, $createArguments, $createdEventBlob,
-                      $createdAt, $contractExpiresAt,
-                      ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
-                      ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId},
-                      $userParty, $safeUserName, $providerParty, $validatorParty, $trafficDomainId,
-                      $appConfigurationVersion, $safeAppConfigurationName, $safeAppReleaseVersion, $safeJsonHash)
-              on conflict do nothing
-            """
-    }
+  ): Either[String, AcsRowData] = {
+    ValidatorAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob)
   }
 
   override def lookupInstallByParty(

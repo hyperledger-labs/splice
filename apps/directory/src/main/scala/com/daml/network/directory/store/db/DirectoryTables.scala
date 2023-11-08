@@ -5,7 +5,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.store.db.AcsTables
+import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import com.daml.network.util.{Contract, QualifiedName}
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.ByteString
@@ -20,7 +20,15 @@ object DirectoryTables extends AcsTables {
       directoryEntryOwner: Option[PartyId],
       subscriptionReferenceContractId: Option[ContractId[subsCodegen.SubscriptionRequest]],
       subscriptionNextPaymentDueAt: Option[Timestamp],
-  )
+  ) extends AcsRowData {
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
+      "directory_install_user" -> directoryInstallUser,
+      "directory_entry_name" -> directoryEntryName.map(lengthLimited),
+      "directory_entry_owner" -> directoryEntryOwner,
+      "subscription_reference_contract_id" -> subscriptionReferenceContractId,
+      "subscription_next_payment_due_at" -> subscriptionNextPaymentDueAt,
+    )
+  }
 
   object DirectoryAcsStoreRowData {
     def fromCreatedEvent(

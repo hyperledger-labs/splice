@@ -3,7 +3,7 @@ package com.daml.network.sv.store.db
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
-import com.daml.network.store.db.AcsTables
+import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import com.daml.network.util.{Contract, QualifiedName}
 import com.google.protobuf.ByteString
 
@@ -14,7 +14,12 @@ object SvTables extends AcsTables {
       contractExpiresAt: Option[Timestamp],
       onboardingSecret: Option[String],
       svCandidateName: Option[String],
-  )
+  ) extends AcsRowData {
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
+      "onboarding_secret" -> onboardingSecret.map(lengthLimited),
+      "sv_candidate_name" -> svCandidateName.map(lengthLimited),
+    )
+  }
 
   object SvAcsStoreRowData {
     def fromCreatedEvent(

@@ -36,7 +36,7 @@ abstract class MultiDomainAcsStoreTest[
     id
   }
 
-  private val defaultContractFilter: MultiDomainAcsStore.ContractFilter = {
+  protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter = {
     import MultiDomainAcsStore.mkFilter
 
     MultiDomainAcsStore.SimpleContractFilter(

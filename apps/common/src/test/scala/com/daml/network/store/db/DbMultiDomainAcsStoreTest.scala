@@ -1,17 +1,16 @@
 package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.CreatedEvent
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
-import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.store.{MultiDomainAcsStore, MultiDomainAcsStoreTest, StoreTest}
-import com.daml.network.util.{QualifiedName, ResourceTemplateDecoder, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import slick.jdbc.JdbcProfile
 
@@ -46,6 +45,33 @@ class DbMultiDomainAcsStoreTest
         _ <- assertList(coupon -> Some(d1))(store2) // but not from store2
       } yield succeed
     }
+
+    "not be SQL-injectable" in {
+      val store = mkStoreWithAcsRowDataF(
+        1,
+        defaultContractFilter,
+        acsTableName = "directory_acs_store", // to have extra columns
+        (ce, bs, _) =>
+          Right {
+            val base = acsRowData(defaultContractFilter, ce, bs)
+            new AcsRowData {
+              override val contract: Contract[?, ?] = base.contract
+
+              override def contractExpiresAt: Option[Timestamp] = base.contractExpiresAt
+
+              override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
+                "directory_entry_name" -> lengthLimited("'); DROP TABLE bobby_tables; --")
+              )
+            }
+          },
+      )
+      val coupon = c(1)
+      for {
+        _ <- acs()(store)
+        _ <- d1.create(coupon)(store)
+        _ <- assertList(coupon -> Some(d1))(store)
+      } yield succeed
+    }
   }
 
   private def storeDescriptor(id: Int) =
@@ -54,60 +80,60 @@ class DbMultiDomainAcsStoreTest
       .getOrElse(sys.error("Why is it so hard to define a JSON literal"))
 
   override def mkStore(id: Int, filter: MultiDomainAcsStore.ContractFilter) = {
+    mkStoreWithAcsRowDataF(
+      id,
+      filter,
+      "acs_store_template",
+      (evt, blob, _) => Right(acsRowData(filter, evt, blob)),
+    )
+  }
+
+  def mkStoreWithAcsRowDataF(
+      id: Int,
+      filter: MultiDomainAcsStore.ContractFilter,
+      acsTableName: String,
+      getAcsRowData: (
+          CreatedEvent,
+          ByteString,
+          TraceContext,
+      ) => Either[String, AcsRowData],
+  ) = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(DarResources.cantonCoin.all)
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-    lazy val store
-        : DbMultiDomainAcsStore[StoreTest.TestTxLogIndexRecord, StoreTest.TestTxLogEntry] =
-      new DbMultiDomainAcsStore(
-        storage,
-        "acs_store_template",
-        "txlog_store_template",
-        storeDescriptor(id),
-        loggerFactory,
-        filter,
-        TestTxLogStoreParser,
-        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-        (evt, createdEventBlob, csr, _) =>
-          Right(create(filter, store.storeId, evt, createdEventBlob, csr)),
-        (_, _) => Right(DBIO.successful(())),
-      )
-    store
+    new DbMultiDomainAcsStore(
+      storage,
+      acsTableName,
+      "txlog_store_template",
+      storeDescriptor(id),
+      loggerFactory,
+      filter,
+      TestTxLogStoreParser,
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      getAcsRowData,
+      ingestTxLogInsert = (_: StoreTest.TestTxLogIndexRecord, _: TraceContext) =>
+        Right(DBIO.successful(())),
+    )
   }
 
-  private def create(
+  private def acsRowData(
       filter: MultiDomainAcsStore.ContractFilter,
-      storeId: Int,
       evt: CreatedEvent,
       createdEventBlob: ByteString,
-      contractState: ContractStateRowData,
   ) = {
-    import storage.DbStorageConverters.setParameterByteArray
+    new AcsRowData {
+      override val contract: Contract[?, ?] = filter
+        .decodeMatchingContract(evt, createdEventBlob)
+        .valueOrFail("Failed to decode contract.")
 
-    val contract = filter
-      .decodeMatchingContract(evt, createdEventBlob)
-      .valueOrFail("Failed to decode contract.")
-    val contractId = new ContractId[Any](evt.getContractId)
-    val templateId = contract.identifier
-    val templateIdPackageId = lengthLimited(templateId.getPackageId)
-    val createArguments = payloadJsonFromContract(contract.payload)
-    val createdAt = Timestamp.assertFromInstant(contract.mandatoryCreatedAt)
-    val contractExpiresAt = Some(Timestamp.Epoch.addMicros(1000000000L))
-    sqlu"""
-      insert into acs_store_template(store_id, contract_id, template_id_package_id, template_id_qualified_name, create_arguments, created_event_blob,
-                                created_at, contract_expires_at,
-                                assigned_domain, reassignment_counter, reassignment_target_domain,
-                                reassignment_source_domain, reassignment_submitter, reassignment_unassign_id)
-      values ($storeId, $contractId, $templateIdPackageId, ${QualifiedName(
-        templateId
-      )}, $createArguments, $createdEventBlob,
-              $createdAt, $contractExpiresAt,
-              ${contractState.assignedDomain}, ${contractState.reassignmentCounter}, ${contractState.reassignmentTargetDomain},
-              ${contractState.reassignmentSourceDomain}, ${contractState.reassignmentSubmitter}, ${contractState.reassignmentUnassignId})
-      on conflict do nothing
-    """
+      override def contractExpiresAt: Option[Timestamp] = Some(
+        Timestamp.Epoch.addMicros(1000000000L)
+      )
+
+      override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
+    }
   }
 
   override protected def cleanDb(storage: DbStorage): Future[?] = {
