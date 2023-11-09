@@ -6,6 +6,7 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
+import { CnInput } from './helm';
 import { InfrastructureOutputs } from './infra';
 
 export const config = new pulumi.Config();
@@ -210,7 +211,7 @@ export function installCNHelmChartByNamespaceName(
   name: string,
   chartName: string,
   values: ChartValues = {},
-  dependsOn: pulumi.Input<pulumi.Resource>[] = []
+  dependsOn: CnInput<pulumi.Resource>[] = []
 ): Release {
   return new k8s.helm.v3.Release(
     `helm-${prefix}-${name}`,
@@ -232,7 +233,7 @@ export function installCNHelmChart(
   name: string,
   chartName: string,
   values: ChartValues = {},
-  dependsOn: pulumi.Input<pulumi.Resource>[] = []
+  dependsOn: CnInput<pulumi.Resource>[] = []
 ): Release {
   return installCNHelmChartByNamespaceName(
     xns.logicalName,

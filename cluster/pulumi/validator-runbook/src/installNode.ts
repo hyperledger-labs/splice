@@ -24,6 +24,7 @@ import {
   installValidatorOnboardingSecret,
   installLoopback,
   imagePullSecret,
+  CnInput,
 } from 'cn-pulumi-common';
 import { exit } from 'process';
 
@@ -143,7 +144,7 @@ type ValidatorConfig = {
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
   password: pulumi.Output<string>;
-  imagePullDeps: pulumi.Input<pulumi.Resource>[];
+  imagePullDeps: CnInput<pulumi.Resource>[];
   loopback: k8s.helm.v3.Release | null;
   backupConfigSecret?: pulumi.Resource;
 };

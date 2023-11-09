@@ -115,6 +115,7 @@ export class Auth0Fetch implements Auth0Client {
     }
 
     try {
+      await pulumi.log.info('Attempting to create secret');
       await this.k8sApi.createNamespacedSecret('default', {
         apiVersion: 'v1',
         kind: 'Secret',
@@ -125,10 +126,10 @@ export class Auth0Fetch implements Auth0Client {
       });
     } catch (_) {
       try {
-        console.log('Deleting existing secret');
+        await pulumi.log.info('Deleting existing secret');
         await this.k8sApi.deleteNamespacedSecret(this.cfg.fixedTokenCacheName, 'default');
 
-        console.log('Creating new secret');
+        await pulumi.log.info('Creating new secret');
         await this.k8sApi.createNamespacedSecret('default', {
           apiVersion: 'v1',
           kind: 'Secret',
@@ -138,7 +139,7 @@ export class Auth0Fetch implements Auth0Client {
           data,
         });
       } catch (e) {
-        console.log('Auth0 cache update failed:', e);
+        await pulumi.log.error(`Auth0 cache update failed: ${JSON.stringify(e)}`);
         process.exit(1);
       }
     }
@@ -291,28 +292,21 @@ export async function installAuth0Secret(
   secretNameApp: string,
   clientName: string
 ): Promise<k8s.core.v1.Secret> {
-  async function secretFor(
-    auth0Client: Auth0Client,
-    clientName: string
-  ): Promise<{ [key: string]: string }> {
-    return await auth0Secret(auth0Client, await auth0Client.getSecrets(), clientName);
-  }
+  const secrets = await auth0Client.getSecrets();
+  const secret = await auth0Secret(auth0Client, secrets, clientName);
 
-  return secretFor(auth0Client, clientName).then(
-    secret =>
-      new k8s.core.v1.Secret(
-        'auth0-secret-' + xns.logicalName + '-' + clientName,
-        {
-          metadata: {
-            name: 'cn-app-' + secretNameApp + '-ledger-api-auth',
-            namespace: xns.ns.metadata.name,
-          },
-          stringData: secret,
-        },
-        {
-          dependsOn: xns.ns,
-        }
-      )
+  return new k8s.core.v1.Secret(
+    'auth0-secret-' + xns.logicalName + '-' + clientName,
+    {
+      metadata: {
+        name: 'cn-app-' + secretNameApp + '-ledger-api-auth',
+        namespace: xns.ns.metadata.name,
+      },
+      stringData: secret,
+    },
+    {
+      dependsOn: xns.ns,
+    }
   );
 }
 
@@ -322,18 +316,14 @@ export async function installAuth0UISecret(
   secretNameApp: string,
   clientName: string
 ): Promise<k8s.core.v1.Secret> {
-  async function getClientId() {
-    const clientSecrets = lookupClientSecrets(
-      await auth0Client.getSecrets(),
-      auth0Client.getCfg().namespaceToUiClientId,
-      xns.logicalName
-    );
-    return clientSecrets.client_id;
-  }
+  const secrets = await auth0Client.getSecrets();
+  const id = lookupClientSecrets(
+    secrets,
+    auth0Client.getCfg().namespaceToUiClientId,
+    xns.logicalName
+  ).client_id;
 
-  return getClientId().then(id =>
-    installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, clientName, id)
-  );
+  return installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, clientName, id);
 }
 
 export function installAuth0UiSecretWithClientId(

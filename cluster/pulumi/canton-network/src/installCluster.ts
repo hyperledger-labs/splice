@@ -14,6 +14,7 @@ import {
   loadYamlFromFile,
   svKeyFromSecret,
   SvIdKey,
+  CnInput,
 } from 'cn-pulumi-common';
 import { globalDomainSequencerDriver } from 'cn-pulumi-common/src/global-domain';
 
@@ -90,7 +91,7 @@ const approvedSvIdentities = singleSv
 
 function joinViaSv1(
   sv1: pulumi.Resource,
-  keys: pulumi.Input<SvIdKey>,
+  keys: CnInput<SvIdKey>,
   sequencerDatabase: Postgres
 ): SvOnboarding {
   return {

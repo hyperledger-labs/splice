@@ -54,7 +54,7 @@ export async function installValidator1(
   );
 
   installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, [
-    installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
+    await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
   ]);
 
   const extraDependsOn: pulumi.Resource[] = [svc, postgresDb];

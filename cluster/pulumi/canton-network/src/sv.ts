@@ -21,7 +21,7 @@ import {
   validatorOnboardingSecretName,
   installValidatorOnboardingSecret,
 } from 'cn-pulumi-common';
-import type { Auth0Client, SvIdKey } from 'cn-pulumi-common';
+import type { Auth0Client, CnInput, SvIdKey } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
 import { installCometBftNode } from './cometbft';
@@ -30,7 +30,7 @@ import { installValidatorApp } from './validator';
 
 export function installSvKeySecret(
   xns: ExactNamespace,
-  keys: pulumi.Input<SvIdKey>
+  keys: CnInput<SvIdKey>
 ): k8s.core.v1.Secret {
   const secretName = 'cn-app-sv-key';
 
@@ -61,7 +61,7 @@ export type SvOnboarding =
   | { type: 'found-collective' }
   | {
       type: 'join-with-key';
-      keys: pulumi.Input<SvIdKey>;
+      keys: CnInput<SvIdKey>;
       sequencerDatabase: postgres.Postgres;
       sponsorRelease?: pulumi.Resource;
       sponsorApiUrl: string;
@@ -102,7 +102,7 @@ export async function installSvNode(config: SvConfig): Promise<{
 }> {
   const xns = exactNamespace(config.nodename);
 
-  const auth0BackendSecrets: pulumi.Input<pulumi.Resource>[] = [
+  const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
     await installAuth0Secret(config.auth0Client, xns, 'sv', config.nodename),
   ];
 
@@ -124,10 +124,10 @@ export async function installSvNode(config: SvConfig): Promise<{
     : undefined;
 
   const participantBootstrapDumpSecret: pulumi.Resource | undefined = config.bootstrappingDumpConfig
-    ? fetchAndInstallParticipantBootstrapDump(xns, config.bootstrappingDumpConfig)
+    ? await fetchAndInstallParticipantBootstrapDump(xns, config.bootstrappingDumpConfig)
     : undefined;
 
-  const dependsOn: pulumi.Input<pulumi.Resource>[] = auth0BackendSecrets
+  const dependsOn: CnInput<pulumi.Resource>[] = auth0BackendSecrets
     .concat(auth0UISecrets)
     .concat(
       config.onboarding.type == 'join-with-key'

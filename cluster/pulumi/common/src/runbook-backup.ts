@@ -84,7 +84,7 @@ export async function setupBootstrapping(config: BootstrapParams): Promise<Boots
       start,
       end,
     };
-    participantBootstrapDumpSecret = fetchAndInstallParticipantBootstrapDump(
+    participantBootstrapDumpSecret = await fetchAndInstallParticipantBootstrapDump(
       xns,
       bootstrappingDumpConfig
     );

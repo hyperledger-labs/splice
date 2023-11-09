@@ -4,6 +4,7 @@ import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersi
 
 import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
 import { Auth0Client } from './auth0types';
+import { CnInput } from './helm';
 import { btoa, ExactNamespace, requireEnv } from './utils';
 
 export type SvIdKey = {
@@ -67,7 +68,7 @@ export function imagePullSecretByNamespaceName(ns: string): pulumi.Resource[] {
   return [secret, patch];
 }
 
-export function imagePullSecret(ns: ExactNamespace): pulumi.Input<pulumi.Resource>[] {
+export function imagePullSecret(ns: ExactNamespace): CnInput<pulumi.Resource>[] {
   return imagePullSecretByNamespaceName(ns.logicalName);
 }
 
@@ -115,7 +116,7 @@ export async function svAppSecrets(
   };
 }
 
-export function svKeySecret(ns: ExactNamespace, keys: pulumi.Input<SvIdKey>): k8s.core.v1.Secret {
+export function svKeySecret(ns: ExactNamespace, keys: CnInput<SvIdKey>): k8s.core.v1.Secret {
   const secretName = 'cn-app-sv-key';
   const data = pulumi.output(keys).apply(ks => {
     return {

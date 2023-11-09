@@ -1,6 +1,11 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { installAuth0Secret, installAuth0UISecret, installCNHelmChart } from 'cn-pulumi-common';
+import {
+  CnInput,
+  installAuth0Secret,
+  installAuth0UISecret,
+  installCNHelmChart,
+} from 'cn-pulumi-common';
 import {
   Auth0Client,
   BackupConfig,
@@ -54,7 +59,7 @@ export type ValidatorConfig = {
 export async function installValidatorApp(config: ValidatorConfig): Promise<pulumi.Resource> {
   const participantBootstrapDumpSecret: pulumi.Resource | undefined =
     config.participantBootstrapDump
-      ? fetchAndInstallParticipantBootstrapDump(config.xns, config.participantBootstrapDump)
+      ? await fetchAndInstallParticipantBootstrapDump(config.xns, config.participantBootstrapDump)
       : undefined;
 
   const backupConfig: BackupConfig | undefined = config.backupConfig
@@ -72,12 +77,12 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       : installBootstrapDataBucketSecret(config.xns, config.backupConfig.config.bucket)
     : undefined;
 
-  const dependsOn: pulumi.Input<pulumi.Resource>[] = [
+  const dependsOn: CnInput<pulumi.Resource>[] = [
     config.xns.ns,
     config.participant,
-    installAuth0Secret(config.auth0Client, config.xns, 'validator', config.auth0AppName),
-    installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
-    installAuth0UISecret(config.auth0Client, config.xns, 'directory', 'directory'),
+    await installAuth0Secret(config.auth0Client, config.xns, 'validator', config.auth0AppName),
+    await installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
+    await installAuth0UISecret(config.auth0Client, config.xns, 'directory', 'directory'),
   ]
     .concat(
       config.onboarding ? [installValidatorOnboardingSecret(config.xns, config.onboarding)] : []

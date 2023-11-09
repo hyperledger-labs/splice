@@ -6,5 +6,13 @@
   "[python]": {
     "editor.defaultFormatter": "ms-python.autopep8"
   },
+  "eslint.workingDirectories": [
+    "./cluster/pulumi/canton-network",
+    "./cluster/pulumi/canton-network-gateway",
+    "./cluster/pulumi/common",
+    "./cluster/pulumi/infra",
+    "./cluster/pulumi/sv-runbook",
+    "./cluster/pulumi/validator-runbook"
+  ],
   "python.formatting.provider": "none"
 }

@@ -1,18 +1,4 @@
 {
-    "compilerOptions": {
-        "strict": true,
-        "outDir": "bin",
-        "target": "es2021",
-        "module": "commonjs",
-        "moduleResolution": "node",
-        "sourceMap": true,
-        "experimentalDecorators": true,
-        "pretty": true,
-        "noFallthroughCasesInSwitch": true,
-        "noImplicitReturns": true,
-        "forceConsistentCasingInFileNames": true
-    },
-    "include": [
-        "src/**/*.ts"
-    ]
+  "extends": "../tsconfig.json",
+  "include": ["src/**/*.ts"]
 }

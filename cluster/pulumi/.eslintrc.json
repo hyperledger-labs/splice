@@ -1,21 +1,20 @@
 {
-      "root": true,
+  "root": true,
   "parser": "@typescript-eslint/parser",
+  "ignorePatterns": ["dump-config.ts"],
   "parserOptions": {
-    "project": [
-      "./tsconfig.json"
-    ]
+    "project": ["./tsconfig.json"]
   },
-  "plugins": [
-    "@typescript-eslint"
-  ],
+  "plugins": ["@typescript-eslint"],
   "extends": [
     "eslint:recommended",
+    "plugin:promise/recommended",
     "plugin:@typescript-eslint/eslint-recommended",
     "plugin:@typescript-eslint/recommended"
   ],
   "rules": {
     "curly": ["error"],
+    "promise/prefer-await-to-then": "warn",
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/explicit-module-boundary-types": "warn",
     "@typescript-eslint/ban-types": "warn",

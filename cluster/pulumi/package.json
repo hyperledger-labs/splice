@@ -12,13 +12,14 @@
         "eslint": "^8.35.0",
         "eslint-config-prettier": "^8.6.0",
         "eslint-plugin-import": "^2.27.5",
+        "eslint-plugin-promise": "^6.1.1",
         "prettier": "^2.7.1",
         "typescript": "^4.8.4"
     },
     "dependencies": {
         "@pulumi/gcp": "^6.0.0",
-        "@pulumi/pulumi": "^3.0.0",
         "@pulumi/kubernetes-cert-manager": "^0.0.5",
+        "@pulumi/pulumi": "^3.0.0",
         "js-yaml": "^4.1.0",
         "lodash": "^4.17.21",
         "node-fetch": "^2.6.1"

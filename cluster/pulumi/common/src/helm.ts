@@ -3,6 +3,10 @@ import * as pulumi from '@pulumi/pulumi';
 
 import { ChartValues, ExactNamespace, HELM_CHART_TIMEOUT_SEC, requireEnv } from './utils';
 
+// pulumi.Input<T> allows Promise<T>, which can cause issues with our deployment scripts (i.e. auth0 token cache)
+// if not awaited. this custom type is a subset that excludes promises, which gives us some type safety
+export type CnInput<T> = T | pulumi.OutputInstance<T>;
+
 export function installCNSVHelmChartByNamespaceName(
   ns: pulumi.Output<string> | string,
   name: string,
@@ -10,7 +14,7 @@ export function installCNSVHelmChartByNamespaceName(
   values: ChartValues,
   local: boolean,
   version = '',
-  dependsOn: pulumi.Input<pulumi.Resource>[] = []
+  dependsOn: CnInput<pulumi.Resource>[] = []
 ): k8s.helm.v3.Release {
   const repo_root = requireEnv('REPO_ROOT', 'root directory of the repo');
   const username = local ? '' : requireEnv('ARTIFACTORY_USER', 'Username for jfrog artifactory');
@@ -50,7 +54,7 @@ export function installCNSVHelmChart(
   values: ChartValues,
   local: boolean,
   version = '',
-  dependsOn: pulumi.Input<pulumi.Resource>[] = []
+  dependsOn: CnInput<pulumi.Resource>[] = []
 ): k8s.helm.v3.Release {
   return installCNSVHelmChartByNamespaceName(
     ns.ns.metadata.name,

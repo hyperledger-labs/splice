@@ -1,7 +1,8 @@
 import * as k8s from '@pulumi/kubernetes';
-import { Input, Output, Resource } from '@pulumi/pulumi';
+import { Output, Resource } from '@pulumi/pulumi';
 import {
   ChartValues,
+  CnInput,
   ExactNamespace,
   REPO_ROOT,
   installCNSVHelmChart,
@@ -18,7 +19,7 @@ export function installGlobalDomainNode(
   svNamespace: ExactNamespace,
   postgresPassword: Output<string>,
   svName: string,
-  dependencies: Input<Resource>[]
+  dependencies: CnInput<Resource>[]
 ): k8s.helm.v3.Release {
   const cometbft = installCometBftNode(svNamespace, svName, dependencies);
 

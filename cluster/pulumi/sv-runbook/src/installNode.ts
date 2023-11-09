@@ -29,6 +29,7 @@ import {
   SvIdKey,
   installLoopback,
   imagePullSecret,
+  CnInput,
 } from 'cn-pulumi-common';
 
 import { auth0Cfg } from './auth0cfg';
@@ -150,10 +151,10 @@ type SvConfig = {
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
   password: pulumi.Output<string>;
-  imagePullDeps: pulumi.Input<pulumi.Resource>[];
+  imagePullDeps: CnInput<pulumi.Resource>[];
   loopback: k8s.helm.v3.Release | null;
   backupConfigSecret?: pulumi.Resource;
-  svKey: pulumi.Input<SvIdKey>;
+  svKey: CnInput<SvIdKey>;
   onboardingName: string;
   cometBftConnectionUri: string;
   validatorWalletUserName: string;
