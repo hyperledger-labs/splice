@@ -75,4 +75,9 @@ in pkgs.mkShell {
   GRAFANA_DASHBOARDS = "${pkgs.da_grafana_dashboards}";
   # Avoid sbt-assembly falling over. See https://github.com/sbt/sbt-assembly/issues/496
   LC_ALL = if stdenv.isDarwin then "" else "C.UTF-8";
+  # Avoid "warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)"
+  # warnings in damlc.
+  LOCALE_ARCHIVE_2_27 = if pkgs.stdenv.hostPlatform.libc == "glibc"
+                        then "${pkgs.glibcLocales}/lib/locale/locale-archive"
+                        else null;
 }
