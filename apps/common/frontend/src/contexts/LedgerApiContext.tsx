@@ -2,7 +2,6 @@ import { callWithLogging, Contract, useUserState } from 'common-frontend';
 import React, { useContext } from 'react';
 
 import Ledger, { CommandMeta, CreateEvent, DisclosedContract, LedgerOptions } from '@daml/ledger';
-import { Query } from '@daml/ledger';
 import { Choice, ContractId, Template, TemplateOrInterface } from '@daml/types';
 
 const DIRECTORY_LEDGER_NAME = 'directory-ledger';
@@ -136,23 +135,6 @@ export class LedgerApiClient {
         throw e;
       });
     return result[0];
-  }
-
-  // TODO(#8269) Remove this once the directory UI has been switched to read directly from the validator
-  // as it doesn't support upgrading.
-  async query<T extends object, K>(
-    operationName: string,
-    unresolvedTemplate: Template<T, K>,
-    query?: Query<T>
-  ): Promise<CreateEvent<T, K>[]> {
-    const template = await this.packageIdResolver.resolveTemplate(unresolvedTemplate);
-    return await callWithLogging(
-      DIRECTORY_LEDGER_NAME,
-      operationName,
-      (t, q) => this.ledger.query(t, q),
-      template,
-      query
-    );
   }
 
   toContract<T extends object, K, I extends string = string>(
