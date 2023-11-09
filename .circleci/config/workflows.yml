@@ -555,6 +555,7 @@ workflows:
               only:
                 - deployment/devnet
           cluster: "devnet"
+          wait_for_cluster_version: false
           context:
             - artifactory
             - canton-network-vpn
@@ -584,6 +585,7 @@ workflows:
               only:
                 - deployment/cidaily
           cluster: "cidaily"
+          wait_for_cluster_version: false
           context:
             - artifactory
             - canton-network-vpn
@@ -613,6 +615,7 @@ workflows:
               only:
                 - deployment/cidaily-testnet
           cluster: "cidaily-testnet"
+          wait_for_cluster_version: false
           <<: *non_devnet_preflight_params
           context:
             - artifactory
@@ -643,6 +646,7 @@ workflows:
               only:
                 - deployment/cilr
           cluster: "cilr"
+          wait_for_cluster_version: false
           context:
             - artifactory
             - canton-network-vpn
@@ -689,6 +693,7 @@ workflows:
             - datadog
             - slack-context
           cluster: "cidaily"
+          wait_for_cluster_version: false
           requires:
             - deploy_sv_runbook
 
@@ -730,6 +735,7 @@ workflows:
             - datadog
             - slack-context
           cluster: "cilr"
+          wait_for_cluster_version: false
           requires:
             - deploy_sv_runbook
 
