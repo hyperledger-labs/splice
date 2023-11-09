@@ -1,9 +1,10 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
-import { Contract, PollingStrategy, useDirectoryClient, usePrimaryParty } from 'common-frontend';
+import { Contract, PollingStrategy, useDirectoryClient } from 'common-frontend';
 
 import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
 import { toFullEntryName } from '../../utils';
+import { usePrimaryParty } from './usePrimaryParty';
 
 type LookupEntryResponse = {
   entryContract?: Contract<DirectoryEntry>;
@@ -14,7 +15,7 @@ const useLookupEntryByName = (
   suffix: string
 ): UseQueryResult<LookupEntryResponse> => {
   const directoryClient = useDirectoryClient();
-  const { data: primaryPartyId } = usePrimaryParty();
+  const primaryPartyId = usePrimaryParty();
 
   return useQuery({
     queryKey: ['lookupEntryByName', name, suffix],

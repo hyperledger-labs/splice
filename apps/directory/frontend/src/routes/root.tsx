@@ -1,28 +1,19 @@
-import {
-  ErrorBoundary,
-  ErrorDisplay,
-  Loading,
-  PartyId,
-  useLedgerApiClient,
-  usePrimaryParty,
-  useUserState,
-} from 'common-frontend';
+import { ErrorBoundary, ErrorDisplay, Loading, PartyId, useUserState } from 'common-frontend';
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 
 import { Box, Button, Toolbar, Typography } from '@mui/material';
 
 import { useDirectoryInstall, useProviderParty, useRequestDirectoryInstall } from '../hooks';
+import { usePrimaryParty } from '../hooks/queries/usePrimaryParty';
 import { isDarFileMissingError } from '../utils/errors';
 
 const Root: React.FC = () => {
   const { logout } = useUserState();
-  const primaryPartyQuery = usePrimaryParty();
-  const primaryPartyId = primaryPartyQuery.data;
+  const primaryPartyId = usePrimaryParty();
   const directoryInstall = useDirectoryInstall();
   const { data: providerPartyId } = useProviderParty();
 
-  const ledgerApiClient = useLedgerApiClient();
   const requestDirectoryInstall = useRequestDirectoryInstall();
 
   useEffect(() => {
@@ -30,20 +21,18 @@ const Root: React.FC = () => {
       requestDirectoryInstall.isIdle &&
       directoryInstall.isSuccess &&
       primaryPartyId &&
-      providerPartyId &&
-      ledgerApiClient
+      providerPartyId
     ) {
       if (directoryInstall.data) {
         console.debug('DirectoryInstall found');
       } else {
         console.debug('DirectoryInstall not found, creating DirectoryInstallRequest');
-        requestDirectoryInstall.mutate({ primaryPartyId, providerPartyId, ledgerApiClient });
+        requestDirectoryInstall.mutate({});
       }
     }
   }, [
     directoryInstall.isSuccess,
     directoryInstall.data,
-    ledgerApiClient,
     primaryPartyId,
     providerPartyId,
     requestDirectoryInstall,
@@ -67,14 +56,7 @@ const Root: React.FC = () => {
         userAction="Please try again later. If the problem persists, contact the application operator."
       />
     );
-  } else if (primaryPartyQuery.error !== null) {
-    content = (
-      <ErrorDisplay
-        message="Problem loading primary party"
-        userAction="Please try again later. If the problem persists, contact the application operator."
-      />
-    );
-  } else if (directoryInstall.isLoading || !directoryInstall.data || primaryPartyQuery.isLoading) {
+  } else if (directoryInstall.isLoading || !directoryInstall.data || !primaryPartyId) {
     content = <Loading />;
   } else {
     content = <Outlet />;

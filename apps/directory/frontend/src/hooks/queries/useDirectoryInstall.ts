@@ -1,29 +1,22 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
-import { Contract, useLedgerApiClient, usePrimaryParty } from 'common-frontend';
+import { FetchDirectoryInstallResponse } from 'directory-external-openapi';
 
 import { DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
 
-import { useProviderParty } from '..';
+import { useExternalDirectoryClient } from '../../context/ValidatorServiceContext';
 
 export const QueryDirectoryInstallOperationName = 'queryDirectoryInstall';
-const useDirectoryInstall = (): UseQueryResult<Contract<DirectoryInstall> | null> => {
+const useDirectoryInstall = (): UseQueryResult<FetchDirectoryInstallResponse | null> => {
   const operationName = QueryDirectoryInstallOperationName;
-  const ledgerApi = useLedgerApiClient();
-  const { data: primaryPartyId } = usePrimaryParty();
-  const { data: providerPartyId } = useProviderParty();
 
+  const directoryApi = useExternalDirectoryClient();
   return useQuery({
-    queryKey: [operationName, ledgerApi, DirectoryInstall],
+    queryKey: [operationName, DirectoryInstall],
     queryFn: async () => {
-      const result = await ledgerApi!.query(operationName, DirectoryInstall);
-      const directoryInstall = result
-        .map(ev => ledgerApi!.toContract(ev))
-        .find(c => c.payload.user === primaryPartyId && c.payload.provider === providerPartyId);
-
-      if (directoryInstall) {
-        return directoryInstall;
-      } else {
-        // react-query blows up if queryFn returns undefined
+      try {
+        return await directoryApi.fetchDirectoryInstall();
+      } catch (error) {
+        console.debug(error);
         return null;
       }
     },
@@ -33,7 +26,6 @@ const useDirectoryInstall = (): UseQueryResult<Contract<DirectoryInstall> | null
         console.debug('useDirectoryInstall: contract found, stopping');
         return false;
       } else if (query.state.status === 'error') {
-        //
         console.debug('useDirectoryInstall: query error, stopping');
         return false;
       } else {
@@ -41,7 +33,7 @@ const useDirectoryInstall = (): UseQueryResult<Contract<DirectoryInstall> | null
         return 500;
       }
     },
-    enabled: !!ledgerApi && !!primaryPartyId && !!providerPartyId, // wait for dependencies to be defined
+    enabled: !!directoryApi,
   });
 };
 

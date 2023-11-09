@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.LocalAuth0Test
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{FrontendLoginUtil, DirectoryFrontendTestUtil, WalletTestUtil}
@@ -40,7 +39,7 @@ class DirectoryFrontendIntegrationTest
         reserveDirectoryNameFor(
           () => login(aliceDirectoryUIPort, aliceDamlUser),
           entryName,
-          "1.0",
+          "1.0000000000",
           "USD",
           "90 days",
         )
@@ -83,10 +82,6 @@ class DirectoryFrontendIntegrationTest
           )
         }
       }
-    }
-
-    "allow login via auth0" taggedAs LocalAuth0Test in { implicit env =>
-      withAuth0LoginCheck("alice", aliceDirectoryUIPort)((_, _, _) => ())
     }
   }
 }

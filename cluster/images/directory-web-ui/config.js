@@ -6,12 +6,14 @@ window.canton_network_config = {
     authority: "${CN_APP_DIRECTORY_UI_AUTH_URL}",
     client_id: "${CN_APP_DIRECTORY_UI_AUTH_CLIENT_ID}",
     token_audience: "${CN_APP_DIRECTORY_UI_AUTH_AUDIENCE}",
-    token_scope: "daml_ledger_api",
   },
   services: {
     directory: {
       // URL of the directory backend.
       url: `https://directory.sv-1.svc.${cluster}/api/v0/directory`,
+    },
+    validator: {
+      url: "https://" + window.location.hostname + "/api/validator",
     },
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet

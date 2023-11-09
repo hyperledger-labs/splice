@@ -37,6 +37,7 @@ const WalletButton = <T,>(props: Props<T>, walletPage: string) => {
 export const TransferButton: (props: Props<AppPaymentRequest>) => JSX.Element = (
   props: Props<AppPaymentRequest>
 ) => WalletButton(props, 'confirm-payment');
+
 export const SubscriptionButton: (props: Props<SubscriptionRequest>) => JSX.Element = (
   props: Props<SubscriptionRequest>
 ) => WalletButton(props, 'confirm-subscription');

@@ -1,4 +1,4 @@
-import { ErrorDisplay, Loading, usePrimaryParty } from 'common-frontend';
+import { ErrorDisplay, Loading } from 'common-frontend';
 import React from 'react';
 
 import { Box, Container } from '@mui/material';
@@ -6,14 +6,13 @@ import { Box, Container } from '@mui/material';
 import DirectoryEntries from '../components/DirectoryEntries';
 import RequestDirectoryEntry from '../components/RequestDirectoryEntry';
 import { useDirectoryInstall } from '../hooks';
+import { usePrimaryParty } from '../hooks/queries/usePrimaryParty';
 
 const Home: React.FC = () => {
-  const primaryPartyIdQuery = usePrimaryParty();
+  const primaryPartyId = usePrimaryParty();
   const directoryInstallQuery = useDirectoryInstall();
 
-  if (primaryPartyIdQuery.isError) {
-    return <ErrorDisplay message={'Error while fetching primary party'} />;
-  } else if (primaryPartyIdQuery.isLoading) {
+  if (!primaryPartyId) {
     return <Loading />;
   }
 

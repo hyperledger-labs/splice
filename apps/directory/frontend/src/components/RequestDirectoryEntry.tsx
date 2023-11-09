@@ -83,8 +83,8 @@ const SubscriptionBar: React.FC<{ entryName: string; nameLookupStatus: NameLooku
 
   var message, icon, additionalContent;
 
-  const entryFee = directoryInstall.payload.entryFee;
-  const entryInterval = directoryInstall.payload.entryLifetime.microseconds;
+  const entryFee = directoryInstall.entryFee;
+  const entryInterval = directoryInstall.entryLifetime;
 
   if (!isEntryNameValid(entryName)) {
     message =

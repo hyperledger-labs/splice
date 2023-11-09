@@ -1,4 +1,4 @@
-import { Loading, usePrimaryParty } from 'common-frontend';
+import { Loading } from 'common-frontend';
 import React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
@@ -6,18 +6,14 @@ import { CloseRounded, DoneRounded } from '@mui/icons-material';
 import { Button, Stack, Typography } from '@mui/material';
 
 import { useLookupEntryByName } from '../hooks';
+import { usePrimaryParty } from '../hooks/queries/usePrimaryParty';
 import { ENTRY_NAME_SUFFIX, toFullEntryName } from '../utils';
 
 export const PostPayment: React.FC = () => {
   const [searchParams] = useSearchParams();
   const entryName = searchParams.get('entryName') || '';
 
-  const {
-    data: primaryPartyId,
-    isLoading: primaryPartyIdIsLoading,
-    isError: primaryPartyIdIsError,
-    error: primaryPartyIdError,
-  } = usePrimaryParty();
+  const primaryPartyId = usePrimaryParty();
   const {
     data: directoryEntry,
     isLoading: directoryEntryIsLoading,
@@ -32,22 +28,11 @@ export const PostPayment: React.FC = () => {
 
   const fullEntryName = toFullEntryName(entryName, ENTRY_NAME_SUFFIX);
 
-  if (primaryPartyIdIsLoading || directoryEntryIsLoading) {
+  if (!primaryPartyId || directoryEntryIsLoading) {
     return <DirectoryLoading fullEntryName={fullEntryName} />;
   }
 
-  if (primaryPartyIdIsError) {
-    return (
-      <DirectoryFailed
-        errorMessage={`Could not retrieve primary party.`}
-        errorDetails={
-          primaryPartyIdError instanceof Error ? primaryPartyIdError.message : undefined
-        }
-      />
-    );
-  }
-
-  if (primaryPartyIdIsError || directoryEntryIsError) {
+  if (directoryEntryIsError) {
     return (
       <DirectoryFailed
         errorMessage={`${fullEntryName} was not registered. Something went wrong.`}

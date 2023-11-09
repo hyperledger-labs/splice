@@ -1,29 +1,16 @@
-import { UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
-import { LedgerApiClient } from 'common-frontend';
+import { useMutation, UseMutationResult, useQueryClient } from '@tanstack/react-query';
 
-import { DirectoryInstallRequest } from '@daml.js/directory/lib/CN/Directory';
-
+import { useExternalDirectoryClient } from '../../context/ValidatorServiceContext';
 import { QueryDirectoryInstallOperationName } from '../queries/useDirectoryInstall';
 
-interface RequestDirectoryInstallArgs {
-  primaryPartyId: string;
-  providerPartyId: string;
-  ledgerApiClient: LedgerApiClient;
-}
-
-const useRequestDirectoryInstall: () => UseMutationResult<
-  void,
-  unknown,
-  RequestDirectoryInstallArgs
-> = () => {
+const useRequestDirectoryInstall: () => UseMutationResult<void, unknown, unknown> = () => {
   const queryClient = useQueryClient();
+  const directoryApi = useExternalDirectoryClient();
+
   return useMutation({
-    mutationFn: async ({ primaryPartyId, providerPartyId, ledgerApiClient }) => {
-      console.debug('DirectoryInstall not found, creating DirectoryInstallRequest');
-      await ledgerApiClient.create([primaryPartyId], DirectoryInstallRequest, {
-        user: primaryPartyId,
-        provider: providerPartyId,
-      });
+    mutationFn: async () => {
+      console.debug('Creating DirectoryInstallRequest');
+      await directoryApi.createDirectoryInstall();
       console.debug('Created DirectoryInstallRequest');
     },
     onError: (error: unknown) => {

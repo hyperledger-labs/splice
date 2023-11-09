@@ -89,7 +89,7 @@ class SelfHostedPreflightIntegrationTest
         reserveDirectoryNameFor(
           () => login(directoryUiPort, "alice"),
           cnsName,
-          "1.0",
+          "1.0000000000",
           "USD",
           "90 days",
         )

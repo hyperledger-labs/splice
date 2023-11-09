@@ -1,11 +1,10 @@
 import { UseMutationResult, useMutation } from '@tanstack/react-query';
-import { useLedgerApiClient, usePrimaryParty } from 'common-frontend';
+import { CreateDirectoryEntryRequest } from 'directory-external-openapi';
 
-import { DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
 import { SubscriptionRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';
 
-import { useDirectoryInstall, useProviderParty } from '..';
+import { useExternalDirectoryClient } from '../../context/ValidatorServiceContext';
 import { toFullEntryName } from '../../utils';
 
 interface RequestEntryArgs {
@@ -17,37 +16,22 @@ const useRequestEntry = (): UseMutationResult<
   string,
   RequestEntryArgs
 > => {
-  const ledgerApiClient = useLedgerApiClient();
-  const { data: primaryPartyId } = usePrimaryParty();
-  const { data: providerPartyId } = useProviderParty();
-  const directoryInstall = useDirectoryInstall().data?.contractId;
+  const directoryApi = useExternalDirectoryClient();
 
   return useMutation({
     mutationFn: async ({ entryName, suffix }) => {
-      if (!ledgerApiClient) {
-        throw new Error('No ledgerAPIClient available while requesting entry');
-      }
-      if (!primaryPartyId) {
-        throw new Error('No primary party found while requesting entry');
-      }
-      if (!providerPartyId) {
-        throw new Error('No provider party found while requesting entry');
-      }
-      if (!directoryInstall) {
-        throw new Error('Failed to find DirectoryInstall');
-      }
+      const createReq: CreateDirectoryEntryRequest = {
+        name: toFullEntryName(entryName, suffix),
+        url: '',
+        description: '',
+      };
 
-      const response = await ledgerApiClient.exercise(
-        [primaryPartyId],
-        [],
-        DirectoryInstall.DirectoryInstall_RequestEntry,
-        directoryInstall,
-        // TODO(#6862) pass this value from form data
-        { name: toFullEntryName(entryName, suffix), url: '', description: '' }
-      );
+      const createRes = await directoryApi.createDirectoryEntry(createReq);
+      const subscriptionRequestCid =
+        createRes.subscriptionRequestCid as ContractId<SubscriptionRequest>;
 
       console.debug('Created SubscriptionRequest');
-      return response._2;
+      return subscriptionRequestCid;
     },
   });
 };

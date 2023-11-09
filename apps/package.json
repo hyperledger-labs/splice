@@ -5,6 +5,7 @@
     "common/frontend",
     "directory/frontend",
     "directory/openapi-ts-client",
+    "directory/external-openapi-ts-client",
     "scan/frontend",
     "scan/openapi-ts-client",
     "splitwell/frontend",

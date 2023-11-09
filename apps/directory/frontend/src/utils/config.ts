@@ -8,7 +8,8 @@ const walletSchema = z.object({
 type DirectoryServicesConfig = {
   wallet: z.infer<typeof walletSchema>;
   directory: z.infer<typeof serviceSchema>;
-  jsonApi: z.infer<typeof serviceSchema>;
+  validator: z.infer<typeof serviceSchema>;
+  jsonApi: z.infer<typeof serviceSchema>; // TODO(#8269) remove this config
 };
 
 type DirectoryConfig = {
@@ -26,6 +27,7 @@ const reader = new ConfigReader(
         uiUrl: z.string().url(),
       }),
       directory: serviceSchema,
+      validator: serviceSchema,
       jsonApi: serviceSchema,
     }),
   })

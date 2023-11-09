@@ -4,16 +4,10 @@ info:
   version: 0.0.1
 tags:
   - name: directory
+servers:
+  - url: https://example.com/api/validator
 paths:
-  /readyz:
-    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
-  /livez:
-    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
-  /status:
-    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1status"
-  /version:
-    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
-  /entry/create:
+  /v0/entry/create:
     post:
       tags: [directory]
       x-jvm-package: external.directory
@@ -40,7 +34,7 @@ paths:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /entry/all:
+  /v0/entry/all:
     get:
       tags: [ directory ]
       x-jvm-package: external.directory
@@ -112,9 +106,9 @@ components:
         - subscriptionRequestCid
       properties:
         entryContextCid:
-          type: string
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
         subscriptionRequestCid:
-          type: string
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
         name:
           type: string
         url:
@@ -142,7 +136,7 @@ components:
         - paymentDuration
       properties:
         contractId:
-          type: string
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
         name:
           type: string
         amount:

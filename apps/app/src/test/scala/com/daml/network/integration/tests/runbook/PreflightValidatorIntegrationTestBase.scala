@@ -289,10 +289,13 @@ abstract class PreflightValidatorIntegrationTestBase
           auth0Login(
             aliceUser,
             directoryUiUrl,
-            () => find(id("entry-name-field")) should not be empty,
+            () => {
+              waitForQuery(id("entry-name-field"))
+              find(id("entry-name-field")) should not be empty
+            },
           ),
         cnsName,
-        "1.0",
+        "1.0000000000",
         "USD",
         "90 days",
       )
