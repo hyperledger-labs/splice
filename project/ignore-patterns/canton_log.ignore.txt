@@ -43,9 +43,6 @@ NOT_FOUND/USER_NOT_FOUND.*: getting user failed for unknown user \\"sv_user\\".*
 # TODO(#8124): Remove this once upstream changes permit us to do so
 Using approximate topology snapshot at .* for desired timestamp .*
 
-# TODO(#8463): Remove once the drivers team demotes this to a debug log
-Received CometBFT error message: ErrorResult\(Some\(Error\(could not find results for height .*\)\)\)
-
 # TODO(#3933) We expect these logs when topology change during party migration.
 MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for informee participants
 ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to locked contracts
