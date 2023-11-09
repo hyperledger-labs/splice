@@ -97,7 +97,7 @@ class ValidatorApp(
     with BasicDirectives {
 
   override def packages =
-    super.packages ++ DarResources.wallet.all ++ DarResources.directoryService.all ++ DarResources.appManager.all
+    super.packages ++ DarResources.wallet.all ++ DarResources.directoryService.all ++ DarResources.cantonNameService.all ++ DarResources.appManager.all
 
   override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version

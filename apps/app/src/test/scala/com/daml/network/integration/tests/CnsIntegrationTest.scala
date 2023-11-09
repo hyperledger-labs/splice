@@ -34,8 +34,6 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
 
   import CnsIntegrationTest.*
 
-  private val cnsDarPath = "daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar"
-
   private val testEntryName = "mycoolentry.unverified.cns"
   private val testEntryUrl = "https://cns-dir-url.com"
   private val testEntryDescription = "Sample CNS Directory Entry Description"
@@ -47,11 +45,6 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       .addConfigTransformToFront(
         CNNodeConfigTransforms.onlySv1
       )
-      // TODO(#7353): we will not upload the dars here after we have switch to upload dars in validator.
-      .withAdditionalSetup(implicit env => {
-        aliceValidatorBackend.participantClient.upload_dar_unless_exists(cnsDarPath)
-        bobValidatorBackend.participantClient.upload_dar_unless_exists(cnsDarPath)
-      })
       .addConfigTransforms((_, config) =>
         CNNodeConfigTransforms.updateAllAutomationConfigs(
           _.withPausedTrigger[ExpiredCnsEntryTrigger]

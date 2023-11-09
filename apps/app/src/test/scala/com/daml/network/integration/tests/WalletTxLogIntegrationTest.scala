@@ -30,7 +30,6 @@ class WalletTxLogIntegrationTest
     with WalletTxLogTestUtil {
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
-  private val cnsDarPath = "daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar"
 
   private val coinPrice = BigDecimal(0.75).setScale(10)
 
@@ -64,9 +63,6 @@ class WalletTxLogIntegrationTest
       .withAdditionalSetup(implicit env => {
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
-        // TODO(#7353): we will not upload the cns dars here after we have switch to upload dars in validator.
-        aliceValidatorBackend.participantClient.upload_dar_unless_exists(cnsDarPath)
-        bobValidatorBackend.participantClient.upload_dar_unless_exists(cnsDarPath)
       })
   }
 
