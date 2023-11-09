@@ -17,7 +17,7 @@ trait Trigger extends FlagCloseable with NamedLogging with Spanning with HasHeal
 
   protected def context: TriggerContext
 
-  protected def metrics: Option[PollingTriggerMetrics]
+  protected def metrics: TriggerMetrics = new TriggerMetrics(context.metricsFactory)
 
   protected def timeouts: ProcessingTimeout = context.timeouts
 

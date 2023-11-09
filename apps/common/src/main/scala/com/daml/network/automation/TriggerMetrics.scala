@@ -2,42 +2,28 @@ package com.daml.network.automation
 
 import com.daml.network.environment.CNMetrics
 import com.daml.metrics.api.{MetricDoc, MetricName}
-import com.daml.metrics.api.MetricDoc.MetricQualification.{Latency, Traffic, Debug, Errors}
+import com.daml.metrics.api.MetricDoc.MetricQualification.{Latency, Traffic}
 import com.daml.metrics.api.MetricHandle.{Timer, Meter}
 import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
 
-class PollingTriggerMetrics(
+class TriggerMetrics(
     metricsFactory: LabeledMetricsFactory
 ) {
   val prefix: MetricName = CNMetrics.MetricsPrefix :+ "trigger"
 
   @MetricDoc.Tag(
-    summary = "How long it takes to complete one iteration of performWork",
+    summary = "How long it takes to complete one trigger task",
     description =
       "This metric measures the time taken of individual polling iterations processed by the trigger.",
     qualification = Latency,
   )
-  val iterationLatency: Timer = metricsFactory.timer(prefix :+ "iteration-latency")
+  val latency: Timer = metricsFactory.timer(prefix :+ "latency")
 
   @MetricDoc.Tag(
-    summary = "Number of iterations of performWork that succeeded",
+    summary = "Number of trigger tasks that succeeded",
     description =
-      "This metric measures the total number of successful polling iterations processed by the trigger.",
+      "This metric measures the total number of successful tasks processed by the trigger.",
     qualification = Traffic,
   )
-  val iterationsCompleted: Meter = metricsFactory.meter(prefix :+ "iterations-completed")
-
-  @MetricDoc.Tag(
-    summary = "Number of performWork calls that failed with a retriable exception",
-    description = "",
-    qualification = Debug,
-  )
-  val iterationsRetried: Meter = metricsFactory.meter(prefix :+ "iterations-retried")
-
-  @MetricDoc.Tag(
-    summary = "Number of performWork calls that failed with a non-retriable exception",
-    description = "",
-    qualification = Errors,
-  )
-  val iterationsFailed: Meter = metricsFactory.meter(prefix :+ "iterations-failed")
+  val completed: Meter = metricsFactory.meter(prefix :+ "completed")
 }

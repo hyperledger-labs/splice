@@ -343,6 +343,7 @@ final class RetryProvider(
       task: => Future[T],
       logger: TracedLogger,
       retryable: R = Seq.empty,
+      additionalMetricsLabels: Map[String, String] = Map.empty,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -358,7 +359,7 @@ final class RetryProvider(
       retryConfig.maxDelay,
       operationName,
       resetRetriesAfter = retryConfig.resetRetriesAfter,
-    ).apply(task, mkRetryable(operationName, retryable, metricsFactory))
+    ).apply(task, mkRetryable(operationName, retryable, metricsFactory, additionalMetricsLabels))
   }
 }
 
@@ -398,6 +399,7 @@ object RetryProvider {
       nonTransientDescription: String,
       fatalBehavior: String,
       metricsFactory: LabeledMetricsFactory,
+      additionalMetricsLabels: Map[String, String],
   ) extends ExceptionRetryable {
     // Additional categories that are not marked as retryable but we
     // can safely retry since we know there are other apps or
@@ -435,8 +437,6 @@ object RetryProvider {
       StatusCodes.GatewayTimeout,
     )
 
-    // TODO(M4-64) There will be some overlap with trigger-specific error metrics. Decide whether to keep the retryCounter, and if so...
-    //  add labels to identify the operation being run and build dashboards around it
     private val retryCounter =
       metricsFactory.counter(CNMetrics.MetricsPrefix :+ "retries" :+ "failures")
 
@@ -591,7 +591,7 @@ object RetryProvider {
       }
       implicit val mc = MetricsContext(
         "error_kind" -> errorKindLabel
-      )
+      ).merge(MetricsContext(additionalMetricsLabels))
       retryCounter.inc()
       errorKind
     }
@@ -602,6 +602,7 @@ object RetryProvider {
         operationName: String,
         a: A,
         metricsFactory: LabeledMetricsFactory,
+        additionalMetricsLabels: Map[String, String],
     ): ExceptionRetryable
   }
 
@@ -612,6 +613,7 @@ object RetryProvider {
             operationName: String,
             a: String => ExceptionRetryable,
             metricsFactory: LabeledMetricsFactory,
+            additionalMetricsLabels: Map[String, String],
         ) = a(operationName)
       }
 
@@ -620,6 +622,7 @@ object RetryProvider {
           operationName: String,
           additionalCodes: Seq[Status.Code],
           metricsFactory: LabeledMetricsFactory,
+          additionalMetricsLabels: Map[String, String],
       ) = RetryProvider.RetryableError(
         operationName,
         additionalCodes,
@@ -628,6 +631,7 @@ object RetryProvider {
         nonTransientDescription,
         fatalBehavior,
         metricsFactory,
+        additionalMetricsLabels,
       )
     }
 
@@ -637,6 +641,7 @@ object RetryProvider {
             operationName: String,
             additionalConditions: RetryableConditions,
             metricsFactory: LabeledMetricsFactory,
+            additionalMetricsLabels: Map[String, String],
         ) = RetryProvider.RetryableError(
           operationName,
           Seq.empty,
@@ -645,6 +650,7 @@ object RetryProvider {
           nonTransientDescription,
           fatalBehavior,
           metricsFactory,
+          additionalMetricsLabels,
         )
       }
   }

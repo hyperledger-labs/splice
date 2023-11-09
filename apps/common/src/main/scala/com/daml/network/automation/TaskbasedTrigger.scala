@@ -5,6 +5,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.daml.network.environment.RetryFor
 import com.daml.network.environment.RetryProvider.RetryableConditions
+import com.daml.metrics.api.MetricsContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -18,8 +19,10 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends Trigger {
-
-  override def metrics = None // TODO(#8221)
+  private implicit val mc: MetricsContext = MetricsContext(
+    "trigger_name" -> this.getClass.getSimpleName(),
+    "trigger_type" -> "taskbased",
+  )
 
   /** How to complete a task.
     *
@@ -49,7 +52,9 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
     // Creating a new trace here, as multiple requests can be processed in parallel.
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
       def processTaskWithStalenessCheck(): Future[TaskOutcome] =
-        completeTask(task)
+        // TODO(#8526) refactor for better latency reporting
+        metrics.latency
+          .timeFuture(completeTask(task))
           .recoverWith { case ex =>
             logger.info("Checking whether the task is stale, as its processing failed with ", ex)
             isStaleTask(task)
@@ -75,6 +80,7 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
           processTaskWithStalenessCheck(),
           logger,
           additionalRetryableConditions,
+          mc.labels,
         )
         .transform {
           case Success(taskOutcomeE) =>
@@ -83,11 +89,17 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
                 logger.info(
                   show"Completed processing with outcome: ${description}"
                 )
+                MetricsContext.withExtraMetricLabels(("stale", "false")) { m =>
+                  metrics.completed.mark()(m)
+                }
                 Success(true)
               case TaskStale =>
                 logger.info(
                   show"${TaskStale}"
                 )
+                MetricsContext.withExtraMetricLabels(("stale", "true")) { m =>
+                  metrics.completed.mark()(m)
+                }
                 Success(true)
             }
 

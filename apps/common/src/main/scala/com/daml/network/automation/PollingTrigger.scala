@@ -8,7 +8,7 @@ import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.retry.RetryUtil.FatalErrorKind
+import com.digitalasset.canton.util.retry.RetryUtil.ErrorKind
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{Future, Promise, blocking}
@@ -20,8 +20,6 @@ import scala.util.{Failure, Success}
   * Look at its child classes (`ctrl + h` for type hierarchy in IntelliJ) for useful specializations.
   */
 trait PollingTrigger extends Trigger with FlagCloseableAsync {
-  override def metrics = Some(new PollingTriggerMetrics(context.metricsFactory))
-
   private implicit val mc: MetricsContext = MetricsContext(
     "trigger_name" -> this.getClass.getSimpleName(),
     "trigger_type" -> "polling",
@@ -54,10 +52,9 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
             "performWorkIfNotPaused may not be called concurrently",
           )
           runningTaskFinishedVar = Some(Promise())
-          metrics
-            .fold(performWorkIfAvailable())(
-              _.iterationLatency.timeFuture(performWorkIfAvailable())
-            )
+          // TODO(#8526) refactor for better latency reporting
+          metrics.latency
+            .timeFuture(performWorkIfAvailable())
             .andThen { case _ =>
               blocking {
                 synchronized {
@@ -84,6 +81,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     "non-transient",
     s"restarting after ${context.config.pollingInterval}",
     context.metricsFactory,
+    mc.labels,
   )
 
   override def isHealthy: Boolean = pollingLoopRef.get().exists(!_.isCompleted)
@@ -126,16 +124,13 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
           // Here we tie the knot and ensure that once the previous iteration completes, we kick off another iteration.
           previousResult.transformWith {
             case Failure(ex) =>
-              // We call this to differentiate fatal errors for metric reporting
-              (retryable.retryOK(Failure(ex), logger)) match {
-                case FatalErrorKind => metrics.map(_.iterationsFailed.mark()): Unit
-                case _ => metrics.map(_.iterationsRetried.mark()): Unit
-              }
+              // We only call this to get logging
+              (retryable.retryOK(Failure(ex), logger)).discard[ErrorKind]
               loopWithDelay()
 
             case Success(workDone) => {
-              MetricsContext.withExtraMetricLabels[Unit](("work_done", workDone.toString)) {
-                implicit m => metrics.map(_.iterationsCompleted.mark()(m)): Unit
+              MetricsContext.withExtraMetricLabels(("work_done", workDone.toString)) { m =>
+                metrics.completed.mark()(m)
               }
 
               if (context.retryProvider.isClosing) {
