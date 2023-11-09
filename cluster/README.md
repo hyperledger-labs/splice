@@ -70,6 +70,7 @@
     - [Bootstrapping from a Cluster Data Dump](#bootstrapping-from-a-cluster-data-dump)
   - [Testing](#testing)
     - [Writing Tests against different Clusters](#writing-tests-against-different-clusters)
+    - [Patching healthchecks against a deployed cluster](#patching-healthchecks-against-a-deployed-cluster)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -1605,6 +1606,13 @@ When [deploying via CI](#manually-deploying-via-ci), you can use the `bootstrapp
    - see the different steps in `.circleci/config/workflows.yml` and `.circleci/config/prelude.yml`
    - run [`build-config.sh`](/.circleci/build-config.sh) to update the main config file
 
+
+### Patching healthchecks against a deployed cluster
+
+Our periodic healthchecks are triggered by CircleCI on `deployment/<cluster>` branches.
+In case you need to patch the tests without redeploying the cluster, you can cherry-pick the fix onto the corresponding deployment branch.
+You will also need to disable version compatibility enforcement (since the tests will no longer match the version tag of the cluster)
+by pushing another commit that sets `failOnVersionMismatch` to `false` in [NetworkAppClientConfig.scala](https://github.com/DACH-NY/canton-network-node/blob/b08bd36f1eb1c34545921816e863236b7cb2a0cd/apps/common/src/main/scala/com/daml/network/config/NetworkAppClientConfig.scala#L14).
 
 ## Appendix: Kubernetes and Other Deployment Resources
 
