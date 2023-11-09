@@ -365,7 +365,69 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-
+  /v0/cns-entries:
+    get:
+      tags: [ scan ]
+      x-jvm-package: scan
+      operationId: "listCnsEntries"
+      parameters:
+        - name: "name_prefix"
+          in: "query"
+          schema:
+            type: string
+        - name: "page_size"
+          in: "query"
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListEntriesResponse"
+  /v0/cns-entries/by-party/{party}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "lookupCnsEntryByParty"
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupEntryByPartyResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/cns-entries/by-name/{name}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "lookupCnsEntryByName"
+      parameters:
+        - name: "name"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupEntryByNameResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 components:
   schemas:
     GetSvcPartyIdResponse:
@@ -894,3 +956,23 @@ components:
           description: |
             Total fees paid by the receiver, based on receiver_fee_ratio on outputs
           type: string
+    ListEntriesResponse:
+      type: object
+      required: [ "entries" ]
+      properties:
+        entries:
+          type: array
+          items:
+            "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+    LookupEntryByPartyResponse:
+      type: object
+      required: [ "entry" ]
+      properties:
+        entry:
+          "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+    LookupEntryByNameResponse:
+      type: object
+      required: [ "entry" ]
+      properties:
+        entry:
+          "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"

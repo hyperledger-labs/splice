@@ -315,10 +315,16 @@ create table scan_acs_store
     amount                      numeric,
 
     -- the receiver of an ImportCrate contract
-    import_crate_receiver text,
+    import_crate_receiver       text,
 
     -- the provider partyid of a FeaturedAppRight contract
-    featured_app_right_provider text
+    featured_app_right_provider text,
+
+    -- the name of the cns entry
+    cns_entry_name              text,
+
+    -- party-id of the directory user that owns a cns entry contract
+    cns_entry_owner             text
 );
 
 -- lookup validator traffic
@@ -335,6 +341,16 @@ create index scan_acs_store_sid_tid_icrn
 create index scan_acs_store_sid_tid_farp
     on scan_acs_store (store_id, template_id_qualified_name, featured_app_right_provider)
     where featured_app_right_provider is not null;
+
+-- retrieve cns entries by name
+create index scan_acs_store_sid_den_tpo
+    on scan_acs_store (store_id, cns_entry_name text_pattern_ops)
+    where cns_entry_name is not null;
+
+-- retrieve the cns entries owned by a particular party paged by name
+create index scan_acs_store_sid_deo_den
+    on scan_acs_store (store_id, cns_entry_owner, cns_entry_name)
+    where cns_entry_owner is not null and cns_entry_name is not null;
 
 create table scan_txlog_store
 (

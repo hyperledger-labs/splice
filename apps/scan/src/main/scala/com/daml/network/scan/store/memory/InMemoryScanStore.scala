@@ -5,13 +5,20 @@ import cats.kernel.Monoid
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
-import com.daml.network.codegen.java.cn.cns.CnsRules
+import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry, TxLogIndexRecord}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.store.{HardLimit, InMemoryCNNodeAppStore, Limit, PageLimit, TxLogStore}
+import com.daml.network.store.{
+  HardLimit,
+  InMemoryCNNodeAppStore,
+  Limit,
+  LimitHelpers,
+  PageLimit,
+  TxLogStore,
+}
 import com.daml.network.util.{Contract, ContractWithState}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -32,7 +39,8 @@ class InMemoryScanStore(
 )(implicit
     ec: ExecutionContext
 ) extends InMemoryCNNodeAppStore[TxLogIndexRecord, TxLogEntry]
-    with ScanStore {
+    with ScanStore
+    with LimitHelpers {
 
   override def lookupCoinRules()(implicit
       tc: TraceContext
@@ -226,6 +234,35 @@ class InMemoryScanStore(
         case _ => false
       }),
     )
+
+  override def listEntries(namePrefix: String, limit: Limit = Limit.DefaultLimit)(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[ContractWithState[CnsEntry.ContractId, CnsEntry]]
+  ] = for {
+    list <- multiDomainAcsStore.filterContracts(
+      CnsEntry.COMPANION,
+      (entry: Contract[?, CnsEntry]) => entry.payload.name.startsWith(namePrefix),
+      limit,
+    )
+  } yield applyLimit(limit, list)
+
+  override def lookupEntryByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[ContractWithState[CnsEntry.ContractId, CnsEntry]]
+  ] = for {
+    entryContracts <- multiDomainAcsStore.filterContracts(
+      CnsEntry.COMPANION,
+      (entry: Contract[?, CnsEntry]) => entry.payload.user == partyId.toProtoPrimitive,
+    )
+  } yield entryContracts.sortBy(_.payload.name).headOption
+
+  override def lookupEntryByName(name: String)(implicit tc: TraceContext): Future[
+    Option[ContractWithState[CnsEntry.ContractId, CnsEntry]]
+  ] = multiDomainAcsStore.findContract(CnsEntry.COMPANION)((entry: Contract[?, CnsEntry]) =>
+    entry.payload.name == name
+  )
 
   override def listTransactions(
       pageEndEventId: Option[String],

@@ -8,6 +8,7 @@ import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_Coin
 import com.daml.network.codegen.java.cc.coinrules.PaymentTransferContext
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cn.cns.CnsEntry
 import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, svcrules as svcrulesCodegen}
 import com.daml.network.codegen.java.cn.svc.globaldomain as globaldomainCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -651,6 +652,70 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       }
     }
 
+    "listEntries" should {
+      "list entries with prefix" in {
+        for {
+          store <- mkStore()
+          unwantedContract = cnsEntry(1, "unwanted")
+          wantedContract = cnsEntry(2, "wanted")
+          wantedContract2 = cnsEntry(3, "wanted2")
+          _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(wantedContract)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(wantedContract2)(store.multiDomainAcsStore)
+          expectedResult = Seq(
+            ContractWithState(wantedContract, Assigned(dummyDomain)),
+            ContractWithState(wantedContract2, Assigned(dummyDomain)),
+          )
+        } yield {
+          store.listEntries("wanted").futureValue should be(
+            expectedResult
+          )
+          store.listEntries("dummy").futureValue should be(
+            Seq.empty
+          )
+        }
+      }
+    }
+
+    "lookupEntryByName" should {
+      "return None for no entry" in {
+        for {
+          store <- mkStore()
+          result <- store.lookupEntryByName("nope")
+        } yield result should be(None)
+      }
+
+      "return the entry with the exact name" in {
+        for {
+          store <- mkStore()
+          unwantedContract = cnsEntry(1, "unwanted")
+          wantedContract = cnsEntry(2, "wanted")
+          _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(wantedContract)(store.multiDomainAcsStore)
+          expectedResult = Some(ContractWithState(wantedContract, Assigned(dummyDomain)))
+        } yield {
+          store.lookupEntryByName("wanted").futureValue should be(
+            expectedResult
+          )
+        }
+      }
+    }
+
+    "lookupEntryByParty" should {
+      "return the first lexicographical entry of the user" in {
+        for {
+          store <- mkStore()
+          unwantedContract = cnsEntry(1, "unwanted")
+          bContract = cnsEntry(2, "b")
+          aContract = cnsEntry(2, "a")
+          _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(bContract)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(aContract)(store.multiDomainAcsStore)
+          expectedResult = Some(ContractWithState(aContract, Assigned(dummyDomain)))
+        } yield store.lookupEntryByParty(userParty(2)).futureValue should be(expectedResult)
+      }
+    }
+
     "listTransactions" should {
       "return the most recent txs in pages" in {
         val limit = 10
@@ -1111,6 +1176,23 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       identifier = templateId,
       contractId = new svcrulesCodegen.SvcRules.ContractId(nextCid()),
       payload = template,
+    )
+  }
+
+  private def cnsEntry(n: Int, name: String) = {
+    val template = new CnsEntry(
+      userParty(n).toProtoPrimitive,
+      svcParty.toProtoPrimitive,
+      name,
+      s"https://example.com/$name",
+      s"Test with $name",
+      Instant.now().plusSeconds(3600),
+    )
+
+    contract(
+      CnsEntry.TEMPLATE_ID,
+      new CnsEntry.ContractId(nextCid()),
+      template,
     )
   }
 

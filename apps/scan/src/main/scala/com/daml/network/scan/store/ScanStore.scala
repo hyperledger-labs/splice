@@ -148,6 +148,22 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
+  def listEntries(namePrefix: String, limit: Limit = Limit.DefaultLimit)(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[ContractWithState[cn.cns.CnsEntry.ContractId, cn.cns.CnsEntry]]
+  ]
+
+  def lookupEntryByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[ContractWithState[cn.cns.CnsEntry.ContractId, cn.cns.CnsEntry]]
+  ]
+
+  def lookupEntryByName(name: String)(implicit tc: TraceContext): Future[
+    Option[ContractWithState[cn.cns.CnsEntry.ContractId, cn.cns.CnsEntry]]
+  ]
+
   def listTransactions(
       pageEndEventId: Option[String],
       sortOrder: SortOrder,
@@ -245,6 +261,7 @@ object ScanStore {
         mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
         mkFilter(cc.coinimport.ImportCrate.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cn.cns.CnsEntry.COMPANION)(co => co.payload.svc == svc),
       ),
     )
   }

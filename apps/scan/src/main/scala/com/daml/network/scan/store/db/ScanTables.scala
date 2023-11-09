@@ -22,6 +22,8 @@ object ScanTables extends AcsTables {
       amount: Option[BigDecimal],
       importCrateReceiver: Option[String],
       featuredAppRightProvider: Option[PartyId],
+      cnsEntryName: Option[String],
+      cnsEntryOwner: Option[PartyId],
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "round" -> round,
@@ -29,6 +31,8 @@ object ScanTables extends AcsTables {
       "amount" -> amount,
       "import_crate_receiver" -> importCrateReceiver.map(lengthLimited),
       "featured_app_right_provider" -> featuredAppRightProvider,
+      "cns_entry_name" -> cnsEntryName.map(lengthLimited),
+      "cns_entry_owner" -> cnsEntryOwner,
     )
   }
 
@@ -51,6 +55,8 @@ object ScanTables extends AcsTables {
                 amount = None,
                 importCrateReceiver = None,
                 featuredAppRightProvider = None,
+                cnsEntryName = None,
+                cnsEntryOwner = None,
               )
           }
         case t if t == QualifiedName(cn.cns.CnsRules.TEMPLATE_ID) =>
@@ -63,6 +69,8 @@ object ScanTables extends AcsTables {
               amount = None,
               importCrateReceiver = None,
               featuredAppRightProvider = None,
+              cnsEntryName = None,
+              cnsEntryOwner = None,
             )
           }
         case t if t == QualifiedName(cn.svcrules.SvcRules.TEMPLATE_ID) =>
@@ -75,6 +83,8 @@ object ScanTables extends AcsTables {
               amount = None,
               importCrateReceiver = None,
               featuredAppRightProvider = None,
+              cnsEntryName = None,
+              cnsEntryOwner = None,
             )
           }
         case t if t == QualifiedName(cc.round.OpenMiningRound.TEMPLATE_ID) =>
@@ -89,6 +99,8 @@ object ScanTables extends AcsTables {
                 amount = None,
                 importCrateReceiver = None,
                 featuredAppRightProvider = None,
+                cnsEntryName = None,
+                cnsEntryOwner = None,
               )
           }
         case t if t == QualifiedName(cc.round.ClosedMiningRound.TEMPLATE_ID) =>
@@ -102,6 +114,8 @@ object ScanTables extends AcsTables {
                 amount = None,
                 importCrateReceiver = None,
                 featuredAppRightProvider = None,
+                cnsEntryName = None,
+                cnsEntryOwner = None,
               )
           }
         case t if t == QualifiedName(cc.round.IssuingMiningRound.TEMPLATE_ID) =>
@@ -116,6 +130,8 @@ object ScanTables extends AcsTables {
                 amount = None,
                 importCrateReceiver = None,
                 featuredAppRightProvider = None,
+                cnsEntryName = None,
+                cnsEntryOwner = None,
               )
           }
         case t if t == QualifiedName(cc.round.SummarizingMiningRound.TEMPLATE_ID) =>
@@ -129,6 +145,8 @@ object ScanTables extends AcsTables {
                 amount = None,
                 importCrateReceiver = None,
                 featuredAppRightProvider = None,
+                cnsEntryName = None,
+                cnsEntryOwner = None,
               )
           }
         case t if t == QualifiedName(cc.coin.FeaturedAppRight.TEMPLATE_ID) =>
@@ -143,6 +161,8 @@ object ScanTables extends AcsTables {
                 importCrateReceiver = None,
                 featuredAppRightProvider =
                   Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+                cnsEntryName = None,
+                cnsEntryOwner = None,
               )
           }
         case t if t == QualifiedName(cc.coin.Coin.TEMPLATE_ID) =>
@@ -155,6 +175,8 @@ object ScanTables extends AcsTables {
               amount = Some(contract.payload.amount.initialAmount),
               importCrateReceiver = None,
               featuredAppRightProvider = None,
+              cnsEntryName = None,
+              cnsEntryOwner = None,
             )
           }
         case t if t == QualifiedName(cc.coin.LockedCoin.TEMPLATE_ID) =>
@@ -168,6 +190,8 @@ object ScanTables extends AcsTables {
               amount = Some(contract.payload.coin.amount.initialAmount),
               importCrateReceiver = None,
               featuredAppRightProvider = None,
+              cnsEntryName = None,
+              cnsEntryOwner = None,
             )
           }
         case t if t == QualifiedName(cc.coinimport.ImportCrate.TEMPLATE_ID) =>
@@ -181,7 +205,23 @@ object ScanTables extends AcsTables {
                 amount = None,
                 importCrateReceiver = Some(contract.payload.receiver),
                 featuredAppRightProvider = None,
+                cnsEntryName = None,
+                cnsEntryOwner = None,
               )
+          }
+        case t if t == QualifiedName(cn.cns.CnsEntry.TEMPLATE_ID) =>
+          tryToDecode(cn.cns.CnsEntry.COMPANION, createdEvent, createdEventBlob) { contract =>
+            ScanAcsStoreRowData(
+              contract = contract,
+              contractExpiresAt = None,
+              round = None,
+              validator = None,
+              amount = None,
+              importCrateReceiver = None,
+              featuredAppRightProvider = None,
+              cnsEntryName = Some(contract.payload.name),
+              cnsEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+            )
           }
         case t =>
           Left(s"Template $t cannot be decoded as an entry for the scan store.")

@@ -215,6 +215,7 @@ class HttpScanHandler(
       }
     }
   }
+
   def getClosedRounds(
       response: v0.ScanResource.GetClosedRoundsResponse.type
   )()(extracted: TraceContext): Future[v0.ScanResource.GetClosedRoundsResponse] = {
@@ -547,6 +548,59 @@ class HttpScanHandler(
           )
         }.toVector
       )
+    }
+  }
+
+  override def listCnsEntries(
+      respond: ScanResource.ListCnsEntriesResponse.type
+  )(namePrefix: Option[String], pageSize: Int)(
+      extracted: TraceContext
+  ): Future[ScanResource.ListCnsEntriesResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listEntries") { _ => _ =>
+      for {
+        entries <- store.listEntries(namePrefix.getOrElse(""), PageLimit.tryCreate(pageSize))
+      } yield definitions.ListEntriesResponse(entries.map(_.contract.toHttp).toVector)
+    }
+  }
+
+  override def lookupCnsEntryByName(respond: ScanResource.LookupCnsEntryByNameResponse.type)(
+      name: String
+  )(extracted: TraceContext): Future[ScanResource.LookupCnsEntryByNameResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.lookupEntryByName") { _ => _ =>
+      store.lookupEntryByName(name).flatMap {
+        case Some(entry) =>
+          Future.successful(
+            v0.ScanResource.LookupCnsEntryByNameResponse.OK(
+              definitions.LookupEntryByNameResponse(entry.contract.toHttp)
+            )
+          )
+        case None =>
+          Future.failed(HttpErrorHandler.notFound(s"No cns entry found for name: $name"))
+      }
+    }
+  }
+
+  override def lookupCnsEntryByParty(respond: ScanResource.LookupCnsEntryByPartyResponse.type)(
+      party: String
+  )(extracted: TraceContext): Future[ScanResource.LookupCnsEntryByPartyResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.lookupEntryByParty") { _ => _ =>
+      store
+        .lookupEntryByParty(PartyId.tryFromProtoPrimitive(party))
+        .flatMap {
+          case Some(entry) =>
+            Future.successful(
+              v0.ScanResource.LookupCnsEntryByPartyResponse.OK(
+                definitions.LookupEntryByPartyResponse(entry.contract.toHttp)
+              )
+            )
+          case None =>
+            Future.failed(
+              HttpErrorHandler.notFound(s"No cns entry found for party: ${party}")
+            )
+        }
     }
   }
 }

@@ -14,7 +14,7 @@ import com.daml.network.codegen.java.cc.round.{
   OpenMiningRound,
 }
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
-import com.daml.network.codegen.java.cn.cns.CnsRules
+import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.definitions.{GetCnsRulesRequest, GetCoinRulesRequest}
 import com.daml.network.store.MultiDomainAcsStore
@@ -269,6 +269,71 @@ object HttpScanAppClient {
       response.featuredAppRight
         .traverse(co => Contract.fromHttp(FeaturedAppRight.COMPANION)(co))
         .leftMap(_.toString)
+    }
+  }
+
+  case class ListCnsEntries(
+      namePrefix: String,
+      pageSize: Int,
+  ) extends BaseCommand[http.ListCnsEntriesResponse, Seq[
+        Contract[CnsEntry.ContractId, CnsEntry]
+      ]] {
+
+    def submitRequest(client: Client, headers: List[HttpHeader]) =
+      client.listCnsEntries(Some(namePrefix), pageSize, headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListCnsEntriesResponse.OK(response) =>
+      response.entries
+        .traverse(entry => Contract.fromHttp(CnsEntry.COMPANION)(entry))
+        .leftMap(_.toString)
+    }
+  }
+
+  case class LookupCnsEntryByParty(
+      party: PartyId
+  ) extends BaseCommand[
+        http.LookupCnsEntryByPartyResponse,
+        Contract[CnsEntry.ContractId, CnsEntry],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.lookupCnsEntryByParty(party.toProtoPrimitive, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.LookupCnsEntryByPartyResponse.OK(response) =>
+      for {
+        entry <- Contract
+          .fromHttp(CnsEntry.COMPANION)(response.entry)
+          .leftMap(_.toString)
+      } yield entry
+    }
+  }
+
+  case class LookupCnsEntryByName(
+      name: String
+  ) extends BaseCommand[
+        http.LookupCnsEntryByNameResponse,
+        Contract[CnsEntry.ContractId, CnsEntry],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ) = client.lookupCnsEntryByName(name, headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.LookupCnsEntryByNameResponse.OK(response) =>
+      for {
+        entry <- Contract
+          .fromHttp(CnsEntry.COMPANION)(response.entry)
+          .leftMap(_.toString)
+      } yield entry
     }
   }
 

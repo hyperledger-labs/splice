@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cc.round.{
   IssuingMiningRound,
   OpenMiningRound,
 }
-import com.daml.network.codegen.java.cn.cns.CnsRules
+import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -83,6 +83,34 @@ abstract class ScanAppReference(
   def getCnsRules(): ContractWithState[CnsRules.ContractId, CnsRules] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetCnsRules(None))
+    }
+
+  @Help.Summary("List cns entries")
+  @Help.Description(
+    "Lists all cns entries whose name is prefixed with the given prefix, up to a given number of entries"
+  )
+  def listEntries(
+      namePrefix: String,
+      pageSize: Int,
+  ): Seq[Contract[CnsEntry.ContractId, CnsEntry]] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.ListCnsEntries(namePrefix, pageSize))
+    }
+
+  @Help.Summary("Lookup a cns entry by the party that registered it")
+  def lookupEntryByParty(
+      party: PartyId
+  ): Contract[CnsEntry.ContractId, CnsEntry] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.LookupCnsEntryByParty(party))
+    }
+
+  @Help.Summary("Lookup a cns entry by its name")
+  def lookupEntryByName(
+      name: String
+  ): Contract[CnsEntry.ContractId, CnsEntry] =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.LookupCnsEntryByName(name))
     }
 
   @Help.Summary(

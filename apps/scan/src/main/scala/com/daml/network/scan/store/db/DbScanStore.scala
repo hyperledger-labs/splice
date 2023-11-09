@@ -5,7 +5,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
-import com.daml.network.codegen.java.cn.cns.CnsRules
+import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.db.ScanTables.{ScanAcsStoreRowData, ScanTxLogRowData}
@@ -204,6 +204,85 @@ class DbScanStore(
         )
       } yield result.getOrElse(0)
     }
+
+  override def listEntries(namePrefix: String, limit: Limit = Limit.DefaultLimit)(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[ContractWithState[CnsEntry.ContractId, CnsEntry]]
+  ] = waitUntilAcsIngested {
+    val limitedPrefix = lengthLimited(namePrefix)
+    for {
+      rows <- storage
+        .query(
+          selectFromAcsTableWithState(
+            ScanTables.acsTableName,
+            storeId,
+            where = sql"""
+                template_id_qualified_name = ${QualifiedName(
+                CnsEntry.COMPANION.TEMPLATE_ID
+              )} and cns_entry_name ^@ $limitedPrefix
+            """,
+            orderLimit = sql"""
+                order by cns_entry_name
+                limit ${sqlLimit(limit)}
+            """,
+          ),
+          "listEntries",
+        )
+    } yield applyLimit(limit, rows).map(
+      contractWithStateFromRow(CnsEntry.COMPANION)(_)
+    )
+  }
+
+  override def lookupEntryByParty(
+      partyId: PartyId
+  )(implicit tc: TraceContext): Future[
+    Option[ContractWithState[CnsEntry.ContractId, CnsEntry]]
+  ] = waitUntilAcsIngested {
+    (for {
+      row <- storage
+        .querySingle(
+          selectFromAcsTableWithState(
+            ScanTables.acsTableName,
+            storeId,
+            where = sql"""
+                template_id_qualified_name = ${QualifiedName(
+                CnsEntry.COMPANION.TEMPLATE_ID
+              )}
+                and cns_entry_owner = $partyId
+                and cns_entry_name >= ''
+            """,
+            orderLimit = sql"""
+                order by cns_entry_name
+                limit 1
+            """,
+          ).headOption,
+          "lookupEntryByParty",
+        )
+    } yield contractWithStateFromRow(CnsEntry.COMPANION)(row)).value
+  }
+
+  override def lookupEntryByName(name: String)(implicit tc: TraceContext): Future[
+    Option[ContractWithState[CnsEntry.ContractId, CnsEntry]]
+  ] = waitUntilAcsIngested {
+    (for {
+      row <- storage
+        .querySingle(
+          selectFromAcsTableWithState(
+            ScanTables.acsTableName,
+            storeId,
+            where = sql"""
+              template_id_qualified_name = ${QualifiedName(
+                CnsEntry.COMPANION.TEMPLATE_ID
+              )}
+              and cns_entry_name = ${lengthLimited(name)}
+                 """,
+            orderLimit = sql"limit 1",
+          ).headOption,
+          "lookupEntryByName",
+        )
+    } yield contractWithStateFromRow(CnsEntry.COMPANION)(row)).value
+  }
 
   override def listTransactions(
       pageEndEventId: Option[String],
