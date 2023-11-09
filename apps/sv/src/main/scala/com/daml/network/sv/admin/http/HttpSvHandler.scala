@@ -682,18 +682,17 @@ class HttpSvHandler(
   )(implicit tc: TraceContext): Future[Unit] =
     for {
       svcRules <- svcStore.getSvcRules()
-      cmds = (
-        svcRules.contractId
-          .exerciseSvcRules_OnboardValidator(
+      cmds = Seq(
+        svcRules.exercise(
+          _.exerciseSvcRules_OnboardValidator(
             svParty.toProtoPrimitive,
             candidateParty.toProtoPrimitive,
           )
-          .commands
-          .asScala ++ validatorOnboarding.contractId
-          .exerciseValidatorOnboarding_Match(secret, candidateParty.toProtoPrimitive)
-          .commands
-          .asScala
-      ).toSeq
+        ),
+        validatorOnboarding.exercise(
+          _.exerciseValidatorOnboarding_Match(secret, candidateParty.toProtoPrimitive)
+        ),
+      ) map (_.update)
       _ <- svcStoreWithIngestion.connection
         .submit(Seq(svParty), Seq(svcParty), cmds)
         .withDomainId(svcRules.domain)

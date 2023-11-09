@@ -23,7 +23,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 object AcsStoreDump {
 
@@ -67,7 +66,7 @@ object AcsStoreDump {
       contracts: Seq[http.Contract]
   )(implicit
       templateDecoder: TemplateJsonDecoder
-  ): Seq[data.Command] = {
+  ): Seq[data.codegen.HasCommands] = {
 
     def extractCoin(co: http.Contract): Seq[cc.coin.Coin] =
       // attempt to decode as a: Coin
@@ -108,9 +107,8 @@ object AcsStoreDump {
       crate.payload.payload, // keep as-is
     )
 
-    (coinCommands ++ validatorLicenseCommands ++ importCrateCommands).flatMap(
-      _.create.commands.asScala
-    )
+    (coinCommands ++ validatorLicenseCommands ++ importCrateCommands)
+      .map(_.create())
   }
 
   def receiveCratesFor(

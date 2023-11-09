@@ -56,9 +56,11 @@ class TerminatedSubscriptionTrigger(
               .submit(
                 Seq(svcParty),
                 Seq.empty,
-                cnsEntryContext.contractId.exerciseCnsEntryContext_Terminate(
-                  svcParty.toProtoPrimitive,
-                  task.contract.contractId,
+                cnsEntryContext.exercise(
+                  _.exerciseCnsEntryContext_Terminate(
+                    svcParty.toProtoPrimitive,
+                    task.contract.contractId,
+                  )
                 ),
               )
               .withDomainId(task.domain)

@@ -44,20 +44,19 @@ class TerminatedAppPaymentTrigger(
             .withDescription("No corresponding TransferInProgress for TerminatedAppPayment")
             .asRuntimeException()
         case Some(transferInProgress) =>
-          for {
-            _ <- connection
-              .submit(
-                Seq(store.providerParty),
-                Seq.empty,
+          connection
+            .submit(
+              Seq(store.providerParty),
+              Seq.empty,
+              task.exercise { tapContractId =>
                 transferInProgress.contractId.exerciseTransferInProgress_Terminate(
                   store.providerParty.toProtoPrimitive,
-                  task.contract.contractId,
-                ),
-              )
-              .withDomainId(task.domain)
-              .noDedup
-              .yieldUnit()
-          } yield ()
+                  tapContractId,
+                )
+              },
+            )
+            .noDedup
+            .yieldUnit()
       }
     } yield TaskSuccess("Archived TransferInProgress because corresponding payment got terminated")
   }

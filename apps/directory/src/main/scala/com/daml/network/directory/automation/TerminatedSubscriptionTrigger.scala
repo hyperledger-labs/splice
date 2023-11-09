@@ -10,8 +10,10 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.util.AssignedContract
+import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
+import com.daml.network.util.{AssignedContract, ContractWithState}
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -45,24 +47,29 @@ class TerminatedSubscriptionTrigger(
               "Ignoring TerminatedSubscription as there is no corresponding DirectoryEntryContext"
             )
           )
+        case Some(ContractWithState(_, decState)) if decState != Assigned(task.domain) =>
+          Future failed Status.FAILED_PRECONDITION
+            .withDescription(
+              s"DirectoryEntryContext in state $decState, does not match TerminatedSubscription"
+            )
+            .asRuntimeException()
         case Some(directoryEntryContext) =>
-          for {
-            _ <- connection
-              .submit(
-                Seq(store.providerParty),
-                Seq.empty,
+          connection
+            .submit(
+              Seq(store.providerParty),
+              Seq.empty,
+              task.exercise { taskContractId =>
                 directoryEntryContext.contractId.exerciseDirectoryEntryContext_Terminate(
                   store.providerParty.toProtoPrimitive,
-                  task.contract.contractId,
-                ),
-              )
-              .withDomainId(task.domain)
-              .noDedup
-              .yieldUnit()
-          } yield ()
+                  taskContractId,
+                )
+              },
+            )
+            .noDedup
+            .yieldUnit()
       }
     } yield TaskSuccess(
-      "Archived DirectoryEntrytContext because corresponding subscription got terminated"
+      "Archived DirectoryEntryContext because corresponding subscription got terminated"
     )
   }
 }
