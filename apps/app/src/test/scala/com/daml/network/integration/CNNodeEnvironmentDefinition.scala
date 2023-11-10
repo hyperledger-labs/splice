@@ -103,7 +103,7 @@ case class CNNodeEnvironmentDefinition(
         .foreach { sv1 =>
           val participantNamespace = sv1.participantClientWithAdminToken.id.uid.namespace
           val unionspace = UnionspaceDefinitionX.computeNamespace(Set(participantNamespace))
-          val svParty = participantNamespace
+          val sv1Party = participantNamespace
           sv1.participantClientWithAdminToken.domains
             .list_connected()
             .find(_.domainAlias == sv1.config.domains.global.alias)
@@ -127,12 +127,12 @@ case class CNNodeEnvironmentDefinition(
                   logger.info("Resetting unionspace to contain only sv1")(
                     TraceContext.empty
                   )
-                  val ownersThatMustBeRemoved = existingUnionspace.item.owners.diff(Set(svParty))
+                  val ownersThatMustBeRemoved = existingUnionspace.item.owners.diff(Set(sv1Party))
                   if (ownersThatMustBeRemoved.nonEmpty) {
                     def proposeUnionspaceReset(client: CNParticipantClientReference): Unit = {
                       client.topology.unionspaces
                         .propose(
-                          Set(svParty.fingerprint),
+                          Set(sv1Party.fingerprint),
                           PositiveInt.one,
                           store,
                           serial = Some(existingUnionspace.context.serial + PositiveInt.one),

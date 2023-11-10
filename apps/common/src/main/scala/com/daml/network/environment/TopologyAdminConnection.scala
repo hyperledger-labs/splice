@@ -15,7 +15,6 @@ import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommandsX
 import com.digitalasset.canton.admin.api.client.data.topologyx.{
   BaseResult,
-  ListMediatorDomainStateResult,
   ListSequencerDomainStateResult,
 }
 import com.digitalasset.canton.config.ClientConfig
@@ -140,9 +139,27 @@ class TopologyAdminConnection(
       TopologyResult(base, mapping)
     }
 
-  def getMediatorDomainState(domainId: DomainId, proposals: Boolean = false)(implicit
+  def getMediatorDomainStateProposals(domainId: DomainId)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[TopologyResult[MediatorDomainStateX]]] = {
+    listMediatorDomainState(domainId, proposals = true)
+  }
+
+  def getMediatorDomainState(domainId: DomainId)(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[MediatorDomainStateX]] =
+    listMediatorDomainState(domainId, proposals = false).map { txs =>
+      txs.headOption
+        .getOrElse(
+          throw Status.NOT_FOUND
+            .withDescription(s"No mediator state for domain $domainId")
+            .asRuntimeException()
+        )
+    }
+
+  private def listMediatorDomainState(domainId: DomainId, proposals: Boolean)(implicit
+      traceContext: TraceContext
+  ) = {
     runCmd(
       TopologyAdminCommandsX.Read.MediatorDomainState(
         BaseQueryX(
@@ -155,15 +172,10 @@ class TopologyAdminConnection(
         ),
         filterDomain = "",
       )
-    ).map { txs =>
-      val ListMediatorDomainStateResult(base, mapping) = txs.headOption
-        .getOrElse(
-          throw Status.NOT_FOUND
-            .withDescription(s"No mediator state for domain $domainId")
-            .asRuntimeException()
-        )
-      TopologyResult(base, mapping)
-    }
+    )
+  }.map { txs =>
+    txs.map { tx => TopologyResult(tx.context, tx.item) }
+  }
 
   def getUnionspaceDefinition(
       domainId: DomainId,

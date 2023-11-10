@@ -1,4 +1,4 @@
-package com.daml.network.sv.automation.singlesv
+package com.daml.network.sv.automation.singlesv.onboarding
 
 import akka.stream.Materializer
 import cats.implicits.catsSyntaxParallelTraverse1

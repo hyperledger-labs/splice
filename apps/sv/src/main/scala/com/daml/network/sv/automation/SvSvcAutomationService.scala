@@ -21,13 +21,21 @@ import com.daml.network.sv.automation.confirmation.{
   SvOnboardingRequestTrigger,
 }
 import com.daml.network.sv.automation.singlesv.*
+import com.daml.network.sv.automation.singlesv.onboarding.{
+  SvOnboardingMediatorProposalTrigger,
+  SvOnboardingNamespaceProposalTrigger,
+  SvOnboardingPartyToParticipantProposalTrigger,
+  SvOnboardingSequencerProposalTrigger,
+}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
 import com.daml.network.util.QualifiedName
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.time.{Clock, WallClock}
 import io.opentelemetry.api.trace.Tracer
+import monocle.Monocle.toAppliedFocusOps
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -159,8 +167,16 @@ class SvSvcAutomationService(
     )
   )
 
+  // requires namespace permissions to run these triggers, can only be run after onboarding
   def registerPostOnboardingTriggers(): Unit = {
-    // requires namespace permissions to run these triggers, can only be run after onboarding
+    // required for triggers that must run in sim time as well
+    val wallClockTriggerContext = triggerContext
+      .focus(_.clock)
+      .replace(
+        new WallClock(triggerContext.timeouts, triggerContext.loggerFactory)
+      )
+      .focus(_.config.pollingInterval)
+      .replace(NonNegativeFiniteDuration.ofSeconds(1))
     registerTrigger(
       new ReconcileSequencerLimitWithMemberTrafficTrigger(
         triggerContext,
@@ -170,6 +186,27 @@ class SvSvcAutomationService(
     )
     registerTrigger(
       new SvOnboardingNamespaceProposalTrigger(triggerContext, svcStore, participantAdminConnection)
+    )
+    registerTrigger(
+      new SvOnboardingPartyToParticipantProposalTrigger(
+        wallClockTriggerContext,
+        svcStore,
+        participantAdminConnection,
+      )
+    )
+    registerTrigger(
+      new SvOnboardingSequencerProposalTrigger(
+        wallClockTriggerContext,
+        svcStore,
+        participantAdminConnection,
+      )
+    )
+    registerTrigger(
+      new SvOnboardingMediatorProposalTrigger(
+        wallClockTriggerContext,
+        svcStore,
+        participantAdminConnection,
+      )
     )
   }
 }

@@ -85,7 +85,7 @@ initCollective initialOpenRounds isDevNet = do
                 sequencer = Some SequencerConfig with
                   sequencerId = "sequencer-id"
                   url = "sequencer.address:1234"
-                  availableAfter = now
+                  availableAfter = Some now
                 mediator = Some MediatorConfig with
                   mediatorId = "mediator-id"
         )]

@@ -391,7 +391,7 @@ class HttpSvHandler(
           .map(_.sequencerAdminConnection)
           .toRight("Onboarding sequencer configured to use X nodes but sponsoring SV is not")
       } yield {
-        onboardSequencer(sequencerConnection, sequencerId)
+        getSequencerOnboardingSnapshots(sequencerConnection, sequencerId)
       }).fold(
         errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)),
         _.map(snapshot =>
@@ -439,20 +439,12 @@ class HttpSvHandler(
       .map(_.isDefined)
   }
 
-  private def addSequencerToTopologyState(
+  private def waitForNewSequencerObservedByExistingSequencer(
       sequencerAdminConnection: SequencerAdminConnection,
       sequencerId: SequencerId,
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    logger.info("Proposing new sequencer")
     for {
-      ourParticipant <- participantAdminConnection.getParticipantId()
       globalDomain <- svcStore.getSvcRules().map(_.domain)
-      _ <- participantAdminConnection.ensureSequencerDomainState(
-        globalDomain,
-        sequencerId,
-        ourParticipant.uid.namespace.fingerprint,
-        RetryFor.ClientCalls,
-      )
       _ <- retryProvider.waitUntil(
         RetryFor.ClientCalls,
         "New sequencer is observed in SequencerDomainState through existing sequencer",
@@ -502,13 +494,13 @@ class HttpSvHandler(
     } yield ()
   }
 
-  private def onboardSequencer(
+  private def getSequencerOnboardingSnapshots(
       sequencerAdminConnection: SequencerAdminConnection,
       sequencerId: SequencerId,
   )(implicit traceContext: TraceContext): Future[definitions.SequencerSnapshot] = {
     logger.info("Querying sequencer domain state")
     for {
-      _ <- addSequencerToTopologyState(sequencerAdminConnection, sequencerId)
+      _ <- waitForNewSequencerObservedByExistingSequencer(sequencerAdminConnection, sequencerId)
       // We need to generate a dummy transaction before generating the export
       // to make sure that the new sequencer gets a sequencer counter that is included in the snapshot.
       // Note that for now we do the dummy transaction here independent of whether the sequencer has already been onboarded

@@ -488,6 +488,14 @@ class InMemorySvSvcStore(
     )
   } yield result
 
+  override def listSvOnboardingConfirmed(limit: Limit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]] = {
+    multiDomainAcsStore
+      .listContracts(so.SvOnboardingConfirmed.COMPANION, limit)
+      .map(_.map(_.contract))
+  }
+
   override def lookupSvOnboardingConfirmedByParty(svParty: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]] =

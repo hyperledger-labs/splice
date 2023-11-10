@@ -60,8 +60,9 @@ data SequencerConfig = SequencerConfig with
     -- ^ The id of the sequencer.
     url : Text
     -- ^ The public accessible url of the sequencer.
-    availableAfter : Time
+    availableAfter : Optional Time
     -- ^ Any participant should subscribe this sequencer after this time.
+    -- ^ If not set the sequencer is not yet accessible
   deriving (Eq, Show)
 
 -- | Config for a mediator.

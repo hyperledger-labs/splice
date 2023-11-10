@@ -32,7 +32,7 @@ testDomainMigration = do
         sequencer = Some SequencerConfig with
           sequencerId = "sequencer-id-" <> partyToText sv
           url = "sequencer-" <> partyToText sv <> ".address:1234"
-          availableAfter = now
+          availableAfter = Some now
         mediator = Some MediatorConfig with
           mediatorId = "mediator-id-" <> partyToText sv
 
@@ -44,4 +44,4 @@ testDomainMigration = do
     domainConfig.sequencer === Some SequencerConfig with
       sequencerId = "sequencer-id-" <> partyToText sv
       url = "sequencer-" <> partyToText sv <> ".address:1234"
-      availableAfter = now
+      availableAfter = Some now

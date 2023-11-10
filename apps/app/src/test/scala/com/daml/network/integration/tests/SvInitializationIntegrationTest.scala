@@ -1,11 +1,14 @@
 package com.daml.network.integration.tests
 
+import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.console.{
   ScanAppBackendReference,
   SvAppBackendReference,
   ValidatorAppBackendReference,
 }
+import com.daml.network.environment.RetryFor
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 
 import scala.jdk.CollectionConverters.*
 
@@ -62,6 +65,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
 
   // A test to make debugging bootstrap problems easier
   "SV apps can start one by one" in { implicit env =>
+    import env.executionContext
     clue("Starting SVC app and SV1 app") {
       startAllSync(sv1ScanBackend, sv1ValidatorBackend, sv1Backend)
     }
@@ -83,6 +87,29 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
 
     startSv(2, sv2Backend, sv2ValidatorBackend, Some(sv2ScanBackend))
     startSv(3, sv3Backend, sv3ValidatorBackend)
+    // Increase the unionspace threshold to 3 to require more than the candidate and sponsor to authorize the party to participant mapping. This ensures that the party to participant reconciliation loops work as expected.
+    // do this by falsely adding the sequencer namespace to the unionspace
+    val sv1SequencerAdminConnection =
+      sv1Backend.appState.localDomainNode.value.sequencerAdminConnection
+    val sv1SequencerId = sv1SequencerAdminConnection.getSequencerId.futureValue
+    val newUnionspace = Seq(
+      sv1SequencerAdminConnection,
+      sv1Backend.appState.participantAdminConnection,
+      sv2Backend.appState.participantAdminConnection,
+    ).parTraverse { connection =>
+      val id = connection.getId().futureValue
+      connection
+        .ensureUnionspaceDefinitionProposalAccepted(
+          globalDomainId,
+          svcParty.uid.namespace,
+          sv1SequencerId.uid.namespace,
+          id.namespace.fingerprint,
+          RetryFor.WaitingOnInitDependency,
+        )
+    }.futureValue
+      .headOption
+      .value
+    newUnionspace.mapping.threshold shouldBe PositiveInt.tryCreate(3)
     startSv(4, sv4Backend, sv4ValidatorBackend)
     withClue("validate party to participant threshold") {
       // validate here as well when onboarding is sequential

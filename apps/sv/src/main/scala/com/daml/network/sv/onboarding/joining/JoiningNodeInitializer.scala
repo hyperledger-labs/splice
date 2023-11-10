@@ -17,7 +17,9 @@ import com.daml.network.sv.cometbft.{
   CometBftNode,
 }
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
-import com.daml.network.sv.onboarding.{SetupUtil, SvcPartyHosting}
+import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
+import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState.{Onboarded, Onboarding}
+import com.daml.network.sv.onboarding.{DomainNodeReconciler, SetupUtil, SvcPartyHosting}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
@@ -183,8 +185,11 @@ class JoiningNodeInitializer(
           withSvStore
             .startOnboardingWithSvcPartyMigration(initConnection, svcStore)
         }
+      _ = svcAutomation.registerPostOnboardingTriggers()
       _ <- waitForSvcMembership(svcStore)
       _ <- SetupUtil.ensureSvcPartyMetadataAnnotation(svAutomation.connection, config, svcPartyId)
+      _ <- withSvStore
+        .setDomainNodeConfigIfRequired(svcAutomation, localDomainNode, Onboarding)
       _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
         for {
           _ <- waitUntilCometBftNodeHasCaughtUp
@@ -203,9 +208,8 @@ class JoiningNodeInitializer(
         } yield ()
       }
       _ <- withSvStore
-        .setDomainNodeConfigIfRequired(svcAutomation, localDomainNode)
+        .setDomainNodeConfigIfRequired(svcAutomation, localDomainNode, Onboarded)
     } yield {
-      svcAutomation.registerPostOnboardingTriggers()
       (
         globalDomain,
         svcPartyHosting,
@@ -285,8 +289,10 @@ class JoiningNodeInitializer(
     def setDomainNodeConfigIfRequired(
         svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
         localDomainNode: Option[LocalDomainNode],
+        domainNodeState: DomainNodeState,
     ): Future[Unit] = {
-      new WithSvcStore(svcStoreWithIngestion).reconcileDomainNodeConfigIfRequired(localDomainNode)
+      new WithSvcStore(svcStoreWithIngestion)
+        .reconcileDomainNodeConfigIfRequired(localDomainNode, domainNodeState)
     }
 
     /** A private class to share the svcStoreWithIngestion across utility methods. */
@@ -294,6 +300,13 @@ class JoiningNodeInitializer(
         svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore]
     ) {
       private val svcStore: SvSvcStore = svcStoreWithIngestion.store
+      private val domainNodeReconciler = new DomainNodeReconciler(
+        svcStore,
+        svcStoreWithIngestion.connection,
+        clock,
+        retryProvider,
+        logger,
+      )
 
       def startOnboardingWithSvcPartyHosted(): Future[Unit] = {
         val SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =
@@ -327,7 +340,7 @@ class JoiningNodeInitializer(
           // Wait on the SVC store to make sure that we atomically see either the SvOnboardingConfirmed contract
           // or the SvcRules contract.
           _ <- waitForSvOnboardingConfirmedInSvcStore()
-          svcRules <- retryProvider.retry(
+          _ <- retryProvider.retry(
             RetryFor.WaitingOnInitDependency,
             "add member to Svc",
             for {
@@ -392,16 +405,13 @@ class JoiningNodeInitializer(
       }
 
       def reconcileDomainNodeConfigIfRequired(
-          localDomainNode: Option[LocalDomainNode]
+          localDomainNode: Option[LocalDomainNode],
+          domainNodeState: DomainNodeState,
       ): Future[Unit] = {
-        SvApp.reconcileDomainNodeConfigIfRequired(
-          svcStore,
+        domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
           localDomainNode,
           domainId,
-          svcStoreWithIngestion.connection,
-          clock,
-          retryProvider,
-          logger,
+          domainNodeState,
         )
       }
     }

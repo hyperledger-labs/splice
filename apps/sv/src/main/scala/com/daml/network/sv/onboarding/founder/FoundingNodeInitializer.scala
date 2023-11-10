@@ -13,14 +13,15 @@ import com.daml.network.environment.*
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion, PageLimit}
+import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, SvOnboardingConfig}
+import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
-import com.daml.network.sv.onboarding.{SetupUtil, SvcPartyHosting}
+import com.daml.network.sv.onboarding.{DomainNodeReconciler, SetupUtil, SvcPartyHosting}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
 import com.daml.network.util.{AssignedContract, GcpBucket, TemplateJsonDecoder, UploadablePackage}
 import com.daml.nonempty.NonEmpty
@@ -346,6 +347,13 @@ class FoundingNodeInitializer(
     private val svcStore = svcStoreWithIngestion.store
     private val svcParty = svcStore.key.svcParty
     private val svParty = svcStore.key.svParty
+    private val domainNodeReconciler = new DomainNodeReconciler(
+      svcStore,
+      svcStoreWithIngestion.connection,
+      clock,
+      retryProvider,
+      logger,
+    )
 
     /** The one and only entry-point: found a fresh collective, given a properly allocated SVC party */
     def foundCollective(): Future[Unit] = retryProvider.retry(
@@ -358,14 +366,10 @@ class FoundingNodeInitializer(
     def reconcileSequencerConfigIfRequired(
         localDomainNode: Option[LocalDomainNode]
     ): Future[Unit] = {
-      SvApp.reconcileDomainNodeConfigIfRequired(
-        svcStore,
+      domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
         localDomainNode,
         domainId,
-        svcStoreWithIngestion.connection,
-        clock,
-        retryProvider,
-        logger,
+        DomainNodeState.Onboarded,
       )
     }
 

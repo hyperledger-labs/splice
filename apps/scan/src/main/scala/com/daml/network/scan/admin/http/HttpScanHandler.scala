@@ -465,11 +465,12 @@ class HttpScanHandler(
           memberInfo <- svcRules.payload.members.asScala.values
           (domainId, domainConfig) <- memberInfo.domainNodes.asScala
           sequencer <- domainConfig.sequencer.toScala
+          availableAfter <- sequencer.availableAfter.toScala
         } yield domainId -> definitions.SvcSequencer(
           sequencer.sequencerId,
           sequencer.url,
           memberInfo.name,
-          OffsetDateTime.ofInstant(sequencer.availableAfter, ZoneOffset.UTC),
+          OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
         )
         sequencersByDomain = sequencers.groupBy(_._1).view.mapValues(_.map(_._2))
         domainSequencers = sequencersByDomain.map { case (domainId, svcSequencers) =>

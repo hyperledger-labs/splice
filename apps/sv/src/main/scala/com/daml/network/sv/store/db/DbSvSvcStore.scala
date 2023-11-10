@@ -167,6 +167,25 @@ class DbSvSvcStore(
     }
   }
 
+  override def listSvOnboardingConfirmed(limit: Limit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]] =
+    waitUntilAcsIngested {
+      for {
+        result <- storage
+          .query(
+            (selectFromAcsTable(DbSvSvcStore.acsTableName) ++
+              sql"""
+            where store_id = $storeId
+              and template_id_qualified_name = ${QualifiedName(
+                  SvOnboardingConfirmed.TEMPLATE_ID
+                )}""").toActionBuilder.as[SelectFromAcsTableResult],
+            "listSvOnboardingConfirmed",
+          )
+        limited = applyLimit(limit, result)
+      } yield limited.map(contractFromRow(SvOnboardingConfirmed.COMPANION)(_))
+    }
+
   override def lookupSvOnboardingConfirmedByParty(svParty: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]]] =

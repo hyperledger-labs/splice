@@ -4,7 +4,14 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import better.files.*
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.environment.*
+import com.daml.network.environment.{
+  CNLedgerConnection,
+  MediatorAdminConnection,
+  ParticipantAdminConnection,
+  RetryFor,
+  RetryProvider,
+  SequencerAdminConnection,
+}
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.util.{ProcessTestUtil, TemplateJsonDecoder}
@@ -27,8 +34,8 @@ import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerCon
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, WallClock}
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionX,
   StoredTopologyTransactionsX,
+  StoredTopologyTransactionX,
   TimeQueryX,
 }
 import com.digitalasset.canton.topology.transaction.{

@@ -145,7 +145,7 @@ object SvUtil {
         new SequencerConfig(
           c.sequencerId,
           c.url,
-          clock.now.toInstant,
+          Some(clock.now.toInstant).toJava,
         )
       )
       localMediatorConfig <- getMediatorConfig(Some(localDomainNode))
@@ -153,7 +153,7 @@ object SvUtil {
         new MediatorConfig(
           c.mediatorId
         )
-      ),
+      )
     } yield {
       Map(
         domainId.toProtoPrimitive -> new DomainNodeConfig(

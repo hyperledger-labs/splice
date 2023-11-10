@@ -507,6 +507,12 @@ trait SvSvcStore
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[SvSvcStore.IdleCnsSubscription]]
 
+  def listSvOnboardingConfirmed(
+      limit: Limit = Limit.DefaultLimit
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]
+  ]
+
   def lookupSvOnboardingConfirmedByParty(
       svParty: PartyId
   )(implicit tc: TraceContext): Future[

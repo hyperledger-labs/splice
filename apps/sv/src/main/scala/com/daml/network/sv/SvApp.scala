@@ -15,14 +15,9 @@ import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
-import com.daml.network.codegen.java.cn.svc.globaldomain.{
-  DomainNodeConfig,
-  MediatorConfig,
-  SequencerConfig,
-}
+import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.codegen.java.cn
 import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
@@ -47,7 +42,6 @@ import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
 import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.SvUtil.LocalSequencerConfig
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -1171,85 +1165,6 @@ object SvApp {
   private[sv] def isDevNet(
       svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
   ): Boolean = svcRules.payload.isDevNet
-
-  private[sv] def reconcileDomainNodeConfigIfRequired(
-      svcStore: SvSvcStore,
-      localDomainNode: Option[LocalDomainNode],
-      domainId: DomainId,
-      connection: CNLedgerConnection,
-      clock: Clock,
-      retryProvider: RetryProvider,
-      logger: TracedLogger,
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[Unit] = {
-    logger.debug("Setting sequencer config")
-    val svParty = svcStore.key.svParty
-    val svcParty = svcStore.key.svcParty
-
-    def setConfigIfRequired() = for {
-      localSequencerConfig <- SvUtil.getSequencerConfig(localDomainNode).map(_.toJava)
-      localMediatorConfig <- SvUtil.getMediatorConfig(localDomainNode).map(_.toJava)
-      svcRules <- svcStore.getSvcRules()
-      // TODO(#4901): do not use default, but reconcile all configured domains
-      memberInfo = Option(svcRules.payload.members.get(svParty.toProtoPrimitive))
-        .getOrElse(throw new IllegalArgumentException(s"SV $svParty is not party of the SVC"))
-      existingConfig = java.util.Optional
-        .ofNullable(memberInfo.domainNodes.get(domainId.toProtoPrimitive))
-        .flatMap(_.sequencer.map(c => LocalSequencerConfig(c.sequencerId, c.url)))
-      _ <-
-        if (existingConfig != localSequencerConfig) {
-          val nodeConfig = new DomainNodeConfig(
-            Option(memberInfo.domainNodes.get(domainId.toProtoPrimitive))
-              .map(_.cometBft)
-              .getOrElse(SvUtil.emptyCometBftConfig),
-            localSequencerConfig.map { c =>
-              val sequencerAvailabilityDelay =
-                localDomainNode
-                  .map(_.sequencerAvailabilityDelay)
-                  .getOrElse(
-                    sys.error(
-                      "localDomainNode is not expected to be empty."
-                    )
-                  )
-              new SequencerConfig(
-                c.sequencerId,
-                c.url,
-                clock.now.toInstant.plus(sequencerAvailabilityDelay),
-              )
-            },
-            localMediatorConfig.map(c =>
-              new MediatorConfig(
-                c.mediatorId
-              )
-            ),
-          )
-          val cmd = svcRules.exercise(
-            _.exerciseSvcRules_SetDomainNodeConfig(
-              svParty.toProtoPrimitive,
-              domainId.toProtoPrimitive,
-              nodeConfig,
-            )
-          )
-          connection
-            .submit(Seq(svParty), Seq(svcParty), cmd)
-            .noDedup
-            .yieldResult()
-        } else {
-          logger.info(s"Not setting domain node config because it is the same as the existing one.")
-          Future.unit
-        }
-    } yield ()
-
-    retryProvider
-      .retry(
-        RetryFor.WaitingOnInitDependency,
-        s"setting domain config for $svParty",
-        setConfigIfRequired(),
-        logger,
-      )
-  }
 
   private def initializeValidator(
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
