@@ -53,6 +53,9 @@
         "34.171.188.196/32"
       ]
     },
-    "validators": {}
+    "validators": {
+      "Daml Finance CN Test App": ["20.250.62.34/32"],
+      "Cumberland-Labs": ["52.220.114.41/32"]
+    }
   }
 }
