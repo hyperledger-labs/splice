@@ -4,9 +4,14 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_SetConfig
 import com.daml.network.codegen.java.cn.svcrules.SvcRules_SetConfig
-import com.daml.network.environment.DarResources
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.environment.{CNNodeEnvironmentImpl, DarResources}
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTestWithSharedEnvironment,
+  CNNodeTestConsoleEnvironment,
+}
 import com.daml.network.util.{ConfigScheduleUtil, WalletTestUtil}
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -16,6 +21,12 @@ class ModelUpgradeIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with ConfigScheduleUtil
     with WalletTestUtil {
+
+  override def environmentDefinition
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+    CNNodeEnvironmentDefinition
+      .simpleTopology(this.getClass.getSimpleName)
+      .withSequencerConnectionsFromScanDisabled
 
   "daml model upgrade" should {
     "support switching to new svc-governance version" in { implicit env =>
