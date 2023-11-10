@@ -10,7 +10,7 @@
       ]
     },
     "svs": {
-      "Canton-Foundation": ["104.198.172.213/32"],
+      "Canton-Foundation": ["34.170.195.24/32"],
       "Liberty-City-Ventures": ["54.228.250.8/32"],
       "Digital-Asset": [
         "34.31.226.101/32",
@@ -26,6 +26,8 @@
       "Fiutur": ["52.3.116.188/32"]
     },
     "validators": {
+      "Canton-Foundation Test Validator": ["34.170.195.24/32"],
+      "Canton-Foundation Splitwell App": ["34.170.195.24/32"],
       "Daml Finance CN Test App": ["20.250.62.34/32"],
       "Cumberland-Labs": ["52.220.114.41/32"]
     }
@@ -54,6 +56,8 @@
       ]
     },
     "validators": {
+      "Canton-Foundation Test Validator": ["34.70.176.204/32"],
+      "Canton-Foundation Splitwell App": ["34.70.176.204/32"],
       "Daml Finance CN Test App": ["20.250.62.34/32"],
       "Cumberland-Labs": ["52.220.114.41/32"]
     }
