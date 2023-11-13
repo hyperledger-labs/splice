@@ -221,7 +221,7 @@ workflows:
         requires:
           - wait_for_previous_pipeline
 
-  deploy_cidaily:
+  deploy_cidaily_and_cidaily_testnet:
     when:
       equal: [ deploy-cidaily, << pipeline.parameters.run-job >> ]
     jobs:
@@ -238,7 +238,7 @@ workflows:
         context:
           - artifactory
           - slack-context
-        workflow_names: "deploy_cidaily cidaily_health_check redeploy_sv_runbook_cidaily"
+        workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_health_check cidaily_testnet_health_check redeploy_sv_runbook_cidaily"
     - deploy_cluster:
         name: deploy_cluster_cidaily
         <<: *main-branch-only
@@ -580,7 +580,7 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "deploy_cidaily redeploy_sv_runbook_cidaily"
+          workflow_names: "deploy_cidaily_and_cidaily_testnet redeploy_sv_runbook_cidaily"
       - preflight_check:
           filters:
             branches:
@@ -610,7 +610,7 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "deploy_cidaily"
+          workflow_names: "deploy_cidaily_and_cidaily_testnet"
       - preflight_check:
           filters:
             branches:
@@ -670,7 +670,7 @@ workflows:
           context:
             - artifactory
             - slack-context
-          workflow_names: "deploy_cidaily redeploy_sv_runbook_cidaily cidaily_health_check"
+          workflow_names: "deploy_cidaily_and_cidaily_testnet redeploy_sv_runbook_cidaily cidaily_health_check"
       - deploy_sv_runbook:
           filters:
             branches:
