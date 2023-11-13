@@ -52,6 +52,7 @@
       '';
 
       installPhase = ''
+        export PULUMI_HOME=$out
         mkdir -p $out/plugins
         mkdir -p $out/bin
 
@@ -71,7 +72,7 @@
         do
             type=$(basename "$plugin" | sed 's/pulumi-resource-\(.*\)-v.*$/\1/')
             version=$(basename "$plugin" | sed 's/pulumi-resource-.*-v\(.*\)$/\1/')
-            if [ "$type" -eq "gcp" ]; then
+            if [ "$type" = "gcp" ]; then
                 version="v$version"
             fi
             echo "Installing $plugin with type $type and version $version"

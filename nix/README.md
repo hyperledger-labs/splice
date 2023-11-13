@@ -20,13 +20,13 @@ To update the versions used in the project follow the steps:
 Pulumi by default installs by itself any missing plugins, in the default `PULUMI_HOME` location (`$HOME/pulumi` by default).
 This could lead to higher build times in our CI as those plugins might not be cached. Also, the version of those plugin might
 change without us being explicitly aware of it.
+To disable this behaviour we have set `PULUMI_HOME` to the nix pulumi path. The behavior is disabled because we will lack permissions to create new files in that location.
 
 ### Extra Plugins
 
 The `extra-pulumi-packages.nix` defines a list of plugins that will be installed on top of the ones comes with the nix version.
-The file is based on the default [pulumi setup](https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/admin/pulumi-bin/data.nix).
+The file is based on the default [pulumi setup](https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/admin/pulumi-bin/data.nix) and is generated using `generate_pulumi_packages.sh`.
 To add a new one use the same format for the urls, changing the version and populate the sha checksums from the github release page. Eg for kubernetes https://github.com/pulumi/pulumi-kubernetes/releases/tag/v3.30.1
 
-We have a number of older plugins in our extra packages. These are as follows:
-
-- gcp 6.50.0 required by the gateway stack. Should no longer be required once we apply the latest upgrade to all the infra stacks.
+We have a number of older plugins in our extra packages. These are either plugins that are not yet in the official nix package (eg: command) or packages
+that require multiple versions while we upgrade the pulumi stack to the latest version.
