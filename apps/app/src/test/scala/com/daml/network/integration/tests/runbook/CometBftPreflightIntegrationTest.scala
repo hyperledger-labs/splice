@@ -39,7 +39,9 @@ class CometBftPreflightIntegrationTest
   "All svs have their CometBFT nodes set as validators" in { env =>
     for (i <- 1 to 4) {
       val sv = env.svs.remote.find(sv => sv.name == s"sv$i").value
-      sv.cometBftNodeStatus().votingPower.doubleValue should be(1d)
+      eventuallySucceeds() {
+        sv.cometBftNodeStatus().votingPower.doubleValue should be(1d)
+      }
     }
   }
 
@@ -58,7 +60,7 @@ class CometBftPreflightIntegrationTest
 
     val sv4 = svcl("sv4").copy(token = Some(token))
 
-    eventually() {
+    eventuallySucceeds() {
       val status = parse(
         sv4
           .cometBftNodeDebugDump()
