@@ -1089,6 +1089,8 @@ An extreme option if that does not work is simply `cncluster pdown && cncluster 
 however that takes several minutes and is hard to iterate with.
 
 It is often much more convenient to experiment with modifications directly on the deployed resources, via `kubectl edit`, or `e` in `k9s`.
+For example, you might want to:
+- *whitelist a new ip*: `kubectl edit svc -n cluster-ingress istio-ingress` (modify the `loadBalancerSourceRanges` section)
 
 Alternatively, for changes in a Helm chart, or in the values with which it is deployed, also consider one of the following options:
 
