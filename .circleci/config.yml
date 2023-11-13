@@ -1104,6 +1104,20 @@ commands:
           custom: |
             { "text": "*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
 
+  notify-cluster-deployment:
+    parameters:
+      <<: *cluster-parameter
+      channel_notify:
+        type: string
+        default: C05DT77QF5M
+    steps:
+      - slack/notify:
+          channel: << parameters.channel_notify >>
+          branch_pattern: (deployment\/.*|main)
+          event: pass
+          custom: |
+            { "text": "*✅Job '${CIRCLE_JOB}' deployed on cluster '<< parameters.cluster >>'*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
+
   docker_build:
     steps:
       - run_bash_command_in_nix:
@@ -1350,6 +1364,9 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
+      send_deployment_notification:
+        type: boolean
+        default: true
     steps:
       - checkout
       - record_job_start_time
@@ -1390,6 +1407,11 @@ jobs:
             cncluster ci_apply_sv $VERSION
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_deployment_notification >>
+          steps:
+            - notify-cluster-deployment:
+                cluster: << parameters.cluster >>
       - collect_test_timings_and_send_to_datadog
 
   deploy_cluster:
@@ -1411,6 +1433,9 @@ jobs:
         type: boolean
         default: false
       update_deployment_branch:
+        type: boolean
+        default: true
+      send_deployment_notification:
         type: boolean
         default: true
     steps:
@@ -1475,6 +1500,11 @@ jobs:
                 cmd_retry_count: 5
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_deployment_notification >>
+          steps:
+            - notify-cluster-deployment:
+                cluster: << parameters.cluster >>
       - collect_test_timings_and_send_to_datadog
 
   preflight_check:
@@ -2134,6 +2164,7 @@ workflows:
           - datadog
           - slack-context
         cluster: "cimain"
+        send_deployment_notification: false
         update_deployment_branch: false  # No need to create a deployment branch for cimain
         requires:
            - docker_images_push
@@ -2145,6 +2176,7 @@ workflows:
           - datadog
           - slack-context
         cluster: "cimain"
+        send_deployment_notification: false
         requires:
           - deploy_cluster
     - preflight_check:

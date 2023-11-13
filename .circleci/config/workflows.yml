@@ -185,6 +185,7 @@ workflows:
           - datadog
           - slack-context
         cluster: "cimain"
+        send_deployment_notification: false
         update_deployment_branch: false  # No need to create a deployment branch for cimain
         requires:
            - docker_images_push
@@ -196,6 +197,7 @@ workflows:
           - datadog
           - slack-context
         cluster: "cimain"
+        send_deployment_notification: false
         requires:
           - deploy_cluster
     - preflight_check:

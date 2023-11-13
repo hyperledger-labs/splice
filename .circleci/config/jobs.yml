@@ -194,6 +194,9 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
+      send_deployment_notification:
+        type: boolean
+        default: true
     steps:
       - checkout
       - record_job_start_time
@@ -234,6 +237,11 @@ jobs:
             cncluster ci_apply_sv $VERSION
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_deployment_notification >>
+          steps:
+            - notify-cluster-deployment:
+                cluster: << parameters.cluster >>
       - collect_test_timings_and_send_to_datadog
 
   deploy_cluster:
@@ -255,6 +263,9 @@ jobs:
         type: boolean
         default: false
       update_deployment_branch:
+        type: boolean
+        default: true
+      send_deployment_notification:
         type: boolean
         default: true
     steps:
@@ -319,6 +330,11 @@ jobs:
                 cmd_retry_count: 5
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_deployment_notification >>
+          steps:
+            - notify-cluster-deployment:
+                cluster: << parameters.cluster >>
       - collect_test_timings_and_send_to_datadog
 
   preflight_check:

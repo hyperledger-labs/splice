@@ -1025,6 +1025,20 @@ commands:
           custom: |
             { "text": "*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
 
+  notify-cluster-deployment:
+    parameters:
+      <<: *cluster-parameter
+      channel_notify:
+        type: string
+        default: C05DT77QF5M
+    steps:
+      - slack/notify:
+          channel: << parameters.channel_notify >>
+          branch_pattern: (deployment\/.*|main)
+          event: pass
+          custom: |
+            { "text": "*✅Job '${CIRCLE_JOB}' deployed on cluster '<< parameters.cluster >>'*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
+
   docker_build:
     steps:
       - run_bash_command_in_nix:
