@@ -17,9 +17,9 @@
         "typescript": "^4.8.4"
     },
     "dependencies": {
-        "@pulumi/gcp": "^6.0.0",
-        "@pulumi/kubernetes-cert-manager": "^0.0.5",
-        "@pulumi/pulumi": "^3.0.0",
+        "@pulumi/gcp": "6.67.0",
+        "@pulumi/pulumi": "^3.92.0",
+        "@pulumi/kubernetes": "4.5.4",
         "js-yaml": "^4.1.0",
         "lodash": "^4.17.21",
         "node-fetch": "^2.6.1"

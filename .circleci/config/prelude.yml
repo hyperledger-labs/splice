@@ -20,7 +20,7 @@ parameters:
   # old files don't pollute your build.
   cache-version:
     type: string
-    default: "20"
+    default: "21"
   run-job:
     type: enum
     enum: [build, deploy-cidaily, deploy-cilr, deploy-devnet, deploy-testnet,

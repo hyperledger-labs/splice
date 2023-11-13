@@ -6,8 +6,8 @@ let
     src = fetchFromGitHub {
       owner = "kubernetes";
       repo = "cli-runtime";
-      rev = "v0.26.0";
-      hash = "sha256-EsorDivYqOA4KZj55vITW2ZmEIwDwNFsrRtak8CA820=";
+      rev = "v0.28.2";
+      hash = "sha256-XJJ0AmxTnjwB0juURwOekWKnrYun/CyaUiA5c6j1oig=";
     };
     patches = [
       ./fix-config-groupversion-override.diff
@@ -18,8 +18,9 @@ let
     '';
   };
 
-  version = "3.30.1";
-  vendorHash = "sha256-Jc115q/4j344vPz/8Ygk/QqfsdJswmfRjXAzc1hlILo=";
+  # If this version is updated the version in `overlays.nix` used for `pulumi plugin install` must be updated as well
+  version = "4.5.4";
+  vendorHash = "sha256-OwyQCYVzgILfZCB0F1Ljq1A5os2eEcRuH7laaAM5bug=";
 
   pulumi-kubernetes-src = stdenv.mkDerivation {
     name = "pulumi-kubernetes-src";
@@ -27,7 +28,7 @@ let
       owner = "pulumi";
       repo = "pulumi-kubernetes";
       rev = "v${version}";
-      hash = "sha256-I57mGwlmZpYUkwLzMfr/WhMrH+BWyRJVKziy7w80dHU=";
+      hash = "sha256-9sRk6qnlRatp2UT90TVOe1alnak5SFtLYi399fJP54A=";
     };
     nativeBuildInputs = [ go ];
     buildPhase = ''
@@ -62,7 +63,7 @@ let
 
     ldflags = [
       "-w" # skip debug info
-      "-X github.com/pulumi/pulumi-kubernetes/provider/v3/pkg/version.Version=v${version}"
+      "-X github.com/pulumi/pulumi-kubernetes/provider/v4/pkg/version.Version=v${version}"
     ];
 
     nativeBuildInputs = [

@@ -4,7 +4,7 @@
   "main": "src/index.ts",
   "dependencies": {
     "@kubernetes/client-node": "^0.18.1",
-    "@pulumi/kubernetes": "3.30.1",
+    "@pulumi/kubernetes": "4.5.4",
     "@types/auth0": "^3.3.2",
     "auth0": "^3.4.0"
   },

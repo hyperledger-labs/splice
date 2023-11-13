@@ -3,7 +3,13 @@
   "main": "src/index.ts",
   "dependencies": {
     "@pulumi/command": "^0.9.2",
+    "@pulumi/kubernetes-cert-manager": "^0.0.5",
     "cn-pulumi-common": "1.0.0"
+  },
+  "overrides": {
+    "@pulumi/kubernetes-cert-manager": {
+      "@pulumi/kubernetes": "4.54.0"
+    }
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
