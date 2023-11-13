@@ -426,28 +426,32 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     * Currently intended only for manual use during development and debugging.
     */
   protected def screenshot()(implicit webDriver: WebDriverType): Unit = {
-    val screenshotFile = webDriver.getScreenshotAs(OutputType.FILE)
-    val time = Calendar.getInstance.getTime
-    val timestamp = new SimpleDateFormat("yy-MM-dd-H:m:s.S").format(time)
-    val filename = Paths.get("log", s"screenshot-${timestamp}.png").toString
-    FileUtils.copyFile(screenshotFile, new File(filename))
+    clue("Saving screenshot") {
+      val screenshotFile = webDriver.getScreenshotAs(OutputType.FILE)
+      val time = Calendar.getInstance.getTime
+      val timestamp = new SimpleDateFormat("yy-MM-dd-H:m:s.S").format(time)
+      val filename = Paths.get("log", s"screenshot-${timestamp}.png").toString
+      FileUtils.copyFile(screenshotFile, new File(filename))
+    }
   }
 
   /** Saves the current web page (the currently rendered DOM) to a file in the log directory. */
   protected def savePageSource()(implicit webDriver: WebDriverType): Unit = {
-    val time = Calendar.getInstance.getTime
-    val timestamp = new SimpleDateFormat("yy-MM-dd-H:m:s.S").format(time)
-    val filename = Paths.get("log", s"webpage-${timestamp}.html").toString
+    clue("Saving page source") {
+      val time = Calendar.getInstance.getTime
+      val timestamp = new SimpleDateFormat("yy-MM-dd-H:m:s.S").format(time)
+      val filename = Paths.get("log", s"webpage-${timestamp}.html").toString
 
-    val pageSource =
-      Try(webDriver.findElement(By.tagName("body")).getAttribute("outerHTML")).recover {
-        case e: Throwable => e.getMessage
-      }.get
-    FileUtils.writeStringToFile(
-      new File(filename),
-      pageSource,
-      java.nio.charset.StandardCharsets.UTF_8,
-    )
+      val pageSource =
+        Try(webDriver.findElement(By.tagName("body")).getAttribute("outerHTML")).recover {
+          case e: Throwable => e.getMessage
+        }.get
+      FileUtils.writeStringToFile(
+        new File(filename),
+        pageSource,
+        java.nio.charset.StandardCharsets.UTF_8,
+      )
+    }
   }
 
   /** Returns a list of network requests performed by the frontend since the beginning of the test.
@@ -458,29 +462,39 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     * of requests (e.g., HTTP 200 or HTTP 404).
     */
   protected def logNetworkRequests()(implicit webDriver: WebDriverType): Unit = {
-    Try(
-      webDriver
-        .executeScript(
-          "performance.getEntriesByType(\"resource\").forEach(e => console.debug(JSON.stringify(e, undefined, \"  \")))"
-        )
-    ).fold(e => logger.debug(s"Failed to get network requests: $e"), _ => ())
+    clue("Logging network requests") {
+      Try(
+        webDriver
+          .executeScript(
+            "performance.getEntriesByType(\"resource\").forEach(e => console.debug(JSON.stringify(e, undefined, \"  \")))"
+          )
+      ).fold(e => logger.debug(s"Failed to get network requests: $e"), _ => ())
+    }
   }
 
   protected def logCookies()(implicit webDriver: WebDriverType): Unit = {
-    // Note: only logging cookie names, as values might contain sensitive information
-    val cookies = webDriver
-      .manage()
-      .getCookies
-      .asScala
-    logger.debug(s"Cookies:\n${cookies.map(c => s"  ${c.getName}").mkString("\n")}")
+    clue("Logging cookies") {
+      // Note: only logging cookie names, as values might contain sensitive information
+      Try {
+        val cookies = webDriver
+          .manage()
+          .getCookies
+          .asScala
+        logger.debug(cookies.map(c => s"  ${c.getName}").mkString("\n"))
+      }.fold(e => logger.debug(s"Failed to log cookies: $e"), _ => ())
+    }
   }
 
   protected def logLocalAndSessionStorage()(implicit webDriver: WebDriverType): Unit = {
-    // Note: only logging keys, as values might contain sensitive information
-    val localStorageKeys = webDriver.getLocalStorage.keySet.asScala
-    logger.debug(s"localStorage:\n${localStorageKeys.mkString("\n")}")
-    val sessionStorageKeys = webDriver.getLocalStorage.keySet.asScala
-    logger.debug(s"sessionStorage:\n${sessionStorageKeys.mkString("\n")}")
+    clue("Logging local and session storage") {
+      // Note: only logging keys, as values might contain sensitive information
+      Try {
+        val localStorageKeys = webDriver.getLocalStorage.keySet.asScala
+        logger.debug(s"localStorage:\n${localStorageKeys.mkString("\n")}")
+        val sessionStorageKeys = webDriver.getSessionStorage.keySet.asScala
+        logger.debug(s"sessionStorage:\n${sessionStorageKeys.mkString("\n")}")
+      }.fold(e => logger.debug(s"Failed to log storage: $e"), _ => ())
+    }
   }
 
   protected def dumpDebugInfoOnFailure[T](value: => T)(implicit
