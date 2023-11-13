@@ -244,6 +244,65 @@ jobs:
                 cluster: << parameters.cluster >>
       - collect_test_timings_and_send_to_datadog
 
+  deploy_validator_runbook:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      use_published_artifacts:
+        type: boolean
+        default: false
+      deploy_version:
+        type: string
+        default: ""
+      restore_cluster:
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_nix
+      - when:
+          condition: << parameters.deploy_version >>
+          steps:
+          - run_bash_command_in_nix:
+              cmd_name: Checkout commit << parameters.deploy_version >>
+              cmd: git checkout << parameters.deploy_version >>
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+      - run_bash_command_in_nix:
+          cmd_name: Apply Validator runbook Kubernetes manifest to cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          gce_authenticate: true
+          cmd: |
+            if [[ << parameters.restore_cluster >> == true ]]; then
+              export RESTORE_CLUSTER=1
+            fi
+            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
+              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
+                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+                exit 1
+              fi
+            fi
+            cncluster activate
+            VERSION=""
+            if [[ << parameters.use_published_artifacts >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+            fi
+            cncluster ci_apply_validator $VERSION
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+      - collect_test_timings_and_send_to_datadog
+
   deploy_cluster:
     circleci_ip_ranges: true
     docker:
@@ -527,6 +586,95 @@ jobs:
             --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cluster: << parameters.cluster >>
           cmd: cncluster preflight_sv
+          cmd_retry_count: 3
+          # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
+          # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
+          cmd_before_retry: |
+            echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
+
+            ./stop-frontends.sh
+
+            /tmp/vpn-scripts/stop-vpn.sh
+
+            echo "Starting VPN..." | tee -a /var/log/vpn.log
+            /tmp/vpn-scripts/connect-vpn.expect $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD &
+
+            echo "Waiting for VPN to reconnect"
+            /tmp/vpn-scripts/wait-for-vpn-and-del-default-route.sh
+
+            echo "Authenticating to cluster again"
+            export KUBECONFIG=$PWD/.kubecfg
+            cncluster activate
+
+            echo "Setting VPN routes again"
+            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
+            /tmp/vpn-scripts/setup-vpn-routes.sh
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - cleanup_sbt_test_job
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>
+      - collect_test_timings_and_send_to_datadog
+
+  preflight_validator_check:
+    parameters:
+      <<: *cluster-parameter
+      channel_notify:
+        type: string
+        # #team-canton-network-internal-ci
+        default: C05DT77QF5M
+      wait_for_cluster_version:
+        type: boolean
+        default: true
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_vpn
+      # Needs to occur before setup_vpn_routes
+      - setup_nix
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Activate cluster (configure kubectl)
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: cncluster activate
+          cmd_retry_count: 5
+      - restore_sbt_cache
+      - restore_precompiled_classes
+      - restore_frontend_node_modules
+      - restore_daml_artifacts
+      - execute_sbt_command:
+          cmd: "Test/compile"
+      - run_bash_command_in_nix:
+          cmd_name: wait for validator-runbook deployment to finish
+          cluster: << parameters.cluster >>
+          cmd: |
+            if [[ << parameters.wait_for_cluster_version >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+              cncluster wait_version $VERSION
+            fi
+            # We use readiness of validator-app in the validator namespace as an approximation to the validator's readiness
+            cncluster wait validator validator-app
+            echo "Done waiting. All pods in the cluster are:"
+            kubectl get pods -A
+      - run_bash_command_in_nix:
+          cmd_name: Run Validator preflight tests
+          additional_nix_args: "--keep ARTIFACTORY_USER \
+            --keep ARTIFACTORY_PASSWORD \
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID \
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET \
+            --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+          cluster: << parameters.cluster >>
+          cmd: cncluster preflight_validator
           cmd_retry_count: 3
           # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
           # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)

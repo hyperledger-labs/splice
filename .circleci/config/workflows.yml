@@ -200,6 +200,15 @@ workflows:
         send_deployment_notification: false
         requires:
           - deploy_cluster
+    - deploy_validator_runbook:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "cimain"
+        requires:
+          - deploy_cluster
     - preflight_check:
         cluster: "cimain"
         <<: *main-branch-only
@@ -211,6 +220,16 @@ workflows:
         requires:
           - wait_for_previous_pipeline
     - preflight_sv_check:
+        <<: *main-branch-only
+        cluster: "cimain"
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        requires:
+          - wait_for_previous_pipeline
+    - preflight_validator_check:
         <<: *main-branch-only
         cluster: "cimain"
         context:
@@ -321,6 +340,18 @@ workflows:
         restore_cluster: true
         requires:
           - deploy_cluster_cidaily_testnet
+    - deploy_validator_runbook:
+        name: deploy_validator_runbook_devnet
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "cidaily"
+        use_published_artifacts: true
+        requires:
+          - deploy_cluster
+          - publish_public_release
     - preflight_sv_check:
         name: preflight_sv_check_devnet
         <<: *main-branch-only
@@ -343,6 +374,17 @@ workflows:
         cluster: "cidaily-testnet"
         requires:
           - deploy_sv_runbook_testnet
+    - preflight_validator_check:
+        name: preflight_validator_check_devnet
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        cluster: "cidaily"
+        requires:
+          - deploy_validator_runbook_devnet
 
   deploy_cilr:
     when:
@@ -381,6 +423,15 @@ workflows:
         cluster: "cilr"
         requires:
           - deploy_cluster
+    - deploy_validator_runbook:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "cilr"
+        requires:
+          - deploy_cluster
     - preflight_check:
         cluster: "cilr"
         <<: *main-branch-only
@@ -411,6 +462,16 @@ workflows:
         cluster: "cilr"
         requires:
           - deploy_sv_runbook
+    - preflight_validator_check:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        cluster: "cilr"
+        requires:
+          - deploy_validator_runbook
 
   deploy_devnet:
     when:
@@ -445,6 +506,17 @@ workflows:
         use_published_artifacts: true
         requires:
           - deploy_cluster
+    - deploy_validator_runbook:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "devnet"
+        deploy_version: "devnet-next"
+        use_published_artifacts: true
+        requires:
+          - deploy_cluster
     - preflight_check:
         <<: *main-branch-only
         context:
@@ -468,6 +540,16 @@ workflows:
         requires:
           - deploy_sv_runbook
           - preflight_check
+    - preflight_validator_check:
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        cluster: "devnet"
+        requires:
+          - deploy_validator_runbook
 
 
   deploy_testnet:

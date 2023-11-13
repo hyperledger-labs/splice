@@ -45,6 +45,15 @@
           cluster: "_CLUSTERNAME_"
           requires:
             - deploy_cluster
+      - deploy_validator_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          requires:
+            - deploy_cluster
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -65,6 +74,16 @@
           cluster: "_CLUSTERNAME_"
           requires:
             - hold
+      - preflight_validator_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          requires:
+            - hold
       - reset_cluster:
           <<: *main-branch-never
           cluster: "_CLUSTERNAME_"
@@ -74,3 +93,4 @@
           requires:
             - preflight_check
             - preflight_sv_check
+            - preflight_validator_check
