@@ -58,7 +58,7 @@ As when setting up a self-hosted validator, you need a super validator to provid
 
   .. parsed-literal::
 
-     curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/sv/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+     curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
 ...and then start the splitwell validator with this configuration file and the onboarding config you just obtained:
 

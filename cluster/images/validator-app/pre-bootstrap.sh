@@ -10,7 +10,7 @@ n=0
 if [[ -z ${CN_APP_DEVNET:-} ]]; then
     json_log "Not running in devnet, relying on externally configured secret"
 else
-    ONBOARD_SECRET_URL="${CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS}/devnet/onboard/validator/prepare"
+    ONBOARD_SECRET_URL="${CN_APP_VALIDATOR_SV_SPONSOR_ADDRESS}/v0/devnet/onboard/validator/prepare"
 
     json_log "Getting onboarding secret from SV (${ONBOARD_SECRET_URL})..." "pre-bootstrap.sh"
 
