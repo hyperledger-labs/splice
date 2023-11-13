@@ -10,12 +10,6 @@
       }
       {
         url =
-          "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v3.30.1-linux-amd64.tar.gz";
-        sha256 =
-          "c2d886dc79df683f80f79e74de065cd11373c51c2508a8f772691b046425bfd2";
-      }
-      {
-        url =
           "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-cert-manager-v0.0.5-linux-amd64.tar.gz";
         sha256 =
           "449d19d54d606cf723bed76f24c821e2c963a04297e6d12f35b91576254aed2f";
@@ -34,12 +28,6 @@
           "https://api.pulumi.com/releases/plugins/pulumi-resource-command-v0.9.2-darwin-amd64.tar.gz";
         sha256 =
           "0b33689487f8297642336bab2e7fe6c83813d2f694a21ba397e851a5a3215696";
-      }
-      {
-        url =
-          "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v3.30.1-darwin-amd64.tar.gz";
-        sha256 =
-          "a99acee17e5f1c2afdc2701df8fae65ed2ba6ee1c1de2c9bbd0d8c37a5eceb5b";
       }
       {
         url =
@@ -63,12 +51,6 @@
       }
       {
         url =
-          "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v3.30.1-linux-arm64.tar.gz";
-        sha256 =
-          "1e271bca2b23eee1cc88dc2352d3a0c14017c9b96d271a684371c242fc29e0a4";
-      }
-      {
-        url =
           "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-cert-manager-v0.0.5-linux-arm64.tar.gz";
         sha256 =
           "33b645af0f32e36a7dc1468a65a4b55c01ccd0c0dc85506e2ff42f8fd69d0082";
@@ -86,12 +68,6 @@
           "https://api.pulumi.com/releases/plugins/pulumi-resource-command-v0.9.2-darwin-arm64.tar.gz";
         sha256 =
           "15b1f11b1d7329733337605f78eaf1612e2c3bf8bb4afbb43146f418dd6f4526";
-      }
-      {
-        url =
-          "https://api.pulumi.com/releases/plugins/pulumi-resource-kubernetes-v3.30.1-darwin-arm64.tar.gz";
-        sha256 =
-          "edcc43d6a877aeb2a95d407ac55e5ec7d347b63ed144272057eb4463257570fa";
       }
       {
         url =

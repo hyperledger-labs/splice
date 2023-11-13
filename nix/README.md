@@ -20,7 +20,6 @@ To update the versions used in the project follow the steps:
 Pulumi by default installs by itself any missing plugins, in the default `PULUMI_HOME` location (`$HOME/pulumi` by default).
 This could lead to higher build times in our CI as those plugins might not be cached. Also, the version of those plugin might
 change without us being explicitly aware of it.
-To disable this behaviour we have set `PULUMI_HOME` to the nix pulumi path. The behavior is disabled because we will lack permissions to create new files in that location.
 
 ### Extra Plugins
 

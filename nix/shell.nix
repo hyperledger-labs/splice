@@ -73,7 +73,6 @@ in pkgs.mkShell {
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
   COMETBFT_DRIVER = "${pkgs.cometbft_driver}";
   GRAFANA_DASHBOARDS = "${pkgs.da_grafana_dashboards}";
-  PULUMI_HOME = "${pkgs.pulumi-bin}";
   # Avoid sbt-assembly falling over. See https://github.com/sbt/sbt-assembly/issues/496
   LC_ALL = if stdenv.isDarwin then "" else "C.UTF-8";
   # Avoid "warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)"

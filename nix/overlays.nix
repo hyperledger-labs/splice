@@ -52,7 +52,6 @@
       '';
 
       installPhase = ''
-        export PULUMI_HOME=$out
         mkdir -p $out/plugins
         mkdir -p $out/bin
 
