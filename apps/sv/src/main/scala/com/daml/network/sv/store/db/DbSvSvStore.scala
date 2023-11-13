@@ -1,20 +1,17 @@
 package com.daml.network.sv.store.db
 
-import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding.{UsedSecret, ValidatorOnboarding}
 import com.daml.network.environment.RetryProvider
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.store.{MultiDomainAcsStore, StoreErrors}
-import MultiDomainAcsStore.QueryResult
-import com.daml.network.store.db.{AcsQueries, AcsRowData, AcsTables, DbCNNodeAppStoreWithoutHistory}
-import com.daml.network.sv.store.db.SvTables.SvAcsStoreRowData
 import com.daml.network.sv.store.{SvStore, SvSvStore}
 import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
-import com.google.protobuf.ByteString
 import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -49,12 +46,6 @@ class DbSvSvStore(
   import multiDomainAcsStore.waitUntilAcsIngested
 
   def storeId: Int = multiDomainAcsStore.storeId
-
-  override def getAcsRowData(createdEvent: CreatedEvent, createdEventBlob: ByteString)(implicit
-      tc: TraceContext
-  ): Either[String, AcsRowData] = {
-    SvAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob)
-  }
 
   override def lookupValidatorOnboardingBySecretWithOffset(
       secret: String

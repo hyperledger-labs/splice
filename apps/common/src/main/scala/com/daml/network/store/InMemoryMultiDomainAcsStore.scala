@@ -8,7 +8,8 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, Tra
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.*
-import com.daml.network.util.{Contract, ContractWithState, AssignedContract, QualifiedName, Trees}
+import com.daml.network.store.db.AcsRowData
+import com.daml.network.util.{AssignedContract, Contract, ContractWithState, QualifiedName, Trees}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.topology.DomainId
@@ -24,7 +25,7 @@ import scala.reflect.ClassTag
 
 class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
     override protected val loggerFactory: NamedLoggerFactory,
-    contractFilter: MultiDomainAcsStore.ContractFilter,
+    contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
     retryProvider: RetryProvider,
 )(implicit
@@ -667,7 +668,7 @@ object InMemoryMultiDomainAcsStore {
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
         acsOffset: String,
         txLogParser: TxLogStore.Parser[TXI, TXE],
-        contractFilter: MultiDomainAcsStore.ContractFilter,
+        contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
     )(implicit
         tc: TraceContext
     ): (State[TXI, TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
@@ -709,7 +710,7 @@ object InMemoryMultiDomainAcsStore {
         domain: DomainId,
         tx: TransactionTree,
         txProto: TransactionOuterClass.TransactionTree,
-        contractFilter: MultiDomainAcsStore.ContractFilter,
+        contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
         txLogParser: TxLogStore.Parser[TXI, TXE],
         logger: TracedLogger,
     )(implicit
@@ -877,7 +878,7 @@ object InMemoryMultiDomainAcsStore {
 
     private def ingestActiveContracts(
         contracts: Seq[ActiveContract],
-        contractFilter: MultiDomainAcsStore.ContractFilter,
+        contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
     ): (State[TXI, TXE], IngestionSummary[TXE]) = {
       assert(offset.isEmpty, "state was not switched to update ingestion yet")
       contracts.foldLeft((this, IngestionSummary.empty[TXE])) { case ((st, summary), contract) =>

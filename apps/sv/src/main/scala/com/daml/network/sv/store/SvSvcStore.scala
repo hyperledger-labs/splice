@@ -3,6 +3,7 @@ package com.daml.network.sv.store
 import cats.implicits.toTraverseOps
 import com.daml.ledger.javaapi.data as javab
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cc.coin.UnclaimedReward
@@ -35,25 +36,21 @@ import com.daml.network.store.MultiDomainAcsStore.{
   ConstrainedTemplate,
   JsonAcsSnapshot,
   QueryResult,
+  TemplateFilter,
 }
 import com.daml.network.store.TxLogStore.TransactionTreeSource
+import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.sv.store.SvSvcStore.ignoredContractsForAcsDump
 import com.daml.network.sv.store.db.DbSvSvcStore
+import com.daml.network.sv.store.db.SvcTables.SvcAcsStoreRowData
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.network.util.{
-  AssignedContract,
-  CNNodeUtil,
-  Contract,
-  ContractWithState,
-  QualifiedName,
-  TemplateJsonDecoder,
-}
+import com.daml.network.util.*
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -70,7 +67,7 @@ trait SvSvcStore
       SvcTxLogParser.TxLogEntry,
     ]
     with PackageIdResolver.HasCoinRulesPayload {
-  import SvSvcStore.{svcRulesFollowers, coinRulesFollowers}
+  import SvSvcStore.{coinRulesFollowers, svcRulesFollowers}
 
   override protected def txLogParser = new SvcTxLogParser(loggerFactory)
 
@@ -946,54 +943,240 @@ object SvSvcStore {
   def contractFilter(
       svcParty: PartyId,
       svParty: PartyId,
-  ): MultiDomainAcsStore.ContractFilter = {
+  ): MultiDomainAcsStore.ContractFilter[SvcAcsStoreRowData] = {
     import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
     val sv = svParty.toProtoPrimitive
 
+    val svcFilters = Map[QualifiedName, TemplateFilter[?, ?, SvcAcsStoreRowData]](
+      mkFilter(cn.svc.coinprice.CoinPriceVote.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          voter = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
+        )
+      },
+      mkFilter(cn.svcrules.Confirmation.COMPANION)(co => co.payload.svc == svc) { contract =>
+        val (
+          actionCnsEntryContextCid,
+          actionCnsEntryContextPaymentId,
+          actionCnsEntryContextArcType,
+        ) =
+          contract.payload.action match {
+            case arcCnsEntryContext: cn.svcrules.actionrequiringconfirmation.ARC_CnsEntryContext =>
+              arcCnsEntryContext.cnsEntryContextAction match {
+                case action: cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment =>
+                  (
+                    Some(arcCnsEntryContext.cnsEntryContextCid),
+                    Some(action.cnsEntryContext_CollectInitialEntryPaymentValue.paymentCid),
+                    Some("CNSRARC_CollectInitialEntryPayment"),
+                  )
+                case action: cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_RejectEntryInitialPayment =>
+                  (
+                    Some(arcCnsEntryContext.cnsEntryContextCid),
+                    Some(action.cnsEntryContext_RejectEntryInitialPaymentValue.paymentCid),
+                    Some("CNSRARC_RejectEntryInitialPayment"),
+                  )
+                case _ =>
+                  (None, None, None)
+              }
+            case _ => (None, None, None)
+          }
+        SvcAcsStoreRowData(
+          contract,
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          actionRequiringConfirmation =
+            Some(AcsJdbcTypes.payloadJsonFromValue(contract.payload.action.toValue)),
+          confirmer = Some(PartyId.tryFromProtoPrimitive(contract.payload.confirmer)),
+          actionCnsEntryContextCid = actionCnsEntryContextCid,
+          actionCnsEntryContextPaymentId = actionCnsEntryContextPaymentId,
+          actionCnsEntryContextArcType = actionCnsEntryContextArcType,
+        )
+      },
+      mkFilter(cn.svcrules.ElectionRequest.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          requester = Some(PartyId.tryFromProtoPrimitive(contract.payload.requester)),
+          electionRequestEpoch = Some(contract.payload.epoch),
+        )
+      },
+      mkFilter(cn.svcrules.VoteRequest.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          actionRequiringConfirmation =
+            Some(AcsJdbcTypes.payloadJsonFromValue(contract.payload.action.toValue)),
+          requester = Some(PartyId.tryFromProtoPrimitive(contract.payload.requester)),
+        )
+      },
+      mkFilter(cn.svcrules.Vote.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          voter = Some(PartyId.tryFromProtoPrimitive(contract.payload.voter)),
+          voteRequestCid = Some(contract.payload.requestCid),
+        )
+      },
+      mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc)(
+        SvcAcsStoreRowData(_)
+      ),
+      mkFilter(cn.svcrules.SvReward.COMPANION)(co => co.payload.svc == svc && co.payload.sv == sv)(
+        SvcAcsStoreRowData(_)
+      ),
+      mkFilter(so.SvOnboardingRequest.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          svOnboardingToken = Some(contract.payload.token),
+          svCandidateParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.candidateParty)),
+          svCandidateName = Some(contract.payload.candidateName),
+        )
+      },
+      mkFilter(so.SvOnboardingConfirmed.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          svCandidateParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.svParty)),
+          svCandidateName = Some(contract.payload.svName),
+        )
+      },
+      mkFilter(cc.coinrules.CoinRules.COMPANION)(co => co.payload.svc == svc)(
+        SvcAcsStoreRowData(_)
+      ),
+      mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          coinRoundOfExpiry = Some(CNNodeUtil.coinExpiresAt(contract.payload).number),
+        )
+      },
+      mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          featuredAppRightProvider = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+        )
+      },
+      mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          coinRoundOfExpiry = Some(CNNodeUtil.coinExpiresAt(contract.payload.coin).number),
+        )
+      },
+      mkFilter(cc.coinimport.ImportCrate.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          importCrateReceiver = Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
+        )
+      },
+      mkFilter(cc.coin.SvcReward.COMPANION)(co => co.payload.svc == svc)(SvcAcsStoreRowData(_)),
+      mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          rewardRound = Some(contract.payload.round.number),
+          rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+        )
+      },
+      mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          rewardRound = Some(contract.payload.round.number),
+          rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+        )
+      },
+      mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          miningRound = Some(contract.payload.round.number),
+        )
+      },
+      mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
+          miningRound = Some(contract.payload.round.number),
+        )
+      },
+      mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          miningRound = Some(contract.payload.round.number),
+        )
+      },
+      mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          miningRound = Some(contract.payload.round.number),
+        )
+      },
+      mkFilter(cc.coin.UnclaimedReward.COMPANION)(co => co.payload.svc == svc)(
+        SvcAcsStoreRowData(_)
+      ),
+      mkFilter(vl.ValidatorLicense.COMPANION)(vl => vl.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
+        )
+      },
+      mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt => vt.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          memberTrafficMember = Some(Member.tryFromProtoPrimitive(contract.payload.memberId)),
+          totalTrafficPurchased = Some(contract.payload.totalPurchased),
+        )
+      },
+      mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.svc == svc)(SvcAcsStoreRowData(_)),
+      mkFilter(cn.cns.CnsEntry.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          cnsEntryName = Some(contract.payload.name),
+        )
+      },
+      mkFilter(cn.cns.CnsEntryContext.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          cnsEntryName = Some(contract.payload.name),
+          subscriptionReferenceContractId = Some(contract.payload.reference),
+        )
+      },
+      mkFilter(sub.SubscriptionInitialPayment.COMPANION)(co =>
+        co.payload.subscriptionData.svc == svc && co.payload.subscriptionData.provider == svc
+      ) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          subscriptionReferenceContractId = Some(contract.payload.reference),
+        )
+      },
+      mkFilter(sub.SubscriptionPayment.COMPANION)(co =>
+        co.payload.subscriptionData.svc == svc && co.payload.subscriptionData.provider == svc
+      ) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          subscriptionReferenceContractId = Some(contract.payload.reference),
+        )
+      },
+      mkFilter(sub.SubscriptionIdleState.COMPANION)(co =>
+        co.payload.subscriptionData.svc == svc && co.payload.subscriptionData.provider == svc
+      ) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          subscriptionReferenceContractId = Some(contract.payload.reference),
+          subscriptionNextPaymentDueAt =
+            Some(Timestamp.assertFromInstant(contract.payload.nextPaymentDueAt)),
+        )
+      },
+    )
+    val copiedDirectoryFilters =
+      DirectoryStore.directoryTemplateFilters(svcParty).map { case (template, filter) =>
+        template -> filter.mapEncode(directoryRowData =>
+          SvcAcsStoreRowData(
+            contract = directoryRowData.contract,
+            contractExpiresAt = directoryRowData.contractExpiresAt,
+          )
+        )
+      }
+    val allFilters = svcFilters ++ (copiedDirectoryFilters -- svcFilters.keys)
+
     MultiDomainAcsStore.SimpleContractFilter(
       svcParty,
-      Map(
-        mkFilter(cn.svc.coinprice.CoinPriceVote.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cn.svcrules.Confirmation.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cn.svcrules.ElectionRequest.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cn.svcrules.VoteRequest.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cn.svcrules.Vote.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cn.svcrules.SvReward.COMPANION)(co =>
-          co.payload.svc == svc && co.payload.sv == sv
-        ),
-        mkFilter(so.SvOnboardingRequest.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(so.SvOnboardingConfirmed.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coinrules.CoinRules.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
-        mkFilter(cc.coinimport.ImportCrate.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.SvcReward.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.UnclaimedReward.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(vl.ValidatorLicense.COMPANION)(vl => vl.payload.svc == svc),
-        mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt => vt.payload.svc == svc),
-        mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cn.cns.CnsEntry.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cn.cns.CnsEntryContext.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(sub.SubscriptionInitialPayment.COMPANION)(co =>
-          co.payload.subscriptionData.svc == svc && co.payload.subscriptionData.provider == svc
-        ),
-        mkFilter(sub.SubscriptionPayment.COMPANION)(co =>
-          co.payload.subscriptionData.svc == svc && co.payload.subscriptionData.provider == svc
-        ),
-        mkFilter(sub.SubscriptionIdleState.COMPANION)(co =>
-          co.payload.subscriptionData.svc == svc && co.payload.subscriptionData.provider == svc
-        ),
-      ) ++
-        DirectoryStore.directoryTemplateFilters(svcParty),
+      allFilters,
     )
   }
 

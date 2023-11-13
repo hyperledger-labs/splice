@@ -1,21 +1,17 @@
 package com.daml.network.wallet.store.db
 
-import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
+import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.store.db.{AcsQueries, AcsRowData, AcsTables, DbCNNodeAppStoreWithHistory}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
+import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletStore.TxLogIndexRecord
-import com.daml.network.wallet.store.db.WalletTables.{
-  UserWalletAcsStoreRowData,
-  UserWalletTxLogStoreRowData,
-}
+import com.daml.network.wallet.store.db.WalletTables.UserWalletTxLogStoreRowData
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -23,7 +19,6 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.google.protobuf.ByteString
 import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -63,12 +58,6 @@ class DbUserWalletStore(
   import multiDomainAcsStore.waitUntilAcsIngested
 
   def storeId: Int = multiDomainAcsStore.storeId
-
-  override def getAcsRowData(createdEvent: CreatedEvent, createdEventBlob: ByteString)(implicit
-      tc: TraceContext
-  ): Either[String, AcsRowData] = {
-    UserWalletAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob)
-  }
 
   override def ingestionTxLogInsert(record: TxLogIndexRecord)(implicit
       tc: TraceContext

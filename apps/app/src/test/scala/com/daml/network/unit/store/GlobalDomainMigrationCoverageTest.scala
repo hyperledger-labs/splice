@@ -2,11 +2,10 @@ package com.daml.network
 package unit.store
 
 import store.MultiDomainAcsStore.ContractFilter
-
 import com.daml.ledger.javaapi.data.codegen.ContractTypeCompanion
+import com.daml.network.store.db.AcsRowData
 import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.topology.PartyId
-
 import org.scalatest.AppendedClues
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -106,8 +105,8 @@ object GlobalDomainMigrationCoverageTest {
   private val dummyParty = PartyId.tryFromProtoPrimitive("foo::dummy")
 
   private val filtersAndMoveLists
-      : Seq[(Object, ContractFilter, Seq[ContractTypeCompanion[?, ?, ?, ?]])] =
-    Seq(
+      : Seq[(Object, ContractFilter[_ <: AcsRowData], Seq[ContractTypeCompanion[?, ?, ?, ?]])] =
+    Seq[(Object, ContractFilter[_ <: AcsRowData], Seq[ContractTypeCompanion[?, ?, ?, ?]])](
       (
         ValidatorStore,
         ValidatorStore.contractFilter(

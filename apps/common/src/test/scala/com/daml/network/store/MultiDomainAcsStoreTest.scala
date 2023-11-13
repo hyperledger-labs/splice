@@ -3,12 +3,14 @@ package com.daml.network.store
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.lf.data.Time
 import com.daml.network.codegen.java.cc.coin.{AppRewardCoupon, Coin, ValidatorRewardCoupon}
 import com.daml.network.codegen.java.cn.splitwell.*
 import com.daml.network.codegen.java.cn.wallet.payment.AppPaymentRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.ledger.api.ReassignmentEvent
 import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord}
+import com.daml.network.store.db.{AcsRowData, IndexColumnValue}
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, QualifiedName}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
@@ -36,20 +38,28 @@ abstract class MultiDomainAcsStoreTest[
     id
   }
 
-  protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter = {
+  case class GenericAcsRowData(contract: Contract[_, _]) extends AcsRowData {
+    override def contractExpiresAt: Option[Time.Timestamp] = None
+
+    override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
+  }
+
+  protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData] = {
     import MultiDomainAcsStore.mkFilter
 
     MultiDomainAcsStore.SimpleContractFilter(
       svcParty,
       templateFilters = Map(
-        mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured)
+        mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured) { contract =>
+          GenericAcsRowData(contract)
+        }
       ),
     )
   }
 
   protected def mkStore(
       id: Int = 0,
-      filter: MultiDomainAcsStore.ContractFilter = defaultContractFilter,
+      filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData] = defaultContractFilter,
   ): Store
 
   protected type Store = S
@@ -659,15 +669,15 @@ abstract class MultiDomainAcsStoreTest[
     }
 
     "getJsonAcsSnapshot" in {
-      val contractFilter: MultiDomainAcsStore.ContractFilter = {
+      val contractFilter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData] = {
         import MultiDomainAcsStore.mkFilter
 
         MultiDomainAcsStore.SimpleContractFilter(
           svcParty,
           templateFilters = Map(
-            mkFilter(AppRewardCoupon.COMPANION)(_ => true),
-            mkFilter(ValidatorRewardCoupon.COMPANION)(_ => true),
-            mkFilter(Coin.COMPANION)(_ => true),
+            mkFilter(AppRewardCoupon.COMPANION)(_ => true)(GenericAcsRowData(_)),
+            mkFilter(ValidatorRewardCoupon.COMPANION)(_ => true)(GenericAcsRowData(_)),
+            mkFilter(Coin.COMPANION)(_ => true)(GenericAcsRowData(_)),
           ),
         )
       }

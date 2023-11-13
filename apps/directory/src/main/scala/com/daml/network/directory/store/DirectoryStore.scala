@@ -1,13 +1,15 @@
 package com.daml.network.directory.store
 
+import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.store.db.DbDirectoryStore
+import com.daml.network.directory.store.db.DirectoryTables.DirectoryAcsStoreRowData
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.RetryProvider
+import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, TemplateFilter}
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore}
-import MultiDomainAcsStore.ConstrainedTemplate
-import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.util.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -33,7 +35,7 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
     */
   def providerParty: PartyId
 
-  lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter =
+  lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[DirectoryAcsStoreRowData] =
     DirectoryStore.contractFilter(providerParty)
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
@@ -164,37 +166,84 @@ object DirectoryStore {
     )
 
   /** Contract filter of a directory app store for a specific provider. */
-  def contractFilter(providerPartyId: PartyId): MultiDomainAcsStore.ContractFilter =
+  def contractFilter(
+      providerPartyId: PartyId
+  ): MultiDomainAcsStore.ContractFilter[DirectoryAcsStoreRowData] =
     MultiDomainAcsStore.SimpleContractFilter(
       providerPartyId,
       directoryTemplateFilters(providerPartyId),
     )
 
-  def directoryTemplateFilters(providerPartyId: PartyId) = {
+  def directoryTemplateFilters(
+      providerPartyId: PartyId
+  ): Map[QualifiedName, TemplateFilter[?, ?, DirectoryAcsStoreRowData]] = {
     import MultiDomainAcsStore.mkFilter
     val provider: String = providerPartyId.toProtoPrimitive
 
     Map(
-      mkFilter(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.provider == provider),
+      mkFilter(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.provider == provider) {
+        contract =>
+          DirectoryAcsStoreRowData(
+            contract = contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+            directoryEntryName = Some(contract.payload.name),
+            directoryEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+          )
+      },
       mkFilter(directoryCodegen.DirectoryEntryContext.COMPANION)(co =>
         co.payload.provider == provider
-      ),
+      ) { contract =>
+        DirectoryAcsStoreRowData(
+          contract = contract,
+          directoryEntryName = Some(contract.payload.name),
+          directoryEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+          subscriptionReferenceContractId = Some(contract.payload.reference),
+        )
+      },
       mkFilter(subsCodegen.SubscriptionInitialPayment.COMPANION)(co =>
         co.payload.subscriptionData.provider == provider
-      ),
+      ) { contract =>
+        DirectoryAcsStoreRowData(
+          contract = contract,
+          subscriptionReferenceContractId = Some(contract.payload.reference),
+        )
+      },
       mkFilter(subsCodegen.SubscriptionPayment.COMPANION)(co =>
         co.payload.subscriptionData.provider == provider
-      ),
+      ) { contract =>
+        DirectoryAcsStoreRowData(
+          contract = contract,
+          subscriptionReferenceContractId = Some(contract.payload.reference),
+        )
+      },
       mkFilter(subsCodegen.SubscriptionIdleState.COMPANION)(co =>
         co.payload.subscriptionData.provider == provider
-      ),
+      ) { contract =>
+        DirectoryAcsStoreRowData(
+          contract = contract,
+          subscriptionReferenceContractId = Some(contract.payload.reference),
+          subscriptionNextPaymentDueAt =
+            Some(Timestamp.assertFromInstant(contract.payload.nextPaymentDueAt)),
+        )
+      },
       mkFilter(directoryCodegen.DirectoryInstallRequest.COMPANION)(co =>
         co.payload.provider == provider
-      ),
-      mkFilter(directoryCodegen.DirectoryInstall.COMPANION)(co => co.payload.provider == provider),
+      ) { contract =>
+        DirectoryAcsStoreRowData(
+          contract = contract,
+          directoryInstallUser = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+        )
+      },
+      mkFilter(directoryCodegen.DirectoryInstall.COMPANION)(co => co.payload.provider == provider) {
+        contract =>
+          DirectoryAcsStoreRowData(
+            contract = contract,
+            directoryInstallUser = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+          )
+      },
       mkFilter(subsCodegen.TerminatedSubscription.COMPANION)(co =>
         co.payload.subscriptionData.provider == provider
-      ),
+      )(DirectoryAcsStoreRowData(_)),
     )
   }
 

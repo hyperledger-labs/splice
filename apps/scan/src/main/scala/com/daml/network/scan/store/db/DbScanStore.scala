@@ -1,35 +1,32 @@
 package com.daml.network.scan.store.db
 
-import com.daml.ledger.javaapi.data.CreatedEvent
+import cats.implicits.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
+import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import com.daml.network.scan.store.db.ScanTables.{ScanAcsStoreRowData, ScanTxLogRowData}
+import com.daml.network.scan.store.SortOrder.{Ascending, Descending}
+import com.daml.network.scan.store.db.ScanTables.ScanTxLogRowData
 import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry, TxLogIndexRecord}
-import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.store.db.{AcsQueries, AcsRowData, AcsTables, DbCNNodeAppStoreWithHistory}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
+import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.util.{ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
-import cats.implicits.*
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.google.protobuf.ByteString
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
-import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
-import com.daml.network.scan.store.SortOrder.Ascending
-import com.daml.network.scan.store.SortOrder.Descending
 
 class DbScanStore(
     override val serviceUserPrimaryParty: PartyId,
@@ -62,12 +59,6 @@ class DbScanStore(
   import multiDomainAcsStore.waitUntilAcsIngested
 
   def storeId: Int = multiDomainAcsStore.storeId
-
-  override def getAcsRowData(createdEvent: CreatedEvent, createdEventBlob: ByteString)(implicit
-      tc: TraceContext
-  ): Either[String, AcsRowData] = {
-    ScanAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob)
-  }
 
   override def ingestionTxLogInsert(record: TxLogIndexRecord)(implicit
       tc: TraceContext

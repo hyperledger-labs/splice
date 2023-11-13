@@ -58,14 +58,9 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     txLogTableName: String,
     storeDescriptor: io.circe.Json,
     override protected val loggerFactory: NamedLoggerFactory,
-    contractFilter: MultiDomainAcsStore.ContractFilter,
+    contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
     override val txLogParser: TxLogStore.Parser[TXI, TXE],
     retryProvider: RetryProvider,
-    getAcsRowData: (
-        CreatedEvent,
-        ByteString,
-        TraceContext,
-    ) => Either[String, AcsRowData],
     ingestTxLogInsert: (TXI, TraceContext) => Either[String, DBIOAction[?, NoStream, Effect.Write]],
 )(implicit
     ec: ExecutionContext,
@@ -956,13 +951,13 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     )(implicit
         tc: TraceContext
     ) = {
-      getAcsRowData(createdEvent, createdEventBlob, tc) match {
-        case Left(err) =>
+      contractFilter.matchingContractToRow(createdEvent, createdEventBlob) match {
+        case None =>
           val errMsg =
-            s"Item at offset $offset with contract id ${createdEvent.getContractId} cannot be ingested: $err"
+            s"Item at offset $offset with contract id ${createdEvent.getContractId} cannot be ingested."
           logger.error(errMsg)
           throw new IllegalArgumentException(errMsg)
-        case Right(rowData) =>
+        case Some(rowData) =>
           summary.ingestedCreatedEvents.addOne(createdEvent)
 
           val contract = rowData.contract

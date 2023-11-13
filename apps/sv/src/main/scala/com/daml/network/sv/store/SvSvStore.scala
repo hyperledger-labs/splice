@@ -1,14 +1,16 @@
 package com.daml.network.sv.store
 
+import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.codegen.java.cn.svlocal
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult}
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore, PageLimit}
 import com.daml.network.sv.store.db.DbSvSvStore
+import com.daml.network.sv.store.db.SvTables.SvAcsStoreRowData
 import com.daml.network.sv.store.memory.InMemorySvSvStore
 import com.daml.network.util.{AssignedContract, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -139,19 +141,41 @@ object SvSvStore {
     )
 
   /** Contract filter of an sv acs store for a specific acs party. */
-  def contractFilter(key: SvStore.Key): MultiDomainAcsStore.ContractFilter = {
+  def contractFilter(key: SvStore.Key): MultiDomainAcsStore.ContractFilter[SvAcsStoreRowData] = {
     import MultiDomainAcsStore.mkFilter
     val sv = key.svParty.toProtoPrimitive
 
     MultiDomainAcsStore.SimpleContractFilter(
       key.svParty,
       Map(
-        mkFilter(vo.ValidatorOnboarding.COMPANION)(co => co.payload.sv == sv),
-        mkFilter(vo.UsedSecret.COMPANION)(co => co.payload.sv == sv),
+        mkFilter(vo.ValidatorOnboarding.COMPANION)(co => co.payload.sv == sv) { contract =>
+          SvAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+            onboardingSecret = Some(contract.payload.candidateSecret),
+          )
+        },
+        mkFilter(vo.UsedSecret.COMPANION)(co => co.payload.sv == sv) { contract =>
+          SvAcsStoreRowData(
+            contract,
+            onboardingSecret = Some(contract.payload.secret),
+          )
+        },
         mkFilter(svlocal.approvedsvidentity.ApprovedSvIdentity.COMPANION)(co =>
           co.payload.approvingSv == sv
-        ),
-        mkFilter(so.SvOnboardingConfirmed.COMPANION)(co => co.payload.svParty == sv),
+        ) { contract =>
+          SvAcsStoreRowData(
+            contract,
+            svCandidateName = Some(contract.payload.candidateName),
+          )
+        },
+        mkFilter(so.SvOnboardingConfirmed.COMPANION)(co => co.payload.svParty == sv) { contract =>
+          SvAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+            svCandidateName = Some(contract.payload.svName),
+          )
+        },
       ),
     )
   }

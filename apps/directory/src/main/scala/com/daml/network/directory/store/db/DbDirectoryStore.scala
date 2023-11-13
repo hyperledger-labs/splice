@@ -1,28 +1,28 @@
 package com.daml.network.directory.store.db
 
-import com.daml.ledger.javaapi.data.CreatedEvent
+import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.directory.{DirectoryEntry, DirectoryInstall}
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.RetryProvider
+import com.daml.network.store.db.AcsQueries.{
+  SelectFromAcsTableResult,
+  SelectFromAcsTableWithStateResult,
+}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.store.{Limit, LimitHelpers, MultiDomainAcsStore}
-import com.daml.network.store.db.{AcsQueries, AcsRowData, AcsTables, DbCNNodeAppStoreWithoutHistory}
-import AcsQueries.{SelectFromAcsTableResult, SelectFromAcsTableWithStateResult}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-
-import scala.concurrent.{ExecutionContext, Future}
-import com.daml.network.codegen.java.cn.directory as directoryCodegen
-import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.directory.store.db.DirectoryTables.DirectoryAcsStoreRowData
-import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
-import com.google.protobuf.ByteString
 import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+
+import scala.concurrent.{ExecutionContext, Future}
 
 class DbDirectoryStore(
     override val providerParty: PartyId,
@@ -54,12 +54,6 @@ class DbDirectoryStore(
   import multiDomainAcsStore.waitUntilAcsIngested
 
   private def storeId: Int = multiDomainAcsStore.storeId
-
-  override def getAcsRowData(createdEvent: CreatedEvent, createdEventBlob: ByteString)(implicit
-      tc: TraceContext
-  ): Either[String, AcsRowData] = {
-    DirectoryAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob)
-  }
 
   override def lookupInstallByUserWithOffset(user: PartyId)(implicit tc: TraceContext): Future[
     MultiDomainAcsStore.QueryResult[Option[Contract[DirectoryInstall.ContractId, DirectoryInstall]]]

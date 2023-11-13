@@ -10,8 +10,8 @@ import com.daml.network.util.Contract
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String300}
+import com.digitalasset.canton.ledger.api.validation.NoLoggingValueValidator
 import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.google.protobuf
 import io.circe.Json
@@ -20,7 +20,6 @@ import slick.jdbc.{GetResult, JdbcType, PositionedParameters, PositionedResult, 
 import spray.json.{JsString, JsValue, JsonFormat, deserializationError}
 
 import java.sql.{PreparedStatement, ResultSet}
-
 import com.google.protobuf.ByteString
 
 trait AcsJdbcTypes {
@@ -209,37 +208,14 @@ trait AcsJdbcTypes {
         case None => pp.setNull(java.sql.Types.OTHER)
       }
 
-  private val contractCodec = {
-    // copied from JsonContractIdFormat
-    implicit val ContractIdFormat: JsonFormat[LfValue.ContractId] =
-      new JsonFormat[LfValue.ContractId] {
-        override def write(obj: LfValue.ContractId): JsValue =
-          JsString(obj.coid)
-
-        override def read(json: JsValue): LfValue.ContractId = json match {
-          case JsString(s) =>
-            LfValue.ContractId.fromString(s).fold(deserializationError(_), identity)
-          case _ => deserializationError("ContractId must be a string")
-        }
-      }
-
-    // DB *must not* use stringly ints or decimals;
-    // this output relies on a *big* invariant: comparing the raw JSON data
-    // with the built-in SQL operators <, >, &c, yields equal results to
-    // comparing the same data in a data-aware way. That's why we *must* use
-    // numbers-as-numbers in this codec, and why ISO-8601 strings
-    // for dates and timestamps are so important.
-    new ApiCodecCompressed(encodeDecimalAsString = false, encodeInt64AsString = false)
-  }
-
   protected def payloadJsonFromContract(
       payload: DamlRecord[?]
-  )(implicit elc: ErrorLoggingContext): JsValue = {
+  ): JsValue = {
     payloadJsonFromValue(payload.toValue)
   }
 
-  protected def payloadJsonFromValue(value: Value)(implicit elc: ErrorLoggingContext): JsValue = {
-    contractCodec.apiValueToJsValue(Contract.javaValueToLfValue(value))
+  protected def payloadJsonFromValue(value: Value): JsValue = {
+    AcsJdbcTypes.payloadJsonFromValue(value)
   }
 
   protected def payloadValueJsonStringFromRecord(
@@ -273,4 +249,35 @@ trait AcsJdbcTypes {
 
 object AcsJdbcTypes {
   final case class JsonString(value: String)
+
+  private val contractCodec = {
+    // copied from JsonContractIdFormat
+    implicit val ContractIdFormat: JsonFormat[LfValue.ContractId] =
+      new JsonFormat[LfValue.ContractId] {
+        override def write(obj: LfValue.ContractId): JsValue =
+          JsString(obj.coid)
+
+        override def read(json: JsValue): LfValue.ContractId = json match {
+          case JsString(s) =>
+            LfValue.ContractId.fromString(s).fold(deserializationError(_), identity)
+          case _ => deserializationError("ContractId must be a string")
+        }
+      }
+
+    // DB *must not* use stringly ints or decimals;
+    // this output relies on a *big* invariant: comparing the raw JSON data
+    // with the built-in SQL operators <, >, &c, yields equal results to
+    // comparing the same data in a data-aware way. That's why we *must* use
+    // numbers-as-numbers in this codec, and why ISO-8601 strings
+    // for dates and timestamps are so important.
+    new ApiCodecCompressed(encodeDecimalAsString = false, encodeInt64AsString = false)
+  }
+
+  def payloadJsonFromValue(value: Value): JsValue = {
+    contractCodec.apiValueToJsValue(
+      NoLoggingValueValidator
+        .validateValue(com.daml.ledger.api.v1.value.Value.fromJavaProto(value.toProto))
+        .fold(err => throw err, identity)
+    )
+  }
 }

@@ -15,6 +15,7 @@ import com.daml.network.environment.ledger.api.{
   TreeUpdate,
 }
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
+import com.daml.network.store.db.AcsRowData
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.{
   AssignedContract,
@@ -210,7 +211,7 @@ object MultiDomainAcsStore {
   case class JsonAcsSnapshot(offset: String, contracts: Seq[Contract[?, ?]])
 
   /** Static specification of a set of create events in scope for ingestion into an MultiDomainAcsStore. */
-  trait ContractFilter {
+  trait ContractFilter[R <: AcsRowData] {
 
     /** The filter required for ingestion into this store. */
     def ingestionFilter: IngestionFilter
@@ -229,6 +230,11 @@ object MultiDomainAcsStore {
         createdEventBlob: ByteString,
     ): Option[Contract[?, ?]]
 
+    def matchingContractToRow(
+        ev: CreatedEvent,
+        createdEventBlob: ByteString,
+    ): Option[R]
+
     def decodeMatchingContractFromRow(
         row: SelectFromAcsTableResult
     )(implicit templateJsonDecoder: TemplateJsonDecoder): Option[Contract[?, ?]]
@@ -245,17 +251,41 @@ object MultiDomainAcsStore {
     }
   }
 
-  private type DecodeFromCreatedEvent = (CreatedEvent, ByteString) => Option[Contract[?, ?]]
+  private type DecodeFromCreatedEvent[TCid <: ContractId[T], T <: Template] =
+    (CreatedEvent, ByteString) => Option[Contract[TCid, T]]
+  private type EncodeToRow[TCid <: ContractId[T], T <: Template, R <: AcsRowData] =
+    Contract[TCid, T] => R
   private type DecodeFromRow = (SelectFromAcsTableResult, TemplateJsonDecoder) => Contract[?, ?]
 
+  case class TemplateFilter[TCid <: ContractId[T], T <: Template, R <: AcsRowData](
+      evPredicate: (CreatedEvent, ByteString) => Boolean,
+      decodeFromCreatedEvent: DecodeFromCreatedEvent[TCid, T],
+      decodeFromRow: DecodeFromRow,
+      encodeToRow: EncodeToRow[TCid, T, R],
+  ) {
+    def matchingContractToRow(
+        ev: CreatedEvent,
+        createdEventBlob: ByteString,
+    ): Option[R] = {
+      decodeFromCreatedEvent(ev, createdEventBlob).map(encodeToRow)
+    }
+
+    def mapEncode[R2 <: AcsRowData](f: R => R2): TemplateFilter[TCid, T, R2] = TemplateFilter(
+      evPredicate,
+      decodeFromCreatedEvent,
+      decodeFromRow,
+      contract => f(encodeToRow(contract)),
+    )
+  }
+
   /** A helper to easily construct a [[ContractFilter]] for a single party. */
-  case class SimpleContractFilter(
+  case class SimpleContractFilter[R <: AcsRowData](
       primaryParty: PartyId,
       templateFilters: Map[
         QualifiedName,
-        ((CreatedEvent, ByteString) => Boolean, DecodeFromCreatedEvent, DecodeFromRow),
+        TemplateFilter[?, ?, R],
       ],
-  ) extends ContractFilter {
+  ) extends ContractFilter[R] {
 
     override val ingestionFilter =
       IngestionFilter(
@@ -264,9 +294,9 @@ object MultiDomainAcsStore {
       )
 
     override def contains(ev: CreatedEvent): Boolean =
-      templateFilters.get(QualifiedName(ev.getTemplateId)).exists { case (evPredicate, _, _) =>
-        evPredicate(ev, ByteString.EMPTY)
-      }
+      templateFilters
+        .get(QualifiedName(ev.getTemplateId))
+        .exists(_.evPredicate(ev, ByteString.EMPTY))
 
     override def mightContain[TC, TCid, T](
         templateCompanion: JavaContractCompanion[TC, TCid, T]
@@ -282,17 +312,27 @@ object MultiDomainAcsStore {
         createdEventBlob: ByteString,
     ): Option[Contract[?, ?]] = {
       for {
-        (_, decoder, _) <- templateFilters.get(QualifiedName(ev.getTemplateId))
-        contract <- decoder(ev, createdEventBlob)
+        templateFilter <- templateFilters.get(QualifiedName(ev.getTemplateId))
+        contract <- templateFilter.decodeFromCreatedEvent(ev, createdEventBlob)
       } yield contract
+    }
+
+    override def matchingContractToRow(
+        ev: CreatedEvent,
+        createdEventBlob: ByteString,
+    ): Option[R] = {
+      for {
+        templateFilter <- templateFilters.get(QualifiedName(ev.getTemplateId))
+        row <- templateFilter.matchingContractToRow(ev, createdEventBlob)
+      } yield row
     }
 
     override def decodeMatchingContractFromRow(
         row: SelectFromAcsTableResult
     )(implicit templateJsonDecoder: TemplateJsonDecoder): Option[Contract[?, ?]] = {
       for {
-        (_, _, decoder) <- templateFilters.get(row.templateIdQualifiedName)
-      } yield decoder(row, templateJsonDecoder)
+        templateFilter <- templateFilters.get(row.templateIdQualifiedName)
+      } yield templateFilter.decodeFromRow(row, templateJsonDecoder)
     }
 
     override def isStakeholderOf(ev: CreatedEvent): Boolean = {
@@ -302,23 +342,21 @@ object MultiDomainAcsStore {
   }
 
   /** Construct a contract filter for input into a [[SimpleContractFilter]]. */
-  def mkFilter[TCid <: ContractId[T], T <: Template](
+  def mkFilter[TCid <: ContractId[T], T <: Template, R <: AcsRowData](
       templateCompanion: Contract.Companion.Template[TCid, T]
   )(
       p: Contract[TCid, T] => Boolean
+  )(
+      encode: EncodeToRow[TCid, T, R]
   )(implicit
       companionClass: ContractCompanion[Contract.Companion.Template[TCid, T], TCid, T]
   ): (
       QualifiedName,
-      (
-          (CreatedEvent, ByteString) => Boolean,
-          (CreatedEvent, ByteString) => Option[Contract[?, ?]],
-          DecodeFromRow,
-      ),
+      TemplateFilter[TCid, T, R],
   ) =
     (
       QualifiedName(templateCompanion.TEMPLATE_ID),
-      (
+      TemplateFilter(
         (ev, bs) => {
           val c = Contract.fromCreatedEvent(templateCompanion)(ev, bs)
           c.exists(p)
@@ -326,6 +364,7 @@ object MultiDomainAcsStore {
         (ev, bs) => Contract.fromCreatedEvent(templateCompanion)(ev, bs),
         (row, templateJsonDecoder) =>
           row.toContract(templateCompanion)(companionClass, templateJsonDecoder),
+        encode,
       ),
     )
 
@@ -385,7 +424,7 @@ object MultiDomainAcsStore {
     def fromCreatedEvent(
         companion: C
     )(
-        filter: MultiDomainAcsStore.ContractFilter,
+        filter: MultiDomainAcsStore.ContractFilter[?],
         event: CreatedEvent,
         // TODO(#8392) Remove this and read it from the CreatedEvent.
         createdEventBlob: ByteString,
@@ -411,7 +450,7 @@ object MultiDomainAcsStore {
       )
     }
 
-    def mightContain(filter: MultiDomainAcsStore.ContractFilter)(companion: C): Boolean
+    def mightContain(filter: MultiDomainAcsStore.ContractFilter[?])(companion: C): Boolean
 
     def typeId(companion: C): Identifier
 
@@ -431,12 +470,12 @@ object MultiDomainAcsStore {
       : ContractCompanion[Contract.Companion.Template[TCid, T], TCid, T] =
     new ContractCompanion[Contract.Companion.Template[TCid, T], TCid, T] {
       override def fromCreatedEvent(companion: Contract.Companion.Template[TCid, T])(
-          filter: MultiDomainAcsStore.ContractFilter,
+          filter: MultiDomainAcsStore.ContractFilter[?],
           event: CreatedEvent,
           createdEventBlob: ByteString,
       ): Option[Contract[TCid, T]] = Contract.fromCreatedEvent(companion)(event, createdEventBlob)
 
-      override def mightContain(filter: MultiDomainAcsStore.ContractFilter)(
+      override def mightContain(filter: MultiDomainAcsStore.ContractFilter[?])(
           companion: Contract.Companion.Template[TCid, T]
       ): Boolean = filter.mightContain(companion)
 

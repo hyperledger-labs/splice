@@ -3,7 +3,6 @@ package com.daml.network.sv.store.db
 import cats.data.OptionT
 import cats.implicits.*
 import com.daml.ledger.javaapi.data as javab
-import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc
@@ -24,18 +23,12 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
-import com.daml.network.store.db.{AcsQueries, AcsRowData, AcsTables, DbCNNodeAppStoreWithHistory}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithHistory}
 import com.daml.network.store.{AcsStoreDump, Limit, LimitHelpers, MultiDomainAcsStore}
-import com.daml.network.sv.store.db.SvcTables.{SvcAcsStoreRowData, SvcTxLogRowData}
+import com.daml.network.sv.store.db.SvcTables.SvcTxLogRowData
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
+import com.daml.network.util.*
 import com.daml.network.util.Contract.Companion.Template
-import com.daml.network.util.{
-  AssignedContract,
-  Contract,
-  ContractWithState,
-  QualifiedName,
-  TemplateJsonDecoder,
-}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -43,7 +36,6 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.google.protobuf.ByteString
 import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -80,12 +72,6 @@ class DbSvSvcStore(
   import multiDomainAcsStore.waitUntilAcsIngested
 
   def storeId: Int = multiDomainAcsStore.storeId
-
-  override def getAcsRowData(createdEvent: CreatedEvent, createdEventBlob: ByteString)(implicit
-      tc: TraceContext
-  ): Either[String, AcsRowData] = {
-    SvcAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob)
-  }
 
   override def ingestionTxLogInsert(record: SvcTxLogParser.TxLogIndexRecord)(implicit
       tc: TraceContext

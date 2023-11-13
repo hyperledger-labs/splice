@@ -1,5 +1,7 @@
 package com.daml.network.wallet.store
 
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.{
@@ -16,30 +18,18 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{BaseLedgerConnection, RetryProvider}
-import com.daml.network.store.{CNNodeAppStoreWithHistory, Limit, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.util.{
-  AssignedContract,
-  CNNodeUtil,
-  Contract,
-  ContractWithState,
-  TemplateJsonDecoder,
-}
-import UserWalletStore.{
-  Subscription,
-  SubscriptionIdleState,
-  SubscriptionPaymentState,
-  SubscriptionState,
-  templatesMovedByMyAutomation,
-}
+import com.daml.network.store.{CNNodeAppStoreWithHistory, Limit, PageLimit}
+import com.daml.network.util.*
+import com.daml.network.wallet.store.UserWalletStore.*
 import com.daml.network.wallet.store.db.DbUserWalletStore
+import com.daml.network.wallet.store.db.WalletTables.UserWalletAcsStoreRowData
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.*
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -300,10 +290,10 @@ trait UserWalletStore
     Seq[UserWalletStore.DirectoryEntryWithPayData]
   ] = {
     import UserWalletStore.{
-      EntryWithSubscriptionContext,
       DirectoryEntryWithPayData,
-      SubscriptionPayData,
+      EntryWithSubscriptionContext,
       SubscriptionIdleState,
+      SubscriptionPayData,
       SubscriptionPaymentState,
     }
     for {
@@ -390,7 +380,9 @@ trait UserWalletStore
       companionClass: ContractCompanion[C, TCid, T],
       tc: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]] = {
-    import cats.data.OptionT, cats.syntax.semigroupk.*, cats.Eval
+    import cats.Eval
+    import cats.data.OptionT
+    import cats.syntax.semigroupk.*
     OptionT(
       multiDomainAcsStore
         .listAssignedContracts(companion, PageLimit.tryCreate(1))
@@ -528,7 +520,7 @@ object UserWalletStore {
   }
 
   /** Contract of a wallet store for a specific user party. */
-  def contractFilter(key: Key): ContractFilter = {
+  def contractFilter(key: Key): ContractFilter[UserWalletAcsStoreRowData] = {
     val endUser = key.endUserParty.toProtoPrimitive
     val svc = key.svcParty.toProtoPrimitive
 
@@ -539,41 +531,53 @@ object UserWalletStore {
         mkFilter(installCodegen.WalletAppInstall.COMPANION)(co =>
           co.payload.svcParty == svc &&
             co.payload.endUserParty == endUser
+        )(UserWalletAcsStoreRowData(_)),
+        mkFilter(directoryCodegen.DirectoryInstall.COMPANION)(co => co.payload.user == endUser)(
+          UserWalletAcsStoreRowData(_)
         ),
-        mkFilter(directoryCodegen.DirectoryInstall.COMPANION)(co => co.payload.user == endUser),
         // Coins
         mkFilter(coinCodegen.Coin.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.owner == endUser
-        ),
+        )(UserWalletAcsStoreRowData(_)),
         mkFilter(coinCodegen.LockedCoin.COMPANION)(co =>
           co.payload.coin.svc == svc &&
             co.payload.coin.owner == endUser
-        ),
+        )(UserWalletAcsStoreRowData(_)),
         // Rewards
         mkFilter(coinCodegen.AppRewardCoupon.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.provider == endUser
-        ),
+        )(UserWalletAcsStoreRowData(_)),
         mkFilter(coinCodegen.ValidatorRewardCoupon.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.user == endUser
-        ),
+        )(UserWalletAcsStoreRowData(_)),
         mkFilter(coinCodegen.ValidatorRight.COMPANION)(co =>
           // All validator rights where the current user is the validator.
           co.payload.svc == svc &&
             co.payload.validator == endUser
-        ),
+        )(UserWalletAcsStoreRowData(_)),
         // Transfer offers
         mkFilter(transferOffersCodegen.TransferOffer.COMPANION)(co =>
           co.payload.svc == svc &&
             (co.payload.sender == endUser ||
               co.payload.receiver == endUser)
+        )(contract =>
+          UserWalletAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
         ),
         mkFilter(transferOffersCodegen.AcceptedTransferOffer.COMPANION)(co =>
           co.payload.svc == svc &&
             (co.payload.sender == endUser ||
               co.payload.receiver == endUser)
+        )(contract =>
+          UserWalletAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
         ),
         // We only ingest app payment contracts where the user is the sender,
         // as app payments the user is a receiver or a provider are handled by
@@ -581,39 +585,48 @@ object UserWalletStore {
         mkFilter(walletCodegen.AppPaymentRequest.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.sender == endUser
+        )(contract =>
+          UserWalletAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
         ),
         mkFilter(walletCodegen.AcceptedAppPayment.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.sender == endUser
-        ),
+        )(UserWalletAcsStoreRowData(_)),
         // Subscriptions
         mkFilter(subsCodegen.Subscription.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
-        ),
+        )(UserWalletAcsStoreRowData(_)),
         mkFilter(subsCodegen.SubscriptionRequest.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
-        ),
+        )(UserWalletAcsStoreRowData(_)),
         mkFilter(subsCodegen.SubscriptionIdleState.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
-        ),
+        )(UserWalletAcsStoreRowData(_)),
         mkFilter(subsCodegen.SubscriptionInitialPayment.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
-        ),
+        )(UserWalletAcsStoreRowData(_)),
         mkFilter(subsCodegen.SubscriptionPayment.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
-        ),
+        )(UserWalletAcsStoreRowData(_)),
         // Featured app right
         mkFilter(coinCodegen.FeaturedAppRight.COMPANION)(co =>
           co.payload.svc == svc && co.payload.provider == endUser
-        ),
+        )(UserWalletAcsStoreRowData(_)),
         // Directory entry
-        mkFilter(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.user == endUser),
-        mkFilter(directoryCodegen.DirectoryEntryContext.COMPANION)(co => co.payload.user == endUser),
+        mkFilter(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.user == endUser)(
+          UserWalletAcsStoreRowData(_)
+        ),
+        mkFilter(directoryCodegen.DirectoryEntryContext.COMPANION)(co =>
+          co.payload.user == endUser
+        )(UserWalletAcsStoreRowData(_)),
       ),
     )
   }

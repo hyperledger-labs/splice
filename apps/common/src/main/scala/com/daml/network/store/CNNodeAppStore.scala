@@ -1,6 +1,7 @@
 package com.daml.network.store
 
 import com.daml.network.store.TxLogStore.TransactionTreeSource
+import com.daml.network.store.db.AcsRowData
 import com.digitalasset.canton.logging.NamedLogging
 
 import scala.concurrent.ExecutionContext
@@ -17,7 +18,7 @@ trait CNNodeAppStore[
   implicit protected def ec: ExecutionContext
 
   /** Defines which create events are to be ingested into the store. */
-  protected def acsContractFilter: MultiDomainAcsStore.ContractFilter
+  protected def acsContractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData]
 
   def domains: DomainStore
 

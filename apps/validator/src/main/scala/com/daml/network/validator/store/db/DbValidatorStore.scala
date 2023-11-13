@@ -1,32 +1,31 @@
 package com.daml.network.validator.store.db
 
 import cats.implicits.*
-import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.appmanager.store.AppConfiguration
-import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
-import com.daml.network.codegen.java.cn.wallet.topupstate as topupCodegen
+import com.daml.network.codegen.java.cn.wallet.{
+  install as walletCodegen,
+  topupstate as topupCodegen,
+}
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
-import com.daml.network.store.db.{AcsQueries, AcsRowData, AcsTables, DbCNNodeAppStoreWithoutHistory}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
+import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.daml.network.validator.store.ValidatorStore
-import com.daml.network.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
 import com.daml.network.wallet.store.WalletStore
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
-import com.google.protobuf.ByteString
 import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -66,12 +65,6 @@ class DbValidatorStore(
   import multiDomainAcsStore.waitUntilAcsIngested
 
   private def storeId: Int = multiDomainAcsStore.storeId
-
-  override def getAcsRowData(createdEvent: CreatedEvent, createdEventBlob: ByteString)(implicit
-      tc: TraceContext
-  ): Either[String, AcsRowData] = {
-    ValidatorAcsStoreRowData.fromCreatedEvent(createdEvent, createdEventBlob)
-  }
 
   override def lookupInstallByParty(
       endUserParty: PartyId

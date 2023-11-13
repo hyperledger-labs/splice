@@ -6,13 +6,14 @@ import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.memory.InMemorySplitwellStore
+import com.daml.network.store.db.AcsRowData
 import com.daml.network.store.{
   CNNodeAppStoreWithoutHistory,
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
   TxLogStore,
 }
-import com.daml.network.util.{Contract, ContractWithState, AssignedContract}
+import com.daml.network.util.{AssignedContract, Contract, ContractWithState}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -238,40 +239,51 @@ object SplitwellStore {
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 
-  def contractFilter(providerPartyId: PartyId): MultiDomainAcsStore.ContractFilter = {
+  def contractFilter(providerPartyId: PartyId): MultiDomainAcsStore.ContractFilter[AcsRowData] = {
     import MultiDomainAcsStore.mkFilter
     val provider = providerPartyId.toProtoPrimitive
+
+    // TODO (#8293): make it db
+    def splitwellIsInMemoryOnly(contract: Contract[?, ?]) = throw new IllegalArgumentException(
+      "This shouldn't have been called on splitwell."
+    )
 
     MultiDomainAcsStore.SimpleContractFilter(
       providerPartyId,
       Map(
-        mkFilter(splitwellCodegen.SplitwellRules.COMPANION)(co => co.payload.provider == provider),
+        mkFilter(splitwellCodegen.SplitwellRules.COMPANION)(co => co.payload.provider == provider)(
+          splitwellIsInMemoryOnly
+        ),
         mkFilter(splitwellCodegen.SplitwellInstallRequest.COMPANION)(co =>
           co.payload.provider == provider
-        ),
+        )(splitwellIsInMemoryOnly),
         mkFilter(splitwellCodegen.SplitwellInstall.COMPANION)(co =>
           co.payload.provider == provider
-        ),
+        )(splitwellIsInMemoryOnly),
         mkFilter(splitwellCodegen.TransferInProgress.COMPANION)(co =>
           co.payload.group.provider == provider
+        )(splitwellIsInMemoryOnly),
+        mkFilter(splitwellCodegen.Group.COMPANION)(co => co.payload.provider == provider)(
+          splitwellIsInMemoryOnly
         ),
-        mkFilter(splitwellCodegen.Group.COMPANION)(co => co.payload.provider == provider),
         mkFilter(splitwellCodegen.GroupRequest.COMPANION)(co =>
           co.payload.group.provider == provider
-        ),
+        )(splitwellIsInMemoryOnly),
         mkFilter(splitwellCodegen.GroupInvite.COMPANION)(co =>
           co.payload.group.provider == provider
-        ),
+        )(splitwellIsInMemoryOnly),
         mkFilter(splitwellCodegen.AcceptedGroupInvite.COMPANION)(co =>
           co.payload.groupKey.provider == provider
-        ),
+        )(splitwellIsInMemoryOnly),
         mkFilter(splitwellCodegen.BalanceUpdate.COMPANION)(co =>
           co.payload.group.provider == provider
+        )(splitwellIsInMemoryOnly),
+        mkFilter(walletCodegen.AcceptedAppPayment.COMPANION)(co => co.payload.provider == provider)(
+          splitwellIsInMemoryOnly
         ),
-        mkFilter(walletCodegen.AcceptedAppPayment.COMPANION)(co => co.payload.provider == provider),
         mkFilter(walletCodegen.TerminatedAppPayment.COMPANION)(co =>
           co.payload.provider == provider
-        ),
+        )(splitwellIsInMemoryOnly),
       ),
     )
   }

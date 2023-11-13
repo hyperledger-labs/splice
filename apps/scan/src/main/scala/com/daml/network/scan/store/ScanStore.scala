@@ -1,6 +1,7 @@
 package com.daml.network.scan.store
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{BaseLedgerConnection, PackageIdResolver, RetryProvider}
@@ -15,6 +16,7 @@ import com.daml.network.store.{
 }
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.scan.store.db.DbScanStore
+import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{CoinConfigSchedule, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
@@ -51,7 +53,7 @@ trait ScanStore
 
   def serviceUserPrimaryParty: PartyId
 
-  override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter =
+  override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] =
     ScanStore.contractFilter(svcParty)
 
   def lookupCoinRules()(implicit
@@ -243,25 +245,80 @@ object ScanStore {
 
   def contractFilter(
       svcParty: PartyId
-  ): MultiDomainAcsStore.ContractFilter = {
+  ): MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] = {
     import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
 
     MultiDomainAcsStore.SimpleContractFilter(
       svcParty,
       Map(
-        mkFilter(cc.coinrules.CoinRules.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc),
-        mkFilter(cc.coinimport.ImportCrate.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cn.cns.CnsEntry.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coinrules.CoinRules.COMPANION)(co => co.payload.svc == svc)(
+          ScanAcsStoreRowData(_)
+        ),
+        mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.svc == svc)(ScanAcsStoreRowData(_)),
+        mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc)(
+          ScanAcsStoreRowData(_)
+        ),
+        mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc) { contract =>
+          ScanAcsStoreRowData(
+            contract = contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
+            round = Some(contract.payload.round.number),
+          )
+        },
+        mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc) { contract =>
+          ScanAcsStoreRowData(
+            contract = contract,
+            round = Some(contract.payload.round.number),
+          )
+        },
+        mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc) { contract =>
+          ScanAcsStoreRowData(
+            contract = contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
+            round = Some(contract.payload.round.number),
+          )
+        },
+        mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.svc == svc) {
+          contract =>
+            ScanAcsStoreRowData(
+              contract = contract,
+              round = Some(contract.payload.round.number),
+            )
+        },
+        mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc) { contract =>
+          ScanAcsStoreRowData(
+            contract = contract,
+            featuredAppRightProvider =
+              Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+          )
+        },
+        mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc) { contract =>
+          ScanAcsStoreRowData(
+            contract = contract,
+            amount = Some(contract.payload.amount.initialAmount),
+          )
+        },
+        mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc) { contract =>
+          ScanAcsStoreRowData(
+            contract = contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.lock.expiresAt)),
+            amount = Some(contract.payload.coin.amount.initialAmount),
+          )
+        },
+        mkFilter(cc.coinimport.ImportCrate.COMPANION)(co => co.payload.svc == svc) { contract =>
+          ScanAcsStoreRowData(
+            contract = contract,
+            importCrateReceiver = Some(contract.payload.receiver),
+          )
+        },
+        mkFilter(cn.cns.CnsEntry.COMPANION)(co => co.payload.svc == svc) { contract =>
+          ScanAcsStoreRowData(
+            contract = contract,
+            cnsEntryName = Some(contract.payload.name),
+            cnsEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+          )
+        },
       ),
     )
   }

@@ -1,6 +1,5 @@
 package com.daml.network.store.db
 
-import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
 import com.daml.network.util.TemplateJsonDecoder
@@ -11,8 +10,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 
 import scala.concurrent.ExecutionContext
-
-import com.google.protobuf.ByteString
 
 abstract class DbCNNodeAppStore[
     TXI <: TxLogStore.IndexRecord,
@@ -41,7 +38,6 @@ abstract class DbCNNodeAppStore[
       acsContractFilter,
       txLogParser,
       retryProvider,
-      (evt, createdEventBlob, tc) => getAcsRowData(evt, createdEventBlob)(tc),
       (evt, tc) => ingestionTxLogInsert(evt)(tc),
     )
 
@@ -59,11 +55,6 @@ abstract class DbCNNodeAppStore[
       loggerFactory,
       retryProvider,
     )
-
-  def getAcsRowData(
-      createdEvent: CreatedEvent,
-      createdEventBlob: ByteString,
-  )(implicit tc: TraceContext): Either[String, AcsRowData]
 
   def ingestionTxLogInsert(record: TXI)(implicit
       tc: TraceContext

@@ -7,13 +7,17 @@ import com.daml.network.codegen.java.cc.{
   validatorlicense as validatorLicenseCodegen,
 }
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
-import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
-import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
+import com.daml.network.codegen.java.cn.wallet.{
+  install as walletCodegen,
+  topupstate as topUpCodegen,
+}
 import com.daml.network.environment.RetryProvider
+import com.daml.network.http.v0.definitions
+import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore}
-import MultiDomainAcsStore.{ConstrainedTemplate, QueryResult}
-import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.util.*
 import com.daml.network.validator.store.db.DbValidatorStore
+import com.daml.network.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.daml.network.wallet.store.WalletStore
 import com.digitalasset.canton.crypto.Hash
@@ -265,54 +269,120 @@ object ValidatorStore {
           else Seq.empty)
 
   /** Contract of a wallet store for a specific validator party. */
-  def contractFilter(key: Key): MultiDomainAcsStore.ContractFilter = {
+  def contractFilter(key: Key): MultiDomainAcsStore.ContractFilter[ValidatorAcsStoreRowData] = {
     import MultiDomainAcsStore.mkFilter
     val validator = key.validatorParty.toProtoPrimitive
     val svc = key.svcParty.toProtoPrimitive
 
     MultiDomainAcsStore.SimpleContractFilter(
       key.validatorParty,
-      Map(
+      Map[QualifiedName, TemplateFilter[?, ?, ValidatorAcsStoreRowData]](
         mkFilter(walletCodegen.WalletAppInstall.COMPANION)(co =>
           co.payload.validatorParty == validator &&
             co.payload.svcParty == svc
-        ),
+        ) { contract =>
+          ValidatorAcsStoreRowData(
+            contract = contract,
+            userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.endUserParty)),
+            userName = Some(contract.payload.endUserName),
+          )
+        },
         mkFilter(validatorLicenseCodegen.ValidatorLicense.COMPANION)(co =>
           co.payload.validator == validator && co.payload.svc == svc
-        ),
+        ) { contract =>
+          ValidatorAcsStoreRowData(
+            contract = contract,
+            validatorParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
+          )
+        },
         mkFilter(coinCodegen.ValidatorRight.COMPANION)(co =>
           co.payload.validator == validator &&
             co.payload.svc == svc
-        ),
+        ) { contract =>
+          ValidatorAcsStoreRowData(
+            contract = contract,
+            userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+            validatorParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
+          )
+        },
         mkFilter(coinCodegen.FeaturedAppRight.COMPANION)(co =>
           co.payload.svc == svc && co.payload.provider == validator
-        ),
+        ) { contract =>
+          ValidatorAcsStoreRowData(
+            contract = contract,
+            contractExpiresAt = None,
+            providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+          )
+        },
         mkFilter(topUpCodegen.ValidatorTopUpState.COMPANION)(co =>
           co.payload.validator == validator
-        ),
+        ) { contract =>
+          ValidatorAcsStoreRowData(
+            contract = contract,
+            trafficDomainId = Some(DomainId.tryFromString(contract.payload.domainId)),
+          )
+        },
         mkFilter(coinCodegen.Coin.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.owner == validator
-        ),
+        )(ValidatorAcsStoreRowData(_)),
       ) ++ (if (key.appManagerEnabled)
-              Map(
+              Map[QualifiedName, TemplateFilter[?, ?, ValidatorAcsStoreRowData]](
                 mkFilter(appManagerCodegen.AppConfiguration.COMPANION)(co =>
                   co.payload.validatorOperator == validator
-                ),
+                ) { contract =>
+                  val name = io.circe.parser
+                    .decode[definitions.AppConfiguration](contract.payload.json)
+                    .map(_.name)
+                    .getOrElse(
+                      throw new IllegalArgumentException(
+                        s"Failed to extract name from ${contract.payload.json}"
+                      )
+                    )
+                  ValidatorAcsStoreRowData(
+                    contract = contract,
+                    contractExpiresAt = None,
+                    providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+                    appConfigurationVersion = Some(contract.payload.version),
+                    appConfigurationName = Some(name),
+                  )
+                },
                 mkFilter(appManagerCodegen.AppRelease.COMPANION)(co =>
                   co.payload.validatorOperator == validator
-                ),
+                ) { contract =>
+                  ValidatorAcsStoreRowData(
+                    contract = contract,
+                    providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+                    appReleaseVersion = Some(contract.payload.version),
+                  )
+                },
                 mkFilter(appManagerCodegen.RegisteredApp.COMPANION)(co =>
                   co.payload.validatorOperator == validator
-                ),
+                ) { contract =>
+                  ValidatorAcsStoreRowData(
+                    contract = contract,
+                    providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+                  )
+                },
                 mkFilter(appManagerCodegen.InstalledApp.COMPANION)(co =>
                   co.payload.validatorOperator == validator
-                ),
+                ) { contract =>
+                  ValidatorAcsStoreRowData(
+                    contract = contract,
+                    providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+                  )
+                },
                 mkFilter(appManagerCodegen.ApprovedReleaseConfiguration.COMPANION)(co =>
                   co.payload.validatorOperator == validator
-                ),
+                ) { contract =>
+                  ValidatorAcsStoreRowData(
+                    contract = contract,
+                    providerParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+                    jsonHash = Some(contract.payload.jsonHash),
+                  )
+                },
               )
-            else Map.empty),
+            else Map.empty[QualifiedName, TemplateFilter[?, ?, ValidatorAcsStoreRowData]]),
     )
   }
 
