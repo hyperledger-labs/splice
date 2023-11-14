@@ -8,7 +8,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{ProcessTestUtil, CommonCNNodeAppInstanceReferences, SplitwellTestUtil}
+import com.daml.network.util.{CommonCNNodeAppInstanceReferences, ProcessTestUtil, SplitwellTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
@@ -59,6 +59,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
       )
       // Obtain a fresh onboarding secret from a SV because this is what we want runbook users to do.
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
+      .withSequencerConnectionsFromScanDisabled
       // Replace the path to the splitwell dar file.
       .addConfigTransforms((_, conf) => replaceDarFilePath(conf))
       .withManualStart
