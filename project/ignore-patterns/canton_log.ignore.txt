@@ -53,6 +53,9 @@ A security-sensitive error has been received.*TransactionProcessingSteps:partici
 # TODO(#5706): investigate and remove once fixed
 MEDIATOR_INVALID_MESSAGE.*Received a mediator response.*with an unknown request id.*Discarding response
 
+# TODO(#8596) Might be expected and benign, but let's investigate to be sure
+MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Superfluous root hash message
+
 # TODO(#6106): Remove this when we can
 Failed to handle Mediator events
 Synchronous event processing failed for event batch with sequencer counters.*
@@ -67,6 +70,9 @@ Your detailed API event logging is turned on but you are doing quite a few concu
 
 # TODO(#8295): Remove this once fixed in Canton
 UNAUTHORIZED_TOPOLOGY_TRANSACTION
+
+# TODO(#8091): investigate and remove once fixed
+MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received an unauthorized mediator response
 
 # TODO(#8507): investigate and decide if we want to remove it once fixed
 Late processing \(or clock skew\) of batch with counter.*after sequencing
