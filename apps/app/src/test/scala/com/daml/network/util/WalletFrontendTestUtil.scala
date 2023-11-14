@@ -5,12 +5,15 @@ import com.daml.network.util.WalletFrontendTestUtil.FrontendTransaction
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 
+import scala.concurrent.duration.*
+
 trait WalletFrontendTestUtil { self: FrontendTestCommon =>
 
   protected def tapCoins(tapQuantity: BigDecimal)(implicit webDriver: WebDriverType): Unit = {
     // The eventually makes this robust against `StaleElementReferenceException` errors
-    val transactionsBefore =
-      eventually()(findAll(className("tx-row")).toSeq.map(readTransactionFromRow))
+    val transactionsBefore = eventually(timeUntilSuccess = 1.minute)(
+      findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
+    )
 
     click on "tap-amount-field"
     numberField("tap-amount-field").underlying.clear()
@@ -19,7 +22,7 @@ trait WalletFrontendTestUtil { self: FrontendTestCommon =>
 
     // Make sure the tap has been processed
     // This will have to change if we add a reload button here instead of auto-refreshing transactions.
-    eventually() {
+    eventually(timeUntilSuccess = 1.minute) {
       val transactionsAfter = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
       val newTxs = transactionsAfter.diff(transactionsBefore)
       forExactly(1, newTxs) { balanceChange =>
