@@ -13,9 +13,6 @@ resources:
     cpu: 1
     memory: 4096Mi
 
-domain:
-  enable: true
-
 metrics:
   enable: false
   release: prometheus-grafana-monitoring

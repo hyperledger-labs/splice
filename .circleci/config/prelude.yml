@@ -41,11 +41,6 @@ parameters:
   bootstrapping-config:
     type: string
     default: ""
-  # Disable the CometBFT driver for the global domain sequencer
-  # TODO(#7344) remove once the driver is stable
-  disable-cometbft-driver:
-    type: boolean
-    default: false
 
 notify-fail: &notify-fail
   context: slack-context

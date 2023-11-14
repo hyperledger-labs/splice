@@ -16,7 +16,6 @@ import {
   SvIdKey,
   CnInput,
 } from 'cn-pulumi-common';
-import { globalDomainSequencerDriver } from 'cn-pulumi-common/src/global-domain';
 
 import { installDocs } from './docs';
 import { configureForwardAll } from './gateway';
@@ -176,7 +175,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     topupConfig,
     withDomainNode: true,
     auth0ValidatorAppName: 'sv1_validator',
-    sequencerDriver: globalDomainSequencerDriver,
+    sequencerDriver: 'cometbft',
   });
 
   if (!singleSv) {
@@ -196,7 +195,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       auth0ValidatorAppName: 'sv2_validator',
       bootstrappingDumpConfig,
       topupConfig,
-      sequencerDriver: globalDomainSequencerDriver,
+      sequencerDriver: 'cometbft',
     });
     await installSvNode({
       auth0Client,
@@ -214,7 +213,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       auth0ValidatorAppName: 'sv3_validator',
       bootstrappingDumpConfig,
       topupConfig,
-      sequencerDriver: globalDomainSequencerDriver,
+      sequencerDriver: 'cometbft',
     });
     await installSvNode({
       auth0Client,
@@ -232,7 +231,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       auth0ValidatorAppName: 'sv4_validator',
       bootstrappingDumpConfig,
       topupConfig,
-      sequencerDriver: globalDomainSequencerDriver,
+      sequencerDriver: 'cometbft',
     });
   }
 

@@ -390,7 +390,8 @@
           "enabled": true
         },
         "domain": {
-          "enable": true
+          "sequencerAvailabilityDelay": "60 seconds",
+          "sequencerPublicUrl": "https://sequencer.sv.svc.svrun.network.canton.global"
         },
         "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",

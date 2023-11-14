@@ -34,7 +34,7 @@ import {
 
 import { auth0Cfg } from './auth0cfg';
 import { SvAppConfig, ValidatorAppConfig } from './config';
-import { includesCometBftGlobalDomainNode, installGlobalDomainNode } from './globalDomain';
+import { installGlobalDomainNode } from './globalDomain';
 import { walletUIClientId, directoryClientId, svUIClientId } from './secrets';
 import { CLUSTER_BASENAME, localCharts, TARGET_CLUSTER, version } from './utils';
 
@@ -261,9 +261,6 @@ async function installSvAndValidator(config: SvConfig) {
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
     approvedSvIdentities,
-    domain: {
-      enable: includesCometBftGlobalDomainNode,
-    },
     cometBFT: {
       enabled: true,
       connectionUri: cometBftConnectionUri,

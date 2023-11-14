@@ -510,12 +510,6 @@ Given approval, a manual deployment of `main` can be done as follows:
 4. When deploying a network that bootstraps from ACS and participant identities dumps (such as `TestNet` and `CIDaily TestNet`), you might need to override the default bootstrapping config using an additional `bootstrapping-config` parameter. See [Bootstrapping from a Cluster Data Dump](#bootstrapping-from-a-cluster-data-dump).
 5. Observe progress of the job via the CI console.
 
-#### Optional deployment settings
-
-For the manual deployments the following optional configs are available via parameters:
-
-- add the parameter `disable-cometbft-driver` with value `true` to use the reference driver for the global domain and not the CometBFT driver
-
 #### Confirming the Deployment
 
 To confirm the deployment, you can use a command like the following to
