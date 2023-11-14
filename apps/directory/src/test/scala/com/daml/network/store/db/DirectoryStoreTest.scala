@@ -47,11 +47,9 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
             store.multiDomainAcsStore
           )
         } yield {
-          eventually() {
-            store.lookupInstallByUserWithOffset(userParty(2)).futureValue.value should be(
-              None
-            )
-          }
+          store.lookupInstallByUserWithOffset(userParty(2)).futureValue.value should be(
+            None
+          )
         }
       }
 
@@ -67,11 +65,9 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
             store.multiDomainAcsStore
           )
         } yield {
-          eventually() {
-            store.lookupInstallByUserWithOffset(userParty(2)).futureValue.value should be(
-              Some(wantedContract)
-            )
-          }
+          store.lookupInstallByUserWithOffset(userParty(2)).futureValue.value should be(
+            Some(wantedContract)
+          )
         }
       }
 
@@ -98,11 +94,9 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
             store.multiDomainAcsStore
           )
         } yield {
-          eventually() {
-            store.lookupEntryByNameWithOffset("wanted").futureValue.value should be(
-              Some(wantedContract)
-            )
-          }
+          store.lookupEntryByNameWithOffset("wanted").futureValue.value should be(
+            Some(wantedContract)
+          )
         }
       }
 
@@ -144,11 +138,9 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
               IdleDirectorySubscription(AssignedContract(idleContract, dummyDomain), ctxContract)
             }
             .reverse
-          eventually() {
-            store
-              .listExpiredDirectorySubscriptions(CantonTimestamp.now(), PageLimit.tryCreate(3))
-              .futureValue should be(expected)
-          }
+          store
+            .listExpiredDirectorySubscriptions(CantonTimestamp.now(), PageLimit.tryCreate(3))
+            .futureValue should be(expected)
         }
       }
 
@@ -172,9 +164,7 @@ abstract class DirectoryStoreTest extends StoreTest with HasExecutionContext {
             store.multiDomainAcsStore
           )
         } yield {
-          eventually() {
-            store.lookupEntryByParty(userParty(2)).futureValue should be(Some(aContract))
-          }
+          store.lookupEntryByParty(userParty(2)).futureValue should be(Some(aContract))
         }
       }
 

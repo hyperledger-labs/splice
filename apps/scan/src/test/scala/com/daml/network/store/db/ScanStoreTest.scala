@@ -72,12 +72,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             store.multiDomainAcsStore
           )
         } yield {
-          eventually() {
-            store.getTotalCoinBalance(1).futureValue shouldBe (0.0)
-            // 100.0 is the initial amount as of round 0, so at the end of round 2 the holding fee was applied three times
-            store.getTotalCoinBalance(2).futureValue shouldBe (coinAmount - 3 * holdingFee)
-            store.getTotalCoinBalance(3).futureValue shouldBe (coinAmount - 4 * holdingFee)
-          }
+          store.getTotalCoinBalance(1).futureValue shouldBe (0.0)
+          // 100.0 is the initial amount as of round 0, so at the end of round 2 the holding fee was applied three times
+          store.getTotalCoinBalance(2).futureValue shouldBe (coinAmount - 3 * holdingFee)
+          store.getTotalCoinBalance(3).futureValue shouldBe (coinAmount - 4 * holdingFee)
         }
       }
 
@@ -106,15 +104,13 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             store.multiDomainAcsStore
           )
         } yield {
-          eventually() {
-            store.getTotalCoinBalance(1).futureValue shouldBe (coinRound1 - 1 * holdingFee)
-            store
-              .getTotalCoinBalance(2)
-              .futureValue shouldBe (coinRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
-            store
-              .getTotalCoinBalance(3)
-              .futureValue shouldBe (coinRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
-          }
+          store.getTotalCoinBalance(1).futureValue shouldBe (coinRound1 - 1 * holdingFee)
+          store
+            .getTotalCoinBalance(2)
+            .futureValue shouldBe (coinRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
+          store
+            .getTotalCoinBalance(3)
+            .futureValue shouldBe (coinRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
         }
       }
 
@@ -143,15 +139,13 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             store.multiDomainAcsStore
           )
         } yield {
-          eventually() {
-            store.getTotalCoinBalance(1).futureValue shouldBe (coinRound1 - 1 * holdingFee)
-            store
-              .getTotalCoinBalance(2)
-              .futureValue shouldBe (coinRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
-            store
-              .getTotalCoinBalance(3)
-              .futureValue shouldBe (coinRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
-          }
+          store.getTotalCoinBalance(1).futureValue shouldBe (coinRound1 - 1 * holdingFee)
+          store
+            .getTotalCoinBalance(2)
+            .futureValue shouldBe (coinRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
+          store
+            .getTotalCoinBalance(3)
+            .futureValue shouldBe (coinRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
         }
       }
 
@@ -163,12 +157,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             store.multiDomainAcsStore
           )
         } yield {
-          eventually() {
-            store.getTotalCoinBalance(1).futureValue shouldBe (0.0)
-            // The coin is minted at round 2, so at the end of that round it's already incurring 1 x holding fee
-            store.getTotalCoinBalance(2).futureValue shouldBe (mintAmount - 1 * holdingFee)
-            store.getTotalCoinBalance(3).futureValue shouldBe (mintAmount - 2 * holdingFee)
-          }
+          store.getTotalCoinBalance(1).futureValue shouldBe (0.0)
+          // The coin is minted at round 2, so at the end of that round it's already incurring 1 x holding fee
+          store.getTotalCoinBalance(2).futureValue shouldBe (mintAmount - 1 * holdingFee)
+          store.getTotalCoinBalance(3).futureValue shouldBe (mintAmount - 2 * holdingFee)
         }
       }
 
@@ -204,11 +196,9 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               )(store.multiDomainAcsStore)
           }
         } yield {
-          eventually() {
-            store
-              .getTotalRewardsCollectedEver()
-              .futureValue shouldBe validatorRewards.sum + appRewards.sum
-          }
+          store
+            .getTotalRewardsCollectedEver()
+            .futureValue shouldBe validatorRewards.sum + appRewards.sum
         }
       }
 
@@ -258,11 +248,9 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             )(store.multiDomainAcsStore)
           }
         } yield {
-          eventually() {
-            store.getRewardsCollectedInRound(1).futureValue shouldBe validatorRewards(
-              1
-            ) + appRewards(1)
-          }
+          store.getRewardsCollectedInRound(1).futureValue shouldBe validatorRewards(
+            1
+          ) + appRewards(1)
         }
       }
 
@@ -280,20 +268,18 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         } yield {
           transactionTreeSource.addTree(wantedTx)
           transactionTreeSource.addTree(unwantedTx)
-          eventually() {
-            val logEntry = store.getCoinConfigForRound(round = 2).futureValue
-            logEntry.indexRecord match {
-              case OpenMiningRoundIndexRecord(_, _, _, round) =>
-                round should be(wanted.payload.round.number)
-              case x =>
-                fail(s"Index record was not an OpenMiningRoundIndexRecord but a $x")
-            }
-            numeric(logEntry.coinCreateFee) should be(
-              numeric(
-                wanted.payload.transferConfigUsd.createFee.fee.divide(wanted.payload.coinPrice)
-              )
-            )
+          val logEntry = store.getCoinConfigForRound(round = 2).futureValue
+          logEntry.indexRecord match {
+            case OpenMiningRoundIndexRecord(_, _, _, round) =>
+              round should be(wanted.payload.round.number)
+            case x =>
+              fail(s"Index record was not an OpenMiningRoundIndexRecord but a $x")
           }
+          numeric(logEntry.coinCreateFee) should be(
+            numeric(
+              wanted.payload.transferConfigUsd.createFee.fee.divide(wanted.payload.coinPrice)
+            )
+          )
         }
       }
 
@@ -325,11 +311,9 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           transactionTreeSource.addTree(wantedOpenTx)
           transactionTreeSource.addTree(unwantedOpenTx)
           transactionTreeSource.addTree(closedTx)
-          eventually() {
-            val (round, effectiveAt) = store.getRoundOfLatestData().futureValue
-            round should be(2)
-            effectiveAt should be(closeTime)
-          }
+          val (round, effectiveAt) = store.getRoundOfLatestData().futureValue
+          round should be(2)
+          effectiveAt should be(closeTime)
         }
       }
 
@@ -340,10 +324,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           wantedOpenTx <- dummyDomain.create(open)(store.multiDomainAcsStore)
         } yield {
           transactionTreeSource.addTree(wantedOpenTx)
-          eventually() {
-            val failure = store.getRoundOfLatestData().failed.futureValue
-            failure.getMessage should be(txLogNotFound().getMessage)
-          }
+          val failure = store.getRoundOfLatestData().failed.futureValue
+          failure.getMessage should be(txLogNotFound().getMessage)
         }
       }
 
@@ -363,10 +345,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         } yield {
           transactionTreeSource.addTree(openAfterTx)
           transactionTreeSource.addTree(closedTx)
-          eventually() {
-            val failure = store.getRoundOfLatestData().failed.futureValue
-            failure.getMessage should be(txLogNotFound().getMessage)
-          }
+          val failure = store.getRoundOfLatestData().failed.futureValue
+          failure.getMessage should be(txLogNotFound().getMessage)
         }
       }
 
@@ -418,12 +398,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         transactionTreeSource.addTree(openTx)
         transactionTreeSource.addTree(closedTx)
         rewardTxs.foreach(transactionTreeSource.addTree)
-        eventually() {
-          getTopProviders(store, asOfEndOfRound, 2).futureValue shouldBe Seq(
-            userParty(3) -> BigDecimal(4.0 * 3),
-            userParty(1) -> BigDecimal(4.0 * 2),
-          )
-        }
+        getTopProviders(store, asOfEndOfRound, 2).futureValue shouldBe Seq(
+          userParty(3) -> BigDecimal(4.0 * 3),
+          userParty(1) -> BigDecimal(4.0 * 2),
+        )
       }
     }
 
@@ -533,26 +511,24 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           transactionTreeSource.addTree(openTx)
           transactionTreeSource.addTree(closedTx)
           trafficPurchaseUpdates.foreach(transactionTreeSource.addTree)
-          eventually() {
-            store
-              .getTopValidatorsByPurchasedTraffic(asOfEndOfRound, limit = 2)
-              .futureValue shouldBe Seq(
-              HttpScanAppClient.ValidatorPurchasedTraffic(
-                validator = userParty(1),
-                numPurchases = 3,
-                totalTrafficPurchased = 4 * 3,
-                totalCcSpent = 2.0 * 3,
-                lastPurchasedInRound = 3,
-              ),
-              HttpScanAppClient.ValidatorPurchasedTraffic(
-                validator = userParty(3),
-                numPurchases = 2,
-                totalTrafficPurchased = 4 * 2,
-                totalCcSpent = 3.0 * 2,
-                lastPurchasedInRound = 2,
-              ),
-            )
-          }
+          store
+            .getTopValidatorsByPurchasedTraffic(asOfEndOfRound, limit = 2)
+            .futureValue shouldBe Seq(
+            HttpScanAppClient.ValidatorPurchasedTraffic(
+              validator = userParty(1),
+              numPurchases = 3,
+              totalTrafficPurchased = 4 * 3,
+              totalCcSpent = 2.0 * 3,
+              lastPurchasedInRound = 3,
+            ),
+            HttpScanAppClient.ValidatorPurchasedTraffic(
+              validator = userParty(3),
+              numPurchases = 2,
+              totalTrafficPurchased = 4 * 2,
+              totalCcSpent = 3.0 * 2,
+              lastPurchasedInRound = 2,
+            ),
+          )
         }
       }
 
@@ -566,12 +542,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           store <- mkStore()
           _ <- dummyDomain.create(cr)(store.multiDomainAcsStore)
         } yield {
-          eventually() {
-            store
-              .lookupCoinRules()
-              .futureValue
-              .map(_.contract) should be(Some(cr))
-          }
+          store
+            .lookupCoinRules()
+            .futureValue
+            .map(_.contract) should be(Some(cr))
         }
       }
 
@@ -584,12 +558,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           store <- mkStore()
           _ <- dummyDomain.create(cr)(store.multiDomainAcsStore)
         } yield {
-          eventually() {
-            store
-              .lookupCnsRules()
-              .futureValue
-              .map(_.contract) should be(Some(cr))
-          }
+          store
+            .lookupCnsRules()
+            .futureValue
+            .map(_.contract) should be(Some(cr))
         }
       }
     }
@@ -601,12 +573,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           store <- mkStore()
           _ <- dummyDomain.create(sr)(store.multiDomainAcsStore)
         } yield {
-          eventually() {
-            store
-              .lookupSvcRules()
-              .futureValue
-              .map(_.contract) should be(Some(sr))
-          }
+          store
+            .lookupSvcRules()
+            .futureValue
+            .map(_.contract) should be(Some(sr))
         }
       }
     }
@@ -623,12 +593,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           _ <- dummyDomain.create(unwanted)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(wanted2)(store.multiDomainAcsStore)
         } yield {
-          eventually() {
-            store
-              .listImportCrates(userParty(1))
-              .futureValue
-              .map(_.contract) should contain theSameElementsAs Set(wanted1, wanted2)
-          }
+          store
+            .listImportCrates(userParty(1))
+            .futureValue
+            .map(_.contract) should contain theSameElementsAs Set(wanted1, wanted2)
         }
       }
 
@@ -644,7 +612,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           store <- mkStore()
           _ <- dummyDomain.create(wanted)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(unwanted)(store.multiDomainAcsStore)
-        } yield eventually() {
+        } yield {
           store
             .findFeaturedAppRight(userParty(1))
             .futureValue should be(expectedResult)
@@ -806,50 +774,48 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             }
           }
         } yield {
-          eventually() {
-            val firstPageDescending = store
-              .listByType[TransferLogEntry](None, SortOrder.Descending, limit)
-              .futureValue
-              .toList
+          val firstPageDescending = store
+            .listByType[TransferLogEntry](None, SortOrder.Descending, limit)
+            .futureValue
+            .toList
 
-            firstPageDescending
-              .map(stripEventId) should be(
-              expectedFirstPage
-                .map(stripEventId)
+          firstPageDescending
+            .map(stripEventId) should be(
+            expectedFirstPage
+              .map(stripEventId)
+          )
+          val nextPageDescending = store
+            .listByType[TransferLogEntry](
+              Some(firstPageDescending.last.indexRecord.eventId),
+              SortOrder.Descending,
+              limit,
             )
-            val nextPageDescending = store
-              .listByType[TransferLogEntry](
-                Some(firstPageDescending.last.indexRecord.eventId),
-                SortOrder.Descending,
-                limit,
-              )
-              .futureValue
-              .toList
+            .futureValue
+            .toList
 
-            nextPageDescending
-              .map(stripEventId) should be(
-              expectedSecondPage
-                .map(stripEventId)
+          nextPageDescending
+            .map(stripEventId) should be(
+            expectedSecondPage
+              .map(stripEventId)
+          )
+
+          val firstPageAscending = store
+            .listByType[TransferLogEntry](None, SortOrder.Ascending, limit)
+            .futureValue
+            .toList
+
+          firstPageAscending should be(nextPageDescending.reverse)
+
+          val nextPageAscending = store
+            .listByType[TransferLogEntry](
+              Some(firstPageAscending.last.indexRecord.eventId),
+              SortOrder.Ascending,
+              limit,
             )
+            .futureValue
+            .toList
 
-            val firstPageAscending = store
-              .listByType[TransferLogEntry](None, SortOrder.Ascending, limit)
-              .futureValue
-              .toList
-
-            firstPageAscending should be(nextPageDescending.reverse)
-
-            val nextPageAscending = store
-              .listByType[TransferLogEntry](
-                Some(firstPageAscending.last.indexRecord.eventId),
-                SortOrder.Ascending,
-                limit,
-              )
-              .futureValue
-              .toList
-
-            nextPageAscending should be(firstPageDescending.reverse)
-          }
+          nextPageAscending should be(firstPageDescending.reverse)
         }
       }
     }

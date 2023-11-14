@@ -42,11 +42,9 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
             createdEventSignatories = Seq(storeSvParty),
           )(store.multiDomainAcsStore)
         } yield {
-          eventually() {
-            store.lookupValidatorOnboardingBySecretWithOffset("good_secret").futureValue should be(
-              QueryResult(secondOffset, Some(wanted))
-            )
-          }
+          store.lookupValidatorOnboardingBySecretWithOffset("good_secret").futureValue should be(
+            QueryResult(secondOffset, Some(wanted))
+          )
         }
       }
 
@@ -77,11 +75,9 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
             createdEventSignatories = Seq(storeSvParty),
           )(store.multiDomainAcsStore)
         } yield {
-          eventually() {
-            store.lookupUsedSecretWithOffset("good_secret").futureValue should be(
-              QueryResult(secondOffset, Some(wanted))
-            )
-          }
+          store.lookupUsedSecretWithOffset("good_secret").futureValue should be(
+            QueryResult(secondOffset, Some(wanted))
+          )
         }
       }
 
@@ -105,11 +101,9 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
             createdEventSignatories = Seq(storeSvParty),
           )(store.multiDomainAcsStore)
         } yield {
-          eventually() {
-            store.lookupApprovedSvIdentityByNameWithOffset("good_name").futureValue should be(
-              QueryResult(secondOffset, Some(wanted))
-            )
-          }
+          store.lookupApprovedSvIdentityByNameWithOffset("good_name").futureValue should be(
+            QueryResult(secondOffset, Some(wanted))
+          )
         }
       }
 

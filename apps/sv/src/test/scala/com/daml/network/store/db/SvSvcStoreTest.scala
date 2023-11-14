@@ -811,11 +811,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
               IdleCnsSubscription(idleContract, ctxContract)
             }
             .reverse
-          eventually() {
-            store
-              .listExpiredCnsSubscriptions(CantonTimestamp.now(), limit = PageLimit.tryCreate(3))
-              .futureValue should be(expected)
-          }
+          store
+            .listExpiredCnsSubscriptions(CantonTimestamp.now(), limit = PageLimit.tryCreate(3))
+            .futureValue should be(expected)
         }
       }
 

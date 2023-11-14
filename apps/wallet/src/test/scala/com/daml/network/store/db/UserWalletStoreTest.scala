@@ -54,11 +54,9 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             store.multiDomainAcsStore
           )
         } yield {
-          eventually() {
-            store.getInstall().futureValue.contractId should be(
-              wantedContract.contractId
-            )
-          }
+          store.getInstall().futureValue.contractId should be(
+            wantedContract.contractId
+          )
         }
       }
 
@@ -72,14 +70,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummyDomain.createMulti(install1, createdEventSignatories = Seq(user1))(allAcsStores)
           _ <- dummyDomain.createMulti(install2, createdEventSignatories = Seq(user2))(allAcsStores)
         } yield {
-          eventually() {
-            store1.getInstall().futureValue.contractId should be(
-              install1.contractId
-            )
-            store2.getInstall().futureValue.contractId should be(
-              install2.contractId
-            )
-          }
+          store1.getInstall().futureValue.contractId should be(
+            install1.contractId
+          )
+          store2.getInstall().futureValue.contractId should be(
+            install2.contractId
+          )
         }
       }
 
@@ -104,16 +100,14 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             .futureValue
             .map(_.contract.contractId)
 
-          eventually() {
-            cidsAt(time(0)) should be(empty)
-            cidsAt(time(1)) should be(empty)
-            cidsAt(time(2)) should contain theSameElementsAs Seq(offer1.contractId)
-            cidsAt(time(3)) should contain theSameElementsAs Seq(offer1.contractId)
-            cidsAt(time(4)) should contain theSameElementsAs Seq(
-              offer1.contractId,
-              offer3.contractId,
-            )
-          }
+          cidsAt(time(0)) should be(empty)
+          cidsAt(time(1)) should be(empty)
+          cidsAt(time(2)) should contain theSameElementsAs Seq(offer1.contractId)
+          cidsAt(time(3)) should contain theSameElementsAs Seq(offer1.contractId)
+          cidsAt(time(4)) should contain theSameElementsAs Seq(
+            offer1.contractId,
+            offer3.contractId,
+          )
         }
       }
 
@@ -138,16 +132,14 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             .futureValue
             .map(_.contract.contractId)
 
-          eventually() {
-            cidsAt(time(0)) should be(empty)
-            cidsAt(time(1)) should be(empty)
-            cidsAt(time(2)) should contain theSameElementsAs Seq(offer1.contractId)
-            cidsAt(time(3)) should contain theSameElementsAs Seq(offer1.contractId)
-            cidsAt(time(4)) should contain theSameElementsAs Seq(
-              offer1.contractId,
-              offer3.contractId,
-            )
-          }
+          cidsAt(time(0)) should be(empty)
+          cidsAt(time(1)) should be(empty)
+          cidsAt(time(2)) should contain theSameElementsAs Seq(offer1.contractId)
+          cidsAt(time(3)) should contain theSameElementsAs Seq(offer1.contractId)
+          cidsAt(time(4)) should contain theSameElementsAs Seq(
+            offer1.contractId,
+            offer3.contractId,
+          )
         }
       }
 
@@ -281,16 +273,14 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             .futureValue
             .map(_.contract.contractId)
 
-          eventually() {
-            cidsAt(time(0)) should be(empty)
-            cidsAt(time(1)) should be(empty)
-            cidsAt(time(2)) should contain theSameElementsAs Seq(request1.contractId)
-            cidsAt(time(3)) should contain theSameElementsAs Seq(request1.contractId)
-            cidsAt(time(4)) should contain theSameElementsAs Seq(
-              request1.contractId,
-              request3.contractId,
-            )
-          }
+          cidsAt(time(0)) should be(empty)
+          cidsAt(time(1)) should be(empty)
+          cidsAt(time(2)) should contain theSameElementsAs Seq(request1.contractId)
+          cidsAt(time(3)) should contain theSameElementsAs Seq(request1.contractId)
+          cidsAt(time(4)) should contain theSameElementsAs Seq(
+            request1.contractId,
+            request3.contractId,
+          )
         }
       }
 
@@ -341,32 +331,30 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
               ]
           ) = r.contractId.contractId
 
-          eventually() {
-            // Listing - user only sees their own request
-            val actual1 = store1.listAppPaymentRequests().futureValue.map(resultCids)
-            val expected1 = Seq(
-              request1.contractId.contractId
-            )
-            actual1 should contain theSameElementsInOrderAs expected1
+          // Listing - user only sees their own request
+          val actual1 = store1.listAppPaymentRequests().futureValue.map(resultCids)
+          val expected1 = Seq(
+            request1.contractId.contractId
+          )
+          actual1 should contain theSameElementsInOrderAs expected1
 
-            // Listing - user only sees their own request
-            val actual2 = store2.listAppPaymentRequests().futureValue.map(resultCids)
-            val expected2 = Seq(
-              request2.contractId.contractId
-            )
-            actual2 should contain theSameElementsInOrderAs expected2
+          // Listing - user only sees their own request
+          val actual2 = store2.listAppPaymentRequests().futureValue.map(resultCids)
+          val expected2 = Seq(
+            request2.contractId.contractId
+          )
+          actual2 should contain theSameElementsInOrderAs expected2
 
-            // Listing - provider doesn't see any request
-            val actualP = storeP.listAppPaymentRequests().futureValue.map(resultCids)
-            actualP should be(empty)
+          // Listing - provider doesn't see any request
+          val actualP = storeP.listAppPaymentRequests().futureValue.map(resultCids)
+          actualP should be(empty)
 
-            // Pointwise lookup - only user1 store should see request1
-            store1.getAppPaymentRequest(request1.contractId).map(resultCids).futureValue should be(
-              request1.contractId.contractId
-            )
-            assertThrows[Throwable](store2.getAppPaymentRequest(request1.contractId).futureValue)
-            assertThrows[Throwable](storeP.getAppPaymentRequest(request1.contractId).futureValue)
-          }
+          // Pointwise lookup - only user1 store should see request1
+          store1.getAppPaymentRequest(request1.contractId).map(resultCids).futureValue should be(
+            request1.contractId.contractId
+          )
+          assertThrows[Throwable](store2.getAppPaymentRequest(request1.contractId).futureValue)
+          assertThrows[Throwable](storeP.getAppPaymentRequest(request1.contractId).futureValue)
         }
       }
 
@@ -421,21 +409,19 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           ) =
             r.contractId.contractId
 
-          eventually() {
-            // Listing - only request1 should be visible
-            val actual = store1.listAppPaymentRequests().futureValue.map(resultCids)
-            val expected = Seq(
-              request1.contractId.contractId
-            )
-            actual should contain theSameElementsInOrderAs expected
+          // Listing - only request1 should be visible
+          val actual = store1.listAppPaymentRequests().futureValue.map(resultCids)
+          val expected = Seq(
+            request1.contractId.contractId
+          )
+          actual should contain theSameElementsInOrderAs expected
 
-            // Pointwise lookup - only request1 should be visible
-            store1.getAppPaymentRequest(request1.contractId).map(resultCids).futureValue should be(
-              request1.contractId.contractId
-            )
-            assertThrows[Throwable](store1.getAppPaymentRequest(request2.contractId).futureValue)
-            assertThrows[Throwable](store1.getAppPaymentRequest(request3.contractId).futureValue)
-          }
+          // Pointwise lookup - only request1 should be visible
+          store1.getAppPaymentRequest(request1.contractId).map(resultCids).futureValue should be(
+            request1.contractId.contractId
+          )
+          assertThrows[Throwable](store1.getAppPaymentRequest(request2.contractId).futureValue)
+          assertThrows[Throwable](store1.getAppPaymentRequest(request3.contractId).futureValue)
         }
       }
     }
@@ -472,14 +458,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             .futureValue
             .map(_.contract.contractId)
 
-          eventually() {
-            cidsAt(time(1)) should be(empty)
-            cidsAt(time(2)) should contain theSameElementsAs Seq(idleState1.contractId)
-            cidsAt(time(3)) should contain theSameElementsAs Seq(
-              idleState2.contractId,
-              idleState1.contractId,
-            )
-          }
+          cidsAt(time(1)) should be(empty)
+          cidsAt(time(2)) should contain theSameElementsAs Seq(idleState1.contractId)
+          cidsAt(time(3)) should contain theSameElementsAs Seq(
+            idleState2.contractId,
+            idleState1.contractId,
+          )
         }
       }
 
@@ -533,14 +517,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
           _ <- dummyDomain.createMulti(state2, createdEventSignatories = Seq(user1))(allAcsStores)
         } yield {
-          eventually() {
-            val actual = resultCids(store1)
-            val expected = Seq(
-              subscription1.contractId.contractId -> state1.contractId.contractId,
-              subscription2.contractId.contractId -> state2.contractId.contractId,
-            )
-            actual should contain theSameElementsAs expected
-          }
+          val actual = resultCids(store1)
+          val expected = Seq(
+            subscription1.contractId.contractId -> state1.contractId.contractId,
+            subscription2.contractId.contractId -> state2.contractId.contractId,
+          )
+          actual should contain theSameElementsAs expected
         }
       }
 
@@ -571,13 +553,11 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             store1.multiDomainAcsStore
           )
         } yield {
-          eventually() {
-            val actual = resultCids(store1)
-            val expected = Seq(
-              subscription1.contractId.contractId -> state2.contractId.contractId
-            )
-            actual should contain theSameElementsAs expected
-          }
+          val actual = resultCids(store1)
+          val expected = Seq(
+            subscription1.contractId.contractId -> state2.contractId.contractId
+          )
+          actual should contain theSameElementsAs expected
         }
       }
 
@@ -598,10 +578,8 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummyDomain.archive(state1)(store1.multiDomainAcsStore)
           _ <- dummyDomain.archive(subscription1)(store1.multiDomainAcsStore)
         } yield {
-          eventually() {
-            val actual = resultCids(store1)
-            actual should be(empty)
-          }
+          val actual = resultCids(store1)
+          actual should be(empty)
         }
       }
     }
@@ -634,31 +612,29 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           )
           _ <- dummyDomain.createMulti(request2, createdEventSignatories = Seq(user2))(allAcsStores)
         } yield {
-          eventually() {
-            // Listing - user only sees their own request
-            val actual1 = store1.listSubscriptionRequests().futureValue.map(_.contractId)
-            val expected1 = Seq(request1.contractId)
-            actual1 should contain theSameElementsInOrderAs expected1
+          // Listing - user only sees their own request
+          val actual1 = store1.listSubscriptionRequests().futureValue.map(_.contractId)
+          val expected1 = Seq(request1.contractId)
+          actual1 should contain theSameElementsInOrderAs expected1
 
-            // Listing - user only sees their own request
-            val actual2 = store2.listSubscriptionRequests().futureValue.map(_.contractId)
-            val expected2 = Seq(request2.contractId)
-            actual2 should contain theSameElementsInOrderAs expected2
+          // Listing - user only sees their own request
+          val actual2 = store2.listSubscriptionRequests().futureValue.map(_.contractId)
+          val expected2 = Seq(request2.contractId)
+          actual2 should contain theSameElementsInOrderAs expected2
 
-            // Listing - provider doesn't see any request
-            val actualP = storeP.listSubscriptionRequests().futureValue.map(_.contractId)
-            actualP should be(empty)
+          // Listing - provider doesn't see any request
+          val actualP = storeP.listSubscriptionRequests().futureValue.map(_.contractId)
+          actualP should be(empty)
 
-            // Pointwise lookup - only user1 store should see request1
-            store1
-              .getSubscriptionRequest(request1.contractId)
-              .futureValue
-              .contractId should be(
-              request1.contractId
-            )
-            assertThrows[Throwable](store2.getSubscriptionRequest(request1.contractId).futureValue)
-            assertThrows[Throwable](storeP.getSubscriptionRequest(request1.contractId).futureValue)
-          }
+          // Pointwise lookup - only user1 store should see request1
+          store1
+            .getSubscriptionRequest(request1.contractId)
+            .futureValue
+            .contractId should be(
+            request1.contractId
+          )
+          assertThrows[Throwable](store2.getSubscriptionRequest(request1.contractId).futureValue)
+          assertThrows[Throwable](storeP.getSubscriptionRequest(request1.contractId).futureValue)
         }
       }
 
@@ -680,20 +656,18 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
               .futureValue
               .map(_._1.toDouble)
 
-          eventually() {
-            // Values of the 4 coins by time:
-            // 11 10 09 08 07 06 05 04 03 02
-            //    12 10 08 06 04 02 00 00 00
-            //       13 09 05 01 00 00 00 00
-            //          10 09 08 07 06 05 04
-            // Note: need to start at round 4, as listSortedCoinsAndQuantity() does not filter out coins
-            // created after the given round
-            top3At(4L) should contain theSameElementsAs Seq(10.0, 9.0, 8.0)
-            top3At(5L) should contain theSameElementsAs Seq(9.0, 7.0, 6.0)
-            top3At(6L) should contain theSameElementsAs Seq(8.0, 6.0, 4.0)
-            top3At(7L) should contain theSameElementsAs Seq(7.0, 5.0, 2.0)
-            top3At(8L) should contain theSameElementsAs Seq(6.0, 4.0)
-          }
+          // Values of the 4 coins by time:
+          // 11 10 09 08 07 06 05 04 03 02
+          //    12 10 08 06 04 02 00 00 00
+          //       13 09 05 01 00 00 00 00
+          //          10 09 08 07 06 05 04
+          // Note: need to start at round 4, as listSortedCoinsAndQuantity() does not filter out coins
+          // created after the given round
+          top3At(4L) should contain theSameElementsAs Seq(10.0, 9.0, 8.0)
+          top3At(5L) should contain theSameElementsAs Seq(9.0, 7.0, 6.0)
+          top3At(6L) should contain theSameElementsAs Seq(8.0, 6.0, 4.0)
+          top3At(7L) should contain theSameElementsAs Seq(7.0, 5.0, 2.0)
+          top3At(8L) should contain theSameElementsAs Seq(6.0, 4.0)
         }
       }
 
@@ -830,21 +804,19 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             store1.multiDomainAcsStore
           )
         } yield {
-          eventually() {
-            val actual = store1.listDirectoryEntries().futureValue
-            val expected = Seq(
-              UserWalletStore.DirectoryEntryWithPayData(
-                contractId = directoryEntry1.contractId,
-                expiresAt = directoryEntry1.payload.expiresAt,
-                entryName = directoryEntry1.payload.name,
-                amount = state1.payload.payData.paymentAmount.amount,
-                currency = state1.payload.payData.paymentAmount.currency,
-                paymentInterval = state1.payload.payData.paymentInterval,
-                paymentDuration = state1.payload.payData.paymentDuration,
-              )
+          val actual = store1.listDirectoryEntries().futureValue
+          val expected = Seq(
+            UserWalletStore.DirectoryEntryWithPayData(
+              contractId = directoryEntry1.contractId,
+              expiresAt = directoryEntry1.payload.expiresAt,
+              entryName = directoryEntry1.payload.name,
+              amount = state1.payload.payData.paymentAmount.amount,
+              currency = state1.payload.payData.paymentAmount.currency,
+              paymentInterval = state1.payload.payData.paymentInterval,
+              paymentDuration = state1.payload.payData.paymentDuration,
             )
-            actual should contain theSameElementsAs expected
-          }
+          )
+          actual should contain theSameElementsAs expected
         }
       }
 
