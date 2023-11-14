@@ -2466,7 +2466,7 @@ workflows:
         cluster: "cidaily"
         use_published_artifacts: true
         requires:
-          - deploy_cluster
+          - deploy_cluster_cidaily
           - publish_public_release
     - preflight_sv_check:
         name: preflight_sv_check_devnet
