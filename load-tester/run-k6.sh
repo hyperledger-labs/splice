@@ -21,6 +21,7 @@ npm run build
 K6_PROMETHEUS_RW_SERVER_URL="$prometheus_rw" k6 \
     -o experimental-prometheus-rw \
     -e WALLET_URL="$wallet_url" \
+    -e LOAD_TEST_USER="$K6_LOAD_TEST_USER" \
     -e AUTH0_DOMAIN="$auth0_domain" \
     -e AUTH0_CLIENT_ID="$auth0_client_id" \
     run dist/test/load-test.js

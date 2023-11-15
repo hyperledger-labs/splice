@@ -27,7 +27,7 @@ export class Auth0Manager {
     this.auth0Tenant = auth0Tenant;
     this.clientId = clientId;
     this.walletUri = walletUri;
-    this.httpClient = new HttpClient();
+    this.httpClient = new HttpClient(auth0Tenant);
   }
 
   // Step through the /authorize endpoint
@@ -138,7 +138,7 @@ export class Auth0Manager {
     };
 
     return this.httpClient.postSuccess(`${this.auth0Tenant}/oauth/token`, data, headers, resp => {
-      const json: any = resp.json();
+      const json = JSON.parse(resp.body || '{}');
 
       if (json && typeof json.access_token === 'string') {
         return json.access_token;
@@ -148,7 +148,23 @@ export class Auth0Manager {
     });
   };
 
-  public userToken = (username: string, password: string) => {
+  private _parse_credentials = (credentials: string): { username: string; password: string } => {
+    const pair = credentials.split(':');
+    if (pair.length !== 2) {
+      throw new Error(`Failed to parse credentials: ${credentials}`);
+    }
+
+    return { username: pair[0], password: pair[1] };
+  };
+
+  /**
+   *
+   * @param credentials : A string "username:password"
+   * @returns
+   */
+  public authorizationCodeGrant = (credentials: string): string => {
+    const { username, password } = this._parse_credentials(credentials);
+
     const a = this._authorize();
     const l = this._login(a.location, a.state, username, password);
     const r = this._resume(l.location);

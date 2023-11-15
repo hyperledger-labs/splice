@@ -1,4 +1,4 @@
-import http, { RefinedResponse, ResponseType } from 'k6/http';
+import http, { RefinedResponse } from 'k6/http';
 
 export class HttpClient {
   // we're _definitely_ a browser ;)
@@ -10,7 +10,11 @@ export class HttpClient {
     Connection: 'keep-alive',
   };
 
-  constructor() {}
+  private tag: string | undefined;
+
+  constructor(tag: string) {
+    this.tag = tag;
+  }
 
   // base HTTP request with simple error handling
   private _request<R>(
@@ -19,7 +23,7 @@ export class HttpClient {
     body: string | Buffer | undefined,
     expectedStatus: 200 | 302,
     additionalHeaders: Record<string, string>,
-    handleResponse: (resp: RefinedResponse<ResponseType>) => R,
+    handleResponse: (resp: RefinedResponse<'text'>) => R,
   ): R {
     console.log(`Calling ${method} on endpoint: ${url}`);
 
@@ -28,7 +32,13 @@ export class HttpClient {
       ...additionalHeaders,
     };
 
-    const resp = http.request(method, url, body, { headers, redirects: 0 });
+    const tags = this.tag ? { name: this.tag } : undefined;
+
+    const resp = http.request(method, url, body, {
+      headers,
+      tags,
+      redirects: 0,
+    });
 
     if (resp.status !== expectedStatus) {
       console.error(resp.headers, resp.body);
@@ -46,7 +56,7 @@ export class HttpClient {
     method: 'GET' | 'POST',
     body: string | Buffer | undefined,
     additionalHeaders: Record<string, string>,
-    handleResponse: (resp: RefinedResponse<ResponseType>, location: string) => R,
+    handleResponse: (resp: RefinedResponse<'text'>, location: string) => R,
   ): R {
     return this._request(url, method, body, 302, additionalHeaders, resp => {
       const location = resp.headers['Location'];
@@ -63,7 +73,7 @@ export class HttpClient {
   public getRedirect<R>(
     url: string,
     additionalHeaders: Record<string, string>,
-    handleResponse: (resp: RefinedResponse<ResponseType>, location: string) => R,
+    handleResponse: (resp: RefinedResponse<'text'>, location: string) => R,
   ): R {
     return this._redirect(url, 'GET', undefined, additionalHeaders, handleResponse);
   }
@@ -72,7 +82,7 @@ export class HttpClient {
     url: string,
     body: string | Buffer | undefined,
     additionalHeaders: Record<string, string>,
-    handleResponse: (resp: RefinedResponse<ResponseType>, location: string) => R,
+    handleResponse: (resp: RefinedResponse<'text'>, location: string) => R,
   ): R {
     return this._redirect(url, 'POST', body, additionalHeaders, handleResponse);
   }
@@ -81,7 +91,7 @@ export class HttpClient {
     url: string,
     body: string | Buffer | undefined,
     additionalHeaders: Record<string, string>,
-    handleResponse: (resp: RefinedResponse<ResponseType>) => R,
+    handleResponse: (resp: RefinedResponse<'text'>) => R,
   ): R {
     return this._request(url, 'POST', body, 200, additionalHeaders, handleResponse);
   }

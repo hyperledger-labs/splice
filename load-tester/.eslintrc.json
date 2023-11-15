@@ -1,5 +1,7 @@
 {
-  "extends": ["@typescript-eslint/plugin/recommended"],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
   "rules": {
     "curly": ["error"],
     "@typescript-eslint/no-explicit-any": "warn",
