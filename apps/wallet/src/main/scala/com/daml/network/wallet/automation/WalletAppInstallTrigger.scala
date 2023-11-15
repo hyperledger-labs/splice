@@ -47,7 +47,7 @@ class WalletAppInstallTrigger(
         case UnlessShutdown.Outcome(true) =>
           TaskSuccess(s"onboarded wallet end-user '$endUserName'")
         case UnlessShutdown.Outcome(false) =>
-          logger.warn(s"Unexpected duplicate on-boarding of wallet end-user '$endUserName'")
+          logger.info(s"Unexpected duplicate on-boarding of wallet end-user '$endUserName'")
           TaskSuccess(s"skipped duplicate on-boarding wallet end-user '$endUserName'")
       }
     }

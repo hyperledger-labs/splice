@@ -53,9 +53,6 @@ Invalid Status code=405 text=Method Not Allowed","logger_name":"o.o.s.remote.htt
 # TODO(#7696) revisit after migration of tests to vitest
 Trying to re-register template.*
 
-# TODO (#8140) remove when trigger detects reassignment properly
-Unexpected duplicate on-boarding of wallet end-user
-
 .*GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)
 
 # TODO(#8300) Ignore errors related to global domain disconnection and reconnection after sequencers connections changed for now.
