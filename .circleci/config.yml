@@ -1577,6 +1577,9 @@ jobs:
       wait_for_cluster_version:
         type: boolean
         default: true
+      cluster_version:
+        type: string
+        default: ""
     machine:
       image: ubuntu-2004:2023.04.2
     environment:
@@ -1599,6 +1602,12 @@ jobs:
       - setup_vpn
       # Needs to occur before setup_vpn_routes
       - setup_nix
+      - when:
+          condition: << parameters.cluster_version >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Checkout commit << parameters.cluster_version >>
+                cmd: git checkout << parameters.cluster_version >>
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
@@ -1699,6 +1708,9 @@ jobs:
       wait_for_cluster_version:
         type: boolean
         default: true
+      cluster_version:
+        type: string
+        default: ""
     machine:
       image: ubuntu-2004:2023.04.2
     environment:
@@ -1711,6 +1723,12 @@ jobs:
       - setup_vpn
       # Needs to occur before setup_vpn_routes
       - setup_nix
+      - when:
+          condition: << parameters.cluster_version >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Checkout commit << parameters.cluster_version >>
+                cmd: git checkout << parameters.cluster_version >>
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
@@ -1790,6 +1808,9 @@ jobs:
       wait_for_cluster_version:
         type: boolean
         default: true
+      cluster_version:
+        type: string
+        default: ""
     machine:
       image: ubuntu-2004:2023.04.2
     environment:
@@ -1802,6 +1823,12 @@ jobs:
       - setup_vpn
       # Needs to occur before setup_vpn_routes
       - setup_nix
+      - when:
+          condition: << parameters.cluster_version >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Checkout commit << parameters.cluster_version >>
+                cmd: git checkout << parameters.cluster_version >>
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
@@ -2642,6 +2669,7 @@ workflows:
           - datadog
           - slack-context
         cluster: "devnet"
+        cluster_version: "devnet-next"
         # require deploy_cluster and deploy_sv_runbook for stability and reliability
         requires:
           - deploy_cluster
@@ -2654,6 +2682,7 @@ workflows:
           - datadog
           - slack-context
         cluster: "devnet"
+        cluster_version: "devnet-next"
         requires:
           - deploy_sv_runbook
           - preflight_check
@@ -2665,6 +2694,7 @@ workflows:
           - datadog
           - slack-context
         cluster: "devnet"
+        cluster_version: "devnet-next"
         requires:
           - deploy_validator_runbook
 
@@ -2702,6 +2732,7 @@ workflows:
           - datadog
           - slack-context
         cluster: "testnet"
+        cluster_version: "testnet-next"
         requires:
           - deploy_cluster
 
