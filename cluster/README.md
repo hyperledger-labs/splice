@@ -1510,11 +1510,32 @@ Network. Steps to do this are as follows:
       --role "roles/secretmanager.secretAccessor" \
       --condition=title="SA key secret",expression='resource.name.endsWith("secrets/gcp-bucket-sa-key-secret/versions/1")'
    ```
+14. Enable the Service Networking API:
+   ```
+   gcloud services enable servicenetworking.googleapis.com
+   ```
+15. Configure a network path for Google Services (CloudSQL only at the time of writing)
+    to access private networks within the project.
+    ```
+    gcloud compute addresses create google-managed-services-default \
+           --global \
+           --purpose=VPC_PEERING \
+           --prefix-length=20 \
+           --network=projects/${CLOUDSDK_CORE_PROJECT}/global/networks/default
+
+     gcloud services vpc-peerings connect \
+        --service=servicenetworking.googleapis.com \
+        --ranges=google-managed-services-default \
+        --network=default \
+        --project=${CLOUDSDK_CORE_PROJECT}
+     ```
+
 
 ## Cluster Data Dumps
 
-At the time of writing, only TestNet style deployments (i.e., deployment triggered with `export IS_DEVNET=false`) produce
-data dumps. The setup for this works as follows.
+At the time of writing, only TestNet style deployments (i.e.,
+deployment triggered with `export IS_DEVNET=false`) produce data
+dumps. The setup for this works as follows.
 
 All validator apps in a TestNet style deployment get provisioned with a key for
 the service account `da-cn-data-exports@da-cn-devnet.iam.gserviceaccount.com` in the `da-cn-devnet` project. They use
