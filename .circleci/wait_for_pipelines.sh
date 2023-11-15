@@ -77,23 +77,23 @@ write_pages() {
         new_url=$(sed 's/\(&\|?\)page-token=.*$//' <<< "$url")
         if [[ $new_url == *'?'* ]]; then
             next_page_url="${new_url}&page-token=${next_page_token}"
-        else 
+        else
             next_page_url="${new_url}?page-token=${next_page_token}"
         fi
 
         most_recent_date=$(jq -r '.items | sort_by(.created_at)[-1].created_at' <<< "$response")
         if [ "$most_recent_date" != "null" ]; then
-          current_timestamp=$(date +%s)  
+          current_timestamp=$(date +%s)
           date_timestamp=$(date -d "${most_recent_date%.*}" +%s)
           day_ago=$((current_timestamp - max_age_seconds))
           if [ "$date_timestamp" -gt "$day_ago" ]; then
             write_pages "$next_page_url" "$output_file" "$max_age_seconds"
           else
             return 0
-          fi 
-        else 
-          write_pages "$next_page_url" "$output_file" "$max_age_seconds"  
-        fi         
+          fi
+        else
+          write_pages "$next_page_url" "$output_file" "$max_age_seconds"
+        fi
     fi
 }
 
@@ -108,9 +108,10 @@ fetch_pages() {
 run() {
   tmp_pipelines_file="/tmp/pipelines.json"
   tmp_workflows_file="/tmp/workflows.json"
-  fetch_pages "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=main" "$tmp_pipelines_file" "$MAX_AGE_SECONDS"
-
-  PREVIOUS_JOBS=$(jq -c < $tmp_pipelines_file ".items | map(select(.number < $CURRENT_PIPELINE_NUMBER)) | .[] | { number: .number, id: .id}")
+  fetch_pages "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline" "$tmp_pipelines_file" "$MAX_AGE_SECONDS"
+  # Only filter out jobs on the deployment branches and main
+  # Note that .vcs.branch can be null if the workflow is triggered on a tag
+  PREVIOUS_JOBS=$(jq -c < $tmp_pipelines_file ".items | map(select((.vcs.branch // \"\" | test(\"^main|deployment/.*$\")) and (.number|tonumber < $CURRENT_PIPELINE_NUMBER))) | .[] | {number: .number, branch: .vcs.branch, id: .id}")
   if [ "${#PREVIOUS_JOBS}" -gt 0 ]; then
       while IFS= read -r JOB; do
           PIPELINE_NUMBER=$(jq <<< "$JOB" -r '.number')
