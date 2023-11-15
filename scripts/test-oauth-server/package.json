@@ -1,0 +1,14 @@
+{
+  "name": "test-oauth-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/index.mjs"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "oauth2-mock-server": "^7.1.1"
+  }
+}

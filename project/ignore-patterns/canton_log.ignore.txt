@@ -33,6 +33,7 @@ PERMISSION_DENIED.*Could not resolve is_deactivated status for user
 # when authenticating using an auth config that is not the first in the list.
 Could not verify JWT token: The provided Algorithm doesn't match the one defined in the JWT's Header.
 Could not verify JWT token: com.auth0.jwk.SigningKeyNotFoundException: No key found in https://canton-network-test.us.auth0.com/.well-known/jwks.json
+Could not verify JWT token: com.auth0.jwk.NetworkException: Cannot obtain jwks from url http://127.0.0.1:9876/jwks
 
 # Ignore UNAUTHENTICATED errors logged during the invalid token rejection tests
 GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)

@@ -49,6 +49,7 @@
         1. [Setting up `lnav` to Inspect Canton logs](#setting-up-lnav-to-inspect-canton-logs)
         1. [Handling Errors in Integration Tests](#handling-errors-in-integration-tests)
     1. [Testing CircleCI Deployment Config Changes](#testing-circleci-deployment-config-changes)
+    1. [Connecting external tools to the shared Canton instances](#connecting-external-tools-to-the-shared-canton-instances)
 1. [Building and Running the Wallet and Splitwell Apps](#building-and-running-the-wallet-and-splitwell-apps)
     1. [Building the Wallet and Splitwell Frontend](#building-the-wallet-and-splitwell-frontend)
     1. [Running the Wallet and Splitwell Frontend](#running-the-wallet-and-splitwell-frontend)
@@ -965,6 +966,29 @@ If you've made changes to the logic of jobs in `.circleci/config.yaml` involved 
 
 To do so before merging your changes into main, open CircleCI's UI to your PR's branch and manually approve one of the three scratchnet deploy holds corresponding to the cluster you've reserved via [`cncluster lock`](/cluster/README.md#deploy-a-build-to-a-cluster).
 Don't forget to `cncluster unlock` the cluster once you are finished!
+
+### Connecting external tools to the shared Canton instances
+
+Our shared Canton participants (the ones started with`./start-canton.sh`) use an authenticated ledger API.
+If you have an external tool that needs to access one of the participants using the ledger API,
+you will need to configure the app to supply a valid JWT token to each request.
+
+If the tool can be configured to use a static token, generate one on https://jwt.io with the following payload
+```
+{
+  "sub": "<ledger api user name>",
+  "aud": "https://canton.network.global",
+}
+```
+and use HS256 as the signing algorithm with the HMAC secret set to "test".
+
+If the tool can be configured to fetch tokens from an OAuth2 server using client credentials,
+run
+```
+./scripts/test-oauth-server.sh
+```
+and point your tool to the displayed URL.
+Set the client id to the desired ledger API user name, and use an arbitrary value for the client secret.
 
 ## Building and Running the Wallet and Splitwell Apps
 
