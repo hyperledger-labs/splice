@@ -2141,7 +2141,24 @@ jobs:
           name: "Wait for previous pipeline"
           command: |
             set -eou pipefail
-            .circleci/wait_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>"
+            .circleci/wait_or_cancel_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>"
+
+  cancel_if_previous_pipeline:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    parameters:
+      # space separated strings of workflow names to check if they exist and cancel current workflow if so.
+      workflow_names:
+        type: string
+    steps:
+      - checkout
+      - run:
+          name: "Cancel if previous pipeline << parameters.workflow_names >>"
+          command: |
+            set -eou pipefail
+            .circleci/wait_or_cancel_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" cancel_self
 main-branch-only: &main-branch-only
   filters:
     branches:
@@ -2740,7 +2757,7 @@ workflows:
     when:
       equal: [ healthcheck-testnet, << pipeline.parameters.run-job >> ]
     jobs:
-      - wait_for_previous_pipeline:
+      - cancel_if_previous_pipeline:
           <<: *notify-fail
           filters:
             branches:
@@ -2749,7 +2766,8 @@ workflows:
           context:
             - artifactory
             - slack-context
-          # Only wait for deployments, concurrent preflight checks are fine.
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
           workflow_names: "deploy_testnet"
       - preflight_check:
           <<: *non_devnet_preflight_params
@@ -2770,7 +2788,7 @@ workflows:
     when:
       equal: [ healthcheck-devnet, << pipeline.parameters.run-job >> ]
     jobs:
-      - wait_for_previous_pipeline:
+      - cancel_if_previous_pipeline:
           <<: *notify-fail
           filters:
             branches:
@@ -2779,7 +2797,8 @@ workflows:
           context:
             - artifactory
             - slack-context
-          # Only wait for deployments, concurrent preflight checks are fine.
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
           workflow_names: "deploy_devnet"
       - preflight_check:
           filters:
@@ -2809,8 +2828,20 @@ workflows:
           context:
             - artifactory
             - slack-context
-          # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "deploy_cidaily_and_cidaily_testnet redeploy_sv_runbook_cidaily"
+          # Only wait for sv runbook deployments, concurrent preflight checks are fine.
+          workflow_names: "redeploy_sv_runbook_cidaily"
+      - cancel_if_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/testnet
+          context:
+            - artifactory
+            - slack-context
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
+          workflow_names: "deploy_cidaily_and_cidaily_testnet"
       - preflight_check:
           filters:
             branches:
@@ -2830,16 +2861,17 @@ workflows:
     when:
       equal: [ healthcheck-cidaily-testnet, << pipeline.parameters.run-job >> ]
     jobs:
-      - wait_for_previous_pipeline:
+      - cancel_if_previous_pipeline:
           <<: *notify-fail
           filters:
             branches:
               only:
-                - deployment/cidaily-testnet
+                - deployment/testnet
           context:
             - artifactory
             - slack-context
-          # Only wait for deployments, concurrent preflight checks are fine.
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
           workflow_names: "deploy_cidaily_and_cidaily_testnet"
       - preflight_check:
           filters:
@@ -2871,7 +2903,19 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for deployments, concurrent preflight checks are fine.
-          workflow_names: "deploy_cilr redeploy_sv_runbook_cilr"
+          workflow_names: "redeploy_sv_runbook_cilr"
+      - cancel_if_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/testnet
+          context:
+            - artifactory
+            - slack-context
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
+          workflow_names: "deploy_cilr"
       - preflight_check:
           filters:
             branches:

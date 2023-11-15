@@ -2,6 +2,7 @@
 set -eou pipefail
 CURRENT_PIPELINE_NUMBER="$1"
 WORKFLOW_NAMES="$2"
+WAIT_OR_CANCEL="${3:-wait}"
 # only fetching pipeline data up to seconds old defined here
 MAX_AGE_SECONDS="$((8*3600))"
 
@@ -57,6 +58,12 @@ get_url() {
         --retry 60 \
         --retry-max-time 120 \
         --fail -X GET -u "$CIRCLECI_TOKEN:" -H "Content-Type: application/json" "${url}"
+}
+
+cancel_workflow() {
+  curl --request POST \
+              --url https://circleci.com/api/v2/workflow/"$CIRCLE_WORKFLOW_ID"/cancel \
+              --header "Circle-Token: ${CIRCLE_TOKEN}"
 }
 
 write_pages() {
@@ -121,8 +128,13 @@ run() {
           while IFS= read -r WORKFLOW; do
               WORKFLOW_NAME=$(jq -r <<< "$WORKFLOW" '.name')
               if [[ " ${WORKFLOW_NAMES} " == *" ${WORKFLOW_NAME} "* ]]; then
-                  echo "Pipeline contains workflow $WORKFLOW_NAME, waiting for pipeline to complete ..."
-                  wait_for_pipeline_to_complete "$PIPELINE_ID"
+                  if [ "$WAIT_OR_CANCEL" = "cancel_self" ]; then
+                    echo "Pipeline contains workflow $WORKFLOW_NAME, cancelling current workflow..."
+                    cancel_workflow
+                  else
+                    echo "Pipeline contains workflow $WORKFLOW_NAME, waiting for pipeline to complete ..."
+                    wait_for_pipeline_to_complete "$PIPELINE_ID"
+                  fi
               else
                   echo "Ignoring workflow $WORKFLOW_NAME"
               fi

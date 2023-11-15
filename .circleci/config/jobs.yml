@@ -975,4 +975,21 @@ jobs:
           name: "Wait for previous pipeline"
           command: |
             set -eou pipefail
-            .circleci/wait_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>"
+            .circleci/wait_or_cancel_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>"
+
+  cancel_if_previous_pipeline:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    parameters:
+      # space separated strings of workflow names to check if they exist and cancel current workflow if so.
+      workflow_names:
+        type: string
+    steps:
+      - checkout
+      - run:
+          name: "Cancel if previous pipeline << parameters.workflow_names >>"
+          command: |
+            set -eou pipefail
+            .circleci/wait_or_cancel_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" cancel_self
