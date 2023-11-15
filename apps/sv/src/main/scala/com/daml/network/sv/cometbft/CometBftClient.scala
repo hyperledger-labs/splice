@@ -57,6 +57,15 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
       .nodeStatus()
       .rethrowAsGrpcException("node status")
 
+  def jsonRpcCall(id: Json, method: String, params: Map[String, Json] = Map.empty)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[CometBftHttpRpcClient.CometBftCallResponse[Json]] = {
+    client
+      .rawCallFullResponse(method, params, Some(id))
+      .rethrowAsGrpcException("json rpc api call")
+  }
+
   def nodeDebugDump()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -89,7 +98,7 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
 
   private def cometBftErrorToGrpcStatus(error: CometBftHttpRpcClient.CometBftError) = {
     error match {
-      case CometBftHttpError(_, CometBftErrorResponse(error))
+      case CometBftHttpError(_, CometBftErrorResponse(_, _, error))
           if error.noSpaces.contains("tx already exists in cache") =>
         Status.ABORTED.withDescription(error.noSpaces)
       case CometBftHttpRpcClient.CometBftHttpError(code, error) if code > 500 =>

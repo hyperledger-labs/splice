@@ -121,10 +121,7 @@ export function installCometBftNode(
         };
       }),
     stateSync: {
-      rpcServers:
-        rpcServiceAddress('cometbft-sv-1', 'sv-1') +
-        ',' +
-        rpcServiceAddress('cometbft-sv-1', 'sv-1'),
+      rpcServers: rpcServiceAddress('sv-1') + ',' + rpcServiceAddress('sv-1'),
     },
     genesis: {
       // for TestNet-like deployments on scratchnet, set the chainId to 'test'
@@ -166,6 +163,6 @@ function p2pServiceAddress(nodename: string, namespace: string): string {
   return `${nodename}-cometbft-p2p.${namespace}.svc.cluster.local:26656`;
 }
 
-function rpcServiceAddress(nodename: string, namespace: string): string {
-  return `http://${nodename}-cometbft-rpc.${namespace}.svc.cluster.local:26657`;
+function rpcServiceAddress(namespace: string): string {
+  return `http://sv-app.${namespace}.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc`;
 }

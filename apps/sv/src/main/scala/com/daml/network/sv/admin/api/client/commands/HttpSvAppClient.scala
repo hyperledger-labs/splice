@@ -403,4 +403,33 @@ object HttpSvAppClient {
     }
   }
 
+  case class CometBftJsonRpcRequest(
+      id: io.circe.Json,
+      method: definitions.CometBftJsonRpcRequest.Method,
+      params: Map[String, io.circe.Json],
+  ) extends BaseCommand[
+        http.CometBftJsonRpcRequestResponse,
+        definitions.CometBftJsonRpcResponse,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.CometBftJsonRpcRequestResponse] =
+      client.cometBftJsonRpcRequest(
+        headers = headers,
+        body = definitions.CometBftJsonRpcRequest(id, method, Some(params)),
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      http.CometBftJsonRpcRequestResponse,
+      Either[String, definitions.CometBftJsonRpcResponse],
+    ] = {
+      case http.CometBftJsonRpcRequestResponse.OK(response) => Right(response)
+      case http.CometBftJsonRpcRequestResponse.NotFound(response) => Left(response.error)
+    }
+  }
+
 }

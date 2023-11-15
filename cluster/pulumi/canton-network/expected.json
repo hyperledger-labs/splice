@@ -1793,7 +1793,7 @@
         },
         "stateSync": {
           "enable": true,
-          "rpcServers": "http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657",
+          "rpcServers": "http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }
       }
@@ -2834,7 +2834,7 @@
         },
         "stateSync": {
           "enable": true,
-          "rpcServers": "http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657",
+          "rpcServers": "http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }
       }
@@ -3756,7 +3756,7 @@
         },
         "stateSync": {
           "enable": true,
-          "rpcServers": "http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657",
+          "rpcServers": "http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }
       }
@@ -4588,7 +4588,7 @@
         },
         "stateSync": {
           "enable": true,
-          "rpcServers": "http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657,http://cometbft-sv-1-cometbft-rpc.sv-1.svc.cluster.local:26657",
+          "rpcServers": "http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }
       }

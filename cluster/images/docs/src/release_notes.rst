@@ -6,6 +6,8 @@ Release Notes
 2023-11-20
 ----------
 
+* The CometBft RPC endpoints required for state sync are now exposed through the SV App. Accordingly, the list of `rpcServers` in `cometbft-values.yaml` has been updated to reflect the new URL path.
+
 * Documentation fixes
 
 2023-11-13

@@ -76,6 +76,30 @@ paths:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/admin/domain/cometbft/json-rpc:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "cometBftJsonRpcRequest"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CometBftJsonRpcRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CometBftJsonRpcResponse"
+        "404":
+          description: "CometBFT is not configured for this app."
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
   /v0/admin/domain/cometbft/debug:
     get:
       tags: [sv]
@@ -605,6 +629,44 @@ components:
         voting_power:
           type: number
           description: "The voting power assigned to the CometBFT node"
+
+    CometBftJsonRpcRequest:
+      type: object
+      required:
+        - id
+        - method
+      properties:
+        # TODO(#2755): restrict to string and integer once oneOf is supported
+        id:
+          type: object # accept any value
+        method:
+          type: string
+          # status, block - used in configure-state-sync.sh
+          # commit, validators, consensus_params - used by the CometBFT Light client for state sync
+          enum:
+            - status
+            - block
+            - commit
+            - validators
+            - consensus_params
+        params:
+          type: object
+          additionalProperties: true
+    CometBftJsonRpcResponse:
+      type: object
+      required:
+        - jsonrpc
+        - id
+      properties:
+        jsonrpc:
+          type: string
+        # TODO(#2755): restrict to string and integer once oneOf is supported
+        id:
+          type: object
+        result:
+          type: object
+        error:
+          type: object
 
     # TODO(#2755) make prettier with support of oneOf
     CometBftNodeDumpOrErrorResponse:

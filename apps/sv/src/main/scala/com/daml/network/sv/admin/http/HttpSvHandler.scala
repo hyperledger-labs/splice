@@ -283,6 +283,29 @@ class HttpSvHandler(
     }
   }
 
+  override def cometBftJsonRpcRequest(
+      respond: SvResource.CometBftJsonRpcRequestResponse.type
+  )(
+      body: definitions.CometBftJsonRpcRequest
+  )(extracted: TraceContext): Future[SvResource.CometBftJsonRpcRequestResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.cometBftJsonRpcRequest") { _ => _ =>
+      withClientOrNotFound(respond.NotFound) { client =>
+        client
+          .jsonRpcCall(body.id, body.method.value, body.params.getOrElse(Map.empty))
+          .map(res =>
+            SvResource.CometBftJsonRpcRequestResponseOK(
+              definitions.CometBftJsonRpcResponse(
+                res.jsonrpc,
+                res.id,
+                Some(res.result),
+              )
+            )
+          )
+      }
+    }
+  }
+
   def onboardSvPartyMigrationAuthorize(
       respond: v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse.type
   )(

@@ -36,6 +36,12 @@ function _configure_state_sync() {
   sed -i "s|STATE_SYNC_TRUST_PERIOD|\"${trust_period}\"|" "${config_file}"
 }
 
+function _json_rpc_call() {
+  server_url="$1"
+  request_data="$2"
+  curl -fsSL --connect-timeout 10 -H "Content-Type: application/json" -X POST -d "${request_data}" "${server_url}"
+}
+
 enable="${STATE_SYNC_ENABLE:-false}"
 if [ "$enable" == "false" ]; then
   echo "State sync has been explicitly disabled."
@@ -52,7 +58,7 @@ else
 
   min_trust_height_age=${STATE_SYNC_MIN_TRUST_HEIGHT_AGE:-100}
   trust_period=${STATE_SYNC_TRUST_PERIOD:-"168h0m0s"}  # trust period defaults to 1 week
-  latest_block_height=$( curl -fsSL "${base_url}/status" | jq -r '.result.sync_info.latest_block_height' )
+  latest_block_height=$( _json_rpc_call "${base_url}" '{"id": "0", "method": "status"}' | jq -r '.result.sync_info.latest_block_height' )
   echo "Latest block height: $latest_block_height"
   # Disable state sync entirely if latest_block_height is less than min_trust_height_age
   if [ "$latest_block_height" -le "$min_trust_height_age" ]; then
@@ -61,7 +67,7 @@ else
   else
     enable=true
     trust_height=$(( latest_block_height - min_trust_height_age ))
-    trust_hash=$( curl -sL --fail -X GET "${base_url}/block?height=${trust_height}" | jq -r '.result.block_id.hash' )
+    trust_hash=$( _json_rpc_call "${base_url}" '{"id": "1", "method": "block", "params": {"height": "'"${trust_height}"'"}}' | jq -r '.result.block_id.hash' )
   fi
 fi
 

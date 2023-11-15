@@ -66,11 +66,7 @@ export function installCometBftNode(
         port: 26696,
       },
       stateSync: {
-        // Note that the port number and the ending slash are significant in the list of rpcServers
-        rpcServers:
-          `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global:443/cometbft-rpc/` +
-          ',' +
-          `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global:443/cometbft-rpc/`,
+        rpcServers: rpcServiceAddress('sv-1') + ',' + rpcServiceAddress('sv-1'),
       },
       genesis: {
         // for TestNet-like deployments on scratchnet, set the chainId to 'test'
@@ -82,4 +78,9 @@ export function installCometBftNode(
     version,
     dependencies
   );
+}
+
+function rpcServiceAddress(namespace: string): string {
+  // Note that the port number is significant in the rpcServer address used for state sync
+  return `https://sv.${namespace}.svc.${CLUSTER_BASENAME}.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc`;
 }

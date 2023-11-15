@@ -14,10 +14,10 @@ import com.daml.network.sv.cometbft.CometBftHttpRpcClient.NodeStatus.{
   ValidatorInfo,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import io.circe.generic.semiauto.deriveDecoder
+import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.parser.*
 import io.circe.syntax.EncoderOps
-import io.circe.{Decoder, Json}
+import io.circe.{Decoder, Encoder, Json}
 import io.grpc.Status
 
 import java.net.http.HttpClient
@@ -52,12 +52,21 @@ class CometBftHttpRpcClient(
   def rawCall(
       path: String,
       params: Map[String, Json] = Map.empty,
+      id: Option[Json] = None,
   ): EitherT[Future, CometBftError, Json] = {
-    callCometBftJsonHttp[Json](path, params).map(_.result)
+    callCometBftJsonHttp[Json](path, params, id).map(_.result)
+  }
+
+  def rawCallFullResponse(
+      path: String,
+      params: Map[String, Json] = Map.empty,
+      id: Option[Json] = None,
+  ): EitherT[Future, CometBftError, CometBftCallResponse[Json]] = {
+    callCometBftJsonHttp[Json](path, params, id)
   }
 
   def nodeStatus(): EitherT[Future, CometBftError, NodeStatus] = {
-    callCometBftJsonHttp[NodeStatus]("status", Map.empty).map(_.result)
+    callCometBftJsonHttp[NodeStatus]("status", Map.empty[String, Json]).map(_.result)
   }
 
   def query(queryParams: Map[String, Json]): EitherT[Future, CometBftError, QueryResponse] = {
@@ -99,16 +108,17 @@ class CometBftHttpRpcClient(
   // TODO(#5428) add retries for failures
   private def callCometBftJsonHttp[T: Decoder](
       method: String,
-      param: Map[String, Json],
+      params: Map[String, Json],
+      id: Option[Json] = None,
   ): EitherT[Future, CometBftError, CometBftCallResponse[T]] = EitherT {
-    // id is set to a unique id for correlating requests with responses
-    // without an id the requests is treated fully async
+    // if not provided, id is set to a unique id for correlating requests with responses
+    // without an id the request is treated fully async
     val toSend =
       s"""{
          |  "jsonrpc": "2.0",
          |  "method": "$method",
-         |  "params": ${param.asJson.noSpaces},
-         |  "id": "${UUID.randomUUID()}"
+         |  "params": ${params.asJson.noSpaces},
+         |  "id": ${id.fold(UUID.randomUUID().toString.asJson)(_.asJson)}
          |}""".stripMargin
     httpClientBuilder
       .sendAsync(
@@ -190,14 +200,21 @@ object CometBftHttpRpcClient {
 
   private val AbciQueryMethod = "abci_query"
 
+  private[cometbft] sealed trait CometBftJsonHttpResponse {
+    def jsonrpc: String
+    def id: Json // id could be a string (auto-generated UUID in our code) or a number (used by the CometBft Light client during state sync)
+  }
+
   // Ideally error should be a `String`, as defined by the API spec, but it seems that it's not really enforced and sometimes it's an object
-  private[cometbft] case class CometBftErrorResponse(error: Json)
+  private[cometbft] case class CometBftErrorResponse(jsonrpc: String, id: Json, error: Json)
+      extends CometBftJsonHttpResponse
 
   private[cometbft] object CometBftErrorResponse {
     implicit val errorDecoder: Decoder[CometBftErrorResponse] =
       deriveDecoder[CometBftErrorResponse]
   }
-  private[cometbft] case class CometBftCallResponse[T](result: T)
+  private[cometbft] case class CometBftCallResponse[T](jsonrpc: String, id: Json, result: T)
+      extends CometBftJsonHttpResponse
 
   private[cometbft] object CometBftCallResponse {
     implicit val responseDecoder: Decoder[CometBftQueryResponse] =
@@ -210,6 +227,8 @@ object CometBftHttpRpcClient {
 
     @nowarn("cat=unused")
     implicit def successDecoder[T: Decoder]: Decoder[CometBftCallResponse[T]] = deriveDecoder
+    @nowarn("cat=unused")
+    implicit def responseEncoder[T: Encoder]: Encoder[CometBftCallResponse[T]] = deriveEncoder
   }
 
   case class NodeStatus(nodeInfo: NodeInfo, syncInfo: SyncInfo, validatorInfo: ValidatorInfo)

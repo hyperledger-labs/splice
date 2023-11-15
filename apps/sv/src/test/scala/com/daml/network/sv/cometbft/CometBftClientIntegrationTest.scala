@@ -22,6 +22,7 @@ import com.digitalasset.canton.drivers.cometbft.{
   UpdateNetworkConfigRequest,
 }
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import io.circe.Json
 import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.ExecutionContext
@@ -107,6 +108,16 @@ class CometBftClientIntegrationTest
           dump.validators.findAllByKey("address") should not be empty
           dump.networkInfo.findAllByKey("n_peers") should not be empty
           dump.status.findAllByKey("latest_block_height") should not be empty
+        }
+    }
+
+    "json rpc call" in {
+      val id = Json.fromInt(0)
+      cometBftClient
+        .jsonRpcCall(id, "status")
+        .map { response =>
+          response.id shouldBe id
+          response.result.findAllByKey("node_info") should not be empty
         }
     }
 
