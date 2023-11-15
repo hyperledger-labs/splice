@@ -492,6 +492,18 @@ Once logged in one should see the transactions page.
   :width: 600
   :alt: After logged in into the wallet UI
 
+
+.. _helm_validator_testnet_cc_grant:
+
+(Testnet-only) Granting coin to the validator for traffic purchases
+-------------------------------------------------------------------
+
+On testnet, your validator party will need an initial coin grant to be able to purchase traffic.
+After logging into the wallet UI in the previous section, note that the party ID is displayed in
+the top right of the UI (e.g. ``validator_validator_service_user::12204f9f94b7369e027544927703efcdf0f03cb15bd26ac53c784c627b63bdf8f041``).
+
+An SV (say your sponsor) will need to transfer coin to this party. They can do this through their wallet UI.
+
 .. _helm-validator-directory-web-ui:
 
 Logging into the directory UI
