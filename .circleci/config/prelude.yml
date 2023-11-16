@@ -55,7 +55,7 @@ notify-fail: &notify-fail
     # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
     # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
     - slack/notify:
-        branch_pattern: main
+        branch_pattern: (deployment\/.*|main)
         # #team-canton-network-internal-ci
         channel: C05DT77QF5M
         event: fail
