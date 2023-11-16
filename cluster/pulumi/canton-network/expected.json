@@ -1792,7 +1792,7 @@
           }
         },
         "stateSync": {
-          "enable": true,
+          "enable": false,
           "rpcServers": "http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }
@@ -2833,7 +2833,7 @@
           }
         },
         "stateSync": {
-          "enable": true,
+          "enable": false,
           "rpcServers": "http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }
@@ -3755,7 +3755,7 @@
           }
         },
         "stateSync": {
-          "enable": true,
+          "enable": false,
           "rpcServers": "http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }
@@ -4587,7 +4587,7 @@
           }
         },
         "stateSync": {
-          "enable": true,
+          "enable": false,
           "rpcServers": "http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.sv-1.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }

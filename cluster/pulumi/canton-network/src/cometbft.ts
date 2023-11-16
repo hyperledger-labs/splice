@@ -121,6 +121,8 @@ export function installCometBftNode(
         };
       }),
     stateSync: {
+      // TODO(#8636): enable for all nodes once we have an explicit dependency between cometbft of sv2-4 on sv-app of sv-1.
+      enable: false,
       rpcServers: rpcServiceAddress('sv-1') + ',' + rpcServiceAddress('sv-1'),
     },
     genesis: {
