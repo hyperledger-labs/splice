@@ -474,7 +474,7 @@ Another reference Helm chart is provided for that, which can be installed using:
 
 .. code-block:: bash
 
-    helm install cluster-ingress-validator canton-network-helm/cn-cluster-ingress-runbook -n cluster-ingress --version ${CHART_VERSION} --set cluster.hostname=$YOUR_HOSTNAME --set cluster.svNamespace=validator --set withSv=false --set withScan=false --set withDomainNode=false
+    helm install cluster-ingress-validator canton-network-helm/cn-cluster-ingress-runbook -n cluster-ingress --version ${CHART_VERSION} --set cluster.hostname=$YOUR_HOSTNAME --set cluster.svNamespace=validator --set cluster.hostPrefix="" --set withSv=false --set withScan=false --set withDomainNode=false
 
 
 .. _helm-validator-wallet-ui:
