@@ -88,6 +88,6 @@ export async function installValidator1(
     participantBootstrapDump,
     topupConfig,
     svValidator: false,
-    additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
+    additionalJvmOptions: jmxOptions(),
   });
 }

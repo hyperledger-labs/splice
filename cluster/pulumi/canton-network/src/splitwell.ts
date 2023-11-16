@@ -29,7 +29,7 @@ export async function installSplitwell(
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
 
-  const domain = installDomain(xns, 'domain', postgresDb, isDevNet);
+  const domain = installDomain(xns, 'domain', postgresDb);
 
   const loopback = installCNHelmChart(
     xns,

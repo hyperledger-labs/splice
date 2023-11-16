@@ -171,8 +171,7 @@ export async function installSvNode(config: SvConfig): Promise<{
         : {
             driver: 'postgres',
             postgres: sequencerDatabase,
-          },
-      isDevNet
+          }
     );
   }
 
@@ -229,7 +228,7 @@ export async function installSvNode(config: SvConfig): Promise<{
     metrics: {
       enable: true,
     },
-    additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
+    additionalJvmOptions: jmxOptions(),
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -262,7 +261,7 @@ export async function installSvNode(config: SvConfig): Promise<{
         enable: true,
       },
       persistence: persistenceConfig(postgresDb, scanDbName),
-      additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
+      additionalJvmOptions: jmxOptions(),
     };
     const scanApp = installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, [
       svApp,
@@ -277,7 +276,7 @@ export async function installSvNode(config: SvConfig): Promise<{
           enable: true,
         },
         persistence: persistenceConfig(postgresDb, directoryDbName),
-        additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
+        additionalJvmOptions: jmxOptions(),
       };
       installCNHelmChart(xns, 'directory-' + xns.logicalName, 'cn-directory', directoryValues, [
         scanApp,

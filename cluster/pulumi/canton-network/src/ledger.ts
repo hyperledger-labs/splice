@@ -9,8 +9,7 @@ import { Postgres } from './postgres';
 export function installDomain(
   xns: ExactNamespace,
   name: string,
-  postgres: Postgres,
-  isDevNet: boolean
+  postgres: Postgres
 ): pulumi.Resource {
   const sanitizedNs = xns.logicalName.replace('-', '_');
   const sanitizedName = name.replace('-', '_');
@@ -30,7 +29,7 @@ export function installDomain(
       postgresPassword: postgres.password,
       postgresMediatorDb: mediatorDbName,
       postgresSequencerDb: sequencerDbName,
-      additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
+      additionalJvmOptions: jmxOptions(),
     },
     [mediatorDb, sequencerDb]
   );
@@ -40,8 +39,7 @@ export function installGlobalDomain(
   xns: ExactNamespace,
   name: string,
   postgres: Postgres,
-  sequencer: PostgresSequencer | CometBftSequencer,
-  isDevNet: boolean
+  sequencer: PostgresSequencer | CometBftSequencer
 ): pulumi.Resource {
   const sanitizedNs = xns.logicalName.replace('-', '_');
   const sanitizedName = name.replace('-', '_');
@@ -76,7 +74,7 @@ export function installGlobalDomain(
       metrics: {
         enable: true,
       },
-      additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
+      additionalJvmOptions: jmxOptions(),
     },
     [mediatorDb, sequencerDb]
   );
@@ -109,7 +107,7 @@ export function installParticipant(
       metrics: {
         enable: true,
       },
-      additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
+      additionalJvmOptions: jmxOptions(),
     },
     dependsOn.concat([postgresDb])
   );
