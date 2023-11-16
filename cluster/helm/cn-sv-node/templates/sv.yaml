@@ -78,7 +78,7 @@ spec:
                   config {
                     dataSourceClass = "org.postgresql.ds.PGSimpleDataSource"
                     properties = {
-                      databaseName = "cantonnet"
+                      databaseName = "{{ .databaseName }}"
                       currentSchema = "{{ .schema }}"
                       serverName = "{{ .host }}"
                       portNumber = {{ .port }}

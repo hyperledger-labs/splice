@@ -39,6 +39,10 @@ spec:
            secretKeyRef:
               name: "{{ .Release.Name }}-secrets"
               key: cantonParticipantPostgresPassword
+        {{- if .Values.postgresDb }}
+        - name: CANTON_PARTICIPANT_POSTGRES_DB
+          value: {{ .Values.postgresDb }}
+        {{- end }}
         {{- with .Values.globalDomain }}
         {{- if .alias }}
         - name: GLOBAL_DOMAIN_ALIAS

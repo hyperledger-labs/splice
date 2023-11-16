@@ -30,6 +30,14 @@ spec:
            secretKeyRef:
               name: "{{ .Release.Name }}-secrets"
               key: cantonDomainPostgresPassword
+        {{- if .Values.postgresSequencerDb }}
+        - name: CANTON_SEQUENCER_POSTGRES_DB
+          value: {{ .Values.postgresSequencerDb }}
+        {{- end }}
+        {{- if .Values.postgresMediatorDb }}
+        - name: CANTON_MEDIATOR_POSTGRES_DB
+          value: {{ .Values.postgresMediatorDb }}
+        {{- end }}
         imagePullPolicy: Always
         ports:
         - containerPort: 5008

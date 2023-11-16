@@ -849,6 +849,286 @@
     "type": "kubernetes:core/v1:Service"
   },
   {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database directory_sv_1\""
+    },
+    "name": "createdb-directory_sv_1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_1\""
+    },
+    "name": "createdb-scan_sv_1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_2\""
+    },
+    "name": "createdb-scan_sv_2",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database splitwell_domain_mediator\""
+    },
+    "name": "createdb-splitwell_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database splitwell_domain_sequencer\""
+    },
+    "name": "createdb-splitwell_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database splitwell_participant\""
+    },
+    "name": "createdb-splitwell_participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_1_global_domain_mediator\""
+    },
+    "name": "createdb-sv_1_global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_1_global_domain_sequencer\""
+    },
+    "name": "createdb-sv_1_global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_1_participant\""
+    },
+    "name": "createdb-sv_1_participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_1\""
+    },
+    "name": "createdb-sv_1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_2_global_domain_mediator\""
+    },
+    "name": "createdb-sv_2_global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_2_global_domain_sequencer\""
+    },
+    "name": "createdb-sv_2_global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_2_participant\""
+    },
+    "name": "createdb-sv_2_participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_2\""
+    },
+    "name": "createdb-sv_2",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_3_global_domain_mediator\""
+    },
+    "name": "createdb-sv_3_global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_3_global_domain_sequencer\""
+    },
+    "name": "createdb-sv_3_global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_3_participant\""
+    },
+    "name": "createdb-sv_3_participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_3\""
+    },
+    "name": "createdb-sv_3",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_4_global_domain_mediator\""
+    },
+    "name": "createdb-sv_4_global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_4_global_domain_sequencer\""
+    },
+    "name": "createdb-sv_4_global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_4_participant\""
+    },
+    "name": "createdb-sv_4_participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_4\""
+    },
+    "name": "createdb-sv_4",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n validator1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator1_participant\""
+    },
+    "name": "createdb-validator1_participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n validator1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator1\""
+    },
+    "name": "createdb-validator1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_1\""
+    },
+    "name": "createdb-validator_sv_1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_2\""
+    },
+    "name": "createdb-validator_sv_2",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_3\""
+    },
+    "name": "createdb-validator_sv_3",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_4\""
+    },
+    "name": "createdb-validator_sv_4",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
     "custom": false,
     "id": "https://www.googleapis.com/compute/v1/projects/test-project/global/networks/default",
     "inputs": {},
@@ -1094,6 +1374,8 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": "postgres.splitwell.svc.cluster.local",
+        "postgresMediatorDb": "splitwell_domain_mediator",
+        "postgresSequencerDb": "splitwell_domain_sequencer",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -1271,6 +1553,7 @@
           }
         },
         "postgres": "postgres.splitwell.svc.cluster.local",
+        "postgresDb": "splitwell_participant",
         "postgresSchema": "splitwell_participant",
         "resources": {
           "limits": {
@@ -1876,9 +2159,10 @@
           "release": "prometheus-grafana-monitoring"
         },
         "persistence": {
+          "databaseName": "directory_sv_1",
           "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
-          "schema": "cn_apps_directory",
+          "schema": "directory_sv_1",
           "user": "cnadmin"
         },
         "resources": {
@@ -1967,6 +2251,8 @@
           "release": "prometheus-grafana-monitoring"
         },
         "postgres": "postgres.sv-1.svc.cluster.local",
+        "postgresMediatorDb": "sv_1_global_domain_mediator",
+        "postgresSequencerDb": "sv_1_global_domain_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -2148,7 +2434,8 @@
           }
         },
         "postgres": "postgres.sv-1.svc.cluster.local",
-        "postgresSchema": "sv-1_participant",
+        "postgresDb": "sv_1_participant",
+        "postgresSchema": "sv_1_participant",
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -2401,9 +2688,10 @@
           "release": "prometheus-grafana-monitoring"
         },
         "persistence": {
+          "databaseName": "scan_sv_1",
           "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
-          "schema": "cn_apps_scan",
+          "schema": "scan_sv_1",
           "user": "cnadmin"
         },
         "resources": {
@@ -2591,9 +2879,10 @@
         "onboardingName": "Canton-Foundation-1",
         "onboardingType": "found-collective",
         "persistence": {
+          "databaseName": "sv_1",
           "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
-          "schema": "cn_apps_sv_1",
+          "schema": "sv_1",
           "user": "cnadmin"
         },
         "resources": {
@@ -2686,9 +2975,10 @@
           "release": "prometheus-grafana-monitoring"
         },
         "persistence": {
+          "databaseName": "validator_sv_1",
           "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
-          "schema": "cn_apps_validator",
+          "schema": "validator_sv_1",
           "user": "cnadmin"
         },
         "resources": {
@@ -2921,6 +3211,8 @@
           "release": "prometheus-grafana-monitoring"
         },
         "postgres": "postgres.sv-2.svc.cluster.local",
+        "postgresMediatorDb": "sv_2_global_domain_mediator",
+        "postgresSequencerDb": "sv_2_global_domain_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -3102,7 +3394,8 @@
           }
         },
         "postgres": "postgres.sv-2.svc.cluster.local",
-        "postgresSchema": "sv-2_participant",
+        "postgresDb": "sv_2_participant",
+        "postgresSchema": "sv_2_participant",
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -3355,9 +3648,10 @@
           "release": "prometheus-grafana-monitoring"
         },
         "persistence": {
+          "databaseName": "scan_sv_2",
           "host": "postgres.sv-2.svc.cluster.local",
           "port": 5432,
-          "schema": "cn_apps_scan",
+          "schema": "scan_sv_2",
           "user": "cnadmin"
         },
         "resources": {
@@ -3517,9 +3811,10 @@
         "onboardingName": "Canton-Foundation-2",
         "onboardingType": "join-with-key",
         "persistence": {
+          "databaseName": "sv_2",
           "host": "postgres.sv-2.svc.cluster.local",
           "port": 5432,
-          "schema": "cn_apps_sv_2",
+          "schema": "sv_2",
           "user": "cnadmin"
         },
         "resources": {
@@ -3612,9 +3907,10 @@
           "release": "prometheus-grafana-monitoring"
         },
         "persistence": {
+          "databaseName": "validator_sv_2",
           "host": "postgres.sv-2.svc.cluster.local",
           "port": 5432,
-          "schema": "cn_apps_validator",
+          "schema": "validator_sv_2",
           "user": "cnadmin"
         },
         "resources": {
@@ -3847,6 +4143,8 @@
           "release": "prometheus-grafana-monitoring"
         },
         "postgres": "postgres.sv-3.svc.cluster.local",
+        "postgresMediatorDb": "sv_3_global_domain_mediator",
+        "postgresSequencerDb": "sv_3_global_domain_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -4028,7 +4326,8 @@
           }
         },
         "postgres": "postgres.sv-3.svc.cluster.local",
-        "postgresSchema": "sv-3_participant",
+        "postgresDb": "sv_3_participant",
+        "postgresSchema": "sv_3_participant",
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -4352,9 +4651,10 @@
         "onboardingName": "Canton-Foundation-3",
         "onboardingType": "join-with-key",
         "persistence": {
+          "databaseName": "sv_3",
           "host": "postgres.sv-3.svc.cluster.local",
           "port": 5432,
-          "schema": "cn_apps_sv_3",
+          "schema": "sv_3",
           "user": "cnadmin"
         },
         "resources": {
@@ -4447,9 +4747,10 @@
           "release": "prometheus-grafana-monitoring"
         },
         "persistence": {
+          "databaseName": "validator_sv_3",
           "host": "postgres.sv-3.svc.cluster.local",
           "port": 5432,
-          "schema": "cn_apps_validator",
+          "schema": "validator_sv_3",
           "user": "cnadmin"
         },
         "resources": {
@@ -4682,6 +4983,8 @@
           "release": "prometheus-grafana-monitoring"
         },
         "postgres": "postgres.sv-4.svc.cluster.local",
+        "postgresMediatorDb": "sv_4_global_domain_mediator",
+        "postgresSequencerDb": "sv_4_global_domain_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -4863,7 +5166,8 @@
           }
         },
         "postgres": "postgres.sv-4.svc.cluster.local",
-        "postgresSchema": "sv-4_participant",
+        "postgresDb": "sv_4_participant",
+        "postgresSchema": "sv_4_participant",
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -5187,9 +5491,10 @@
         "onboardingName": "Canton-Foundation-4",
         "onboardingType": "join-with-key",
         "persistence": {
+          "databaseName": "sv_4",
           "host": "postgres.sv-4.svc.cluster.local",
           "port": 5432,
-          "schema": "cn_apps_sv_4",
+          "schema": "sv_4",
           "user": "cnadmin"
         },
         "resources": {
@@ -5282,9 +5587,10 @@
           "release": "prometheus-grafana-monitoring"
         },
         "persistence": {
+          "databaseName": "validator_sv_4",
           "host": "postgres.sv-4.svc.cluster.local",
           "port": 5432,
-          "schema": "cn_apps_validator",
+          "schema": "validator_sv_4",
           "user": "cnadmin"
         },
         "resources": {
@@ -5472,6 +5778,7 @@
           }
         },
         "postgres": "postgres.validator1.svc.cluster.local",
+        "postgresDb": "validator1_participant",
         "postgresSchema": "validator1_participant",
         "resources": {
           "limits": {
@@ -5822,9 +6129,10 @@
           }
         },
         "persistence": {
+          "databaseName": "validator1",
           "host": "postgres.validator1.svc.cluster.local",
           "port": 5432,
-          "schema": "cn_apps_validator",
+          "schema": "validator1",
           "user": "cnadmin"
         },
         "resources": {
@@ -6075,5 +6383,285 @@
     "name": "validator1",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-directory_sv_1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-scan_sv_1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-scan_sv_2",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-splitwell_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-splitwell_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-splitwell_participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_1_global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_1_global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_1_participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_2_global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_2_global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_2_participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_2",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_3_global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_3_global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_3_participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_3",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_4_global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_4_global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_4_participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-sv_4",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n validator1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-validator1_participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n validator1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-validator1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-validator_sv_1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-validator_sv_2",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-validator_sv_3",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+    },
+    "name": "waitdb-validator_sv_4",
+    "provider": "",
+    "type": "command:local:Command"
   }
 ]

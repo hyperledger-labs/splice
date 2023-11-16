@@ -59,7 +59,10 @@ export async function installValidator1(
     await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
   ]);
 
-  const extraDependsOn: pulumi.Resource[] = [svc, postgresDb];
+  const validatorDbName = 'validator1';
+  const validatorDb = postgresDb.createDatabase(validatorDbName);
+
+  const extraDependsOn: pulumi.Resource[] = [svc, postgresDb, validatorDb];
 
   return installValidatorApp({
     auth0Client,
@@ -74,7 +77,8 @@ export async function installValidator1(
     persistenceConfig: {
       host: postgresDb.address,
       password: postgresDb.password,
-      schema: pulumi.Output.create('cn_apps_validator'),
+      databaseName: pulumi.Output.create(validatorDbName),
+      schema: pulumi.Output.create(validatorDbName),
       user: pulumi.Output.create('cnadmin'),
       port: pulumi.Output.create(5432),
     },

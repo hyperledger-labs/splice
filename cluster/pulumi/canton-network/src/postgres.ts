@@ -1,6 +1,8 @@
+import * as command from '@pulumi/command';
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
+import { Release } from '@pulumi/kubernetes/helm/v3';
 import { clusterLargeDisk, envFlag, ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 
 const enableCloudSql = envFlag('ENABLE_CLOUD_SQL', false);
@@ -31,6 +33,8 @@ export interface Postgres extends pulumi.Resource {
 
   readonly address: pulumi.Output<string>;
   readonly password: pulumi.Output<string>;
+
+  createDatabase: (name: string) => pulumi.Resource;
 }
 
 class CloudPostgres extends pulumi.ComponentResource implements Postgres {
@@ -75,17 +79,7 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
       }
     );
 
-    const pgDB = new gcp.sql.Database(
-      `db-${logicalName}`,
-      {
-        instance: this.pgSvc.name,
-        name: 'cantonnet',
-      },
-      {
-        parent: this,
-        deletedWith: this.pgSvc,
-      }
-    );
+    const pgDB = this.createDatabase('cantonnet');
 
     this.password = generatePassword(`${logicalName}-passwd`, { parent: this }).result;
 
@@ -108,6 +102,20 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
       privateIpAddress: this.pgSvc.privateIpAddress,
     });
   }
+
+  createDatabase(name: string): pulumi.Resource {
+    return new gcp.sql.Database(
+      `db-${this.name}-${name}`,
+      {
+        instance: this.pgSvc.name,
+        name: name,
+      },
+      {
+        parent: this,
+        deletedWith: this.pgSvc,
+      }
+    );
+  }
 }
 
 class CNPostgres extends pulumi.ComponentResource implements Postgres {
@@ -115,6 +123,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
   namespace: ExactNamespace;
   address: pulumi.Output<string>;
   password: pulumi.Output<string>;
+  pg: Release;
 
   constructor(xns: ExactNamespace, name: string) {
     const logicalName = xns.logicalName + '-' + name;
@@ -125,16 +134,38 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
     this.address = pulumi.output(`${this.name}.${this.namespace.logicalName}.svc.cluster.local`);
     this.password = generatePassword(`${logicalName}-passwd`, { parent: this }).result;
 
+    // there's an "implicit" creation of a database named with the value of the env var POSTGRES_DB
     const pg = installCNHelmChart(xns, name, 'cn-postgres', {
       postgresPassword: this.password,
       db: {
         volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
       },
     });
+    this.pg = pg;
 
     this.registerOutputs({
       address: pg.id.apply(() => `${name}.${xns.logicalName}.svc.cluster.local`),
     });
+  }
+
+  createDatabase(name: string): pulumi.Resource {
+    // the DB is not immediately available even if you can connect to the pod, so psql might fail a few times at the beginning.
+    const waitForPostgresToBeUp = new command.local.Command(
+      `waitdb-${name}`,
+      {
+        create:
+          `kubectl exec -n ${this.namespace.logicalName} postgres-0 -- ` +
+          `bash -c "RETRIES=60; until psql --username=cnadmin --dbname=\${POSTGRES_DB:-cantonnet} -c \\"select 1\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done"`,
+      },
+      { dependsOn: this.pg }
+    );
+    return new command.local.Command(
+      `createdb-${name}`,
+      {
+        create: `kubectl exec -n ${this.namespace.logicalName} postgres-0 -- psql --username=cnadmin --dbname=\${POSTGRES_DB:-cantonnet} -c "create database ${name}"`,
+      },
+      { dependsOn: waitForPostgresToBeUp }
+    );
   }
 }
 

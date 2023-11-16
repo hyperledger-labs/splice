@@ -9,14 +9,31 @@ import { Postgres } from './postgres';
 export function installDomain(
   xns: ExactNamespace,
   name: string,
-  postgresDb: Postgres,
+  postgres: Postgres,
   isDevNet: boolean
 ): pulumi.Resource {
-  return installCNHelmChart(xns, name, 'cn-domain', {
-    postgres: postgresDb.address,
-    postgresPassword: postgresDb.password,
-    additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
-  });
+  const sanitizedNs = xns.logicalName.replace('-', '_');
+  const sanitizedName = name.replace('-', '_');
+
+  const mediatorDbName = `${sanitizedNs}_${sanitizedName}_mediator`;
+  const mediatorDb = postgres.createDatabase(mediatorDbName);
+
+  const sequencerDbName = `${sanitizedNs}_${sanitizedName}_sequencer`;
+  const sequencerDb = postgres.createDatabase(sequencerDbName);
+
+  return installCNHelmChart(
+    xns,
+    name,
+    'cn-domain',
+    {
+      postgres: postgres.address,
+      postgresPassword: postgres.password,
+      postgresMediatorDb: mediatorDbName,
+      postgresSequencerDb: sequencerDbName,
+      additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
+    },
+    [mediatorDb, sequencerDb]
+  );
 }
 
 export function installGlobalDomain(
@@ -26,45 +43,67 @@ export function installGlobalDomain(
   sequencer: PostgresSequencer | CometBftSequencer,
   isDevNet: boolean
 ): pulumi.Resource {
-  return installCNHelmChart(xns, name, 'cn-global-domain', {
-    postgres: postgres.address,
-    postgresPassword: postgres.password,
-    sequencerDriver:
-      sequencer.driver === 'cometbft'
-        ? {
-            type: sequencer.driver,
-            host: pulumi.interpolate`${sequencer.service.metadata.name}.${sequencer.service.metadata.namespace}.svc.cluster.local`,
-            port: 26657,
-          }
-        : {
-            type: sequencer.driver,
-            address: sequencer.postgres.address,
-            password: sequencer.postgres.password,
-          },
-    metrics: {
-      enable: true,
+  const sanitizedNs = xns.logicalName.replace('-', '_');
+  const sanitizedName = name.replace('-', '_');
+
+  const mediatorDbName = `${sanitizedNs}_${sanitizedName}_mediator`;
+  const mediatorDb = postgres.createDatabase(mediatorDbName);
+
+  const sequencerDbName = `${sanitizedNs}_${sanitizedName}_sequencer`;
+  const sequencerDb = postgres.createDatabase(sequencerDbName);
+
+  return installCNHelmChart(
+    xns,
+    name,
+    'cn-global-domain',
+    {
+      postgres: postgres.address,
+      postgresPassword: postgres.password,
+      postgresMediatorDb: mediatorDbName,
+      postgresSequencerDb: sequencerDbName,
+      sequencerDriver:
+        sequencer.driver === 'cometbft'
+          ? {
+              type: sequencer.driver,
+              host: pulumi.interpolate`${sequencer.service.metadata.name}.${sequencer.service.metadata.namespace}.svc.cluster.local`,
+              port: 26657,
+            }
+          : {
+              type: sequencer.driver,
+              address: sequencer.postgres.address,
+              password: sequencer.postgres.password,
+            },
+      metrics: {
+        enable: true,
+      },
+      additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
     },
-    additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
-  });
+    [mediatorDb, sequencerDb]
+  );
 }
 
 export function installParticipant(
   xns: ExactNamespace,
   name: string,
-  postgresDb: Postgres,
+  postgres: Postgres,
   participantAdminUserNameFrom: k8s.types.input.core.v1.EnvVarSource,
   disableAutoInit = false,
   isDevNet: boolean,
   dependsOn: pulumi.Resource[] = []
 ): pulumi.Resource {
+  const sanitizedNs = xns.logicalName.replace('-', '_');
+  const postgresDbName = `${sanitizedNs}_participant`;
+
+  const postgresDb = postgres.createDatabase(postgresDbName);
   return installCNHelmChart(
     xns,
     name,
     'cn-participant',
     {
-      postgres: postgresDb.address,
-      postgresPassword: postgresDb.password,
-      postgresSchema: xns.logicalName + '_participant',
+      postgres: postgres.address,
+      postgresPassword: postgres.password,
+      postgresDb: postgresDbName,
+      postgresSchema: postgresDbName,
       participantAdminUserNameFrom,
       disableAutoInit,
       metrics: {
@@ -72,7 +111,7 @@ export function installParticipant(
       },
       additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
     },
-    dependsOn
+    dependsOn.concat([postgresDb])
   );
 }
 

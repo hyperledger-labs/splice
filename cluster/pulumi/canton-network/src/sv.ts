@@ -20,6 +20,7 @@ import {
   ValidatorOnboarding,
   validatorOnboardingSecretName,
   installValidatorOnboardingSecret,
+  PersistenceConfig,
   isDevNet,
 } from 'cn-pulumi-common';
 import type { Auth0Client, CnInput, SvIdKey } from 'cn-pulumi-common';
@@ -185,6 +186,9 @@ export async function installSvNode(config: SvConfig): Promise<{
     isDevNet
   );
 
+  const svAppName = config.nodename.replace('-', '_');
+  const svDb = postgresDb.createDatabase(svAppName);
+
   const svValues = {
     onboardingType: config.onboarding.type,
     onboardingName: config.onboardingName,
@@ -213,7 +217,7 @@ export async function installSvNode(config: SvConfig): Promise<{
     })),
     isDevNet: config.isDevNet,
     approvedSvIdentities: config.approvedSvIdentities,
-    persistence: persistenceConfig(postgresDb, config.nodename.replace('-', '_')),
+    persistence: persistenceConfig(postgresDb, svAppName),
     acsDumpPeriodicExport: backupConfig,
     acsDumpImport:
       config.bootstrappingDumpConfig && config.onboarding.type === 'found-collective'
@@ -239,7 +243,9 @@ export async function installSvNode(config: SvConfig): Promise<{
     config.nodename + '-sv-app',
     'cn-sv-node',
     svValues,
-    dependsOn.concat([participant, cometBftRpcService, postgresDb].concat(domain ? [domain] : []))
+    dependsOn.concat(
+      [participant, cometBftRpcService, postgresDb, svDb].concat(domain ? [domain] : [])
+    )
   );
 
   if (config.onboarding.type == 'found-collective' && !config.withScan) {
@@ -248,32 +254,41 @@ export async function installSvNode(config: SvConfig): Promise<{
   }
 
   if (config.withScan) {
+    const scanDbName = `scan_${svAppName}`;
+    const scanDb = postgresDb.createDatabase(scanDbName);
     const scanValues = {
       clusterUrl: `${CLUSTER_BASENAME}.network.canton.global`,
       metrics: {
         enable: true,
       },
-      persistence: persistenceConfig(postgresDb, 'scan'),
+      persistence: persistenceConfig(postgresDb, scanDbName),
       additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
     };
     const scanApp = installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, [
       svApp,
       postgresDb,
+      scanDb,
     ]);
     if (config.onboarding.type == 'found-collective') {
+      const directoryDbName = `directory_${svAppName}`;
+      const directoryDb = postgresDb.createDatabase(directoryDbName);
       const directoryValues = {
         metrics: {
           enable: true,
         },
-        persistence: persistenceConfig(postgresDb, 'directory'),
+        persistence: persistenceConfig(postgresDb, directoryDbName),
         additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
       };
       installCNHelmChart(xns, 'directory-' + xns.logicalName, 'cn-directory', directoryValues, [
         scanApp,
         postgresDb,
+        directoryDb,
       ]);
     }
   }
+
+  const validatorDbName = `validator_${svAppName}`;
+  const validatorDb = postgresDb.createDatabase(validatorDbName);
 
   await installValidatorApp({
     auth0Client: config.auth0Client,
@@ -290,8 +305,8 @@ export async function installSvNode(config: SvConfig): Promise<{
             secret: backupConfigSecret,
           }
         : undefined,
-    persistenceConfig: persistenceConfig(postgresDb, 'validator'),
-    extraDependsOn: [svApp, postgresDb],
+    persistenceConfig: persistenceConfig(postgresDb, validatorDbName),
+    extraDependsOn: [svApp, postgresDb, validatorDb],
     svValidator: true,
   });
 
@@ -314,11 +329,13 @@ export async function installSvNode(config: SvConfig): Promise<{
   return { svApp, postgresDatabase: postgresDb };
 }
 
-function persistenceConfig(postgresDb: postgres.Postgres, appName: string) {
+function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): PersistenceConfig {
+  const dbNameO = pulumi.Output.create(dbName);
   return {
     host: postgresDb.address,
     password: postgresDb.password,
-    schema: pulumi.Output.create(`cn_apps_${appName}`),
+    databaseName: dbNameO,
+    schema: dbNameO,
     user: pulumi.Output.create('cnadmin'),
     port: pulumi.Output.create(5432),
   };
