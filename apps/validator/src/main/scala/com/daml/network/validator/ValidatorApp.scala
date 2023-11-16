@@ -41,7 +41,7 @@ import com.daml.network.validator.config.{
   ValidatorOnboardingConfig,
 }
 import com.daml.network.validator.metrics.ValidatorAppMetrics
-import com.daml.network.validator.store.{ParticipantIdentitiesStore, ValidatorStore}
+import com.daml.network.validator.store.{NodeIdentitiesStore, ValidatorStore}
 import com.daml.network.validator.util.{OAuth2Manager, ValidatorUtil}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
@@ -448,7 +448,7 @@ class ValidatorApp(
           RetryFor.WaitingOnInitDependency,
         )
       }
-      participantIdentitiesStore = new ParticipantIdentitiesStore(
+      participantIdentitiesStore = new NodeIdentitiesStore(
         participantAdminConnection,
         config.participantIdentitiesBackup,
         clock,

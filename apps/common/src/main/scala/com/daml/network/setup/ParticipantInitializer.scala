@@ -11,7 +11,7 @@ import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.daml.network.config.{CNParticipantClientConfig, ParticipantBootstrapDumpConfig}
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
-import com.daml.network.util.ParticipantIdentitiesDump
+import com.daml.network.util.NodeIdentitiesDump
 import io.grpc.Status
 
 import java.nio.file.Path
@@ -67,11 +67,11 @@ class ParticipantInitializer(
           _ <- retryProvider.ensureThatB(
             RetryFor.WaitingOnInitDependency,
             "participant is initialized",
-            isInitialized(),
+            isInitialized,
             initializeFromDump(dump),
             logger,
           )
-          id <- getId()
+          id <- getId
           result <-
             if (id == dump.id) {
               Future.unit
@@ -88,7 +88,7 @@ class ParticipantInitializer(
           .waitUntil(
             RetryFor.WaitingOnInitDependency,
             "participant is initialized",
-            isInitialized()
+            isInitialized
               .flatMap(if (_) {
                 Future.unit
               } else {
@@ -108,14 +108,14 @@ class ParticipantInitializer(
           )
     }
 
-  private def isInitialized(): Future[Boolean] = participantAdminConnection.getStatus().map {
+  private def isInitialized: Future[Boolean] = participantAdminConnection.getStatus().map {
     case NodeStatus.NotInitialized(_) => false
     case _ => true
   }
 
-  private def getId(): Future[ParticipantId] = participantAdminConnection.getParticipantId()
+  private def getId: Future[ParticipantId] = participantAdminConnection.getParticipantId()
 
-  private def initializeFromDump(dump: ParticipantIdentitiesDump): Future[Unit] = for {
+  private def initializeFromDump(dump: NodeIdentitiesDump): Future[Unit] = for {
     _ <- {
       logger.info("Uploading participant keys from dump")
       // this is idempotent
@@ -134,14 +134,14 @@ class ParticipantInitializer(
     }
   } yield ()
 
-  private def getDump(config: ParticipantBootstrapDumpConfig): Future[ParticipantIdentitiesDump] =
+  private def getDump(config: ParticipantBootstrapDumpConfig): Future[NodeIdentitiesDump] =
     config match {
       case ParticipantBootstrapDumpConfig.File(file) => getDumpFromFile(file)
     }
 
-  private def getDumpFromFile(file: Path): Future[ParticipantIdentitiesDump] = {
+  private def getDumpFromFile(file: Path): Future[NodeIdentitiesDump] = {
     logger.info(s"Loading participant identities dump from file at $file")
-    ParticipantIdentitiesDump.fromJsonFile(file) match {
+    NodeIdentitiesDump.fromJsonFile(file, ParticipantId.tryFromProtoPrimitive) match {
       case Right(dump) => Future.successful(dump)
       case Left(error) =>
         Future.failed(

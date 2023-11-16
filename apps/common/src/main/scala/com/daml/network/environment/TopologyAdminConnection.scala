@@ -12,7 +12,10 @@ import com.daml.network.environment.TopologyAdminConnection.{
 }
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
-import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommandsX
+import com.digitalasset.canton.admin.api.client.commands.{
+  TopologyAdminCommandsX,
+  VaultAdminCommands,
+}
 import com.digitalasset.canton.admin.api.client.data.topologyx.{
   BaseResult,
   ListSequencerDomainStateResult,
@@ -39,6 +42,8 @@ import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.version.ProtocolVersion
+import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 
 import java.time.{Duration, Instant}
@@ -47,7 +52,7 @@ import scala.reflect.ClassTag
 
 /** Connection to nodes that expose topology information (sequencer, mediator, participant)
   */
-class TopologyAdminConnection(
+abstract class TopologyAdminConnection(
     config: ClientConfig,
     loggerFactory: NamedLoggerFactory,
     override protected[this] val retryProvider: RetryProvider,
@@ -842,8 +847,8 @@ class TopologyAdminConnection(
     ).map(_.map(r => TopologyResult(r.context, r.item)))
   }
 
-  def initId(participantId: ParticipantId)(implicit traceContext: TraceContext): Future[Unit] = {
-    runCmd(TopologyAdminCommandsX.Init.InitId(participantId.uid.toProtoPrimitive))
+  def initId(id: NodeIdentity)(implicit traceContext: TraceContext): Future[Unit] = {
+    runCmd(TopologyAdminCommandsX.Init.InitId(id.uid.toProtoPrimitive))
   }
 
   def sign(transactions: Seq[GenericSignedTopologyTransactionX], signedBy: Fingerprint)(implicit
@@ -856,6 +861,29 @@ class TopologyAdminConnection(
       )
     )
   }
+
+  def identity()(implicit
+      traceContext: TraceContext
+  ): Future[NodeIdentity]
+
+  def listMyKeys()(implicit
+      traceContext: TraceContext
+  ): Future[Seq[com.digitalasset.canton.crypto.admin.grpc.PrivateKeyMetadata]] = {
+    runCmd(VaultAdminCommands.ListMyKeys("", ""))
+  }
+
+  def exportKeyPair(fingerprint: Fingerprint)(implicit
+      traceContext: TraceContext
+  ): Future[ByteString] = {
+    runCmd(VaultAdminCommands.ExportKeyPair(fingerprint, ProtocolVersion.latest))
+  }
+
+  def importKeyPair(keyPair: Array[Byte], name: Option[String])(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    runCmd(VaultAdminCommands.ImportKeyPair(ByteString.copyFrom(keyPair), name))
+  }
+
 }
 
 object TopologyAdminConnection {

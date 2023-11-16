@@ -4,7 +4,8 @@ import com.daml.network.config.GcpBucketConfig
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.validator.store.ParticipantIdentitiesStore
+import com.daml.network.validator.store.NodeIdentitiesStore
+import com.digitalasset.canton.topology.ParticipantId
 
 import java.nio.file.{Path, Paths}
 import java.time.Instant
@@ -37,8 +38,8 @@ trait DataExportTestUtil extends CNNodeTestCommon {
   def testRecentParticipantIdentitiesDump(namespace: String) =
     testRecentDump(
       namespace,
-      ParticipantIdentitiesStore.dumpFilename(_),
-      ParticipantIdentitiesDump.fromJsonString(_),
+      NodeIdentitiesStore.dumpFilename(_),
+      NodeIdentitiesDump.fromJsonString(ParticipantId.tryFromProtoPrimitive, _),
     )
 
   def testRecentAcsDump(namespace: String) =

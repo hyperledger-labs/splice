@@ -8,10 +8,11 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{GcpBucket, ParticipantIdentitiesDump}
+import com.daml.network.util.{GcpBucket, NodeIdentitiesDump}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.ParticipantId
 import org.slf4j.event.Level
 
 import java.nio.file.Paths
@@ -91,8 +92,8 @@ abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig]
                 case (name, participantIdentitiesLogLineRegex(filename))
                     if name.endsWith("validator=aliceValidator") =>
                   val dump = readDump(filename)
-                  val jsonDump = ParticipantIdentitiesDump
-                    .fromJsonString(dump)
+                  val jsonDump = NodeIdentitiesDump
+                    .fromJsonString(ParticipantId.tryFromProtoPrimitive, dump)
                     .fold(
                       err =>
                         throw new IllegalArgumentException(

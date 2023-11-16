@@ -19,11 +19,7 @@ import com.daml.network.environment.{
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.QualifiedName
 import com.daml.network.validator.config.{AppManagerConfig, BuyExtraTrafficConfig}
-import com.daml.network.validator.store.{
-  AppManagerStore,
-  ParticipantIdentitiesStore,
-  ValidatorStore,
-}
+import com.daml.network.validator.store.{AppManagerStore, NodeIdentitiesStore, ValidatorStore}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.automation.{OffboardUsersTrigger, WalletAppInstallTrigger}
 import com.digitalasset.canton.DomainAlias
@@ -48,7 +44,7 @@ class ValidatorAutomationService(
     scanConnection: ScanConnection,
     ledgerClient: CNLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
-    participantIdentitiesStore: ParticipantIdentitiesStore,
+    participantIdentitiesStore: NodeIdentitiesStore,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit

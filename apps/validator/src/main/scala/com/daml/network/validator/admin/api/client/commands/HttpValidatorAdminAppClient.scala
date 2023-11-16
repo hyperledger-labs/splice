@@ -6,8 +6,8 @@ import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.http.v0.validator_admin as http
 import com.daml.network.http.v0.definitions.OnboardUserRequest
-import com.daml.network.util.{Codec, ParticipantIdentitiesDump, TemplateJsonDecoder}
-import com.digitalasset.canton.topology.PartyId
+import com.daml.network.util.{Codec, NodeIdentitiesDump, TemplateJsonDecoder}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -71,7 +71,7 @@ object HttpValidatorAdminAppClient {
   case class DumpParticipantIdentities()
       extends BaseCommand[
         http.DumpParticipantIdentitiesResponse,
-        ParticipantIdentitiesDump,
+        NodeIdentitiesDump,
       ] {
 
     def submitRequest(
@@ -82,7 +82,7 @@ object HttpValidatorAdminAppClient {
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.DumpParticipantIdentitiesResponse.OK(response) =>
-        ParticipantIdentitiesDump.fromHttp(response)
+        NodeIdentitiesDump.fromHttp(ParticipantId.tryFromProtoPrimitive, response)
     }
   }
 }

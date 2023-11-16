@@ -61,7 +61,7 @@ components:
         $ref: "#/components/schemas/MaybeCachedContractWithState"
 
     # IMPORTANT: only modify this message in a backwards compatible fashion. It is used to read old dumps.
-    ParticipantIdentitiesDump:
+    NodeIdentitiesDump:
       type: object
       required:
         - id
@@ -73,7 +73,7 @@ components:
         keys:
           type: array
           items:
-            $ref: "#/components/schemas/ParticipantKey"
+            $ref: "#/components/schemas/NodeKey"
         bootstrapTxs:
           type: array
           items:
@@ -81,7 +81,7 @@ components:
         version:
           type: string
 
-    ParticipantKey:
+    NodeKey:
       type: object
       required:
         - keyPair

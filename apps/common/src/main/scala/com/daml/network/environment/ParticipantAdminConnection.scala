@@ -8,7 +8,6 @@ import com.digitalasset.canton.admin.api.client.commands.{
   DomainTimeCommands,
   ParticipantAdminCommands,
   StatusAdminCommands,
-  VaultAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.ListConnectedDomainsResult
 import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration}
@@ -19,11 +18,10 @@ import com.digitalasset.canton.participant.admin.v0.ExportAcsResponse
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.time.{Clock, FetchTimeResponse, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, NodeIdentity, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.traffic.MemberTrafficStatus
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -368,24 +366,6 @@ class ParticipantAdminConnection(
       )
     } yield ()
 
-  def listMyKeys()(implicit
-      traceContext: TraceContext
-  ): Future[Seq[com.digitalasset.canton.crypto.admin.grpc.PrivateKeyMetadata]] = {
-    runCmd(VaultAdminCommands.ListMyKeys("", ""))
-  }
-
-  def exportKeyPair(fingerprint: Fingerprint)(implicit
-      traceContext: TraceContext
-  ): Future[ByteString] = {
-    runCmd(VaultAdminCommands.ExportKeyPair(fingerprint, ProtocolVersion.latest))
-  }
-
-  def importKeyPair(keyPair: Array[Byte], name: Option[String])(implicit
-      traceContext: TraceContext
-  ): Future[Unit] = {
-    runCmd(VaultAdminCommands.ImportKeyPair(ByteString.copyFrom(keyPair), name))
-  }
-
   def getDomainTime(domainAlias: DomainAlias, timeout: NonNegativeDuration)(implicit
       traceContext: TraceContext
   ): Future[FetchTimeResponse] = {
@@ -405,6 +385,9 @@ class ParticipantAdminConnection(
         timeout,
       )
     )
+
+  override def identity()(implicit traceContext: TraceContext): Future[NodeIdentity] =
+    getParticipantId()
 }
 
 object ParticipantAdminConnection {

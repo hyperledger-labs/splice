@@ -13,7 +13,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SequencerNodeStatus}
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{Member, SequencerId}
+import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerTrafficStatus
@@ -76,4 +76,7 @@ class SequencerAdminConnection(
     runCmd(
       SequencerAdminCommands.GetTrafficControlState(filterMembers)
     )
+
+  override def identity()(implicit traceContext: TraceContext): Future[NodeIdentity] =
+    getSequencerId
 }

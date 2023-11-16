@@ -2,19 +2,19 @@ package com.daml.network.validator.store
 
 import cats.syntax.traverse.*
 import com.daml.network.config.BackupDumpConfig
-import com.daml.network.environment.{BuildInfo, ParticipantAdminConnection}
-import com.daml.network.util.{BackupDump, ParticipantIdentitiesDump}
+import com.daml.network.environment.{BuildInfo, TopologyAdminConnection}
+import com.daml.network.util.{BackupDump, NodeIdentitiesDump}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.nio.file.{Path, Paths}
 import java.time.Instant
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{blocking, ExecutionContext, Future}
 
-/** A store for accessing the participant identities. */
-class ParticipantIdentitiesStore(
-    participantAdminConnection: ParticipantAdminConnection,
+/** A store for accessing the node identities. */
+class NodeIdentitiesStore(
+    adminConnection: TopologyAdminConnection,
     backupDumpConfig: Option[BackupDumpConfig],
     clock: Clock,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -23,22 +23,22 @@ class ParticipantIdentitiesStore(
 
   def getParticipantIdentitiesDump()(implicit
       tc: TraceContext
-  ): Future[ParticipantIdentitiesDump] =
+  ): Future[NodeIdentitiesDump] =
     for {
-      id <- participantAdminConnection.getParticipantId()
-      keysMetadata <- participantAdminConnection.listMyKeys()
+      id <- adminConnection.identity()
+      keysMetadata <- adminConnection.listMyKeys()
       keys <- keysMetadata.traverse(keyM =>
-        participantAdminConnection
+        adminConnection
           .exportKeyPair(keyM.publicKeyWithName.publicKey.id)
           .map(keyBytes =>
-            ParticipantIdentitiesDump.ParticipantKey(
+            NodeIdentitiesDump.NodeKey(
               keyBytes.toByteArray,
               keyM.publicKeyWithName.name.map(_.unwrap),
             )
           )
       )
-      bootstrapTxs <- participantAdminConnection.getIdentityBootstrapTransactions(id.uid)
-    } yield ParticipantIdentitiesDump(
+      bootstrapTxs <- adminConnection.getIdentityBootstrapTransactions(id.uid)
+    } yield NodeIdentitiesDump(
       id,
       keys,
       bootstrapTxs,
@@ -67,7 +67,7 @@ class ParticipantIdentitiesStore(
         // Deliberately not using better files here
         // because it turns this into an absolute path which
         // then makes all the logging stuff below very confusing.
-        val filename = ParticipantIdentitiesStore.dumpFilename(now)
+        val filename = NodeIdentitiesStore.dumpFilename(now)
         val fileDesc =
           s"participant identities dump containing ${dump.keys.size} keys to ${dumpConfig.locationDescription} at path: $filename"
         logger.debug(s"Attempting to write $fileDesc")
@@ -84,7 +84,7 @@ class ParticipantIdentitiesStore(
   } yield path
 }
 
-object ParticipantIdentitiesStore {
+object NodeIdentitiesStore {
   def dumpFilename(now: Instant) =
     Paths.get(
       s"participant_identities_${now}.json"

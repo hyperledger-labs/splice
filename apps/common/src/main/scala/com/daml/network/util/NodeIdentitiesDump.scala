@@ -1,7 +1,7 @@
 package com.daml.network.util
 
 import better.files.File
-import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.NodeIdentity
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.daml.network.http.v0.definitions as http
@@ -12,19 +12,19 @@ import java.nio.file.Path
 import java.util.Base64
 import scala.util.Try
 
-final case class ParticipantIdentitiesDump(
-    id: ParticipantId,
-    keys: Seq[ParticipantIdentitiesDump.ParticipantKey],
+final case class NodeIdentitiesDump(
+    id: NodeIdentity,
+    keys: Seq[NodeIdentitiesDump.NodeKey],
     bootstrapTxs: Seq[GenericSignedTopologyTransactionX],
     version: Option[String],
 ) {
-  def toHttp: http.ParticipantIdentitiesDump = {
-    http.ParticipantIdentitiesDump(
+  def toHttp: http.NodeIdentitiesDump = {
+    http.NodeIdentitiesDump(
       id.toProtoPrimitive,
       keys
-        .map(key => http.ParticipantKey(Base64.getEncoder().encodeToString(key.keyPair), key.name))
+        .map(key => http.NodeKey(Base64.getEncoder.encodeToString(key.keyPair), key.name))
         .toVector,
-      bootstrapTxs.map(tx => Base64.getEncoder().encodeToString(tx.toByteArray)).toVector,
+      bootstrapTxs.map(tx => Base64.getEncoder.encodeToString(tx.toByteArray)).toVector,
       version,
     )
   }
@@ -32,15 +32,15 @@ final case class ParticipantIdentitiesDump(
     toHttp.asJson
   }
 }
-object ParticipantIdentitiesDump {
+object NodeIdentitiesDump {
   def fromHttp(
-      response: http.ParticipantIdentitiesDump
-  ): Either[String, ParticipantIdentitiesDump] = {
+      id: String => NodeIdentity,
+      response: http.NodeIdentitiesDump,
+  ): Either[String, NodeIdentitiesDump] = {
     Try(
-      ParticipantIdentitiesDump(
-        id = ParticipantId.tryFromProtoPrimitive(response.id),
-        keys =
-          response.keys.toSeq.map(k => ParticipantKey(Base64.getDecoder.decode(k.keyPair), k.name)),
+      NodeIdentitiesDump(
+        id = id(response.id),
+        keys = response.keys.toSeq.map(k => NodeKey(Base64.getDecoder.decode(k.keyPair), k.name)),
         bootstrapTxs = response.bootstrapTxs.toSeq.map(t =>
           SignedTopologyTransactionX
             .fromByteArray(Base64.getDecoder.decode(t))
@@ -50,19 +50,19 @@ object ParticipantIdentitiesDump {
       )
     ).toEither.left.map(_.getMessage())
   }
-  def fromJsonString(json: String): Either[String, ParticipantIdentitiesDump] =
+  def fromJsonString(id: String => NodeIdentity, json: String): Either[String, NodeIdentitiesDump] =
     io.circe.parser
-      .decode[http.ParticipantIdentitiesDump](json)
+      .decode[http.NodeIdentitiesDump](json)
       .left
       .map(_.getMessage())
-      .flatMap(fromHttp)
+      .flatMap(fromHttp(id, _))
 
-  def fromJsonFile(file: Path): Either[String, ParticipantIdentitiesDump] = {
+  def fromJsonFile(file: Path, id: String => NodeIdentity): Either[String, NodeIdentitiesDump] = {
     val jsonString = Try(File(file).contentAsString).toEither.left.map(_.getMessage())
-    jsonString.flatMap(fromJsonString)
+    jsonString.flatMap(fromJsonString(id, _))
   }
 
-  final case class ParticipantKey(
+  final case class NodeKey(
       keyPair: Array[Byte],
       name: Option[String],
   )
