@@ -2782,7 +2782,7 @@ workflows:
             - datadog
             - slack-context
           requires:
-             - wait_for_previous_pipeline
+            - cancel_if_previous_pipeline
 
   devnet_health_check:
     when:
@@ -2813,7 +2813,7 @@ workflows:
             - datadog
             - slack-context
           requires:
-             - wait_for_previous_pipeline
+             - cancel_if_previous_pipeline
 
   cidaily_health_check:
     when:
@@ -2856,6 +2856,7 @@ workflows:
             - slack-context
           requires:
             - wait_for_previous_pipeline
+            - cancel_if_previous_pipeline
 
   cidaily_testnet_health_check:
     when:
@@ -2887,7 +2888,7 @@ workflows:
             - datadog
             - slack-context
           requires:
-            - wait_for_previous_pipeline
+            - cancel_if_previous_pipeline
 
   cilr_health_check:
     when:
@@ -2930,6 +2931,7 @@ workflows:
             - slack-context
           requires:
              - wait_for_previous_pipeline
+             - cancel_if_previous_pipeline
 
   redeploy_sv_runbook_cidaily:
     when:
