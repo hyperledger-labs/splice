@@ -1011,14 +1011,7 @@ The following commands cover the typical lifecycle of a Canton Network cluster.
    run `cncluster lock`  from the cluster's deployment directory, which will
    then assert a lock on the cluster in your name (unless somebody else has
    it already).
-1. Build and upload all docker images
-    1. Clean and build the main application, by invoking `make clean`
-       and `make build` from the project root.
-    1. From a cluster deployment directory, run `cncluster
-       deploy`. This will rebuild the images and apply the manifest to
-       the current cluster.
-    1. If you still run into any issues, run `make clean-all` from the
-        project root directory to clear all state, and try again.
+1. Deploy your cluster. See [Pulumi and Helm](#pulumi-and-helm).
 1. Debug your deployment. Tools mentioned in [Observing Cluster Operation](#observing-cluster-operation)
    can be useful.
 1. Once you are done with scratchnet, release the cluster lock with
