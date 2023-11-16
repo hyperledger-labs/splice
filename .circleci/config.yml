@@ -2835,7 +2835,7 @@ workflows:
           filters:
             branches:
               only:
-                - deployment/testnet
+                - deployment/cidaily
           context:
             - artifactory
             - slack-context
@@ -2867,7 +2867,7 @@ workflows:
           filters:
             branches:
               only:
-                - deployment/testnet
+                - deployment/cidaily-testnet
           context:
             - artifactory
             - slack-context
@@ -2910,7 +2910,7 @@ workflows:
           filters:
             branches:
               only:
-                - deployment/testnet
+                - deployment/cilr
           context:
             - artifactory
             - slack-context
