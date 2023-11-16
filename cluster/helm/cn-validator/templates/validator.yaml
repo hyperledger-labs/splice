@@ -23,7 +23,7 @@ spec:
         imagePullPolicy: Always
         env:
         - name: JAVA_TOOL_OPTIONS
-          value: {{ .Values.defaultJvmOptions }}
+          value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
         - name: CN_APP_VALIDATOR_PARTICIPANT_ADDRESS
           value: {{ .Values.participantAddress | default "participant" | quote }}
         {{ if .Values.appDars -}}

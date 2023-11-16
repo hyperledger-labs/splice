@@ -54,6 +54,7 @@ export type ValidatorConfig = {
   additionalUsers?: k8s.types.input.core.v1.EnvVar[];
   participantBootstrapDump?: BootstrappingDumpConfig;
   svValidator?: boolean;
+  additionalJvmOptions?: string;
 };
 
 export async function installValidatorApp(config: ValidatorConfig): Promise<pulumi.Resource> {

@@ -24,7 +24,7 @@ spec:
           imagePullPolicy: "Always"
           env:
             - name: JAVA_TOOL_OPTIONS
-              value: {{ .Values.defaultJvmOptions }}
+              value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
             {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "sv" "keyName" "sv" "fixedTokens" .Values.cluster.fixedTokens) | indent 12}}
             {{- include "cn-util-lib.auth0-user-env-var" (dict "appName" "validator" "keyName" "validator") | indent 12}}
             {{- if eq .Values.onboardingType "found-collective" }}

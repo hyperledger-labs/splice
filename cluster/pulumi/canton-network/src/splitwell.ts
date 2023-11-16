@@ -20,6 +20,7 @@ export async function installSplitwell(
   svc: pulumi.Resource,
   providerWalletUser: string,
   onboarding: ValidatorOnboarding,
+  isDevNet: boolean,
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
   topupConfig?: ValidatorTopupConfig
@@ -28,7 +29,7 @@ export async function installSplitwell(
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
 
-  const domain = installDomain(xns, 'domain', postgresDb);
+  const domain = installDomain(xns, 'domain', postgresDb, isDevNet);
 
   const loopback = installCNHelmChart(
     xns,
@@ -49,6 +50,7 @@ export async function installSplitwell(
     auth0UserNameEnvVarSource('validator'),
     // We disable auto-init if we have a dump to bootstrap from.
     !!participantBootstrapDump,
+    isDevNet,
     [domain, loopback]
   );
 

@@ -832,6 +832,17 @@ To edit an alert follow the following steps:
 This can be simplified in the future if we change to use a database for the grafana storage. Allowing us to manually `unmark` the alerts as
 provisioned.
 
+#### JVM debug information
+
+To collect low-level debug information for a JVM process running in the cluster, follow these steps:
+
+1. Install a JMX client application. VisualVM and JDK Mission Control are both free and tested to work.
+1. Use `kubectl get pods -A` to find the name of the pod on which the JVM application is running.
+1. Use `kubectl port-forward pods/<pod-name> 9010:9010 --namespace=<namespace>` to forward port
+   9010 from the pod to your local network.
+1. In your JMX client application, open a connection to `localhost:9010`, without SSL or authentication.
+1. In your JMX client application, start a Java Flight Recorder with the desired settings and analyze the result.
+
 ### Checking Pod Node Assignments and Memory Usage
 
 Kubernetes runs Docker images in `Pod`s of containers that it

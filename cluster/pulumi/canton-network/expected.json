@@ -1038,6 +1038,7 @@
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
@@ -1196,6 +1197,7 @@
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "auth": {
           "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
@@ -1812,6 +1814,7 @@
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
@@ -1903,6 +1906,7 @@
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
@@ -2070,6 +2074,7 @@
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "auth": {
           "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
@@ -2335,6 +2340,7 @@
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
@@ -2425,6 +2431,7 @@
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "approvedSvIdentities": [
           {
             "name": "SBI-Holdings",
@@ -2853,6 +2860,7 @@
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
@@ -3020,6 +3028,7 @@
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "auth": {
           "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
@@ -3285,6 +3294,7 @@
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
@@ -3375,6 +3385,7 @@
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "approvedSvIdentities": [
           {
             "name": "SBI-Holdings",
@@ -3775,6 +3786,7 @@
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
@@ -3942,6 +3954,7 @@
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "auth": {
           "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
@@ -4207,6 +4220,7 @@
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "approvedSvIdentities": [
           {
             "name": "SBI-Holdings",
@@ -4607,6 +4621,7 @@
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "cluster": {
           "basename": "mock",
           "dnsName": "mock.network.canton.global",
@@ -4774,6 +4789,7 @@
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "auth": {
           "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"
@@ -5039,6 +5055,7 @@
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "approvedSvIdentities": [
           {
             "name": "SBI-Holdings",
@@ -5381,6 +5398,7 @@
       "namespace": "validator1",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "auth": {
           "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
           "targetAudience": "https://canton.network.global"

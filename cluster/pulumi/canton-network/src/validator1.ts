@@ -11,6 +11,7 @@ import {
   ValidatorOnboarding,
 } from 'cn-pulumi-common';
 import type { Auth0Client } from 'cn-pulumi-common';
+import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
 import { installParticipant } from './ledger';
@@ -50,6 +51,7 @@ export async function installValidator1(
     auth0UserNameEnvVarSource('validator'),
     // We disable auto-init if we have a dump to bootstrap from.
     !!participantBootstrapDump,
+    isDevNet,
     [loopback]
   );
 
@@ -82,5 +84,6 @@ export async function installValidator1(
     participantBootstrapDump,
     topupConfig,
     svValidator: false,
+    additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
   });
 }

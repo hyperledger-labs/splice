@@ -26,7 +26,7 @@ spec:
         {{- end}}
           env:
             - name: JAVA_TOOL_OPTIONS
-              value: {{ .Values.defaultJvmOptions }}
+              value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
             - name: CANTON_DOMAIN_POSTGRES_SERVER
               value: {{ .Values.postgres }}
             - name: CANTON_DOMAIN_POSTGRES_PASSWORD

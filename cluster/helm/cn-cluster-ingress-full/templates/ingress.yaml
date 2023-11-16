@@ -98,7 +98,7 @@ spec:
         image: "{{ .Values.imageRepo }}/external-proxy-full:{{ (.Values.cluster).imageTag }}"
         env:
         - name: JAVA_TOOL_OPTIONS
-          value: {{ .Values.defaultJvmOptions }}
+          value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
         imagePullPolicy: Always
         ports:
         - containerPort: 80

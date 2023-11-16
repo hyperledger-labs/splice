@@ -20,8 +20,10 @@ import {
   ValidatorOnboarding,
   validatorOnboardingSecretName,
   installValidatorOnboardingSecret,
+  isDevNet,
 } from 'cn-pulumi-common';
 import type { Auth0Client, CnInput, SvIdKey } from 'cn-pulumi-common';
+import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
 import { installCometBftNode } from './cometbft';
@@ -168,7 +170,8 @@ export async function installSvNode(config: SvConfig): Promise<{
         : {
             driver: 'postgres',
             postgres: sequencerDatabase,
-          }
+          },
+      isDevNet
     );
   }
 
@@ -178,7 +181,8 @@ export async function installSvNode(config: SvConfig): Promise<{
     postgresDb,
     auth0UserNameEnvVarSource('sv'),
     // If we have a dump, we disable auto init.
-    !!config.bootstrappingDumpConfig
+    !!config.bootstrappingDumpConfig,
+    isDevNet
   );
 
   const svValues = {
@@ -221,6 +225,7 @@ export async function installSvNode(config: SvConfig): Promise<{
     metrics: {
       enable: true,
     },
+    additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -249,6 +254,7 @@ export async function installSvNode(config: SvConfig): Promise<{
         enable: true,
       },
       persistence: persistenceConfig(postgresDb, 'scan'),
+      additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
     };
     const scanApp = installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, [
       svApp,
@@ -260,6 +266,7 @@ export async function installSvNode(config: SvConfig): Promise<{
           enable: true,
         },
         persistence: persistenceConfig(postgresDb, 'directory'),
+        additionalJvmOptions: isDevNet ? jmxOptions() : undefined,
       };
       installCNHelmChart(xns, 'directory-' + xns.logicalName, 'cn-directory', directoryValues, [
         scanApp,

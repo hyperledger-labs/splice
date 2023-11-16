@@ -252,6 +252,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     sv1,
     'auth0|63e12e0415ad881ffe914e61',
     splitwellOnboarding,
+    isDevNet,
     backupConfig,
     bootstrappingDumpConfig,
     topupConfig
