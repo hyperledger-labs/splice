@@ -60,10 +60,14 @@ get_url() {
         --fail -X GET -u "$CIRCLECI_TOKEN:" -H "Content-Type: application/json" "${url}"
 }
 
-cancel_workflow() {
-  curl --request POST \
-              --url https://circleci.com/api/v2/workflow/"$CIRCLE_WORKFLOW_ID"/cancel \
-              --header "Circle-Token: ${CIRCLECI_TOKEN}"
+cancel_workflow_if_still_running() {
+    pipeline_id=$1
+    while ! pipeline_workflows_complete "$PIPELINE_ID"
+    do
+      curl --request POST \
+                  --url https://circleci.com/api/v2/workflow/"$CIRCLE_WORKFLOW_ID"/cancel \
+                  --header "Circle-Token: ${CIRCLECI_TOKEN}"
+    done
 }
 
 write_pages() {
@@ -129,8 +133,8 @@ run() {
               WORKFLOW_NAME=$(jq -r <<< "$WORKFLOW" '.name')
               if [[ " ${WORKFLOW_NAMES} " == *" ${WORKFLOW_NAME} "* ]]; then
                   if [ "$WAIT_OR_CANCEL" = "cancel_self" ]; then
-                    echo "Pipeline contains workflow $WORKFLOW_NAME, cancelling current workflow..."
-                    cancel_workflow
+                    echo "Pipeline contains workflow $WORKFLOW_NAME, cancelling current workflow if pipeline is still running..."
+                    cancel_workflow_if_still_running "$PIPELINE_ID"
                   else
                     echo "Pipeline contains workflow $WORKFLOW_NAME, waiting for pipeline to complete ..."
                     wait_for_pipeline_to_complete "$PIPELINE_ID"
