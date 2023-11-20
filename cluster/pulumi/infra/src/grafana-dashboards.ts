@@ -10,6 +10,7 @@ export function createGrafanaDashboards(namespace: Input<string>, filtered: bool
   const prefix = filtered ? 'filtered-' : '';
   createConfigMapForFolder(namespace, `${dashboardsPath}/${prefix}platform`, 'platform');
   createConfigMapForFolder(namespace, `${dashboardsPath}/${prefix}participant`, 'participant');
+  createConfigMapForFolder(namespace, `${dashboardsPath}/${prefix}canton`, 'canton');
   createConfigMapForFolder(namespace, `${REPO_ROOT}/cluster/grafana-dashboards`, 'canton-network');
 }
 
