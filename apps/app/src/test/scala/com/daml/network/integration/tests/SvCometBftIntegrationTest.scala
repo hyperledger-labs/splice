@@ -9,6 +9,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.SvAppBackendReference
 import com.daml.network.environment.CNNodeEnvironmentImpl
+import com.daml.network.http.v0.definitions.CometBftJsonRpcRequest
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.CometBftNetworkPlugin
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -21,6 +22,7 @@ import com.daml.network.util.SvTestUtil
 import com.digitalasset.canton.drivers.cometbft.data.{CometBftTx, SequencerTx}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import io.circe.Json
 import monocle.macros.syntax.lens.*
 
 import java.util.UUID
@@ -102,6 +104,30 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
     }
   }
 
+  // In case this test fails, please also test CometBFT state sync is working by:
+  // - deploying a scratchnet cluster
+  // - waiting a while for the block height to grow beyond the minTrustHeightAge configured in the cometbft helm chart
+  // - deploying the SV runbook
+  "Sv app" should {
+    "expose CometBFT RPC methods required for state sync" in { implicit env =>
+      testJsonRpcCall(1, "status", Map.empty, Seq("node_info", "sync_info", "validator_info"))
+      testJsonRpcCall(2, "block", Map("height" -> Json.fromString("1")), Seq("block_id", "block"))
+      testJsonRpcCall(3, "commit", Map("height" -> Json.fromString("1")), Seq("signed_header"))
+      testJsonRpcCall(
+        4,
+        "validators",
+        Map("height" -> Json.fromString("1")),
+        Seq("block_height", "validators"),
+      )
+      testJsonRpcCall(
+        5,
+        "consensus_params",
+        Map("height" -> Json.fromString("1")),
+        Seq("block_height", "consensus_params"),
+      )
+    }
+  }
+
   private def cometBFTnodeIsUpToDateValidator(sv: SvAppBackendReference) = {
     // node is up to date
     sv.cometBftNodeStatus().catchingUp shouldBe false
@@ -138,4 +164,19 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
       NamedLoggerFactory.root,
     )
   }
+
+  private def testJsonRpcCall(
+      id: Int,
+      method: String,
+      params: Map[String, Json],
+      responseKeys: Seq[String],
+  )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
+    val id_ = Json.fromInt(id)
+    val method_ = CometBftJsonRpcRequest.Method.from(method).value
+    val response = sv1Backend.cometBftJsonRpcRequest(id_, method_, params)
+    response.id shouldBe id_
+    response.jsonrpc shouldBe "2.0"
+    responseKeys.foreach(key => response.result.value.findAllByKey(key) should not be empty)
+  }
+
 }
