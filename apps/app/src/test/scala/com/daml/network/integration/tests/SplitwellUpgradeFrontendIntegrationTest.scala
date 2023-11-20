@@ -41,7 +41,7 @@ class SplitwellUpgradeFrontendIntegrationTest
         } validator.participantClient.upload_dar_unless_exists(darPath)
       })
       // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
-      .withSequencerConnectionsFromScanDisabled
+      .withSequencerConnectionsFromScanDisabled()
 
   "splitwell frontend with upgraded domain" should {
     "create per domain install contracts" in { implicit env =>

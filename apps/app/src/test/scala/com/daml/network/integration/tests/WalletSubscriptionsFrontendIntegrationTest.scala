@@ -21,7 +21,7 @@ class WalletSubscriptionsFrontendIntegrationTest
       .simpleTopology(this.getClass.getSimpleName)
       .withCoinPrice(2)
       // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
-      .withSequencerConnectionsFromScanDisabled
+      .withSequencerConnectionsFromScanDisabled()
 
   "A wallet UI" should {
 

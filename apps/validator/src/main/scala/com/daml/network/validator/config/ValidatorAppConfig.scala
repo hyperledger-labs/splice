@@ -90,7 +90,10 @@ final case class BuyExtraTrafficConfig(
 
 case class ValidatorGlobalDomainConfig(
     alias: DomainAlias,
-    url: String,
+    /** An optional statically specified URL for a sequencer to use to connect to the domain.
+      * By default (when a URL is not specified), the list of sequencer URLs will be read from Scan.
+      */
+    url: Option[String] = None,
     buyExtraTraffic: BuyExtraTrafficConfig = BuyExtraTrafficConfig(),
 
     /** amount of extra traffic reserved for transactions required to do traffic topups
@@ -151,7 +154,6 @@ case class ValidatorAppBackendConfig(
     participantIdentitiesBackup: Option[BackupDumpConfig] = None,
     appManager: Option[AppManagerConfig] = None,
     svValidator: Boolean = false,
-    useSequencerConnectionsFromScan: Boolean = true,
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(5),
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {

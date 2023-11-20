@@ -121,7 +121,7 @@ spec:
                       address = {{ .sequencerAddress | default "global-domain-sequencer" | quote }}
                       port = 5008
                     }
-                    external-public-api-url = {{ .sequencerPublicUrl | default "" | quote }}
+                    external-public-api-url = {{ .sequencerPublicUrl | quote }}
                   }
                   mediator {
                     admin-api {

@@ -87,11 +87,9 @@ spec:
           value: "true"
         {{ end }}
         {{ if not .Values.useSequencerConnectionsFromScan }}
-        - name: CN_APP_VALIDATOR_SEQUENCER_CONNECTIONS_FROM_SCAN
-          value: "false"
+        - name: ADDITIONAL_CONFIG_STATIC_SEQUENCER_URL
+          value: canton.validator-apps.validator_backend.domains.global.url = {{ .Values.globalDomainUrl | quote }}
         {{ end }}
-        - name: CN_APP_VALIDATOR_GLOBAL_DOMAIN_URL
-          value: {{ .Values.globalDomainUrl | quote }}
         {{- range $ii, $domain := .Values.extraDomains }}
         - name: ADDITIONAL_CONFIG_EXTRA_DOMAIN_{{ $ii }}
           value: |

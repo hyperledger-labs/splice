@@ -12,3 +12,4 @@
 {{- end }}
 
 {{ $_ := required ".Values.globalDomainUrl is required." .Values.globalDomainUrl }}
+{{ $_ := required ".Values.domain.sequencerPublicUrl is required." .Values.domain.sequencerPublicUrl }}

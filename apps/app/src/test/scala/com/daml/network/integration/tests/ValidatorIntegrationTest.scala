@@ -34,7 +34,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       .simpleTopology(this.getClass.getSimpleName)
       .withManualStart
       .withoutInitialManagerApps // TODO (#7539): this should no longer be required once app-instances is removed
-      .withSequencerConnectionsFromScanDisabled // TODO(#8393) re-enable this when it is more robust to temporary domain disconnects
+      .withSequencerConnectionsFromScanDisabled() // TODO(#8393) re-enable this when it is more robust to temporary domain disconnects
 
   "start and restart cleanly" in { implicit env =>
     initSvcWithSv1Only()

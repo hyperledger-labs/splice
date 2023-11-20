@@ -596,8 +596,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   lazy val domainAlias = DomainAlias.tryCreate(domain)
   lazy val domainConfig = ValidatorDomainConfig(
     global = ValidatorGlobalDomainConfig(
-      domainAlias,
-      "",
+      domainAlias
     )
   )
 }

@@ -366,9 +366,12 @@ object CNNodeConfigTransforms {
       val uri = Uri(s)
       uri.withPort(uri.effectivePort + bump).toString
     }
+    def bumpOptionalUrl(o: Option[String]): Option[String] = {
+      o.map(bumpUrl(_))
+    }
     updateAllValidatorConfigs_(
       _.focus(_.domains.global.url)
-        .modify(bumpUrl(_))
+        .modify(bumpOptionalUrl(_))
         .focus(_.domains.extra)
         .modify(_.map(d => d.copy(url = bumpUrl(d.url))))
     )

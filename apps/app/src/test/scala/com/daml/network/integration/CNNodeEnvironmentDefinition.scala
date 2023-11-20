@@ -249,12 +249,14 @@ case class CNNodeEnvironmentDefinition(
       )(config)
     )
 
-  def withSequencerConnectionsFromScanDisabled: CNNodeEnvironmentDefinition =
+  def withSequencerConnectionsFromScanDisabled(
+      sequencerPortBump: Int = 0
+  ): CNNodeEnvironmentDefinition =
     addConfigTransform((_, config) =>
       CNNodeConfigTransforms.updateAllValidatorConfigs_(config =>
         config
-          .focus(_.useSequencerConnectionsFromScan)
-          .replace(false)
+          .focus(_.domains.global.url)
+          .replace(Some(s"http://localhost:${5008 + sequencerPortBump}"))
       )(config)
     )
 
@@ -316,7 +318,7 @@ case class CNNodeEnvironmentDefinition(
         CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
       )
       .withTrafficTopupsDisabled
-      .withSequencerConnectionsFromScanDisabled
+      .withSequencerConnectionsFromScanDisabled(10_000)
 
   override lazy val environmentFactory: EnvironmentFactory[CNNodeEnvironmentImpl] =
     CNNodeEnvironmentFactory

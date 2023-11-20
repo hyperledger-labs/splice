@@ -328,19 +328,21 @@ class ValidatorApp(
       participantAdminConnection: ParticipantAdminConnection,
       scanConnection: ScanConnection,
   ): Future[Unit] = {
-    // TODO (#8450) config.domains.global.alias is wrong if global has migrated
-    if (config.useSequencerConnectionsFromScan)
-      ensureDomainRegisteredFromScan(
-        config.domains.global.alias,
-        participantAdminConnection,
-        scanConnection,
-      )
-    else
-      ensureDomainRegistered(
-        config.domains.global.alias,
-        config.domains.global.url,
-        participantAdminConnection,
-      )
+    // TODO (#8450) config.domains.global.alias and config.domains.global.url are wrong if global has migrated
+    config.domains.global.url match {
+      case None =>
+        ensureDomainRegisteredFromScan(
+          config.domains.global.alias,
+          participantAdminConnection,
+          scanConnection,
+        )
+      case Some(url) =>
+        ensureDomainRegistered(
+          config.domains.global.alias,
+          url,
+          participantAdminConnection,
+        )
+    }
   }
 
   private def ensureExtraDomainsRegistered(
@@ -500,7 +502,7 @@ class ValidatorApp(
         config.participantIdentitiesBackup,
         config.domains.global.buyExtraTraffic,
         config.appManager,
-        config.useSequencerConnectionsFromScan,
+        config.domains.global.url.isEmpty,
         config.prevetDuration,
         config.domains.global.alias,
         clock,

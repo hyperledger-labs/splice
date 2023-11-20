@@ -3,6 +3,11 @@
 Release Notes
 =============
 
+2023-11-27
+----------
+
+* The `domain.sequencerPublicUrl` configuration in `cn-sv-node` helm chart is now mandatory. All SVs must specify the URL at which their sequencer can be reached.
+
 2023-11-20
 ----------
 
