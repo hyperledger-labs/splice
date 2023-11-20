@@ -8,7 +8,6 @@ import {
   BootstrappingDumpConfig,
   ValidatorTopupConfig,
   CLUSTER_BASENAME,
-  ValidatorOnboarding,
 } from 'cn-pulumi-common';
 import type { Auth0Client } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
@@ -21,7 +20,7 @@ export async function installValidator1(
   auth0Client: Auth0Client,
   svc: pulumi.Resource,
   name: string,
-  onboarding: ValidatorOnboarding,
+  onboardingSecret: string,
   isDevNet: boolean,
   validatorWalletUser: string,
   backupConfig?: BackupConfig,
@@ -73,7 +72,7 @@ export async function installValidator1(
     validatorPartyHint: `${name}_validator_service_user`,
     extraDomains: [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
     svSponsorAddress: 'http://sv-app.sv-1:5014',
-    onboarding,
+    onboardingSecret,
     persistenceConfig: {
       host: postgresDb.address,
       password: postgresDb.password,

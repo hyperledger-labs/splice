@@ -2,18 +2,19 @@ import * as k8s from '@pulumi/kubernetes';
 
 import { btoa, ExactNamespace } from './utils';
 
-export type ValidatorOnboarding = { name: string; expiresIn: string; secret: string };
+export type ExpectedValidatorOnboarding = { name: string; expiresIn: string; secret: string };
 
-export const validatorOnboardingSecretName = (onboarding: ValidatorOnboarding): string =>
-  `cn-app-validator-onboarding-${onboarding.name}`;
+export const validatorOnboardingSecretName = (name: string): string =>
+  `cn-app-validator-onboarding-${name}`;
 
 export function installValidatorOnboardingSecret(
   xns: ExactNamespace,
-  onboarding: ValidatorOnboarding
+  name: string,
+  secret: string
 ): k8s.core.v1.Secret {
-  const secretName = validatorOnboardingSecretName(onboarding);
+  const secretName = validatorOnboardingSecretName(name);
   return new k8s.core.v1.Secret(
-    `cn-app-${xns.logicalName}-validator-onboarding-${onboarding.name}`,
+    `cn-app-${xns.logicalName}-validator-onboarding-${name}`,
     {
       metadata: {
         name: secretName,
@@ -21,7 +22,7 @@ export function installValidatorOnboardingSecret(
       },
       type: 'Opaque',
       data: {
-        secret: btoa(onboarding.secret),
+        secret: btoa(secret),
       },
     },
     {

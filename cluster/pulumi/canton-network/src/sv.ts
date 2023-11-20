@@ -17,7 +17,7 @@ import {
   installCNHelmChart,
   installBootstrapDataBucketSecret,
   participantBootstrapDumpSecretName,
-  ValidatorOnboarding,
+  ExpectedValidatorOnboarding,
   validatorOnboardingSecretName,
   installValidatorOnboardingSecret,
   PersistenceConfig,
@@ -81,7 +81,7 @@ export type SvConfig = {
   approvedSvIdentities: ApprovedSvIdentity[];
   withScan: boolean;
   withDirectoryBackend: boolean;
-  expectedValidatorOnboardings: ValidatorOnboarding[];
+  expectedValidatorOnboardings: ExpectedValidatorOnboarding[];
   isDevNet: boolean;
   backupConfig?: BackupConfig;
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
@@ -147,7 +147,7 @@ export async function installSvNode(
     )
     .concat(
       config.expectedValidatorOnboardings.map(onboarding =>
-        installValidatorOnboardingSecret(xns, onboarding)
+        installValidatorOnboardingSecret(xns, onboarding.name, onboarding.secret)
       )
     )
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
@@ -216,7 +216,7 @@ export async function installSvNode(
       expiresIn: onboarding.expiresIn,
       secretFrom: {
         secretKeyRef: {
-          name: validatorOnboardingSecretName(onboarding),
+          name: validatorOnboardingSecretName(onboarding.name),
           key: 'secret',
           optional: false,
         },

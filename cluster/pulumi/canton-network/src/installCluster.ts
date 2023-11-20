@@ -105,19 +105,19 @@ function joinViaSv1(
 const splitwellOnboarding = {
   name: 'splitwell',
   secret: 'splitwellsecret',
-  expiresIn: '1h',
+  expiresIn: '24h',
 };
 
 const validator1Onboarding = {
   name: 'validator1',
   secret: 'validator1secret',
-  expiresIn: '1h',
+  expiresIn: '24h',
 };
 
 const standaloneValidatorOnboarding = {
   name: 'validator',
   secret: 'validatorsecret',
-  expiresIn: '1h',
+  expiresIn: '24h',
 };
 
 let backupConfig: BackupConfig | undefined;
@@ -248,7 +248,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     auth0Client,
     sv1,
     'validator1',
-    validator1Onboarding,
+    validator1Onboarding.secret,
     isDevNet,
     'auth0|63e3d75ff4114d87a2c1e4f5',
     backupConfig,
@@ -260,7 +260,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     auth0Client,
     sv1,
     'auth0|63e12e0415ad881ffe914e61',
-    splitwellOnboarding,
+    splitwellOnboarding.secret,
     isDevNet,
     backupConfig,
     bootstrappingDumpConfig,

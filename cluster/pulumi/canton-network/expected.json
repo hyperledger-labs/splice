@@ -650,12 +650,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-validator-onboarding-splitwell",
+        "name": "cn-app-validator-onboarding-validator",
         "namespace": "splitwell"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-splitwell-validator-onboarding-splitwell",
+    "name": "cn-app-splitwell-validator-onboarding-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -807,12 +807,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-validator-onboarding-validator1",
+        "name": "cn-app-validator-onboarding-validator",
         "namespace": "validator1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-validator1-validator-onboarding-validator1",
+    "name": "cn-app-validator1-validator-onboarding-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1920,7 +1920,7 @@
         "onboardingSecretFrom": {
           "secretKeyRef": {
             "key": "secret",
-            "name": "cn-app-validator-onboarding-splitwell",
+            "name": "cn-app-validator-onboarding-validator",
             "optional": false
           }
         },
@@ -2837,7 +2837,7 @@
         },
         "expectedValidatorOnboardings": [
           {
-            "expiresIn": "1h",
+            "expiresIn": "24h",
             "secretFrom": {
               "secretKeyRef": {
                 "key": "secret",
@@ -2847,7 +2847,7 @@
             }
           },
           {
-            "expiresIn": "1h",
+            "expiresIn": "24h",
             "secretFrom": {
               "secretKeyRef": {
                 "key": "secret",
@@ -2857,7 +2857,7 @@
             }
           },
           {
-            "expiresIn": "1h",
+            "expiresIn": "24h",
             "secretFrom": {
               "secretKeyRef": {
                 "key": "secret",
@@ -6124,7 +6124,7 @@
         "onboardingSecretFrom": {
           "secretKeyRef": {
             "key": "secret",
-            "name": "cn-app-validator-onboarding-validator1",
+            "name": "cn-app-validator-onboarding-validator",
             "optional": false
           }
         },

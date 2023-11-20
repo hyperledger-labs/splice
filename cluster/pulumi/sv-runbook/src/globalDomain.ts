@@ -5,7 +5,7 @@ import {
   CnInput,
   ExactNamespace,
   REPO_ROOT,
-  installCNSVHelmChart,
+  installCNRunbookHelmChart,
   loadYamlFromFile,
 } from 'cn-pulumi-common';
 
@@ -27,7 +27,7 @@ export function installGlobalDomainNode(
     ),
     postgresPassword: postgresPassword,
   };
-  return installCNSVHelmChart(
+  return installCNRunbookHelmChart(
     svNamespace,
     'global-domain',
     'cn-global-domain',

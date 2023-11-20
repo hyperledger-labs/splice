@@ -5,7 +5,7 @@ import { Resource } from '@pulumi/pulumi';
 import {
   ExactNamespace,
   isDevNet,
-  installCNSVHelmChart,
+  installCNRunbookHelmChart,
   loadYamlFromFile,
   REPO_ROOT,
   CnInput,
@@ -52,7 +52,7 @@ export function installCometBftNode(
     },
     { dependsOn: dependencies.concat([xns.ns]) }
   );
-  return installCNSVHelmChart(
+  return installCNRunbookHelmChart(
     xns,
     'cometbft',
     'cn-cometbft',

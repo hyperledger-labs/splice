@@ -16,7 +16,6 @@ import {
   fetchAndInstallParticipantBootstrapDump,
   installBootstrapDataBucketSecret,
   participantBootstrapDumpSecretName,
-  ValidatorOnboarding,
   installValidatorOnboardingSecret,
   validatorOnboardingSecretName,
 } from 'cn-pulumi-common';
@@ -38,7 +37,7 @@ export type ValidatorConfig = {
   auth0Client: Auth0Client;
   xns: ExactNamespace;
   auth0AppName: string;
-  onboarding?: ValidatorOnboarding;
+  onboardingSecret?: string;
   topupConfig?: ValidatorTopupConfig;
   validatorWalletUser?: string;
   disableAllocateLedgerApiUserParty?: boolean;
@@ -86,7 +85,9 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
     await installAuth0UISecret(config.auth0Client, config.xns, 'directory', 'directory'),
   ]
     .concat(
-      config.onboarding ? [installValidatorOnboardingSecret(config.xns, config.onboarding)] : []
+      config.onboardingSecret
+        ? [installValidatorOnboardingSecret(config.xns, 'validator', config.onboardingSecret)]
+        : []
     )
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
@@ -104,10 +105,10 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       extraDomains: config.extraDomains,
       validatorWalletUser: config.validatorWalletUser,
       svSponsorAddress: config.svSponsorAddress,
-      onboardingSecretFrom: config.onboarding
+      onboardingSecretFrom: config.onboardingSecret
         ? {
             secretKeyRef: {
-              name: validatorOnboardingSecretName(config.onboarding),
+              name: validatorOnboardingSecretName('validator'),
               key: 'secret',
               optional: false,
             },

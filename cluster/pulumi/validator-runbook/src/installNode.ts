@@ -13,11 +13,10 @@ import {
   setupBootstrapping,
   imagePullSecretByNamespaceName,
   infraStack,
-  installCNSVHelmChart,
-  installCNSVHelmChartByNamespaceName,
+  installCNRunbookHelmChart,
+  installCNRunbookHelmChartByNamespaceName,
   isDevNet,
   loadYamlFromFile,
-  ValidatorOnboarding,
   domainFeesConfig,
   ValidatorTopupConfig,
   validatorSecrets,
@@ -78,11 +77,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       bootstrappingConfig,
     });
 
-  const onboarding = {
-    name: 'validator',
-    secret: 'validatorsecret',
-    expiresIn: '1h',
-  };
+  const onboardingSecret = 'validatorsecret';
 
   const loopback =
     TARGET_CLUSTER === CLUSTER_BASENAME
@@ -104,7 +99,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const validator = await installValidator({
     xns,
-    onboarding,
+    onboardingSecret,
     password,
     participantBootstrapDumpSecret,
     auth0Client,
@@ -116,7 +111,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   });
 
   const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
-  installCNSVHelmChartByNamespaceName(
+  installCNRunbookHelmChartByNamespaceName(
     infraStack.requireOutput('ingressNs') as pulumi.Output<string>,
     'cluster-ingress-validator',
     'cn-cluster-ingress-runbook',
@@ -139,7 +134,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 type ValidatorConfig = {
   auth0Client: Auth0Client;
   xns: ExactNamespace;
-  onboarding: ValidatorOnboarding;
+  onboardingSecret?: string;
   backupConfig?: BackupConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
@@ -152,7 +147,7 @@ type ValidatorConfig = {
 async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Release> {
   const {
     xns,
-    onboarding,
+    onboardingSecret,
     password,
     participantBootstrapDumpSecret,
     auth0Client,
@@ -163,7 +158,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     topupConfig,
   } = config;
 
-  const postgres = installCNSVHelmChart(
+  const postgres = installCNRunbookHelmChart(
     xns,
     'postgres',
     'cn-postgres',
@@ -195,7 +190,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     },
   };
 
-  const participant = installCNSVHelmChart(
+  const participant = installCNRunbookHelmChart(
     xns,
     'participant',
     'cn-participant',
@@ -256,10 +251,12 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     .concat([validatorAppSecret, validatorUISecret])
     .concat([directoryUiSecret(xns, auth0Client, directoryClientId)])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
-    .concat(onboarding ? [installValidatorOnboardingSecret(xns, onboarding)] : [])
+    .concat(
+      onboardingSecret ? [installValidatorOnboardingSecret(xns, 'validator', onboardingSecret)] : []
+    )
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
-  const validator = installCNSVHelmChart(
+  const validator = installCNRunbookHelmChart(
     xns,
     'validator',
     'cn-validator',

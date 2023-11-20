@@ -13,8 +13,8 @@ import {
   setupBootstrapping,
   infraStack,
   imagePullSecretByNamespaceName,
-  installCNSVHelmChart,
-  installCNSVHelmChartByNamespaceName,
+  installCNRunbookHelmChart,
+  installCNRunbookHelmChartByNamespaceName,
   isDevNet,
   loadYamlFromFile,
   participantBootstrapDumpSecretName,
@@ -25,7 +25,7 @@ import {
   svKeySecret,
   svKeyFromSecret,
   validatorSecrets,
-  ValidatorOnboarding,
+  ExpectedValidatorOnboarding,
   SvIdKey,
   installLoopback,
   imagePullSecret,
@@ -127,7 +127,7 @@ export async function installNode(
   });
 
   const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
-  installCNSVHelmChartByNamespaceName(
+  installCNRunbookHelmChartByNamespaceName(
     infraStack.requireOutput('ingressNs') as pulumi.Output<string>,
     'cluster-ingress-sv',
     'cn-cluster-ingress-runbook',
@@ -146,7 +146,7 @@ export async function installNode(
 type SvConfig = {
   auth0Client: Auth0Client;
   xns: ExactNamespace;
-  onboarding?: ValidatorOnboarding;
+  onboarding?: ExpectedValidatorOnboarding;
   backupConfig?: BackupConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
@@ -177,7 +177,7 @@ async function installSvAndValidator(config: SvConfig) {
     validatorWalletUserName,
   } = config;
 
-  const postgres = installCNSVHelmChart(
+  const postgres = installCNRunbookHelmChart(
     xns,
     'postgres',
     'cn-postgres',
@@ -218,7 +218,7 @@ async function installSvAndValidator(config: SvConfig) {
     svUIClientId
   );
 
-  const participant = installCNSVHelmChart(
+  const participant = installCNRunbookHelmChart(
     xns,
     'participant',
     'cn-participant',
@@ -292,7 +292,7 @@ async function installSvAndValidator(config: SvConfig) {
     walletUIClientId
   );
 
-  const sv = installCNSVHelmChart(
+  const sv = installCNRunbookHelmChart(
     xns,
     'sv-app',
     'cn-sv-node',
@@ -316,7 +316,7 @@ async function installSvAndValidator(config: SvConfig) {
     ...fixedTokensValue,
   };
 
-  installCNSVHelmChart(
+  installCNRunbookHelmChart(
     xns,
     'scan',
     'cn-scan',
@@ -355,7 +355,7 @@ async function installSvAndValidator(config: SvConfig) {
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
-  const validator = installCNSVHelmChart(
+  const validator = installCNRunbookHelmChart(
     xns,
     'validator',
     'cn-validator',

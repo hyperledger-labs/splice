@@ -7,7 +7,7 @@ import { ChartValues, ExactNamespace, HELM_CHART_TIMEOUT_SEC, requireEnv } from 
 // if not awaited. this custom type is a subset that excludes promises, which gives us some type safety
 export type CnInput<T> = T | pulumi.OutputInstance<T>;
 
-export function installCNSVHelmChartByNamespaceName(
+export function installCNRunbookHelmChartByNamespaceName(
   ns: pulumi.Output<string> | string,
   name: string,
   chartName: string,
@@ -47,7 +47,7 @@ export function installCNSVHelmChartByNamespaceName(
   );
 }
 
-export function installCNSVHelmChart(
+export function installCNRunbookHelmChart(
   ns: ExactNamespace,
   name: string,
   chartName: string,
@@ -56,7 +56,7 @@ export function installCNSVHelmChart(
   version = '',
   dependsOn: CnInput<pulumi.Resource>[] = []
 ): k8s.helm.v3.Release {
-  return installCNSVHelmChartByNamespaceName(
+  return installCNRunbookHelmChartByNamespaceName(
     ns.ns.metadata.name,
     name,
     chartName,

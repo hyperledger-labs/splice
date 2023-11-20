@@ -7,7 +7,6 @@ import {
   installCNHelmChart,
   CLUSTER_BASENAME,
   ValidatorTopupConfig,
-  ValidatorOnboarding,
 } from 'cn-pulumi-common';
 import type { Auth0Client, BackupConfig, BootstrappingDumpConfig } from 'cn-pulumi-common';
 
@@ -19,7 +18,7 @@ export async function installSplitwell(
   auth0Client: Auth0Client,
   svc: pulumi.Resource,
   providerWalletUser: string,
-  onboarding: ValidatorOnboarding,
+  onboardingSecret: string,
   isDevNet: boolean,
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
@@ -90,7 +89,7 @@ export async function installSplitwell(
       '  dars = ["cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]',
       '}',
     ].join('\n'),
-    onboarding,
+    onboardingSecret,
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     svSponsorAddress: 'http://sv-app.sv-1:5014',
     auth0AppName: 'splitwell_validator',
