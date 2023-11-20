@@ -1,5 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 import { Service } from '@pulumi/kubernetes/core/v1';
+import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Output } from '@pulumi/pulumi';
 import {
   clusterLargeDisk,
@@ -93,50 +94,63 @@ const nodeConfigs: {
 export function installCometBftNode(
   xns: ExactNamespace,
   nodename: string,
-  onboardingName: string
+  onboardingName: string,
+  syncSource?: Release
 ): Service {
   const nodeConfig = nodeConfigs[nodename];
-  const cometbftRelease = installCNHelmChart(xns, 'cometbft', 'cn-cometbft', {
-    nodeName: onboardingName,
-    imageName: 'cometbft',
-    founder: founder,
-    istioVirtualService: {
-      enabled: true,
-      gateway: 'cluster-ingress/cn-apps-gateway',
-      port: nodeConfig.istioPort,
-    },
-    node: nodeConfig,
-    peers: Object.keys(nodeConfigs)
-      .filter(key => key !== nodename && key !== 'sv-1')
-      .map(svName => {
-        /*
-         * We configure the peers explicitly here so that every cometbft node knows about the other nodes.
-         * This is required to bypass the use of externalAddress when communicating between cometbft nodes for sv1-sv4
-         * We bypass the external address and use the internal kubernetes services address so that there is no requirement for
-         * sending the traffic through the loopback to satisfy the firewall rules
-         * */
-        return {
-          nodeId: nodeConfigs[svName].id,
-          externalAddress: p2pServiceAddress(`cometbft-${svName}`, svName),
-        };
-      }),
-    stateSync: {
-      // TODO(#8636): enable for all nodes once we have an explicit dependency between cometbft of sv2-4 on sv-app of sv-1.
-      enable: false,
-      rpcServers: rpcServiceAddress('sv-1') + ',' + rpcServiceAddress('sv-1'),
-    },
-    genesis: {
-      // for TestNet-like deployments on scratchnet, set the chainId to 'test'
-      chainId:
-        `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet ? 'test' : `${CLUSTER_BASENAME}`,
-    },
-    metrics: {
+  let stateSyncConfig;
+  if (syncSource) {
+    const rpcServer = syncSource.status.namespace.apply(rpcServiceAddress);
+    stateSyncConfig = {
       enable: true,
+      rpcServers: pulumi.interpolate`${rpcServer},${rpcServer}`,
+    };
+  } else {
+    stateSyncConfig = { enable: false };
+  }
+  const cometbftRelease = installCNHelmChart(
+    xns,
+    'cometbft',
+    'cn-cometbft',
+    {
+      nodeName: onboardingName,
+      imageName: 'cometbft',
+      founder: founder,
+      istioVirtualService: {
+        enabled: true,
+        gateway: 'cluster-ingress/cn-apps-gateway',
+        port: nodeConfig.istioPort,
+      },
+      node: nodeConfig,
+      peers: Object.keys(nodeConfigs)
+        .filter(key => key !== nodename && key !== 'sv-1')
+        .map(svName => {
+          /*
+           * We configure the peers explicitly here so that every cometbft node knows about the other nodes.
+           * This is required to bypass the use of externalAddress when communicating between cometbft nodes for sv1-sv4
+           * We bypass the external address and use the internal kubernetes services address so that there is no requirement for
+           * sending the traffic through the loopback to satisfy the firewall rules
+           * */
+          return {
+            nodeId: nodeConfigs[svName].id,
+            externalAddress: p2pServiceAddress(`cometbft-${svName}`, svName),
+          };
+        }),
+      stateSync: stateSyncConfig,
+      genesis: {
+        // for TestNet-like deployments on scratchnet, set the chainId to 'test'
+        chainId:
+          `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet ? 'test' : `${CLUSTER_BASENAME}`,
+      },
+      metrics: {
+        enable: true,
+      },
+      db: {
+        volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
+      },
     },
-    db: {
-      volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
-    },
-  });
+    syncSource ? [syncSource] : []
+  );
   return Service.get(
     `${nodeConfig.identifier}-cometbft-rpc`,
     pulumi.interpolate`${cometbftRelease.status.namespace}/${nodeConfig.identifier}-cometbft-rpc`

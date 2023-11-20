@@ -179,60 +179,69 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   });
 
   if (!singleSv) {
-    await installSvNode({
-      auth0Client,
-      nodename: 'sv-2',
-      onboardingName: 'Canton-Foundation-2',
-      validatorWalletUser: 'auth0|64afbc353bbc7ca776e27bf4',
-      onboarding: joinViaSv1(sv1, sv2Key, postgresDB1),
-      approvedSvIdentities,
-      withScan: true,
-      withDirectoryBackend: false,
-      expectedValidatorOnboardings: [],
-      isDevNet,
-      backupConfig: backupConfig,
-      withDomainNode: isDevNet,
-      auth0ValidatorAppName: 'sv2_validator',
-      bootstrappingDumpConfig,
-      topupConfig,
-      sequencerDriver: 'cometbft',
-    });
-    await installSvNode({
-      auth0Client,
-      nodename: 'sv-3',
-      onboardingName: 'Canton-Foundation-3',
-      validatorWalletUser: 'auth0|64afbc4431b562edb8995da6',
-      onboarding: joinViaSv1(sv1, sv3Key, postgresDB1),
-      approvedSvIdentities,
-      withScan: false,
-      withDirectoryBackend: false,
-      expectedValidatorOnboardings: [],
-      isDevNet,
-      backupConfig,
-      withDomainNode: isDevNet,
-      auth0ValidatorAppName: 'sv3_validator',
-      bootstrappingDumpConfig,
-      topupConfig,
-      sequencerDriver: 'cometbft',
-    });
-    await installSvNode({
-      auth0Client,
-      nodename: 'sv-4',
-      onboardingName: 'Canton-Foundation-4',
-      validatorWalletUser: 'auth0|64afbc720e20777e46fff490',
-      onboarding: joinViaSv1(sv1, sv4Key, postgresDB1),
-      approvedSvIdentities,
-      withScan: false,
-      withDirectoryBackend: false,
-      expectedValidatorOnboardings: [],
-      isDevNet,
-      backupConfig,
-      withDomainNode: isDevNet,
-      auth0ValidatorAppName: 'sv4_validator',
-      bootstrappingDumpConfig,
-      topupConfig,
-      sequencerDriver: 'cometbft',
-    });
+    await installSvNode(
+      {
+        auth0Client,
+        nodename: 'sv-2',
+        onboardingName: 'Canton-Foundation-2',
+        validatorWalletUser: 'auth0|64afbc353bbc7ca776e27bf4',
+        onboarding: joinViaSv1(sv1, sv2Key, postgresDB1),
+        approvedSvIdentities,
+        withScan: true,
+        withDirectoryBackend: false,
+        expectedValidatorOnboardings: [],
+        isDevNet,
+        backupConfig: backupConfig,
+        withDomainNode: isDevNet,
+        auth0ValidatorAppName: 'sv2_validator',
+        bootstrappingDumpConfig,
+        topupConfig,
+        sequencerDriver: 'cometbft',
+      },
+      sv1
+    );
+    await installSvNode(
+      {
+        auth0Client,
+        nodename: 'sv-3',
+        onboardingName: 'Canton-Foundation-3',
+        validatorWalletUser: 'auth0|64afbc4431b562edb8995da6',
+        onboarding: joinViaSv1(sv1, sv3Key, postgresDB1),
+        approvedSvIdentities,
+        withScan: false,
+        withDirectoryBackend: false,
+        expectedValidatorOnboardings: [],
+        isDevNet,
+        backupConfig,
+        withDomainNode: isDevNet,
+        auth0ValidatorAppName: 'sv3_validator',
+        bootstrappingDumpConfig,
+        topupConfig,
+        sequencerDriver: 'cometbft',
+      },
+      sv1
+    );
+    await installSvNode(
+      {
+        auth0Client,
+        nodename: 'sv-4',
+        onboardingName: 'Canton-Foundation-4',
+        validatorWalletUser: 'auth0|64afbc720e20777e46fff490',
+        onboarding: joinViaSv1(sv1, sv4Key, postgresDB1),
+        approvedSvIdentities,
+        withScan: false,
+        withDirectoryBackend: false,
+        expectedValidatorOnboardings: [],
+        isDevNet,
+        backupConfig,
+        withDomainNode: isDevNet,
+        auth0ValidatorAppName: 'sv4_validator',
+        bootstrappingDumpConfig,
+        topupConfig,
+        sequencerDriver: 'cometbft',
+      },
+      sv1
+    );
   }
 
   const validator = await installValidator1(

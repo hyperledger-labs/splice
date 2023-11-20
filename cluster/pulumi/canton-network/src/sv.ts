@@ -99,8 +99,11 @@ async function getAcsBootstrappingDump(xns: ExactNamespace, config: Bootstrappin
   };
 }
 
-export async function installSvNode(config: SvConfig): Promise<{
-  svApp: pulumi.Resource;
+export async function installSvNode(
+  config: SvConfig,
+  cometBftSyncSource?: k8s.helm.v3.Release
+): Promise<{
+  svApp: k8s.helm.v3.Release;
   postgresDatabase: postgres.Postgres;
 }> {
   const xns = exactNamespace(config.nodename);
@@ -151,15 +154,20 @@ export async function installSvNode(config: SvConfig): Promise<{
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
-  const cometBftRpcService = installCometBftNode(xns, config.nodename, config.onboardingName);
+  const cometBftRpcService = installCometBftNode(
+    xns,
+    config.nodename,
+    config.onboardingName,
+    cometBftSyncSource
+  );
 
-  const domain = undefined;
+  let domain = undefined;
 
   if (config.withDomainNode) {
     const sequencerDatabase =
       config.onboarding.type === 'join-with-key' ? config.onboarding.sequencerDatabase : postgresDb;
 
-    installGlobalDomain(
+    domain = installGlobalDomain(
       xns,
       'global-domain',
       postgresDb,
