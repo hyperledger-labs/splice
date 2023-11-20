@@ -22,17 +22,23 @@ abstract class PreflightValidatorIntegrationTestBase
 
   protected val auth0Users: mutable.Map[String, Auth0User] = mutable.Map.empty[String, Auth0User]
 
-  protected def auth0: Auth0Util
+  protected val isDevNet: Boolean
 
-  protected def validatorName: String
-  protected def validatorAuth0Secret: String
-  protected def validatorAuth0Audience: String
-  protected def validatorWalletUser: String
-  protected def walletUiUrl: String
-  protected def directoryUiUrl: String
+  protected val auth0: Auth0Util
 
-  // Set this to None if you don't want to run splitwell tests
-  protected def splitwellUiUrl: Option[String]
+  protected val validatorName: String
+  protected val validatorAuth0Secret: String
+  protected val validatorAuth0Audience: String
+  protected val validatorWalletUser: String
+  protected val validatorUrlPrefix: String
+  protected val includeSplitwellTests = true
+
+  private lazy val walletUiUrl =
+    s"https://wallet.${validatorUrlPrefix}.${sys.env("NETWORK_APPS_ADDRESS")}/"
+  private lazy val directoryUiUrl =
+    s"https://directory.${validatorUrlPrefix}.${sys.env("NETWORK_APPS_ADDRESS")}/"
+  private lazy val splitwellUiUrl =
+    s"https://splitwell.${validatorUrlPrefix}.${sys.env("NETWORK_APPS_ADDRESS")}/"
 
   override def beforeEach() = {
     super.beforeEach();
@@ -128,15 +134,17 @@ abstract class PreflightValidatorIntegrationTestBase
     }
 
     withFrontEnd("alice-validator") { implicit webDriver =>
-      tapCoins(100)
+      if (isDevNet) {
+        tapCoins(100)
 
-      clue(s"Creating transfer offer for: $bobPartyId") {
-        createTransferOffer(
-          PartyId.tryFromProtoPrimitive(bobPartyId),
-          BigDecimal("10"),
-          90,
-          "p2ptransfer",
-        )
+        clue(s"Creating transfer offer for: $bobPartyId") {
+          createTransferOffer(
+            PartyId.tryFromProtoPrimitive(bobPartyId),
+            BigDecimal("10"),
+            90,
+            "p2ptransfer",
+          )
+        }
       }
 
       click on "logout-button"
@@ -144,34 +152,37 @@ abstract class PreflightValidatorIntegrationTestBase
     }
 
     withFrontEnd("bob-validator") { implicit webDriver =>
-      val acceptButton = eventually() {
-        findAll(className("transfer-offer")).toSeq.headOption match {
-          case Some(element) =>
-            element.childWebElement(className("transfer-offer-accept"))
-          case None => fail("failed to find transfer offer")
+      if (isDevNet) {
+        val acceptButton = eventually() {
+          findAll(className("transfer-offer")).toSeq.headOption match {
+            case Some(element) =>
+              element.childWebElement(className("transfer-offer-accept"))
+            case None => fail("failed to find transfer offer")
+          }
         }
-      }
 
-      acceptButton.click()
+        acceptButton.click()
 
-      click on "navlink-transactions"
+        click on "navlink-transactions"
 
-      eventually() {
-        inside(findAll(className("tx-row")).toSeq) { case Seq(tx) =>
-          val transaction = readTransactionFromRow(tx)
-          transaction.action should matchText("Received")
-          val partyR = s"${alicePartyId}.*${validatorName}_validator_service_user::.*".r
-          val description = transaction.partyDescription.getOrElse(fail("There should be a party."))
-          description should fullyMatch regex partyR
-          transaction.ccAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
-          // we can't test a specific coin price as the coin price on a live network can change
-          val rateR = """^\s*(\d+(?:\.\d+)?)\s*CC/USD\s*$""".r
-          inside(transaction.rate) { case rateR(rate) =>
-            BigDecimal(rate) should be > BigDecimal(0)
-            transaction.usdAmount should beWithin(
-              transaction.ccAmount / BigDecimal(rate) - smallAmount,
-              transaction.ccAmount / BigDecimal(rate) + smallAmount,
-            )
+        eventually() {
+          inside(findAll(className("tx-row")).toSeq) { case Seq(tx) =>
+            val transaction = readTransactionFromRow(tx)
+            transaction.action should matchText("Received")
+            val partyR = s"${alicePartyId}.*${validatorName}_validator_service_user::.*".r
+            val description =
+              transaction.partyDescription.getOrElse(fail("There should be a party."))
+            description should fullyMatch regex partyR
+            transaction.ccAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
+            // we can't test a specific coin price as the coin price on a live network can change
+            val rateR = """^\s*(\d+(?:\.\d+)?)\s*CC/USD\s*$""".r
+            inside(transaction.rate) { case rateR(rate) =>
+              BigDecimal(rate) should be > BigDecimal(0)
+              transaction.usdAmount should beWithin(
+                transaction.ccAmount / BigDecimal(rate) - smallAmount,
+                transaction.ccAmount / BigDecimal(rate) + smallAmount,
+              )
+            }
           }
         }
       }
@@ -183,43 +194,44 @@ abstract class PreflightValidatorIntegrationTestBase
 
   // test is similar to 'settle debts with a single party' in SplitwellFrontendIntegrationTest
   "test splitwell group creation and payment against validator" in { _ =>
-    splitwellUiUrl match {
-      case Some(_) =>
-        val groupName = "troika"
+    if (includeSplitwellTests) {
+      val groupName = "troika"
 
-        val aliceUser = auth0Users.get("alice-validator").value
-        val bobUser = auth0Users.get("bob-validator").value
+      val aliceUser = auth0Users.get("alice-validator").value
+      val bobUser = auth0Users.get("bob-validator").value
 
-        val bobUserPartyId = withFrontEnd("bob-validator") { implicit webDriver =>
-          val bobUserPartyId = loginAndOnboardToWalletUi(bobUser)
+      val bobUserPartyId = withFrontEnd("bob-validator") { implicit webDriver =>
+        val bobUserPartyId = loginAndOnboardToWalletUi(bobUser)
+        if (isDevNet) {
           tapCoins(710)
-          bobUserPartyId
         }
+        bobUserPartyId
+      }
 
-        val (aliceUserPartyId, invite) = withFrontEnd("alice-validator") { implicit webDriver =>
-          val aliceUserPartyId = loginAndOnboardToWalletUi(aliceUser)
-          tapCoins(60)
-          loginToSplitwellUi(aliceUser)
+      val (aliceUserPartyId, invite) = withFrontEnd("alice-validator") { implicit webDriver =>
+        val aliceUserPartyId = loginAndOnboardToWalletUi(aliceUser)
+        loginToSplitwellUi(aliceUser)
 
-          (aliceUserPartyId, createGroupAndInviteLink(groupName))
+        (aliceUserPartyId, createGroupAndInviteLink(groupName))
+      }
+
+      withFrontEnd("bob-validator") { implicit webDriver =>
+        loginToSplitwellUi(bobUser)
+        requestGroupMembership(invite)
+      }
+
+      withFrontEnd("alice-validator") { implicit webDriver =>
+        eventually() {
+          findAll(className("add-user-link")).toSeq should not be (empty)
         }
+        actAndCheck("add user", click on className("add-user-link"))(
+          "user has been added and invite link disappears",
+          _ => findAll(className("add-user-link")).toSeq shouldBe empty,
+        )
+        addTeamLunch(100)
+      }
 
-        withFrontEnd("bob-validator") { implicit webDriver =>
-          loginToSplitwellUi(bobUser)
-          requestGroupMembership(invite)
-        }
-
-        withFrontEnd("alice-validator") { implicit webDriver =>
-          eventually() {
-            findAll(className("add-user-link")).toSeq should not be (empty)
-          }
-          actAndCheck("add user", click on className("add-user-link"))(
-            "user has been added and invite link disappears",
-            _ => findAll(className("add-user-link")).toSeq shouldBe empty,
-          )
-          addTeamLunch(100)
-        }
-
+      if (isDevNet) {
         withFrontEnd("bob-validator") { implicit webDriver =>
           enterSplitwellPayment(
             aliceUserPartyId,
@@ -268,37 +280,50 @@ abstract class PreflightValidatorIntegrationTestBase
             )
           }
         }
-      case None => ()
+      }
     }
   }
 
-  "test a directory entry allocation against validator" in { _ =>
+  "test the directory ui of a validator" in { _ =>
     val aliceUser = auth0Users.get("alice-validator").value
-
-    // Generate new random CNS names to avoid conflicts between multiple preflight check runs
-    val entryId = (new scala.util.Random).nextInt().toHexString
-    val cnsName = s"alice_${entryId}.unverified.cns"
 
     withFrontEnd("alice-validator") { implicit webDriver =>
       loginAndOnboardToWalletUi(aliceUser)
 
-      tapCoins(100)
+      if (isDevNet) {
+        // On DevNet-like clusters, we test the full CNS entry creation flow
 
-      reserveDirectoryNameFor(
-        () =>
-          auth0Login(
-            aliceUser,
-            directoryUiUrl,
-            () => {
-              waitForQuery(id("entry-name-field"))
-              find(id("entry-name-field")) should not be empty
-            },
-          ),
-        cnsName,
-        "1.0000000000",
-        "USD",
-        "90 days",
-      )
+        // Generate new random CNS names to avoid conflicts between multiple preflight check runs
+        val entryId = (new scala.util.Random).nextInt().toHexString
+        val cnsName = s"alice_${entryId}.unverified.cns"
+
+        tapCoins(100)
+        reserveDirectoryNameFor(
+          () =>
+            auth0Login(
+              aliceUser,
+              directoryUiUrl,
+              () => {
+                waitForQuery(id("entry-name-field"))
+                find(id("entry-name-field")) should not be empty
+              },
+            ),
+          cnsName,
+          "1.0000000000",
+          "USD",
+          "90 days",
+        )
+      } else {
+        // On non-DevNet clusters, we only test logging in to the directory UI
+        auth0Login(
+          aliceUser,
+          directoryUiUrl,
+          () => {
+            waitForQuery(id("entry-name-field"))
+            find(id("entry-name-field")) should not be empty
+          },
+        )
+      }
     }
   }
 
@@ -332,17 +357,13 @@ abstract class PreflightValidatorIntegrationTestBase
   private def loginToSplitwellUi(
       user: Auth0User
   )(implicit webDriver: WebDriverType) = {
-    splitwellUiUrl match {
-      case Some(url) =>
-        clue(s"Logging in to splitwell UI at: ${url}") {
-          auth0Login(
-            user,
-            url,
-            () => find(id("group-id-field")) should not be empty,
-          )
-          waitForQuery(id("logged-in-user"))
-        }
-      case None => fail("splitwellUiUrl not set")
+    clue(s"Logging in to splitwell UI at: ${splitwellUiUrl}") {
+      auth0Login(
+        user,
+        splitwellUiUrl,
+        () => find(id("group-id-field")) should not be empty,
+      )
+      waitForQuery(id("logged-in-user"))
     }
   }
 
@@ -375,4 +396,36 @@ abstract class PreflightValidatorIntegrationTestBase
       )
     }
   }
+}
+
+final class PreflightValidatorIntegrationTest extends PreflightValidatorIntegrationTestBase {
+
+  override protected val isDevNet = true
+  override protected val auth0 =
+    auth0UtilFromEnvVars("https://canton-network-validator-test.us.auth0.com", Some("validator"))
+
+  override protected val validatorName = "validator"
+  override protected val validatorAuth0Secret = "cznBUeB70fnpfjaq9TzblwiwjkVyvh5z"
+  override protected val validatorAuth0Audience = "https://validator.example.com/api"
+  override protected val validatorUrlPrefix = "validator"
+  override protected val includeSplitwellTests = false
+
+  // TODO(tech-debt): consider de-hardcoding this
+  override protected val validatorWalletUser =
+    "auth0|6526fab5214c99a9a8e1e3cc"
+}
+
+final class Validator1PreflightIntegrationTest extends PreflightValidatorIntegrationTestBase {
+
+  override protected val isDevNet = true
+  override protected val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com")
+
+  override protected val validatorName = "validator1"
+  override protected val validatorAuth0Secret = "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq"
+  override protected val validatorAuth0Audience = "https://canton.network.global"
+
+  // TODO(tech-debt): consider de-hardcoding this
+  override protected val validatorWalletUser =
+    "auth0|63e3d75ff4114d87a2c1e4f5"
+  override protected val validatorUrlPrefix = "validator1"
 }
