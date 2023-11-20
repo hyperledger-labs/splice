@@ -256,7 +256,6 @@ data Reason = Reason with
     body : Text -- ^ Freeform text intended for human consumption.
   deriving (Eq, Show)
 
--- TODO(#8297): this contract is a storage leak. Remove it and use a query against the tx history instead
 data VoteResult = VoteResult with
     action : ActionRequiringConfirmation
     executed : Bool
