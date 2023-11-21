@@ -1041,13 +1041,26 @@ jobs:
       # space separated strings of workflow names to wait for.
       workflow_names:
         type: string
+      branch_filter:
+        type: string
+        default: "^main|deployment/.*$"
+      branch_filter_is_regex:
+        type: boolean
+        default: true
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 28800  # limit search to pipelines that are 8 hours old
     steps:
       - checkout
       - run:
           name: "Wait for previous pipeline"
           command: |
-            set -eou pipefail
-            .circleci/wait_or_cancel_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>"
+            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
+              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
+              << parameters.max_pipeline_age_secs >> wait
 
   cancel_if_previous_pipeline:
     docker:
@@ -1058,10 +1071,53 @@ jobs:
       # space separated strings of workflow names to check if they exist and cancel current workflow if so.
       workflow_names:
         type: string
+      branch_filter:
+        type: string
+        default: "^main|deployment/.*$"
+      branch_filter_is_regex:
+        type: boolean
+        default: true
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 28800  # limit search to pipelines that are 8 hours old
     steps:
       - checkout
       - run:
-          name: "Cancel if previous pipeline << parameters.workflow_names >>"
+          name: "Cancel if previous pipeline"
           command: |
-            set -eou pipefail
-            .circleci/wait_or_cancel_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" cancel_self
+            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
+              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
+              << parameters.max_pipeline_age_secs >> cancel_self
+
+  cancel_previous_pipelines:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    parameters:
+      # space separated strings of workflow names to cancel if they exist.
+      workflow_names:
+        type: string
+      branch_filter:
+        type: string
+        default: ""
+      branch_filter_is_regex:
+        type: boolean
+        default: false
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 28800  # limit search to pipelines that are 8 hours old
+    steps:
+      - checkout
+      - run:
+          name: "Cancel previous pipelines"
+          command: |
+            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
+              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
+              << parameters.max_pipeline_age_secs >> cancel_pipeline

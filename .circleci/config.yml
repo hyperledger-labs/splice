@@ -72,6 +72,7 @@ cluster-parameter: &cluster-parameter
   cluster:
     type: enum
     enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "cimain", "cidaily", "cidaily-testnet", "cilr", "devnet", "testnet", "testnet-preview", "observability"]
+
 commands:
   setup_nix:
     description: Set up Nix
@@ -1164,6 +1165,7 @@ commands:
             docker pull ${COMETBFT_DOCKER_IMAGE}
             docker pull ${TESTCONTAINERS_SSHD_CONTAINER_IMAGE}
             docker pull ${OTEL_COLLECTOR_IMAGE}
+
 jobs:
 
   # Inspired by Canton, we put the lint-like checks into their own CI job
@@ -2207,13 +2209,26 @@ jobs:
       # space separated strings of workflow names to wait for.
       workflow_names:
         type: string
+      branch_filter:
+        type: string
+        default: "^main|deployment/.*$"
+      branch_filter_is_regex:
+        type: boolean
+        default: true
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 28800  # limit search to pipelines that are 8 hours old
     steps:
       - checkout
       - run:
           name: "Wait for previous pipeline"
           command: |
-            set -eou pipefail
-            .circleci/wait_or_cancel_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>"
+            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
+              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
+              << parameters.max_pipeline_age_secs >> wait
 
   cancel_if_previous_pipeline:
     docker:
@@ -2224,13 +2239,57 @@ jobs:
       # space separated strings of workflow names to check if they exist and cancel current workflow if so.
       workflow_names:
         type: string
+      branch_filter:
+        type: string
+        default: "^main|deployment/.*$"
+      branch_filter_is_regex:
+        type: boolean
+        default: true
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 28800  # limit search to pipelines that are 8 hours old
     steps:
       - checkout
       - run:
-          name: "Cancel if previous pipeline << parameters.workflow_names >>"
+          name: "Cancel if previous pipeline"
           command: |
-            set -eou pipefail
-            .circleci/wait_or_cancel_for_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" cancel_self
+            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
+              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
+              << parameters.max_pipeline_age_secs >> cancel_self
+
+  cancel_previous_pipelines:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    parameters:
+      # space separated strings of workflow names to cancel if they exist.
+      workflow_names:
+        type: string
+      branch_filter:
+        type: string
+        default: ""
+      branch_filter_is_regex:
+        type: boolean
+        default: false
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 28800  # limit search to pipelines that are 8 hours old
+    steps:
+      - checkout
+      - run:
+          name: "Cancel previous pipelines"
+          command: |
+            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
+              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
+              << parameters.max_pipeline_age_secs >> cancel_pipeline
+
 main-branch-only: &main-branch-only
   filters:
     branches:
@@ -2242,7 +2301,6 @@ main-branch-never: &main-branch-never
     branches:
       ignore:
          - main
-
 
 workflows:
   version: 2
@@ -2268,6 +2326,13 @@ workflows:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
+    - cancel_previous_pipelines:
+        workflow_names: "build"
+        branch_filter: "$CIRCLE_BRANCH"
+        # cannot use a simple CCI branch filter for the job since this job is a dependency for all the other jobs in this workflow
+        # and cannot be skipped
+        branch_ignores: "^(main|deployment/.*)$"
+        max_pipeline_age_secs: 0  # no pipeline age limit
     # Linting and formatting
     - static_tests:
         <<: *notify-fail
@@ -2275,6 +2340,8 @@ workflows:
           - artifactory
           - datadog
           - slack-context
+        requires:
+          - cancel_previous_pipelines
     # Daml
     - daml_test:
         <<: *notify-fail
@@ -2282,6 +2349,8 @@ workflows:
           - artifactory
           - datadog
           - slack-context
+        requires:
+          - cancel_previous_pipelines
     # Scala
     - scala_test:
         <<: *notify-fail
@@ -2295,6 +2364,8 @@ workflows:
         start_canton_options: "-w -f -m"
         resource_class: "xlarge"
         parallelism: 8
+        requires:
+          - cancel_previous_pipelines
     - scala_test:
         <<: *notify-fail
         context:
@@ -2307,6 +2378,8 @@ workflows:
         start_canton_options: "-s"
         resource_class: "xlarge"
         parallelism: 5
+        requires:
+          - cancel_previous_pipelines
     - scala_test:
         <<: *notify-fail
         context:
@@ -2321,6 +2394,8 @@ workflows:
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge"
         parallelism: 4
+        requires:
+          - cancel_previous_pipelines
     - scala_test:
         <<: *notify-fail
         context:
@@ -2335,6 +2410,8 @@ workflows:
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "xlarge"
         parallelism: 1
+        requires:
+          - cancel_previous_pipelines
     - scala_test:
         <<: *notify-fail
         context:
@@ -2349,6 +2426,8 @@ workflows:
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "xlarge"
         parallelism: 1
+        requires:
+          - cancel_previous_pipelines
     - scala_test:
         <<: *notify-fail
         context:
@@ -2361,18 +2440,24 @@ workflows:
         start_canton_options: "-s -g"
         resource_class: "xlarge"
         parallelism: 1
+        requires:
+          - cancel_previous_pipelines
     - ui_test:
         <<: *notify-fail
         context:
           - artifactory
           - datadog
           - slack-context
+        requires:
+          - cancel_previous_pipelines
     - bundle:
         <<: *notify-fail
         context:
           - artifactory
           - datadog
           - slack-context
+        requires:
+          - cancel_previous_pipelines
     # Ops
     - update_pipeline_schedule:
         <<: *notify-fail
@@ -2380,18 +2465,24 @@ workflows:
         context:
           - artifactory
           - slack-context
+        requires:
+          - cancel_previous_pipelines
     - deployment_test:
         <<: *notify-fail
         context:
           - artifactory
           - datadog
           - slack-context
+        requires:
+          - cancel_previous_pipelines
     - docker_images_build:
         <<: *notify-fail
         context:
           - artifactory
           - datadog
           - slack-context
+        requires:
+          - cancel_previous_pipelines
 
   deploy_cimain:
     when:

@@ -28,8 +28,11 @@ fi
     echo ''
 
     cat "${REPO_ROOT}/.circleci/config/prelude.yml"
+    echo
     cat "${REPO_ROOT}/.circleci/config/commands.yml"
+    echo
     cat "${REPO_ROOT}/.circleci/config/jobs.yml"
+    echo
     cat "${REPO_ROOT}/.circleci/config/workflows.yml"
 } > "${OUTPUT_CONF}"
 

@@ -10,7 +10,6 @@ main-branch-never: &main-branch-never
       ignore:
          - main
 
-
 workflows:
   version: 2
 
@@ -35,6 +34,13 @@ workflows:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
+    - cancel_previous_pipelines:
+        workflow_names: "build"
+        branch_filter: "$CIRCLE_BRANCH"
+        # cannot use a simple CCI branch filter for the job since this job is a dependency for all the other jobs in this workflow
+        # and cannot be skipped
+        branch_ignores: "^(main|deployment/.*)$"
+        max_pipeline_age_secs: 0  # no pipeline age limit
     # Linting and formatting
     - static_tests:
         <<: *notify-fail
@@ -42,6 +48,8 @@ workflows:
           - artifactory
           - datadog
           - slack-context
+        requires:
+          - cancel_previous_pipelines
     # Daml
     - daml_test:
         <<: *notify-fail
@@ -49,6 +57,8 @@ workflows:
           - artifactory
           - datadog
           - slack-context
+        requires:
+          - cancel_previous_pipelines
     # Scala
     - scala_test:
         <<: *notify-fail
@@ -62,6 +72,8 @@ workflows:
         start_canton_options: "-w -f -m"
         resource_class: "xlarge"
         parallelism: 8
+        requires:
+          - cancel_previous_pipelines
     - scala_test:
         <<: *notify-fail
         context:
@@ -74,6 +86,8 @@ workflows:
         start_canton_options: "-s"
         resource_class: "xlarge"
         parallelism: 5
+        requires:
+          - cancel_previous_pipelines
     - scala_test:
         <<: *notify-fail
         context:
@@ -88,6 +102,8 @@ workflows:
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "2xlarge"
         parallelism: 4
+        requires:
+          - cancel_previous_pipelines
     - scala_test:
         <<: *notify-fail
         context:
@@ -102,6 +118,8 @@ workflows:
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "xlarge"
         parallelism: 1
+        requires:
+          - cancel_previous_pipelines
     - scala_test:
         <<: *notify-fail
         context:
@@ -116,6 +134,8 @@ workflows:
         extra_post_sbt_cmd: "&& ./stop-frontends.sh"
         resource_class: "xlarge"
         parallelism: 1
+        requires:
+          - cancel_previous_pipelines
     - scala_test:
         <<: *notify-fail
         context:
@@ -128,18 +148,24 @@ workflows:
         start_canton_options: "-s -g"
         resource_class: "xlarge"
         parallelism: 1
+        requires:
+          - cancel_previous_pipelines
     - ui_test:
         <<: *notify-fail
         context:
           - artifactory
           - datadog
           - slack-context
+        requires:
+          - cancel_previous_pipelines
     - bundle:
         <<: *notify-fail
         context:
           - artifactory
           - datadog
           - slack-context
+        requires:
+          - cancel_previous_pipelines
     # Ops
     - update_pipeline_schedule:
         <<: *notify-fail
@@ -147,18 +173,24 @@ workflows:
         context:
           - artifactory
           - slack-context
+        requires:
+          - cancel_previous_pipelines
     - deployment_test:
         <<: *notify-fail
         context:
           - artifactory
           - datadog
           - slack-context
+        requires:
+          - cancel_previous_pipelines
     - docker_images_build:
         <<: *notify-fail
         context:
           - artifactory
           - datadog
           - slack-context
+        requires:
+          - cancel_previous_pipelines
 
   deploy_cimain:
     when:
