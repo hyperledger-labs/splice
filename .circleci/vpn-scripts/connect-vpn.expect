@@ -3,17 +3,31 @@
 # enable debug/diagnostic when running the script
 exp_internal 1
 
-set timeout -1
-
 set VPN_HOST_NAME [lindex $argv 0]
 set VPN_USER [lindex $argv 1]
 set VPN_PASSWORD [lindex $argv 2]
 
 spawn echo $VPN_USER $VPN_PASSWORD
-spawn /usr/bin/sudo charon-cmd --host $VPN_HOST_NAME --identity $VPN_USER --eap-identity $VPN_USER --profile ikev2-eap --cert /etc/ssl/certs/ISRG_Root_X1.pem
-expect "EAP password: "
-
-# sleep 2 second to wait the spawned process to be fully initialized
-sleep 2
-send "$VPN_PASSWORD\r"
-expect eof
+for {set tries 0} {$tries < 3} {incr tries} {
+  # 3 chances for wait-for-vpn-and-del-default-route.sh to succeed
+  set timeout 60
+  spawn /usr/bin/sudo charon-cmd --host $VPN_HOST_NAME --identity $VPN_USER --eap-identity $VPN_USER --profile ikev2-eap --cert /etc/ssl/certs/ISRG_Root_X1.pem
+  expect {
+    "EAP password: " {
+      # sleep 2 second to wait the spawned process to be fully initialized
+      sleep 2
+      send "$VPN_PASSWORD\r"
+    }
+    timeout {
+      close
+      continue
+    }
+  }
+  set timeout -1
+  set waited [wait]
+  if {[lindex $waited 3] != 0} {
+    continue
+  } else {
+    exit
+  }
+}
