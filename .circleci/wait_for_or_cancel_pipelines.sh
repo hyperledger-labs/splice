@@ -224,7 +224,7 @@ if [[ "$BRANCH_FILTER_IS_REGEX" == "true" && "$MAX_AGE_SECONDS" -eq 0 ]]; then
 fi
 if [[ "$CIRCLE_BRANCH" =~ $BRANCH_IGNORES ]]; then
     echo "Skipping since branch \"$CIRCLE_BRANCH\" matches ignore pattern $BRANCH_IGNORES"
-    exit 1
+    exit 0
 fi
 
 max_retries=5

@@ -2327,6 +2327,9 @@ workflows:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
     - cancel_previous_pipelines:
+        <<: *notify-fail
+        context:
+          - slack-context
         workflow_names: "build"
         branch_filter: "$CIRCLE_BRANCH"
         # cannot use a simple CCI branch filter for the job since this job is a dependency for all the other jobs in this workflow
