@@ -41,6 +41,11 @@ parameters:
   bootstrapping-config:
     type: string
     default: ""
+  # Whether the cluster should be reset before deploying.
+  # It only makes sense to unset this if you are planning to use CI to fix a broken deployment.
+  reset-before-deploy:
+    type: boolean
+    default: true
 
 notify-fail: &notify-fail
   context: slack-context

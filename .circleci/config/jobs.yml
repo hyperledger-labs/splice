@@ -366,7 +366,11 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            cncluster ci_apply
+            if [[ << pipeline.parameters.reset-before-deploy >> == true ]]; then
+              cncluster ci_apply
+            else
+              cncluster ci_apply --skip-reset
+            fi
       - when:
           condition: << parameters.update_deployment_branch >>
           steps:
