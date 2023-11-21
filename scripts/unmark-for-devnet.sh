@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # This deletes the devnet-next tag. The next `publish_public_release` CI job
-# with `mark-for-devnet-if-unmarked=true` will recreate it. `cidayly`
+# with `mark-for-devnet-if-unmarked=true` will recreate it. `cidaily`
 # deployments do this.
 
 read -r -p "This will delete the devnet-next tag. Type \"I know what I'm doing\" to continue: " confirmation

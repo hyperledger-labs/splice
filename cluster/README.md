@@ -397,7 +397,9 @@ Wednesday to Wednesday weekly sprint cycle and adequately tested
 before being deployed to customers in DevNet.
 
 A convenient way to move the `devnet-next` tag to the commit of the next `CIDaily` deployment is to run `scripts/unmark-for-devnet.sh`.
-This will remove that tag. The next `CIDaily` deployment will then recreate the tag.
+This will remove that tag. The next automatic (daily) `CIDaily` deployment
+(or manually triggered `CIDaily` deployment that sets the `mark-for-devnet-if-unmarked` pipeline parameter to `true`)
+will then recreate the tag.
 Note that if the next `CIDaily` deployment fails, the next `DevNet` deployment will too (for lack of a tag).
 
 On Wednesday night, another trigger marks the version running on `DevNet`
