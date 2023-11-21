@@ -1742,6 +1742,10 @@ function subcmd_participant_console() {
       _error "No participant found in namespace '$namespace'."
     fi
 
+    if (netstat -an | grep ".1100[12].*LISTEN"); then
+      _error "Ports 11001 and/or 11002 are already in use on localhost. Please close any processes that might be listening on them."
+    fi
+
     if [ ! "${LEDGER_API_AUTH_TOKEN-}" ] && sv_app_pod=$(_get_single_pod "$namespace" "sv-app"); then
       if LEDGER_API_AUTH_TOKEN=$(_get_env_value "$namespace" "$sv_app_pod" CN_APP_SV_LEDGER_API_AUTH_TOKEN); then
         _info "Using Ledger API token from '$sv_app_pod'..."
@@ -1785,7 +1789,7 @@ function subcmd_participant_console() {
     fi
 
     _info "Starting port forwarding from '$participant_pod'..."
-    kubectl port-forward -n "$namespace" "$participant_pod" 5001:5001 5002:5002 &
+    kubectl port-forward -n "$namespace" "$participant_pod" 11001:5001 11002:5002 &
     port_forwarding_pid=$!
 
     _info "Starting Canton console..."
