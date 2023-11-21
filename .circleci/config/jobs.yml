@@ -730,6 +730,78 @@ jobs:
           channel_notify: << parameters.channel_notify >>
       - collect_test_timings_and_send_to_datadog
 
+  load_test:
+    parameters:
+      <<: *cluster-parameter
+      test_duration:
+        type: string
+        default: "5m"
+      channel_notify:
+        type: string
+        # #team-canton-network-internal-ci
+        default: C05DT77QF5M
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+      K6_TEST_DURATION: << parameters.test_duration >>
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_vpn
+      # Needs to occur before setup_vpn_routes
+      - setup_nix
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Activate cluster (configure kubectl)
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: cncluster activate
+          cmd_retry_count: 5
+      - run_bash_command_in_nix:
+          cmd: "cncluster load_test"
+          additional_nix_args: "--keep K6_LOAD_TEST_USER --keep K6_AUTH0_DOMAIN --keep K6_AUTH0_CLIENT_ID --keep K6_TEST_DURATION --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
+          cmd_retry_count: 3
+          # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
+          # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
+          cluster: << parameters.cluster >>
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
+          cmd_before_retry: |
+            echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
+
+            ./stop-frontends.sh
+
+            /tmp/vpn-scripts/stop-vpn.sh
+
+            echo "Starting VPN..." | tee -a /var/log/vpn.log
+            /tmp/vpn-scripts/connect-vpn.expect $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD &
+
+            echo "Waiting for VPN to reconnect"
+            /tmp/vpn-scripts/wait-for-vpn-and-del-default-route.sh
+
+            echo "Authenticating to cluster again"
+            export KUBECONFIG=$PWD/.kubecfg
+            cncluster activate
+
+            echo "Setting VPN routes again"
+            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
+            /tmp/vpn-scripts/setup-vpn-routes.sh
+      - print_gcloud_logs_commands:
+          cluster: <<parameters.cluster>>
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+          channel_notify: << parameters.channel_notify >>
+      - collect_test_timings_and_send_to_datadog
+      - store_artifacts:
+          name: Upload vpn log
+          path: /var/log/vpn.log
+      - store_artifacts:
+          name: Upload logs
+          path: log
+
   reset_cluster:
     parameters:
       <<: *cluster-parameter

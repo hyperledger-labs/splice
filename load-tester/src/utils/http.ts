@@ -1,6 +1,10 @@
+import { sleep } from 'k6';
 import http, { RefinedResponse } from 'k6/http';
 
 export class HttpClient {
+  private retryCount: number = 5;
+  private retryWait: number = 1; // in seconds
+
   // we're _definitely_ a browser ;)
   private headers: Record<string, string> = {
     'User-Agent':
@@ -23,9 +27,10 @@ export class HttpClient {
     body: string | Buffer | undefined,
     expectedStatus: 200 | 302,
     additionalHeaders: Record<string, string>,
+    retries: number,
     handleResponse: (resp: RefinedResponse<'text'>) => R,
   ): R {
-    console.log(`Calling ${method} on endpoint: ${url}`);
+    console.debug(`Calling ${method} on endpoint: ${url}`);
 
     const headers = {
       ...this.headers,
@@ -34,6 +39,8 @@ export class HttpClient {
 
     const tags = this.tag ? { name: this.tag } : undefined;
 
+    console.debug(`Request data: ${JSON.stringify({ headers, body, url })}`);
+
     const resp = http.request(method, url, body, {
       headers,
       tags,
@@ -41,10 +48,26 @@ export class HttpClient {
     });
 
     if (resp.status !== expectedStatus) {
-      console.error(resp.headers, resp.body);
-      throw new Error(
-        `Expected status code ${expectedStatus} but received ${resp.status} for ${method} ${url}`,
-      );
+      if (retries > 0) {
+        console.debug(`Received an unexpected status code ${resp.status} for ${method} ${url}`);
+        console.debug(`${retries} retries remaining...`);
+
+        sleep(this.retryWait);
+        this._request(
+          url,
+          method,
+          body,
+          expectedStatus,
+          additionalHeaders,
+          retries - 1,
+          handleResponse,
+        );
+      } else {
+        console.error(resp.headers, resp.body);
+        throw new Error(
+          `Expected status code ${expectedStatus} but received ${resp.status} for ${method} ${url}`,
+        );
+      }
     }
 
     return handleResponse(resp);
@@ -58,7 +81,7 @@ export class HttpClient {
     additionalHeaders: Record<string, string>,
     handleResponse: (resp: RefinedResponse<'text'>, location: string) => R,
   ): R {
-    return this._request(url, method, body, 302, additionalHeaders, resp => {
+    return this._request(url, method, body, 302, additionalHeaders, this.retryCount, resp => {
       const location = resp.headers['Location'];
 
       if (typeof location === 'string') {
@@ -93,6 +116,14 @@ export class HttpClient {
     additionalHeaders: Record<string, string>,
     handleResponse: (resp: RefinedResponse<'text'>) => R,
   ): R {
-    return this._request(url, 'POST', body, 200, additionalHeaders, handleResponse);
+    return this._request(
+      url,
+      'POST',
+      body,
+      200,
+      additionalHeaders,
+      this.retryCount,
+      handleResponse,
+    );
   }
 }

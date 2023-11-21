@@ -230,6 +230,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
           ? { 'notification_policies.yaml': readFile('notification_policies.yaml') }
           : {}),
         ...{
+          'load-tester_alerts.yaml': readFile('load-tester_alerts.yaml'),
           'cometbft_alerts.yaml': readFile('cometbft_alerts.yaml'),
           'templates.yaml': readFile('templates.yaml')
             .replaceAll('$CLUSTER_BASENAME', CLUSTER_BASENAME)

@@ -153,11 +153,11 @@ object BuildCommon {
         ) ++
         addCommandAlias(
           "formatFix",
-          s"; format ; scalafixAll ; apps-frontends/npmFix ; pulumi/npmFix",
+          s"; format ; scalafixAll ; apps-frontends/npmFix ; pulumi/npmFix ; load-tester/npmFix",
         ) ++
         addCommandAlias(
           "lint",
-          "; damlDarsLockFileCheck ; cantonDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; runShellcheck ; syncpackCheck ; runCheckUpgradeModelDiffs",
+          "; damlDarsLockFileCheck ; cantonDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; runShellcheck ; syncpackCheck ; runCheckUpgradeModelDiffs",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all CN DARs here, just in case
