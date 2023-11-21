@@ -407,11 +407,11 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase {
           },
         ),
         logEntries => {
-          forAtLeast(1, logEntries)(logEntry => {
-            logEntry.message should startWith(
-              "Noticed an SvcRules epoch change"
-            )
-          })
+          val noticedLbRestarts = logEntries collect {
+            case logEntry if logEntry.message startsWith "Noticed an SvcRules epoch change" =>
+              raw"\bSV=(.+?)\b".r.findFirstMatchIn(logEntry.loggerName).value.group(1)
+          }
+          noticedLbRestarts should contain theSameElementsAs Seq("sv1", "sv2", "sv3")
         },
       )
   }
