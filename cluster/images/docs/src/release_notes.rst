@@ -10,6 +10,8 @@ Release Notes
 
 * The Canton Name Service (CNS) application is now decentralized. Rather than the founder SV operating a backend service for CNS, the application is now a decentralized one, operated by the SVC with BFT guarantees. No deployment or configuration changes are required for this change.
 
+* CNS entry name limit is changed from 40 to 60 (including suffix).
+
 2023-11-20
 ----------
 

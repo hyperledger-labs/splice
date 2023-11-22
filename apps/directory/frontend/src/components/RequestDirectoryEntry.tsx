@@ -12,7 +12,7 @@ import { config, ENTRY_NAME_SUFFIX, toFullEntryName } from '../utils';
 
 type NameLookupStatus = 'available' | 'taken' | 'loading';
 
-const entryNameRegex = new RegExp(`^[a-z0-9_-]{1,${40 - ENTRY_NAME_SUFFIX.length}}$`);
+const entryNameRegex = new RegExp(`^[a-z0-9_-]{1,${60 - ENTRY_NAME_SUFFIX.length}}$`);
 const isEntryNameValid = (name: string) => {
   return entryNameRegex.test(name);
 };
@@ -89,7 +89,7 @@ const SubscriptionBar: React.FC<{ entryName: string; nameLookupStatus: NameLooku
 
   if (!isEntryNameValid(entryName)) {
     message =
-      'The provided entry name has an invalid format. Maximum 40 characters(including suffix), a-z, 0-9, - and _ are supported.';
+      'The provided entry name has an invalid format. Maximum 60 characters(including suffix), a-z, 0-9, - and _ are supported.';
     icon = <ErrorOutline id="unavailable-icon" color="error" />;
   } else if (nameLookupStatus === 'available') {
     message = 'is available!';
