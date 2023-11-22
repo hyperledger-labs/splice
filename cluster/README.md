@@ -415,7 +415,13 @@ Here are a few strategies and techniques that can be useful for speeding up the 
 - If the deployment problem looks like a flake,
   i.e., if it looks as if the deployment has a high chance of succeeding without any further changes,
   the CirlceCI deployment workflow can simply be "Rerun from failed" (see the "Rerun" button on the top right).
-  Please still follow up on the flake and make sure it can't happen at all in future deployments.
+  Note, however, that if the deployment was a partial success,
+  using "Rerun from failed" will reset already deployed pods before redeploying.
+  If you want to keep already deployed pods running
+  (for example because external partners are already using a deployment),
+  you have the option to [manually deploy via CI](#manually-deploying-via-ci) and set the
+  `reset-before-deploy` pipeline parameter to `false`.
+  In any case, please still follow up on the flake and make sure it can't happen at all in future deployments.
   Example [postmortem](https://docs.google.com/document/d/1WYQgZ6PZC1ZcIIo5CSQtuCg7zNdXPyGYAKx96vVe-Jc).
 - If it looks as if the deployment failed due to a bug in our CircleCI configuration,
   the CircleCI configuration must be fixed on the current main branch first.
@@ -510,7 +516,13 @@ Given approval, a manual deployment of `main` can be done as follows:
    * `deploy-testnet` - Reset the state of `TestNet` and deploy a new code set.
    * `deploy-cidaily-testnet` - Reset the state of `CIDaily TestNet` and deploy a new code set.
 4. When deploying a network that bootstraps from ACS and participant identities dumps (such as `TestNet` and `CIDaily TestNet`), you might need to override the default bootstrapping config using an additional `bootstrapping-config` parameter. See [Bootstrapping from a Cluster Data Dump](#bootstrapping-from-a-cluster-data-dump).
-5. Observe progress of the job via the CI console.
+5. If you want to keep the existing deployment intact and only deploy missing resources,
+   add an additional boolean parameter named `reset-before-deploy` and set it to `false.
+   Note that this might lead to unexpected results if you are triggering the pipeline based on a Git commit
+   that is different from the one of the original deployment,
+   and also for deployments that bootstrap from ACS and participant identities dumps
+   (see above; pulumi might decide to redeploy your node because the dump file changed, even if the dump contents are identical).
+6. Observe progress of the job via the CI console.
 
 #### Confirming the Deployment
 
