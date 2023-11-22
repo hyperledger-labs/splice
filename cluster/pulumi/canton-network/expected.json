@@ -1092,6 +1092,16 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_splitwell\""
+    },
+    "name": "createdb-validator_splitwell",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_1\""
     },
     "name": "createdb-validator_sv_1",
@@ -1923,6 +1933,13 @@
             "name": "cn-app-validator-onboarding-validator",
             "optional": false
           }
+        },
+        "persistence": {
+          "databaseName": "validator_splitwell",
+          "host": "postgres.splitwell.svc.cluster.local",
+          "port": 5432,
+          "schema": "validator_splitwell",
+          "user": "cnadmin"
         },
         "resources": {
           "limits": {
@@ -6388,7 +6405,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-directory_sv_1",
     "provider": "",
@@ -6398,7 +6415,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-scan_sv_1",
     "provider": "",
@@ -6408,7 +6425,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-scan_sv_2",
     "provider": "",
@@ -6418,7 +6435,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-splitwell_domain_mediator",
     "provider": "",
@@ -6428,7 +6445,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-splitwell_domain_sequencer",
     "provider": "",
@@ -6438,7 +6455,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-splitwell_participant",
     "provider": "",
@@ -6448,7 +6465,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_1_global_domain_mediator",
     "provider": "",
@@ -6458,7 +6475,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_1_global_domain_sequencer",
     "provider": "",
@@ -6468,7 +6485,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_1_participant",
     "provider": "",
@@ -6478,7 +6495,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_1",
     "provider": "",
@@ -6488,7 +6505,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_2_global_domain_mediator",
     "provider": "",
@@ -6498,7 +6515,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_2_global_domain_sequencer",
     "provider": "",
@@ -6508,7 +6525,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_2_participant",
     "provider": "",
@@ -6518,7 +6535,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_2",
     "provider": "",
@@ -6528,7 +6545,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_3_global_domain_mediator",
     "provider": "",
@@ -6538,7 +6555,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_3_global_domain_sequencer",
     "provider": "",
@@ -6548,7 +6565,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_3_participant",
     "provider": "",
@@ -6558,7 +6575,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_3",
     "provider": "",
@@ -6568,7 +6585,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_4_global_domain_mediator",
     "provider": "",
@@ -6578,7 +6595,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_4_global_domain_sequencer",
     "provider": "",
@@ -6588,7 +6605,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_4_participant",
     "provider": "",
@@ -6598,7 +6615,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-sv_4",
     "provider": "",
@@ -6608,7 +6625,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n validator1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n validator1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-validator1_participant",
     "provider": "",
@@ -6618,7 +6635,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n validator1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n validator1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-validator1",
     "provider": "",
@@ -6628,7 +6645,17 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "waitdb-validator_splitwell",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-validator_sv_1",
     "provider": "",
@@ -6638,7 +6665,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-validator_sv_2",
     "provider": "",
@@ -6648,7 +6675,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-validator_sv_3",
     "provider": "",
@@ -6658,7 +6685,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done\""
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-validator_sv_4",
     "provider": "",

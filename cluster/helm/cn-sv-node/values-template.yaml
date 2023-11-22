@@ -17,3 +17,11 @@ metrics:
   enable: false
   release: prometheus-grafana-monitoring
   interval: 30s
+
+persistence:
+  databaseName: cantonnet
+  schema: sv
+  host: postgres
+  port: 5432
+  user: cnadmin
+  password: "POSTGRES_USER_PASSWORD" # Replace with the password you created

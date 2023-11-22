@@ -250,22 +250,25 @@ async function installSvAndValidator(config: SvConfig) {
     ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv234NameSet.has(id.name))
     : allApprovedSvIdentities;
 
-  const svValues: ChartValues = {
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`, {
-      TARGET_CLUSTER: TARGET_CLUSTER,
-      YOUR_SV_NAME: onboardingName,
-      OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
-      YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
-    }),
-    participantIdentitiesDumpImport: participantBootstrapDumpSecret
-      ? { secretName: participantBootstrapDumpSecretName }
-      : undefined,
-    approvedSvIdentities,
-    cometBFT: {
-      enabled: true,
-      connectionUri: cometBftConnectionUri,
+  const svValues: ChartValues = addPersistencePassword(
+    {
+      ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`, {
+        TARGET_CLUSTER: TARGET_CLUSTER,
+        YOUR_SV_NAME: onboardingName,
+        OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+        YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
+      }),
+      participantIdentitiesDumpImport: participantBootstrapDumpSecret
+        ? { secretName: participantBootstrapDumpSecretName }
+        : undefined,
+      approvedSvIdentities,
+      cometBFT: {
+        enabled: true,
+        connectionUri: cometBftConnectionUri,
+      },
     },
-  };
+    password
+  );
 
   const svValuesWithSpecifiedAud: ChartValues = {
     ...svValues,
@@ -305,11 +308,14 @@ async function installSvAndValidator(config: SvConfig) {
       .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
   );
 
-  const scanValues: ChartValues = {
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
-      TARGET_CLUSTER: TARGET_CLUSTER,
-    }),
-  };
+  const scanValues: ChartValues = addPersistencePassword(
+    {
+      ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
+        TARGET_CLUSTER: TARGET_CLUSTER,
+      }),
+    },
+    password
+  );
 
   const scanValuesWithFixedTokens = {
     ...scanValues,
@@ -326,15 +332,20 @@ async function installSvAndValidator(config: SvConfig) {
     imagePullDeps.concat([sv, participant]).concat(svAppSecret)
   );
 
-  const validatorValues = {
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
-      TARGET_CLUSTER: TARGET_CLUSTER,
-      OPERATOR_WALLET_USER_ID: validatorWalletUserName,
-      OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
-    }),
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),
-    participantIdentitiesDumpPeriodicBackup: backupConfig,
-  };
+  const validatorValues = addPersistencePassword(
+    {
+      ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
+        TARGET_CLUSTER: TARGET_CLUSTER,
+        OPERATOR_WALLET_USER_ID: validatorWalletUserName,
+        OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+      }),
+      ...loadYamlFromFile(
+        `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`
+      ),
+      participantIdentitiesDumpPeriodicBackup: backupConfig,
+    },
+    password
+  );
 
   const validatorValuesWithSpecifiedAud: ChartValues = {
     ...validatorValues,
@@ -370,4 +381,10 @@ async function installSvAndValidator(config: SvConfig) {
   );
 
   return { sv, validator };
+}
+
+function addPersistencePassword(values: ChartValues, password: pulumi.Output<string>): ChartValues {
+  const oldPersistence = values.persistence;
+  const newPersistence = { ...oldPersistence, password: password };
+  return { ...values, persistence: newPersistence };
 }

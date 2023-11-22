@@ -12,6 +12,9 @@ Release Notes
 
 * CNS entry name limit is changed from 40 to 60 (including suffix).
 
+* The SV, Scan, directory and validator apps now require a PostgreSQL database to run.
+  This can be configured in ``sv-values.yaml``, ``validator-values.yaml``, ``scan-values.yaml``.
+
 2023-11-20
 ----------
 

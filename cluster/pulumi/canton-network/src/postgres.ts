@@ -155,7 +155,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
       {
         create:
           `kubectl exec -n ${this.namespace.logicalName} postgres-0 -- ` +
-          `bash -c "RETRIES=60; until psql --username=cnadmin --dbname=\${POSTGRES_DB:-cantonnet} -c \\"select 1\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do sleep 1; done"`,
+          `bash -c "let RETRIES=60; until psql --username=cnadmin --dbname=\${POSTGRES_DB:-cantonnet} -c \\"select 1\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done"`,
       },
       { dependsOn: this.pg }
     );

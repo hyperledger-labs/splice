@@ -24,3 +24,6 @@ cometBFT:
 domain:
   sequencerPublicUrl: "https://sequencer.sv.svc.YOUR_HOSTNAME"
   sequencerAvailabilityDelay: "60 seconds"
+
+persistence:
+  password: "POSTGRES_USER_PASSWORD" # Replace with the password you created

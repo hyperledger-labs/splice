@@ -1,1 +1,4 @@
 clusterUrl: "TARGET_CLUSTER.network.canton.global"
+
+persistence:
+  password: "POSTGRES_USER_PASSWORD" # Replace with the password you created

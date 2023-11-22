@@ -14,3 +14,10 @@ metrics:
   enable: false
   release: prometheus-grafana-monitoring
   interval: 30s
+
+persistence:
+  databaseName: cantonnet
+  schema: scan
+  host: postgres
+  port: 5432
+  user: cnadmin

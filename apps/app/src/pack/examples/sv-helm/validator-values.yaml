@@ -22,3 +22,6 @@ topup:
   enabled: true
   targetThroughput: 33330
   minTopupInterval: "1m"
+
+persistence:
+  password: "POSTGRES_USER_PASSWORD" # Replace with the password you created

@@ -310,7 +310,8 @@
       "timeout": 480,
       "values": {
         "clusterUrl": "svrun.network.com.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "persistence": {}
       }
     },
     "name": "scan",
@@ -398,7 +399,8 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global"
         },
-        "onboardingName": "DA-Helm-Test-Node"
+        "onboardingName": "DA-Helm-Test-Node",
+        "persistence": {}
       }
     },
     "name": "sv-app",
@@ -453,6 +455,7 @@
         "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
+        "persistence": {},
         "scanAddress": "https://scan.sv-1.svc.svrun.network.com.network.canton.global",
         "svValidator": true,
         "topup": {

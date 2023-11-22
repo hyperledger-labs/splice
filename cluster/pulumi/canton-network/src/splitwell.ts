@@ -67,9 +67,13 @@ export async function installSplitwell(
     [svc, participant]
   );
 
+  const validatorDbName = 'validator_splitwell';
+  const validatorDb = postgresDb.createDatabase(validatorDbName);
+
   const extraDependsOn = [
     svc,
     await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell'),
+    validatorDb,
   ];
 
   return installValidatorApp({
@@ -96,5 +100,13 @@ export async function installSplitwell(
     participantBootstrapDump,
     topupConfig: topupConfig,
     svValidator: false,
+    persistenceConfig: {
+      host: postgresDb.address,
+      password: postgresDb.password,
+      databaseName: pulumi.Output.create(validatorDbName),
+      schema: pulumi.Output.create(validatorDbName),
+      user: pulumi.Output.create('cnadmin'),
+      port: pulumi.Output.create(5432),
+    },
   });
 }
