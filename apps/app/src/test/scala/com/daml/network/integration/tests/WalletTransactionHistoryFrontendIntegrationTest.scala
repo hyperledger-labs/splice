@@ -10,7 +10,6 @@ import com.daml.network.util.{
   WalletFrontendTestUtil,
   WalletTestUtil,
 }
-import com.daml.network.config.CNNodeConfigTransforms
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
@@ -33,9 +32,8 @@ class WalletTransactionHistoryFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndCoinMerging
-      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
       .withCoinPrice(coinPrice)
 
   "A wallet transaction history UI" should {

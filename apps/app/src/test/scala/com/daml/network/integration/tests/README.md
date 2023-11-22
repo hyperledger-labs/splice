@@ -53,7 +53,7 @@ To use `canton-simtime` instead of `canton`, a test needs to use an appropriate 
 ```
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
 ```
 
 Time-based test classes typically mixin the [`TimeTestUtil`](/apps/app/src/test/scala/com/daml/network/util/TimeTestUtil.scala) trait which provides the `advanceTime` method (among others).

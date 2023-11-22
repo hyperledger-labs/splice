@@ -18,7 +18,7 @@ class WalletSubscriptionsFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       .withCoinPrice(2)
       // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()

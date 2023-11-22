@@ -16,7 +16,7 @@ class WalletFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       .withCoinPrice(coinPrice)
 
   "A wallet UI" should {

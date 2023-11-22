@@ -21,16 +21,13 @@ class WalletTxLogAcsIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndCoinMerging
       // disable top-ups to prevent extra traffic purchase txs entering the tx log non-deterministically
       // and interfering with the tests in this suite.
       .withTrafficTopupsDisabled
-      .addConfigTransformToFront(
-        CNNodeConfigTransforms.onlySv1
-      )
       // Set a non-unit coin price to better test CC-USD conversion.
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
       .withManualStart

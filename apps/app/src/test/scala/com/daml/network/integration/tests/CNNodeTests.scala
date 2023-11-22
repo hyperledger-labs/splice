@@ -49,7 +49,7 @@ object CNNodeTests {
     override def environmentDefinition
         : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
       CNNodeEnvironmentDefinition
-        .simpleTopology(this.getClass.getSimpleName)
+        .simpleTopology1Sv(this.getClass.getSimpleName)
   }
 
   trait CNNodeIntegrationTestWithSharedEnvironment
@@ -66,7 +66,7 @@ object CNNodeTests {
     override def environmentDefinition
         : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
       CNNodeEnvironmentDefinition
-        .simpleTopology(this.getClass.getSimpleName)
+        .simpleTopology1Sv(this.getClass.getSimpleName)
 
     // We append this to configured Daml user names for isolation across test cases.
     @SuppressWarnings(Array("org.wartremover.warts.Var"))

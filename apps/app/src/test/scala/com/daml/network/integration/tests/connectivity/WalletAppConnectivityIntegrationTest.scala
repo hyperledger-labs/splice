@@ -19,7 +19,7 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms(
         (_, config) =>
           // we want fine-grained control when we send a CoinOperation from the wallet & query the scan app

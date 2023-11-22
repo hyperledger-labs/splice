@@ -217,7 +217,7 @@ final class FileEmptyAcsStoreDumpImportIntegrationTest extends CNNodeIntegration
 
   override def environmentDefinition: CNNodeEnvironmentDefinition =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms(
         (_, config) =>
           updateAllAutomationConfigs(c =>

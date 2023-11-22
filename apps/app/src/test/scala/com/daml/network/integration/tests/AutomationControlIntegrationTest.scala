@@ -25,11 +25,10 @@ class AutomationControlIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4, to speed up the test
       .addConfigTransformsToFront(
-        CNNodeConfigTransforms.onlySv1,
-        { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInScan(c) },
+        { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInScan(c) }
       )
       // Very short round ticks
       .addConfigTransforms((_, config) =>

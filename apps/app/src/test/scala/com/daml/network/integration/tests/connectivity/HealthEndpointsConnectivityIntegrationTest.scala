@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests.connectivity
 
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.toxiproxy.UseToxiproxy
@@ -15,8 +14,7 @@ class HealthEndpointsConnectivityIntegrationTest extends CNNodeIntegrationTest {
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
-      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       .withManualStart
 
   private val toxiproxy = UseToxiproxy(createSvLedgerApiProxies = true)

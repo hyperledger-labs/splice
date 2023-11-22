@@ -21,7 +21,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
       .withManualStart
 
   "initialize a scan app that joins late" in { implicit env =>

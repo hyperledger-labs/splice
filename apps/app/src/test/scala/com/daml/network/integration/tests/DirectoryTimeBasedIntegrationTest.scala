@@ -2,7 +2,6 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
@@ -30,11 +29,7 @@ class DirectoryTimeBasedIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
-      // start only sv1 but not sv2-4
-      .addConfigTransformToFront(
-        CNNodeConfigTransforms.onlySv1
-      )
+      .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
 
   "Directory service" should {
 

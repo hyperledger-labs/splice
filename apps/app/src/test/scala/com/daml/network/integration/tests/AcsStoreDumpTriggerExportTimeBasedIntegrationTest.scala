@@ -42,13 +42,9 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
   implicit val templateJsonDecoder: TemplateJsonDecoder =
     new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
-  protected val simpleTopologyWithSimtimeTuned: CNNodeEnvironmentDefinition =
+  protected val simpleTopology1SvWithSimtimeTuned: CNNodeEnvironmentDefinition =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
-      // start only sv1 but not sv2-4
-      .addConfigTransformToFront(
-        CNNodeConfigTransforms.onlySv1
-      )
+      .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
 
   protected def createTestContracts()(implicit env: FixtureParam): (Set[String], Set[String]) = {
     clue("Advance by one round, so we can check that we properly restore open mining rounds") {
@@ -244,7 +240,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    simpleTopologyWithSimtimeTuned
+    simpleTopology1SvWithSimtimeTuned
       .addConfigTransforms((_, conf) =>
         CNNodeConfigTransforms.updateAllSvAppConfigs_(c =>
           c.copy(acsStoreDump = Some(acsStoreDumpConfig(conf.name.value)))

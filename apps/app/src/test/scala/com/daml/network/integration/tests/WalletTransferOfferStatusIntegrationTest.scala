@@ -3,7 +3,6 @@ package com.daml.network.integration.tests
 import com.daml.ledger.api.v1.event.CreatedEvent.toJavaProto
 import com.daml.ledger.api.v1.transaction.{TransactionTree, TreeEvent}
 import com.daml.ledger.javaapi.data.CreatedEvent
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.history.CoinCreate
 import com.daml.network.http.v0.definitions as d0
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -24,8 +23,7 @@ class WalletTransferOfferStatusIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
-      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
   }
 
   "A wallet transfer offer status" should {

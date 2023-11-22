@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -20,11 +19,7 @@ class ScanConnectionIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
-      // start only sv1 but not sv2-4
-      .addConfigTransformToFront(
-        CNNodeConfigTransforms.onlySv1
-      )
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
       .withoutAutomaticRewardsCollectionAndCoinMerging
 

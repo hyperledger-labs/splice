@@ -20,8 +20,7 @@ class WalletTxLogTimeBasedIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
-      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
+      .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndCoinMerging

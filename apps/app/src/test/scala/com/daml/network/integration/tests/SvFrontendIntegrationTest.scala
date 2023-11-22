@@ -21,7 +21,7 @@ class SvFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology4Svs(this.getClass.getSimpleName)
 
   "SV UIs" should {
     "have basic login functionality" in { implicit env =>

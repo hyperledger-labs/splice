@@ -103,7 +103,7 @@ abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElection
     extends CNNodeIntegrationTest
     with SvTimeBasedIntegrationTestUtil {
   protected val baseEnvironmentDefinition: CNNodeEnvironmentDefinition = CNNodeEnvironmentDefinition
-    .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+    .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
     .withManualStart
     // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
     .withoutAutomaticRewardsCollectionAndCoinMerging
@@ -125,7 +125,7 @@ abstract class SvTimeBasedIntegrationTestBaseWithSharedEnvironment
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .withoutLeaderReplacement

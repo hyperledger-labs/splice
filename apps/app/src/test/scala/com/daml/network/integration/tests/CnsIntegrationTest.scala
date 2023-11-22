@@ -41,10 +41,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
-      .addConfigTransformToFront(
-        CNNodeConfigTransforms.onlySv1
-      )
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
         CNNodeConfigTransforms.updateAllAutomationConfigs(
           _.withPausedTrigger[ExpiredCnsEntryTrigger]

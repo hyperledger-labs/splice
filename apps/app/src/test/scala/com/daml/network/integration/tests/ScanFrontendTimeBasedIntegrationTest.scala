@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -23,8 +22,7 @@ class ScanFrontendTimeBasedIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
-      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
+      .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withCoinPrice(coinPrice)
 
   def compareLeaderboardTable(

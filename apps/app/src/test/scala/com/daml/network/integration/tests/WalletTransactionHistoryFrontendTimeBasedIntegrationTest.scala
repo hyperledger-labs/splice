@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -23,10 +22,9 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .withCoinPrice(coinPrice)
-      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
 
   "A wallet transaction history UI" should {
 

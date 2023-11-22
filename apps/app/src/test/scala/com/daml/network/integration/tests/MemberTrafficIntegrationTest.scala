@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
@@ -20,8 +19,7 @@ class MemberTrafficIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
-      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       // NOTE: automatic top-ups should be explicitly disabled for this test as currently written
       .withTrafficTopupsDisabled
   }

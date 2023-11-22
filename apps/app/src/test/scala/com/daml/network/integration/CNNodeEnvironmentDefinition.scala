@@ -339,15 +339,26 @@ case class CNNodeEnvironmentDefinition(
 
 object CNNodeEnvironmentDefinition extends CommonCNNodeAppInstanceReferences {
 
-  def simpleTopology(testName: String): CNNodeEnvironmentDefinition =
+  // Prefer this to `4Svs` for better test performance (unless your really need >1 SV of course).
+  def simpleTopology1Sv(testName: String): CNNodeEnvironmentDefinition =
+    fromResources(Seq("simple-topology-1sv.conf"), testName)
+      .withAllocatedUsers()
+      .withInitializedNodes()
+      .withTrafficTopupsEnabled
+      .withResettedUnionspace()
+
+  def simpleTopology4Svs(testName: String): CNNodeEnvironmentDefinition =
     fromResources(Seq("simple-topology.conf"), testName)
       .withAllocatedUsers()
       .withInitializedNodes()
       .withTrafficTopupsEnabled
       .withResettedUnionspace()
 
-  def simpleTopologyWithSimTime(testName: String): CNNodeEnvironmentDefinition =
-    simpleTopology(testName).withSimTime
+  def simpleTopology1SvWithSimTime(testName: String): CNNodeEnvironmentDefinition =
+    simpleTopology1Sv(testName).withSimTime
+
+  def simpleTopology4SvsWithSimTime(testName: String): CNNodeEnvironmentDefinition =
+    simpleTopology4Svs(testName).withSimTime
 
   def preflightTopology(testName: String): CNNodeEnvironmentDefinition = {
     fromResource("preflight-topology.conf", testName).clearConfigTransforms()

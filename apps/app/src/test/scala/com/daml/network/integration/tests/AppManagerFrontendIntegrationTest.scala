@@ -31,10 +31,9 @@ class AppManagerFrontendIntegrationTest
 
   override def environmentDefinition =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
-      .addConfigTransforms(
-        CNNodeConfigTransforms.onlySv1,
-        (_, config) => CNNodeConfigTransforms.disableSplitwellUserDomainConnections(config),
+      .simpleTopology1Sv(this.getClass.getSimpleName)
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.disableSplitwellUserDomainConnections(config)
       )
       .withoutInitialManagerApps
 

@@ -21,7 +21,6 @@ import com.daml.network.validator.config.{
 }
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.domain.config.CommunityDomainConfig
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
@@ -157,17 +156,6 @@ object CNNodeConfigTransforms {
     val id = (new scala.util.Random).nextInt().toHexString
     addConfigName(id)(addDamlNameSuffix(id)(config))
   }
-
-  def onlySv1: (String, CNNodeConfig) => CNNodeConfig =
-    (_, c) =>
-      c.copy(
-        svApps = c.svApps.filter(_._1 == InstanceName.tryCreate("sv1")),
-        svAppClients = c.svAppClients.filter(_._1 == InstanceName.tryCreate("sv1")),
-        validatorApps = c.validatorApps.filter { case (name, _) =>
-          !name.toProtoPrimitive.startsWith("sv") || name == InstanceName.tryCreate("sv1Validator")
-        },
-        scanApps = c.scanApps.filter(_._1 == InstanceName.tryCreate("sv1Scan")),
-      )
 
   /** Default transforms to apply to tests using a [[CNNodeEnvironmentDefinition]].
     * Covers the primary ways that distinct concurrent environments may unintentionally

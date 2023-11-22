@@ -25,7 +25,7 @@ class ModelUpgradeIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology4Svs(this.getClass.getSimpleName)
 
   "daml model upgrade" should {
     "support switching to new svc-governance version" in { implicit env =>

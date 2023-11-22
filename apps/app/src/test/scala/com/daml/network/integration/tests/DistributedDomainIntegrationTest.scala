@@ -25,7 +25,7 @@ class DistributedDomainIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart
 
   private val globalDomain = DomainAlias.tryCreate("global")

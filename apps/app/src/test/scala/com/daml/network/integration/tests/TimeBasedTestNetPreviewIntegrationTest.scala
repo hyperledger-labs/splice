@@ -19,7 +19,7 @@ class TimeBasedTestNetPreviewIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
+      .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.noDevNet(config))
 
   "TestNet initializes correctly" in { implicit env =>

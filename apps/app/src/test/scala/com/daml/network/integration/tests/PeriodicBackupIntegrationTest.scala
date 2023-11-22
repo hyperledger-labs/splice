@@ -29,10 +29,9 @@ abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig]
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
       .addConfigTransformsToFront(
-        CNNodeConfigTransforms.onlySv1,
         (_, conf) =>
           CNNodeConfigTransforms.updateAllValidatorAppConfigs_(c =>
             c.copy(participantIdentitiesBackup = Some(backupDumpConfig))

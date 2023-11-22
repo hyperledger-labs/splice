@@ -19,7 +19,7 @@ trait SvIntegrationTestBase extends CNNodeIntegrationTest with SvTestUtil {
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart
       .withAdditionalSetup(implicit env => {
         // Some tests rely on those DARs being present without starting the SV/validator app which usually upload these.

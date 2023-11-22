@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -32,11 +31,10 @@ class SplitwellFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         CNNodeEnvironmentDefinition
-          .simpleTopology(this.getClass.getSimpleName)
-          .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
+          .simpleTopology1Sv(this.getClass.getSimpleName)
           .setup(env)
 
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)

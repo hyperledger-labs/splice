@@ -18,8 +18,7 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
-      .addConfigTransforms(CNNodeConfigTransforms.onlySv1)
+      .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.noDevNet(config))
       // Set a non-unit coin price to better test CC-USD conversion.
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))

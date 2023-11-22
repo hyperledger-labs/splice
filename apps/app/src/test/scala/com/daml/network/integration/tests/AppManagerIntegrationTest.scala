@@ -81,9 +81,8 @@ class AppManagerIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms(
-        CNNodeConfigTransforms.onlySv1,
         (_, config) => CNNodeConfigTransforms.disableSplitwellUserDomainConnections(config),
         (_, config) =>
           CNNodeConfigTransforms.updateAllAppManagerConfigs_(

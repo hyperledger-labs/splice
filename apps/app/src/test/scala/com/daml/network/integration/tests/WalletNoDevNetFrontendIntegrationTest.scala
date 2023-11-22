@@ -15,7 +15,7 @@ class WalletNoDevNetFrontendIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.noDevNet(config))
       // disable top-ups since in non-devnet setups, validators need to pay for top-ups
       .withTrafficTopupsDisabled

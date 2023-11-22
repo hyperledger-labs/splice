@@ -2,7 +2,6 @@ package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
 import com.daml.network.auth.AuthConfig.Rs256
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{FrontendLoginUtil, DirectoryFrontendTestUtil, WalletTestUtil}
@@ -18,11 +17,7 @@ class DirectoryAuth0FrontendIntegrationTest
 
   override def environmentDefinition =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
-      // start only sv1 but not sv2-4
-      .addConfigTransformToFront(
-        CNNodeConfigTransforms.onlySv1
-      )
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransform((_, cnNodeConfig) =>
         updateAllValidatorConfigs_(conf =>
           conf

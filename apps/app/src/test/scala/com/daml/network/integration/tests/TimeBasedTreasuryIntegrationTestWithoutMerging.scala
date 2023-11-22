@@ -32,11 +32,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
-      .simpleTopologyWithSimTime(this.getClass.getSimpleName)
-      // start only sv1 but not sv2-4
-      .addConfigTransformToFront(
-        CNNodeConfigTransforms.onlySv1
-      )
+      .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // for testing that input limits are respected.
       .withoutAutomaticRewardsCollectionAndCoinMerging
       .addConfigTransform((_, config) =>

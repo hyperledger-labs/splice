@@ -31,7 +31,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+      .simpleTopology1Sv(this.getClass.getSimpleName)
       .withManualStart
       .withoutInitialManagerApps // TODO (#7539): this should no longer be required once app-instances is removed
       .withSequencerConnectionsFromScanDisabled() // TODO(#8393) re-enable this when it is more robust to temporary domain disconnects
