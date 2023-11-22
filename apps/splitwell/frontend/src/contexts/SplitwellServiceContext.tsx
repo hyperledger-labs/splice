@@ -2,7 +2,7 @@ import * as openapi from 'splitwell-openapi';
 import { OpenAPILoggingMiddleware } from 'common-frontend';
 import React, { useContext, useMemo } from 'react';
 
-const DirectoryContext = React.createContext<openapi.SplitwellApi | undefined>(undefined);
+const SplitwellContext = React.createContext<openapi.SplitwellApi | undefined>(undefined);
 
 export interface SplitwellProps {
   url: string;
@@ -20,11 +20,11 @@ export const SplitwellClientProvider: React.FC<React.PropsWithChildren<Splitwell
     return new openapi.SplitwellApi(configuration);
   }, [url]);
 
-  return <DirectoryContext.Provider value={client}>{children}</DirectoryContext.Provider>;
+  return <SplitwellContext.Provider value={client}>{children}</SplitwellContext.Provider>;
 };
 
 export const useSplitwellClient: () => openapi.SplitwellApi = () => {
-  const client = useContext<openapi.SplitwellApi | undefined>(DirectoryContext);
+  const client = useContext<openapi.SplitwellApi | undefined>(SplitwellContext);
   if (!client) {
     throw new Error('SplitwellClient not initialized');
   }

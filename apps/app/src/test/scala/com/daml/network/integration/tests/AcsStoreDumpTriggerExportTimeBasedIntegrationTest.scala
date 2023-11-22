@@ -34,9 +34,9 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
     with DirectoryTestUtil {
 
   private val packageSignatures = {
-    // Note: the directory-service.dar suffices as it transitively references canton-coin.dar as well.
+    // Note: the canton-name-service.dar suffices as it transitively references canton-coin.dar as well.
     ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-      DarResources.directoryService.all
+      DarResources.cantonNameService.all
     )
   }
   implicit val templateJsonDecoder: TemplateJsonDecoder =
@@ -73,24 +73,24 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
       )
       aliceUserParty
     }
-    val (_, aliceDirectoryEntryContractIds) = actAndCheck(
-      "Setup a directory entry for alice",
+    val (_, aliceCnsEntryContractIds) = actAndCheck(
+      "Setup a cns entry for alice",
       initialiseDirectoryApp(
         "alice.unverified.cns",
         aliceUserParty,
-        aliceDirectoryClient,
+        aliceDirectoryExternalClient,
         aliceWalletClient,
       ),
     )(
-      "there is one directory entry visible on alice's participant",
+      "there is one cns entry visible on alice's participant",
       _ => {
-        val aliceDirectoryEntries =
+        val aliceCnsEntries =
           aliceValidatorBackend.participantClient.ledger_api_extensions.acs
-            .filterJava(cn.directory.DirectoryEntry.COMPANION)(
+            .filterJava(cn.cns.CnsEntry.COMPANION)(
               aliceUserParty
             )
-        aliceDirectoryEntries should not be empty
-        aliceDirectoryEntries.map(_.id.contractId)
+        aliceCnsEntries should not be empty
+        aliceCnsEntries.map(_.id.contractId)
       },
     )
 
@@ -158,7 +158,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
       aliceUnlockedIds
         .appendedAll(aliceLockedIds)
         .appendedAll(Seq(id2.contractId, id3.contractId, charlieCrateId))
-        .appendedAll(aliceDirectoryEntryContractIds)
+        .appendedAll(aliceCnsEntryContractIds)
         .toSet,
       aliceRewardContractsIds,
     )
@@ -210,7 +210,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
       }
       val lockedCoinContractIds = checkContracts(cc.coin.LockedCoin.COMPANION)
       val importCrateContractIds = checkContracts(cc.coinimport.ImportCrate.COMPANION)
-      val directoryEntryContractIds = checkContracts(cn.directory.DirectoryEntry.COMPANION)
+      val directoryEntryContractIds = checkContracts(cn.cns.CnsEntry.COMPANION)
 
       clue("check that all expected contract-ids are present") {
         val actualContractIds =

@@ -1,66 +1,13 @@
-import { ErrorBoundary, ErrorDisplay, Loading, PartyId, useUserState } from 'common-frontend';
-import { useEffect } from 'react';
+import { ErrorBoundary, Loading, PartyId, useUserState } from 'common-frontend';
 import { Outlet } from 'react-router-dom';
 
 import { Box, Button, Toolbar, Typography } from '@mui/material';
 
-import { useDirectoryInstall, useProviderParty, useRequestDirectoryInstall } from '../hooks';
 import { usePrimaryParty } from '../hooks/queries/usePrimaryParty';
-import { isDarFileMissingError } from '../utils/errors';
 
 const Root: React.FC = () => {
   const { logout } = useUserState();
   const primaryPartyId = usePrimaryParty();
-  const directoryInstall = useDirectoryInstall();
-  const { data: providerPartyId } = useProviderParty();
-
-  const requestDirectoryInstall = useRequestDirectoryInstall();
-
-  useEffect(() => {
-    if (
-      requestDirectoryInstall.isIdle &&
-      directoryInstall.isSuccess &&
-      primaryPartyId &&
-      providerPartyId
-    ) {
-      if (directoryInstall.data) {
-        console.debug('DirectoryInstall found');
-      } else {
-        console.debug('DirectoryInstall not found, creating DirectoryInstallRequest');
-        requestDirectoryInstall.mutate({});
-      }
-    }
-  }, [
-    directoryInstall.isSuccess,
-    directoryInstall.data,
-    primaryPartyId,
-    providerPartyId,
-    requestDirectoryInstall,
-  ]);
-
-  let content;
-  if (isDarFileMissingError(directoryInstall.error)) {
-    const missingTemplates = directoryInstall.error.warnings.unknownTemplateIds.join(', ');
-    content = (
-      <ErrorDisplay
-        message="A required template was not found on the participant"
-        userAction="Make sure the application operator has uploaded all relevant DAR files."
-        details={`Missing templates: ${missingTemplates}`}
-        retryFn={() => directoryInstall.refetch()}
-      />
-    );
-  } else if (directoryInstall.error !== null) {
-    content = (
-      <ErrorDisplay
-        message="Problem loading directory install contract"
-        userAction="Please try again later. If the problem persists, contact the application operator."
-      />
-    );
-  } else if (directoryInstall.isLoading || !directoryInstall.data || !primaryPartyId) {
-    content = <Loading />;
-  } else {
-    content = <Outlet />;
-  }
 
   return (
     <ErrorBoundary>
@@ -86,7 +33,7 @@ const Root: React.FC = () => {
             </Button>
           </Toolbar>
         </Box>
-        {content}
+        {primaryPartyId ? <Outlet /> : <Loading />}
       </Box>
     </ErrorBoundary>
   );

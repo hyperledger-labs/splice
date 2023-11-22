@@ -4,9 +4,9 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import {
   AuthProvider,
   cnReplaceEqualDeep,
-  DirectoryClientProvider,
   theme,
   UserProvider,
+  ScanClientProvider as OldScanClientProvider,
 } from 'common-frontend';
 import {
   createBrowserRouter,
@@ -41,16 +41,18 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
       warn: () => {},
     },
   });
+
+  // TODO: (#8692) remove OldScanClientProvider when we no longer use it.
   return (
     <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
       <QueryClientProvider client={queryClient}>
         <ReactQueryDevtools initialIsOpen={false} />
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
-          <DirectoryClientProvider url={config.services.directory.url}>
+          <OldScanClientProvider url={config.services.scan.url}>
             <AppManagerClientProvider url={config.services.validator.url}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>{children}</LocalizationProvider>
             </AppManagerClientProvider>
-          </DirectoryClientProvider>
+          </OldScanClientProvider>
         </UserProvider>
       </QueryClientProvider>
     </AuthProvider>

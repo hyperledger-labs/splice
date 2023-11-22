@@ -12,6 +12,10 @@ window.canton_network_config = {
       // URL of the directory backend.
       url: `https://directory.sv-1.svc.${cluster}/api/v0/directory`,
     },
+    scan: {
+      // URL of the scan backend.
+      url: `https://scan.sv-1.svc.${cluster}/api/scan`,
+    },
     validator: {
       url: "https://" + window.location.hostname + "/api/validator",
     },

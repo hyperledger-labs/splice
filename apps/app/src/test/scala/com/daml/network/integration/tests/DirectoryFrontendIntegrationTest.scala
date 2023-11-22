@@ -67,10 +67,14 @@ class DirectoryFrontendIntegrationTest
         clue("requesting an invalid name to check invalid name message") {
           waitForQuery(id("entry-name-field"))
           click on "entry-name-field"
-          textField("entry-name-field").value = entryName
+          textField("entry-name-field").value = entryName;
+
+          screenshot()
 
           waitForCondition(id("search-entry-button")) { ExpectedConditions.elementToBeClickable(_) }
           click on "search-entry-button"
+
+          screenshot()
           waitForQuery(id("unavailable-icon"))
           find(id("entry-name-validation-message")).fold(fail("Unable to find validation message"))(
             _.text should startWith("The provided entry name has an invalid format")

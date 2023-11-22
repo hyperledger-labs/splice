@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cn.directory as dirCodegen
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
@@ -9,8 +9,11 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{SplitwellTestUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.sv.automation.leaderbased.CnsSubscriptionRenewalPaymentTrigger
+import com.daml.network.sv.config.InitialCnsConfig
+import com.daml.network.util.{SplitwellTestUtil, TimeTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.Duration
@@ -20,7 +23,8 @@ class WalletTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with TimeTestUtil
-    with SplitwellTestUtil {
+    with SplitwellTestUtil
+    with TriggerTestUtil {
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
   private val testEntryName = "mycoolentry.unverified.cns"
@@ -35,6 +39,16 @@ class WalletTimeBasedIntegrationTest
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
+      .addConfigTransform((_, config) =>
+        CNNodeConfigTransforms
+          .updateAllSvAppFoundCollectiveConfigs_(
+            _.copy(
+              initialCnsConfig = InitialCnsConfig(
+                renewalDuration = NonNegativeFiniteDuration.ofDays(1)
+              )
+            )
+          )(config)
+      )
 
   "A wallet" should {
 
@@ -131,15 +145,10 @@ class WalletTimeBasedIntegrationTest
     }
 
     "allow a user to list multiple subscriptions in different states" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       clue("Alice gets some coins") {
         aliceWalletClient.tap(50)
-      }
-      clue("Setting up directory as provider for the created subscriptions") {
-        aliceDirectoryClient.requestDirectoryInstall()
-        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(aliceUserParty)
       }
       aliceWalletClient.listSubscriptions() shouldBe empty
 
@@ -149,9 +158,8 @@ class WalletTimeBasedIntegrationTest
 
             val (_, requestId) = actAndCheck(
               "Request directory entry", {
-                aliceDirectoryClient
-                  .requestDirectoryEntry(name, testEntryUrl, testEntryDescription)
-                  ._1
+                aliceDirectoryExternalClient
+                  .createDirectoryEntry(name, testEntryUrl, testEntryDescription)
               },
             )(
               "the corresponding subscription request is created",
@@ -178,14 +186,11 @@ class WalletTimeBasedIntegrationTest
         },
         cancelAllSubscriptions(aliceWalletClient, aliceValidatorBackend),
       ) {
-        // TODO (#7609): replace with stopping and starting triggers
-        bracket(
-          clue("Stopping directory backend so that payments aren't collected.") {
-            directoryBackend.stop()
-          },
-          clue("Starting directory backend again so other tests can use it") {
-            directoryBackend.startSync()
-          },
+        val cnsSubscriptionRenewalPaymentTrigger =
+          sv1Backend.leaderBasedAutomation.trigger[CnsSubscriptionRenewalPaymentTrigger]
+        setTriggersWithin(
+          triggersToPauseAtStart = Seq(cnsSubscriptionRenewalPaymentTrigger),
+          triggersToResumeAtStart = Seq.empty,
         ) {
           actAndCheck(
             "Wait for a payment on the first subscription to become possible", {
@@ -543,13 +548,7 @@ class WalletTimeBasedIntegrationTest
     }
 
     "generate rewards for subscriptions" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-
-      val dirParty = clue(
-        "Getting directory party ID (will fail if another test stopped the directory and failed before starting it again)"
-      ) {
-        directoryBackend.getProviderPartyId()
-      }
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       clue(
         "Advance seven rounds to ensure that rewards from previous test cases were claimed or expired"
@@ -557,14 +556,8 @@ class WalletTimeBasedIntegrationTest
         Range(1, 8).foreach(_ => advanceRoundsByOneTick)
       }
 
-      clue("Request install and wait for provider to auto-accept") {
-        aliceDirectoryClient.requestDirectoryInstall()
-        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(aliceUserParty)
-      }
-
-      val (_, subReqId) = clue("Alice requests a directory entry") {
-        aliceDirectoryClient.requestDirectoryEntry(
+      val respond = clue("Alice requests a directory entry") {
+        aliceDirectoryExternalClient.createDirectoryEntry(
           testEntryName,
           testEntryUrl,
           testEntryDescription,
@@ -573,13 +566,13 @@ class WalletTimeBasedIntegrationTest
       bracket(
         clue("Alice obtains some coins and accepts the subscription") {
           aliceWalletClient.tap(50.0)
-          aliceWalletClient.acceptSubscriptionRequest(subReqId)
+          aliceWalletClient.acceptSubscriptionRequest(respond.subscriptionRequestCid)
         },
         cancelAllSubscriptions(aliceWalletClient, aliceValidatorBackend),
       ) {
         clue("Getting Alice's new entry") {
           eventuallySucceeds() {
-            directoryBackend.lookupEntryByName(testEntryName)
+            sv1ScanBackend.lookupEntryByName(testEntryName)
           }
         }
 
@@ -587,10 +580,10 @@ class WalletTimeBasedIntegrationTest
           eventually()({
             aliceValidatorWalletClient.listAppRewardCoupons() should have length 1
             aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 2
-            directoryBackend.participantClient.ledger_api_extensions.acs
+            sv1Backend.participantClient.ledger_api_extensions.acs
               .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(
-                dirParty,
-                _.data.provider == dirParty.toProtoPrimitive,
+                svcParty,
+                _.data.provider == svcParty.toProtoPrimitive,
               ) should have length 1
           })
         }
@@ -603,10 +596,10 @@ class WalletTimeBasedIntegrationTest
           _ => {
             aliceValidatorWalletClient.listAppRewardCoupons() should be(empty)
             aliceValidatorWalletClient.listValidatorRewardCoupons() should be(empty)
-            directoryBackend.participantClient.ledger_api_extensions.acs
+            sv1Backend.participantClient.ledger_api_extensions.acs
               .filterJava(coinCodegen.AppRewardCoupon.COMPANION)(
-                dirParty,
-                _.data.provider == dirParty.toProtoPrimitive,
+                svcParty,
+                _.data.provider == svcParty.toProtoPrimitive,
               ) should be(empty)
           },
         )

@@ -1,8 +1,7 @@
 package com.daml.network.util
 
 import com.digitalasset.canton.util.ShowUtil.*
-import com.daml.network.codegen.java.cn.directory as dirCodegen
-import com.daml.network.console.{DirectoryAppClientReference, WalletAppClientReference}
+import com.daml.network.console.{DirectoryExternalAppReference, WalletAppClientReference}
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.digitalasset.canton.topology.PartyId
 
@@ -11,19 +10,12 @@ trait DirectoryTestUtil extends CNNodeTestCommon with CnsTestUtil {
   def initialiseDirectoryApp(
       userName: String,
       userParty: PartyId,
-      directory: DirectoryAppClientReference,
+      directoryExternalApp: DirectoryExternalAppReference,
       wallet: WalletAppClientReference,
   ): Unit = {
-    actAndCheck("Request directory install", directory.requestDirectoryInstall())(
-      "Install created",
-      _ =>
-        directory.ledgerApi.ledger_api_extensions.acs
-          .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty),
-    )
-
     val (_, reqId) = actAndCheck(
       show"Request directory entry ${userName.singleQuoted} for $userParty",
-      directory.requestDirectoryEntry(
+      directoryExternalApp.createDirectoryEntry(
         userName,
         "https://cns-dir-url.com",
         "Sample CNS Directory Entry Description",

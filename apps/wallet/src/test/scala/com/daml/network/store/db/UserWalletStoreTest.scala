@@ -6,13 +6,13 @@ import com.daml.network.codegen.java.cc.{
   round as roundCodegen,
 }
 import com.daml.network.codegen.java.cc.round.types.Round
-import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as paymentCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
+import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.daml.network.wallet.store.db.DbUserWalletStore
@@ -781,7 +781,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             user1,
             "user1",
             subscriptionRequest1,
-            provider1,
           )
           directoryEntry1 = directoryEntry(
             user1,
@@ -1072,8 +1071,8 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       entryUrl: String = "https://cns-entry-url.com",
       entryDescription: String = "Sample fake description",
   ) = {
-    val templateId = dirCodegen.DirectoryEntry.TEMPLATE_ID
-    val template = new dirCodegen.DirectoryEntry(
+    val templateId = cnsCodegen.CnsEntry.TEMPLATE_ID
+    val template = new cnsCodegen.CnsEntry(
       user.toProtoPrimitive,
       provider.toProtoPrimitive,
       name,
@@ -1083,7 +1082,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
     contract(
       identifier = templateId,
-      contractId = new dirCodegen.DirectoryEntry.ContractId(nextCid()),
+      contractId = new cnsCodegen.CnsEntry.ContractId(nextCid()),
       payload = template,
     )
   }
@@ -1092,14 +1091,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       user: PartyId,
       name: String,
       subscriptionRequest: subsCodegen.SubscriptionRequest.ContractId,
-      provider: PartyId = providerParty(0),
       entryUrl: String = "https://cns-entry-url.com",
       entryDescription: String = "Sample fake description",
   ) = {
-    val templateId = dirCodegen.DirectoryEntryContext.TEMPLATE_ID
-    val template = new dirCodegen.DirectoryEntryContext(
+    val templateId = cnsCodegen.CnsEntryContext.TEMPLATE_ID
+    val template = new cnsCodegen.CnsEntryContext(
       svcParty.toProtoPrimitive,
-      provider.toProtoPrimitive,
       user.toProtoPrimitive,
       name,
       entryUrl,
@@ -1108,7 +1105,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
     contract(
       identifier = templateId,
-      contractId = new dirCodegen.DirectoryEntryContext.ContractId(nextCid()),
+      contractId = new cnsCodegen.CnsEntryContext.ContractId(nextCid()),
       payload = template,
     )
   }
@@ -1281,7 +1278,8 @@ class DbUserWalletStoreTest
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         DarResources.cantonCoin.all ++
           DarResources.wallet.all ++
-          DarResources.directoryService.all
+          DarResources.directoryService.all ++
+          DarResources.cantonNameService.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)

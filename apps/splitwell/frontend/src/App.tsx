@@ -1,12 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import {
-  DirectoryClientProvider,
   AuthProvider,
   UserProvider,
   theme,
   cnReplaceEqualDeep,
   useUserState,
+  ScanClientProvider as OldScanClientProvider,
   PackageIdResolver,
 } from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
@@ -64,13 +64,14 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 
   const config = useConfig();
 
+  // TODO: (#8692) remove OldScanClientProvider when we no longer use it.
   return (
     <AuthProvider authConf={config.auth}>
       <QueryClientProvider client={queryClient}>
         <ReactQueryDevtools initialIsOpen={false} />
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
           <SplitwellClientProvider url={config.services.splitwell.url}>
-            <DirectoryClientProvider url={config.services.directory.url}>
+            <OldScanClientProvider url={config.services.scan.url}>
               <ScanClientProvider url={config.services.scan.url}>
                 <SplitwellLedgerApiClientProvider
                   jsonApiUrl={config.services.jsonApi.url}
@@ -79,7 +80,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
                   {children}
                 </SplitwellLedgerApiClientProvider>
               </ScanClientProvider>
-            </DirectoryClientProvider>
+            </OldScanClientProvider>
           </SplitwellClientProvider>
         </UserProvider>
       </QueryClientProvider>

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { DirectoryClientProvider, cnReplaceEqualDeep, theme } from 'common-frontend';
+import { cnReplaceEqualDeep, theme } from 'common-frontend';
+import { ScanClientProvider as OldScanClientProvider } from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
 import {
@@ -31,12 +32,13 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     },
   });
 
+  // TODO: (#8692) remove OldScanClientProvider when we no longer use it.
   return (
     <QueryClientProvider client={queryClient}>
       <ReactQueryDevtools initialIsOpen={false} />
-      <DirectoryClientProvider url={config.services.directory.url}>
+      <OldScanClientProvider url={config.services.scan.url}>
         <ScanClientProvider url={config.services.scan.url}>{children}</ScanClientProvider>
-      </DirectoryClientProvider>
+      </OldScanClientProvider>
     </QueryClientProvider>
   );
 };

@@ -36,8 +36,7 @@ class WalletPaymentFrontendIntegrationTest
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
-          aliceUserParty,
-          aliceDirectoryClient,
+          aliceDirectoryExternalClient,
           aliceEntryName,
           aliceWalletClient,
         )
@@ -45,8 +44,7 @@ class WalletPaymentFrontendIntegrationTest
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
         val charlieEntryName = perTestCaseName("charlie")
         createDirectoryEntry(
-          charlieUserParty,
-          charlieDirectoryClient,
+          charlieDirectoryExternalClient,
           charlieEntryName,
           charlieWalletClient,
         )
@@ -117,8 +115,7 @@ class WalletPaymentFrontendIntegrationTest
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
-          aliceUserParty,
-          aliceDirectoryClient,
+          aliceDirectoryExternalClient,
           aliceEntryName,
           aliceWalletClient,
         )
@@ -126,8 +123,7 @@ class WalletPaymentFrontendIntegrationTest
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
         val charlieEntryName = perTestCaseName("charlie")
         createDirectoryEntry(
-          charlieUserParty,
-          charlieDirectoryClient,
+          charlieDirectoryExternalClient,
           charlieEntryName,
           charlieWalletClient,
         )
@@ -202,8 +198,7 @@ class WalletPaymentFrontendIntegrationTest
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
-          aliceUserParty,
-          aliceDirectoryClient,
+          aliceDirectoryExternalClient,
           aliceEntryName,
           aliceWalletClient,
         )
@@ -211,8 +206,7 @@ class WalletPaymentFrontendIntegrationTest
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
         val charlieEntryName = perTestCaseName("charlie")
         createDirectoryEntry(
-          charlieUserParty,
-          charlieDirectoryClient,
+          charlieDirectoryExternalClient,
           charlieEntryName,
           charlieWalletClient,
         )
@@ -286,8 +280,7 @@ class WalletPaymentFrontendIntegrationTest
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
-          aliceUserParty,
-          aliceDirectoryClient,
+          aliceDirectoryExternalClient,
           aliceEntryName,
           aliceWalletClient,
         )
@@ -295,8 +288,7 @@ class WalletPaymentFrontendIntegrationTest
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
         val charlieEntryName = perTestCaseName("charlie")
         createDirectoryEntry(
-          charlieUserParty,
-          charlieDirectoryClient,
+          charlieDirectoryExternalClient,
           charlieEntryName,
           charlieWalletClient,
         )
@@ -370,8 +362,7 @@ class WalletPaymentFrontendIntegrationTest
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
         createDirectoryEntry(
-          aliceUserParty,
-          aliceDirectoryClient,
+          aliceDirectoryExternalClient,
           aliceEntryName,
           aliceWalletClient,
         )
@@ -379,8 +370,7 @@ class WalletPaymentFrontendIntegrationTest
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
         val charlieEntryName = perTestCaseName("charlie")
         createDirectoryEntry(
-          charlieUserParty,
-          charlieDirectoryClient,
+          charlieDirectoryExternalClient,
           charlieEntryName,
           charlieWalletClient,
         )

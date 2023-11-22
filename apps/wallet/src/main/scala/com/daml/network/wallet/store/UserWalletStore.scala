@@ -10,6 +10,7 @@ import com.daml.network.codegen.java.cc.{
   round as roundCodegen,
 }
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
+import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
@@ -299,11 +300,11 @@ trait UserWalletStore
     for {
       // NOTE: entries and entry contexts are sometimes out of sync so we just filter out entries in such cases
       entries <- multiDomainAcsStore.listContracts(
-        directoryCodegen.DirectoryEntry.COMPANION,
+        cnsCodegen.CnsEntry.COMPANION,
         limit,
       )
       entryContexts <- multiDomainAcsStore.listContracts(
-        directoryCodegen.DirectoryEntryContext.COMPANION,
+        cnsCodegen.CnsEntryContext.COMPANION,
         limit,
       )
       subscriptions <- listSubscriptions(limit)
@@ -437,7 +438,7 @@ object UserWalletStore {
       payData: subsCodegen.SubscriptionPayData,
   )
   final case class DirectoryEntryWithPayData(
-      contractId: directoryCodegen.DirectoryEntry.ContractId,
+      contractId: cnsCodegen.CnsEntry.ContractId,
       expiresAt: Instant,
       entryName: String,
       amount: java.math.BigDecimal,
@@ -446,7 +447,7 @@ object UserWalletStore {
       paymentDuration: RelTime,
   )
   final case class EntryWithSubscriptionContext(
-      entry: Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry],
+      entry: Contract[cnsCodegen.CnsEntry.ContractId, cnsCodegen.CnsEntry],
       subscriptionReference: subsCodegen.SubscriptionRequest.ContractId,
   )
 
@@ -627,6 +628,13 @@ object UserWalletStore {
         mkFilter(directoryCodegen.DirectoryEntryContext.COMPANION)(co =>
           co.payload.user == endUser
         )(UserWalletAcsStoreRowData(_)),
+        // Cns entry
+        mkFilter(cnsCodegen.CnsEntry.COMPANION)(co => co.payload.user == endUser)(
+          UserWalletAcsStoreRowData(_)
+        ),
+        mkFilter(cnsCodegen.CnsEntryContext.COMPANION)(co => co.payload.user == endUser)(
+          UserWalletAcsStoreRowData(_)
+        ),
       ),
     )
   }

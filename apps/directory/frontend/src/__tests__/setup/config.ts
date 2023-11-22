@@ -20,6 +20,11 @@ const config = {
       url: 'https://directory.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/directory',
     },
     // END_DIRECTORY_CONFIG
+    scan: {
+      // URL of scan backend.
+      // Edit this to the cluster you're trying to connect on.
+      url: 'https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/scan',
+    },
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet
       uiUrl: 'http://wallet.localhost:3000',

@@ -1,11 +1,16 @@
 import * as openapi from 'scan-openapi';
 import BigNumber from 'bignumber.js';
 import React, { useContext, useMemo } from 'react';
-import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi';
+import {
+  ApiException,
+  GetOpenAndIssuingMiningRoundsRequest,
+  ListEntriesResponse,
+} from 'scan-openapi';
 
 import { FeaturedAppRight } from '@daml.js/canton-coin/lib/CC/Coin';
 import { CoinRules } from '@daml.js/canton-coin/lib/CC/CoinRules';
 import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
+import { CnsEntry } from '@daml.js/cns/lib/CN/Cns';
 import { Party } from '@daml/types';
 
 import { Contract, OpenAPILoggingMiddleware } from '../utils';
@@ -24,6 +29,9 @@ export interface ScanClient {
   getCoinRules: () => Promise<Contract<CoinRules>>;
   lookupFeaturedAppRight: (partyId: Party) => Promise<Contract<FeaturedAppRight> | undefined>;
   getSvcPartyId: () => Promise<string>;
+  lookupEntryByName: (name: string) => Promise<Contract<CnsEntry>>;
+  listEntries: (pageSize: number, namePrefix?: string) => Promise<ListEntriesResponse>;
+  lookupEntryByParty: (partyId: string) => Promise<CnsEntry | undefined>;
 }
 
 export const ScanClientProvider: React.FC<React.PropsWithChildren<ScanProps>> = ({
@@ -78,6 +86,30 @@ export const ScanClientProvider: React.FC<React.PropsWithChildren<ScanProps>> = 
         const response = await scanClient.getSvcPartyId();
         return response.svc_party_id;
       },
+      // TODO: (#8692) replace callers of these function with react query
+      lookupEntryByName: async (name: string): Promise<Contract<CnsEntry>> => {
+        const response = await scanClient.lookupCnsEntryByName(name);
+        return Contract.decodeOpenAPI(response.entry, CnsEntry);
+      },
+      listEntries: async (pageSize: number, namePrefix?: string): Promise<ListEntriesResponse> => {
+        return await scanClient.listCnsEntries(pageSize, namePrefix);
+      },
+      lookupEntryByParty: async (partyId: string): Promise<CnsEntry | undefined> => {
+        try {
+          const entryByPartyResponse = await scanClient.lookupCnsEntryByParty(partyId);
+          const entry = entryByPartyResponse.entry;
+          return Contract.decodeOpenAPI(entry, CnsEntry).payload;
+        } catch (e) {
+          if (e instanceof Error) {
+            if ((e as ApiException<undefined>).code === 404) {
+              console.debug(`No cns entry for partyId ${partyId} found`);
+              return undefined;
+            }
+          }
+          throw e;
+        }
+      },
+      ApiException,
     };
   }, [url]);
 

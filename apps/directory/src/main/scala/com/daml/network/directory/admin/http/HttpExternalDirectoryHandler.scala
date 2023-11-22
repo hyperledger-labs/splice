@@ -1,18 +1,20 @@
 package com.daml.network.directory.admin.http
 
+import akka.stream.Materializer
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.codegen.java.cn.directory.{DirectoryInstall, DirectoryInstallRequest}
-import com.daml.network.environment.RetryProvider
+import com.daml.network.codegen.java.cn.directory.DirectoryInstallRequest
 import com.daml.network.http.v0.external
 import com.daml.network.http.v0.external.directory.DirectoryResource as r0
-import com.daml.network.http.v0.{definitions as d0}
-import com.daml.network.util.AssignedContract
+import com.daml.network.http.v0.definitions as d0
+import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.util.DisclosedContracts
 import com.daml.network.wallet.admin.http.HttpWalletHandlerUtil
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry.RetryUtil
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
@@ -22,10 +24,11 @@ import scala.util.Try
 class HttpExternalDirectoryHandler(
     override val walletManager: UserWalletManager,
     directoryProvider: PartyId,
-    retryProvider: RetryProvider,
+    scanConnection: ScanConnection,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
+    mat: Materializer,
     tracer: Tracer,
 ) extends external.directory.DirectoryHandler[TracedUser]
     with HttpWalletHandlerUtil {
@@ -42,9 +45,21 @@ class HttpExternalDirectoryHandler(
       val connection = getUserWallet(user).connection
       for {
         partyId <- connection.getPrimaryParty(user)
-        install <- getInstallContract(user)
-        update = install.exercise(
-          _.exerciseDirectoryInstall_RequestEntry(body.name, body.url, body.description)
+        cnsRules <- scanConnection.getCnsRules()
+        cnsRulesCt = cnsRules.toAssignedContract.getOrElse(
+          throw Status.Code.FAILED_PRECONDITION.toStatus
+            .withDescription(
+              s"CnsRules contract is not assigned to a domain."
+            )
+            .asRuntimeException()
+        )
+        update = cnsRulesCt.exercise(
+          _.exerciseCnsRules_RequestEntry(
+            body.name,
+            body.url,
+            body.description,
+            partyId.toProtoPrimitive,
+          )
             .map { e =>
               r0.CreateDirectoryEntryResponse.OK(
                 d0.CreateDirectoryEntryResponse(
@@ -59,6 +74,7 @@ class HttpExternalDirectoryHandler(
         )
         res <- connection
           .submit(Seq(partyId), Seq(partyId), update)
+          .withDisclosedContracts(DisclosedContracts(cnsRules))
           .noDedup
           .yieldResult()
       } yield res
@@ -155,15 +171,4 @@ class HttpExternalDirectoryHandler(
         tc: TraceContext
     ): RetryUtil.ErrorKind = RetryUtil.TransientErrorKind
   }
-
-  private def getInstallContract(user: String)(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[AssignedContract[DirectoryInstall.ContractId, ?]] =
-    retryProvider.retryForClientCalls(
-      "fetchInstallContract",
-      getUserStore(user).flatMap(_.getDirectoryInstall()),
-      logger,
-      DirectoryInstallNotFound(_),
-    )
 }

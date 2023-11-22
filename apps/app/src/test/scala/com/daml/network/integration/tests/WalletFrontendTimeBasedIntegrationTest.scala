@@ -71,18 +71,17 @@ class WalletFrontendTimeBasedIntegrationTest
 
     "show user details after login" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val entryName = perTestCaseName("alice")
 
       createDirectoryEntry(
-        aliceParty,
-        aliceDirectoryClient,
+        aliceDirectoryExternalClient,
         entryName,
         aliceWalletClient,
       )
 
       eventuallySucceeds() {
-        directoryBackend.lookupEntryByName(entryName)
+        sv1ScanBackend.lookupEntryByName(entryName)
       }
 
       withFrontEnd("alice") { implicit webDriver =>

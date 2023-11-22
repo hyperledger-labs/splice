@@ -17,7 +17,7 @@ import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
 import com.daml.network.http.v0.definitions
 import com.daml.network.sv.SvApp
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
-import com.daml.network.sv.automation.LeaderBasedAutomationService
+import com.daml.network.sv.automation.{LeaderBasedAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.automation.singlesv.RestartLeaderBasedAutomationTrigger
 import com.daml.network.sv.config.{SvAppBackendConfig, SvAppClientConfig}
 import com.daml.network.util.Contract
@@ -179,6 +179,13 @@ class SvAppBackendReference(
       .epochState
       .getOrElse(throw new RuntimeException("LeaderBasedAutomation is not fully started up"))
       .leaderBasedAutomation
+  }
+
+  @Help.Summary(
+    "Returns the current svc automation."
+  )
+  def svcAutomation: SvSvcAutomationService = {
+    appState.svcAutomation
   }
 
   @Help.Summary("Return sv app config")

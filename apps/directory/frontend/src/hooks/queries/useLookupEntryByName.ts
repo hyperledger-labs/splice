@@ -1,5 +1,5 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
-import { Contract, PollingStrategy, useDirectoryClient } from 'common-frontend';
+import { Contract, PollingStrategy, useScanClient } from 'common-frontend';
 
 import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
@@ -12,15 +12,16 @@ type LookupEntryResponse = {
 
 const useLookupEntryByName = (
   name: string,
-  suffix: string
+  suffix: string,
+  retryWhenNotFound: boolean = false
 ): UseQueryResult<LookupEntryResponse> => {
-  const directoryClient = useDirectoryClient();
+  const scanClient = useScanClient();
   const primaryPartyId = usePrimaryParty();
 
   return useQuery({
     queryKey: ['lookupEntryByName', name, suffix],
     queryFn: async () => {
-      return directoryClient
+      return scanClient
         .lookupEntryByName(toFullEntryName(name, suffix))
         .then(response => ({
           entryContract: response,
@@ -28,7 +29,11 @@ const useLookupEntryByName = (
         .catch(err => {
           if (err?.code === 404) {
             console.info(`Contract for directory entry ${name} does not exist`);
-            return { entryContract: undefined };
+            if (retryWhenNotFound) {
+              throw err;
+            } else {
+              return { entryContract: undefined };
+            }
           } else {
             throw err;
           }

@@ -13,6 +13,7 @@ module.exports = {
       dependencies: [
         "@daml.js/canton-coin",
         "@daml.js/directory",
+        "@daml.js/cns",
         "@daml.js/wallet",
         "@daml.js/wallet-payments",
       ],

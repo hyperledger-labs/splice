@@ -283,6 +283,14 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       // SubscriptionExpired
       text = 'Subscription Expired';
       break;
+    case 'CnsRules_CollectInitialEntryPayment':
+      // CnsEntryInitialPaymentCollected
+      text = 'CNS Entry Initial Payment Collected';
+      break;
+    case 'CnsRules_CollectEntryRenewalPayment':
+      // CnsEntryRenewalPaymentCollected
+      text = 'CNS Entry Renewal Payment Collected';
+      break;
     default:
       console.warn('Unknown Transaction Subtype', subtype);
       text = subtype.choice;

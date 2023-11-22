@@ -7,12 +7,13 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinrules.{AppTransferContext, CoinRules}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.environment.{
   CNLedgerClient,
   HttpAppConnection,
   PackageIdResolver,
-  RetryProvider,
   RetryFor,
+  RetryProvider,
 }
 import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -97,6 +98,9 @@ final class ScanConnection private (
   private val coinRulesCache: AtomicReference[Option[CachedCoinRules]] =
     new AtomicReference(None)
 
+  private val cnsRulesCache: AtomicReference[Option[CachedCnsRules]] =
+    new AtomicReference(None)
+
   private val cachedRounds: AtomicReference[CachedMiningRounds] =
     new AtomicReference(CachedMiningRounds())
 
@@ -175,6 +179,40 @@ final class ScanConnection private (
           )
           coinRules
         }
+    }
+  }
+
+  def getCnsRules()(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[ContractWithState[CnsRules.ContractId, CnsRules]] = {
+    val now = clock.now
+    getCoinRules().flatMap { coinRules =>
+      cnsRulesCache.get() match {
+        case Some(ccr @ CachedCnsRules(_, cnsRules)) if ccr.validAsOf(now, coinRules) =>
+          Future.successful(cnsRules)
+        case cacheO =>
+          logger.debug(
+            s"cnsRules cache is empty or outdated, retrieving CnsRules from CC scan."
+          )
+          for {
+            cnsRules <- runHttpCmd(
+              config.adminApi.url,
+              HttpScanAppClient.GetCnsRules(cacheO.map(_.cnsRules)),
+            )
+          } yield {
+            cnsRulesCache.set(
+              Some(
+                CachedCnsRules(
+                  now.add(config.coinRulesCacheTimeToLive.asJava),
+                  cnsRules,
+                )
+              )
+            )
+            cnsRules
+          }
+      }
     }
   }
 
@@ -371,6 +409,21 @@ object ScanConnection {
       coinRules: ContractWithState[CoinRules.ContractId, CoinRules],
   ) {
     def validAsOf(now: CantonTimestamp): Boolean =
+      now.isBefore(cacheValidUntil) && coinRules.state.fold(
+        assignment =>
+          CoinConfigSchedule(coinRules)
+            .getConfigAsOf(now)
+            .globalDomain
+            .activeDomain == assignment.toProtoPrimitive,
+        false,
+      )
+  }
+
+  private case class CachedCnsRules(
+      cacheValidUntil: CantonTimestamp,
+      cnsRules: ContractWithState[CnsRules.ContractId, CnsRules],
+  ) {
+    def validAsOf(now: CantonTimestamp, coinRules: ContractWithState[?, CoinRules]): Boolean =
       now.isBefore(cacheValidUntil) && coinRules.state.fold(
         assignment =>
           CoinConfigSchedule(coinRules)

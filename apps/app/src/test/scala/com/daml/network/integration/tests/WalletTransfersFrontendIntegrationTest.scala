@@ -45,13 +45,12 @@ class WalletTransfersFrontendIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       onboardWalletUser(bobWalletClient, bobValidatorBackend)
       createDirectoryEntry(
-        aliceUserParty,
-        aliceDirectoryClient,
+        aliceDirectoryExternalClient,
         aliceDirectoryName,
         aliceWalletClient,
         cc,
       )
-      createDirectoryEntry(bobUserParty, bobDirectoryClient, bobDirectoryName, bobWalletClient, cc)
+      createDirectoryEntry(bobDirectoryExternalClient, bobDirectoryName, bobWalletClient, cc)
 
       bobWalletClient.listTransferOffers() shouldBe empty
 
@@ -134,12 +133,11 @@ class WalletTransfersFrontendIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       onboardWalletUser(bobWalletClient, bobValidatorBackend)
       createDirectoryEntry(
-        aliceUserParty,
-        aliceDirectoryClient,
+        aliceDirectoryExternalClient,
         aliceDirectoryName,
         aliceWalletClient,
       )
-      createDirectoryEntry(bobUserParty, bobDirectoryClient, bobDirectoryName, bobWalletClient)
+      createDirectoryEntry(bobDirectoryExternalClient, bobDirectoryName, bobWalletClient)
 
       actAndCheck(
         " Bob creates transfer offer to alice",
@@ -187,7 +185,6 @@ class WalletTransfersFrontendIntegrationTest
 
     "not show transfer offers I created" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceDirectoryName = perTestCaseName("alice")
 
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
@@ -198,12 +195,11 @@ class WalletTransfersFrontendIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       onboardWalletUser(bobWalletClient, bobValidatorBackend)
       createDirectoryEntry(
-        aliceUserParty,
-        aliceDirectoryClient,
+        aliceDirectoryExternalClient,
         aliceDirectoryName,
         aliceWalletClient,
       )
-      createDirectoryEntry(bobUserParty, bobDirectoryClient, bobDirectoryName, bobWalletClient)
+      createDirectoryEntry(bobDirectoryExternalClient, bobDirectoryName, bobWalletClient)
 
       actAndCheck(
         "Alice creates transfer offer to bob",
@@ -234,7 +230,6 @@ class WalletTransfersFrontendIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceDirectoryName = perTestCaseName("alice")
 
-      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val bobDirectoryName = perTestCaseName("bob")
 
       val cc = BigDecimal(10)
@@ -244,13 +239,12 @@ class WalletTransfersFrontendIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       onboardWalletUser(bobWalletClient, bobValidatorBackend)
       createDirectoryEntry(
-        aliceUserParty,
-        aliceDirectoryClient,
+        aliceDirectoryExternalClient,
         aliceDirectoryName,
         aliceWalletClient,
         cc,
       )
-      createDirectoryEntry(bobUserParty, bobDirectoryClient, bobDirectoryName, bobWalletClient, cc)
+      createDirectoryEntry(bobDirectoryExternalClient, bobDirectoryName, bobWalletClient, cc)
 
       // transfer from bob to alice
       actAndCheck(
@@ -291,7 +285,6 @@ class WalletTransfersFrontendIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceDirectoryName = perTestCaseName("alice")
 
-      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val bobDirectoryName = perTestCaseName("bob")
 
       val cc = BigDecimal(10)
@@ -301,13 +294,12 @@ class WalletTransfersFrontendIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       onboardWalletUser(bobWalletClient, bobValidatorBackend)
       createDirectoryEntry(
-        aliceUserParty,
-        aliceDirectoryClient,
+        aliceDirectoryExternalClient,
         aliceDirectoryName,
         aliceWalletClient,
         cc,
       )
-      createDirectoryEntry(bobUserParty, bobDirectoryClient, bobDirectoryName, bobWalletClient, cc)
+      createDirectoryEntry(bobDirectoryExternalClient, bobDirectoryName, bobWalletClient, cc)
 
       // transfer from bob to alice
       actAndCheck(

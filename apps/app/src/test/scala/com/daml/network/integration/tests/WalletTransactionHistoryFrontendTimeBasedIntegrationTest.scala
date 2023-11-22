@@ -30,15 +30,14 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
 
     "show all subscription payments" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice")
 
       val directoryExpectedCns = createDirectoryEntryForDirectoryItself
 
       withFrontEnd("alice") { implicit webDriver =>
         createDirectoryEntry(
-          aliceUserParty,
-          aliceDirectoryClient,
+          aliceDirectoryExternalClient,
           aliceEntryName,
           aliceWalletClient,
         )
@@ -140,8 +139,8 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           expectedAction = "Sent",
           expectedSubtype =
             if (isInitial)
-              "Subscription Initial Payment Collected"
-            else "Subscription Payment Collected",
+              "CNS Entry Initial Payment Collected"
+            else "CNS Entry Renewal Payment Collected",
           expectedPartyDescription = Some(s"$directoryExpectedCns $directoryExpectedCns"),
           expectedAmountCC = BigDecimal(0), // 0 USD
         )

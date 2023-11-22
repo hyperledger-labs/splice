@@ -192,17 +192,16 @@ class WalletFrontendIntegrationTest
     "show logged in directory name" in { implicit env =>
       // Create directory entry for alice
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val entryName = perTestCaseName("alice")
-      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       createDirectoryEntry(
-        aliceParty,
-        aliceDirectoryClient,
+        aliceDirectoryExternalClient,
         entryName,
         aliceWalletClient,
       )
       eventuallySucceeds() {
-        directoryBackend.lookupEntryByName(entryName)
+        sv1ScanBackend.lookupEntryByName(entryName)
       }
 
       withFrontEnd("alice") { implicit webDriver =>

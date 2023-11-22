@@ -1,4 +1,5 @@
 import { AmountDisplay, IntervalDisplay, SubscriptionButton } from 'common-frontend';
+import { useGetCnsRules } from 'common-frontend/scan-api';
 import React, { useState } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 
@@ -6,7 +7,7 @@ import { CheckCircleOutline, ErrorOutline } from '@mui/icons-material';
 import { Box, Button, Stack, Typography, styled } from '@mui/material';
 
 import Searchbar from '../components/Searchbar';
-import { useDirectoryInstall, useLookupEntryByName, useRequestEntry } from '../hooks';
+import { useLookupEntryByName, useRequestEntry } from '../hooks';
 import { config, ENTRY_NAME_SUFFIX, toFullEntryName } from '../utils';
 
 type NameLookupStatus = 'available' | 'taken' | 'loading';
@@ -75,16 +76,16 @@ const SubscriptionBar: React.FC<{ entryName: string; nameLookupStatus: NameLooku
   nameLookupStatus,
 }) => {
   const { mutateAsync: requestEntry } = useRequestEntry();
-  const { data: directoryInstall } = useDirectoryInstall();
+  const { data: cnsRules } = useGetCnsRules();
 
-  if (nameLookupStatus === 'loading' || !directoryInstall) {
+  if (nameLookupStatus === 'loading' || !cnsRules) {
     return <></>;
   }
 
   var message, icon, additionalContent;
 
-  const entryFee = directoryInstall.entryFee;
-  const entryInterval = directoryInstall.entryLifetime;
+  const entryFee = cnsRules.payload.config.entryFee;
+  const entryInterval = cnsRules.payload.config.entryLifetime;
 
   if (!isEntryNameValid(entryName)) {
     message =
@@ -100,7 +101,7 @@ const SubscriptionBar: React.FC<{ entryName: string; nameLookupStatus: NameLooku
         </Typography>
         &nbsp;
         <Typography display="inline">
-          every <IntervalDisplay microseconds={entryInterval} />
+          every <IntervalDisplay microseconds={entryInterval.microseconds} />
         </Typography>
         <SubscriptionButton
           sx={{ marginLeft: 4 }}

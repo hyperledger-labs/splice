@@ -3,30 +3,31 @@ import React, { useState, useEffect } from 'react';
 import { Typography, TypographyProps } from '@mui/material';
 import Tooltip from '@mui/material/Tooltip';
 
-import { DirectoryEntry as damlDirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
+import { CnsEntry as damlCnsEntry } from '@daml.js/cns/lib/CN/Cns';
 
-import { useDirectoryClient } from '../contexts';
+import { useScanClient } from '../contexts';
 import PartyId, { PartyIdProps } from './PartyId';
 
 interface Entry {
   user: string;
-  entry: damlDirectoryEntry | undefined; // undefined if no entry exists for this user
+  entry: damlCnsEntry | undefined; // undefined if no entry exists for this user
 }
 
 type DirectoryEntryProps = PartyIdProps & TypographyProps;
 
 const DirectoryEntry: React.FC<DirectoryEntryProps> = props => {
   const { partyId, className, noCopy: _, ...typographyProps } = props;
-  const directoryClient = useDirectoryClient();
+  const scanClient = useScanClient();
 
   const [entry, setParty] = useState<Entry | undefined>(undefined); // undefined state represents the directory lookup still being pending
   useEffect(() => {
     const getEntry = async () => {
-      const value = await directoryClient.lookupEntryByParty(partyId);
+      // TODO: (#8692) replace this with react query
+      const value = await scanClient.lookupEntryByParty(partyId);
       setParty({ user: partyId, entry: value });
     };
     getEntry();
-  }, [directoryClient, partyId]);
+  }, [scanClient, partyId]);
 
   if (entry === undefined) {
     return <div>...</div>;

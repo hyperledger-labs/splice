@@ -49,8 +49,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       val charlieEntryName = perTestCaseName("charlie")
       createDirectoryEntry(
-        charlieUserParty,
-        charlieDirectoryClient,
+        charlieDirectoryExternalClient,
         charlieEntryName,
         charlieWalletClient,
       )
@@ -74,8 +73,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
           "Transactions are done", {
             // alice's directory - also taps 5 CC
             createDirectoryEntry(
-              aliceUserParty,
-              aliceDirectoryClient,
+              aliceDirectoryExternalClient,
               aliceEntryName,
               aliceWalletClient,
             )
@@ -143,7 +141,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
             matchTransaction(directoryCreation)(
               coinPrice = 2,
               expectedAction = "Sent",
-              expectedSubtype = "Subscription Initial Payment Collected",
+              expectedSubtype = "CNS Entry Initial Payment Collected",
               expectedPartyDescription = Some(s"$directoryExpectedCns $directoryExpectedCns"),
               expectedAmountCC = BigDecimal(0), // 0 USD
             )
@@ -197,7 +195,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
     "paginate transactions" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice")
       waitForWalletUser(aliceValidatorWalletClient)
 
@@ -220,12 +218,11 @@ class WalletTransactionHistoryFrontendIntegrationTest
         )
 
         createDirectoryEntry(
-          aliceUserParty,
-          aliceDirectoryClient,
+          aliceDirectoryExternalClient,
           aliceEntryName,
           aliceWalletClient,
         )
-        createDirectoryEntry(bobUserParty, bobDirectoryClient, bobEntryName, bobWalletClient)
+        createDirectoryEntry(bobDirectoryExternalClient, bobEntryName, bobWalletClient)
 
         aliceWalletClient.tap(500)
 

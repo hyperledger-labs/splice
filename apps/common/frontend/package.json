@@ -16,6 +16,7 @@
   "dependencies": {
     "@daml.js/canton-coin": "file:daml.js/canton-coin-0.2.0",
     "@daml.js/directory": "file:daml.js/directory-service-0.2.0",
+    "@daml.js/cns": "file:daml.js/canton-name-service-0.2.0",
     "@daml.js/wallet": "file:daml.js/wallet-0.2.0",
     "@daml.js/wallet-payments": "file:daml.js/wallet-payments-0.2.0",
     "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",

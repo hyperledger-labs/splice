@@ -30,7 +30,7 @@ class WalletSubscriptionsFrontendIntegrationTest
       val alicePartyId = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice")
       val directoryParty = createDirectoryEntryForDirectoryItself
-      createDirectoryEntry(alicePartyId, aliceDirectoryClient, aliceEntryName, aliceWalletClient)
+      createDirectoryEntry(aliceDirectoryExternalClient, aliceEntryName, aliceWalletClient)
       val directoryPaymentDue = LocalDate.now().plusDays(90)
       val aDate = LocalDate.now().plusDays(1)
       val selfSubscriptionDescription = "A recurring thing"
@@ -72,7 +72,7 @@ class WalletSubscriptionsFrontendIntegrationTest
               expectedPaymentDate =
                 s"${directoryPaymentDue.getMonthValue}/${directoryPaymentDue.getDayOfMonth}/${directoryPaymentDue.getYear}",
               expectedButtonEnabled = true,
-              expectedDescription = s"Directory entry: \"$aliceEntryName\"",
+              expectedDescription = s"Cns entry: \"$aliceEntryName\"",
             )
             matchSecondSubscription(subscriptionRows(1))
             subscriptionRows
@@ -125,20 +125,20 @@ class WalletSubscriptionsFrontendIntegrationTest
 
     "allow accepting subscriptions" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName1 = perTestCaseName("alice")
-      createDirectoryEntry(aliceUserParty, aliceDirectoryClient, aliceEntryName1, aliceWalletClient)
+      createDirectoryEntry(aliceDirectoryExternalClient, aliceEntryName1, aliceWalletClient)
 
       val directoryParty = createDirectoryEntryForDirectoryItself
       val directoryPaymentDue = LocalDate.now().plusDays(90)
       val newlyPurchasedName = perTestCaseName("new")
-      val (_, subCid) =
-        requestDirectoryEntry(aliceUserParty, aliceDirectoryClient, newlyPurchasedName)
+      val respond =
+        requestDirectoryEntry(aliceDirectoryExternalClient, newlyPurchasedName)
 
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
           "Alice goes to the confirm-subscription page", {
-            go to s"http://localhost:3000/confirm-subscription/${subCid.contractId}"
+            go to s"http://localhost:3000/confirm-subscription/${respond.subscriptionRequestCid.contractId}"
             loginOnCurrentPage(3000, aliceDamlUser)
           },
         )(
@@ -155,7 +155,7 @@ class WalletSubscriptionsFrontendIntegrationTest
 
             find(className("sub-request-description"))
               .valueOrFail("Description is not shown")
-              .text should matchText(s"Directory entry: \"$newlyPurchasedName\"")
+              .text should matchText(s"Cns entry: \"$newlyPurchasedName\"")
 
             find(className("sub-request-price"))
               .valueOrFail("Price is not shown")
@@ -189,7 +189,7 @@ class WalletSubscriptionsFrontendIntegrationTest
               expectedPaymentDate =
                 s"${directoryPaymentDue.getMonthValue}/${directoryPaymentDue.getDayOfMonth}/${directoryPaymentDue.getYear}",
               expectedButtonEnabled = true,
-              expectedDescription = s"Directory entry: \"$newlyPurchasedName\"",
+              expectedDescription = s"Cns entry: \"$newlyPurchasedName\"",
             )
           },
         )

@@ -157,6 +157,7 @@ class ValidatorApp(
     val darFiles = Seq(
       UploadablePackage.fromResource(DarResources.wallet.bootstrap),
       UploadablePackage.fromResource(DarResources.directoryService.bootstrap),
+      UploadablePackage.fromResource(DarResources.cantonNameService.bootstrap),
     )
     for {
       _ <- participantAdminConnection.uploadDarFiles(darFiles, RetryFor.WaitingOnInitDependency)
@@ -606,7 +607,7 @@ class ValidatorApp(
       directoryExternalHandler = new HttpExternalDirectoryHandler(
         walletManager,
         svcParty, // making an assumption here that the SVC party is the Directory provider party
-        retryProvider,
+        scanConnection,
         loggerFactory,
       )
 

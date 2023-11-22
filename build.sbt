@@ -562,6 +562,7 @@ lazy val `apps-common-frontend` = {
           (`wallet-upgrade-daml` / Compile / damlBuild).value ++
           (`wallet-payments-upgrade-daml` / Compile / damlBuild).value ++
           (`directory-upgrade-daml` / Compile / damlBuild).value ++
+          (`canton-name-service-upgrade-daml` / Compile / damlBuild).value ++
           (`svc-governance-upgrade-daml` / Compile / damlBuild).value ++
           (`splitwell-upgrade-daml` / Compile / damlBuild).value ++
           (`validator-lifecycle-daml` / Compile / damlBuild).value ++

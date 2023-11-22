@@ -8,6 +8,10 @@ Release Notes
 
 * The `domain.sequencerPublicUrl` configuration in `cn-sv-node` helm chart is now mandatory. All SVs must specify the URL at which their sequencer can be reached.
 
+* Deployment updates:
+
+  * Canton name service operation is switched to be decentralized. The determination of whether to accept a Canton name registration request now follows a BFT consensus mechanism.
+
 2023-11-20
 ----------
 

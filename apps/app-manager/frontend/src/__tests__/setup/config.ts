@@ -22,8 +22,8 @@ const config = {
     wallet: {
       uiUrl: 'http://wallet',
     },
-    directory: {
-      url: 'http://directory',
+    scan: {
+      url: 'http://scan',
     },
   },
 };

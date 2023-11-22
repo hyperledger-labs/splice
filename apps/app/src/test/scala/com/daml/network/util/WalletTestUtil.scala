@@ -3,9 +3,7 @@ package com.daml.network.util
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.fees as feesCodegen
-import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
-import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
 import com.daml.network.codegen.java.cn.wallet.{
   install as walletInstallCodegen,
   payment as paymentCodegen,
@@ -407,12 +405,11 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val dirEntryName = "directory.cns"
     val entryUrl = "https://cns-dir-url.com"
     val entryDescription = "Sample CNS Directory Entry Description"
-    val dirParty = directoryBackend.getProviderPartyId()
-    directoryBackend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
-      actAs = Seq(dirParty),
-      commands = new dirCodegen.DirectoryEntry(
-        dirParty.toProtoPrimitive,
-        dirParty.toProtoPrimitive,
+    sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+      actAs = Seq(svcParty),
+      commands = new cnsCodegen.CnsEntry(
+        svcParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
         dirEntryName,
         entryUrl,
         entryDescription,
@@ -420,19 +417,26 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       ).create.commands.asScala.toSeq,
       optTimeout = None,
     )
-    expectedCns(dirParty, dirEntryName)
+    waitForDirectoryEntry(dirEntryName)
+    expectedCns(svcParty, dirEntryName)
   }
 
   protected def createDirectoryEntry(
-      userParty: PartyId,
-      directory: DirectoryAppClientReference,
+      directoryExternalApp: DirectoryExternalAppReference,
       entryName: String,
       wallet: WalletAppClientReference,
       tapAmount: BigDecimal = 5.0,
       entryUrl: String = "https://cns-dir-url.com",
       entryDescription: String = "Sample CNS Directory Entry Description",
-  ): SubscriptionInitialPayment.ContractId = {
-    requestDirectoryEntry(userParty, directory, entryName, entryUrl, entryDescription)
+  )(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): Unit = {
+    requestDirectoryEntry(
+      directoryExternalApp,
+      entryName,
+      entryUrl,
+      entryDescription,
+    )
     wallet.tap(tapAmount)
     eventually() {
       wallet.listSubscriptionRequests() should have length 1
@@ -440,24 +444,26 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     wallet.acceptSubscriptionRequest(
       wallet.listSubscriptionRequests().head.contractId
     )
+    waitForDirectoryEntry(entryName)
+  }
+
+  private def waitForDirectoryEntry(name: String)(implicit
+      env: CNNodeTestConsoleEnvironment
+  ) = {
+    eventuallySucceeds(40.seconds) {
+      sv1ScanBackend.lookupEntryByName(name)
+    }
   }
 
   protected def requestDirectoryEntry(
-      userParty: PartyId,
-      directory: DirectoryAppClientReference,
+      directoryExternalApp: DirectoryExternalAppReference,
       entryName: String,
       entryUrl: String = "https://cns-dir-url.com",
       entryDescription: String = "Sample CNS Directory Entry Description",
   ) = {
-    // Whitelist the directory service on alice's validator
-    directory.requestDirectoryInstall()
-    eventually() {
-      directory.ledgerApi.ledger_api_extensions.acs
-        .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty)
-    }
     // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
     retryCommandSubmission(
-      directory.requestDirectoryEntry(entryName, entryUrl, entryDescription)
+      directoryExternalApp.createDirectoryEntry(entryName, entryUrl, entryDescription)
     )
   }
 

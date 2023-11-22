@@ -2,10 +2,10 @@ import React, { useCallback, useEffect } from 'react';
 
 import { Autocomplete, StandardTextFieldProps, TextField } from '@mui/material';
 
-import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
+import { CnsEntry } from '@daml.js/cns/lib/CN/Cns';
 import { Party } from '@daml/types';
 
-import { useDirectoryClient } from '../contexts';
+import { useScanClient } from '../contexts';
 import { Contract } from '../utils';
 
 interface Props extends StandardTextFieldProps {
@@ -15,8 +15,8 @@ interface Props extends StandardTextFieldProps {
 type UserInput = { type: 'typed'; value: string } | { type: 'selected'; value: string };
 
 const DirectoryField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
-  const directoryClient = useDirectoryClient();
-  const [options, setOptions] = React.useState<Contract<DirectoryEntry>[]>([]);
+  const scanClient = useScanClient();
+  const [options, setOptions] = React.useState<Contract<CnsEntry>[]>([]);
   const [resolvedParty, setResolvedPartyId] = React.useState<string>('');
   const [userInput, setUserInput] = React.useState<UserInput>({ type: 'typed', value: '' });
   const onInputChange = async (event: React.SyntheticEvent, newValue: string, reason: string) => {
@@ -30,8 +30,9 @@ const DirectoryField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
     let effectCancelled = false;
     const fetchCompletions = async () => {
       if (userInput.type === 'typed') {
-        const entries = (await directoryClient.listEntries(20, userInput.value)).entries;
-        const decoded = entries.map(c => Contract.decodeOpenAPI(c, DirectoryEntry));
+        // TODO: (#8692) replace this with react query
+        const entries = (await scanClient.listEntries(20, userInput.value)).entries;
+        const decoded = entries.map(c => Contract.decodeOpenAPI(c, CnsEntry));
         if (!effectCancelled) {
           setOptions(decoded);
         }
@@ -41,11 +42,11 @@ const DirectoryField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
     return () => {
       effectCancelled = true;
     };
-  }, [userInput, directoryClient]);
+  }, [userInput, scanClient]);
 
   const onItemSelected = async (
     event: React.SyntheticEvent,
-    item: string | Contract<DirectoryEntry> | null
+    item: string | Contract<CnsEntry> | null
   ) => {
     if (item === null || typeof item === 'string') {
       return;
@@ -58,7 +59,8 @@ const DirectoryField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
     async (input: string) => {
       if (input !== undefined || input !== null || input !== '') {
         try {
-          const entry = await directoryClient.lookupEntryByName(input);
+          // TODO: (#8692) replace this with react query
+          const entry = await scanClient.lookupEntryByName(input);
           if (entry === undefined) {
             // Could not lookup cns name - assume input is a party ID
             return input;
@@ -74,7 +76,7 @@ const DirectoryField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
         return input;
       }
     },
-    [directoryClient]
+    [scanClient]
   );
 
   useEffect(() => {
@@ -115,7 +117,7 @@ const DirectoryField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
         />
       )}
       options={options}
-      getOptionLabel={(option: string | Contract<DirectoryEntry>) =>
+      getOptionLabel={(option: string | Contract<CnsEntry>) =>
         typeof option === 'string' ? option : option.payload.name
       }
       onInputChange={onInputChange}

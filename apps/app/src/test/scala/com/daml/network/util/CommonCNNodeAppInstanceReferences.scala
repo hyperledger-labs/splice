@@ -172,27 +172,21 @@ trait CommonCNNodeAppInstanceReferences {
       )
     )
 
-  def aliceDirectoryClient(implicit
-      env: CNNodeTestConsoleEnvironment
-  ): DirectoryAppClientReference = rdp(
-    "aliceDirectory"
-  )
-
   def aliceDirectoryExternalClient(implicit
       env: CNNodeTestConsoleEnvironment
   ): DirectoryExternalAppClientReference = rdpe(
     "aliceDirectory"
   )
 
-  def bobDirectoryClient(implicit
+  def bobDirectoryExternalClient(implicit
       env: CNNodeTestConsoleEnvironment
-  ): DirectoryAppClientReference = rdp(
+  ): DirectoryExternalAppClientReference = rdpe(
     "bobDirectory"
   )
 
-  def charlieDirectoryClient(implicit
+  def charlieDirectoryExternalClient(implicit
       env: CNNodeTestConsoleEnvironment
-  ): DirectoryAppClientReference = rdp(
+  ): DirectoryExternalAppClientReference = rdpe(
     "charlieDirectory"
   )
 

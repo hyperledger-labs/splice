@@ -19,7 +19,7 @@ export const PostPayment: React.FC = () => {
     isLoading: directoryEntryIsLoading,
     isError: directoryEntryIsError,
     error: directoryEntryError,
-  } = useLookupEntryByName(entryName, ENTRY_NAME_SUFFIX);
+  } = useLookupEntryByName(entryName, ENTRY_NAME_SUFFIX, true);
 
   if (!entryName) {
     console.error('PostPayment rendered without entryName.');
@@ -28,7 +28,9 @@ export const PostPayment: React.FC = () => {
 
   const fullEntryName = toFullEntryName(entryName, ENTRY_NAME_SUFFIX);
 
-  if (!primaryPartyId || directoryEntryIsLoading) {
+  const directoryEntryOwner = directoryEntry?.entryContract?.payload.user;
+
+  if (!primaryPartyId || !directoryEntryOwner || directoryEntryIsLoading) {
     return <DirectoryLoading fullEntryName={fullEntryName} />;
   }
 
@@ -42,8 +44,6 @@ export const PostPayment: React.FC = () => {
       />
     );
   }
-
-  const directoryEntryOwner = directoryEntry.entryContract?.payload.user;
 
   if (primaryPartyId !== directoryEntryOwner) {
     return (

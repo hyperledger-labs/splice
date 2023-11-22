@@ -191,10 +191,15 @@ class SplitwellFrontendIntegrationTest
       initialiseDirectoryApp(
         aliceEntryName,
         aliceUserParty,
-        aliceDirectoryClient,
+        aliceDirectoryExternalClient,
         aliceWalletClient,
       )
-      initialiseDirectoryApp(bobEntryName, bobUserParty, bobDirectoryClient, bobWalletClient)
+      initialiseDirectoryApp(
+        bobEntryName,
+        bobUserParty,
+        bobDirectoryExternalClient,
+        bobWalletClient,
+      )
       val aliceCns = expectedCns(aliceUserParty, aliceEntryName)
       val bobCns = expectedCns(bobUserParty, bobEntryName)
       bobWalletClient.tap(510)
