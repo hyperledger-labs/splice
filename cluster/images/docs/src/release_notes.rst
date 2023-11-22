@@ -8,9 +8,7 @@ Release Notes
 
 * The `domain.sequencerPublicUrl` configuration in `cn-sv-node` helm chart is now mandatory. All SVs must specify the URL at which their sequencer can be reached.
 
-* Deployment updates:
-
-  * Canton name service operation is switched to be decentralized. The determination of whether to accept a Canton name registration request now follows a BFT consensus mechanism.
+* The Canton Name Service (CNS) application is now decentralized. Rather than the founder SV operating a backend service for CNS, the application is now a decentralized one, operated by the SVC with BFT guarantees. No deployment or configuration changes are required for this change.
 
 2023-11-20
 ----------

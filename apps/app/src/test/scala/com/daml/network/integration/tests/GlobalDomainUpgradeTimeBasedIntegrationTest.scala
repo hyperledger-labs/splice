@@ -521,7 +521,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       subscriptionRequestCid
     }
 
-    clue("create svc-signed Cns contracts of various kinds") {
+    clue("create svc-signed CNS contracts of various kinds") {
       import com.daml.network.util.CNNodeUtil.defaultCnsConfig
 
       val svc = svcParty.toProtoPrimitive
