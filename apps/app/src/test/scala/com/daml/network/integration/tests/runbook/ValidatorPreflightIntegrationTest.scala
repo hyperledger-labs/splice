@@ -9,6 +9,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
 import scala.collection.mutable
+import scala.concurrent.duration.*
 
 /** Base for preflight tests running against a deployed validator
   */
@@ -251,11 +252,11 @@ abstract class PreflightValidatorIntegrationTestBase
           // Accepting the payment (which triggers the redirect) and seeing
           // the balance update in the splitwell UI both take time,
           // so we use an eventually for each check.
-          eventually() {
+          eventually(60.seconds) {
             findAll(className("balances-table-row")).toSeq.headOption
               .valueOrFail("Failed to find balances table. Did the payment succeed?")
           }
-          eventually() {
+          eventually(60.seconds) {
             inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
               seleniumText(
                 row.childElement(className("balances-table-receiver"))
