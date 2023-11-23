@@ -59,7 +59,8 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
       // And then back to directory, where they are already logged in
 
       // The success page may take a while to show
-      val goToDirectoryEntriesButton = eventually() {
+      // Bumping the eventually timeout due to the decentralized CNS would take more time to collect the initial payment.
+      val goToDirectoryEntriesButton = eventually(timeUntilSuccess = 40.seconds) {
         find(id("directory-entries-button")).valueOrFail("The success page did not load.")
       }
       val timeAfterAllocate = LocalDateTime.now()
