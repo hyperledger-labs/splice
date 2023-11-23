@@ -1053,6 +1053,13 @@ The following commands cover the typical lifecycle of a Canton Network cluster.
    is no longer in use. If you do forcibly remove a cluster lock,
    please be sure to let the former lockholder know.
 
+#### Deploy a previous CN version to a Cluster
+
+1. Checkout the branch with the version you want to deploy to get the right helm charts,
+1. Overwrite the `get-snapshot-version` file with the version (e.g. `echo <version>`),
+1. Run `make cluster/build` from the repository root to build the helm charts with the correct version,
+1. Run `cncluster apply` in your target cluster.
+
 ### Add a Component to the Build
 
 1. Edit the canton network cluster definition
