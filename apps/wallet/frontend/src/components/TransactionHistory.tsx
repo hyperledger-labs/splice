@@ -29,8 +29,6 @@ import { usePrimaryParty, useTransactions } from '../hooks';
 import { Transaction, TransactionSubtype } from '../models/models';
 
 const TransactionHistory: React.FC = () => {
-  // TODO(#7928) -- remove after this flake is resolved.
-  console.debug('TransactionHistory component is being rendered.');
   const txQuery = useTransactions();
 
   const coinPriceQuery = useCoinPrice();

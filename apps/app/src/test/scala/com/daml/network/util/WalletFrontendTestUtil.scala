@@ -10,24 +10,30 @@ import scala.concurrent.duration.*
 trait WalletFrontendTestUtil { self: FrontendTestCommon =>
 
   protected def tapCoins(tapQuantity: BigDecimal)(implicit webDriver: WebDriverType): Unit = {
-    // The eventually makes this robust against `StaleElementReferenceException` errors
-    val transactionsBefore = eventually(timeUntilSuccess = 1.minute)(
-      findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
-    )
+    val tapsBefore =
+      clue("Getting state before tap") {
+        // The long eventually makes this robust against `StaleElementReferenceException` errors
+        eventually(timeUntilSuccess = 2.minute)(
+          findAll(className("tx-row")).toSeq.flatMap(readTapCCAmountFromRow)
+        )
+      }
 
-    click on "tap-amount-field"
-    numberField("tap-amount-field").underlying.clear()
-    numberField("tap-amount-field").underlying.sendKeys(tapQuantity.toString())
-    click on "tap-button"
+    clue("Tapping...") {
+      click on "tap-amount-field"
+      numberField("tap-amount-field").underlying.clear()
+      numberField("tap-amount-field").underlying.sendKeys(tapQuantity.toString())
+      click on "tap-button"
+    }
 
-    // Make sure the tap has been processed
-    // This will have to change if we add a reload button here instead of auto-refreshing transactions.
-    eventually(timeUntilSuccess = 1.minute) {
-      val transactionsAfter = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
-      val newTxs = transactionsAfter.diff(transactionsBefore)
-      forExactly(1, newTxs) { balanceChange =>
-        balanceChange.action should matchText("Balance Change")
-        balanceChange.ccAmount should be(tapQuantity)
+    clue("Making sure the tap has been processed") {
+      // This will have to change if we add a reload button here instead of auto-refreshing transactions.
+      // The long eventually makes this robust against `StaleElementReferenceException` errors
+      eventually(timeUntilSuccess = 2.minute) {
+        val tapsAfter = findAll(className("tx-row")).toSeq.flatMap(readTapCCAmountFromRow)
+        val newTaps = tapsAfter.diff(tapsBefore)
+        forExactly(1, newTaps) { tap =>
+          tap should be(tapQuantity)
+        }
       }
     }
   }
@@ -155,6 +161,39 @@ trait WalletFrontendTestUtil { self: FrontendTestCommon =>
     click on "create-offer-submit-button"
   }
 
+  private def readTapCCAmountFromRow(transactionRow: Element): Option[BigDecimal] = {
+    if (
+      transactionRow
+        .childElement(className("tx-action"))
+        .text
+        .contains("Balance Change") && transactionRow
+        .childElement(className("tx-subtype"))
+        .text
+        .contains("Tap")
+    ) {
+      Some(
+        parseAmountText(
+          transactionRow
+            .childElement(className("tx-amount-cc"))
+            .text,
+          currency = "CC",
+        )
+      )
+    } else None
+  }
+
+  private def parseAmountText(str: String, currency: String) = {
+    try {
+      BigDecimal(
+        str
+          .replace(currency, "")
+          .trim
+      )
+    } catch {
+      case e: Throwable =>
+        throw new RuntimeException(s"Could not parse the string '$str' as a coin amount", e)
+    }
+  }
 }
 
 object WalletFrontendTestUtil {
