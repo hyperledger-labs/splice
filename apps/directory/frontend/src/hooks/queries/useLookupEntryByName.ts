@@ -41,6 +41,7 @@ const useLookupEntryByName = (
     },
     refetchInterval: PollingStrategy.NONE,
     enabled: !!primaryPartyId && !!name,
+    retry: 10,
   });
 };
 
