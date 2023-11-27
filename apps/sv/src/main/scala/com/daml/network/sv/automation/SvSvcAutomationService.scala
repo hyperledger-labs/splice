@@ -132,11 +132,12 @@ class SvSvcAutomationService(
       connection,
       store.key.svcParty,
       implicit tc =>
-        svcStore.listSvcRulesTransferFollowers().flatMap { svcRulesFollowers =>
-          // don't try to schedule CoinRules' followers if CoinRules might move
-          // (i.e. be one of svcRulesFollowers)
-          if (svcRulesFollowers.nonEmpty) Future successful svcRulesFollowers
-          else svcStore.listCoinRulesTransferFollowers()
+        svcStore.listSvcRulesTransferFollowers(participantAdminConnection).flatMap {
+          svcRulesFollowers =>
+            // don't try to schedule CoinRules' followers if CoinRules might move
+            // (i.e. be one of svcRulesFollowers)
+            if (svcRulesFollowers.nonEmpty) Future successful svcRulesFollowers
+            else svcStore.listCoinRulesTransferFollowers(participantAdminConnection)
         },
     )
   )
@@ -151,7 +152,8 @@ class SvSvcAutomationService(
         svcStore
           .lookupSvcRules()
           .flatMap(
-            _.map(svStore.listSvcRulesTransferFollowers(_)).getOrElse(Future successful Seq.empty)
+            _.map(svStore.listSvcRulesTransferFollowers(_, participantAdminConnection))
+              .getOrElse(Future successful Seq.empty)
           ),
     )
   )

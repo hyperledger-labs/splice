@@ -19,6 +19,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{BaseLedgerConnection, RetryProvider}
+import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.{CNNodeAppStoreWithHistory, Limit, PageLimit}
@@ -357,12 +358,16 @@ trait UserWalletStore
     }
   }
 
-  final def listLaggingCoinRulesFollowers(targetDomain: DomainId)(implicit
+  final def listLaggingCoinRulesFollowers(
+      targetDomain: DomainId,
+      participantIdSource: HasParticipantId,
+  )(implicit
       tc: TraceContext
   ): Future[Seq[AssignedContract[?, ?]]] =
     multiDomainAcsStore.listAssignedContractsNotOnDomainN(
       targetDomain,
-      templatesMovedByMyAutomation: _*
+      participantIdSource,
+      templatesMovedByMyAutomation,
     )
 
   override protected def txLogParser =

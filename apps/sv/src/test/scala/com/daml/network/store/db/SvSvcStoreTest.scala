@@ -46,6 +46,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{DarResources, RetryProvider}
+import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{Limit, PageLimit, StoreTest, TxLogStore}
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
@@ -832,7 +833,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummy2Domain.create(followerContract1)(store.multiDomainAcsStore)
           _ <- dummy2Domain.create(followerContract2)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(alreadyReassigned)(store.multiDomainAcsStore)
-          result <- store.listSvcRulesTransferFollowers()
+          result <- store.listSvcRulesTransferFollowers(HasParticipantId.ForTesting)
         } yield result.map(x =>
           x.leader.contractId -> x.follower.contractId
         ) should contain theSameElementsAs Seq(
@@ -855,7 +856,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummy2Domain.create(followerContract1)(store.multiDomainAcsStore)
           _ <- dummy2Domain.create(followerContract2)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(alreadyReassigned)(store.multiDomainAcsStore)
-          result <- store.listCoinRulesTransferFollowers()
+          result <- store.listCoinRulesTransferFollowers(HasParticipantId.ForTesting)
         } yield result.map(x =>
           x.leader.contractId -> x.follower.contractId
         ) should contain theSameElementsAs Seq(

@@ -11,7 +11,13 @@ import TransferFollowTrigger.Task as FollowTask
 import UnassignTrigger.GetTargetDomain
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{DarResources, CNLedgerClient, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{
+  DarResources,
+  CNLedgerClient,
+  PackageIdResolver,
+  ParticipantAdminConnection,
+  RetryProvider,
+}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.QualifiedName
 import com.daml.network.wallet.store.UserWalletStore
@@ -26,6 +32,7 @@ class UserWalletAutomationService(
     store: UserWalletStore,
     treasury: TreasuryService,
     ledgerClient: CNLedgerClient,
+    participantAdminConnection: ParticipantAdminConnection,
     globalDomain: GetTargetDomain,
     automationConfig: AutomationConfig,
     clock: Clock,
@@ -90,7 +97,7 @@ class UserWalletAutomationService(
         scanConnection.getCoinRules() flatMap { coinRules =>
           coinRules.toAssignedContract map { coinRules =>
             store
-              .listLaggingCoinRulesFollowers(coinRules.domain)
+              .listLaggingCoinRulesFollowers(coinRules.domain, participantAdminConnection)
               .map(_ map (FollowTask(coinRules, _)))
           } getOrElse Future.successful(Seq.empty)
         },

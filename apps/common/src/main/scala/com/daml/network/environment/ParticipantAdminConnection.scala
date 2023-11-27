@@ -30,6 +30,8 @@ import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 
+import ParticipantAdminConnection.HasParticipantId
+
 /** Connection to the subset of the Canton admin API that we rely
   * on in our own applications.
   */
@@ -44,7 +46,8 @@ class ParticipantAdminConnection(
       loggerFactory,
       retryProvider,
       clock,
-    ) {
+    )
+    with HasParticipantId {
   override val serviceName = "Canton Participant Admin API"
 
   private val hashOps = new HashOps {
@@ -425,5 +428,27 @@ object ParticipantAdminConnection {
     // might be a big file to download
     override def timeoutType = GrpcAdminCommand.DefaultUnboundedTimeout
 
+  }
+
+  /** Like [[ParticipantAdminConnection]], but document that the scope is only
+    * interested in the `getParticipantId` feature.
+    */
+  sealed trait HasParticipantId {
+    def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId]
+  }
+
+  object HasParticipantId {
+    @com.google.common.annotations.VisibleForTesting
+    private[network] def Const(participantId: ParticipantId): HasParticipantId =
+      new HasParticipantId {
+        override def getParticipantId()(implicit traceContext: TraceContext) =
+          Future successful participantId
+      }
+
+    /** For tests that don't care about the random separation provided by the
+      * participant ID in the hash.
+      */
+    @com.google.common.annotations.VisibleForTesting
+    private[network] val ForTesting = Const(ParticipantId("OnlyForTesting"))
   }
 }

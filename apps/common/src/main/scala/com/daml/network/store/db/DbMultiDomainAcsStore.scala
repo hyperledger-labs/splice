@@ -9,7 +9,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, Tra
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -265,28 +265,36 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
 
   override def listAssignedContractsNotOnDomainN(
       excludedDomain: DomainId,
-      companions: ConstrainedTemplate*
+      participantIdSource: ParticipantAdminConnection.HasParticipantId,
+      companions: Seq[ConstrainedTemplate],
+      limit: notOnDomainsTotalLimit.type,
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = waitUntilAcsIngested {
     val templateIdMap = companions
       .map(c => QualifiedName(c.TEMPLATE_ID) -> c)
       .toMap
     val templateIds = templateIdMap.keys.mkString("('", "','", "')")
     for {
+      participantId <- participantIdSource.getParticipantId()
       result <- storage.query(
         selectFromAcsTableWithState(
           acsTableName,
           storeId,
           where =
             sql"""template_id_qualified_name IN #${templateIds} and assigned_domain is not null and assigned_domain != $excludedDomain""",
+          // bytea comparison in PG is left-to-right unsigned ascending, shorter
+          // array is lesser if bytes are otherwise equal; there's an equivalent
+          // soft implementation in
+          // InMemoryMultiDomainAcsStore.reassignmentContractOrder
+          orderLimit = sql"""order by digest((contract_id || $participantId)::bytea, 'md5'::text)
+              limit ${(limit: PageLimit).limit}""",
         ),
         "listAssignedContractsNotOnDomainN",
       )
-      assigned = result.map(row =>
-        assignedContractFromRow(
-          templateIdMap(row.acsRow.templateIdQualifiedName)
-        )(row)
-      )
-    } yield assigned
+    } yield result.map { row =>
+      assignedContractFromRow(
+        templateIdMap(row.acsRow.templateIdQualifiedName)
+      )(row)
+    }
   }
 
   override def streamAssignedContracts[C, TCid <: ContractId[_], T](companion: C)(implicit

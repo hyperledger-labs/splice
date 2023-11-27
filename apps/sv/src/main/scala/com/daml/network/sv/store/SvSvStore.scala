@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.codegen.java.cn.svlocal
 import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult}
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore, PageLimit}
 import com.daml.network.sv.store.db.DbSvSvStore
@@ -98,18 +99,21 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
       )
       .map(_.headOption map (_.contract))
 
-  private[this] def listLaggingSvcRulesFollowers(targetDomain: DomainId)(implicit
-      tc: TraceContext
-  ): Future[Seq[AssignedContract[?, ?]]] =
+  private[this] def listLaggingSvcRulesFollowers(
+      targetDomain: DomainId,
+      participantIdSource: HasParticipantId,
+  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
     multiDomainAcsStore.listAssignedContractsNotOnDomainN(
       targetDomain,
-      templatesMovedByMyAutomation: _*
+      participantIdSource,
+      templatesMovedByMyAutomation,
     )
 
-  final def listSvcRulesTransferFollowers[SrCid, Sr](svcRules: AssignedContract[SrCid, Sr])(implicit
-      tc: TraceContext
-  ): Future[Seq[FollowTask[SrCid, Sr, ?, ?]]] =
-    listLaggingSvcRulesFollowers(svcRules.domain)
+  final def listSvcRulesTransferFollowers[SrCid, Sr](
+      svcRules: AssignedContract[SrCid, Sr],
+      participantIdSource: HasParticipantId,
+  )(implicit tc: TraceContext): Future[Seq[FollowTask[SrCid, Sr, ?, ?]]] =
+    listLaggingSvcRulesFollowers(svcRules.domain, participantIdSource)
       .map(_ map (FollowTask(svcRules, _)))
 
   def key: SvStore.Key

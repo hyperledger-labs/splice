@@ -16,6 +16,7 @@ import com.daml.network.directory.config.DirectoryAppBackendConfig
 import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus, DarResources}
+import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.http.v0.directory.DirectoryResource
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -28,7 +29,7 @@ import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
 
@@ -93,11 +94,17 @@ class DirectoryApp(
         loggerFactory,
         retryProvider,
       )
+      // under the theory that contention for directory app won't matter,
+      // we don't look up a real participant ID just to avoid it
+      participantAdminConnection = HasParticipantId.Const(
+        ParticipantId("DirectoryDoesNotRandomizeOrder")
+      )
       automation = new DirectoryAutomationService(
         config.automation,
         clock,
         store,
         ledgerClient,
+        participantAdminConnection,
         scanConnection,
         retryProvider,
         loggerFactory,

@@ -14,7 +14,7 @@ import com.daml.network.store.db.{AcsRowData, IndexColumnValue}
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, QualifiedName}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
@@ -699,5 +699,73 @@ abstract class MultiDomainAcsStoreTest[
         result.contracts should contain(validatorReward)
       }
     }
+
+    "have 900-1000 test contracts for the mismatch test" in {
+      MultiDomainAcsStoreTest.generatedCoids.value.size should (be >= 900 and be <= 1000)
+    }
+
+    "read assignment-mismatched contracts in a stable order" in {
+      import com.daml.lf.value.Value
+      import com.daml.network.codegen.java.cc.coin.{FeaturedAppRight, SvcReward}
+      import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
+      import MultiDomainAcsStore.ConstrainedTemplate
+
+      // the specific templates don't matter, we just need 2 of them
+      val sampleParticipantId = ParticipantId("foo")
+      val evenCompanion = FeaturedAppRight.COMPANION
+      val oddCompanion = SvcReward.COMPANION
+      def smallestContract(coid: Value.ContractId, ix: Int) =
+        if (ix % 2 == 0) featuredAppRight(svcParty, coid.coid)
+        else svcReward(0, contractId = coid.coid)
+      val coids = MultiDomainAcsStoreTest.generatedCoids.value
+      val expectedOrder = InMemoryMultiDomainAcsStore.reassignmentContractOrder(
+        coids,
+        sampleParticipantId,
+      )(_.coid)
+
+      val contractFilter = {
+        import MultiDomainAcsStore.mkFilter
+
+        MultiDomainAcsStore.SimpleContractFilter(
+          svcParty,
+          templateFilters = Map(
+            mkFilter(evenCompanion)(_ => true)(GenericAcsRowData(_)),
+            mkFilter(oddCompanion)(_ => true)(GenericAcsRowData(_)),
+          ),
+        )
+      }
+      implicit val store: Store = mkStore(0, contractFilter)
+      for {
+        _ <- acs(coids.zipWithIndex.map { case (coid, ix) =>
+          (smallestContract(coid, ix), dummyDomain, 0L)
+        })
+        contracts <- store.listAssignedContractsNotOnDomainN(
+          dummy2Domain,
+          HasParticipantId.Const(sampleParticipantId),
+          Seq[ConstrainedTemplate](evenCompanion, oddCompanion),
+        )
+      } yield contracts.map(_.contractId.contractId) shouldBe expectedOrder.map(_.coid)
+    }
   }
+}
+
+private[store] object MultiDomainAcsStoreTest {
+  import org.scalacheck.Gen
+  import com.daml.lf.value.Value
+  import com.daml.lf.value.test.ValueGenerators.comparableCoidsGen
+
+  private[this] val coidsGen = comparableCoidsGen match {
+    case a +: b +: cs => Gen.oneOf(a, b, cs: _*)
+    case Seq(a) => a
+    // should never be reached
+    case _ => throw new IllegalStateException("no contract ID generator present")
+  }
+
+  // we want the same sequence of contract IDs without writing it out
+  // between test runs
+  private[this] val chosenByFairDiceRoll = org.scalacheck.rng.Seed(-4003657415693691769L)
+  private val generatedCoids = Gen
+    .containerOfN[Set, Value.ContractId](1000, coidsGen)
+    .map(_.toSeq)
+    .apply(Gen.Parameters.default, chosenByFairDiceRoll)
 }

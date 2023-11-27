@@ -12,6 +12,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   topupstate as topUpCodegen,
 }
 import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.http.v0.definitions
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore}
@@ -186,11 +187,16 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
   ]]]]
 
   final def listCoinRulesTransferFollowers(
-      coinRules: AssignedContract[coinrulesCodegen.CoinRules.ContractId, coinrulesCodegen.CoinRules]
+      coinRules: AssignedContract[
+        coinrulesCodegen.CoinRules.ContractId,
+        coinrulesCodegen.CoinRules,
+      ],
+      participantIdSource: HasParticipantId,
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
     multiDomainAcsStore.listAssignedContractsNotOnDomainN(
       coinRules.domain,
-      templatesMovedByMyAutomation(key.appManagerEnabled): _*
+      participantIdSource,
+      templatesMovedByMyAutomation(key.appManagerEnabled),
     )
 }
 

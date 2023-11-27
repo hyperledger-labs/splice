@@ -12,6 +12,7 @@ import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.{DarResources, RetryProvider}
+import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, CNPostgresTest}
 import com.daml.network.util.{AssignedContract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
@@ -421,7 +422,8 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
             store.multiDomainAcsStore
           )
           tfResult <- store.listCoinRulesTransferFollowers(
-            AssignedContract(coinRules1, dummy2Domain)
+            AssignedContract(coinRules1, dummy2Domain),
+            HasParticipantId.ForTesting,
           )
         } yield {
           val actual = tfResult.map(_.contract.identifier.getEntityName)

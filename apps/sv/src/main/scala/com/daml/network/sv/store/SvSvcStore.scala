@@ -30,6 +30,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{BaseLedgerConnection, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
 import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{
@@ -735,35 +736,38 @@ trait SvSvcStore
       receiver: PartyId
   )(implicit tc: TraceContext): Future[AcsStoreDump.ImportShipment]
 
-  private[this] def listLaggingSvcRulesFollowers(targetDomain: DomainId)(implicit
-      tc: TraceContext
-  ): Future[Seq[AssignedContract[?, ?]]] = for {
+  private[this] def listLaggingSvcRulesFollowers(
+      targetDomain: DomainId,
+      participantIdSource: HasParticipantId,
+  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = for {
     coinRulesO <- lookupCoinRules()
     otherContracts <- multiDomainAcsStore.listAssignedContractsNotOnDomainN(
       targetDomain,
-      svcRulesFollowers: _*
+      participantIdSource,
+      svcRulesFollowers,
     )
   } yield otherContracts ++ coinRulesO
     .filterNot(_.domain == targetDomain)
     .toList
 
-  final def listSvcRulesTransferFollowers()(implicit
+  final def listSvcRulesTransferFollowers(participantIdSource: HasParticipantId)(implicit
       tc: TraceContext
   ): Future[Seq[FollowTask[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules, _, _]]] = {
     lookupSvcRules().flatMap(_.map { svcRules =>
-      listLaggingSvcRulesFollowers(svcRules.domain)
+      listLaggingSvcRulesFollowers(svcRules.domain, participantIdSource)
         .map(_ map (FollowTask(svcRules, _)))
     }.getOrElse(Future successful Seq.empty))
   }
 
-  def listCoinRulesTransferFollowers()(implicit
+  def listCoinRulesTransferFollowers(participantIdSource: HasParticipantId)(implicit
       tc: TraceContext
   ): Future[Seq[FollowTask[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules, ?, ?]]] = {
     lookupCoinRules().flatMap(_.map { coinRules =>
       multiDomainAcsStore
         .listAssignedContractsNotOnDomainN(
           coinRules.domain,
-          coinRulesFollowers: _*
+          participantIdSource,
+          coinRulesFollowers,
         )
         .map(_.map(FollowTask(coinRules, _)).toSeq)
     }.getOrElse(Future successful Seq.empty))

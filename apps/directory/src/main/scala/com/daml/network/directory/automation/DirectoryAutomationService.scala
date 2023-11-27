@@ -10,6 +10,7 @@ import TransferFollowTrigger.Task as FollowTask
 import com.daml.network.config.AutomationConfig
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -23,6 +24,7 @@ class DirectoryAutomationService(
     clock: Clock,
     store: DirectoryStore,
     ledgerClient: CNLedgerClient,
+    participantIdSource: HasParticipantId,
     scanConnection: ScanConnection,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -67,7 +69,7 @@ class DirectoryAutomationService(
         scanConnection.getCoinRules() flatMap { coinRules =>
           coinRules.toAssignedContract map { coinRules =>
             store
-              .listLaggingCoinRulesFollowers(coinRules.domain)
+              .listLaggingCoinRulesFollowers(coinRules.domain, participantIdSource)
               .map(_ map (FollowTask(coinRules, _)))
           } getOrElse Future.successful(Seq.empty)
         },

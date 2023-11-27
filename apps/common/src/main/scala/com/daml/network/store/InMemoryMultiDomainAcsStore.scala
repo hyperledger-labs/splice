@@ -6,13 +6,13 @@ import com.daml.ledger.api.v1.TransactionOuterClass
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.environment.ledger.api.*
 import com.daml.network.store.db.AcsRowData
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, QualifiedName, Trees}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
@@ -37,6 +37,7 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
     with StoreErrors {
 
   import MultiDomainAcsStore.*
+  import InMemoryMultiDomainAcsStore.reassignmentContractOrder
 
   private val finishedAcsIngestion: Promise[Unit] = Promise()
 
@@ -192,10 +193,17 @@ class InMemoryMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogSto
 
   override def listAssignedContractsNotOnDomainN(
       excludedDomain: DomainId,
-      companions: ConstrainedTemplate*
-  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = Future
-    .traverse(companions)(listAssignedContractsNotOnDomain(excludedDomain, _))
-    .map(_.flatten)
+      participantIdSource: ParticipantAdminConnection.HasParticipantId,
+      companions: Seq[ConstrainedTemplate],
+      limit: notOnDomainsTotalLimit.type,
+  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = {
+    for {
+      participantId <- participantIdSource.getParticipantId()
+      grouped <- Future
+        .traverse(companions)(listAssignedContractsNotOnDomain(excludedDomain, _))
+    } yield reassignmentContractOrder(grouped.flatten, participantId)()
+      .take((limit: PageLimit).limit)
+  }
 
   private[this] def listAssignedContractsNotOnDomain[C, I <: ContractId[?], P](
       excludedDomain: DomainId,
@@ -1131,4 +1139,29 @@ object InMemoryMultiDomainAcsStore {
       }
     }
   }
+
+  private[this] val charsetMatchingDbBytes = java.nio.charset.Charset forName "UTF-8"
+
+  private[store] def reassignmentContractOrder[AC](
+      unordered: Seq[AC],
+      participantId: ParticipantId,
+  )(getContractId: AC => String = (_: Contract.Has[?, ?]).contractId.contractId): Seq[AC] =
+    if (unordered.sizeIs <= 1) unordered
+    else {
+      val pidBytes = participantId.toProtoPrimitive getBytes charsetMatchingDbBytes
+      val md = java.security.MessageDigest getInstance "MD5"
+      unordered
+        .map { ac =>
+          md.update(getContractId(ac) getBytes charsetMatchingDbBytes)
+          // in postgres bytea comparison, \x3132 < \xc3a9 (i.e. bytewise
+          // comparison is unsigned); Arrays.compare on byte[] incompatibly
+          // compares signed bytes, e.g. yielding \x3132 > \xc3a9.  Pretend we
+          // have unsigned bytes to match the DB memory store's sorting behavior
+          val digest = md.digest(pidBytes).map(b => if (b < 0) 256 + b else b.toInt)
+          md.reset()
+          (digest, ac)
+        }
+        .sortBy(_._1)(java.util.Arrays.compare(_, _))
+        .map(_._2)
+    }
 }

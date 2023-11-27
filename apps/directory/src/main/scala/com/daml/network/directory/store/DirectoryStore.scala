@@ -7,6 +7,7 @@ import com.daml.network.directory.store.db.DbDirectoryStore
 import com.daml.network.directory.store.db.DirectoryTables.DirectoryAcsStoreRowData
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, TemplateFilter}
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore}
 import com.daml.network.util.*
@@ -101,10 +102,15 @@ trait DirectoryStore extends CNNodeAppStoreWithoutHistory {
     directoryCodegen.DirectoryEntryContext,
   ]]]
 
-  final def listLaggingCoinRulesFollowers(targetDomain: DomainId)(implicit
-      tc: TraceContext
-  ): Future[Seq[AssignedContract[?, ?]]] =
-    multiDomainAcsStore.listAssignedContractsNotOnDomainN(targetDomain)
+  final def listLaggingCoinRulesFollowers(
+      targetDomain: DomainId,
+      participantIdSource: HasParticipantId,
+  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
+    multiDomainAcsStore.listAssignedContractsNotOnDomainN(
+      targetDomain,
+      participantIdSource,
+      DirectoryStore.templatesMovedByMyAutomation,
+    )
 }
 
 object DirectoryStore {

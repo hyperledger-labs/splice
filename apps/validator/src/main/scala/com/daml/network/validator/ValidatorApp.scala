@@ -488,6 +488,7 @@ class ValidatorApp(
       walletManager =
         new UserWalletManager(
           ledgerClient,
+          participantAdminConnection,
           store,
           config.ledgerApiUser,
           config.automation,

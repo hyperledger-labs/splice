@@ -4,7 +4,7 @@ import akka.stream.Materializer
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.Limit
 import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder}
@@ -26,6 +26,7 @@ import scala.concurrent.{ExecutionContext, Future}
 /** Manages all services comprising an end-user wallets. */
 class UserWalletManager(
     ledgerClient: CNLedgerClient,
+    participantAdminConnection: ParticipantAdminConnection,
     val store: WalletStore,
     val validatorUser: String,
     automationConfig: AutomationConfig,
@@ -103,6 +104,7 @@ class UserWalletManager(
         )
       val walletService = new UserWalletService(
         ledgerClient,
+        participantAdminConnection,
         key,
         this,
         automationConfig,

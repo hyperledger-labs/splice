@@ -119,7 +119,7 @@ class ValidatorAutomationService(
           coinRulesCWS.toAssignedContract
             .map { coinRules =>
               store
-                .listCoinRulesTransferFollowers(coinRules)
+                .listCoinRulesTransferFollowers(coinRules, participantAdminConnection)
                 .map(_ map (FollowTask(coinRules, _)))
             }
             .getOrElse(Future successful Seq.empty)

@@ -6,6 +6,7 @@ import com.daml.network.environment.{
   CNLedgerClient,
   CNLedgerConnection,
   PackageIdResolver,
+  ParticipantAdminConnection,
   RetryProvider,
 }
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -28,6 +29,7 @@ import scala.concurrent.ExecutionContext
 /** A service managing the treasury, automation, and store for an end-user's wallet. */
 class UserWalletService(
     ledgerClient: CNLedgerClient,
+    participantAdminConnection: ParticipantAdminConnection,
     key: UserWalletStore.Key,
     walletManager: UserWalletManager,
     automationConfig: AutomationConfig,
@@ -84,6 +86,7 @@ class UserWalletService(
     store,
     treasury,
     ledgerClient,
+    participantAdminConnection,
     scanConnection.getCoinRulesDomain,
     automationConfig,
     clock,

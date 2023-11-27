@@ -8,6 +8,7 @@ import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractCompanion as JavaContractCompanion}
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
+import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -145,9 +146,21 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
       traceContext: TraceContext,
   ): Future[Seq[Contract[TCid, T]]]
 
+  /** At most 1000 (`notOnDomainsTotalLimit`) contracts sorted by a hash of
+    * contract ID and participant ID.
+    *
+    * The idea is that different apps making the same migration on different
+    * participants will split the work better, while preserving determinism of a
+    * specific running app for fault-tolerance.  For the former to happen, the
+    * position of a contract on one list must have no correlation with that on
+    * another list; that is why the contract ID by itself cannot be used by
+    * itself as the source of the sort key.
+    */
   def listAssignedContractsNotOnDomainN(
       excludedDomain: DomainId,
-      companions: ConstrainedTemplate*
+      participantIdSource: ParticipantAdminConnection.HasParticipantId,
+      companions: Seq[ConstrainedTemplate],
+      limit: notOnDomainsTotalLimit.type = notOnDomainsTotalLimit,
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]]
 
   private[network] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[T], T <: Template](
@@ -660,4 +673,9 @@ object MultiDomainAcsStore {
           .asRuntimeException
       )
     }
+
+  /** Max batch size for domain reassignment automation.  Not a hard limit,
+    * chosen to be "reasonable".
+    */
+  val notOnDomainsTotalLimit: PageLimit = PageLimit tryCreate 1000
 }

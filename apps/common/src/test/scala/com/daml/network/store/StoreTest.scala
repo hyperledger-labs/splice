@@ -318,8 +318,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       ),
     )
 
-  protected def toCreatedEvent[TCid <: ContractId[T], T](
-      contract: Contract[TCid, T],
+  protected def toCreatedEvent(
+      contract: Contract[?, ?],
       signatories: Seq[PartyId] = Seq.empty,
   ): CreatedEvent = {
     new CreatedEvent(
@@ -451,8 +451,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected val defaultEffectiveAt: Instant = CantonTimestamp.Epoch.toInstant
 
-  protected def toIncompleteUnassign[TCid <: ContractId[T], T](
-      contract: Contract[TCid, T],
+  protected def toIncompleteUnassign(
+      contract: Contract[?, ?],
       unassignId: String,
       source: DomainId,
       target: DomainId,
@@ -469,8 +469,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     contract.createdEventBlob,
   )
 
-  protected def toIncompleteAssign[TCid <: ContractId[T], T](
-      contract: Contract[TCid, T],
+  protected def toIncompleteAssign(
+      contract: Contract[?, ?],
       unassignId: String,
       source: DomainId,
       target: DomainId,
@@ -501,8 +501,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       counter = counter,
     )
 
-  protected def toAssignEvent[TCid <: ContractId[T], T](
-      contract: Contract[TCid, T],
+  protected def toAssignEvent(
+      contract: Contract[?, ?],
       unassignId: String,
       source: DomainId,
       target: DomainId,
@@ -538,10 +538,10 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     effectiveAt,
   )
 
-  protected def acs[TCid <: ContractId[T], T](
-      acs: Seq[(Contract[TCid, T], DomainId, Long)] = Seq.empty,
-      incompleteOut: Seq[(Contract[TCid, T], DomainId, DomainId, String, Long)] = Seq.empty,
-      incompleteIn: Seq[(Contract[TCid, T], DomainId, DomainId, String, Long)] = Seq.empty,
+  protected def acs(
+      acs: Seq[(Contract[?, ?], DomainId, Long)] = Seq.empty,
+      incompleteOut: Seq[(Contract[?, ?], DomainId, DomainId, String, Long)] = Seq.empty,
+      incompleteIn: Seq[(Contract[?, ?], DomainId, DomainId, String, Long)] = Seq.empty,
       acsOffset: String = nextOffset,
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.ingestionSink.initialize()
