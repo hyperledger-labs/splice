@@ -772,7 +772,7 @@ function _down_stack() {
     _info "Uninstalling Pulumi ${STACK} stack"
 
     RETCODE=0
-    ERRFILE="./tmp_ERRFILE"
+    ERRFILE="./.tmp_ERRFILE"
     ERRMSG=""
 
     touch "$ERRFILE"

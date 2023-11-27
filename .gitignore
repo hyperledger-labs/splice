@@ -59,3 +59,4 @@ external-openapi-ts-client
 rust_mozprofile*
 openapi-cache-key.txt
 apps/splitwell/src/test/resources/splitwell-bundle*.tar.gz
+.tmp_ERRFILE
