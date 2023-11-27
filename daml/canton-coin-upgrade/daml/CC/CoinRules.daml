@@ -502,7 +502,7 @@ executeTransfer context svc t = do
   csum <- summarizeAndValidateContext context svc t
   isum <- summarizeAndConsumeInputs csum svc t.sender t.inputs
   osum <- preprocessOutputs csum.config t.sender t.outputs
-  summary <- summarizeTransfer csum.openRound csum.config isum osum
+  summary <- summarizeTransfer t.sender csum.openRound csum.config isum osum
   -- check that overall transfer constraints are satisfied
   case checkTransferConstraints t summary csum.config of
     Left err -> throw (InvalidTransfer err)
@@ -704,11 +704,18 @@ preprocessOutputs transferConfigCC sender outs =
             amount = amount - receiverOutputFee
             lock
 
-summarizeTransfer : OpenMiningRound -> TransferConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update TransferSummary
-summarizeTransfer openRound transferConfigCC inp preprocessedOutputs = do
+summarizeTransfer : Party -> OpenMiningRound -> TransferConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update TransferSummary
+summarizeTransfer sender openRound transferConfigCC inp preprocessedOutputs = do
     -- These traces are shown in the tx view in Daml studio, and greatly aid debugging fee calculations
     trace summary $ trace preprocessedOutputs $ trace inp $ pure summary
   where
+    coinAsOfRoundZeroAdjustment = intToDecimal openRound.round.number * transferConfigCC.holdingFee.rate
+    outputBalanceChange preprocessedOutput = 
+      let balanceChange = BalanceChange with 
+            changeToInitialAmountAsOfRoundZero = preprocessedOutput.amount + coinAsOfRoundZeroAdjustment
+            changeToHoldingFeesRate = transferConfigCC.holdingFee.rate
+      in (preprocessedOutput.owner, balanceChange)
+
     outputFees = map (.outputFee) preprocessedOutputs
     totalOutputAmount = sum $ map (.amount) preprocessedOutputs
     leftOverAmount =
@@ -716,10 +723,21 @@ summarizeTransfer openRound transferConfigCC inp preprocessedOutputs = do
       - inp.totalHoldingFees - totalOutputAmount - sum outputFees
     senderChangeFee = min transferConfigCC.createFee.fee leftOverAmount
     senderChangeAmount = leftOverAmount - senderChangeFee
-    numOutputs = intToDecimal (length preprocessedOutputs + (if senderChangeAmount > 0.0 then 1 else 0))
+    
+    senderBalanceChange = if senderChangeAmount > 0.0 then 
+      BalanceChange with 
+        changeToInitialAmountAsOfRoundZero = senderChangeAmount + coinAsOfRoundZeroAdjustment - inp.amountArchivedAsOfRoundZero
+        changeToHoldingFeesRate = transferConfigCC.holdingFee.rate + inp.changeToHoldingFeesRate
+    else 
+      BalanceChange with 
+        changeToInitialAmountAsOfRoundZero = negate inp.amountArchivedAsOfRoundZero
+        changeToHoldingFeesRate = inp.changeToHoldingFeesRate
+
+    balanceChanges = Map.fromListWith (+) ((sender, senderBalanceChange) :: map outputBalanceChange preprocessedOutputs)
 
     summary = TransferSummary with
       inputCoinAmount = inp.totalCoinAmount
+      balanceChanges = balanceChanges
       inputAppRewardAmount = inp.totalAppRewardAmount
       inputValidatorRewardAmount = inp.totalValidatorRewardAmount
       holdingFees = inp.totalHoldingFees
@@ -727,12 +745,7 @@ summarizeTransfer openRound transferConfigCC inp preprocessedOutputs = do
       senderChangeFee
       senderChangeAmount
       coinPrice = openRound.coinPrice
-      changeToInitialAmountAsOfRoundZero = totalOutputAmount
-        + senderChangeAmount
-        + intToDecimal openRound.round.number *  numOutputs * transferConfigCC.holdingFee.rate
-        - inp.amountArchivedAsOfRoundZero
-      changeToHoldingFeesRate = numOutputs * transferConfigCC.holdingFee.rate + inp.changeToHoldingFeesRate
-
+          
 issueRewards : TransferContextSummary -> Party -> Party -> TransferSummary -> Update ()
 issueRewards csum sender provider summary
   | usageFees <= 0.0 = pure ()
@@ -886,7 +899,7 @@ data Transfer = Transfer with
 
 -- | An individual output for a batch transfer.
 data TransferOutput = TransferOutput with
-    receiver : Party -- ^ The reciver who will own the created output coin.
+    receiver : Party -- ^ The receiver who will own the created output coin.
     receiverFeeRatio : Decimal
       -- ^ The ratio of the output fee paid from receiver's output amount.
       -- 1.0 means the whole fee is deducted from the specified output amount,
@@ -920,6 +933,7 @@ data TransferSummary = TransferSummary with
     inputAppRewardAmount : Decimal -- ^ Total amount of app rewards input into this transfer.
     inputValidatorRewardAmount : Decimal -- ^ Total amount of validator rewards input into this transfer.
     inputCoinAmount : Decimal -- ^ Total input amount of coin input into this transfer, before deducting holding fees.
+    balanceChanges : Map Party BalanceChange -- ^ Balance changes per party
     holdingFees : Decimal -- ^ Holding fees paid by the sender on their input coins.
     outputFees : [Decimal] -- ^ Fees paid for the individual output coins in the order they were specified.
     senderChangeFee : Decimal
@@ -936,9 +950,21 @@ data TransferSummary = TransferSummary with
       -- ^ The final amount of coin returned to the sender after paying for all outputs and fees.
       -- If it is zero, then no coin is created for the sender.
     coinPrice : Decimal -- ^ The coin price at the round this transfer was executed.
+  deriving (Show, Eq)
+
+data BalanceChange = BalanceChange with
     changeToInitialAmountAsOfRoundZero : Decimal
-      -- ^ The change to the total balance introduced by this transfer, normalized to round zero, i.e.,
+      -- ^ The change to the total balance introduced by this balance change, normalized to round zero, i.e.,
       -- a coin created in round 3 is treated as a coin created in round 0 with a higher initial amount.
     changeToHoldingFeesRate : Decimal
-      -- ^ The change of total holding fees introduced by this transfer.
+      -- ^ The change of total holding fees introduced by this balance change.
   deriving (Show, Eq)
+
+instance Additive BalanceChange where
+  (+) l r = BalanceChange with 
+     changeToInitialAmountAsOfRoundZero = l.changeToInitialAmountAsOfRoundZero + r.changeToInitialAmountAsOfRoundZero
+     changeToHoldingFeesRate = l.changeToHoldingFeesRate + r.changeToHoldingFeesRate
+  aunit = BalanceChange with changeToInitialAmountAsOfRoundZero = 0.0; changeToHoldingFeesRate = 0.0
+  (-) l r = BalanceChange with 
+     changeToInitialAmountAsOfRoundZero = l.changeToInitialAmountAsOfRoundZero - r.changeToInitialAmountAsOfRoundZero
+     changeToHoldingFeesRate = l.changeToHoldingFeesRate - r.changeToHoldingFeesRate

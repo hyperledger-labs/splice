@@ -374,8 +374,12 @@ object ScanTxLogParser {
             domainId = domainId,
             round = round.number,
             changeToInitialAmountAsOfRoundZero =
-              node.result.value.summary.changeToInitialAmountAsOfRoundZero,
-            changeToHoldingFeesRate = node.result.value.summary.changeToHoldingFeesRate,
+              node.result.value.summary.balanceChanges.values.asScala
+                .map(bc => BigDecimal(bc.changeToInitialAmountAsOfRoundZero))
+                .sum,
+            changeToHoldingFeesRate = node.result.value.summary.balanceChanges.values.asScala
+              .map(bc => BigDecimal(bc.changeToHoldingFeesRate))
+              .sum,
             acsContractId = None,
           )
         )

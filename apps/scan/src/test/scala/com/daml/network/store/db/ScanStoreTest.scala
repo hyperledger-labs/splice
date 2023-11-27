@@ -47,6 +47,7 @@ import java.time.Instant
 import java.util.{Collections, Optional}
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
+import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.reflect.ClassTag
 import com.daml.network.scan.store.SortOrder
 
@@ -66,7 +67,19 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             interfaceId = Some(cc.coinrules.CoinRules.TEMPLATE_ID),
             Transfer.choice.name,
             mkCoinRulesTransfer(user1, coinAmount),
-            mkTransferResult(2, coinAmount, holdingFee),
+            mkTransferResult(
+              round = 2,
+              inputAppRewardAmount = 0,
+              inputCoinAmount = coinAmount,
+              inputValidatorRewardAmount = 0,
+              balanceChanges = Map(
+                user1.toProtoPrimitive -> new cc.coinrules.BalanceChange(
+                  BigDecimal(coinAmount).bigDecimal,
+                  BigDecimal(holdingFee).bigDecimal,
+                )
+              ),
+              coinPrice = 0.0005,
+            ),
             "011",
           )(
             store.multiDomainAcsStore
@@ -187,11 +200,12 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
                 Transfer.choice.name,
                 mkCoinRulesTransfer(user1, 1.0),
                 mkTransferResult(
-                  round.toLong,
-                  1.0,
-                  holdingFee,
+                  round = round.toLong,
                   inputAppRewardAmount = appAmount,
                   inputValidatorRewardAmount = validatorAmount,
+                  inputCoinAmount = 0,
+                  balanceChanges = Map(),
+                  coinPrice = 0.0005,
                 ),
               )(store.multiDomainAcsStore)
           }
@@ -226,10 +240,12 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               Transfer.choice.name,
               mkCoinRulesTransfer(user1, amount),
               mkTransferResult(
-                round.toLong,
-                amount,
-                holdingFee,
+                round = round.toLong,
                 inputAppRewardAmount = amount,
+                inputCoinAmount = 0,
+                inputValidatorRewardAmount = 0,
+                balanceChanges = Map(),
+                coinPrice = 0.0005,
               ),
             )(store.multiDomainAcsStore)
           }
@@ -240,10 +256,12 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               Transfer.choice.name,
               mkCoinRulesTransfer(user1, amount),
               mkTransferResult(
-                round.toLong,
-                amount,
-                holdingFee,
+                round = round.toLong,
+                inputAppRewardAmount = 0,
                 inputValidatorRewardAmount = amount,
+                inputCoinAmount = 0,
+                balanceChanges = Map(),
+                coinPrice = 0.0005,
               ),
             )(store.multiDomainAcsStore)
           }
@@ -413,13 +431,14 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           (amount, round) =>
             mkTransferResult(
               round = round,
-              changeToInitialAmountAsOfRoundZero = 1.0,
-              changeToHoldingFeesRate = 1.0,
               inputAppRewardAmount = amount,
+              inputCoinAmount = 0,
+              inputValidatorRewardAmount = 0,
+              balanceChanges = Map(),
+              coinPrice = 0.0005,
             ),
         )
       }
-
     }
 
     "getTopValidatorsByValidatorRewards" should {
@@ -430,9 +449,11 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           (amount, round) =>
             mkTransferResult(
               round = round,
-              changeToInitialAmountAsOfRoundZero = 1.0,
-              changeToHoldingFeesRate = 1.0,
+              inputAppRewardAmount = 0,
               inputValidatorRewardAmount = amount,
+              inputCoinAmount = 0,
+              balanceChanges = Map(),
+              coinPrice = 0.0005,
             ),
         )
       }
@@ -745,9 +766,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               ),
               exerciseResult = mkTransferResult(
                 round = round,
-                changeToInitialAmountAsOfRoundZero = 0,
-                changeToHoldingFeesRate = holdingFee,
+                inputAppRewardAmount = 0,
                 inputCoinAmount = senderAmount.toDouble,
+                inputValidatorRewardAmount = 0,
+                balanceChanges = Map(),
                 coinPrice = tx.coinPrice.toDouble,
               ),
               offset = offset,
@@ -904,42 +926,38 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     ).toValue
 
   private def mkTransferSummary(
-      changeToInitialAmountAsOfRoundZero: Double,
-      changeToHoldingFeesRate: Double,
       inputAppRewardAmount: Double,
       inputValidatorRewardAmount: Double,
       inputCoinAmount: Double,
+      balanceChanges: Map[String, cc.coinrules.BalanceChange],
       coinPrice: Double,
   ) = new cc.coinrules.TransferSummary(
     new java.math.BigDecimal(inputAppRewardAmount),
     new java.math.BigDecimal(inputValidatorRewardAmount),
     new java.math.BigDecimal(inputCoinAmount),
+    balanceChanges.asJava,
     new java.math.BigDecimal(0.0),
     java.util.List.of(new java.math.BigDecimal(0.0)),
     new java.math.BigDecimal(0.0),
     new java.math.BigDecimal(0.0),
     new java.math.BigDecimal(coinPrice),
-    new java.math.BigDecimal(changeToInitialAmountAsOfRoundZero),
-    new java.math.BigDecimal(changeToHoldingFeesRate),
   )
 
   private def mkTransferResult(
       round: Long,
-      changeToInitialAmountAsOfRoundZero: Double,
-      changeToHoldingFeesRate: Double,
-      inputAppRewardAmount: Double = 0.0,
-      inputValidatorRewardAmount: Double = 0.0,
-      inputCoinAmount: Double = 0.0,
-      coinPrice: Double = 0.0,
+      inputAppRewardAmount: Double,
+      inputValidatorRewardAmount: Double,
+      inputCoinAmount: Double,
+      balanceChanges: Map[String, cc.coinrules.BalanceChange],
+      coinPrice: Double,
   ) =
     new cc.coinrules.TransferResult(
       new cc.round.types.Round(round),
       mkTransferSummary(
-        changeToInitialAmountAsOfRoundZero,
-        changeToHoldingFeesRate,
         inputAppRewardAmount,
         inputValidatorRewardAmount,
         inputCoinAmount,
+        balanceChanges,
         coinPrice,
       ),
       java.util.List.of(),
@@ -966,7 +984,14 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       Transfer.choice.name,
       consuming = false,
       mkCoinRulesTransfer(provider, ccSpent),
-      mkTransferResult(round, ccSpent, holdingFee),
+      mkTransferResult(
+        round = round,
+        inputAppRewardAmount = 0,
+        inputValidatorRewardAmount = 0,
+        inputCoinAmount = ccSpent,
+        balanceChanges = Map.empty,
+        coinPrice = 0.0005,
+      ),
     )
 
     val createdCoin = coin(provider, ccSpent, round, holdingFee)

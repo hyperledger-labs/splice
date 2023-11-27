@@ -3,6 +3,7 @@ module CC.Scripts.TestCoinRulesTransfer where
 import DA.Assert
 import DA.List
 import DA.Time
+import qualified DA.Map as Map
 import Daml.Script
 
 import CC.Coin
@@ -91,17 +92,23 @@ testUsageFees = do
         - config.createFee.fee - expectedLockFee1 - expectedSenderTransferFee
         - expectedSenderLockFee3
 
-  transferResult.summary === TransferSummary with
+  let ignoreBalanceChanges = transferResult.summary with balanceChanges = Map.empty 
+
+  ignoreBalanceChanges === TransferSummary with
     inputAppRewardAmount = 0.0
     inputValidatorRewardAmount = 0.0
     inputCoinAmount = 100.0
+    balanceChanges = Map.empty
     holdingFees = inputCoinHoldingFees
     outputFees
     senderChangeFee
     senderChangeAmount = 0.0
     coinPrice = 1.0
-    changeToInitialAmountAsOfRoundZero = normalizedBalanceAfterTransfer - normalizedBalanceBeforeTransfer
-    changeToHoldingFeesRate = outputCoinHoldingFees - inputCoinHoldingFees
+  
+  let totalBalanceChange = sum $ Map.values transferResult.summary.balanceChanges
+  
+  totalBalanceChange.changeToHoldingFeesRate  === outputCoinHoldingFees - inputCoinHoldingFees
+  totalBalanceChange.changeToInitialAmountAsOfRoundZero  === normalizedBalanceAfterTransfer - normalizedBalanceBeforeTransfer
 
   assertMsg "Partial sender change fee"
     (0.0 < senderChangeFee && senderChangeFee < config.createFee.fee)
@@ -228,3 +235,149 @@ submitTransfer coinRulesCid transferContext svc sender receiver coinCid amount =
                       receiverFeeRatio = 1.0]
         upgrade = Some ()
       context = transferContext
+
+testSenderChangeAndOutput: Script ()
+testSenderChangeAndOutput = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  let holdingFee = 0.000005
+  let coin1Amount = 100.0
+  let outputAmount1 = 20.0
+  let outputAmount2 = 30.0
+  let outputAmount3 = 25.0
+  coin1 <- tap app alice coin1Amount
+  
+  runNextIssuance app
+  context <- getPaymentTransferContext app alice
+  runNextIssuance app
+  aliceNormalizedBalanceBefore <- getNormalizedBalance alice.primaryParty
+  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.svc] $ exerciseCmd context.coinRules CoinRules_Transfer with
+    transfer = Transfer with
+      sender = alice.primaryParty
+      provider = alice.primaryParty
+      inputs = map (\c -> InputCoin c)[coin1]
+      outputs = [ TransferOutput with
+                    receiver = alice.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount1
+                    lock = None
+                -- test another output to sender
+                , TransferOutput with
+                    receiver = alice.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount2
+                    lock = None
+                -- normal receiver coin
+                , TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount3
+                    lock = None
+                ]
+      upgrade = Some ()
+    context = context.context
+  assertMsg "senderChangeAmount > 0" 
+    (transferResult.summary.senderChangeAmount > 0.0)
+  aliceNormalizedBalanceAfter <- getNormalizedBalance alice.primaryParty
+  let Some(balanceChange) = Map.lookup alice.primaryParty transferResult.summary.balanceChanges
+  balanceChange.changeToInitialAmountAsOfRoundZero === aliceNormalizedBalanceAfter - aliceNormalizedBalanceBefore
+  balanceChange.changeToHoldingFeesRate === 2.0 * holdingFee
+  return ()
+
+testSenderNoChange: Script ()
+testSenderNoChange = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  let holdingFee = 0.000005
+  let coin1Amount = 100.0
+  let outputAmount1 = 49.7
+  let outputAmount2 = 30.0
+  let outputAmount3 = 20.0
+  coin1 <- tap app alice coin1Amount
+  
+  runNextIssuance app
+  context <- getPaymentTransferContext app alice
+  runNextIssuance app
+  aliceNormalizedBalanceBefore <- getNormalizedBalance alice.primaryParty
+  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.svc] $ exerciseCmd context.coinRules CoinRules_Transfer with
+    transfer = Transfer with
+      sender = alice.primaryParty
+      provider = alice.primaryParty
+      inputs = map (\c -> InputCoin c)[coin1]
+      outputs = [ TransferOutput with
+                    receiver = alice.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount1
+                    lock = None
+                -- test another output to sender
+                , TransferOutput with
+                    receiver = alice.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount2
+                    lock = None
+                -- normal receiver coin
+                , TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount3
+                    lock = None
+                ]
+      upgrade = Some ()
+    context = context.context
+  assertMsg "senderChangeAmount == 0" 
+    (transferResult.summary.senderChangeAmount == 0.0)
+  aliceNormalizedBalanceAfter <- getNormalizedBalance alice.primaryParty
+  let Some(balanceChange) = Map.lookup alice.primaryParty transferResult.summary.balanceChanges
+  balanceChange.changeToInitialAmountAsOfRoundZero === aliceNormalizedBalanceAfter - aliceNormalizedBalanceBefore
+  balanceChange.changeToHoldingFeesRate === holdingFee
+  return ()
+
+testSenderNoChangeNoSenderOutput: Script ()
+testSenderNoChangeNoSenderOutput = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  let holdingFee = 0.000005
+  let coin1Amount = 100.0
+  let outputAmount1 = 58.97
+  let outputAmount2 = 39.98
+  coin1 <- tap app alice coin1Amount
+  
+  runNextIssuance app
+  context <- getPaymentTransferContext app alice
+  runNextIssuance app
+  aliceNormalizedBalanceBefore <- getNormalizedBalance alice.primaryParty
+  bobNormalizedBalanceBefore <- getNormalizedBalance bob.primaryParty
+  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.svc] $ exerciseCmd context.coinRules CoinRules_Transfer with
+    transfer = Transfer with
+      sender = alice.primaryParty
+      provider = alice.primaryParty
+      inputs = map (\c -> InputCoin c)[coin1]
+      outputs = [ 
+                  TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount1
+                    lock = None
+                , TransferOutput with
+                    receiver = bob.primaryParty
+                    receiverFeeRatio = 0.0
+                    amount = outputAmount2
+                    lock = None
+
+                ]
+      upgrade = Some ()
+    context = context.context
+  assertMsg "senderChangeAmount == 0" 
+    (transferResult.summary.senderChangeAmount == 0.0)
+  aliceNormalizedBalanceAfter <- getNormalizedBalance alice.primaryParty
+  bobNormalizedBalanceAfter <- getNormalizedBalance bob.primaryParty
+  let Some(bobBalanceChange) = Map.lookup bob.primaryParty transferResult.summary.balanceChanges
+  bobBalanceChange.changeToInitialAmountAsOfRoundZero === bobNormalizedBalanceAfter - bobNormalizedBalanceBefore
+  bobBalanceChange.changeToHoldingFeesRate === 2.0 * holdingFee
+  
+  let Some(aliceBalanceChange) = Map.lookup alice.primaryParty transferResult.summary.balanceChanges
+  debug aliceBalanceChange
+  aliceBalanceChange.changeToInitialAmountAsOfRoundZero === aliceNormalizedBalanceAfter - aliceNormalizedBalanceBefore
+  aliceBalanceChange.changeToHoldingFeesRate === negate holdingFee
+
+  return ()
