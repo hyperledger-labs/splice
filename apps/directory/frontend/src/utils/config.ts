@@ -10,7 +10,6 @@ type DirectoryServicesConfig = {
   directory: z.infer<typeof serviceSchema>;
   scan: z.infer<typeof serviceSchema>;
   validator: z.infer<typeof serviceSchema>;
-  jsonApi: z.infer<typeof serviceSchema>; // TODO(#8269) remove this config
 };
 
 type DirectoryConfig = {
@@ -30,7 +29,6 @@ const reader = new ConfigReader(
       directory: serviceSchema,
       scan: serviceSchema,
       validator: serviceSchema,
-      jsonApi: serviceSchema,
     }),
   })
 );

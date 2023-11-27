@@ -33,10 +33,6 @@ const config = {
       // URL of the validator app HTTP API
       url: 'http://localhost:5003',
     },
-    jsonApi: {
-      // URL of the JSON API for the participant
-      url: 'http://' + window.location.host + '/api/json-api/',
-    },
   },
 };
 
