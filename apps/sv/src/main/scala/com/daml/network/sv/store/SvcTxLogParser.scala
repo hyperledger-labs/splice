@@ -10,6 +10,7 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRules_ExecuteDefiniteVote,
+  SvcRules_VoteRequest_Expire,
   VoteResult,
 }
 import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
@@ -43,6 +44,8 @@ class SvcTxLogParser(
         exercised match {
           case SvcRulesExecuteDefiniteVote(node) =>
             State.fromExecuteDefiniteVote(tree, root, domainId, node)
+          case SvcRulesVoteRequestExpire(node) =>
+            State.fromVoteRequestExpire(tree, root, domainId, node)
           case _ => parseTrees(tree, domainId, exercised.getChildEventIds.asScala.toList)
         }
 
@@ -152,6 +155,7 @@ object SvcTxLogParser {
 
     final case class DefiniteVoteTxLogEntry(
         indexRecord: TxLogIndexRecord,
+        expired: Boolean,
         rejectedBy: List[String],
         acceptedBy: List[String],
         action: ActionRequiringConfirmation,
@@ -190,6 +194,36 @@ object SvcTxLogParser {
               node.result.value.votedAt.toString,
             ),
             action = node.result.value.action,
+            expired = node.result.value.expired,
+            rejectedBy = node.result.value.rejectedBy.asScala.toList,
+            acceptedBy = node.result.value.acceptedBy.asScala.toList,
+          )
+        )
+      )
+    }
+
+    def fromVoteRequestExpire(
+        tree: TransactionTree,
+        root: TreeEvent,
+        domainId: DomainId,
+        node: ExerciseNode[SvcRules_VoteRequest_Expire, VoteResult],
+    ): State = {
+      val action = mapActionName(node.result.value.action)
+      State(
+        immutable.Queue(
+          TxLogEntry.DefiniteVoteTxLogEntry(
+            indexRecord = TxLogIndexRecord.DefiniteVoteIndexRecord(
+              tree.getOffset(),
+              root.getEventId(),
+              domainId,
+              action,
+              node.result.value.executed,
+              node.result.value.requester,
+              node.result.value.effectiveAt.toString,
+              node.result.value.votedAt.toString,
+            ),
+            action = node.result.value.action,
+            expired = node.result.value.expired,
             rejectedBy = node.result.value.rejectedBy.asScala.toList,
             acceptedBy = node.result.value.acceptedBy.asScala.toList,
           )

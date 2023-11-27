@@ -43,6 +43,7 @@ type VoteResultRow = {
   idx: number;
   action: ActionRequiringConfirmation;
   executed: boolean;
+  expired: boolean;
   voteStatus: string[][];
 };
 
@@ -132,6 +133,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
       },
     },
     { field: 'executed', headerName: 'Executed', width: 120, filterable: false },
+    { field: 'expired', headerName: 'Expired', width: 120, filterable: false },
     {
       field: 'requester',
       headerName: 'Requester',
@@ -198,6 +200,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
           idx: index,
           action: result.action,
           executed: result.executed,
+          expired: result.expired,
           voteStatus: [result.rejectedBy, result.acceptedBy],
         }))
       : [];

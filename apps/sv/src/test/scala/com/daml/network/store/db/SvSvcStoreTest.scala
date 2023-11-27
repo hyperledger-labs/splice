@@ -968,6 +968,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
               result.effectiveAt.toString,
               result.votedAt.toString,
             ),
+            result.expired,
             result.rejectedBy.asScala.toList,
             result.acceptedBy.asScala.toList,
             result.action,
@@ -1151,6 +1152,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
   ): VoteResult = new VoteResult(
     voteRequestContract.payload.action,
     true,
+    false,
     voteRequestContract.payload.requester,
     Instant.now(),
     Instant.now(),

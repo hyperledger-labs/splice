@@ -5,6 +5,7 @@ import com.daml.network.codegen.java.cn.svcrules.{VoteRequest, VoteRequest_Expir
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import scala.jdk.CollectionConverters.*
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -28,17 +29,24 @@ class ExpireVoteRequestTrigger(
     ]]] {
   type Task = ScheduledTaskTrigger.ReadyTask[AssignedContract[VoteRequest.ContractId, VoteRequest]]
 
-  override def completeTaskAsLeader(task: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
+  private val store = svTaskContext.svcStore
+
+  override def completeTaskAsLeader(task: Task)(implicit tc: TraceContext): Future[TaskOutcome] = {
+    val voteRequestCid = task.work.contractId
     for {
       svcRules <- svTaskContext.svcStore.getSvcRules()
+      votes <- store.listEligibleVotes(voteRequestCid)
       _ <- svTaskContext.connection
         .submit(
           Seq(svTaskContext.svcStore.key.svParty),
           Seq(svTaskContext.svcStore.key.svcParty),
           svcRules.exercise(
             _.exerciseSvcRules_VoteRequest_Expire(
-              task.work.contractId,
+              voteRequestCid,
               new VoteRequest_Expire(),
+              votes
+                .map(_.contractId)
+                .asJava,
             )
           ),
         )
@@ -47,4 +55,5 @@ class ExpireVoteRequestTrigger(
     } yield TaskSuccess(
       s"Archived expired VoteRequest ${task.work.contract.payload.action.toValue}"
     )
+  }
 }

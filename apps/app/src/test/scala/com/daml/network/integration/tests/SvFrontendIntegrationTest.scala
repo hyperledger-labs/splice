@@ -4,6 +4,7 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{FrontendLoginUtil, SvTestUtil}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
@@ -11,7 +12,10 @@ import org.openqa.selenium.support.ui.Select
 import org.openqa.selenium.{By, Keys}
 import org.slf4j.event.Level
 
-import scala.jdk.CollectionConverters.CollectionHasAsScala
+import java.time.format.DateTimeFormatter
+import java.time.{LocalDateTime, ZoneOffset}
+import scala.concurrent.duration.DurationInt
+import scala.jdk.CollectionConverters.*
 
 class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
@@ -691,7 +695,7 @@ class SvFrontendIntegrationTest
             },
           )
 
-          val (_, requestId) = actAndCheck(
+          def setConfigRequest(expiresInNextMinute: Boolean) = actAndCheck(
             "sv1 operator can create a new vote request", {
               val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
               dropDownAction.selectByValue("SRARC_SetConfig")
@@ -706,6 +710,19 @@ class SvFrontendIntegrationTest
                 element.underlying.sendKeys(requestReasonBody)
               }
 
+              if (expiresInNextMinute) {
+                setExpirationDate(
+                  "sv1",
+                  DateTimeFormatter
+                    .ofPattern("dd/MM/yyyy HH:mm a")
+                    .format(
+                      LocalDateTime
+                        .ofInstant(CantonTimestamp.now().toInstant, ZoneOffset.UTC)
+                        .plusMinutes(1)
+                    ),
+                )
+              }
+
               click on "create-voterequest-submit-button"
             },
           )(
@@ -713,20 +730,27 @@ class SvFrontendIntegrationTest
             _ => {
               click on "tab-panel-in-progress"
 
-              val tbody = find(id("sv-voting-in-progress-table-body"))
-              inside(tbody) { case Some(tb) =>
-                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-                rows.size shouldBe previousVoteRequestsInProgress + 1
-                val reviewButton = rows.head
-                reviewButton.underlying.click()
-              }
-              val requestId =
-                inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
-                  tb.text
+              if (!expiresInNextMinute) {
+                val tbody = find(id("sv-voting-in-progress-table-body"))
+                inside(tbody) { case Some(tb) =>
+                  val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+                  rows.size should be > previousVoteRequestsInProgress
+                  val reviewButton = rows.head
+                  reviewButton.underlying.click()
                 }
-              requestId
+                val requestId =
+                  inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                    tb.text
+                  }
+                requestId
+              } else {
+                ""
+              }
             },
           )
+
+          setConfigRequest(expiresInNextMinute = true)
+          val (_, requestId) = setConfigRequest(expiresInNextMinute = false)
 
           vote(sv2Backend, requestId, false, "1", false)
           vote(sv3Backend, requestId, false, "1", false)
@@ -740,12 +764,12 @@ class SvFrontendIntegrationTest
           }
 
           clue("the vote request is rejected") {
-            eventually() {
+            eventually(65.seconds) {
               click on "tab-panel-rejected"
               val tbody = find(id("sv-vote-results-rejected-table-body"))
               val tb = tbody.value
               val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-              rows.size shouldBe 1
+              rows.size shouldBe 2
             }
           }
 

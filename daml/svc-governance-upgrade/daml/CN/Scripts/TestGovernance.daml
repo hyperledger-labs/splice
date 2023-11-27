@@ -195,14 +195,16 @@ testVoteRequestExpire = do
     voteRequestTimeout = None
 
   submitMultiMustFail [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_VoteRequest_Expire with
-    cid=requestCid
+    requestCid=requestCid
     choiceArg=VoteRequest_Expire
+    voteCids=[]
 
   passTime(days 7)
 
   submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_VoteRequest_Expire with
-    cid=requestCid
+    requestCid=requestCid
     choiceArg=VoteRequest_Expire
+    voteCids=[]
 
   return ()
 

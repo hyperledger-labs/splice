@@ -318,6 +318,7 @@ class HttpSvAdminHandler(
                   new VoteResult(
                     res.action,
                     res.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].executed,
+                    res.expired,
                     res.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].requester,
                     Instant.parse(
                       res.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].effectiveAt

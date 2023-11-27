@@ -256,14 +256,17 @@ data Reason = Reason with
     body : Text -- ^ Freeform text intended for human consumption.
   deriving (Eq, Show)
 
+-- TODO(#8737): solve post-MainNet issues
 data VoteResult = VoteResult with
-    action : ActionRequiringConfirmation
-    executed : Bool
-    requester: Party
-    effectiveAt: Time
-    votedAt: Time
-    acceptedBy : [Party]
-    rejectedBy : [Party]
+    action : ActionRequiringConfirmation -- ^ The action that was voted on.
+    executed : Bool -- ^ Whether the action was executed or not.
+    expired: Bool -- ^ Whether the vote request expired.
+    requester: Party -- ^ Who requested the vote on the action.
+    effectiveAt: Time -- ^ When the result of the vote is effective.
+    votedAt: Time -- ^ When the vote  was finalized.
+    acceptedBy : [Party] -- ^ Parties that definitely cast an accepting vote. There may be parties that did cast an accepting vote that are not listed here due to race conditions or malicious leader actions.
+    rejectedBy : [Party] -- ^ Parties that definitely cast an rejecting vote. There may be parties that did cast a rejecting vote that are not listed here due to race conditions or malicious leader actions.
+    -- TODO(#8737): use the tx-log for querying the votes cast for a particular request
   deriving (Eq, Show)
 
 
@@ -686,20 +689,10 @@ template SvcRules with
         ensureNotExpired request.expiresAt
         -- validate and archive votes
         let s = summarizeCollective this
-        votes <- forA voteCids $ \voteCid -> do
-          vote <- fetch voteCid
-          archive voteCid
-          require "SVC matches" (vote.svc == svc)
-          require "Request matches" (vote.requestCid == requestCid)
-          require "Confirmer is (still) a collective member" (vote.voter `Map.member` members)
-          ensureNotExpired vote.expiresAt
-          pure vote
+        votes <- validateAndConsumeVotes voteCids svc requestCid members
         let numYays = length $ filter (.accept) votes
         let numNays = length $ filter (\vote -> not vote.accept) votes
         require "A majority was reached" (numYays >= s.requiredNumVotes || numNays >= s.requiredNumVotes)
-        -- we expect honest voters to cast at most one vote,
-        -- and we expect the leader to pick at most one vote in case there are multiple
-        require "No duplicate voters" (unique $ map (.voter) votes)
         -- determine outcome and execute action if required
         let execute = numYays >= s.requiredNumVotes
         when execute $
@@ -707,9 +700,11 @@ template SvcRules with
         -- store the result of this vote on the return value of the choice
         -- for display in a transaction history
         now <- getTime
+        let (acceptedByVotes, rejectedByVotes) = partition (.accept) votes
         pure $ VoteResult with
           action = request.action
           executed = execute
+          expired = False
           requester = request.requester
           effectiveAt = case request.action of
                   ARC_CoinRules with .. ->
@@ -722,17 +717,32 @@ template SvcRules with
                   ARC_SvcRules with .. -> now
                   ARC_CnsEntryContext with .. -> now
           votedAt = now
-          acceptedBy = map (.voter) $ filter (.accept) votes
-          rejectedBy = map (.voter) $ filter (\vote -> not vote.accept) votes
+          acceptedBy = map (.voter) $ acceptedByVotes
+          rejectedBy = map (.voter) $ rejectedByVotes
 
 
-    nonconsuming choice SvcRules_VoteRequest_Expire : ()
+    nonconsuming choice SvcRules_VoteRequest_Expire : VoteResult
       with
-        cid : ContractId VoteRequest
+        requestCid : ContractId VoteRequest
         choiceArg : VoteRequest_Expire
+        voteCids : [ContractId Vote]
       controller leader
       do
-        exercise cid choiceArg
+        request <- fetch requestCid
+        -- consume voteRequest
+        exercise requestCid choiceArg
+        -- collect and archive votes
+        votes <- validateAndConsumeVotes voteCids svc requestCid members
+        let (acceptedByVotes, rejectedByVotes) = partition (.accept) votes
+        pure $ VoteResult with
+          action = request.action
+          executed = False
+          expired = True
+          requester = request.requester
+          effectiveAt = request.expiresAt
+          votedAt = request.expiresAt
+          acceptedBy = map (.voter) $ acceptedByVotes
+          rejectedBy = map (.voter) $ rejectedByVotes
 
 
     -- Voting on the coin price
@@ -1091,6 +1101,19 @@ template SvcRules with
 
 -- Utility functions
 --------------------
+
+validateAndConsumeVotes : [ContractId Vote] -> Party -> ContractId VoteRequest -> Map.Map Party MemberInfo -> Update [Vote]
+validateAndConsumeVotes voteCids svc requestCid members = do
+  votes <- forA voteCids $ \voteCid -> do
+    vote <- fetch voteCid
+    archive voteCid
+    require "SVC matches" (vote.svc == svc)
+    require "Request matches" (vote.requestCid == requestCid)
+    require "Confirmer is (still) a collective member" (vote.voter `Map.member` members)
+    pure vote
+  -- we expect the leader to pick at most one vote in case there are multiple
+  require "No duplicate voters" (unique $ map (.voter) votes)
+  pure votes
 
 summarizeCollective : SvcRules -> CollectiveSummary
 summarizeCollective svcRules = CollectiveSummary with
