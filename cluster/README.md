@@ -1520,7 +1520,7 @@ Network. Steps to do this are as follows:
    IAM role bindings:
 
    ```
-   for ii in roles/compute.viewer roles/container.serviceAgent roles/logging.privateLogViewer roles/storage.objectAdmin roles/viewer
+   for ii in roles/compute.viewer roles/container.serviceAgent roles/logging.privateLogViewer roles/storage.objectAdmin roles/viewer roles/cloudsql.admin
    do
      gcloud projects add-iam-policy-binding da-cn-scratchnet2 \
         --member='serviceAccount:circleci@da-cn-scratchnet.iam.gserviceaccount.com' \
