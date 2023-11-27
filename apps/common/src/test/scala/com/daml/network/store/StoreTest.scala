@@ -365,7 +365,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     ActiveContract(
       domain,
       toCreatedEvent(contract, Seq(svcParty)),
-      contract.mandatoryCreatedEventBlob,
+      contract.createdEventBlob,
       counter,
     )
 
@@ -466,7 +466,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       counter,
     ),
     toCreatedEvent(contract, Seq(svcParty)),
-    contract.mandatoryCreatedEventBlob,
+    contract.createdEventBlob,
   )
 
   protected def toIncompleteAssign[TCid <: ContractId[T], T](
@@ -513,7 +513,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     source = source,
     target = target,
     createdEvent = toCreatedEvent(contract, Seq(svcParty)),
-    createdEventBlob = contract.mandatoryCreatedEventBlob,
+    createdEventBlob = contract.createdEventBlob,
     counter = counter,
   )
 
@@ -551,7 +551,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         ActiveContract(
           domain,
           toCreatedEvent(contract, Seq(svcParty)),
-          contract.mandatoryCreatedEventBlob,
+          contract.createdEventBlob,
           counter,
         )
       },
@@ -830,8 +830,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     identifier,
     contractId,
     payload,
-    Some(ByteString.EMPTY),
-    Some(Instant.EPOCH),
+    ByteString.EMPTY,
+    Instant.EPOCH,
   )
 }
 

@@ -4,7 +4,6 @@
 package com.daml.network.util
 
 import cats.syntax.either.*
-import cats.syntax.traverse.*
 import com.daml.ledger.api.v1.{CommandsOuterClass, value as scalaValue}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Value}
 import com.daml.ledger.javaapi.data.codegen.{
@@ -50,32 +49,10 @@ final case class Contract[TCid, T](
     identifier: Identifier,
     override val contractId: TCid & ContractId[_],
     override val payload: T & DamlRecord[_],
-    // TODO(#7965) Make this mandatory
-    val createdEventBlob: Option[ByteString],
-    // TODO(#7965) Make this mandatory
-    val createdAt: Option[Instant],
+    val createdEventBlob: ByteString,
+    val createdAt: Instant,
 ) extends PrettyPrinting
     with Contract.Has[TCid, T] {
-
-  // TODO(#7965) Remove this.
-  // We only need to be able to decode old contract so we can already exploit the fact that this field is mandatory in most places.
-  // In particular, it is safe to use this for writes to stores.
-  def mandatoryCreatedEventBlob: ByteString =
-    createdEventBlob.getOrElse(
-      throw new IllegalStateException(
-        show"Called mandatoryCreatedEventBlob on contract that did not have it set: $this"
-      )
-    )
-
-  // TODO(#7965) Remove this.
-  // We only need to be able to decode old contract so we can already exploit the fact that this field is mandatory in most places.
-  // In particular, it is safe to use this for writes to stores.
-  def mandatoryCreatedAt: Instant =
-    createdAt.getOrElse(
-      throw new IllegalStateException(
-        show"Called mandatoryCreatedAt on contract that did not have it set: $this"
-      )
-    )
 
   def toHttp(implicit elc: ErrorLoggingContext): http.Contract = {
     http.Contract(
@@ -89,16 +66,15 @@ final case class Contract[TCid, T](
             .compactPrint
         )
         .valueOr(err => ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")),
-      createdEventBlob =
-        createdEventBlob.map(bs => Base64.getEncoder.encodeToString(bs.toByteArray)),
-      createdAt = createdAt.map(Timestamp.assertFromInstant(_).toString),
+      createdEventBlob = Base64.getEncoder.encodeToString(createdEventBlob.toByteArray),
+      createdAt = Timestamp.assertFromInstant(createdAt).toString,
     )
   }
 
   def toDisclosedContract: CommandsOuterClass.DisclosedContract = {
     com.daml.ledger.api.v1.CommandsOuterClass.DisclosedContract
       .newBuilder()
-      .setCreatedEventBlob(mandatoryCreatedEventBlob)
+      .setCreatedEventBlob(createdEventBlob)
       .setContractId(contractId.contractId)
       .setTemplateId(identifier.toProto)
       .build()
@@ -184,15 +160,15 @@ object Contract {
         templateId.qualifiedName.module.dottedName,
         templateId.qualifiedName.name.dottedName,
       )
-      createdAt <- contract.createdAt
-        .traverse(Timestamp.fromString(_))
+      createdAt <- Timestamp
+        .fromString(contract.createdAt)
         .left
         .map(ProtoDeserializationError.ValueConversionError("createdAt", _))
       result <- fromHttp(companionTemplateId, contractId, decodePayload)(
         javaTemplateId,
         contract.payload,
-        contract.createdEventBlob.map(s => ByteString.copyFrom(Base64.getDecoder.decode(s))),
-        createdAt.map(_.toInstant),
+        ByteString.copyFrom(Base64.getDecoder.decode(contract.createdEventBlob)),
+        createdAt.toInstant,
       )
     } yield result
   }
@@ -204,8 +180,8 @@ object Contract {
   )(
       javaTemplateId: Identifier,
       payload: Json,
-      createdEventBlob: Option[ByteString],
-      createdAt: Option[Instant],
+      createdEventBlob: ByteString,
+      createdAt: Instant,
   ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
     for {
       _ <- Either.cond(
@@ -264,8 +240,8 @@ object Contract {
       identifier = ev.getTemplateId,
       contractId = contract.id,
       payload = contract.data,
-      createdEventBlob = Some(createdEventBlob),
-      createdAt = Some(ev.getContractMetadata.createdAt),
+      createdEventBlob = createdEventBlob,
+      createdAt = ev.getContractMetadata.createdAt,
     )
   }
 

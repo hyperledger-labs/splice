@@ -1,22 +1,158 @@
 {
-  "offset": "000000000000000031",
+  "offset": "000000000000000034",
   "contracts": [
     {
-      "template_id": "deadbeef001:CC.Coin:CoinRules",
-      "contract_id": "00ef44832698a74849d2b3b2f66a4115624dd92cd21ec68aec832fa7968345b0b3ca011220a9a5559ffaca4a8246c0d73ad1949e87e4f7dea7c218fd398fb84700c17a86b9",
+      "template_id": "deadbeef001:CC.Coin:Coin",
+      "contract_id": "00086905fab468531d4cbf26fc750b8ae2c7987bbe4a6a36a77ae5216e273abdf8ca0212204bbd5c8a72f6fb8923b93f4be00619addd4df16269e5468492e7a12a52b9b05d",
       "payload": {
-        "enabledChoices": {
-          "enable_ValidatorRewardCoupon_ArchiveAsValidator": true,
-          "enable_CoinRules_DevNet_Tap": true,
-          "enable_LockedCoin_OwnerExpireLock": true,
-          "enable_LockedCoin_Unlock": true,
-          "enable_LockedCoin_ExpireCoin": true,
-          "enable_CoinRules_Transfer": true,
-          "enable_CoinRules_ComputeFees": true,
-          "enable_Coin_Expire": true
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+        "owner": "canton-foundation-1-fbae5254::122022a627f9b39c854dc6c26c0f71c7112b1f9664133a0cd88431fac50880ba3616",
+        "amount": {
+          "initialAmount": "66590.5631659056",
+          "createdAt": {
+            "number": "3"
+          },
+          "ratePerRound": {
+            "rate": "0.0000048225"
+          }
         },
+        "upgrade": null
+      },
+      "created_event_blob": "CgIxNRKeBQpFAAhpBfq0aFMdTL8m/HULiuLHmHu+Smo2p3rlIW4nOr34ygISIEu9XIpy9vuJI7k/S+AGGa3dTfFiaeVGhJLnoSpSubBdElIKQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEgRDb2luGgRDb2luGowCCokCEl8SXVJbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhJmEmRSYmNhbnRvbi1mb3VuZGF0aW9uLTEtZmJhZTUyNTQ6OjEyMjAyMmE2MjdmOWIzOWM4NTRkYzZjMjZjMGY3MWM3MTEyYjFmOTY2NDEzM2EwY2Q4ODQzMWZhYzUwODgwYmEzNjE2Ej4SPAo6EhQSEjIQNjY1OTAuNTYzMTY1OTA1NhIKEggKBhIEEgIoBhIWEhQKEhIQEg4yDDAuMDAwMDA0ODIyNSpiY2FudG9uLWZvdW5kYXRpb24tMS1mYmFlNTI1NDo6MTIyMDIyYTYyN2Y5YjM5Yzg1NGRjNmMyNmMwZjcxYzcxMTJiMWY5NjY0MTMzYTBjZDg4NDMxZmFjNTA4ODBiYTM2MTYqW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2I5AGiJCQAAAABCKAomCiQIARIgFUAfPRjkNMuwu43N3LEMOAS6clcPvgxDp2elCOS2ano=",
+      "created_at": "1970-01-01T00:02:40Z"
+    },
+    {
+      "template_id": "deadbeef001:CC.Coin:Coin",
+      "contract_id": "00090a9ba7b1addeba87c8ae8d9562cbe70e6d8f06ae83f1f153aace06771c2cd0ca02122044c42ff7286d2a8eb3a7c55735afb0064cc976123efa1874786cff25f22450e8",
+      "payload": {
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+        "owner": "alice__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250",
+        "amount": {
+          "initialAmount": "103.835",
+          "createdAt": {
+            "number": "2"
+          },
+          "ratePerRound": {
+            "rate": "0.0000048225"
+          }
+        },
+        "upgrade": null
+      },
+      "created_event_blob": "CgIxNRKmBQpFAAkKm6exrd66h8iujZViy+cObY8GroPx8VOqzgZ3HCzQygISIETEL/cobSqOs6fFVzWvsAZMyXYSPvoYdHhs/yXyJFDoElIKQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEgRDb2luGgRDb2luGo8CCowCEl8SXVJbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhJrEmlSZ2FsaWNlX193YWxsZXRfX3VzZXItZmJhZTUyNTRfX3RjMDo6MTIyMDNkMzQ3YmZlYzlhN2Y2ZjJiMDI3YWQ1NDUxYjU1ZDkyMGZkNGY5MzBhNWFiNGQ1ZGY3MDRiYjNiMWY2YWIyNTASPBI6CjgSEhIQMg4xMDMuODM1MDAwMDAwMBIKEggKBhIEEgIoBBIWEhQKEhIQEg4yDDAuMDAwMDA0ODIyNSpnYWxpY2VfX3dhbGxldF9fdXNlci1mYmFlNTI1NF9fdGMwOjoxMjIwM2QzNDdiZmVjOWE3ZjZmMmIwMjdhZDU0NTFiNTVkOTIwZmQ0ZjkzMGE1YWI0ZDVkZjcwNGJiM2IxZjZhYjI1MCpbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YjkAaIkJAAAAAEIoCiYKJAgBEiCqKxgaYz8M33u/vnyfo+B5k0uz8Ag0E0rv0oGwkpWkTg==",
+      "created_at": "1970-01-01T00:02:40Z"
+    },
+    {
+      "template_id": "deadbeef001:CC.Coin:Coin",
+      "contract_id": "00d2a322a7b626a7b154af265d2af5dfb870558d6c4a5ffc970c8e7696cfb18580ca021220f3e18f148e5ba64082deddc7f59efac36f2fbe038ac1bc4120bed0f3558e935a",
+      "payload": {
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+        "owner": "bob__wallet__user-fbae5254__tc0::1220792ad917e8da5de02ebf27408f25ba6d5e75b251d44cb0709cad4ae4bce142ef",
+        "amount": {
+          "initialAmount": "20.0",
+          "createdAt": {
+            "number": "2"
+          },
+          "ratePerRound": {
+            "rate": "0.0000048225"
+          }
+        },
+        "upgrade": null
+      },
+      "created_event_blob": "CgIxNRKhBQpFANKjIqe2JqexVK8mXSr137hwVY1sSl/8lwyOdpbPsYWAygISIPPhjxSOW6ZAgt7dx/We+sNvL74DisG8QSC+0PNVjpNaElIKQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEgRDb2luGgRDb2luGowCCokCEl8SXVJbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhJpEmdSZWJvYl9fd2FsbGV0X191c2VyLWZiYWU1MjU0X190YzA6OjEyMjA3OTJhZDkxN2U4ZGE1ZGUwMmViZjI3NDA4ZjI1YmE2ZDVlNzViMjUxZDQ0Y2IwNzA5Y2FkNGFlNGJjZTE0MmVmEjsSOQo3EhESDzINMjAuMDAwMDAwMDAwMBIKEggKBhIEEgIoBBIWEhQKEhIQEg4yDDAuMDAwMDA0ODIyNSplYm9iX193YWxsZXRfX3VzZXItZmJhZTUyNTRfX3RjMDo6MTIyMDc5MmFkOTE3ZThkYTVkZTAyZWJmMjc0MDhmMjViYTZkNWU3NWIyNTFkNDRjYjA3MDljYWQ0YWU0YmNlMTQyZWYqW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2I5AGiJCQAAAABCKAomCiQIARIgtIBcTlumqaFxmLpAMwvAH4kPld+zP3uhcKY2LTzAfIU=",
+      "created_at": "1970-01-01T00:02:40Z"
+    },
+    {
+      "template_id": "deadbeef001:CC.Coin:Coin",
+      "contract_id": "00483db7cef89a74bb72c537a11371bfe53a43fed724488dd92ffa1caac4f3b41dca0212205c4c80b6b9036ef14ed2570581c35a04327f35126971922f2bc74d3dd78fdc01",
+      "payload": {
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+        "owner": "charlie__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250",
+        "amount": {
+          "initialAmount": "30.0",
+          "createdAt": {
+            "number": "2"
+          },
+          "ratePerRound": {
+            "rate": "0.0000048225"
+          }
+        },
+        "upgrade": null
+      },
+      "created_event_blob": "CgIxNRKpBQpFAEg9t874mnS7csU3oRNxv+U6Q/7XJEiN2S/6HKrE87QdygISIFxMgLa5A27xTtJXBYHDWgQyfzUSaXGSLyvHTT3Xj9wBElIKQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEgRDb2luGgRDb2luGpACCo0CEl8SXVJbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhJtEmtSaWNoYXJsaWVfX3dhbGxldF9fdXNlci1mYmFlNTI1NF9fdGMwOjoxMjIwM2QzNDdiZmVjOWE3ZjZmMmIwMjdhZDU0NTFiNTVkOTIwZmQ0ZjkzMGE1YWI0ZDVkZjcwNGJiM2IxZjZhYjI1MBI7EjkKNxIREg8yDTMwLjAwMDAwMDAwMDASChIICgYSBBICKAQSFhIUChISEBIOMgwwLjAwMDAwNDgyMjUqaWNoYXJsaWVfX3dhbGxldF9fdXNlci1mYmFlNTI1NF9fdGMwOjoxMjIwM2QzNDdiZmVjOWE3ZjZmMmIwMjdhZDU0NTFiNTVkOTIwZmQ0ZjkzMGE1YWI0ZDVkZjcwNGJiM2IxZjZhYjI1MCpbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YjkAaIkJAAAAAEIoCiYKJAgBEiAeSpP/7vYnxpI9eKx8eeNH99viBeHZfbkOYTXlHSGIGA==",
+      "created_at": "1970-01-01T00:02:40Z"
+    },
+    {
+      "template_id": "deadbeef001:CC.CoinImport:ImportCrate",
+      "contract_id": "003d0c4156b123bd527be56edd22c5cddb8c4399d70733300b9e5d7186e5cc7053ca0212208ed98a8d17c4296f80a2c30b69fdc914c4c20d3707a35865e20e27166a0ffdd6",
+      "payload": {
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+        "receiver": "charlie__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250",
+        "payload": {
+          "tag": "IP_Coin",
+          "value": {
+            "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+            "owner": "charlie__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250",
+            "amount": {
+              "initialAmount": "30.0",
+              "createdAt": {
+                "number": "2"
+              },
+              "ratePerRound": {
+                "rate": "0.0000048225"
+              }
+            },
+            "upgrade": null
+          }
+        }
+      },
+      "created_event_blob": "CgIxNRKzBgpFAD0MQVaxI71Se+Vu3SLFzduMQ5nXBzMwC55dcYblzHBTygISII7Zio0XxClvgKLDC2n9yRTEwg03B6NYZeIOJxZqD/3WEl8KQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEgpDb2luSW1wb3J0GgtJbXBvcnRDcmF0ZRr4Awr1AxJfEl1SW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2ISbRJrUmljaGFybGllX193YWxsZXRfX3VzZXItZmJhZTUyNTRfX3RjMDo6MTIyMDNkMzQ3YmZlYzlhN2Y2ZjJiMDI3YWQ1NDUxYjU1ZDkyMGZkNGY5MzBhNWFiNGQ1ZGY3MDRiYjNiMWY2YWIyNTASogISnwISnAISB0lQX0NvaW4akAIKjQISXxJdUltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiEm0Sa1JpY2hhcmxpZV9fd2FsbGV0X191c2VyLWZiYWU1MjU0X190YzA6OjEyMjAzZDM0N2JmZWM5YTdmNmYyYjAyN2FkNTQ1MWI1NWQ5MjBmZDRmOTMwYTVhYjRkNWRmNzA0YmIzYjFmNmFiMjUwEjsSOQo3EhESDzINMzAuMDAwMDAwMDAwMBIKEggKBhIEEgIoBBIWEhQKEhIQEg4yDDAuMDAwMDA0ODIyNSpbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YjkAaIkJAAAAAEIoCiYKJAgBEiATN0ZB4R/0LepiXuAHEvFGAS5qXgYbBLzUXMZliU7ltQ==",
+      "created_at": "1970-01-01T00:02:40Z"
+    },
+    {
+      "template_id": "deadbeef001:CC.Coin:LockedCoin",
+      "contract_id": "00cbccd1d46f5b707d74d5c61645019e84895534fdfd7df84953d92c82a43fc7cbca0212203a1a79892adc6ee3518fa146b9e8df07f379465f1b8f0183682a811ff9535f91",
+      "payload": {
+        "coin": {
+          "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+          "owner": "alice__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250",
+          "amount": {
+            "initialAmount": "10.0",
+            "createdAt": {
+              "number": "2"
+            },
+            "ratePerRound": {
+              "rate": "0.0000048225"
+            }
+          },
+          "upgrade": null
+        },
+        "lock": {
+          "holders": [],
+          "expiresAt": "1970-01-11T00:02:40Z"
+        }
+      },
+      "created_event_blob": "CgIxNRLNBQpFAMvM0dRvW3B9dNXGFkUBnoSJVTT9/X34SVPZLIKkP8fLygISIDoaeYkq3G7jUY+hRrno3wfzeUZfG48Bg2gqgR/5U1+RElgKQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEgRDb2luGgpMb2NrZWRDb2luGrACCq0CEpECEo4CCosCEl8SXVJbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhJrEmlSZ2FsaWNlX193YWxsZXRfX3VzZXItZmJhZTUyNTRfX3RjMDo6MTIyMDNkMzQ3YmZlYzlhN2Y2ZjJiMDI3YWQ1NDUxYjU1ZDkyMGZkNGY5MzBhNWFiNGQ1ZGY3MDRiYjNiMWY2YWIyNTASOxI5CjcSERIPMg0xMC4wMDAwMDAwMDAwEgoSCAoGEgQSAigEEhYSFAoSEhASDjIMMC4wMDAwMDQ4MjI1EhcSFQoTEgQSAiIAEgsSCUkAKPMzyQAAACpnYWxpY2VfX3dhbGxldF9fdXNlci1mYmFlNTI1NF9fdGMwOjoxMjIwM2QzNDdiZmVjOWE3ZjZmMmIwMjdhZDU0NTFiNTVkOTIwZmQ0ZjkzMGE1YWI0ZDVkZjcwNGJiM2IxZjZhYjI1MCpbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YjkAaIkJAAAAAEIoCiYKJAgBEiBOPykXePuJ6P0nXdU/y2Ym5frv0hOUu44bvfmfklXang==",
+      "created_at": "1970-01-01T00:02:40Z"
+    },
+    {
+      "template_id": "deadbeef001:CC.CoinRules:CoinRules",
+      "contract_id": "0017028f8349afbc1d1c773a721f68261f7aba5934d449f6c7bffb71ad8f256ccfca0212205aa5ff43a477e34eb631cb4771adcd5ff72c99415b4e6a50dd87aa7ff006b82b",
+      "payload": {
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
         "configSchedule": {
           "initialValue": {
+            "packageConfig": {
+              "cantonCoin": "0.1.0",
+              "svcGovernance": "0.1.0",
+              "validatorLifecycle": "0.1.0",
+              "cantonNameService": "0.1.0",
+              "wallet": "0.1.0",
+              "directoryService": "0.1.0",
+              "walletPayments": "0.1.0"
+            },
+            "tickDuration": {
+              "microseconds": "150000000"
+            },
             "transferConfig": {
               "holdingFee": {
                 "rate": "0.0000048225"
@@ -47,6 +183,28 @@
                 ]
               },
               "maxNumOutputs": "100"
+            },
+            "globalDomain": {
+              "requiredDomains": {
+                "map": [
+                  [
+                    "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+                    {}
+                  ]
+                ]
+              },
+              "activeDomain": "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+              "fees": {
+                "baseRateTrafficLimits": {
+                  "burstAmount": "2000000",
+                  "burstWindow": {
+                    "microseconds": "600000000"
+                  }
+                },
+                "extraTrafficPrice": "1.0",
+                "readVsWriteScalingFactor": "200",
+                "minTopupAmount": "1000"
+              }
             },
             "issuanceCurve": {
               "initialValue": {
@@ -111,49 +269,61 @@
                   }
                 }
               ]
-            },
-            "globalDomain": {
-              "requiredDomains": {
-                "map": [
-                  [
-                    "global-domain::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-                    {}
-                  ]
-                ]
-              },
-              "activeDomain": "global-domain::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-              "fees": {
-                "baseRateTrafficLimits": {
-                  "rate": "3333.0",
-                  "burstWindow": {
-                    "microseconds": "600000000"
-                  }
-                },
-                "extraTrafficPrice": "1.0",
-                "readScalingFactor": "0.02",
-                "minTopupAmount": "1000"
-              }
-            },
-            "tickDuration": {
-              "microseconds": "150000000"
             }
           },
           "futureValues": []
         },
-        "lock": false,
         "isDevNet": true,
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f"
+        "upgrade": null
       },
-      "metadata": {
-        "createdAt": "0",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220377e9b8d5f5c06042d3c86485c8795ed01b09eadfd331302cfd34c9190a1bac4"
+      "created_event_blob": "CgIxNRKYDgpFABcCj4NJr7wdHHc6ch9oJh96ulk01En2x7/7ca2PJWzPygISIFql/0Okd+NOtjHLR3GtzV/3LJlBW05qUN2Hqn/wBrgrElwKQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEglDb2luUnVsZXMaCUNvaW5SdWxlcxrpCwrmCxJfEl1SW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2IS/AoS+QoK9goS7QoS6goK5woSiQIShgIKgwISFhIUChISEBIOMgwwLjAzMDAwMDAwMDASFhIUChISEBIOMgwwLjAwMDAwNDgyMjUSpAESoQEKngESEBIOMgwwLjAxMDAwMDAwMDASiQEShgEigwEKKAomEhISEDIOMTAwLjAwMDAwMDAwMDASEBIOMgwwLjAwMTAwMDAwMDAKKQonEhMSETIPMTAwMC4wMDAwMDAwMDAwEhASDjIMMC4wMDAxMDAwMDAwCiwKKhIWEhQyEjEwMDAwMDAuMDAwMDAwMDAwMBIQEg4yDDAuMDAwMDEwMDAwMBIWEhQKEhIQEg4yDDAuMDA1MDAwMDAwMBIFEgMoyAESBRIDKMgBEgQSAihkEuQFEuEFCt4FEnwSegp4EhoSGDIWNDAwMDAwMDAwMDAuMDAwMDAwMDAwMBIQEg4yDDAuNTAwMDAwMDAwMBIQEg4yDDAuMTUwMDAwMDAwMBIQEg4yDDAuMjAwMDAwMDAwMBISEhAyDjEwMC4wMDAwMDAwMDAwEhASDjIMMC42MDAwMDAwMDAwEt0EEtoEItcECpMBCpABEhASDgoMEgoSCCiAwM/g6JUHEnwSegp4EhoSGDIWMjAwMDAwMDAwMDAuMDAwMDAwMDAwMBIQEg4yDDAuMTIwMDAwMDAwMBIQEg4yDDAuNDAwMDAwMDAwMBIQEg4yDDAuMjAwMDAwMDAwMBISEhAyDjEwMC4wMDAwMDAwMDAwEhASDjIMMC42MDAwMDAwMDAwCpMBCpABEhASDgoMEgoSCCiAwO6husEVEnwSegp4EhoSGDIWMTAwMDAwMDAwMDAuMDAwMDAwMDAwMBIQEg4yDDAuMTgwMDAwMDAwMBIQEg4yDDAuNjIwMDAwMDAwMBIQEg4yDDAuMjAwMDAwMDAwMBISEhAyDjEwMC4wMDAwMDAwMDAwEhASDjIMMC42MDAwMDAwMDAwCpIBCo8BEhASDgoMEgoSCCiAgJvGl9pHEnsSeQp3EhkSFzIVNTAwMDAwMDAwMC4wMDAwMDAwMDAwEhASDjIMMC4yMTAwMDAwMDAwEhASDjIMMC42OTAwMDAwMDAwEhASDjIMMC4yMDAwMDAwMDAwEhISEDIOMTAwLjAwMDAwMDAwMDASEBIOMgwwLjYwMDAwMDAwMDAKkwEKkAESERIPCg0SCxIJKICAtoyvtI8BEnsSeQp3EhkSFzIVMjUwMDAwMDAwMC4wMDAwMDAwMDAwEhASDjIMMC4yMDAwMDAwMDAwEhASDjIMMC43NTAwMDAwMDAwEhASDjIMMC4yMDAwMDAwMDAwEhISEDIOMTAwLjAwMDAwMDAwMDASEBIOMgwwLjYwMDAwMDAwMDASjgISiwIKiAISaBJmCmQSYhJgkgFdClsKVUJTZ2xvYmFsLWRvbWFpbjo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2ISAmIAElcSVUJTZ2xvYmFsLWRvbWFpbjo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2ISQxJBCj8SHRIbChkSBxIFKICS9AESDhIMCgoSCBIGKICYmrwEEhASDjIMMS4wMDAwMDAwMDAwEgUSAyiQAxIFEgMo0A8SDhIMCgoSCBIGKIDGho8BElESTwpNEgkSB0IFMC4xLjASCRIHQgUwLjEuMBIJEgdCBTAuMS4wEgkSB0IFMC4xLjASCRIHQgUwLjEuMBIJEgdCBTAuMS4wEgkSB0IFMC4xLjASBBICIgASBBICWAEqW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2JCKAomCiQIARIgkQYVf4Iaq4CbmMsFq8AaQR+lFNoQkBeYPXMF426qqSM=",
+      "created_at": "1970-01-01T00:00:00Z"
+    },
+    {
+      "template_id": "deadbeef001:CC.Coin:UnclaimedReward",
+      "contract_id": "007a7cf290ce574cc77cff3bfaca4c0a5488061f23a7e950bfaa90c14c7b8aa341ca0212208054c9d9a0e6448252318675ba91825b71f787044d7e88daa25366757cae246a",
+      "payload": {
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+        "amount": "123668.1887366819"
       },
-      "create_arguments_blob": ""
+      "created_event_blob": "CgIxNRKyAwpFAHp88pDOV0zHfP87+spMClSIBh8jp+lQv6qQwUx7iqNBygISIIBUydmg5kSCUjGGdbqRgltx94cETX6I2qJTZnV8riRqEl0KQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEgRDb2luGg9VbmNsYWltZWRSZXdhcmQaegp4El8SXVJbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhIVEhMyETEyMzY2OC4xODg3MzY2ODE5KltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiOQBoiQkAAAAAQigKJgokCAESIMs3lHjO1NwFGsQlwgxrW64uXgtL+COS8wFBZhssIU5F",
+      "created_at": "1970-01-01T00:02:40Z"
+    },
+    {
+      "template_id": "deadbeef001:CC.GlobalDomain:MemberTraffic",
+      "contract_id": "00c53f0347c1358274ed80da4f7d8b219576621f19ea5b84ca2d463c41bb171c11ca021220538fb1993f44202002e9ad18ddcb49b5f6b0cbc6de8660759d34ba3d2b63305b",
+      "payload": {
+        "usdSpent": "0.0",
+        "ccSpent": "0.0",
+        "numPurchases": "0",
+        "domainId": "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+        "totalPurchased": "1000000",
+        "memberId": "PAR::sv1Participant::122022a627f9b39c854dc6c26c0f71c7112b1f9664133a0cd88431fac50880ba3616"
+      },
+      "created_event_blob": "CgIxNRKEBQpFAMU/A0fBNYJ07YDaT32LIZV2Yh8Z6luEyi1GPEG7FxwRygISIFOPsZk/RCAgAumtGN3LSbX2sMvG3oZgdZ00uj0rYzBbEmMKQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEgxHbG9iYWxEb21haW4aDU1lbWJlclRyYWZmaWMazgIKywISXxJdUltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiEl0SW0JZUEFSOjpzdjFQYXJ0aWNpcGFudDo6MTIyMDIyYTYyN2Y5YjM5Yzg1NGRjNmMyNmMwZjcxYzcxMTJiMWY5NjY0MTMzYTBjZDg4NDMxZmFjNTA4ODBiYTM2MTYSVxJVQlNnbG9iYWwtZG9tYWluOjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhIGEgQogIl6EgQSAigAEhASDjIMMC4wMDAwMDAwMDAwEhASDjIMMC4wMDAwMDAwMDAwKltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiQigKJgokCAESICKQ9Ftmi/3hEpm1Wu1NThX5i+dVIMdeMhA34vxrR0DO",
+      "created_at": "1970-01-01T00:00:00Z"
+    },
+    {
+      "template_id": "deadbeef001:CC.Round:IssuingMiningRound",
+      "contract_id": "002d11c5440776dfa01b2be5867a132058075a742b8f15ee4003ed44d610a9e97bca021220b98804e89e8ef09a651b4971083235861629e920a049d185bb3a6ef9649ed85e",
+      "payload": {
+        "issuancePerFeaturedAppRewardCoupon": "100.0",
+        "opensAt": "1970-01-01T00:05:10Z",
+        "targetClosesAt": "1970-01-01T00:10:10Z",
+        "issuancePerUnfeaturedAppRewardCoupon": "0.6",
+        "issuancePerValidatorRewardCoupon": "0.2",
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+        "round": {
+          "number": "0"
+        }
+      },
+      "created_event_blob": "CgIxNRL/AwpFAC0RxUQHdt+gGyvlhnoTIFgHWnQrjxXuQAPtRNYQqel7ygISILmIBOiejvCaZRtJcQgyNYYWKekgoEnRhbs6bvlkntheEmEKQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEgVSb3VuZBoSSXNzdWluZ01pbmluZ1JvdW5kGsIBCr8BEl8SXVJbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhIKEggKBhIEEgIoABIQEg4yDDAuMjAwMDAwMDAwMBISEhAyDjEwMC4wMDAwMDAwMDAwEhASDjIMMC42MDAwMDAwMDAwEgsSCUmAOXoSAAAAABILEglJgNxbJAAAAAAqW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2I5AGiJCQAAAABCKAomCiQIARIgE2NUJS3CTKE1mD/KcJ8lB5z5L7kIQ94L5cThT48E4Ok=",
+      "created_at": "1970-01-01T00:02:40Z"
     },
     {
       "template_id": "deadbeef001:CC.Round:OpenMiningRound",
-      "contract_id": "004301ca9aae1094cc0eb3085783904319465c3217d73393e28a3b22f11f6daae7ca011220c84fa3ea02f43405ea186476761fbdd8b6ab70ee5a0210891ef5fc5c7d9f8fdd",
+      "contract_id": "0089846cd5c586e2bd79de051da87783c04580b05a3325ebbf5c2ec87980cf6c33ca021220dcd2725753003aecf238947f4082194d361c6a7d3481df211bfc0dc83ea33bdf",
       "payload": {
         "issuingFor": {
           "microseconds": "150000000"
@@ -203,21 +373,17 @@
         "tickDuration": {
           "microseconds": "150000000"
         },
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
         "round": {
           "number": "1"
         }
       },
-      "metadata": {
-        "createdAt": "0",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a240801122056a7a9f03f7079a3a8f3d734fad1a7a8dfa5f9390389d547eecc3b56de40657a"
-      },
-      "create_arguments_blob": ""
+      "created_event_blob": "CgIxNRL3BgpFAImEbNXFhuK9ed4FHah3g8BFgLBaMyXrv1wuyHmAz2wzygISINzScldTADrs8jiUf0CCGU02HGp9NIHfIRv8Dcg+ozvfEl4KQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEgVSb3VuZBoPT3Blbk1pbmluZ1JvdW5kGsYECsMEEl8SXVJbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhIKEggKBhIEEgIoAhIQEg4yDDEuMDAwMDAwMDAwMBILEglJAAAAAAAAAAASCxIJSQCj4REAAAAAEg4SDAoKEggSBiiAxoaPARKJAhKGAgqDAhIWEhQKEhIQEg4yDDAuMDMwMDAwMDAwMBIWEhQKEhIQEg4yDDAuMDAwMDA0ODIyNRKkARKhAQqeARIQEg4yDDAuMDEwMDAwMDAwMBKJARKGASKDAQooCiYSEhIQMg4xMDAuMDAwMDAwMDAwMBIQEg4yDDAuMDAxMDAwMDAwMAopCicSExIRMg8xMDAwLjAwMDAwMDAwMDASEBIOMgwwLjAwMDEwMDAwMDAKLAoqEhYSFDISMTAwMDAwMC4wMDAwMDAwMDAwEhASDjIMMC4wMDAwMTAwMDAwEhYSFAoSEhASDjIMMC4wMDUwMDAwMDAwEgUSAyjIARIFEgMoyAESBBICKGQSfBJ6CngSGhIYMhY0MDAwMDAwMDAwMC4wMDAwMDAwMDAwEhASDjIMMC41MDAwMDAwMDAwEhASDjIMMC4xNTAwMDAwMDAwEhASDjIMMC4yMDAwMDAwMDAwEhISEDIOMTAwLjAwMDAwMDAwMDASEBIOMgwwLjYwMDAwMDAwMDASDhIMCgoSCBIGKIDGho8BKltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiQigKJgokCAESIJhV33yMxA/f8BKXTCdW3MwDZCwAGCRdt/f6QD6suQYa",
+      "created_at": "1970-01-01T00:00:00Z"
     },
     {
       "template_id": "deadbeef001:CC.Round:OpenMiningRound",
-      "contract_id": "00dd3369f43f7f766f7c7055d51f88694454de5148890e72f315d3086a7fbd9844ca0112204fd6eb2abb99653957275159a6c7b7f7ea7dc6f7dc4c470fead6293964658b3e",
+      "contract_id": "0002a171921f0030ac4099aa53b111b77190a14d2bb2cc3e02b2db336b29024fe5ca021220ef8aab1700af3e71e0a8c75b16104964dbe324dbeb05ae2af202ee37e5512fd4",
       "payload": {
         "issuingFor": {
           "microseconds": "300000000"
@@ -267,189 +433,17 @@
         "tickDuration": {
           "microseconds": "150000000"
         },
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
         "round": {
           "number": "2"
         }
       },
-      "metadata": {
-        "createdAt": "0",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112204910355cbe03dcf632bf7395faf65be808c86956a6036bb0b47d3790d187ea4a"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CN.SVC.CoinPrice:CoinPriceVote",
-      "contract_id": "008a632271aaa2186da2e80dfbd820c8a01f061e80edad31ca29a71cd343db28c2ca0112203618c8a755824a2a628bba86c82b1c7d84af37e87e36c101fc3a31058f41dcc1",
-      "payload": {
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "sv": "canton-foundation-1-55cef83::122046b17ae474a099d7c67778bad72998c80cef1bd70eb8101a41c126438c73a99d",
-        "coinPrice": "1.0",
-        "lastUpdatedAt": "1970-01-01T00:00:00Z"
-      },
-      "metadata": {
-        "createdAt": "0",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220eebeff8cb92cd70c206867e657122ab096c374cbbfe100c0d9b916a0ef1cbd87"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CN.SvcRules:SvcRules",
-      "contract_id": "004ea4bcb1f7f5c2d619287d7fe6e76f349bacbdbaeb11c2a87c875b0aca821c01ca011220fb105f9316b3bfdd2b654d9cec6d02d2edc6509232afc3a54e4c3023f33ea354",
-      "payload": {
-        "epoch": "0",
-        "initialTrafficState": [],
-        "leader": "canton-foundation-1-55cef83::122046b17ae474a099d7c67778bad72998c80cef1bd70eb8101a41c126438c73a99d",
-        "isDevNet": true,
-        "lock": false,
-        "config": {
-          "domainNodeConfigLimits": {
-            "cometBft": {
-              "maxNumSequencingKeys": "2",
-              "maxNodeIdLength": "50",
-              "maxNumCometBftNodes": "2",
-              "maxPubKeyLength": "256",
-              "maxNumGovernanceKeys": "2"
-            }
-          },
-          "svOnboardingRequestTimeout": {
-            "microseconds": "86400000000"
-          },
-          "numUnclaimedRewardsThreshold": "10",
-          "actionConfirmationTimeout": {
-            "microseconds": "300000000"
-          },
-          "leaderInactiveTimeout": {
-            "microseconds": "70000000"
-          },
-          "voteRequestTimeout": {
-            "microseconds": "604800000000"
-          },
-          "initialTrafficGrant": "1000000",
-          "svOnboardingConfirmedTimeout": {
-            "microseconds": "86400000000"
-          },
-          "globalDomain": {
-            "domains": [
-              [
-                "0",
-                {
-                  "state": "DS_Operational",
-                  "cometBftGenesisJson": "TODO(#4900): share CometBFT genesis.json of founding SV node via SvcRules config."
-                }
-              ]
-            ],
-            "lastDomainNumber": "0",
-            "activeDomain": "0"
-          },
-          "maxTextLength": "1024"
-        },
-        "members": [
-          [
-            "canton-foundation-1-55cef83::122046b17ae474a099d7c67778bad72998c80cef1bd70eb8101a41c126438c73a99d",
-            {
-              "name": "Canton-Foundation-1",
-              "joinedAsOfRound": {
-                "number": "0"
-              },
-              "domainNodes": []
-            }
-          ]
-        ],
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f"
-      },
-      "metadata": {
-        "createdAt": "0",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220967be0c880fbfbbc8d7fa47d585a0712f50446bbc905484c61294929f7a74ebd"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CC.GlobalDomain:ValidatorTraffic",
-      "contract_id": "00a9c5c622f32cf8ede97e01f93c48953bf0ec85373354bb2ea1ef14517ddd8cdfca011220ea8956d28c1b9394642058faa66eaeab1da44869c562bc10aad26731e66d2725",
-      "payload": {
-        "usdSpent": "0.0",
-        "ccSpent": "0.0",
-        "lastPurchasedAt": "0001-01-01T00:00:00Z",
-        "numPurchases": "0",
-        "validator": "canton-foundation-1-55cef83::122046b17ae474a099d7c67778bad72998c80cef1bd70eb8101a41c126438c73a99d",
-        "domainId": "global-domain::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "totalPurchased": "1000000"
-      },
-      "metadata": {
-        "createdAt": "0",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220ec873a82e079e72fe530322d805bdc6cd814fb25c117708f4390a6a03e4a88a1"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
-      "contract_id": "006ed68b224dafd7d4bbe8c63d3bb2460727b1a7994ae55162424665fc78a3c717ca0112208d38a5cbcdfca5a7abd7f3b6a0de11316192a0c70818d3f4b057f72a002b27b5",
-      "payload": {
-        "validator": "canton-foundation-1-55cef83::122046b17ae474a099d7c67778bad72998c80cef1bd70eb8101a41c126438c73a99d",
-        "sponsor": "canton-foundation-1-55cef83::122046b17ae474a099d7c67778bad72998c80cef1bd70eb8101a41c126438c73a99d",
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f"
-      },
-      "metadata": {
-        "createdAt": "0",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220f97d2aa11790870f379cc0a55fd51143b4579483c80957a386914d979c80dc6d"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
-      "contract_id": "0054484559777bf0f26d1799a6f3c7a4aae6f4c145705e298892e01786204df3cdca011220b8263ff4db0ad690af59db264db1a426b384b325a10561df66f5541c2466da9b",
-      "payload": {
-        "validator": "alice__validator__user-55cef83::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1",
-        "sponsor": "canton-foundation-1-55cef83::122046b17ae474a099d7c67778bad72998c80cef1bd70eb8101a41c126438c73a99d",
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f"
-      },
-      "metadata": {
-        "createdAt": "0",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220c4d81a1b8d9ab15f264a00d8002542d6a18ba1958954d1c08571ce23a2ea0d8a"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
-      "contract_id": "008f3839b5642940d9870446d5c58dc7d62ed268666ecc4cdf9bcb0116fd160504ca011220a972eb43a1e42c315965f1e7df8c47e7cab3764e1431141746994b12ef2869cd",
-      "payload": {
-        "validator": "bob__validator__user-55cef83::1220b98732f0778424014608adba1c09a93874e459ba75038504da88215bdeb84d37",
-        "sponsor": "canton-foundation-1-55cef83::122046b17ae474a099d7c67778bad72998c80cef1bd70eb8101a41c126438c73a99d",
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f"
-      },
-      "metadata": {
-        "createdAt": "0",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a240801122006cb07d2946f597cce9ab68e98903dc6287de186801d9ba0c8e7b6b545996289"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
-      "contract_id": "008a285794edd124624e3a25d23d3c13cbbc2adbdd2465535bed5e648752f3ea15ca01122031ee12090feb99c57136153a376cdbb0a883864fbafc464b2bb6eaf75d48bb1f",
-      "payload": {
-        "validator": "splitwell__validator__user-55cef83::1220abcdad7753c4921e5bcad7f3ca1890366fd23892079e928d9240a46f48d9177c",
-        "sponsor": "canton-foundation-1-55cef83::122046b17ae474a099d7c67778bad72998c80cef1bd70eb8101a41c126438c73a99d",
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f"
-      },
-      "metadata": {
-        "createdAt": "0",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220de87089a8aabbdfc7957f7c451ff85b4a449b740506304f8af880af7c3dc5cf1"
-      },
-      "create_arguments_blob": ""
+      "created_event_blob": "CgIxNRL3BgpFAAKhcZIfADCsQJmqU7ERt3GQoU0rssw+ArLbM2spAk/lygISIO+KqxcArz5x4KjHWxYQSWTb4yTb6wWuKvIC7jflUS/UEl4KQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEgVSb3VuZBoPT3Blbk1pbmluZ1JvdW5kGsYECsMEEl8SXVJbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhIKEggKBhIEEgIoBBIQEg4yDDEuMDAwMDAwMDAwMBILEglJgNHwCAAAAAASCxIJSYB00hoAAAAAEg4SDAoKEggSBiiAjI2eAhKJAhKGAgqDAhIWEhQKEhIQEg4yDDAuMDMwMDAwMDAwMBIWEhQKEhIQEg4yDDAuMDAwMDA0ODIyNRKkARKhAQqeARIQEg4yDDAuMDEwMDAwMDAwMBKJARKGASKDAQooCiYSEhIQMg4xMDAuMDAwMDAwMDAwMBIQEg4yDDAuMDAxMDAwMDAwMAopCicSExIRMg8xMDAwLjAwMDAwMDAwMDASEBIOMgwwLjAwMDEwMDAwMDAKLAoqEhYSFDISMTAwMDAwMC4wMDAwMDAwMDAwEhASDjIMMC4wMDAwMTAwMDAwEhYSFAoSEhASDjIMMC4wMDUwMDAwMDAwEgUSAyjIARIFEgMoyAESBBICKGQSfBJ6CngSGhIYMhY0MDAwMDAwMDAwMC4wMDAwMDAwMDAwEhASDjIMMC41MDAwMDAwMDAwEhASDjIMMC4xNTAwMDAwMDAwEhASDjIMMC4yMDAwMDAwMDAwEhISEDIOMTAwLjAwMDAwMDAwMDASEBIOMgwwLjYwMDAwMDAwMDASDhIMCgoSCBIGKIDGho8BKltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiQigKJgokCAESIFv2YQHB0epyasubEvwZWv++kV92mpoL8qH6KoI+hGuJ",
+      "created_at": "1970-01-01T00:00:00Z"
     },
     {
       "template_id": "deadbeef001:CC.Round:OpenMiningRound",
-      "contract_id": "00a95f280b727c8f7c1a37752e336dcb9f409bf28c5f10613cf0b18986c37f1a13ca011220565624121f63b5802006781ef4848f67a168f636662888ccc08c97a7bc04aba9",
+      "contract_id": "00bb8c48ea847f5be33061a87580c2441d9be87c3b61d1098ae778410ec456701bca02122093bdcbdbed086d540a326526b6064599f48e376e03f1d19c2f62e4d3cf9136be",
       "payload": {
         "issuingFor": {
           "microseconds": "450000000"
@@ -499,178 +493,224 @@
         "tickDuration": {
           "microseconds": "150000000"
         },
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
         "round": {
           "number": "3"
         }
       },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112209ef024c81ba7f09c312d653dbe0f03a50cfb78aea593c89b1b0e2e8f5f56f2ce"
-      },
-      "create_arguments_blob": ""
+      "created_event_blob": "CgIxNRKABwpFALuMSOqEf1vjMGGodYDCRB2b6Hw7YdEJiud4QQ7EVnAbygISIJO9y9vtCG1UCjJlJrYGRZn0jjduA/HRnC9i5NPPkTa+El4KQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEgVSb3VuZBoPT3Blbk1pbmluZ1JvdW5kGsYECsMEEl8SXVJbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhIKEggKBhIEEgIoBhIQEg4yDDEuMDAwMDAwMDAwMBILEglJgDl6EgAAAAASCxIJSYDcWyQAAAAAEg4SDAoKEggSBiiA0pOtAxKJAhKGAgqDAhIWEhQKEhIQEg4yDDAuMDMwMDAwMDAwMBIWEhQKEhIQEg4yDDAuMDAwMDA0ODIyNRKkARKhAQqeARIQEg4yDDAuMDEwMDAwMDAwMBKJARKGASKDAQooCiYSEhIQMg4xMDAuMDAwMDAwMDAwMBIQEg4yDDAuMDAxMDAwMDAwMAopCicSExIRMg8xMDAwLjAwMDAwMDAwMDASEBIOMgwwLjAwMDEwMDAwMDAKLAoqEhYSFDISMTAwMDAwMC4wMDAwMDAwMDAwEhASDjIMMC4wMDAwMTAwMDAwEhYSFAoSEhASDjIMMC4wMDUwMDAwMDAwEgUSAyjIARIFEgMoyAESBBICKGQSfBJ6CngSGhIYMhY0MDAwMDAwMDAwMC4wMDAwMDAwMDAwEhASDjIMMC41MDAwMDAwMDAwEhASDjIMMC4xNTAwMDAwMDAwEhASDjIMMC4yMDAwMDAwMDAwEhISEDIOMTAwLjAwMDAwMDAwMDASEBIOMgwwLjYwMDAwMDAwMDASDhIMCgoSCBIGKIDGho8BKltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiOQBoiQkAAAAAQigKJgokCAESIDUNK9V9ZafvEvG9FcnfTaucCDc1sokLWy+93YYPRPCZ",
+      "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.Coin:UnclaimedReward",
-      "contract_id": "00cb89d65a06e07dd1ec1c5e0e2b848dbafccdafab0ec97646665b1f9c4ea0eccbca0112200ec786b83875d44065aae98b42c5d2754c27adb73cc26e218bf5e24846f88204",
+      "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
+      "contract_id": "0094f7b3123703bccdb92e4983c9c26eb5dbf004ecfea22f7eab1f67ea727d9d5dca021220ad12eb01411597a797bfbb7f90f15bb97915678ae7d825eba83ea706e4994e9c",
       "payload": {
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "amount": "123668.1887366819"
+        "validator": "canton-foundation-1-fbae5254::122022a627f9b39c854dc6c26c0f71c7112b1f9664133a0cd88431fac50880ba3616",
+        "sponsor": "canton-foundation-1-fbae5254::122022a627f9b39c854dc6c26c0f71c7112b1f9664133a0cd88431fac50880ba3616",
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b"
       },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112201ffa8289767e34632afe316cc57deffd6b50e6caaa49f7b3704e14dbb3b32e55"
-      },
-      "create_arguments_blob": ""
+      "created_event_blob": "CgIxNRLVBQpFAJT3sxI3A7zNuS5Jg8nCbrXb8ATs/qIvfqsfZ+pyfZ1dygISIK0S6wFBFZenl7+7f5DxW7l5FWeK59gl66g+pwbkmU6cEmoKQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEhBWYWxpZGF0b3JMaWNlbnNlGhBWYWxpZGF0b3JMaWNlbnNlGrQCCrECEmYSZFJiY2FudG9uLWZvdW5kYXRpb24tMS1mYmFlNTI1NDo6MTIyMDIyYTYyN2Y5YjM5Yzg1NGRjNmMyNmMwZjcxYzcxMTJiMWY5NjY0MTMzYTBjZDg4NDMxZmFjNTA4ODBiYTM2MTYSZhJkUmJjYW50b24tZm91bmRhdGlvbi0xLWZiYWU1MjU0OjoxMjIwMjJhNjI3ZjliMzljODU0ZGM2YzI2YzBmNzFjNzExMmIxZjk2NjQxMzNhMGNkODg0MzFmYWM1MDg4MGJhMzYxNhJfEl1SW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2IqW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2IyYmNhbnRvbi1mb3VuZGF0aW9uLTEtZmJhZTUyNTQ6OjEyMjAyMmE2MjdmOWIzOWM4NTRkYzZjMjZjMGY3MWM3MTEyYjFmOTY2NDEzM2EwY2Q4ODQzMWZhYzUwODgwYmEzNjE2QigKJgokCAESIOpjRJe0jbjgAx70JJOy7p3G7tcR10oZYUD2g5H+qlJ5",
+      "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CC.Round:IssuingMiningRound",
-      "contract_id": "006e32ce358f3293c907d3a2bd6dad6bae487fe8b1efc7cdc42a0df1b4da6d8bf6ca0112205ec7ffdbb83f92e49fbd7b431d652158bf664cc9349729579483c4428668bcd2",
+      "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
+      "contract_id": "008aae2d81bc1ceef31c5c04955716b219ec41f447348c107b6b2128941b459a73ca0212203ea44e0db8633f6c84d9f429ceb912927611c8a517d745035a3a1c34117d6621",
       "payload": {
-        "issuancePerFeaturedAppRewardCoupon": "100.0",
-        "opensAt": "1970-01-01T00:05:10Z",
-        "targetClosesAt": "1970-01-01T00:10:10Z",
-        "issuancePerUnfeaturedAppRewardCoupon": "0.6",
-        "issuancePerValidatorRewardCoupon": "0.2",
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "round": {
-          "number": "0"
-        }
+        "validator": "bob__validator__user-fbae5254::1220792ad917e8da5de02ebf27408f25ba6d5e75b251d44cb0709cad4ae4bce142ef",
+        "sponsor": "canton-foundation-1-fbae5254::122022a627f9b39c854dc6c26c0f71c7112b1f9664133a0cd88431fac50880ba3616",
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b"
       },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220f56723d0f0cee0d7962cbf25cc2bc1e6c315ca414b0ae42ba444a861e168e3be"
-      },
-      "create_arguments_blob": ""
+      "created_event_blob": "CgIxNRLXBQpFAIquLYG8HO7zHFwElVcWshnsQfRHNIwQe2shKJQbRZpzygISID6kTg24Yz9shNn0Kc65EpJ2EcilF9dFA1o6HDQRfWYhEmoKQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEhBWYWxpZGF0b3JMaWNlbnNlGhBWYWxpZGF0b3JMaWNlbnNlGrUCCrICEmcSZVJjYm9iX192YWxpZGF0b3JfX3VzZXItZmJhZTUyNTQ6OjEyMjA3OTJhZDkxN2U4ZGE1ZGUwMmViZjI3NDA4ZjI1YmE2ZDVlNzViMjUxZDQ0Y2IwNzA5Y2FkNGFlNGJjZTE0MmVmEmYSZFJiY2FudG9uLWZvdW5kYXRpb24tMS1mYmFlNTI1NDo6MTIyMDIyYTYyN2Y5YjM5Yzg1NGRjNmMyNmMwZjcxYzcxMTJiMWY5NjY0MTMzYTBjZDg4NDMxZmFjNTA4ODBiYTM2MTYSXxJdUltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiKltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiMmNib2JfX3ZhbGlkYXRvcl9fdXNlci1mYmFlNTI1NDo6MTIyMDc5MmFkOTE3ZThkYTVkZTAyZWJmMjc0MDhmMjViYTZkNWU3NWIyNTFkNDRjYjA3MDljYWQ0YWU0YmNlMTQyZWZCKAomCiQIARIgTObXFZ04MMnUq8nIybxxyh3UMWmjJ/j93zAJmgAnMqc=",
+      "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CC.Coin:Coin",
-      "contract_id": "0011aa8d34ee7a0d32d2abc0edb5fe4f295373edd25e8894bb728eb54c51bd3548ca0112204cc67839a29084c379411603ed9c65efe0c22572bc3468294ff275216d3b7edc",
+      "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
+      "contract_id": "00f2b68e825ed53bfa638bf765a081b42cd56d2d06ceb762b6fce0b2b6bd95b655ca0212208fd19ef64427defd60ed432afec9d6628c8e885aec40d65f14eef436891906d0",
       "payload": {
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "owner": "canton-foundation-1-55cef83::122046b17ae474a099d7c67778bad72998c80cef1bd70eb8101a41c126438c73a99d",
-        "amount": {
-          "initialAmount": "66590.5631659056",
-          "createdAt": {
-            "number": "3"
+        "validator": "alice__validator__user-fbae5254::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250",
+        "sponsor": "canton-foundation-1-fbae5254::122022a627f9b39c854dc6c26c0f71c7112b1f9664133a0cd88431fac50880ba3616",
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b"
+      },
+      "created_event_blob": "CgIxNRLbBQpFAPK2joJe1Tv6Y4v3ZaCBtCzVbS0Gzrditvzgsra9lbZVygISII/RnvZEJ979YO1DKv7J1mKMjoha7EDWXxTu9DaJGQbQEmoKQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEhBWYWxpZGF0b3JMaWNlbnNlGhBWYWxpZGF0b3JMaWNlbnNlGrcCCrQCEmkSZ1JlYWxpY2VfX3ZhbGlkYXRvcl9fdXNlci1mYmFlNTI1NDo6MTIyMDNkMzQ3YmZlYzlhN2Y2ZjJiMDI3YWQ1NDUxYjU1ZDkyMGZkNGY5MzBhNWFiNGQ1ZGY3MDRiYjNiMWY2YWIyNTASZhJkUmJjYW50b24tZm91bmRhdGlvbi0xLWZiYWU1MjU0OjoxMjIwMjJhNjI3ZjliMzljODU0ZGM2YzI2YzBmNzFjNzExMmIxZjk2NjQxMzNhMGNkODg0MzFmYWM1MDg4MGJhMzYxNhJfEl1SW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2IqW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2IyZWFsaWNlX192YWxpZGF0b3JfX3VzZXItZmJhZTUyNTQ6OjEyMjAzZDM0N2JmZWM5YTdmNmYyYjAyN2FkNTQ1MWI1NWQ5MjBmZDRmOTMwYTVhYjRkNWRmNzA0YmIzYjFmNmFiMjUwQigKJgokCAESIHiROrhlsPiIctQeR9+jKzrLZM5OVqyVNkeXnP+rKVnK",
+      "created_at": "1970-01-01T00:00:00Z"
+    },
+    {
+      "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
+      "contract_id": "00b354967cb839753f19a1495594a443e409539487c52a3d18641eb37a5e7d42dbca021220e54cd09c37b616967243d22a6932a8361a63ffbc0160c617481f8b2da6204089",
+      "payload": {
+        "validator": "splitwell__validator__user-fbae5254::12201b4b3dc69d968e32513982e4a412b76e1430b394bf8c13a35267fa4e33bd5c31",
+        "sponsor": "canton-foundation-1-fbae5254::122022a627f9b39c854dc6c26c0f71c7112b1f9664133a0cd88431fac50880ba3616",
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b"
+      },
+      "created_event_blob": "CgIxNRLjBQpFALNUlny4OXU/GaFJVZSkQ+QJU5SHxSo9GGQes3pefULbygISIOVM0Jw3thaWckPSKmkyqDYaY/+8AWDGF0gfiy2mIECJEmoKQGM4NDkyMGU3MzFhODBkMjZiODRmMzk0YTM1ZWU4ZGE5NTE0Y2E1MmMyYTk3MzA0ZjY3NjQ5ZThlZDc0NWE4ODUSAkNDEhBWYWxpZGF0b3JMaWNlbnNlGhBWYWxpZGF0b3JMaWNlbnNlGrsCCrgCEm0Sa1Jpc3BsaXR3ZWxsX192YWxpZGF0b3JfX3VzZXItZmJhZTUyNTQ6OjEyMjAxYjRiM2RjNjlkOTY4ZTMyNTEzOTgyZTRhNDEyYjc2ZTE0MzBiMzk0YmY4YzEzYTM1MjY3ZmE0ZTMzYmQ1YzMxEmYSZFJiY2FudG9uLWZvdW5kYXRpb24tMS1mYmFlNTI1NDo6MTIyMDIyYTYyN2Y5YjM5Yzg1NGRjNmMyNmMwZjcxYzcxMTJiMWY5NjY0MTMzYTBjZDg4NDMxZmFjNTA4ODBiYTM2MTYSXxJdUltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiKltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiMmlzcGxpdHdlbGxfX3ZhbGlkYXRvcl9fdXNlci1mYmFlNTI1NDo6MTIyMDFiNGIzZGM2OWQ5NjhlMzI1MTM5ODJlNGE0MTJiNzZlMTQzMGIzOTRiZjhjMTNhMzUyNjdmYTRlMzNiZDVjMzFCKAomCiQIARIgq8YKiSTOrHcbYjB4v9Xz38DtGuxoQu4FK2OMkmmp7rs=",
+      "created_at": "1970-01-01T00:00:00Z"
+    },
+    {
+      "template_id": "deadbeef001:CN.Cns:CnsEntry",
+      "contract_id": "00e55014b4748e8576ad6bcd232cbda79efeeff5b07459e0d004ddcb6a5c435886ca0212204541cbf643c4ef169e33f3b2326b8326eb2a3d0d918b0e687363b07aeea1ef86",
+      "payload": {
+        "name": "alice.unverified.cns",
+        "url": "https://cns-dir-url.com",
+        "description": "Sample CNS Directory Entry Description",
+        "expiresAt": "1970-04-01T00:02:40Z",
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+        "user": "alice__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250"
+      },
+      "created_event_blob": "CgIxNRLbBQpFAOVQFLR0joV2rWvNIyy9p57+7/WwdFng0ATdy2pcQ1iGygISIEVBy/ZDxO8WnjPzsjJrgybrKj0NkYsOaHNjsHruoe+GElUKQGQyODAxNDM5MDU5MDMwMzM3MmY5NGI0NmNhODUzODA1OTk1NTJkYzRkNzU1MmY2NDA2OTRmM2U5MDFjZjFlMGMSAkNOEgNDbnMaCENuc0VudHJ5GsECCr4CEmsSaVJnYWxpY2VfX3dhbGxldF9fdXNlci1mYmFlNTI1NF9fdGMwOjoxMjIwM2QzNDdiZmVjOWE3ZjZmMmIwMjdhZDU0NTFiNTVkOTIwZmQ0ZjkzMGE1YWI0ZDVkZjcwNGJiM2IxZjZhYjI1MBJfEl1SW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2ISGBIWQhRhbGljZS51bnZlcmlmaWVkLmNucxIbEhlCF2h0dHBzOi8vY25zLWRpci11cmwuY29tEioSKEImU2FtcGxlIENOUyBEaXJlY3RvcnkgRW50cnkgRGVzY3JpcHRpb24SCxIJSQAoQYcSBwAAKmdhbGljZV9fd2FsbGV0X191c2VyLWZiYWU1MjU0X190YzA6OjEyMjAzZDM0N2JmZWM5YTdmNmYyYjAyN2FkNTQ1MWI1NWQ5MjBmZDRmOTMwYTVhYjRkNWRmNzA0YmIzYjFmNmFiMjUwKltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiOQBoiQkAAAAAQigKJgokCAESINkG33qDb2qbde6D+qkVad+fMyHT3CROWy2pqpd+XrwE",
+      "created_at": "1970-01-01T00:02:40Z"
+    },
+    {
+      "template_id": "deadbeef001:CN.Cns:CnsEntryContext",
+      "contract_id": "00a3aadc4a878bdab6693a1eaff09f68c3909a45cd20ef5b8ab29846d0d46a9a0eca0212205f006be6e8474bf3187b5e0f8a89d03734741510071136a06efc00390c07a64e",
+      "payload": {
+        "reference": "004f2bdfe3bb511a7a8c11b2342c24e4060e4bd4b0e2b66a92d8373f8d801aaa08ca02122057b846862c91e0a489a1974a0f29ce292ed1a27584c6c862eb0c21ecdba0348c",
+        "name": "alice.unverified.cns",
+        "url": "https://cns-dir-url.com",
+        "description": "Sample CNS Directory Entry Description",
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+        "user": "alice__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250"
+      },
+      "created_event_blob": "CgIxNRLrBgpFAKOq3EqHi9q2aToer/CfaMOQmkXNIO9birKYRtDUapoOygISIF8Aa+boR0vzGHteD4qJ0Dc0dBUQBxE2oG78ADkMB6ZOElwKQGQyODAxNDM5MDU5MDMwMzM3MmY5NGI0NmNhODUzODA1OTk1NTJkYzRkNzU1MmY2NDA2OTRmM2U5MDFjZjFlMGMSAkNOEgNDbnMaD0Nuc0VudHJ5Q29udGV4dBrKAwrHAxJfEl1SW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2ISaxJpUmdhbGljZV9fd2FsbGV0X191c2VyLWZiYWU1MjU0X190YzA6OjEyMjAzZDM0N2JmZWM5YTdmNmYyYjAyN2FkNTQ1MWI1NWQ5MjBmZDRmOTMwYTVhYjRkNWRmNzA0YmIzYjFmNmFiMjUwEhgSFkIUYWxpY2UudW52ZXJpZmllZC5jbnMSGxIZQhdodHRwczovL2Nucy1kaXItdXJsLmNvbRIqEihCJlNhbXBsZSBDTlMgRGlyZWN0b3J5IEVudHJ5IERlc2NyaXB0aW9uEpMBEpABeo0BCooBMDA0ZjJiZGZlM2JiNTExYTdhOGMxMWIyMzQyYzI0ZTQwNjBlNGJkNGIwZTJiNjZhOTJkODM3M2Y4ZDgwMWFhYTA4Y2EwMjEyMjA1N2I4NDY4NjJjOTFlMGE0ODlhMTk3NGEwZjI5Y2UyOTJlZDFhMjc1ODRjNmM4NjJlYjBjMjFlY2RiYTAzNDhjKmdhbGljZV9fd2FsbGV0X191c2VyLWZiYWU1MjU0X190YzA6OjEyMjAzZDM0N2JmZWM5YTdmNmYyYjAyN2FkNTQ1MWI1NWQ5MjBmZDRmOTMwYTVhYjRkNWRmNzA0YmIzYjFmNmFiMjUwKltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiOQBoiQkAAAAAQigKJgokCAESIOU0cOGH0DWoe2cDTS+pvkVGNFpYy2oLAG8IZwWN/ylr",
+      "created_at": "1970-01-01T00:02:40Z"
+    },
+    {
+      "template_id": "deadbeef001:CN.Cns:CnsRules",
+      "contract_id": "00b8662d1e8f8021fc78e5ebd5641c307a81c81e8f01ea4f62b04fc49a2d0035f1ca0212209697dcd3cae5d613ff5e949d074353e9f6ab33bdeafa84993e628514cf7a9b93",
+      "payload": {
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+        "config": {
+          "renewalDuration": {
+            "microseconds": "2592000000000"
           },
-          "ratePerRound": {
-            "rate": "0.0000048225"
-          }
+          "entryLifetime": {
+            "microseconds": "7776000000000"
+          },
+          "entryFee": "1.0"
         }
       },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220d1e4d0033202fbf3b1dfbd46f16e61ade3116b4df6e6ed866dbdcc85e6b8ccb8"
-      },
-      "create_arguments_blob": ""
+      "created_event_blob": "CgIxNRLIAwpFALhmLR6PgCH8eOXr1WQcMHqByB6PAepPYrBPxJotADXxygISIJaX3NPK5dYT/16UnQdDU+n2qzO96vqEmT5ihRTPepuTElUKQGQyODAxNDM5MDU5MDMwMzM3MmY5NGI0NmNhODUzODA1OTk1NTJkYzRkNzU1MmY2NDA2OTRmM2U5MDFjZjFlMGMSAkNOEgNDbnMaCENuc1J1bGVzGqABCp0BEl8SXVJbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhI6EjgKNhIQEg4KDBIKEggogIDq8++WARIQEg4KDBIKEggogIC+28/EAxIQEg4yDDEuMDAwMDAwMDAwMCpbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YkIoCiYKJAgBEiDU7MnaL2MDLBdWZdfia7rSzaox3cdT4y/mkfsvqHL79g==",
+      "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CC.Coin:LockedCoin",
-      "contract_id": "0056285dd24a2e07605027ea9a529084d08756e451bc9940cb4ed88574711a944cca011220bccb95c4414202a6ed4fbbb0075e31687549ecaf3a288fcb360f4d3f7a246417",
+      "template_id": "deadbeef001:CN.SVC.CoinPrice:CoinPriceVote",
+      "contract_id": "00d2bcf8af8932506f3b9e93eff17567558b8613c8804f7f36989e37dd1f49a437ca021220a8d3c0ebc404b8a99eaeb24b3f36e64269a02186eab815468759588d906e025e",
       "payload": {
-        "coin": {
-          "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-          "owner": "alice__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1",
-          "amount": {
-            "initialAmount": "10.0",
-            "createdAt": {
-              "number": "2"
-            },
-            "ratePerRound": {
-              "rate": "0.0000048225"
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+        "sv": "canton-foundation-1-fbae5254::122022a627f9b39c854dc6c26c0f71c7112b1f9664133a0cd88431fac50880ba3616",
+        "coinPrice": "1.0",
+        "lastUpdatedAt": "1970-01-01T00:00:00Z"
+      },
+      "created_event_blob": "CgIxNRKnBApFANK8+K+JMlBvO56T7/F1Z1WLhhPIgE9/NpieN90fSaQ3ygISIKjTwOvEBLipnq6ySz825kJpoCGG6rgVRodZWI2QbgJeEmUKQDk0MzE4YjQxOGEwN2FmNjc0NTJhMzE2ZmQ4YjgyYjQ5ZDU0NGM2NzhhZDdmZmEzYjhhMDU0M2Q4ZmZmMmIwNTcSAkNOEgNTVkMSCUNvaW5QcmljZRoNQ29pblByaWNlVm90ZRrvAQrsARJfEl1SW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2ISZhJkUmJjYW50b24tZm91bmRhdGlvbi0xLWZiYWU1MjU0OjoxMjIwMjJhNjI3ZjliMzljODU0ZGM2YzI2YzBmNzFjNzExMmIxZjk2NjQxMzNhMGNkODg0MzFmYWM1MDg4MGJhMzYxNhIUEhJyEAoOMgwxLjAwMDAwMDAwMDASCxIJSQAAAAAAAAAAKltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiQigKJgokCAESIIBK/W1wAlIEE1aLEQgjSDkVzp808bca8IgDf8dL/vYS",
+      "created_at": "1970-01-01T00:00:00Z"
+    },
+    {
+      "template_id": "deadbeef001:CN.SvcRules:SvcRules",
+      "contract_id": "00e14ec6d8c6f8df9e2a4ebb2e74afe9fbc1db78e89f2332d434c2f10cf5ec42e8ca021220e268684f645e6b34b8e5911bdf96189b5f96021453fb64e6746076843b5deb38",
+      "payload": {
+        "epoch": "0",
+        "initialTrafficState": [
+          [
+            "MED::globalMediatorSv1::1220c13c811bf8a25130bd0ce4d03cd1ad5ea3cb31fddfc07ea37903ed37b92d8eb1",
+            {
+              "consumedTraffic": "0"
             }
-          }
-        },
-        "lock": {
-          "holders": [],
-          "expiresAt": "1970-01-11T00:02:40Z"
-        }
-      },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a240801122073f08b16e482ab60cdf25bd011c47df42c68fec80dc79d0d70a14c9a24d221de"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CN.Directory:DirectoryInstall",
-      "contract_id": "008a1608488731d489579b6de4b19a3920a7ac86d9e2523651bb6ab8c1d808bf33ca011220d2820ef9f345b6d37531851208553bbbfa638daa02b0cd2054ec27b6fdf449f4",
-      "payload": {
-        "provider": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "entryLifetime": {
-          "microseconds": "7776000000000"
-        },
-        "entryFee": "1.0",
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "renewalDuration": {
-          "microseconds": "86400000000"
-        },
-        "user": "alice__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1"
-      },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220c4a58188b0406dabbbeb9145fff8d2023c2707f720eef69f3056fabff53bc423"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CN.Directory:DirectoryEntryContext",
-      "contract_id": "0085f1c7a97daf8add1f726fd6ee71cfdb9036d0899be92745e3da81a44758bcdeca0112204264b58ffe9ff4f3e182d8eeb356bdaf28263a7f97c623f75c166765821004e7",
-      "payload": {
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "provider": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "user": "alice__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1",
-        "name": "alice.unverified.cns"
-      },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220efaafb8f78bdf1b73852d6e5f63fefdf5c729d8dd3107cdbecf098473e9dc9bd"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CC.Coin:Coin",
-      "contract_id": "001172e36cfc7da367406cb6a812960147a25af602daf9755468e29c16cf5f0794ca011220e1befe169d68454efbf3cc32623fe7b5c69200896cf8fc165e42aa8401d51347",
-      "payload": {
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "owner": "alice__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1",
-        "amount": {
-          "initialAmount": "103.835",
-          "createdAt": {
-            "number": "2"
+          ],
+          [
+            "PAR::sv1Participant::122022a627f9b39c854dc6c26c0f71c7112b1f9664133a0cd88431fac50880ba3616",
+            {
+              "consumedTraffic": "0"
+            }
+          ]
+        ],
+        "config": {
+          "svOnboardingRequestTimeout": {
+            "microseconds": "3600000000"
           },
-          "ratePerRound": {
-            "rate": "0.0000048225"
-          }
-        }
+          "numUnclaimedRewardsThreshold": "10",
+          "actionConfirmationTimeout": {
+            "microseconds": "300000000"
+          },
+          "leaderInactiveTimeout": {
+            "microseconds": "70000000"
+          },
+          "svChallengeDeadline": {
+            "microseconds": "1800000000"
+          },
+          "voteRequestTimeout": {
+            "microseconds": "604800000000"
+          },
+          "domainNodeConfigLimits": {
+            "cometBft": {
+              "maxNumSequencingKeys": "2",
+              "maxNodeIdLength": "50",
+              "maxNumCometBftNodes": "2",
+              "maxPubKeyLength": "256",
+              "maxNumGovernanceKeys": "2"
+            }
+          },
+          "numMemberTrafficContractsThreshold": "5",
+          "initialTrafficGrant": "1000000",
+          "svOnboardingConfirmedTimeout": {
+            "microseconds": "3600000000"
+          },
+          "globalDomain": {
+            "domains": [
+              [
+                "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+                {
+                  "state": "DS_Operational",
+                  "cometBftGenesisJson": "TODO(#4900): share CometBFT genesis.json of founding SV node via SvcRules config."
+                }
+              ]
+            ],
+            "lastDomainId": "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+            "activeDomainId": "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b"
+          },
+          "maxTextLength": "1024"
+        },
+        "leader": "canton-foundation-1-fbae5254::122022a627f9b39c854dc6c26c0f71c7112b1f9664133a0cd88431fac50880ba3616",
+        "isDevNet": true,
+        "members": [
+          [
+            "canton-foundation-1-fbae5254::122022a627f9b39c854dc6c26c0f71c7112b1f9664133a0cd88431fac50880ba3616",
+            {
+              "name": "Canton-Foundation-1",
+              "joinedAsOfRound": {
+                "number": "0"
+              },
+              "domainNodes": [
+                [
+                  "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+                  {
+                    "cometBft": {
+                      "nodes": [],
+                      "governanceKeys": [],
+                      "sequencingKeys": []
+                    },
+                    "sequencer": {
+                      "sequencerId": "SEQ::globalSequencerSv1::1220806545013791363039f19b5ef783f3a3b3aadd8be0489f777201108cd0d7c45a",
+                      "url": "http://localhost:15008",
+                      "availableAfter": "1970-01-01T00:00:00Z"
+                    },
+                    "mediator": {
+                      "mediatorId": "MED::globalMediatorSv1::1220c13c811bf8a25130bd0ce4d03cd1ad5ea3cb31fddfc07ea37903ed37b92d8eb1"
+                    }
+                  }
+                ]
+              ]
+            }
+          ]
+        ],
+        "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b"
       },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220bd4687442337b2ba8d47538ceb032d97ddc2fe08870dd56e50af7940496eca0b"
-      },
-      "create_arguments_blob": ""
+      "created_event_blob": "CgIxNRLQDgpFAOFOxtjG+N+eKk67LnSv6fvB23jonyMy1DTC8Qz17ELoygISIOJoaE9kXms0uOWRG9+WGJtflgIUU/tk5nRgdoQ7Xes4EloKQDk0MzE4YjQxOGEwN2FmNjc0NTJhMzE2ZmQ4YjgyYjQ5ZDU0NGM2NzhhZDdmZmEzYjhhMDU0M2Q4ZmZmMmIwNTcSAkNOEghTdmNSdWxlcxoIU3ZjUnVsZXMaowwKoAwSXxJdUltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiEgQSAigAEqkEEqYEkgGiBAqfBApkUmJjYW50b24tZm91bmRhdGlvbi0xLWZiYWU1MjU0OjoxMjIwMjJhNjI3ZjliMzljODU0ZGM2YzI2YzBmNzFjNzExMmIxZjk2NjQxMzNhMGNkODg0MzFmYWM1MDg4MGJhMzYxNhK2AwqzAxIXEhVCE0NhbnRvbi1Gb3VuZGF0aW9uLTESChIICgYSBBICKAASiwMSiAOSAYQDCoEDClVCU2dsb2JhbC1kb21haW46OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiEqcCCqQCEhcSFQoTEgUSA5IBABIEEgIiABIEEgIiABKcARKZAXKWAQqTAQqQARJhEl9CXVNFUTo6Z2xvYmFsU2VxdWVuY2VyU3YxOjoxMjIwODA2NTQ1MDEzNzkxMzYzMDM5ZjE5YjVlZjc4M2YzYTNiM2FhZGQ4YmUwNDg5Zjc3NzIwMTEwOGNkMGQ3YzQ1YRIaEhhCFmh0dHA6Ly9sb2NhbGhvc3Q6MTUwMDgSDxINcgsKCUkAAAAAAAAAABJqEmhyZgpkCmISYBJeQlxNRUQ6Omdsb2JhbE1lZGlhdG9yU3YxOjoxMjIwYzEzYzgxMWJmOGEyNTEzMGJkMGNlNGQwM2NkMWFkNWVhM2NiMzFmZGRmYzA3ZWEzNzkwM2VkMzdiOTJkOGViMRJmEmRSYmNhbnRvbi1mb3VuZGF0aW9uLTEtZmJhZTUyNTQ6OjEyMjAyMmE2MjdmOWIzOWM4NTRkYzZjMjZjMGY3MWM3MTEyYjFmOTY2NDEzM2EwY2Q4ODQzMWZhYzUwODgwYmEzNjE2Er0EEroECrcEEgQSAigUEgQSAigKEg4SDAoKEggSBiiAjI2eAhIOEgwKChIIEgYogJCd6RoSDhIMCgoSCBIGKICQnekaEg8SDQoLEgkSByiAgJ2OmiMSDRILCgkSBxIFKID24EISKRInCiUSIxIhCh8SBBICKAQSBBICKAQSBBICKAQSBBICKGQSBRIDKIAEEgUSAyiAEBIGEgQogIl6Eg4SDAoKEggSBiiAyM60DRKOAxKLAwqIAxLTARLQAZIBzAEKyQEKVUJTZ2xvYmFsLWRvbWFpbjo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2IScApuEhUSE4oBEBIORFNfT3BlcmF0aW9uYWwSVRJTQlFUT0RPKCM0OTAwKTogc2hhcmUgQ29tZXRCRlQgZ2VuZXNpcy5qc29uIG9mIGZvdW5kaW5nIFNWIG5vZGUgdmlhIFN2Y1J1bGVzIGNvbmZpZy4SVxJVQlNnbG9iYWwtZG9tYWluOjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhJXElVCU2dsb2JhbC1kb21haW46OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiEtwBEtkBkgHVAQpqCl5CXE1FRDo6Z2xvYmFsTWVkaWF0b3JTdjE6OjEyMjBjMTNjODExYmY4YTI1MTMwYmQwY2U0ZDAzY2QxYWQ1ZWEzY2IzMWZkZGZjMDdlYTM3OTAzZWQzN2I5MmQ4ZWIxEggKBhIEEgIoAApnCltCWVBBUjo6c3YxUGFydGljaXBhbnQ6OjEyMjAyMmE2MjdmOWIzOWM4NTRkYzZjMjZjMGY3MWM3MTEyYjFmOTY2NDEzM2EwY2Q4ODQzMWZhYzUwODgwYmEzNjE2EggKBhIEEgIoABIEEgJYASpbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YkIoCiYKJAgBEiA6ll7MV8Is/JFnx/HiEL6uIpJ3ib4/lO/2CW4MQ5oCzQ==",
+      "created_at": "1970-01-01T00:00:00Z"
     },
     {
       "template_id": "deadbeef001:CN.Wallet.Subscriptions:SubscriptionIdleState",
-      "contract_id": "0042bd26845e6d40e75f3180043cbab728d258a56293a58b4bbfd24dcc628233edca0112207e9d0370e3f6fed402424c007abdae471b5a1cd71a03d4d84a8e33666a33e469",
+      "contract_id": "001d4e7ffcd08dd65621ec7541d2c72560cad4d002f84fab9aa2700f4b8af7613bca021220a313c51fd4f4de8ccd7d3ae89b1722b408c5cea187a75e85b49eea8448168cb8",
       "payload": {
-        "subscription": "008d300939fab69e9d6ba0d96e1bc66d62b9b82765e88d1e1a0358aeb36115509aca011220ab519a094fcfbf64e7725ebafd3885c0e79275c2ee77e8e410937376084df969",
-        "subscriptionData": {
-          "provider": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-          "context": "0085f1c7a97daf8add1f726fd6ee71cfdb9036d0899be92745e3da81a44758bcdeca0112204264b58ffe9ff4f3e182d8eeb356bdaf28263a7f97c623f75c166765821004e7",
-          "receiver": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-          "sender": "alice__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1",
-          "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f"
-        },
+        "reference": "004f2bdfe3bb511a7a8c11b2342c24e4060e4bd4b0e2b66a92d8373f8d801aaa08ca02122057b846862c91e0a489a1974a0f29ce292ed1a27584c6c862eb0c21ecdba0348c",
         "payData": {
           "paymentAmount": {
             "amount": "1.0",
@@ -680,133 +720,22 @@
             "microseconds": "7776000000000"
           },
           "paymentDuration": {
-            "microseconds": "86400000000"
+            "microseconds": "2592000000000"
           }
         },
-        "nextPaymentDueAt": "1970-04-01T00:02:40Z"
-      },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112200bb98f2b2c4615744008061fd13ddbc7f540981186bd856f37e120b56b73fd1c"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CC.Coin:Coin",
-      "contract_id": "00a2a87bf0627d8ee4085f78586345512c4982588cbae560c59cf3e321efe391ddca011220e26ade0beb973769b99c535bf8edfc8e18935dbe49038c27d7e027e21e85c386",
-      "payload": {
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "owner": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "amount": {
-          "initialAmount": "1.0",
-          "createdAt": {
-            "number": "2"
-          },
-          "ratePerRound": {
-            "rate": "0.0000048225"
-          }
+        "subscription": "00b37a90ef044b0c57a30f669864dfefe61b97159db828c8a4484a909a1a56a25fca0212209d0fe84271968545c872cab8b003d712c7eb14effcd04eef0a10782688adb1e3",
+        "nextPaymentDueAt": "1970-04-01T00:02:40Z",
+        "subscriptionData": {
+          "provider": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+          "description": "Cns entry: \"alice.unverified.cns\"",
+          "receiver": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+          "sender": "alice__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250",
+          "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b"
         }
       },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220323181364738d9767be4554b5ccb4a61762ae920bd5147c9a89973cf64c53d3e"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CN.Directory:DirectoryEntry",
-      "contract_id": "002536d8f4a6b200231f1d64ace07bbf0a3cfda5cbedb245c53b8ef5b4eb315bcbca011220e65b22bb966f61c591f969dbacb938e91053e5c1ac1b8d12ec00e4402bf09006",
-      "payload": {
-        "user": "alice__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1",
-        "provider": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "name": "alice.unverified.cns",
-        "expiresAt": "1970-04-01T00:02:40Z"
-      },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220e4425a0da43d236c3ee0cf7b6602a0c040fa7bf6f17f2817d6d0a8b41ee6c72b"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CC.Coin:Coin",
-      "contract_id": "00d87797f82d5d93476c66ce01b772c5cc1698f55779efa52e5efe348b9afd960eca011220904e7bbf82cf157b12aaf76a2c797040d039d3d3708da5c7e826e190e06740b0",
-      "payload": {
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "owner": "bob__wallet__user-55cef83__tc0_002eunverified_002ecns::1220b98732f0778424014608adba1c09a93874e459ba75038504da88215bdeb84d37",
-        "amount": {
-          "initialAmount": "20.0",
-          "createdAt": {
-            "number": "2"
-          },
-          "ratePerRound": {
-            "rate": "0.0000048225"
-          }
-        }
-      },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112204a88d5ce6f95b0bad7b753d3f90e004e648bacff25b18a87dfef98308f88c35d"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CC.Coin:Coin",
-      "contract_id": "00b9559355194103f06d1732890c9ba1977bd65fade452f9aba70652e8981b0d98ca011220451a0c2419b9bfc3a635746636c06a5820487794f6209bf821b07ed640d25a2e",
-      "payload": {
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "owner": "charlie__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1",
-        "amount": {
-          "initialAmount": "30.0",
-          "createdAt": {
-            "number": "2"
-          },
-          "ratePerRound": {
-            "rate": "0.0000048225"
-          }
-        }
-      },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a24080112203688dce6df9a269e57b511741f127df6a30d7a26b6ecaa91e8db84b027b90604"
-      },
-      "create_arguments_blob": ""
-    },
-    {
-      "template_id": "deadbeef001:CC.CoinImport:ImportCrate",
-      "contract_id": "00be9438f7b7a606e76b3652bfbb53030f6abd63db1a6675a235612f4ae6135066ca0112207ba91c020887ce930331c00db4058e5899918a3f1c195b7ab22a49eadbd008eb",
-      "payload": {
-        "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-        "receiver": "charlie__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1",
-        "payload": {
-          "tag": "IP_Coin",
-          "value": {
-            "svc": "svc-55cef83-55cef83::1220d7df89b5df543f46a8b41fa55fd9506b58c532b61a368f2560bb26b9263d561f",
-            "owner": "charlie__wallet__user-55cef83__tc0_002eunverified_002ecns::122068c3a01b3bf3137f4a77ba83bd5eb87a7c3e9f7ea793b19639c086a655a569f1",
-            "amount": {
-              "initialAmount": "30.0",
-              "createdAt": {
-                "number": "2"
-              },
-              "ratePerRound": {
-                "rate": "0.0000048225"
-              }
-            }
-          }
-        }
-      },
-      "metadata": {
-        "createdAt": "160000000",
-        "contractKeyHash": "",
-        "driverMetadata": "0a260a2408011220818645aefbb439bbcdadbaadc611c11cfc4bf7cebd5e5d4e23ac1b07a46e7dd5"
-      },
-      "create_arguments_blob": ""
+      "created_event_blob": "CgIxNRKDCgpFAB1Of/zQjdZWIex1QdLHJWDK1NAC+E+rmqJwD0uK92E7ygISIKMTxR/U9N6MzX066JsXIrQIxc6hh6dehbSe6oRIFoy4EnQKQDg1YzAyMDk1MWFjODVhN2FmZDg0M2E1NzM0NmJiNGU5OTdjMGE0MmFmM2M4ZTZjYjdmYmQwOTc3ZTc0ODUxODESAkNOEgZXYWxsZXQSDVN1YnNjcmlwdGlvbnMaFVN1YnNjcmlwdGlvbklkbGVTdGF0ZRrKBgrHBhKTARKQAXqNAQqKATAwYjM3YTkwZWYwNDRiMGM1N2EzMGY2Njk4NjRkZmVmZTYxYjk3MTU5ZGI4MjhjOGE0NDg0YTkwOWExYTU2YTI1ZmNhMDIxMjIwOWQwZmU4NDI3MTk2ODU0NWM4NzJjYWI4YjAwM2Q3MTJjN2ViMTRlZmZjZDA0ZWVmMGExMDc4MjY4OGFkYjFlMxK9AxK6Awq3AxJrEmlSZ2FsaWNlX193YWxsZXRfX3VzZXItZmJhZTUyNTRfX3RjMDo6MTIyMDNkMzQ3YmZlYzlhN2Y2ZjJiMDI3YWQ1NDUxYjU1ZDkyMGZkNGY5MzBhNWFiNGQ1ZGY3MDRiYjNiMWY2YWIyNTASXxJdUltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiEl8SXVJbc3ZjLWZiYWU1MjU0LWZiYWU1MjU0OjoxMjIwZTIxNDRhNDJmODZhNmU5OWM3YjJkZmFlM2JhYzllMTgwMTllOWNhMmIxZTFlYWFiMDQxMzhhYzAwODQ0Mjc3YhJfEl1SW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2ISJRIjQiFDbnMgZW50cnk6ICJhbGljZS51bnZlcmlmaWVkLmNucyISTBJKCkgSIhIgCh4SEBIOMgwxLjAwMDAwMDAwMDASChIIigEFEgNVU0QSEBIOCgwSChIIKICAvtvPxAMSEBIOCgwSChIIKICA6vPvlgESCxIJSQAoQYcSBwAAEpMBEpABeo0BCooBMDA0ZjJiZGZlM2JiNTExYTdhOGMxMWIyMzQyYzI0ZTQwNjBlNGJkNGIwZTJiNjZhOTJkODM3M2Y4ZDgwMWFhYTA4Y2EwMjEyMjA1N2I4NDY4NjJjOTFlMGE0ODlhMTk3NGEwZjI5Y2UyOTJlZDFhMjc1ODRjNmM4NjJlYjBjMjFlY2RiYTAzNDhjKmdhbGljZV9fd2FsbGV0X191c2VyLWZiYWU1MjU0X190YzA6OjEyMjAzZDM0N2JmZWM5YTdmNmYyYjAyN2FkNTQ1MWI1NWQ5MjBmZDRmOTMwYTVhYjRkNWRmNzA0YmIzYjFmNmFiMjUwKltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiOQBoiQkAAAAAQigKJgokCAESIGkPkTB6MrSXwe0juRGv8rWAU22FUGoF4NIU/wGmuUjA",
+      "created_at": "1970-01-01T00:02:40Z"
     }
   ],
-  "version": "0.1.1-martinflorian-dirty"
+  "version": "0.1.1-itai-dirty"
 }

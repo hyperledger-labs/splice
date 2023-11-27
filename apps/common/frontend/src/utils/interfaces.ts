@@ -12,7 +12,7 @@ export interface Contract<T> {
   templateId: string;
   contractId: ContractId<T>;
   payload: T;
-  createdEventBlob?: string;
+  createdEventBlob: string;
   createdAt: string;
 }
 

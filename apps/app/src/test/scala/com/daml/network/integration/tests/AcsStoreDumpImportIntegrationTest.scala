@@ -155,7 +155,7 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
       // remove any additional test case suffix,
       // which could have been added if the dump was created in a
       // CNNodeIntegrationTestWithSharedEnvironment
-      .replaceAll("__tc\\d+_002eunverified_002ecns", "")
+      .replaceAll("__tc\\d+", "")
   }
 }
 

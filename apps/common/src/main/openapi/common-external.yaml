@@ -125,6 +125,8 @@ components:
           "template_id",
           "contract_id",
           "payload",
+          "created_event_blob",
+          "created_at"
         ]
 
     ErrorResponse:

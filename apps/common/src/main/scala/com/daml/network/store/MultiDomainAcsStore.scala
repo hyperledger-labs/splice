@@ -498,8 +498,8 @@ object MultiDomainAcsStore {
         Contract.fromHttp(typeId(companion), cId, decoder.decodeTemplate(companion))(
           templateId,
           payload,
-          Some(createdEventBlob),
-          Some(createdAt),
+          createdEventBlob,
+          createdAt,
         )
       }
     }
