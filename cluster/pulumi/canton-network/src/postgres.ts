@@ -6,6 +6,7 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 import { clusterLargeDisk, envFlag, ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 
 const enableCloudSql = envFlag('ENABLE_CLOUD_SQL', false);
+const cluster = process.env['GCP_CLUSTER_BASENAME'] || 'GCP_CLUSTER_BASENAME not set';
 
 const project = gcp.organizations.getProjectOutput({});
 
@@ -71,6 +72,9 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
             ipv4Enabled: false,
             privateNetwork: privateNetwork.id,
             enablePrivatePathForGoogleCloudServices: true,
+          },
+          userLabels: {
+            cluster: cluster,
           },
         },
       },
