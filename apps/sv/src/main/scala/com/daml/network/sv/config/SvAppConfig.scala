@@ -154,7 +154,7 @@ case class SvAppBackendConfig(
     localDomainNode: Option[SvDomainNodeConfig],
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     acsStoreDump: Option[BackupDumpConfig] = None,
-    prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(5),
+    prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(6),
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 
