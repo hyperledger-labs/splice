@@ -100,15 +100,15 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/T
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/TestCoinRulesTransfer.daml ../daml/canton-coin-upgrade/daml/CC/Scripts/TestCoinRulesTransfer.daml
 --- ../daml/canton-coin/daml/CC/Scripts/TestCoinRulesTransfer.daml
 +++ ../daml/canton-coin-upgrade/daml/CC/Scripts/TestCoinRulesTransfer.daml
-@@ -70,6 +70,7 @@
+@@ -69,6 +69,7 @@
                        holders = [alice.primaryParty, bob.primaryParty, bob.primaryParty] -- duplicates get removed
  
                  ]
 +      upgrade = Some ()
      context = context.context
  
-   normalizedBalanceAfterTransfer <- getNormalizedBalance app.svc
-@@ -153,6 +154,7 @@
+   let config = scaleFees 1.0 defaultTransferConfig
+@@ -148,6 +149,7 @@
                        amount = 10.0
                        lock = None
                        receiverFeeRatio = 0.4 ]
@@ -116,7 +116,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/T
        context = contextWithRound1.context
  
    -- Input amount is exactly 100.0.
-@@ -231,6 +233,7 @@
+@@ -227,6 +229,7 @@
                        amount
                        lock = None
                        receiverFeeRatio = 1.0]
@@ -124,7 +124,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/T
        context = transferContext
  
  testSenderChangeAndOutput: Script ()
-@@ -271,6 +274,7 @@
+@@ -269,6 +272,7 @@
                      amount = outputAmount3
                      lock = None
                  ]
@@ -140,7 +140,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/T
      context = context.context
    assertMsg "senderChangeAmount == 0" 
      (transferResult.summary.senderChangeAmount == 0.0)
-@@ -360,6 +365,7 @@
+@@ -359,6 +364,7 @@
                      lock = None
  
                  ]

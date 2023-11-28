@@ -11,7 +11,7 @@ import DA.Foldable (forA_)
 import qualified DA.Map as Map
 import DA.List.Total
 import DA.Time
-
+import DA.Assert
 import CC.Coin
 import CC.CoinRules
 import CC.CoinConfig
@@ -527,6 +527,27 @@ getNormalizedBalance party = do
 
   let sum = normalizedCoinBalance + normalizedLockedCoinBalance
   return sum
+
+getBalanceChangesFromAcs: DefaultAppWithUsers -> Script(Map.Map Party BalanceChange) 
+getBalanceChangesFromAcs DefaultAppWithUsers{..} = do 
+  coins <- query @Coin app.svc
+  lockedCoins <- query @LockedCoin app.svc
+  let allCoins = (map (._2) coins) ++ map (._2.coin) lockedCoins 
+  
+  let balanceChangeFromCoin coin = BalanceChange with 
+        changeToInitialAmountAsOfRoundZero = getValueAsOfRound0 coin.amount
+        changeToHoldingFeesRate = coin.amount.ratePerRound.rate
+
+  let normalizedBalanceChanges = map(\c -> (c.owner, balanceChangeFromCoin c)) allCoins
+  return $ Map.fromListWith (+) normalizedBalanceChanges
+
+checkBalanceChanges: DefaultAppWithUsers -> Script TransferResult -> Script TransferResult
+checkBalanceChanges d script = do
+  before <- getBalanceChangesFromAcs d
+  result <- script
+  after <- getBalanceChangesFromAcs d
+  Map.unionWith (+) before result.summary.balanceChanges === after
+  return result
 
 assertError : (CanAbort m, ActionCatch m) => (() -> a) -> m ()
 assertError f = do
