@@ -61,7 +61,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       val sv4Participant = sv4Backend.participantClient
 
       clue(
-        "svc party hosting authorization request with party which is not confirmed will be rejected by sponsor SV"
+        "SVC party hosting authorization request with party which is not confirmed will be rejected by sponsor SV"
       ) {
         val randomParty = allocateRandomSvParty("random")
         assertThrowsAndLogsCommandFailures(
@@ -76,7 +76,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       }
 
       clue(
-        "svc party hosting authorization request with party which is not hosted on the target participant"
+        "SVC party hosting authorization request with party which is not hosted on the target participant"
       ) {
         val sv1Party = sv1Backend.getSvcInfo().svParty
         assertThrowsAndLogsCommandFailures(

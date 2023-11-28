@@ -21,7 +21,7 @@ export const buildDirectoryMock = (directoryUrl: string): RestHandler[] => [
               payload: DirectoryEntry.encode({
                 name: 'charlie.unverified.cns',
                 provider:
-                  'svc::1220164c57d911c28c81575446053818b21dc83b24cf10b22c622663e0e282d85a57',
+                  'SVC::1220164c57d911c28c81575446053818b21dc83b24cf10b22c622663e0e282d85a57',
                 url: '',
                 description: '',
                 expiresAt: '2024-01-04T07:37:05.004139Z',

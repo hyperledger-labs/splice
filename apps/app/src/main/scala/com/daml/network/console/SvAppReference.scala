@@ -182,13 +182,13 @@ class SvAppBackendReference(
   }
 
   @Help.Summary(
-    "Returns the current svc automation."
+    "Returns the current SVC automation."
   )
   def svcAutomation: SvSvcAutomationService = {
     appState.svcAutomation
   }
 
-  @Help.Summary("Return sv app config")
+  @Help.Summary("Return SV app config")
   def config: SvAppBackendConfig =
     consoleEnvironment.environment.config.svsByString(name)
 
@@ -208,7 +208,7 @@ class SvAppBackendReference(
       )
     }
 
-  @Help.Summary("Update cc price vote (via admin API)")
+  @Help.Summary("Update CC price vote (via admin API)")
   def updateCoinPriceVote(coinPrice: BigDecimal): Unit =
     consoleEnvironment.run {
       httpCommand(
@@ -216,7 +216,7 @@ class SvAppBackendReference(
       )
     }
 
-  @Help.Summary("List cc price vote (via admin API)")
+  @Help.Summary("List CC price vote (via admin API)")
   def listCoinPriceVotes(): Seq[Contract[cp.CoinPriceVote.ContractId, cp.CoinPriceVote]] = {
     consoleEnvironment.run {
       httpCommand(

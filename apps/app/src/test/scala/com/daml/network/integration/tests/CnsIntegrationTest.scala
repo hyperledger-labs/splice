@@ -294,7 +294,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
         aliceSubscriptionReadyForPaymentTrigger.resume()
 
         val renewedEntry = clue(
-          "Eventually, Alice makes a follow-up subscription payment, which the svc collects, renewing her entry."
+          "Eventually, Alice makes a follow-up subscription payment, which the SVC collects, renewing her entry."
         ) {
           eventually() {
             val renewed = lookupEntryByName(testEntryName).value

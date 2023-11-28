@@ -43,7 +43,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     splitwellValidatorBackend.startSync()
   }
 
-  "initialize svc and validator apps" in { implicit env =>
+  "initialize SVC and validator apps" in { implicit env =>
     initSvcWithSv1Only()
     // Check that there is exactly one CoinRule and OpenMiningRound
     val coinRules = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs

@@ -66,7 +66,7 @@ object SvBootstrapDumpConfig {
 object SvOnboardingConfig {
   case class FoundCollective(
       name: String,
-      svcPartyHint: String = "svc",
+      svcPartyHint: String = "SVC",
       initialTickDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(150),
       initialMaxNumInputs: Int = 100,
       initialCoinPrice: BigDecimal = 1.0,

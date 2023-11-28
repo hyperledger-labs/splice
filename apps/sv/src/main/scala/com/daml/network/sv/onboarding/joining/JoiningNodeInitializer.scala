@@ -512,7 +512,7 @@ class JoiningNodeInitializer(
         .hostPartyOnOwnParticipant(domainId, participantId, svParty)
         .map(
           _.getOrElse(
-            sys.error(s"Failed to host svc party on participant $participantId")
+            sys.error(s"Failed to host SVC party on participant $participantId")
           )
         )
     }

@@ -242,7 +242,7 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary(
-    "List the svc sequencers"
+    "List the SVC sequencers"
   )
   def listSvcSequencers(): Seq[HttpScanAppClient.DomainSequencers] =
     consoleEnvironment.run {

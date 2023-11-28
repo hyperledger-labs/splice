@@ -131,7 +131,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     val svParties = clue("We have four sv parties and their apps are online") {
       svs.map(_.getSvcInfo().svParty.toProtoPrimitive)
     }
-    clue("The four sv apps are all svc members and there are no other svc members") {
+    clue("The four SV apps are all SVC members and there are no other SVC members") {
       sv1Backend.getSvcInfo().svcRules.payload.members.keySet() should equal(svParties.toSet.asJava)
     }
     clue("The founding SV app (sv1) is the first leader") {

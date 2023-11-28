@@ -84,7 +84,7 @@ class SvOnboardingPartyToParticipantProposalTrigger(
         svParty.uid.namespace.fingerprint,
       )
     } yield {
-      TaskSuccess(show"Hosted svc party $svcParty on participant $task")
+      TaskSuccess(show"Hosted SVC party $svcParty on participant $task")
     }
   }
 

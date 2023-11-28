@@ -135,7 +135,7 @@ class ExecuteConfirmedActionTrigger(
               .map(_.isEmpty)
           case action =>
             throw new UnsupportedOperationException(
-              show"coin rules $action is not yet supported"
+              show"CoinRules $action is not yet supported"
             )
         }
       case arcSvcRules: ARC_SvcRules =>
@@ -163,7 +163,7 @@ class ExecuteConfirmedActionTrigger(
             } yield isSvOnboardingConfirmed || isSvPartOfSvc
           case action =>
             throw new UnsupportedOperationException(
-              show"svc rules $action is not yet supported"
+              show"SvcRules $action is not yet supported"
             )
         }
       case arcCnsEntryContext: ARC_CnsEntryContext =>
@@ -184,7 +184,7 @@ class ExecuteConfirmedActionTrigger(
               .map(_.isEmpty)
           case action =>
             throw new UnsupportedOperationException(
-              show"cns entry context $action is not yet supported"
+              show"CNS entry context $action is not yet supported"
             )
         }
       case _ =>

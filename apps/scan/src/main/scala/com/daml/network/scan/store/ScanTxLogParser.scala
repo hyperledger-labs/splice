@@ -36,7 +36,7 @@ class ScanTxLogParser(
   private def parseTree(tree: TransactionTree, domainId: DomainId, root: TreeEvent)(implicit
       tc: TraceContext
   ): State = {
-    // TODO(#2930) add more checks on the nodes, at least that the svc party is correct
+    // TODO(#2930) add more checks on the nodes, at least that the SVC party is correct
     root match {
       case exercised: ExercisedEvent =>
         exercised match {

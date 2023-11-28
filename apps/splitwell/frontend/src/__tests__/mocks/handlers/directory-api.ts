@@ -25,7 +25,7 @@ export const buildDirectoryMock = (directoryUrl: string): RestHandler[] => [
               payload: DirectoryEntry.encode({
                 name: 'alice.unverified.cns',
                 provider:
-                  'svc::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
+                  'SVC::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
                 url: 'https://alice-url.cns.com',
                 description: '',
                 expiresAt: '2024-01-07T14:50:26.364476Z',
@@ -49,7 +49,7 @@ export const buildDirectoryMock = (directoryUrl: string): RestHandler[] => [
               payload: DirectoryEntry.encode({
                 name: 'bob.unverified.cns',
                 provider:
-                  'svc::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
+                  'SVC::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
                 url: 'https://bob-url.cns.com',
                 description: '',
                 expiresAt: '2024-01-07T14:50:26.364476Z',

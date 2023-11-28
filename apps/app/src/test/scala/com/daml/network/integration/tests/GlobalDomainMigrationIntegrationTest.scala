@@ -204,7 +204,7 @@ class GlobalDomainMigrationIntegrationTest extends SvIntegrationTestBase with Pr
             .futureValue
 
         val sv2Party = sv2Backend.appState.svStore.key.svParty
-        val partyHosting = withClue("host svc party on new domain") {
+        val partyHosting = withClue("host SVC party on new domain") {
           sv2ParticipantAdminConnection
             .proposeInitialPartyToParticipant(
               svcParty,

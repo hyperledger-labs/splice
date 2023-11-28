@@ -61,7 +61,7 @@ class SvcPartyHosting(
       domain: DomainId,
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Instant] = retryProvider.retryForClientCalls(
-    "wait for svc party to participant authorization to complete",
+    "wait for SVC party to participant authorization to complete",
     getSvcPartyToParticipantTransaction(domain, participantId).foldF(
       Future.failed(
         Status.NOT_FOUND
@@ -91,7 +91,7 @@ class SvcPartyHosting(
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): OptionT[Future, TopologyResult[PartyToParticipantX]] =
     OptionT(for {
-      // We only fetch transactions for the svc party so one per SV on/offboarding which
+      // We only fetch transactions for the SVC party so one per SV on/offboarding which
       // we expect to be rare so we can fetch the entire history.
       xs <- listActivePartyToParticipantMappings(
         svcParty,

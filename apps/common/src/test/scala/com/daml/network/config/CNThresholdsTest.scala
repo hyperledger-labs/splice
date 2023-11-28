@@ -7,7 +7,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 class CNThresholdsTest extends AnyWordSpecLike with BaseTest {
 
   "thresholds" should {
-    "return expected svc consortium thresholds" in {
+    "return expected SVC consortium thresholds" in {
       forAll(Table(("consortium members", "threshold"), (1, 1), (2, 2), (3, 2), (4, 3))) {
         (consortiumMembers: Int, threshold: Int) =>
           CNThresholds.unionspaceThreshold(consortiumMembers) shouldBe PositiveInt.tryCreate(
@@ -16,7 +16,7 @@ class CNThresholdsTest extends AnyWordSpecLike with BaseTest {
       }
     }
 
-    "return expected f based svc consortium thresholds" in {
+    "return expected f based SVC consortium thresholds" in {
       forAll(Table(("consortium members", "threshold"), (1, 1), (2, 1), (3, 1), (4, 2))) {
         (consortiumMembers: Int, threshold: Int) =>
           CNThresholds.sequencerConnectionsSizeThreshold(consortiumMembers) shouldBe PositiveInt
@@ -26,7 +26,7 @@ class CNThresholdsTest extends AnyWordSpecLike with BaseTest {
       }
     }
 
-    "return expected f based minimum svc consortium thresholds" in {
+    "return expected f based minimum SVC consortium thresholds" in {
       forAll(
         Table(
           ("svc size", "mapping specific size", "threshold"),

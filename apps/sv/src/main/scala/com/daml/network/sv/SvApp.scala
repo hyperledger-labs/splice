@@ -1100,7 +1100,7 @@ object SvApp {
               )
           _ <-
             if (token.svcParty == svStore.key.svcParty) Right(())
-            else authFailure("wrong svc party", s"${token.svcParty} != ${svStore.key.svcParty}")
+            else authFailure("wrong SVC party", s"${token.svcParty} != ${svStore.key.svcParty}")
         } yield (token.candidateParty, token.candidateName)
       )
   }

@@ -38,7 +38,7 @@ class JoiningNodeSvcPartyHosting(
         for {
           response <- retryProvider.retry(
             RetryFor.WaitingOnInitDependency,
-            "Onboard to svc party hosting and unionspace membership",
+            "Onboard to SVC party hosting and unionspace membership",
             SvConnection(
               sponsorSvConfig.adminApi,
               retryProvider,
@@ -62,7 +62,7 @@ class JoiningNodeSvcPartyHosting(
                 response <- retryProvider
                   .retry(
                     RetryFor.WaitingOnInitDependency,
-                    "authorize svc party hosting on sponsor",
+                    "authorize SVC party hosting on sponsor",
                     svConnection
                       .authorizeSvcPartyHosting(
                         participantId,
@@ -142,7 +142,7 @@ class JoiningNodeSvcPartyHosting(
             participantId,
           )
           _ = logger.info(
-            s"svc party is now hosted in the candidate SV participant $participantId"
+            s"SVC party is now hosted in the candidate SV participant $participantId"
           )
         } yield Right(())
       case None =>

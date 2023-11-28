@@ -249,7 +249,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase {
         "Moving sv2 to confirmed state",
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
           .submitWithResult(
-            userId = "svc",
+            userId = "SVC",
             actAs = Seq(svcParty),
             readAs = Seq(),
             update = sv1Backend

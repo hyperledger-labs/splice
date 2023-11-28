@@ -6,6 +6,8 @@ Release Notes
 2023-12-04
 ----------
 
+* The party representing the supervalidator collective is renamed from ``svc::...`` to ``SVC::...``, for consistency with SV party names.
+
 * Documentation:
 
   * Clarify that using custom auth audiences is recommended.

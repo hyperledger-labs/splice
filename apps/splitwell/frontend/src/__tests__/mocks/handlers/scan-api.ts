@@ -15,7 +15,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
   rest.get(`${scanUrl}/v0/svc-party-id`, (_, res, ctx) => {
     return res(
       ctx.json<GetSvcPartyIdResponse>({
-        svc_party_id: 'svc::1220809612f787469c92b924ad1d32f1cbc0bdbd4eeda55a50469250bcf64b8becf2',
+        svc_party_id: 'SVC::1220809612f787469c92b924ad1d32f1cbc0bdbd4eeda55a50469250bcf64b8becf2',
       })
     );
   }),
@@ -32,7 +32,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                 '00c8e178f8b0b2c2955103b3fa59ccdc5f34861c4bcf659844c2959ba9febf3f61ca0212207e6c7b0db1b456c2f3f23c3b0c75b02dfc0c470cd1ea3fb603a01527e414c922',
               payload: CnsEntry.encode({
                 name: 'alice.unverified.cns',
-                svc: 'svc::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
+                svc: 'SVC::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
                 url: 'https://alice-url.cns.com',
                 description: '',
                 expiresAt: '2024-01-07T14:50:26.364476Z',
@@ -55,7 +55,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                 '00c8e178f8b0b2c2955103b3fa59ccdc5f34861c4bcf659844c2959ba9febf3f61ca0212207e6c7b0db1b456c2f3f23c3b0c75b02dfc0c470cd1ea3fb603a01527e414c922',
               payload: CnsEntry.encode({
                 name: 'bob.unverified.cns',
-                svc: 'svc::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
+                svc: 'SVC::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
                 url: 'https://bob-url.cns.com',
                 description: '',
                 expiresAt: '2024-01-07T14:50:26.364476Z',

@@ -338,7 +338,7 @@ testTapAfterRestoringOpenRounds : Script ()
 testTapAfterRestoringOpenRounds = do
   now <- getTime
   -- copied from `CoinRules_BootstrapRounds`: not a perfect approximation for importing rounds but good enough
-  let Some svc = partyFromText "svc"
+  let Some svc = partyFromText "SVC"
   let configUsd = getValueAsOf now defaultCoinConfigSchedule
   let tickDuration = configUsd.tickDuration
   let opensAt0 = now

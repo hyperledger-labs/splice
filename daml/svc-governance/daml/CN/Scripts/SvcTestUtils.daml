@@ -37,7 +37,7 @@ initCollective initialOpenRounds isDevNet = do
   [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
 
   -- the founding SV allocates the collective party as part of its initialization
-  svc <- allocateParty "svc"
+  svc <- allocateParty "SVC"
 
   -- We expect the founding node to create a proper single-node domain that can then be used
   -- for driving all Daml workflows

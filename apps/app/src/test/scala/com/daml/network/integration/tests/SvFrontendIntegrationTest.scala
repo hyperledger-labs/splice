@@ -78,7 +78,7 @@ class SvFrontendIntegrationTest
     "have 5 information tabs" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
-          "svc and coin infos are displayed in pretty json", {
+          "SVC and coin infos are displayed in pretty json", {
             login(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(

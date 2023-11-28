@@ -278,7 +278,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       )
     }
 
-    clue("create svc-signed coin contracts of various kinds") {
+    clue("create SVC-signed coin contracts of various kinds") {
       val (oldestRound, newestRound) = {
         val rounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._1
         (rounds.headOption.value, rounds.lastOption.value)
@@ -521,7 +521,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       subscriptionRequestCid
     }
 
-    clue("create svc-signed CNS contracts of various kinds") {
+    clue("create SVC-signed CNS contracts of various kinds") {
       import com.daml.network.util.CNNodeUtil.defaultCnsConfig
 
       val svc = svcParty.toProtoPrimitive

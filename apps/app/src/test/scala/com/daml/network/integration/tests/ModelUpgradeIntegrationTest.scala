@@ -138,7 +138,7 @@ class ModelUpgradeIntegrationTest
           }
         },
       )(
-        "observing svc rules with new package id",
+        "observing SvcRules with new package id",
         _ => {
           val newSvcRules = sv1Backend.getSvcInfo().svcRules
           newSvcRules.identifier.getPackageId shouldBe DarResources.svcGovernance_0_2_0.packageId

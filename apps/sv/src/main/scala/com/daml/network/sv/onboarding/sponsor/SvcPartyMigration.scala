@@ -44,7 +44,7 @@ class SvcPartyMigration(
   def authorizeParticipantForHostingSvcParty(
       participantId: ParticipantId
   )(implicit tc: TraceContext): EitherT[Future, SvcPartyMigrationFailure, ByteString] = {
-    logger.info(s"Sponsor SV authorizing svc party to participant $participantId")
+    logger.info(s"Sponsor SV authorizing SVC party to participant $participantId")
     for {
       svcRules <- EitherT.liftF(svcStore.getSvcRules())
       svcMembersSize = svcRules.payload.members.size()

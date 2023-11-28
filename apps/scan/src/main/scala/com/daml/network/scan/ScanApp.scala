@@ -69,7 +69,7 @@ class ScanApp(
 
   override def initialize(
       ledgerClient: CNLedgerClient,
-      // we don't care about the primary party in scan as that points to the SV party while we need the svc party
+      // we don't care about the primary party in scan as that points to the SV party while we need the SVC party
       // which we read below.
       // primary party of svc User
       // or readAs party from sv User

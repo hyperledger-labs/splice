@@ -107,7 +107,7 @@ export const buildSplitwellMock = (splitwellUrl: string): RestHandler[] => [
                 },
                 owner: alicePartyId,
                 members: [],
-                svc: 'svc::122065980b045703ed871be9b93afb28b61c874b667434259d1df090096837e3ffd0',
+                svc: 'SVC::122065980b045703ed871be9b93afb28b61c874b667434259d1df090096837e3ffd0',
                 acceptDuration: {
                   microseconds: '300000000',
                 },

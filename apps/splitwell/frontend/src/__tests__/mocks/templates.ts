@@ -20,7 +20,7 @@ export const makeGroupInvite = (provider: string, owner: string, groupName: stri
       },
       owner: owner,
       members: [],
-      svc: 'svc::122065980b045703ed871be9b93afb28b61c874b667434259d1df090096837e3ffd0',
+      svc: 'SVC::122065980b045703ed871be9b93afb28b61c874b667434259d1df090096837e3ffd0',
       acceptDuration: {
         microseconds: '300000000',
       },
@@ -72,7 +72,7 @@ export const makeBalanceUpdate = (
       },
       owner: owner,
       members: [],
-      svc: 'svc::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
+      svc: 'SVC::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
       acceptDuration: {
         microseconds: '300000000',
       },

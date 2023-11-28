@@ -17,7 +17,7 @@ class SvOnboardingTokenTest extends AsyncWordSpec with BaseTest {
     val svcParty =
       Codec
         .decode(Codec.Party)(
-          "svc::122020c99a2f48cd66782404648771eeaa104f108131c0c876a6ed04dd2e4175f27d"
+          "SVC::122020c99a2f48cd66782404648771eeaa104f108131c0c876a6ed04dd2e4175f27d"
         )
         .value
 
