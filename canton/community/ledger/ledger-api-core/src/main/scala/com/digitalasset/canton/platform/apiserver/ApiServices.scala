@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.platform.apiserver
 
-import akka.stream.Materializer
 import com.daml.api.util.TimeProvider
 import com.daml.error.ContextualizedErrorLogger
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -60,6 +59,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.protobuf.services.ProtoReflectionService
 import io.grpc.{BindableService, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import java.time.Instant
 import scala.collection.immutable
@@ -109,12 +109,13 @@ object ApiServices {
       userManagementServiceConfig: UserManagementServiceConfig,
       apiStreamShutdownTimeout: FiniteDuration,
       meteringReportKey: MeteringReportKey,
-      explicitDisclosureUnsafeEnabled: Boolean,
+      enableExplicitDisclosure: Boolean,
       authenticateContract: AuthenticateContract,
       telemetry: Telemetry,
       val loggerFactory: NamedLoggerFactory,
       multiDomainEnabled: Boolean,
       upgradingEnabled: Boolean,
+      dynParamGetter: DynamicDomainParameterGetter,
   )(implicit
       materializer: Materializer,
       esf: ExecutionSequencerFactory,
@@ -395,6 +396,8 @@ object ApiServices {
               authenticateContract,
               metrics,
               loggerFactory,
+              dynParamGetter,
+              timeProvider,
             ),
             new ResolveMaximumLedgerTime(maximumLedgerTimeService, loggerFactory),
             maxRetries = 3,
@@ -408,7 +411,7 @@ object ApiServices {
           ledgerId = ledgerId,
           resolveToTemplateId = resolveTemplateNameTo(_.primary)(indexService),
           upgradingEnabled = upgradingEnabled,
-          explicitDisclosureUnsafeEnabled = explicitDisclosureUnsafeEnabled,
+          enableExplicitDisclosure = enableExplicitDisclosure,
         )
         val (apiSubmissionService, commandSubmissionService) =
           CommandSubmissionServiceImpl.createApiService(

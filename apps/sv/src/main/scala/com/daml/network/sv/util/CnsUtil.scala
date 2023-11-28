@@ -1,6 +1,6 @@
 package com.daml.network.sv.util
 
-import akka.http.scaladsl.model.Uri
+import org.apache.pekko.http.scaladsl.model.Uri
 import com.daml.network.codegen.java.cn
 import com.daml.network.util.Contract
 

@@ -3,9 +3,6 @@
 
 package com.digitalasset.canton.participant.store
 
-import akka.NotUsed
-import akka.stream.Materializer
-import akka.stream.scaladsl.Source
 import cats.data.{EitherT, OptionT}
 import cats.syntax.option.*
 import cats.syntax.parallel.*
@@ -54,6 +51,9 @@ import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{DiscardOps, LedgerSubmissionId, LedgerTransactionId}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -92,7 +92,7 @@ trait MultiDomainEventLog extends AutoCloseable { this: NamedLogging =>
     *
     * The caller must await completion of the returned future before calling the method again.
     * Otherwise, the method may fail with an exception or return a failed future.
-    * (This restriction arises, because some implementations will offer the event to an Akka source queue, and the
+    * (This restriction arises, because some implementations will offer the event to an Pekko source queue, and the
     * number of concurrent offers for such queues is bounded.)
     *
     * The event log will stall, i.e., log an error and refuse to publish further events in the following cases:
@@ -120,7 +120,7 @@ trait MultiDomainEventLog extends AutoCloseable { this: NamedLogging =>
   /** Removes all events with offset up to `upToInclusive`. */
   def prune(upToInclusive: GlobalOffset)(implicit traceContext: TraceContext): Future[Unit]
 
-  /** Yields an akka source with all stored events, optionally starting from a given offset.
+  /** Yields an pekko source with all stored events, optionally starting from a given offset.
     * @throws java.lang.IllegalArgumentException if `startInclusive` is lower than [[MultiDomainEventLog.ledgerFirstOffset]].
     */
   def subscribe(startInclusive: Option[GlobalOffset])(implicit
@@ -163,9 +163,9 @@ trait MultiDomainEventLog extends AutoCloseable { this: NamedLogging =>
 
       domainOffsets <- domainLogIds.parTraverse { domainId =>
         for {
-          localOffset <- lastLocalOffsetBeforeOrAt(
+          localOffset <- lastLocalOffset(
             DomainEventLogId(domainId),
-            upToInclusive,
+            Option(upToInclusive),
             None,
           )
 
@@ -177,19 +177,17 @@ trait MultiDomainEventLog extends AutoCloseable { this: NamedLogging =>
             case None => Future.successful(None)
 
             case Some(_: TopologyOffset) =>
-              lastRequestOffsetBeforeOrAt(
+              lastRequestOffset(
                 DomainEventLogId(domainId),
-                upToInclusive,
-                None,
+                Option(upToInclusive),
               )
           }
         } yield domainId.domainId -> (localOffset, requestOffset)
       }
 
-      participantOffset <- lastLocalOffsetBeforeOrAt(
+      participantOffset <- lastLocalOffset(
         participantEventLogId,
-        upToInclusive,
-        None,
+        Some(upToInclusive),
       )
     } yield (domainOffsets.toMap, participantOffset)
   }
@@ -201,24 +199,23 @@ trait MultiDomainEventLog extends AutoCloseable { this: NamedLogging =>
     *   <li>The record time of the event is below or at `timestampInclusive` (if defined)</li>
     * </ol>
     */
-  def lastLocalOffsetBeforeOrAt(
+  def lastLocalOffset(
       eventLogId: EventLogId,
-      upToInclusive: GlobalOffset,
-      timestampInclusive: Option[CantonTimestamp],
+      upToInclusive: Option[GlobalOffset] = None,
+      timestampInclusive: Option[CantonTimestamp] = None,
   )(implicit traceContext: TraceContext): Future[Option[LocalOffset]]
 
   /** Returns the greatest request offset of the [[SingleDimensionEventLog]] given by `eventLogId`, if any,
     * such that the following holds:
     * <ol>
-    * <li>The assigned global offset is below or at `upToInclusive`.</li>
+    * <li>The assigned global offset is below or at `upToInclusive` (if defined).</li>
     * <li>The record time of the event is below or at `timestampInclusive` (if defined)</li>
     * </ol>
     */
-  // TODO(#14381) Update coverage of this method with interleaved topology events
-  def lastRequestOffsetBeforeOrAt(
+  def lastRequestOffset(
       eventLogId: EventLogId,
-      upToInclusive: GlobalOffset,
-      timestampInclusive: Option[CantonTimestamp],
+      upToInclusive: Option[GlobalOffset] = None,
+      timestampInclusive: Option[CantonTimestamp] = None,
   )(implicit traceContext: TraceContext): Future[Option[RequestOffset]]
 
   /** Yields the `deltaFromBeginning`-lowest global offset (if it exists).
@@ -260,12 +257,6 @@ trait MultiDomainEventLog extends AutoCloseable { this: NamedLogging =>
   def getOffsetByTimeAtOrAfter(fromInclusive: CantonTimestamp)(implicit
       traceContext: TraceContext
   ): OptionT[Future, (GlobalOffset, EventLogId, LocalOffset)]
-
-  /** Returns the last linearized [[com.digitalasset.canton.participant.LocalOffset]] for the [[SingleDimensionEventLog]] `id`, if any
-    */
-  def lastLocalOffset(id: EventLogId)(implicit
-      traceContext: TraceContext
-  ): Future[Option[LocalOffset]]
 
   /** Yields the highest global offset up to the given bound, if any. */
   def lastGlobalOffset(upToInclusive: Option[GlobalOffset] = None)(implicit

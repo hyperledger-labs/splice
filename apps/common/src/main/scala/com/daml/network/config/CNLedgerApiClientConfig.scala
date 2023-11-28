@@ -1,6 +1,6 @@
 package com.daml.network.config
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import com.daml.network.auth.{AuthTokenSource, AuthToken}
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory

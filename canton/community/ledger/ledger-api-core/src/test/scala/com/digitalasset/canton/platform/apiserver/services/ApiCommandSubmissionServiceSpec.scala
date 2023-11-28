@@ -3,12 +3,12 @@
 
 package com.digitalasset.canton.platform.apiserver.services
 
-import com.daml.ledger.api.testing.utils.MockMessages.*
 import com.daml.ledger.api.v1.commands.{Command, CreateCommand, DisclosedContract}
 import com.daml.ledger.api.v1.value.{Identifier, Record, RecordField, Value}
 import com.daml.lf.data.Ref
 import com.daml.tracing.{DefaultOpenTelemetry, SpanAttribute}
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.ledger.api.MockMessages.*
 import com.digitalasset.canton.ledger.api.domain.LedgerId
 import com.digitalasset.canton.ledger.api.messages.command.submission.SubmitRequest
 import com.digitalasset.canton.ledger.api.services.CommandSubmissionService
@@ -129,7 +129,7 @@ class ApiCommandSubmissionServiceSpec
         .transform {
           case Failure(exception)
               if exception.getMessage.contains(
-                "feature in development: disclosed_contracts should not be set"
+                "feature disabled: disclosed_contracts should not be set"
               ) =>
             Success(succeed)
           case other => fail(s"Unexpected result: $other")

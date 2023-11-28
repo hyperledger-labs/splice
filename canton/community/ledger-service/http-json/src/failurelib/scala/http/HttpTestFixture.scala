@@ -3,13 +3,13 @@
 
 package com.daml.http
 
-import akka.http.scaladsl.model.Uri
+import org.apache.pekko.http.scaladsl.model.Uri
 import com.daml.bazeltools.BazelRunfiles
 import com.daml.dbutils
 import com.daml.dbutils.ConnectionPool
 import dbbackend.{DbStartupMode, JdbcConfig}
 import com.daml.http.json.{DomainJsonDecoder, DomainJsonEncoder}
-import com.daml.ledger.client.withoutledgerid.{LedgerClient => DamlLedgerClient}
+import com.daml.ledger.client.withoutledgerid.{LedgerClient as DamlLedgerClient}
 import com.daml.ports.LockedFreePort
 import com.daml.testing.postgresql.PostgresAroundAll
 import java.net.InetAddress

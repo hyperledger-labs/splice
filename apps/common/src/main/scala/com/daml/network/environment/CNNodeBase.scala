@@ -1,10 +1,16 @@
 package com.daml.network.environment
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.{ConnectionContext, Http}
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader, HttpRequest, HttpResponse}
-import akka.http.scaladsl.server.Directive0
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.{ConnectionContext, Http}
+import org.apache.pekko.http.scaladsl.model.{
+  ContentTypes,
+  HttpEntity,
+  HttpHeader,
+  HttpRequest,
+  HttpResponse,
+}
+import org.apache.pekko.http.scaladsl.server.Directive0
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.CNNodeMetrics
 import com.daml.network.admin.api.HttpRequestLogger

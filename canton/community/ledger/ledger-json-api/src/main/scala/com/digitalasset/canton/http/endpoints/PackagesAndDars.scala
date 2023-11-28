@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.http.endpoints
 
-import akka.http.scaladsl.model.*
-import akka.NotUsed
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.NotUsed
 import com.digitalasset.canton.http.Endpoints.ET
 import com.digitalasset.canton.http.util.FutureUtil.{eitherT, rightT}
 import com.digitalasset.canton.http.util.Logging.{InstanceUUID, RequestID}
@@ -26,8 +26,8 @@ class PackagesAndDars(routeSetup: RouteSetup, packageManagementService: PackageM
   import routeSetup.*, RouteSetup.*
 
   def uploadDarFile(httpRequest: HttpRequest)(implicit
-                                              lc: LoggingContextOf[InstanceUUID with RequestID],
-                                              metrics: HttpApiMetrics,
+      lc: LoggingContextOf[InstanceUUID with RequestID],
+      metrics: HttpApiMetrics,
   ): ET[domain.SyncResponse[Unit]] = {
     for {
       parseAndDecodeTimer <- getParseAndDecodeTimerCtx()

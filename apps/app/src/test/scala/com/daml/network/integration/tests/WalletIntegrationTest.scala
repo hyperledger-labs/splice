@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCodes}
-import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthUtil
@@ -36,13 +36,13 @@ class WalletIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransform((_, config) =>
-        config.copy(akkaConfig =
+        config.copy(pekkoConfig =
           Some(
             // these settings are needed for the batching tests to pass,
             // since they require a lot of open / queued requests
             ConfigFactory.parseString(
               """
-            |akka.http.host-connection-pool {
+            |org.apache.pekko.http.host-connection-pool {
             |  max-connections = 20
             |  min-connections = 20
             |  max-open-requests = 128

@@ -1,9 +1,9 @@
 package com.daml.network.environment.ledger.api
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.grpc.adapter.client.akka.ClientAdapter
+import com.daml.grpc.adapter.client.pekko.ClientAdapter
 import com.daml.ledger.api.v1.*
 import com.daml.ledger.api.v1.admin.*
 import com.daml.ledger.javaapi.data.{

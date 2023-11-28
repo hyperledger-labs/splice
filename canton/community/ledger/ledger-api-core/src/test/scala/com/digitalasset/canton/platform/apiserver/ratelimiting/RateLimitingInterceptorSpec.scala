@@ -5,10 +5,9 @@ package com.digitalasset.canton.platform.apiserver.ratelimiting
 
 import com.codahale.metrics.MetricRegistry
 import com.daml.executors.executors.{NamedExecutor, QueueAwareExecutor}
-import com.daml.grpc.adapter.utils.implementations.HelloServiceAkkaImplementation
+import com.daml.grpc.adapter.utils.implementations.HelloServicePekkoImplementation
 import com.daml.grpc.sampleservice.implementations.HelloServiceReferenceImplementation
-import com.daml.ledger.api.testing.utils.AkkaBeforeAndAfterAll
-import com.daml.ledger.api.testing.utils.TestingServerInterceptors.serverOwner
+import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.resources.{ResourceOwner, TestResourceContext}
 import com.daml.platform.hello.{HelloRequest, HelloResponse, HelloServiceGrpc}
 import com.daml.ports.Port
@@ -20,12 +19,14 @@ import com.digitalasset.canton.ledger.api.health.HealthChecks.ComponentName
 import com.digitalasset.canton.ledger.api.health.{HealthChecks, ReportsHealth}
 import com.digitalasset.canton.logging.SuppressingLogger
 import com.digitalasset.canton.metrics.Metrics
+import com.digitalasset.canton.platform.apiserver.ActiveStreamMetricsInterceptor
 import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
 import com.digitalasset.canton.platform.apiserver.ratelimiting.LimitResult.LimitResultCheck
 import com.google.protobuf.ByteString
 import io.grpc.Status.Code
 import io.grpc.*
 import io.grpc.health.v1.health.{HealthCheckRequest, HealthCheckResponse, HealthGrpc}
+import io.grpc.netty.NettyServerBuilder
 import io.grpc.protobuf.services.ProtoReflectionService
 import io.grpc.reflection.v1alpha.{
   ServerReflectionGrpc,
@@ -40,12 +41,14 @@ import org.scalatest.time.{Second, Span}
 
 import java.io.IOException
 import java.lang.management.*
+import java.net.{InetAddress, InetSocketAddress}
 import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Promise}
 
 final class RateLimitingInterceptorSpec
     extends AsyncFlatSpec
-    with AkkaBeforeAndAfterAll
+    with PekkoBeforeAndAfterAll
     with Eventually
     with TestResourceContext
     with MockitoSugar
@@ -70,7 +73,7 @@ final class RateLimitingInterceptorSpec
     val threadPoolHumanReadableName = "For testing"
     withChannel(
       metrics,
-      new HelloServiceAkkaImplementation,
+      new HelloServicePekkoImplementation,
       config,
       additionalChecks = List(
         ThreadpoolCheck(
@@ -80,7 +83,7 @@ final class RateLimitingInterceptorSpec
           loggerFactory,
         )
       ),
-    ).use { channel: Channel =>
+    ).use { channel =>
       val helloService = HelloServiceGrpc.stub(channel)
       for {
         _ <- helloService.single(HelloRequest(1))
@@ -101,7 +104,7 @@ final class RateLimitingInterceptorSpec
 
     val protoService = ProtoReflectionService.newInstance()
 
-    withChannel(metrics, protoService, config).use { channel: Channel =>
+    withChannel(metrics, protoService, config).use { channel =>
       val methodDescriptor: MethodDescriptor[ServerReflectionRequest, ServerReflectionResponse] =
         ServerReflectionGrpc.getServerReflectionInfoMethod
       val call = channel.newCall(methodDescriptor, CallOptions.DEFAULT)
@@ -138,7 +141,7 @@ final class RateLimitingInterceptorSpec
         executionContext,
       )
 
-    withChannel(metrics, healthService, config).use { channel: Channel =>
+    withChannel(metrics, healthService, config).use { channel =>
       val healthStub = HealthGrpc.stub(channel)
       val promise = Promise[Unit]()
       for {
@@ -189,8 +192,8 @@ final class RateLimitingInterceptorSpec
 
     val pool = List(nonCollectableBean, nonHeapBean, memoryPoolBean)
 
-    withChannel(metrics, new HelloServiceAkkaImplementation, config, pool, memoryBean).use {
-      channel: Channel =>
+    withChannel(metrics, new HelloServicePekkoImplementation, config, pool, memoryBean).use {
+      channel =>
         val helloService = HelloServiceGrpc.stub(channel)
         for {
           _ <- helloService.single(HelloRequest(1))
@@ -211,7 +214,7 @@ final class RateLimitingInterceptorSpec
     val limitStreamConfig = RateLimitingConfig.Default.copy(maxStreams = 2)
 
     val waitService = new WaitService()
-    withChannel(metrics, waitService, limitStreamConfig).use { channel: Channel =>
+    withChannel(metrics, waitService, limitStreamConfig).use { channel =>
       {
         for {
           fStatus1 <- streamHello(channel) // Ok
@@ -244,7 +247,7 @@ final class RateLimitingInterceptorSpec
     val limitStreamConfig = RateLimitingConfig.Default.copy(maxStreams = 2)
 
     val waitService = new WaitService()
-    withChannel(metrics, waitService, limitStreamConfig).use { channel: Channel =>
+    withChannel(metrics, waitService, limitStreamConfig).use { channel =>
       {
         for {
 
@@ -282,7 +285,7 @@ final class RateLimitingInterceptorSpec
     val limitStreamConfig = RateLimitingConfig.Default.copy(maxStreams = 2)
 
     val waitService = new WaitService()
-    withChannel(metrics, waitService, limitStreamConfig).use { channel: Channel =>
+    withChannel(metrics, waitService, limitStreamConfig).use { channel =>
       {
         for {
 
@@ -310,7 +313,7 @@ final class RateLimitingInterceptorSpec
     val limitStreamConfig = RateLimitingConfig.Default.copy(maxStreams = 2)
 
     val waitService = new WaitService()
-    withChannel(metrics, waitService, limitStreamConfig).use { channel: Channel =>
+    withChannel(metrics, waitService, limitStreamConfig).use { channel =>
       for {
         fStatus1 <- streamHello(channel, cancel = true)
         status1 <- fStatus1
@@ -341,8 +344,8 @@ final class RateLimitingInterceptorSpec
 
     val pool = List(memoryPoolBean)
 
-    withChannel(metrics, new HelloServiceAkkaImplementation, config, pool, memoryBean).use {
-      channel: Channel =>
+    withChannel(metrics, new HelloServicePekkoImplementation, config, pool, memoryBean).use {
+      channel =>
         val helloService = HelloServiceGrpc.stub(channel)
         for {
           _ <- helloService.single(HelloRequest(1))
@@ -393,21 +396,29 @@ object RateLimitingInterceptorSpec extends MockitoSugar {
       pool: List[MemoryPoolMXBean] = List(underLimitMemoryPoolMXBean()),
       memoryBean: MemoryMXBean = ManagementFactory.getMemoryMXBean,
       additionalChecks: List[LimitResultCheck] = List.empty,
-  ): ResourceOwner[Channel] =
+  ): ResourceOwner[Channel] = {
+    val rateLimitingInterceptor = RateLimitingInterceptor(
+      loggerFactory,
+      metrics,
+      config,
+      pool,
+      memoryBean,
+      additionalChecks,
+    )
+    val activeStreamMetricsInterceptor = new ActiveStreamMetricsInterceptor(metrics)
     for {
-      server <- serverOwner(
-        RateLimitingInterceptor(
-          loggerFactory,
-          metrics,
-          config,
-          pool,
-          memoryBean,
-          additionalChecks,
-        ),
-        service,
+      server <- ResourceOwner.forServer(
+        NettyServerBuilder
+          .forAddress(new InetSocketAddress(InetAddress.getLoopbackAddress, 0))
+          .directExecutor()
+          .intercept(activeStreamMetricsInterceptor)
+          .intercept(rateLimitingInterceptor)
+          .addService(service),
+        FiniteDuration(10, "seconds"),
       )
       channel <- GrpcClientResource.owner(Port(server.getPort))
     } yield channel
+  }
 
   /** By default [[HelloServiceReferenceImplementation]] will return all elements and complete the stream on
     * the server side on every request.  For stream based rate limiting we want to explicitly hold open

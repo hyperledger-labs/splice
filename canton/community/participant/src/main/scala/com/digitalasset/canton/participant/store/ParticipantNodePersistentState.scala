@@ -3,13 +3,12 @@
 
 package com.digitalasset.canton.participant.store
 
-import akka.stream.Materializer
 import cats.Eval
 import cats.syntax.foldable.*
 import cats.syntax.parallel.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{BatchingConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.{
   CloseContext,
   FlagCloseable,
@@ -33,6 +32,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.RetryUtil.NoExnRetryable
 import com.digitalasset.canton.util.{ErrorUtil, retry}
 import com.digitalasset.canton.version.ReleaseProtocolVersion
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
@@ -70,6 +70,7 @@ trait ParticipantNodePersistentStateFactory {
       clock: Clock,
       maxDeduplicationDurationO: Option[NonNegativeFiniteDuration],
       uniqueContractKeysO: Option[Boolean],
+      batching: BatchingConfig,
       parameters: ParticipantStoreConfig,
       releaseProtocolVersion: ReleaseProtocolVersion,
       metrics: ParticipantMetrics,
@@ -91,6 +92,7 @@ object ParticipantNodePersistentStateFactory extends ParticipantNodePersistentSt
       clock: Clock,
       maxDeduplicationDurationO: Option[NonNegativeFiniteDuration],
       uniqueContractKeysO: Option[Boolean],
+      batching: BatchingConfig,
       parameters: ParticipantStoreConfig,
       releaseProtocolVersion: ReleaseProtocolVersion,
       metrics: ParticipantMetrics,
@@ -109,6 +111,7 @@ object ParticipantNodePersistentStateFactory extends ParticipantNodePersistentSt
       clock,
       maxDeduplicationDurationO,
       uniqueContractKeysO,
+      batching,
       parameters,
       releaseProtocolVersion,
       metrics,
@@ -135,6 +138,7 @@ object ParticipantNodePersistentState extends HasLoggerName {
       clock: Clock,
       maxDeduplicationDurationO: Option[NonNegativeFiniteDuration],
       uniqueContractKeysO: Option[Boolean],
+      batching: BatchingConfig,
       parameters: ParticipantStoreConfig,
       releaseProtocolVersion: ReleaseProtocolVersion,
       metrics: ParticipantMetrics,
@@ -158,7 +162,7 @@ object ParticipantNodePersistentState extends HasLoggerName {
       )
     val inFlightSubmissionStore = InFlightSubmissionStore(
       storage,
-      parameters.maxItemsInSqlClause,
+      batching.maxItemsInSqlClause,
       parameters.dbBatchAggregationConfig,
       releaseProtocolVersion,
       timeouts,

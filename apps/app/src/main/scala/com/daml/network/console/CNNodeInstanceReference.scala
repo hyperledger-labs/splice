@@ -1,7 +1,7 @@
 package com.daml.network.console
 
-import akka.http.scaladsl.model.HttpHeader
-import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
+import org.apache.pekko.http.scaladsl.model.HttpHeader
+import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.daml.lf.archive.DarParser
 import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.commands.HttpCommand

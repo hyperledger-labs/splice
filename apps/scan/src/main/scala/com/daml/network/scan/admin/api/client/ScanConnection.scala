@@ -1,7 +1,7 @@
 package com.daml.network.scan.admin.api.client
 
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinrules.{AppTransferContext, CoinRules}

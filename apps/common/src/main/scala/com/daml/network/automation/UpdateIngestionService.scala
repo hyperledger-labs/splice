@@ -1,7 +1,7 @@
 package com.daml.network.automation
 
-import akka.stream.Materializer
-import akka.stream.scaladsl.Flow
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Flow
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.network.environment.{CNLedgerConnection, CNLedgerSubscription, RetryProvider}
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse

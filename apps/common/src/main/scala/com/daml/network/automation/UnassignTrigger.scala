@@ -1,6 +1,6 @@
 package com.daml.network.automation
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.daml.ledger.javaapi.data.Template as CodegenTemplate
 import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractTypeCompanion, DamlRecord}
 import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}

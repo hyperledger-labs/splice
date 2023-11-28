@@ -1,6 +1,6 @@
 package com.daml.network.sv.automation.confirmation
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.{
   OnAssignedContractTrigger,
   TaskOutcome,

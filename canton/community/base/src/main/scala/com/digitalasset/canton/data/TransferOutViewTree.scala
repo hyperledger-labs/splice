@@ -127,7 +127,7 @@ object TransferOutViewTree
       )
     )(transferOutViewTreeP)
 }
-// TODO(#12373) replace "protocol version dev" in the documentation for transferCounter
+
 /** Aggregates the data of a transfer-out request that is sent to the mediator and the involved participants.
   *
   * @param salt Salt for blinding the Merkle hash
@@ -301,7 +301,7 @@ object TransferOutCommonData
         adminPartiesP,
         uuidP,
       )
-      protocolVersion = ProtocolVersion.fromProtoPrimitive(protocolVersionP)
+      protocolVersion <- ProtocolVersion.fromProtoPrimitive(protocolVersionP)
       _ <- checkMediatorGroupForProtocolVersion(commonData, protocolVersion)
     } yield TransferOutCommonData(
       commonData.salt,
@@ -379,6 +379,7 @@ sealed abstract class TransferOutView(hashOps: HashOps)
 
   def targetProtocolVersion: TargetProtocolVersion
 
+  // TODO(#15159) Remove the note that it is defined iff...
   /** The [[com.digitalasset.canton.TransferCounter]] of the contract.
     * The value is defined iff the protocol versions is at least
     * [[com.digitalasset.canton.version.ProtocolVersion.CNTestNet]].
@@ -766,6 +767,7 @@ object TransferOutView
     ) = transferOutViewP
 
     for {
+      protocolVersion <- ProtocolVersion.fromProtoPrimitive(targetProtocolVersionP)
       commonData <- ParsedDataV0V1.fromProto(
         hashOps,
         saltP,
@@ -773,7 +775,7 @@ object TransferOutView
         contractIdP,
         targetDomainP,
         targetTimeProofP,
-        ProtocolVersion.fromProtoPrimitive(targetProtocolVersionP),
+        protocolVersion,
       )
     } yield TransferOutViewV4(
       commonData.salt,
@@ -819,7 +821,7 @@ object TransferOutView
       salt <- ProtoConverter.parseRequired(Salt.fromProtoV0, "salt", saltP)
       submitter <- ProtoConverter.parseLfPartyId(submitterP)
       targetDomain <- DomainId.fromProtoPrimitive(targetDomainP, "targetDomain")
-      targetProtocolVersion = ProtocolVersion.fromProtoPrimitive(targetProtocolVersionP)
+      targetProtocolVersion <- ProtocolVersion.fromProtoPrimitive(targetProtocolVersionP)
       targetTimeProof <- ProtoConverter
         .required("targetTimeProof", targetTimeProofP)
         .flatMap(TimeProof.fromProtoV0(targetProtocolVersion, hashOps))

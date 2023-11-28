@@ -3,26 +3,40 @@
 
 package com.digitalasset.canton.http
 
-import akka.http.scaladsl.model.*
-import akka.http.scaladsl.server.RouteResult.Complete
-import akka.http.scaladsl.server.{RequestContext, Route}
-import akka.util.ByteString
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.server.RouteResult.Complete
+import org.apache.pekko.http.scaladsl.server.{RequestContext, Route}
+import org.apache.pekko.util.ByteString
 import util.GrpcHttpErrorCodes.*
 import com.daml.jwt.domain.{DecodedJwt, Jwt}
-import com.digitalasset.canton.ledger.api.auth.{AuthServiceJWTCodec, AuthServiceJWTPayload, CustomDamlJWTPayload, StandardJWTPayload}
+import com.digitalasset.canton.ledger.api.auth.{
+  AuthServiceJWTCodec,
+  AuthServiceJWTPayload,
+  CustomDamlJWTPayload,
+  StandardJWTPayload,
+}
 import com.digitalasset.canton.ledger.api.domain.UserRight
 import UserRight.{CanActAs, CanReadAs}
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ErrorDetail
 import com.daml.ledger.api.refinements.ApiTypes as lar
 import com.digitalasset.canton.http.json.SprayJson
-import com.digitalasset.canton.http.util.Logging.{InstanceUUID, RequestID, extendWithRequestIdLogCtx}
+import com.digitalasset.canton.http.util.Logging.{
+  InstanceUUID,
+  RequestID,
+  extendWithRequestIdLogCtx,
+}
 import com.digitalasset.canton.ledger.client.services.admin.UserManagementClient
 import com.digitalasset.canton.ledger.client.services.identity.LedgerIdentityClient
 import com.digitalasset.canton.ledger.service.Grpc.StatusEnvelope
 import com.daml.lf.data.Ref.UserId
 import com.daml.logging.LoggingContextOf
-import com.digitalasset.canton.http.domain.{JwtPayload, JwtPayloadLedgerIdOnly, JwtWritePayload, LedgerApiError}
+import com.digitalasset.canton.http.domain.{
+  JwtPayload,
+  JwtPayloadLedgerIdOnly,
+  JwtWritePayload,
+  LedgerApiError,
+}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.NoTracing
 import com.google.rpc.Code as GrpcCode
@@ -193,7 +207,7 @@ object EndpointsCompanion extends NoTracing {
 
     implicit val jwtWritePayloadFromCustomToken: CreateFromCustomToken[JwtWritePayload] =
       (
-        jwt: CustomDamlJWTPayload,
+        jwt: CustomDamlJWTPayload
       ) =>
         for {
           ledgerId <- jwt.ledgerId
@@ -283,7 +297,7 @@ object EndpointsCompanion extends NoTracing {
             details = details.map(domain.ErrorDetail.fromErrorUtils),
           )
         mkErrorResponse(
-          grpcStatus.asAkkaHttpForJsonApi,
+          grpcStatus.asPekkoHttpForJsonApi,
           s"$grpcStatus: $description",
           Some(ledgerApiError),
         )

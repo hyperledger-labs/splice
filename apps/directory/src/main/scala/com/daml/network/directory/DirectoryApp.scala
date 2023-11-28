@@ -1,11 +1,9 @@
 package com.daml.network.directory
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Directives.*
-import akka.stream.Materializer
-import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
-import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.stream.Materializer
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
@@ -32,6 +30,8 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
+import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 

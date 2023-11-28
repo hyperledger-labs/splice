@@ -1,7 +1,7 @@
 package com.daml.network.console
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.model.BodyPartEntity
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.model.BodyPartEntity
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment

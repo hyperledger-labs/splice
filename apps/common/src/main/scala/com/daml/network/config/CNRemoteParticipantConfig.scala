@@ -1,6 +1,6 @@
 package com.daml.network.config
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.participant.config.{BaseParticipantConfig, RemoteParticipantConfig}
 

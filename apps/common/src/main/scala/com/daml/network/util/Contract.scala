@@ -241,7 +241,7 @@ object Contract {
       contractId = contract.id,
       payload = contract.data,
       createdEventBlob = createdEventBlob,
-      createdAt = ev.getContractMetadata.createdAt,
+      createdAt = ev.createdAt,
     )
   }
 

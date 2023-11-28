@@ -1,6 +1,6 @@
 package com.daml.network.splitwell.automation
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import cats.syntax.apply.*
 import com.daml.network.automation.{
   AssignTrigger,

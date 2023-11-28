@@ -2,7 +2,7 @@ package com.daml.network.directory
 
 import com.daml.network.environment.CNLedgerConnection
 import com.digitalasset.canton.topology.PartyId
-import akka.http.scaladsl.model.Uri
+import org.apache.pekko.http.scaladsl.model.Uri
 import scala.util.{Try, Success, Failure}
 
 object DirectoryUtil {

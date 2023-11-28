@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import com.daml.network.environment.RetryProvider
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.{BaseTest, DomainAlias}

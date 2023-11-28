@@ -3,7 +3,7 @@
 
 package com.daml.network.auth
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import com.daml.network.auth.OAuthApi.TokenResponse
 import com.daml.network.config.AuthTokenSourceConfig
 import com.digitalasset.canton.data.CantonTimestamp

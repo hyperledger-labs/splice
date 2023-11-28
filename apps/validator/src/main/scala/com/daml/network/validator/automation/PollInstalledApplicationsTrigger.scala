@@ -1,7 +1,7 @@
 package com.daml.network.validator.automation
 
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.daml.network.automation.{

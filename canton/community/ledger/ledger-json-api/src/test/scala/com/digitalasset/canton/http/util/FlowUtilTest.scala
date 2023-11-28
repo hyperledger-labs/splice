@@ -3,10 +3,10 @@
 
 package com.digitalasset.canton.http.util
 
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.Materializer
-import akka.stream.scaladsl.Source
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 import org.scalacheck.{Gen, Arbitrary}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
@@ -15,14 +15,14 @@ import org.scalatest.matchers.should.Matchers
 import scalaz.{-\/, \/, \/-}
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class FlowUtilTest
     extends AnyFlatSpec
     with ScalaFutures
     with Matchers
     with ScalaCheckDrivenPropertyChecks {
-  import com.digitalasset.canton.http.util.FlowUtil._
+  import com.digitalasset.canton.http.util.FlowUtil.*
 
   implicit val asys: ActorSystem = ActorSystem(this.getClass.getSimpleName)
   implicit val materializer: Materializer = Materializer(asys)

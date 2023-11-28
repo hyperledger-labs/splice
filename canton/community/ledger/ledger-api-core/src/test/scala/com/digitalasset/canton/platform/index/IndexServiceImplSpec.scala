@@ -71,7 +71,7 @@ class IndexServiceImplSpec extends AnyFlatSpec with Matchers with MockitoSugar {
         EventProjectionProperties(
           true,
           Set.empty,
-          Map(party.toString -> Map(template1 -> Projection(Set(iface1), true, false, false))),
+          Map(party.toString -> Map(template1 -> Projection(Set(iface1), false, false))),
         ),
       )
     ) // filter gets complicated, filters template1 for iface1, projects iface1
@@ -95,8 +95,8 @@ class IndexServiceImplSpec extends AnyFlatSpec with Matchers with MockitoSugar {
           Set.empty,
           Map(
             party.toString -> Map(
-              template1 -> Projection(Set(iface1), true, false, false),
-              template2 -> Projection(Set(iface1), true, false, false),
+              template1 -> Projection(Set(iface1), false, false),
+              template2 -> Projection(Set(iface1), false, false),
             )
           ),
         ),
@@ -122,7 +122,7 @@ class IndexServiceImplSpec extends AnyFlatSpec with Matchers with MockitoSugar {
         EventProjectionProperties(
           true,
           Set(party),
-          Map(party.toString -> Map(template1 -> Projection(Set(iface1), true, false, false))),
+          Map(party.toString -> Map(template1 -> Projection(Set(iface1), false, false))),
         ),
       )
     )
@@ -388,7 +388,7 @@ object IndexServiceImplSpec {
       QualifiedName.assertFromString("ModuleName:template1")
     val template1: Identifier = Identifier.assertFromString("PackageName:ModuleName:template1")
     val template1Filter: TemplateFilter =
-      TemplateFilter(templateId = template1, includeCreateEventPayload = false)
+      TemplateFilter(templateId = template1, includeCreatedEventBlob = false)
     val templatesForQn1: (QualifiedName, TemplatesForQualifiedName) = templateQualifiedName1 ->
       TemplatesForQualifiedName(
         NonEmptyUtil.fromUnsafe(Set(template1)),
@@ -396,23 +396,21 @@ object IndexServiceImplSpec {
       )
     val template2: Identifier = Identifier.assertFromString("PackageName:ModuleName:template2")
     val template2Filter: TemplateFilter =
-      TemplateFilter(templateId = template2, includeCreateEventPayload = false)
+      TemplateFilter(templateId = template2, includeCreatedEventBlob = false)
     val template3: Identifier = Identifier.assertFromString("PackageName:ModuleName:template3")
     val template3Filter: TemplateFilter =
-      TemplateFilter(templateId = template3, includeCreateEventPayload = false)
+      TemplateFilter(templateId = template3, includeCreatedEventBlob = false)
     val iface1: Identifier = Identifier.assertFromString("PackageName:ModuleName:iface1")
     val iface1Filter: InterfaceFilter = InterfaceFilter(
       iface1,
       includeView = true,
-      includeCreateArgumentsBlob = true,
-      includeCreateEventPayload = false,
+      includeCreatedEventBlob = false,
     )
     val iface2: Identifier = Identifier.assertFromString("PackageName:ModuleName:iface2")
     val iface2Filter: InterfaceFilter = InterfaceFilter(
       iface2,
       includeView = true,
-      includeCreateArgumentsBlob = true,
-      includeCreateEventPayload = false,
+      includeCreatedEventBlob = false,
     )
     val view: PackageMetadataView = mock[PackageMetadataView]
   }

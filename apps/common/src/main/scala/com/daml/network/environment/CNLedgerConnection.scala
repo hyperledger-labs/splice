@@ -1,9 +1,9 @@
 package com.daml.network.environment
 
-import akka.{Done, NotUsed}
-import akka.actor.ActorSystem
-import akka.stream.{KillSwitch, KillSwitches, Materializer}
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import org.apache.pekko.{Done, NotUsed}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import cats.syntax.traverse.*
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
@@ -44,7 +44,7 @@ import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset.Value
 import com.digitalasset.canton.topology.{DomainId, Identifier, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
+import com.digitalasset.canton.util.{PekkoUtil, LoggerUtil}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.FieldMask
 import io.grpc.{Status, StatusRuntimeException}
@@ -493,7 +493,7 @@ class CNLedgerSubscription[S](
 
   import TraceContext.Implicits.Empty.*
 
-  private val (killSwitch, completed_) = AkkaUtil.runSupervised(
+  private val (killSwitch, completed_) = PekkoUtil.runSupervised(
     ex =>
       if (retryProvider.isClosing) {
         logger.info("Ignoring failure to handle transaction, as we are shutting down", ex)

@@ -1,9 +1,9 @@
 package com.daml.network.integration.tests
 
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.client.RequestBuilding.{Get, Post}
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.auth.AuthUtil

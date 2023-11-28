@@ -1,10 +1,10 @@
 package com.daml.network.auth
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import akka.http.scaladsl.model.{FormData, HttpMethods, HttpRequest, HttpResponse}
-import akka.http.scaladsl.unmarshalling.{Unmarshal, Unmarshaller}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import org.apache.pekko.http.scaladsl.model.{FormData, HttpMethods, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.unmarshalling.{Unmarshal, Unmarshaller}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 

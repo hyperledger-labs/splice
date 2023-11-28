@@ -1,7 +1,7 @@
 package com.daml.network.sv
 
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
 import com.daml.network.environment.*
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.TemplateJsonDecoder
@@ -340,8 +340,8 @@ final class LocalDomainNode(
               customTrustCertificates = None,
               SequencerAlias.Local,
             )
-          val newConnections = SequencerConnections.many(
-            NonEmpty.mk(Seq, defaultConnection, localSequencerConnection),
+          val newConnections = SequencerConnections.tryMany(
+            Seq(defaultConnection, localSequencerConnection),
             PositiveInt.tryCreate(1),
           )
           if (conf.sequencerConnections == newConnections) {

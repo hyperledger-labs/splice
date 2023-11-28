@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.domain.sequencing
 
-import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.parallel.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -48,8 +47,10 @@ import com.digitalasset.canton.topology.client.DomainTopologyClientWithInit
 import com.digitalasset.canton.topology.store.TopologyStateForInitializationService
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.FutureInstances.*
+import com.digitalasset.canton.util.FutureUtil
 import com.digitalasset.canton.{DiscardOps, config}
 import io.grpc.{ServerInterceptors, ServerServiceDefinition}
+import org.apache.pekko.actor.ActorSystem
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -189,7 +190,11 @@ class SequencerRuntime(
           logger.warn(
             s"Sequencer is unhealthy, so disconnecting all members. ${status.details.getOrElse("")}"
           )
-          sequencerService.disconnectAllMembers()
+          // Run into a Future because closing subscriptions can take time, especially when having DB connection issues
+          FutureUtil.doNotAwait(
+            Future(sequencerService.disconnectAllMembers()),
+            "Failed to disconnect members",
+          )
         } else {
           logger.info(s"Sequencer is healthy")
         }

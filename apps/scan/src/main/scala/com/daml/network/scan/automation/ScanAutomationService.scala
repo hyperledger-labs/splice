@@ -1,6 +1,6 @@
 package com.daml.network.scan.automation
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.CNNodeAppAutomationService
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}

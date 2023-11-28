@@ -1,6 +1,6 @@
 package com.daml.network.config
 
-import akka.http.scaladsl.model.Uri
+import org.apache.pekko.http.scaladsl.model.Uri
 import com.daml.network.auth.AuthUtil
 import com.daml.network.directory.config.{
   DirectoryAppBackendConfig,

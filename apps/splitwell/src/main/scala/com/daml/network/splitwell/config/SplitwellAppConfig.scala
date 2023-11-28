@@ -3,6 +3,7 @@ package com.daml.network.splitwell.config
 import com.daml.network.config.{
   AutomationConfig,
   CNNodeBackendConfig,
+  CNNodeParametersConfig,
   CNParticipantClientConfig,
   DomainConfig,
   HttpCNNodeClientConfig,
@@ -33,12 +34,12 @@ case class SplitwellAppBackendConfig(
     scanClient: ScanAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     domains: SplitwellDomainConfig,
+    parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "splitwell"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
-
 }
 
 case class SplitwellAppClientConfig(

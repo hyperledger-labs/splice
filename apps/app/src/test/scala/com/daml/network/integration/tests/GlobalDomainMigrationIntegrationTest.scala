@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import better.files.*
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight

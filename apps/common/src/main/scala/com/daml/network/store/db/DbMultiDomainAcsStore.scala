@@ -1,7 +1,7 @@
 package com.daml.network.store.db
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Source
 import cats.data.OptionT
 import cats.implicits.*
 import com.daml.ledger.api.v1.TransactionOuterClass

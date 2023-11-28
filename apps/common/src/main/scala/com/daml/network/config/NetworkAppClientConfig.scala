@@ -1,6 +1,6 @@
 package com.daml.network.config
 
-import akka.http.scaladsl.model.Uri
+import org.apache.pekko.http.scaladsl.model.Uri
 import com.digitalasset.canton.config.{KeepAliveClientConfig, TlsClientConfig}
 
 /** A client configuration to a corresponding server configuration

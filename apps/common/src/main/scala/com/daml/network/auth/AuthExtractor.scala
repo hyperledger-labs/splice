@@ -1,8 +1,8 @@
 package com.daml.network.auth
 
-import akka.http.scaladsl.server.Directive1
-import akka.http.scaladsl.server.Directives.authenticateOAuth2
-import akka.http.scaladsl.server.directives.Credentials
+import org.apache.pekko.http.scaladsl.server.Directive1
+import org.apache.pekko.http.scaladsl.server.Directives.authenticateOAuth2
+import org.apache.pekko.http.scaladsl.server.directives.Credentials
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 

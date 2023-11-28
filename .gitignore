@@ -25,6 +25,7 @@ target
 .bsp
 !canton/community/participant/src/test/resources/daml/illformed.dar
 !canton/community/participant/src/main/resources/dar/AdminWorkflows.dar
+!canton/community/lib/pekko/src/*
 *~
 *#
 *.pid

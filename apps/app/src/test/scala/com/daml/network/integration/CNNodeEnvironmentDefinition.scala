@@ -202,11 +202,11 @@ case class CNNodeEnvironmentDefinition(
 
   def withHttpSettingsForHigherThroughput: CNNodeEnvironmentDefinition =
     addConfigTransform((_, config) =>
-      config.copy(akkaConfig =
+      config.copy(pekkoConfig =
         Some(
           ConfigFactory.parseString(
             """
-              |akka.http.host-connection-pool {
+              |pekko.http.host-connection-pool {
               |  max-connections = 1000
               |  min-connections = 20
               |  max-open-requests = 1024

@@ -3,8 +3,6 @@
 
 package com.digitalasset.canton.platform.apiserver.services
 
-import akka.stream.Materializer
-import akka.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.api.v1.transaction_filter.TransactionFilter
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
@@ -31,6 +29,8 @@ import com.digitalasset.canton.topology.transaction.ParticipantPermission as Top
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.ServerServiceDefinition
 import io.grpc.stub.StreamObserver
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -54,51 +54,53 @@ final class ApiStateService(
   override def getActiveContracts(
       request: GetActiveContractsRequest,
       responseObserver: StreamObserver[GetActiveContractsResponse],
-  ): Unit = registerStream(responseObserver) {
+  ): Unit = {
     implicit val loggingContext: LoggingContextWithTrace =
       LoggingContextWithTrace(loggerFactory, telemetry)
+    registerStream(responseObserver) {
 
-    val result = for {
-      filters <- transactionFilterValidator.validate(
-        TransactionFilter(request.getFilter.filtersByParty)
-      )
-      activeAtO <- FieldValidator.optionalString(request.activeAtOffset)(str =>
-        ApiOffset.fromString(str).left.map { errorMsg =>
-          RequestValidationErrors.NonHexOffset
-            .Error(
-              fieldName = "active_at_offset",
-              offsetValue = request.activeAtOffset,
-              message = s"Reason: $errorMsg",
-            )
-            .asGrpcError
-        }
-      )
-    } yield {
-      withEnrichedLoggingContext(telemetry)(
-        logging.filters(filters)
-      ) { implicit loggingContext =>
-        logger.info(
-          s"Received request for active contracts: $request, ${loggingContext.serializeFiltered("filters")}."
+      val result = for {
+        filters <- transactionFilterValidator.validate(
+          TransactionFilter(request.getFilter.filtersByParty)
         )
-        acsService
-          .getActiveContracts(
-            filter = filters,
-            verbose = request.verbose,
-            activeAtO = activeAtO,
-            multiDomainEnabled = true,
+        activeAtO <- FieldValidator.optionalString(request.activeAtOffset)(str =>
+          ApiOffset.fromString(str).left.map { errorMsg =>
+            RequestValidationErrors.NonHexOffset
+              .Error(
+                fieldName = "active_at_offset",
+                offsetValue = request.activeAtOffset,
+                message = s"Reason: $errorMsg",
+              )
+              .asGrpcError
+          }
+        )
+      } yield {
+        withEnrichedLoggingContext(telemetry)(
+          logging.filters(filters)
+        ) { implicit loggingContext =>
+          logger.info(
+            s"Received request for active contracts: $request, ${loggingContext.serializeFiltered("filters")}."
           )
+          acsService
+            .getActiveContracts(
+              filter = filters,
+              verbose = request.verbose,
+              activeAtO = activeAtO,
+              multiDomainEnabled = true,
+            )
+        }
       }
+      result
+        .fold(
+          t =>
+            Source.failed(
+              ValidationLogger.logFailureWithTrace(logger, request, t)
+            ),
+          identity,
+        )
+        .via(logger.logErrorsOnStream)
+        .via(StreamMetrics.countElements(metrics.daml.lapi.streams.acs))
     }
-    result
-      .fold(
-        t =>
-          Source.failed(
-            ValidationLogger.logFailureWithTrace(logger, request, t)
-          ),
-        identity,
-      )
-      .via(logger.logErrorsOnStream)
-      .via(StreamMetrics.countElements(metrics.daml.lapi.streams.acs))
   }
 
   override def getConnectedDomains(

@@ -469,3 +469,6 @@ max_open_connections = 3
 
 # Instrumentation namespace
 namespace = "cometbft"
+
+# TODO(#8726): enable it
+require-submitter-key-id = false

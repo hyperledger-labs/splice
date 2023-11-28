@@ -1,6 +1,6 @@
 package com.daml.network.admin.http
 
-import akka.http.scaladsl.model.{
+import org.apache.pekko.http.scaladsl.model.{
   ContentTypes,
   HttpEntity,
   HttpResponse,
@@ -8,16 +8,16 @@ import akka.http.scaladsl.model.{
   StatusCode,
   StatusCodes,
 }
-import akka.http.scaladsl.model.StatusCodes.InternalServerError
-import akka.http.scaladsl.server.{Directive0, ExceptionHandler, StandardRoute}
-import akka.http.scaladsl.server.Directives.{
+import org.apache.pekko.http.scaladsl.model.StatusCodes.InternalServerError
+import org.apache.pekko.http.scaladsl.server.{Directive0, ExceptionHandler, StandardRoute}
+import org.apache.pekko.http.scaladsl.server.Directives.{
   complete,
   extractRequestTimeout,
   extractUri,
   handleExceptions,
   withRequestTimeoutResponse,
 }
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import com.digitalasset.canton.ledger.error.groups.CommandExecutionErrors.Interpreter
 import com.daml.network.http.v0.definitions as d0
 import com.digitalasset.canton.error.ErrorCodeUtils

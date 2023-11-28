@@ -1,7 +1,7 @@
 package com.daml.network.validator.automation
 
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.{
   AssignTrigger,
   CNNodeAppAutomationService,

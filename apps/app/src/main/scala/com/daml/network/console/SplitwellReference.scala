@@ -1,6 +1,6 @@
 package com.daml.network.console
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.javaapi.data.codegen.Update
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen

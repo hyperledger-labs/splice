@@ -3,12 +3,8 @@
 
 package com.digitalasset.canton.participant.ledger.api.client
 
-import akka.actor.ActorSystem
-import akka.stream.KillSwitches
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-import akka.{Done, NotUsed}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.refinements.ApiTypes.{ApplicationId, TemplateId, WorkflowId}
+import com.daml.ledger.api.refinements.ApiTypes.{ApplicationId, WorkflowId}
 import com.daml.ledger.api.v1.command_submission_service.SubmitRequest
 import com.daml.ledger.api.v1.commands.Commands.DeduplicationPeriod
 import com.daml.ledger.api.v1.commands.{Command, Commands}
@@ -18,7 +14,8 @@ import com.daml.ledger.api.v1.package_service.GetPackageStatusResponse
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree}
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.ledger.api.v1.value.Identifier
-import com.daml.ledger.client.binding.Primitive as P
+import com.daml.ledger.javaapi
+import com.daml.ledger.javaapi.data.Party
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.ledger.client.LedgerClient
@@ -39,12 +36,16 @@ import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
-import com.digitalasset.canton.util.AkkaUtil
+import com.digitalasset.canton.util.PekkoUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.google.rpc.status.Status
 import io.grpc.StatusRuntimeException
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.KillSwitches
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
+import org.apache.pekko.{Done, NotUsed}
 import org.slf4j.event.Level
 import scalaz.syntax.tag.*
 
@@ -78,7 +79,7 @@ trait LedgerSubscription extends FlagCloseableAsync with NamedLogging {
 }
 
 trait LedgerAcs extends LedgerSubmit {
-  def sender: P.Party
+  def sender: Party
   def activeContracts(
       filter: TransactionFilter = LedgerConnection.transactionFilter(sender)
   ): Future[(Seq[CreatedEvent], LedgerOffset)]
@@ -164,7 +165,7 @@ object LedgerConnection {
       clientConfig: ClientConfig,
       applicationId: ApplicationId,
       maxRetries: Int,
-      senderParty: P.Party,
+      senderParty: Party,
       defaultWorkflowId: WorkflowId,
       commandClientConfiguration: CommandClientConfiguration,
       token: Option[String],
@@ -304,7 +305,7 @@ object LedgerConnection {
       }
 
       def commandsOf(
-          party: P.Party,
+          party: Party,
           commandId: Option[String],
           workflowId: WorkflowId,
           deduplicationTime: Option[NonNegativeFiniteDuration],
@@ -315,7 +316,7 @@ object LedgerConnection {
           workflowId = WorkflowId.unwrap(workflowId),
           applicationId = ApplicationId.unwrap(applicationId),
           commandId = commandId.getOrElse(uniqueId),
-          party = P.Party.unwrap(party),
+          party = party.getValue,
           deduplicationPeriod = deduplicationTime
             .map(dt => DeduplicationPeriod.DeduplicationDuration(dt.toProtoPrimitive))
             .getOrElse(DeduplicationPeriod.Empty),
@@ -341,8 +342,9 @@ object LedgerConnection {
         })
 
       override def transactionById(id: String): Future[Option[Transaction]] =
-        client.transactionClient.getFlatTransactionById(id, Seq(sender.unwrap), token).map { resp =>
-          resp.transaction
+        client.transactionClient.getFlatTransactionById(id, Seq(sender.getValue), token).map {
+          resp =>
+            resp.transaction
         }
 
       override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable](
@@ -398,7 +400,7 @@ object LedgerConnection {
         new LedgerSubscription {
           override protected def timeouts: ProcessingTimeout = processingTimeouts
           import TraceContext.Implicits.Empty.*
-          val (killSwitch, completed) = AkkaUtil.runSupervised(
+          val (killSwitch, completed) = PekkoUtil.runSupervised(
             logger.error("Fatally failed to handle transaction", _),
             source
               // we place the kill switch before the map operator, such that
@@ -451,24 +453,21 @@ object LedgerConnection {
 
     }
 
-  def transactionFilter(ps: P.Party*): TransactionFilter =
-    TransactionFilter(P.Party.unsubst(ps).map((_, Filters.defaultInstance)).toMap)
+  def transactionFilter(ps: Party*): TransactionFilter =
+    TransactionFilter((ps: Seq[Party]).map(p => (p.getValue, Filters.defaultInstance)).toMap)
 
-  def transactionFilterByParty(filter: Map[PartyId, Seq[TemplateId]]): TransactionFilter =
+  def transactionFilterByParty(filter: Map[PartyId, Seq[Identifier]]): TransactionFilter =
     TransactionFilter(filter.map {
-      case (p, Nil) => p.toPrim.unwrap -> Filters.defaultInstance
-      case (p, ts) => p.toPrim.unwrap -> Filters(Some(InclusiveFilters(ts.map(_.unwrap))))
+      case (p, Nil) => p.toParty.getValue -> Filters.defaultInstance
+      case (p, ts) => p.toParty.getValue -> Filters(Some(InclusiveFilters(ts)))
     })
 
-  def mapTemplateIds(id: P.TemplateId[_]): TemplateId = {
-    import scalaz.syntax.tag.*
-    id.unwrap match {
-      case Identifier(packageId, moduleName, entityName) =>
-        TemplateId(
-          Identifier(packageId = packageId, moduleName = moduleName, entityName = entityName)
-        )
-    }
-  }
+  def mapTemplateIds(id: javaapi.data.Identifier): Identifier =
+    Identifier(
+      packageId = id.getPackageId,
+      moduleName = id.getModuleName,
+      entityName = id.getEntityName,
+    )
 
   val ledgerBegin = LedgerOffset(
     LedgerOffset.Value.Boundary(LedgerOffset.LedgerBoundary.LEDGER_BEGIN)

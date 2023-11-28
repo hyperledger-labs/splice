@@ -25,7 +25,7 @@ lazy val `canton-wartremover-extension` = BuildCommon.`canton-wartremover-extens
 lazy val `canton-util-external` = BuildCommon.`canton-util-external`
 lazy val `canton-util-internal` = BuildCommon.`canton-util-internal`
 lazy val `canton-util-logging` = BuildCommon.`canton-util-logging`
-lazy val `canton-akka-fork` = BuildCommon.`canton-akka-fork`
+lazy val `canton-pekko-fork` = BuildCommon.`canton-pekko-fork`
 lazy val `canton-ledger-common` = BuildCommon.`canton-ledger-common`
 lazy val `canton-ledger-api-core` = BuildCommon.`canton-ledger-api-core`
 lazy val `canton-ledger-json-api` = BuildCommon.`canton-ledger-json-api`
@@ -400,7 +400,7 @@ lazy val `apps-common` =
         java_jwt,
         jwks_rsa,
         spray_json,
-        akka_spray_json,
+        pekko_spray_json,
       ),
       BuildCommon.sharedAppSettings,
       buildInfoKeys := Seq[BuildInfoKey](
@@ -421,13 +421,13 @@ lazy val `apps-common` =
             ScalaServer(
               new File(s"apps/common/src/main/openapi/common-$scope.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "akka-http",
+              framework = "pekko-http",
               customExtraction = true,
             ),
             ScalaClient(
               new File(s"apps/common/src/main/openapi/common-$scope.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "akka-http",
+              framework = "pekko-http",
             ),
           )
         },
@@ -445,7 +445,7 @@ lazy val `apps-validator` =
       `app-manager-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(akka_http_cors, commons_compress, jaxb_abi),
+      libraryDependencies ++= Seq(pekko_http_cors, commons_compress, jaxb_abi),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
@@ -463,13 +463,13 @@ lazy val `apps-validator` =
             ScalaServer(
               new File(s"apps/validator/src/main/openapi/${api}.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "akka-http",
+              framework = "pekko-http",
               customExtraction = true,
             ),
             ScalaClient(
               new File(s"apps/validator/src/main/openapi/${api}.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "akka-http",
+              framework = "pekko-http",
             ),
           )
         ),
@@ -488,7 +488,7 @@ lazy val `apps-sv` =
     )
     .settings(
       libraryDependencies ++= Seq(
-        akka_http_cors,
+        pekko_http_cors,
         scalapb_runtime,
         comet_bft_proto,
       ),
@@ -503,13 +503,13 @@ lazy val `apps-sv` =
           ScalaServer(
             new File("apps/sv/src/main/openapi/sv-internal.yaml"),
             pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
+            framework = "pekko-http",
             customExtraction = true,
           ),
           ScalaClient(
             new File("apps/sv/src/main/openapi/sv-internal.yaml"),
             pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
+            framework = "pekko-http",
           ),
         ),
     )
@@ -522,7 +522,7 @@ lazy val `apps-scan` =
       `svc-governance-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(akka_http_cors, scalapb_runtime_grpc, scalapb_runtime),
+      libraryDependencies ++= Seq(pekko_http_cors, scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
@@ -534,13 +534,13 @@ lazy val `apps-scan` =
           ScalaServer(
             new File("apps/scan/src/main/openapi/scan-internal.yaml"),
             pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
+            framework = "pekko-http",
             customExtraction = true,
           ),
           ScalaClient(
             new File("apps/scan/src/main/openapi/scan-internal.yaml"),
             pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
+            framework = "pekko-http",
           ),
         ),
     )
@@ -825,13 +825,13 @@ lazy val `apps-wallet` =
             ScalaServer(
               new File(s"apps/wallet/src/main/openapi/wallet-$scope.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "akka-http",
+              framework = "pekko-http",
               customExtraction = true,
             ),
             ScalaClient(
               new File(s"apps/wallet/src/main/openapi/wallet-$scope.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "akka-http",
+              framework = "pekko-http",
             ),
           )
         },
@@ -848,7 +848,7 @@ lazy val `apps-directory` =
       `directory-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(akka_http_cors),
+      libraryDependencies ++= Seq(pekko_http_cors),
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
         npmName = "directory-openapi",
@@ -866,13 +866,13 @@ lazy val `apps-directory` =
             ScalaServer(
               new File(s"apps/directory/src/main/openapi/directory-$scope.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "akka-http",
+              framework = "pekko-http",
               customExtraction = true,
             ),
             ScalaClient(
               new File(s"apps/directory/src/main/openapi/directory-$scope.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "akka-http",
+              framework = "pekko-http",
             ),
           )
         },
@@ -899,13 +899,13 @@ lazy val `apps-splitwell` =
           ScalaServer(
             new File("apps/splitwell/src/main/openapi/splitwell-internal.yaml"),
             pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
+            framework = "pekko-http",
             customExtraction = true,
           ),
           ScalaClient(
             new File("apps/splitwell/src/main/openapi/splitwell-internal.yaml"),
             pkg = "com.daml.network.http.v0",
-            framework = "akka-http",
+            framework = "pekko-http",
           ),
         ),
       Compile / resourceGenerators += Def.task {
@@ -1060,6 +1060,8 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case PathList("google", "protobuf", _*) => MergeStrategy.first
     case PathList("org", "apache", "logging", _*) => MergeStrategy.first
     case PathList("ch", "qos", "logback", _*) => MergeStrategy.first
+    case PathList("com", "digitalasset", "canton", "config", "LocalNodeParametersConfig.class") =>
+      MergeStrategy.first
     case PathList(
           "META-INF",
           "org",
@@ -1072,7 +1074,7 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
           "Log4j2Plugins.dat",
         ) =>
       MergeStrategy.first
-    case (PathList("akka", "stream", "scaladsl", broadcasthub, _*))
+    case (PathList("org", "apache", "pekko", "stream", "scaladsl", broadcasthub, _*))
         if broadcasthub.startsWith("BroadcastHub") =>
       MergeStrategy.first
     case "META-INF/versions/9/module-info.class" => MergeStrategy.discard

@@ -1,8 +1,8 @@
 package com.daml.network.automation
 
-import akka.NotUsed
-import akka.stream.Materializer
-import akka.stream.scaladsl.Source
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 import com.daml.network.environment.ledger.api.ReassignmentEvent
 import com.daml.network.store.{CNNodeAppStore, MultiDomainAcsStore}
 import com.digitalasset.canton.tracing.TraceContext

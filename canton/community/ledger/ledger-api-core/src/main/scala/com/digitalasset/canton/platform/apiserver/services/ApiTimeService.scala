@@ -3,8 +3,6 @@
 
 package com.digitalasset.canton.platform.apiserver.services
 
-import akka.stream.Materializer
-import akka.stream.scaladsl.Source
 import com.daml.api.util.TimestampConversion.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.api.v1.testing.time_service.TimeServiceGrpc.TimeService
@@ -19,12 +17,14 @@ import com.digitalasset.canton.ledger.api.validation.ValidationErrors.invalidArg
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
 import com.digitalasset.canton.logging.TracedLoggerOps.TracedLoggerOps
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.platform.akkastreams.dispatcher.SignalDispatcher
 import com.digitalasset.canton.platform.apiserver.TimeServiceBackend
+import com.digitalasset.canton.platform.pekkostreams.dispatcher.SignalDispatcher
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.empty.Empty
 import io.grpc.stub.StreamObserver
 import io.grpc.{ServerServiceDefinition, StatusRuntimeException}
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 import scalaz.syntax.tag.*
 
 import java.time.Instant
@@ -58,31 +58,33 @@ private[apiserver] final class ApiTimeService private (
   def getTime(
       request: GetTimeRequest,
       responseObserver: StreamObserver[GetTimeResponse],
-  ): Unit = registerStream(responseObserver) {
+  ): Unit = {
     implicit val loggingContext = LoggingContextWithTrace(loggerFactory, telemetry)
+    registerStream(responseObserver) {
 
-    val validated =
-      matchLedgerId(ledgerId)(optionalLedgerId(request.ledgerId))
-    validated.fold(
-      t => Source.failed(ValidationLogger.logFailureWithTrace(logger, request, t)),
-      { ledgerId =>
-        logger.info(
-          s"Received request for time with ledger ID ${ledgerId.getOrElse("<empty-ledger-id>")}"
-        )
-        dispatcher
-          .subscribe()
-          .map(_ => backend.getCurrentTime)
-          .scan[Option[Instant]](Some(backend.getCurrentTime)) {
-            case (Some(previousTime), currentTime) if previousTime == currentTime => None
-            case (_, currentTime) => Some(currentTime)
-          }
-          .mapConcat {
-            case None => Nil
-            case Some(t) => List(GetTimeResponse(Some(fromInstant(t))))
-          }
-          .via(logger.logErrorsOnStream)
-      },
-    )
+      val validated =
+        matchLedgerId(ledgerId)(optionalLedgerId(request.ledgerId))
+      validated.fold(
+        t => Source.failed(ValidationLogger.logFailureWithTrace(logger, request, t)),
+        { ledgerId =>
+          logger.info(
+            s"Received request for time with ledger ID ${ledgerId.getOrElse("<empty-ledger-id>")}"
+          )
+          dispatcher
+            .subscribe()
+            .map(_ => backend.getCurrentTime)
+            .scan[Option[Instant]](Some(backend.getCurrentTime)) {
+              case (Some(previousTime), currentTime) if previousTime == currentTime => None
+              case (_, currentTime) => Some(currentTime)
+            }
+            .mapConcat {
+              case None => Nil
+              case Some(t) => List(GetTimeResponse(Some(fromInstant(t))))
+            }
+            .via(logger.logErrorsOnStream)
+        },
+      )
+    }
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.JavaSerializable"))

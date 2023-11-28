@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import akka.Done
+import org.apache.pekko.Done
 import com.daml.ledger.javaapi.data
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.lf.data.Ref

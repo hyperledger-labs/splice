@@ -1,6 +1,6 @@
 package com.daml.network.automation
 
-import akka.Done
+import org.apache.pekko.Done
 import com.daml.network.environment.RetryProvider
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.lifecycle.*

@@ -3,18 +3,18 @@
 
 package com.digitalasset.canton.http.json
 
-import akka.NotUsed
-import akka.http.scaladsl.model._
-import akka.stream.scaladsl.*
-import akka.stream.{FanOutShape2, SourceShape, UniformFanInShape}
-import akka.util.ByteString
-import com.digitalasset.canton.fetchcontracts.util.AkkaStreamsUtils
-import scalaz.syntax.show._
+import org.apache.pekko.NotUsed
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.stream.scaladsl.*
+import org.apache.pekko.stream.{FanOutShape2, SourceShape, UniformFanInShape}
+import org.apache.pekko.util.ByteString
+import com.digitalasset.canton.fetchcontracts.util.PekkoStreamsUtils
+import scalaz.syntax.show.*
 import scalaz.{Show, \/}
-import spray.json.DefaultJsonProtocol._
-import spray.json._
+import spray.json.DefaultJsonProtocol.*
+import spray.json.*
 
- object ResponseFormats {
+object ResponseFormats {
   def errorsJsObject(status: StatusCode, es: String*): JsObject = {
     val errors = es.toJson
     JsObject(statusField(status), ("errors", errors))
@@ -34,9 +34,9 @@ import spray.json._
   ): Source[ByteString, NotUsed] = {
 
     val graph = GraphDSL.create() { implicit b =>
-      import GraphDSL.Implicits._
+      import GraphDSL.Implicits.*
 
-      val partition: FanOutShape2[E \/ JsValue, E, JsValue] = b add AkkaStreamsUtils.partition
+      val partition: FanOutShape2[E \/ JsValue, E, JsValue] = b add PekkoStreamsUtils.partition
       val concat: UniformFanInShape[ByteString, ByteString] = b add Concat(3)
 
       // first produce optional warnings and result element

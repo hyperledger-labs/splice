@@ -1,6 +1,6 @@
 package com.daml.network.directory.admin.http
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn.directory.DirectoryInstallRequest
 import com.daml.network.http.v0.external

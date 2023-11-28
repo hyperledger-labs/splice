@@ -1,6 +1,6 @@
 package com.daml.network.automation
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.{LedgerClient, ReassignmentEvent}
 import com.daml.network.store.CNNodeAppStore

@@ -718,9 +718,9 @@ class TransactionProcessingSteps(
 
     val lens = PLens[
       (WithRecipients[LightTransactionViewTree], Option[Signature]),
-      (WithRecipients[TransactionViewTree], Option[Signature]),
+      (WithRecipients[FullTransactionViewTree], Option[Signature]),
       LightTransactionViewTree,
-      TransactionViewTree,
+      FullTransactionViewTree,
     ](_._1.unwrap)(tvt => { case (WithRecipients(_, rec), sig) =>
       (WithRecipients(tvt, rec), sig)
     })
@@ -838,7 +838,6 @@ class TransactionProcessingSteps(
       transferLookup: TransferLookup,
       contractLookup: ContractLookup,
       activenessResultFuture: FutureUnlessShutdown[ActivenessResult],
-      pendingCursor: Future[Unit],
       mediator: MediatorRef,
       freshOwnTimelyTx: Boolean,
   )(implicit
@@ -866,13 +865,12 @@ class TransactionProcessingSteps(
 
     def doParallelChecks(enrichedTransaction: EnrichedTransaction): Future[ParallelChecksResult] = {
       val ledgerTime = enrichedTransaction.ledgerTime
-      for {
-        _ <- pendingCursor
-
-        rootViewTrees = enrichedTransaction.rootViewTreesWithSignatures.map { case (viewTree, _) =>
+      val rootViewTrees = enrichedTransaction.rootViewTreesWithSignatures.map {
+        case (viewTree, _) =>
           viewTree
-        }
+      }
 
+      for {
         authenticationResult <-
           authenticationValidator.verifyViewSignatures(
             requestId,
@@ -1593,7 +1591,7 @@ object TransactionProcessingSteps {
 
   final case class EnrichedTransaction(
       policy: ConfirmationPolicy,
-      rootViewTreesWithSignatures: NonEmpty[Seq[(TransactionViewTree, Option[Signature])]],
+      rootViewTreesWithSignatures: NonEmpty[Seq[(FullTransactionViewTree, Option[Signature])]],
       usedAndCreated: UsedAndCreated,
       workflowIdO: Option[WorkflowId],
       submitterMetadataO: Option[SubmitterMetadata],
@@ -1639,7 +1637,7 @@ object TransactionProcessingSteps {
 
   /** @throws java.lang.IllegalArgumentException if `receivedViewTrees` contains views with different transaction root hashes
     */
-  def tryCommonData(receivedViewTrees: NonEmpty[Seq[TransactionViewTree]]): CommonData = {
+  def tryCommonData(receivedViewTrees: NonEmpty[Seq[FullTransactionViewTree]]): CommonData = {
     val distinctCommonData = receivedViewTrees
       .map(v => CommonData(v.transactionId, v.ledgerTime, v.submissionTime, v.confirmationPolicy))
       .distinct

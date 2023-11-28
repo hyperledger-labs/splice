@@ -72,7 +72,7 @@ private[apiserver] final class ApiVersionService private (
           userAndPartyLocalMetadataExtensions =
             Some(ExperimentalUserAndPartyLocalMetadataExtensions(supported = true)),
           acsActiveAtOffset = Some(AcsActiveAtOffsetFeature(supported = true)),
-          templateFilters = None,
+          templateFilters = Some(TransactionsWithTemplateFilters(supported = true)),
         )
       ),
     )

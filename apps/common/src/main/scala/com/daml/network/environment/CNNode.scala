@@ -1,6 +1,6 @@
 package com.daml.network.environment
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.CNNodeMetrics
 import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParameters}

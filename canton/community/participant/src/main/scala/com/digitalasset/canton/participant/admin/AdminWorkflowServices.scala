@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.participant.admin
 
-import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.functor.*
@@ -47,6 +46,7 @@ import com.google.protobuf.ByteString
 import com.google.rpc.status.Status
 import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
 import org.slf4j.event.Level
 
 import java.io.InputStream
@@ -83,7 +83,7 @@ class AdminWorkflowServices(
 
   override protected def timeouts: ProcessingTimeout = parameters.processingTimeouts
 
-  private val adminParty = adminPartyId.toPrim
+  private val adminParty = adminPartyId.toParty
 
   if (syncService.isActive() && parameters.adminWorkflow.autoloadDar) {
     withNewTraceContext { implicit traceContext =>

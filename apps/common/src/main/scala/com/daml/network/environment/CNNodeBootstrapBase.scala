@@ -1,6 +1,6 @@
 package com.daml.network.environment
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import better.files.File
 import cats.data.EitherT
 import com.daml.nameof.NameOf.functionFullName

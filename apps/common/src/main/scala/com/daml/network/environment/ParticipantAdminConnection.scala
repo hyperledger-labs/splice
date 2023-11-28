@@ -176,7 +176,7 @@ class ParticipantAdminConnection(
       traceContext: TraceContext
   ): Future[Unit] = {
     runCmd(
-      ParticipantAdminCommands.ParticipantRepairManagement.ImportAcs(acsBytes)
+      ParticipantAdminCommands.ParticipantRepairManagement.ImportAcs(acsBytes, "")
     )
   }
 

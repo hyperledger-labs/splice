@@ -8,7 +8,6 @@ package com.digitalasset.canton.config
 // SOME OF THE IMPLICIT IMPORTS NECESSARY TO COMPILE
 ////////////////////////////////////////////////////////
 
-import akka.stream.ThrottleMode
 import cats.Order
 import cats.data.Validated
 import cats.syntax.either.*
@@ -80,6 +79,7 @@ import com.typesafe.config.{
 }
 import com.typesafe.scalalogging.LazyLogging
 import monocle.macros.syntax.lens.*
+import org.apache.pekko.stream.ThrottleMode
 import pureconfig.*
 import pureconfig.error.CannotConvert
 import pureconfig.generic.{FieldCoproductHint, ProductHint}
@@ -177,7 +177,7 @@ final case class MonitoringConfig(
     metrics: MetricsConfig = MetricsConfig(),
     delayLoggingThreshold: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(20),
     tracing: TracingConfig = TracingConfig(),
-    // TODO(i9014) remove (breaking change)
+    // TODO(#15221) remove (breaking change)
     @Deprecated(since = "2.2.0") // use logging.api.messagePayloads instead
     logMessagePayloads: Option[Boolean] = None,
     logQueryCost: Option[QueryCostMonitoringConfig] = None,
@@ -314,7 +314,7 @@ final case class CantonFeatures(
     enablePreviewCommands: Boolean = false,
     enableTestingCommands: Boolean = false,
     enableRepairCommands: Boolean = false,
-    // TODO(#9014) remove for x-nodes
+    // TODO(#15221) remove for x-nodes
     skipTopologyManagerSignatureValidation: Boolean = false,
 ) {
   def featureFlags: Set[FeatureFlag] = {
@@ -406,7 +406,7 @@ trait CantonConfig {
   def parameters: CantonParameters
 
   /** Akka configuration */
-  def akkaConfig: Option[Config] = None
+  def pekkoConfig: Option[Config] = None
 
   /** control which features are enabled */
   def features: CantonFeatures
@@ -453,10 +453,10 @@ trait CantonConfig {
         ),
         uniqueContractKeys = participantConfig.init.parameters.uniqueContractKeys,
         ledgerApiServerParameters = participantParameters.ledgerApiServerParameters,
-        maxDbConnections = participantConfig.storage.maxConnectionsCanton(true, false, false),
         excludeInfrastructureTransactions = participantParameters.excludeInfrastructureTransactions,
         enableEngineStackTrace = participantParameters.enableEngineStackTraces,
         enableContractUpgrading = participantParameters.enableContractUpgrading,
+        iterationsBetweenInterruptions = participantParameters.iterationsBetweenInterruptions,
       )
     }
 
@@ -539,6 +539,7 @@ private[config] object CantonNodeParameterConverter {
       parent.parameters.timeouts.processing,
       node.sequencerClient,
       node.caching,
+      node.parameters.batching,
       parent.parameters.nonStandardConfig,
       node.storage.parameters.migrateAndStart,
       parent.features.skipTopologyManagerSignatureValidation,
@@ -765,6 +766,10 @@ object CantonConfig {
       deriveReader[RemoteDomainConfig]
     lazy implicit val remoteParticipantConfigReader: ConfigReader[RemoteParticipantConfig] =
       deriveReader[RemoteParticipantConfig]
+    lazy implicit val batchingReader: ConfigReader[BatchingConfig] =
+      deriveReader[BatchingConfig]
+    lazy implicit val connectionAllocationReader: ConfigReader[ConnectionAllocation] =
+      deriveReader[ConnectionAllocation]
     lazy implicit val dbParamsReader: ConfigReader[DbParametersConfig] =
       deriveReader[DbParametersConfig]
     lazy implicit val memoryReader: ConfigReader[CommunityStorageConfig.Memory] =
@@ -1134,6 +1139,10 @@ object CantonConfig {
       deriveWriter[RemoteParticipantConfig]
     lazy implicit val nodeMonitoringConfigWriter: ConfigWriter[NodeMonitoringConfig] =
       deriveWriter[NodeMonitoringConfig]
+    lazy implicit val batchingWriter: ConfigWriter[BatchingConfig] =
+      deriveWriter[BatchingConfig]
+    lazy implicit val connectionAllocationWriter: ConfigWriter[ConnectionAllocation] =
+      deriveWriter[ConnectionAllocation]
     lazy implicit val dbParametersWriter: ConfigWriter[DbParametersConfig] =
       deriveWriter[DbParametersConfig]
     lazy implicit val memoryWriter: ConfigWriter[CommunityStorageConfig.Memory] =

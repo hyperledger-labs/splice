@@ -70,7 +70,7 @@ object GrpcParticipantRepairService {
     private def validateProtocolVersion(
         protocolVersion: String
     ): Either[String, Option[ProtocolVersion]] =
-      OptionUtil.emptyStringAsNone(protocolVersion).traverse(ProtocolVersion.create)
+      OptionUtil.emptyStringAsNone(protocolVersion).traverse(ProtocolVersion.create(_))
 
     private def validateContractDomainRenames(
         contractDomainRenames: Map[String, String]
@@ -125,8 +125,6 @@ object GrpcParticipantRepairService {
     private def validateContractDomainRenames(
         contractDomainRenames: Map[String, ExportAcsRequest.TargetDomain],
         allProtocolVersions: Map[DomainId, ProtocolVersion],
-    )(implicit
-        elc: ErrorLoggingContext
     ): Either[String, List[(DomainId, (DomainId, ProtocolVersion))]] =
       contractDomainRenames.toList.traverse {
         case (source, ExportAcsRequest.TargetDomain(targetDomain, targetProtocolVersionRaw)) =>
@@ -136,13 +134,13 @@ object GrpcParticipantRepairService {
             targetDomainId <- DomainId
               .fromProtoPrimitive(targetDomain, "target domain id")
               .leftMap(_.message)
-            targetProtocolVersion = ProtocolVersion.fromProtoPrimitive(targetProtocolVersionRaw)
+            targetProtocolVersion <- ProtocolVersion
+              .fromProtoPrimitive(targetProtocolVersionRaw)
+              .leftMap(_.toString)
 
             /*
-            target protocol version should be supported
-            Moreover, the participant is connected to this domain, it should correspond to the stored version
+            The `targetProtocolVersion` should be the one running on the corresponding domain.
              */
-            _ <- isSupported(targetProtocolVersion).leftMap(_.toString)
             _ <- allProtocolVersions
               .get(targetDomainId)
               .map { foundProtocolVersion =>
@@ -159,7 +157,7 @@ object GrpcParticipantRepairService {
     private def validateRequest(
         request: ExportAcsRequest,
         allProtocolVersions: Map[DomainId, ProtocolVersion],
-    )(implicit elc: ErrorLoggingContext): Either[String, ValidExportAcsRequest] = {
+    ): Either[String, ValidExportAcsRequest] = {
       for {
         parties <- request.parties.traverse(party =>
           UniqueIdentifier.fromProtoPrimitive_(party).map(PartyId(_).toLf)
@@ -488,6 +486,7 @@ final class GrpcParticipantRepairService(
   ): StreamObserver[ImportAcsRequest] = {
     // TODO(i12481): This buffer will contain the whole ACS snapshot.
     val outputStream = new ByteArrayOutputStream()
+    val workflowIdPrefix = new AtomicReference[String]
 
     new StreamObserver[ImportAcsRequest] {
       override def onNext(value: ImportAcsRequest): Unit = {
@@ -496,6 +495,7 @@ final class GrpcParticipantRepairService(
             outputStream.close()
             responseObserver.onError(exception)
           case Success(_) =>
+            workflowIdPrefix.set(value.workflowIdPrefix)
         }
       }
 
@@ -539,6 +539,7 @@ final class GrpcParticipantRepairService(
                         ),
                         ignoreAlreadyAdded = true,
                         ignoreStakeholderCheck = true,
+                        workflowIdPrefix = Option(workflowIdPrefix.get()),
                       )
                     )
                   } yield ()
@@ -652,7 +653,7 @@ final class GrpcParticipantRepairService(
       implicit traceContext: TraceContext
   ): EitherT[Future, String, Unit] = {
     for {
-      protocolVersion <- EitherT.fromOptionF(
+      protocolVersion <- EitherT.fromOption[Future](
         sync.protocolVersionGetter(Traced(domainId)),
         ifNone = s"Domain ID's protocol version not found: $domainId",
       )

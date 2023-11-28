@@ -1,12 +1,10 @@
 package com.daml.network.splitwell
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Directives.*
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
-import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
-import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
@@ -42,6 +40,8 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
+import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 

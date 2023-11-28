@@ -1,7 +1,7 @@
 package com.daml.network.sv.admin.api.client
 
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{HttpAppConnection, RetryProvider}
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient

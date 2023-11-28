@@ -1,6 +1,6 @@
 package com.daml.network.sv.automation.singlesv.onboarding
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.cn.svcrules.SvcRules

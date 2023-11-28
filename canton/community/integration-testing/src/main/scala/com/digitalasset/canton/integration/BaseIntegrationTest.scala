@@ -75,7 +75,7 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
   ): Assertion =
     loggerFactory.assertThrowsAndLogs[CommandFailure](
       within,
-      assertions.map(assertion => { entry: LogEntry =>
+      assertions.map(assertion => { (entry: LogEntry) =>
         assertion(entry)
         entry.commandFailureMessage
         succeed

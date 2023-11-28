@@ -3,9 +3,6 @@
 
 package com.digitalasset.canton.participant.store.db
 
-import akka.NotUsed
-import akka.stream.*
-import akka.stream.scaladsl.{Keep, Sink, Source}
 import cats.data.OptionT
 import cats.syntax.functorFilter.*
 import cats.syntax.option.*
@@ -35,8 +32,8 @@ import com.digitalasset.canton.participant.store.{EventLogId, MultiDomainEventLo
 import com.digitalasset.canton.participant.sync.TimestampedEvent.TransactionEventId
 import com.digitalasset.canton.participant.sync.{LedgerSyncEvent, TimestampedEvent}
 import com.digitalasset.canton.participant.{GlobalOffset, LocalOffset, RequestOffset}
-import com.digitalasset.canton.platform.akkastreams.dispatcher.Dispatcher
-import com.digitalasset.canton.platform.akkastreams.dispatcher.SubSource.RangeSource
+import com.digitalasset.canton.platform.pekkostreams.dispatcher.Dispatcher
+import com.digitalasset.canton.platform.pekkostreams.dispatcher.SubSource.RangeSource
 import com.digitalasset.canton.protocol.TargetDomainId
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.{
@@ -54,6 +51,9 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.{DiscardOps, LedgerTransactionId}
 import com.google.common.annotations.VisibleForTesting
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.*
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import slick.jdbc.GetResult
 
 import java.util.concurrent.atomic.AtomicReference
@@ -72,11 +72,11 @@ import scala.util.control.NonFatal
   *                                  If event publication back-pressures for some reason (e.g. db is unavailable),
   *                                  `publish` will throw an exception,
   *                                  if the number of concurrent calls exceeds this number.
-  *                                  A high number comes with higher memory usage, as Akka allocates a buffer of that size internally.
+  *                                  A high number comes with higher memory usage, as Pekko allocates a buffer of that size internally.
   * @param maxBatchSize maximum number of events that will be persisted in a single database transaction.
   * @param batchTimeout after this timeout, the collect events so far will be persisted, even if `maxBatchSize` has
   *                     not been attained.
-  *                     A small number comes with higher CPU usage, as Akka schedules periodic task at that delay.
+  *                     A small number comes with higher CPU usage, as Pekko schedules periodic task at that delay.
   */
 class DbMultiDomainEventLog private[db] (
     initialLastGlobalOffset: Option[GlobalOffset],
@@ -156,7 +156,7 @@ class DbMultiDomainEventLog private[db] (
     .toMat(Sink.ignore)(Keep.both)
 
   private val ((eventsQueue, killSwitch), done) =
-    AkkaUtil.runSupervised(
+    PekkoUtil.runSupervised(
       logger.error("An exception occurred while publishing an event. Stop publishing events.", _)(
         TraceContext.empty
       ),
@@ -165,6 +165,7 @@ class DbMultiDomainEventLog private[db] (
 
   override def publish(data: PublicationData): Future[Unit] = {
     implicit val traceContext: TraceContext = data.traceContext
+
     val promise = Promise[Unit]()
     for {
       result <- eventsQueue.offer(data -> promise)
@@ -400,7 +401,9 @@ class DbMultiDomainEventLog private[db] (
       traceContext: TraceContext
   ): Future[List[PendingPublish]] = {
     val fromExclusive = lastLocalOffsets.get(id.index)
-    logger.info(s"Fetch unpublished from $id up to $upToInclusiveO")
+    logger.info(
+      s"Fetch unpublished in log $id, from $fromExclusive (exclusive) up to $upToInclusiveO (inclusive)"
+    )
 
     processingTime.event {
       for {
@@ -536,7 +539,7 @@ class DbMultiDomainEventLog private[db] (
 
   private def lastLocalOffsetBeforeOrAt[T <: LocalOffset](
       eventLogId: EventLogId,
-      upToInclusive: GlobalOffset,
+      upToInclusive: Option[GlobalOffset],
       timestampInclusive: Option[CantonTimestamp],
       localOffsetDiscriminator: Option[Int],
   )(implicit traceContext: TraceContext, getResult: GetResult[T]): Future[Option[T]] = {
@@ -546,6 +549,9 @@ class DbMultiDomainEventLog private[db] (
       val tsFilter = timestampInclusive.map(ts => sql" and el.ts <= $ts").getOrElse(sql" ")
       val localOffsetDiscriminatorFilter =
         localOffsetDiscriminator.fold(sql" ")(disc => sql" and el.local_offset_discriminator=$disc")
+      val globalOffsetFilter = upToInclusive
+        .map(upToInclusive => sql" and global_offset <= $upToInclusive")
+        .getOrElse(sql" ")
 
       val ordering = sql" order by global_offset desc #${storage.limit(1)}"
 
@@ -554,27 +560,29 @@ class DbMultiDomainEventLog private[db] (
         sql"""select lel.local_offset_effective_time, lel.local_offset_discriminator, lel.local_offset_tie_breaker
               from linearized_event_log lel
               join event_log el on lel.log_id = el.log_id and lel.local_offset_effective_time = el.local_offset_effective_time and lel.local_offset_discriminator = el.local_offset_discriminator and lel.local_offset_tie_breaker = el.local_offset_tie_breaker
-              where lel.log_id = ${eventLogId.index} and global_offset <= $upToInclusive
+              where lel.log_id = ${eventLogId.index}
               """
 
       val query =
-        (base ++ tsFilter ++ localOffsetDiscriminatorFilter ++ ordering).as[T].headOption
+        (base ++ globalOffsetFilter ++ tsFilter ++ localOffsetDiscriminatorFilter ++ ordering)
+          .as[T]
+          .headOption
 
       storage.query(query, functionFullName)
     }
   }
 
-  override def lastLocalOffsetBeforeOrAt(
+  override def lastLocalOffset(
       eventLogId: EventLogId,
-      upToInclusive: GlobalOffset,
-      timestampInclusive: Option[CantonTimestamp],
+      upToInclusive: Option[GlobalOffset] = None,
+      timestampInclusive: Option[CantonTimestamp] = None,
   )(implicit traceContext: TraceContext): Future[Option[LocalOffset]] =
     lastLocalOffsetBeforeOrAt(eventLogId, upToInclusive, timestampInclusive, None)
 
-  override def lastRequestOffsetBeforeOrAt(
+  override def lastRequestOffset(
       eventLogId: EventLogId,
-      upToInclusive: GlobalOffset,
-      timestampInclusive: Option[CantonTimestamp],
+      upToInclusive: Option[GlobalOffset] = None,
+      timestampInclusive: Option[CantonTimestamp] = None,
   )(implicit traceContext: TraceContext): Future[Option[RequestOffset]] =
     lastLocalOffsetBeforeOrAt[RequestOffset](
       eventLogId,
@@ -687,28 +695,6 @@ class DbMultiDomainEventLog private[db] (
       }
     }
 
-  override def lastLocalOffset(
-      id: EventLogId
-  )(implicit traceContext: TraceContext): Future[Option[LocalOffset]] = {
-
-    /*
-      We want the maximum local offset.
-      Since global offset increases monotonically with the local offset on a given log, we sort by global offset.
-     */
-    val query = sql"""
-      select local_offset_effective_time, local_offset_discriminator, local_offset_tie_breaker from linearized_event_log where log_id=${id.index} order by global_offset desc #${storage
-        .limit(1)}
-     """
-
-    processingTime.event {
-      storage
-        .query(
-          query.as[LocalOffset].headOption,
-          functionFullName,
-        )
-    }
-  }
-
   override def lastGlobalOffset(upToInclusive: Option[GlobalOffset] = None)(implicit
       traceContext: TraceContext
   ): OptionT[Future, GlobalOffset] = {
@@ -775,9 +761,9 @@ class DbMultiDomainEventLog private[db] (
       AsyncCloseable(
         "done",
         done.map(_ => ()).recover {
-          // The Akka stream supervisor has already logged an exception as an error and stopped the stream
+          // The Pekko stream supervisor has already logged an exception as an error and stopped the stream
           case NonFatal(e) =>
-            logger.debug(s"Ignored exception in Akka stream done future during shutdown", e)
+            logger.debug(s"Ignored exception in Pekko stream done future during shutdown", e)
         },
         timeouts.shutdownShort.unwrap,
       ),

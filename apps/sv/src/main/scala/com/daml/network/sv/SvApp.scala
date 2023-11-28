@@ -1,15 +1,13 @@
 package com.daml.network.sv
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse}
-import akka.http.scaladsl.server.Directives.*
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import cats.data.OptionT
 import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
-import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
@@ -67,6 +65,8 @@ import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.circe.Json
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
+import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*

@@ -1,13 +1,13 @@
 package com.daml.network.automation
 
-import akka.{Done, NotUsed}
-import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
-import akka.stream.scaladsl.{Keep, Sink, Source}
+import org.apache.pekko.{Done, NotUsed}
+import org.apache.pekko.stream.{KillSwitches, Materializer, UniqueKillSwitch}
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.AkkaUtil
+import com.digitalasset.canton.util.PekkoUtil
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
@@ -61,7 +61,7 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
             waitForResumePromise = Promise()
           }
           logger.debug("Starting source processing loop")
-          val (killSwitch: UniqueKillSwitch, completed0: Future[Done]) = AkkaUtil.runSupervised(
+          val (killSwitch: UniqueKillSwitch, completed0: Future[Done]) = PekkoUtil.runSupervised(
             logger.error("Fatally failed to handle task", _),
             source
               .mapAsync(1) { task => waitForResumePromise.future.map(_ => task) }

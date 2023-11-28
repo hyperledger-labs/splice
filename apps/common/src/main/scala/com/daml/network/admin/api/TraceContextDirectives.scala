@@ -1,7 +1,7 @@
 package com.daml.network.admin.api
 
-import akka.http.scaladsl.server
-import akka.http.scaladsl.server.{Directive, Directive1, RequestContext, RouteResult}
+import org.apache.pekko.http.scaladsl.server
+import org.apache.pekko.http.scaladsl.server.{Directive, Directive1, RequestContext, RouteResult}
 import com.daml.network.admin.api.client.TraceContextPropagation.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.tracing.W3CTraceContext

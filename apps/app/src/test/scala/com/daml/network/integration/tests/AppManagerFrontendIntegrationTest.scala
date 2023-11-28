@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity}
 import cats.syntax.either.*
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.http.v0.definitions.{AppConfiguration, ReleaseConfiguration, Timespan}

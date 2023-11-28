@@ -1,6 +1,6 @@
 package com.daml.network.validator.config
 
-import akka.http.scaladsl.model.Uri
+import org.apache.pekko.http.scaladsl.model.Uri
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.*
 import com.daml.network.http.v0.definitions
@@ -155,6 +155,7 @@ case class ValidatorAppBackendConfig(
     appManager: Option[AppManagerConfig] = None,
     svValidator: Boolean = false,
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(5),
+    parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

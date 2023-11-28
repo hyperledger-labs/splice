@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.participant
 
-import akka.actor.ActorSystem
 import cats.Eval
 import cats.data.EitherT
 import cats.syntax.either.*
@@ -37,7 +36,10 @@ import com.digitalasset.canton.participant.domain.{
 import com.digitalasset.canton.participant.ledger.api.CantonLedgerApiServerWrapper.IndexerLockIds
 import com.digitalasset.canton.participant.ledger.api.*
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
-import com.digitalasset.canton.participant.scheduler.ParticipantSchedulersParameters
+import com.digitalasset.canton.participant.scheduler.{
+  ParticipantSchedulersParameters,
+  SchedulersWithParticipantPruning,
+}
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.sync.*
 import com.digitalasset.canton.participant.topology.ParticipantTopologyManager.PostInitCallbacks
@@ -50,7 +52,6 @@ import com.digitalasset.canton.participant.topology.{
 import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.platform.apiserver.meteringreport.MeteringReportKey.CommunityKey
 import com.digitalasset.canton.resource.*
-import com.digitalasset.canton.scheduler.SchedulersWithPruning
 import com.digitalasset.canton.sequencing.client.{RecordingConfig, ReplayConfig}
 import com.digitalasset.canton.store.IndexedStringStore
 import com.digitalasset.canton.time.EnrichedDurations.*
@@ -68,6 +69,7 @@ import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.EitherTUtil
 import io.grpc.ServerServiceDefinition
+import org.apache.pekko.actor.ActorSystem
 
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicReference
@@ -87,8 +89,8 @@ class ParticipantNodeBootstrap(
     ) => Unit,
     resourceManagementServiceFactory: Eval[ParticipantSettingsStore] => ResourceManagementService,
     replicationServiceFactory: Storage => ServerServiceDefinition,
-    createSchedulers: ParticipantSchedulersParameters => Future[SchedulersWithPruning] = _ =>
-      Future.successful(SchedulersWithPruning.noop),
+    createSchedulers: ParticipantSchedulersParameters => Future[SchedulersWithParticipantPruning] =
+      _ => Future.successful(SchedulersWithParticipantPruning.noop),
     ledgerApiServerFactory: CantonLedgerApiServerFactory,
     private[canton] val persistentStateFactory: ParticipantNodePersistentStateFactory,
     skipRecipientsCheck: Boolean,
@@ -437,6 +439,7 @@ object ParticipantNodeBootstrap {
         enableLfDev = arguments.parameterConfig.devVersionSupport,
         enableStackTraces = arguments.parameterConfig.enableEngineStackTrace,
         enableContractUpgrading = arguments.parameterConfig.enableContractUpgrading,
+        iterationsBetweenInterruptions = arguments.parameterConfig.iterationsBetweenInterruptions,
       )
 
     override protected def createResourceService(
@@ -593,7 +596,7 @@ class ParticipantNode(
     val adminToken: CantonAdminToken,
     val recordSequencerInteractions: AtomicReference[Option[RecordingConfig]],
     val replaySequencerConfig: AtomicReference[Option[ReplayConfig]],
-    val schedulers: SchedulersWithPruning,
+    val schedulers: SchedulersWithParticipantPruning,
     packageDependencyResolver: PackageDependencyResolver,
     val loggerFactory: NamedLoggerFactory,
     healthData: => Seq[ComponentStatus],

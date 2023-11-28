@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.domain.sequencing.sequencer
 
-import akka.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.functor.*
@@ -49,6 +48,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.version.ProtocolVersion
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 import org.slf4j.event.Level
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -156,6 +156,9 @@ class DatabaseSequencer(
       )
     )
 
+  private val store = writer.generalStore
+
+  // Only start pruning scheduler after `store` variable above has been initialized to avoid racy NPE
   withNewTraceContext { implicit traceContext =>
     timeouts.unbounded.await(s"Waiting for sequencer writer to fully start")(
       writer.startOrLogError()
@@ -171,8 +174,6 @@ class DatabaseSequencer(
       )
     )
   }
-
-  private val store = writer.generalStore
 
   // periodically run the call to mark lagging sequencers as offline
   private def periodicallyMarkLaggingSequencersOffline(

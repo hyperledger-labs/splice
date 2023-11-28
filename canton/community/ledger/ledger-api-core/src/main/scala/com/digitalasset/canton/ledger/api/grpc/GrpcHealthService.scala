@@ -3,8 +3,6 @@
 
 package com.digitalasset.canton.ledger.api.grpc
 
-import akka.stream.Materializer
-import akka.stream.scaladsl.Source
 import com.daml.error.ContextualizedErrorLogger
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.tracing.Telemetry
@@ -16,6 +14,8 @@ import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFact
 import io.grpc.ServerServiceDefinition
 import io.grpc.health.v1.health.{HealthCheckRequest, HealthCheckResponse, HealthGrpc}
 import io.grpc.stub.StreamObserver
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future}
@@ -47,15 +47,16 @@ class GrpcHealthService(
   override def watch(
       request: HealthCheckRequest,
       responseObserver: StreamObserver[HealthCheckResponse],
-  ): Unit = registerStream(responseObserver) {
+  ): Unit = {
     implicit val loggingContext = LoggingContextWithTrace(loggerFactory, telemetry)
-
-    Source
-      .fromIterator(() =>
-        Iterator.continually(matchResponse(serviceFrom(request)).fold(throw _, identity))
-      )
-      .throttle(1, per = maximumWatchFrequency)
-      .via(DropRepeated())
+    registerStream(responseObserver) {
+      Source
+        .fromIterator(() =>
+          Iterator.continually(matchResponse(serviceFrom(request)).fold(throw _, identity))
+        )
+        .throttle(1, per = maximumWatchFrequency)
+        .via(DropRepeated())
+    }
   }
 
   private def matchResponse(

@@ -1,7 +1,7 @@
 package com.daml.network.store
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Source
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.transaction_filter.TransactionFilter as LapiTransactionFilter
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion

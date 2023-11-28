@@ -1,8 +1,8 @@
 package com.daml.network.environment
 
-import akka.Done
-import akka.stream.StreamTcpException
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import org.apache.pekko.Done
+import org.apache.pekko.stream.StreamTcpException
+import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
@@ -554,8 +554,8 @@ object RetryProvider {
             FatalErrorKind
           }
         // We encounter this with toxiproxy if the upstream is not yet up.
-        // The exception type is akka.http.impl.engine.client.OutgoingConnectionBlueprint.UnexpectedConnectionClosureException
-        // but akka-http does not expose that so we match on the message instead.
+        // The exception type is org.apache.pekko.http.impl.engine.client.OutgoingConnectionBlueprint.UnexpectedConnectionClosureException
+        // but pekko-http does not expose that so we match on the message instead.
         case Failure(ex: RuntimeException)
             if Option(ex.getMessage).exists(
               _.contains(

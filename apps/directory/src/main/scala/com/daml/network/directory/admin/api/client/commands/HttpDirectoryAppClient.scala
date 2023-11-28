@@ -1,7 +1,7 @@
 package com.daml.network.directory.admin.api.client.commands
 
-import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}

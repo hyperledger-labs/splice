@@ -1,6 +1,6 @@
 package com.daml.network.wallet
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig

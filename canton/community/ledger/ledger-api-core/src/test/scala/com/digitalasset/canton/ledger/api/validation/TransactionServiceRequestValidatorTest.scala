@@ -45,7 +45,7 @@ class TransactionServiceRequestValidatorTest
             Filters(
               Some(
                 InclusiveFilters(
-                  templateIdsForParty,
+                  templateFilters = templateIdsForParty.map(tId => TemplateFilter(Some(tId))),
                   interfaceFilters = Seq(
                     InterfaceFilter(
                       interfaceId = Some(
@@ -56,7 +56,7 @@ class TransactionServiceRequestValidatorTest
                         )
                       ),
                       includeInterfaceView = true,
-                      includeCreateArgumentsBlob = true,
+                      includeCreatedEventBlob = true,
                     )
                   ),
                 )
@@ -418,7 +418,7 @@ class TransactionServiceRequestValidatorTest
         )
       }
 
-      "not allow mixed (deprecated and current) definitions between parties: one has includeCreateArgumentsBlob, the other has includeCreateEventPayload" in {
+      "not allow mixed (deprecated and current) definitions between parties: one has templateIds, the other has interfaceFilter.includeCreatedEventBlob" in {
         requestMustFailWith(
           request = validator.validate(
             txReqBuilder(Seq.empty).copy(
@@ -429,15 +429,7 @@ class TransactionServiceRequestValidatorTest
                     party -> Filters(
                       Some(
                         InclusiveFilters(
-                          templateIds = Seq.empty,
-                          interfaceFilters = Seq(
-                            InterfaceFilter(
-                              interfaceId = Some(templateId),
-                              includeInterfaceView = false,
-                              includeCreateArgumentsBlob = true,
-                              includeCreateEventPayload = false,
-                            )
-                          ),
+                          templateIds = Seq(templateId),
                           templateFilters = Seq.empty,
                         )
                       )
@@ -451,50 +443,13 @@ class TransactionServiceRequestValidatorTest
                             InterfaceFilter(
                               interfaceId = Some(templateId),
                               includeInterfaceView = false,
-                              includeCreateArgumentsBlob = false,
-                              includeCreateEventPayload = true,
+                              includeCreatedEventBlob = true,
                             )
                           ),
                           templateFilters = Seq.empty,
                         )
                       )
                     ),
-                  )
-                )
-              )
-            ),
-            ledgerEnd,
-          ),
-          code = INVALID_ARGUMENT,
-          description =
-            "INVALID_ARGUMENT(8,0): The submitted command has invalid arguments: Transaction filter should be defined entirely either with deprecated fields, or with non-deprecated fields. Mixed definition is not allowed.",
-          metadata = Map.empty,
-        )
-      }
-
-      "not allow mixed (deprecated and current) definitions within one InclusiveFilter: includeCreateArgumentsBlob and includeCreateEventPayload" in {
-        requestMustFailWith(
-          request = validator.validate(
-            txReqBuilder(Seq.empty).copy(
-              filter = Some(
-                TransactionFilter(
-                  Map(
-                    party -> Filters(
-                      Some(
-                        InclusiveFilters(
-                          templateIds = Seq.empty,
-                          interfaceFilters = Seq(
-                            InterfaceFilter(
-                              interfaceId = Some(templateId),
-                              includeInterfaceView = false,
-                              includeCreateArgumentsBlob = true,
-                              includeCreateEventPayload = true,
-                            )
-                          ),
-                          templateFilters = Seq.empty,
-                        )
-                      )
-                    )
                   )
                 )
               )
@@ -537,62 +492,6 @@ class TransactionServiceRequestValidatorTest
         )
       }
 
-      "deprecated definition populate the right domain request" in {
-        val result = validator.validate(
-          txReqBuilder(Seq.empty).copy(
-            filter = Some(
-              TransactionFilter(
-                Map(
-                  party -> Filters(
-                    Some(
-                      InclusiveFilters(
-                        templateIds = Seq(templateId),
-                        interfaceFilters = Seq(
-                          InterfaceFilter(
-                            interfaceId = Some(templateId),
-                            includeInterfaceView = true,
-                            includeCreateArgumentsBlob = true,
-                            includeCreateEventPayload = false,
-                          )
-                        ),
-                        templateFilters = Seq.empty,
-                      )
-                    )
-                  )
-                )
-              )
-            )
-          ),
-          ledgerEnd,
-        )
-        result.map(_.filter.filtersByParty) shouldBe Right(
-          Map(
-            party -> domain.Filters(
-              Some(
-                domain.InclusiveFilters(
-                  templateFilters = Set(
-                    domain.TemplateFilter(
-                      Ref.Identifier.assertFromString("packageId:includedModule:includedTemplate"),
-                      false,
-                    )
-                  ),
-                  interfaceFilters = Set(
-                    domain.InterfaceFilter(
-                      interfaceId = Ref.Identifier.assertFromString(
-                        "packageId:includedModule:includedTemplate"
-                      ),
-                      includeView = true,
-                      includeCreateArgumentsBlob = true,
-                      includeCreateEventPayload = false,
-                    )
-                  ),
-                )
-              )
-            )
-          )
-        )
-      }
-
       "current definition populate the right domain request" in {
         val result = validator.validate(
           txReqBuilder(Seq.empty).copy(
@@ -607,8 +506,7 @@ class TransactionServiceRequestValidatorTest
                           InterfaceFilter(
                             interfaceId = Some(templateId),
                             includeInterfaceView = true,
-                            includeCreateArgumentsBlob = false,
-                            includeCreateEventPayload = true,
+                            includeCreatedEventBlob = true,
                           )
                         ),
                         templateFilters = Seq(TemplateFilter(Some(templateId), true)),
@@ -638,8 +536,7 @@ class TransactionServiceRequestValidatorTest
                         "packageId:includedModule:includedTemplate"
                       ),
                       includeView = true,
-                      includeCreateArgumentsBlob = false,
-                      includeCreateEventPayload = true,
+                      includeCreatedEventBlob = true,
                     )
                   ),
                 )

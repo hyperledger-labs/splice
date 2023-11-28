@@ -11,6 +11,7 @@ case class DirectoryAppBackendConfig(
     override val participantClient: CNParticipantClientConfig,
     scanClient: ScanAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
+    parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "directory"
 

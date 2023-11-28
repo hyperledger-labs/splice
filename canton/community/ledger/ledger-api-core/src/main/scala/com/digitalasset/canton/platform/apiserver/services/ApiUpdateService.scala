@@ -3,8 +3,6 @@
 
 package com.digitalasset.canton.platform.apiserver.services
 
-import akka.stream.Materializer
-import akka.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.api.v1.transaction_filter.TransactionFilter
 import com.daml.ledger.api.v1.transaction_service.GetTransactionsRequest
@@ -31,6 +29,8 @@ import com.digitalasset.canton.logging.{
 }
 import com.digitalasset.canton.metrics.Metrics
 import io.grpc.stub.StreamObserver
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 import scalaz.syntax.tag.*
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -54,9 +54,9 @@ final class ApiUpdateService(
   override def getUpdates(
       request: GetUpdatesRequest,
       responseObserver: StreamObserver[GetUpdatesResponse],
-  ): Unit =
+  ): Unit = {
+    implicit val loggingContextWithTrace = LoggingContextWithTrace(loggerFactory, telemetry)
     registerStream(responseObserver) {
-      implicit val loggingContextWithTrace = LoggingContextWithTrace(loggerFactory, telemetry)
       implicit val errorLoggingContext = ErrorLoggingContext(logger, loggingContextWithTrace)
 
       logger.debug(s"Received new update request $request.")
@@ -98,13 +98,14 @@ final class ApiUpdateService(
         )
       }
     }
+  }
 
   override def getUpdateTrees(
       request: GetUpdatesRequest,
       responseObserver: StreamObserver[GetUpdateTreesResponse],
-  ): Unit =
+  ): Unit = {
+    implicit val loggingContextWithTrace = LoggingContextWithTrace(loggerFactory, telemetry)
     registerStream(responseObserver) {
-      implicit val loggingContextWithTrace = LoggingContextWithTrace(loggerFactory, telemetry)
       implicit val errorLoggingContext = ErrorLoggingContext(logger, loggingContextWithTrace)
 
       logger.debug(s"Received new update trees request $request.")
@@ -152,6 +153,7 @@ final class ApiUpdateService(
         )
       }
     }
+  }
 
   override def getTransactionTreeByEventId(
       req: GetTransactionByEventIdRequest

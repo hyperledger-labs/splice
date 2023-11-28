@@ -1,6 +1,6 @@
 package com.daml.network.automation
 
-import akka.Done
+import org.apache.pekko.Done
 import com.daml.network.environment.{CNLedgerSubscription, RetryFor, RetryProvider}
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.lifecycle.*

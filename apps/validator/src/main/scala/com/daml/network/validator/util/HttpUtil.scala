@@ -1,8 +1,14 @@
 package com.daml.network.validator.util
 
-import akka.http.scaladsl.model.{ContentTypes, HttpRequest, HttpResponse, StatusCodes, Uri}
-import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.{
+  ContentTypes,
+  HttpRequest,
+  HttpResponse,
+  StatusCodes,
+  Uri,
+}
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.stream.Materializer
 import cats.syntax.either.*
 import com.daml.network.environment.BaseAppConnection
 import io.circe.parser.decode

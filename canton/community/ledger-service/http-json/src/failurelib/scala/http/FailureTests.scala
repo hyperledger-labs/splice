@@ -3,10 +3,10 @@
 
 package com.daml.http
 
-import akka.http.javadsl.model.ws.PeerClosedConnectionException
-import akka.http.scaladsl.model.{StatusCodes, Uri}
-import akka.stream.{KillSwitches, UniqueKillSwitch}
-import akka.stream.scaladsl.{Keep, Sink}
+import org.apache.pekko.http.javadsl.model.ws.PeerClosedConnectionException
+import org.apache.pekko.http.scaladsl.model.{StatusCodes, Uri}
+import org.apache.pekko.stream.{KillSwitches, UniqueKillSwitch}
+import org.apache.pekko.stream.scaladsl.{Keep, Sink}
 import com.daml.dbutils.ConnectionPool
 
 import scala.concurrent.{Future, Promise}
@@ -19,18 +19,18 @@ import com.daml.ledger.api.testing.utils.SuiteResourceManagementAroundAll
 import com.daml.timer.RetryStrategy
 import com.daml.test.evidence.tag.Security.SecurityTest.Property.Availability
 import com.daml.test.evidence.tag.Security.SecurityTest
-import com.daml.test.evidence.scalatest.ScalaTestSupport.Implicits._
+import com.daml.test.evidence.scalatest.ScalaTestSupport.Implicits.*
 import eu.rekawek.toxiproxy.model.ToxicDirection
-import org.scalatest._
+import org.scalatest.*
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.concurrent.Eventually
 import scalaz.\/
-import scalaz.syntax.show._
-import scalaz.syntax.tag._
-import spray.json._
+import scalaz.syntax.show.*
+import scalaz.syntax.tag.*
+import spray.json.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 @SuppressWarnings(Array("org.wartremover.warts.NonUnitStatements"))
 abstract class FailureTests
@@ -41,8 +41,8 @@ abstract class FailureTests
     with SuiteResourceManagementAroundAll
     with Eventually
     with Inside {
-  import HttpServiceTestFixture.{jwtForParties => _, _}
-  import WebsocketTestFixture._
+  import HttpServiceTestFixture.{jwtForParties as _, *}
+  import WebsocketTestFixture.*
 
   protected override final def testId = getClass.getSimpleName
 
@@ -103,7 +103,7 @@ abstract class FailureTests
 
   "Command submission timeout is applied" taggedAs availabilitySecurity in withHttpService {
     (uri, encoder, _, client) =>
-      import json.JsonProtocol._
+      import json.JsonProtocol.*
       for {
         p <- allocateParty(client, "Alice")
         (status, _) <- headersWithParties(List(p)).flatMap(
@@ -346,7 +346,7 @@ abstract class FailureTests
 
       def respBefore(accountCid: domain.ContractId): Sink[JsValue, Future[Unit]] = {
         val dslSyntax = Consume.syntax[JsValue]
-        import dslSyntax._
+        import dslSyntax.*
         Consume.interpret(
           for {
             ContractDelta(Vector((ctId, _)), Vector(), None) <- readOne
@@ -365,7 +365,7 @@ abstract class FailureTests
           stop: UniqueKillSwitch,
       ): Sink[JsValue, Future[Unit]] = {
         val dslSyntax = Consume.syntax[JsValue]
-        import dslSyntax._
+        import dslSyntax.*
         Consume.interpret(
           for {
             ContractDelta(Vector((ctId, _)), Vector(), Some(newOffset)) <- readOne
@@ -440,8 +440,8 @@ abstract class FailureTests
 
   "fromStartupMode should not succeed for any input when the connection to the db is broken" taggedAs availabilitySecurity in {
     import cats.effect.IO
-    import DbStartupOps._, com.daml.http.dbbackend.DbStartupMode._,
-    com.daml.http.dbbackend.JdbcConfig, com.daml.dbutils
+    import DbStartupOps.*, com.daml.http.dbbackend.DbStartupMode.*,
+      com.daml.http.dbbackend.JdbcConfig, com.daml.dbutils
     val bc = jdbcConfig_.baseConfig
     implicit val metrics: HttpJsonApiMetrics = HttpJsonApiMetrics.ForTesting
     val dao = dbbackend.ContractDao(

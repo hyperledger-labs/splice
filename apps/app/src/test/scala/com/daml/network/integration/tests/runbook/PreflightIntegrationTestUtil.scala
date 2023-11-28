@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests.runbook
 
-import akka.http.scaladsl.model.Uri
+import org.apache.pekko.http.scaladsl.model.Uri
 import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.util.{Auth0Util, K8sUtil}
 import com.typesafe.scalalogging.Logger

@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import akka.actor.{ActorSystem, CoordinatedShutdown}
-import akka.Done
-import akka.http.scaladsl.Http
+import org.apache.pekko.actor.{ActorSystem, CoordinatedShutdown}
+import org.apache.pekko.Done
+import org.apache.pekko.http.scaladsl.Http
 import com.auth0.exception.Auth0Exception
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.auth.AuthUtil

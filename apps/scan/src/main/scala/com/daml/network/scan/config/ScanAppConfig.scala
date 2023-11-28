@@ -4,6 +4,7 @@ import com.daml.network.config.{
   AutomationConfig,
   CNDbConfig,
   CNNodeBackendConfig,
+  CNNodeParametersConfig,
   CNParticipantClientConfig,
   HttpCNNodeClientConfig,
   NetworkAppClientConfig,
@@ -23,6 +24,7 @@ case class ScanAppBackendConfig(
     override val automation: AutomationConfig = AutomationConfig(),
     ingestFromParticipantBegin: Boolean = false,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
+    parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
 ) extends CNNodeBackendConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
     {

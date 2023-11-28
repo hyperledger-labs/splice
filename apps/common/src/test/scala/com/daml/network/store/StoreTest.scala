@@ -2,7 +2,6 @@ package com.daml.network.store
 
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord as CodegenDamlRecord}
 import com.daml.ledger.javaapi.data.{
-  ContractMetadata,
   CreatedEvent,
   ExercisedEvent,
   Identifier,
@@ -12,7 +11,6 @@ import com.daml.ledger.javaapi.data.{
   Unit as damlUnit,
   Value as damlValue,
 }
-import com.google.protobuf
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   coinrules as coinrulesCodegen,
@@ -329,13 +327,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       failedInterfaceViews = Map.empty.asJava,
       templateId = contract.identifier,
       arguments = contract.payload.toValue,
-      createArgumentsBlob = protobuf.Any.getDefaultInstance,
-      contractMetadata = ContractMetadata.Empty(),
+      createdEventBlob = ByteString.empty(),
       witnessParties = Seq.empty.asJava,
       signatories = signatories.map(_.toProtoPrimitive).asJava,
       observers = Seq.empty.asJava,
       agreementText = None.toJava,
       contractKey = None.toJava,
+      createdAt = contract.createdAt,
     )
   }
 
@@ -405,13 +403,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         failedInterfaceViews = created.getFailedInterfaceViews,
         templateId = created.getTemplateId,
         arguments = created.getArguments,
-        createArgumentsBlob = created.getCreateArgumentsBlob,
-        contractMetadata = created.getContractMetadata,
+        createdEventBlob = created.getCreatedEventBlob,
         witnessParties = created.getWitnessParties,
         signatories = created.getSignatories,
         observers = created.getObservers,
         agreementText = created.getAgreementText,
         contractKey = created.getContractKey,
+        createdAt = created.createdAt,
       )
     case exercised: ExercisedEvent =>
       new ExercisedEvent(

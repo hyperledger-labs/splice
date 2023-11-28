@@ -1,7 +1,7 @@
 package com.daml.network.splitwell.admin.api.client.commands
 
-import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
 import cats.implicits.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen

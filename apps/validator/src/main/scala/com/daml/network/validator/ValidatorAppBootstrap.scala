@@ -1,6 +1,6 @@
 package com.daml.network.validator
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import cats.data.EitherT
 import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory

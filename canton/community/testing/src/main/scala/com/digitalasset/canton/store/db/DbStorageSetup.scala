@@ -19,7 +19,7 @@ import com.digitalasset.canton.resource.{
 }
 import com.digitalasset.canton.store.db.DbStorageSetup.DbBasicConfig
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.tracing.NoTracing
+import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.typesafe.config.{Config, ConfigFactory}
 import org.postgresql.util.PSQLException
 import org.scalatest.Assertions.fail
@@ -34,6 +34,7 @@ trait DbStorageSetup extends FlagCloseable with HasCloseContext with NamedLoggin
   type C <: DbConfig
 
   protected implicit def executionContext: ExecutionContext
+  private implicit val traceContext: TraceContext = TraceContext.empty
 
   def basicConfig: DbBasicConfig
 
@@ -229,7 +230,7 @@ class PostgresTestContainerSetup(
 ) extends PostgresDbStorageSetup(loggerFactory)
     with NamedLogging {
 
-  private lazy val postgresContainer = new PostgreSQLContainer(s"${PostgreSQLContainer.IMAGE}:11")
+  private lazy val postgresContainer = new PostgreSQLContainer(s"${PostgreSQLContainer.IMAGE}:12")
 
   override protected def prepareDatabase(): Unit = {
     // up the connection limit to deal with everyone using connection pools in tests that can run concurrently.

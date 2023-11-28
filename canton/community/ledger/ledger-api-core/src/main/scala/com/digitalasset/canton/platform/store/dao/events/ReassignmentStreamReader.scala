@@ -3,9 +3,6 @@
 
 package com.digitalasset.canton.platform.store.dao.events
 
-import akka.NotUsed
-import akka.stream.Attributes
-import akka.stream.scaladsl.Source
 import com.daml.ledger.api.v2.reassignment.Reassignment
 import com.daml.lf.data.Ref
 import com.daml.lf.data.Ref.Party
@@ -38,9 +35,11 @@ import com.digitalasset.canton.platform.store.utils.{
 import com.digitalasset.canton.platform.{ApiOffset, TemplatePartiesFilter}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Attributes
+import org.apache.pekko.stream.scaladsl.Source
 
 import java.sql.Connection
-import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.chaining.*
 
@@ -79,7 +78,7 @@ class ReassignmentStreamReader(
         maxOutputBatchCount: Int,
         metric: DatabaseMetrics,
         idDbQuery: IdDbQuery,
-    ): Source[ArrayBuffer[Long], NotUsed] = {
+    ): Source[Iterable[Long], NotUsed] = {
       decomposedFilters
         .map { filter =>
           paginatingAsyncStream.streamIdsFromSeekPagination(
@@ -114,13 +113,13 @@ class ReassignmentStreamReader(
     }
 
     def fetchPayloads[T](
-        ids: Source[ArrayBuffer[Long], NotUsed],
+        ids: Source[Iterable[Long], NotUsed],
         maxParallelPayloadQueries: Int,
         dbMetric: DatabaseMetrics,
         payloadDbQuery: PayloadDbQuery[T],
         deserialize: T => Future[Reassignment],
     ): Source[Reassignment, NotUsed] = {
-      // Akka requires for this buffer's size to be a power of two.
+      // Pekko requires for this buffer's size to be a power of two.
       val inputBufferSize = Utils.largestSmallerOrEqualPowerOfTwo(maxParallelPayloadQueries)
       ids.async
         .addAttributes(Attributes.inputBuffer(initial = inputBufferSize, max = inputBufferSize))

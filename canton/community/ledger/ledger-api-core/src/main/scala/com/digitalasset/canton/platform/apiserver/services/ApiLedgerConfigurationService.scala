@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.platform.apiserver.services
 
-import akka.stream.Materializer
 import com.daml.api.util.DurationConversion.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.api.v1.ledger_configuration_service.*
@@ -20,6 +19,7 @@ import com.digitalasset.canton.logging.TracedLoggerOps.TracedLoggerOps
 import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import io.grpc.stub.StreamObserver
 import io.grpc.{BindableService, ServerServiceDefinition}
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.ExecutionContext
 
@@ -39,22 +39,23 @@ private[apiserver] final class ApiLedgerConfigurationService private (
   def getLedgerConfiguration(
       request: GetLedgerConfigurationRequest,
       responseObserver: StreamObserver[GetLedgerConfigurationResponse],
-  ): Unit = registerStream(responseObserver) {
+  ): Unit = {
     implicit val loggingContextWithTrace = LoggingContextWithTrace(loggerFactory, telemetry)
-
-    logger.info(s"Received request for configuration subscription: $request.")
-    configurationService
-      .getLedgerConfiguration()
-      .map(configuration =>
-        GetLedgerConfigurationResponse(
-          Some(
-            LedgerConfiguration(
-              Some(toProto(configuration.maxDeduplicationDuration))
+    registerStream(responseObserver) {
+      logger.info(s"Received request for configuration subscription: $request.")
+      configurationService
+        .getLedgerConfiguration()
+        .map(configuration =>
+          GetLedgerConfigurationResponse(
+            Some(
+              LedgerConfiguration(
+                Some(toProto(configuration.maxDeduplicationDuration))
+              )
             )
           )
         )
-      )
-      .via(logger.logErrorsOnStream)
+        .via(logger.logErrorsOnStream)
+    }
   }
 
   override def bindService(): ServerServiceDefinition =

@@ -1,6 +1,6 @@
 package com.daml.network.sv.onboarding.founder
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import cats.implicits.{
   catsSyntaxTuple2Semigroupal,
   catsSyntaxTuple3Semigroupal,

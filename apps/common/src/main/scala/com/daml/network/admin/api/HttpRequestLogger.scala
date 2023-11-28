@@ -1,9 +1,13 @@
 package com.daml.network.admin.api
 
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, RemoteAddress}
-import akka.http.scaladsl.server.{AuthorizationFailedRejection, Directive0, RequestContext}
-import akka.http.scaladsl.server.Directives.*
-import akka.http.scaladsl.server.RouteResult.{Complete, Rejected}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, RemoteAddress}
+import org.apache.pekko.http.scaladsl.server.{
+  AuthorizationFailedRejection,
+  Directive0,
+  RequestContext,
+}
+import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.RouteResult.{Complete, Rejected}
 import com.digitalasset.canton.config.ApiLoggingConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext

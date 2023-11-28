@@ -1,7 +1,7 @@
 package com.daml.network.validator.admin.http
 
-import akka.stream.Materializer
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.HttpClientBuilder
 import com.daml.network.environment.{BaseAppConnection}

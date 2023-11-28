@@ -1,6 +1,6 @@
 package com.daml.network.validator.store
 
-import akka.http.scaladsl.model.Uri
+import org.apache.pekko.http.scaladsl.model.Uri
 import cats.syntax.either.*
 import com.daml.network.codegen.java.cn.appmanager.store as codegen
 import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}

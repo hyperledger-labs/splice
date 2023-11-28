@@ -1,6 +1,6 @@
 package com.daml.network.validator.admin.http
 
-import akka.http.scaladsl.model.Uri
+import org.apache.pekko.http.scaladsl.model.Uri
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.environment.{BaseLedgerConnection, CNLedgerConnection, RetryFor}
 import com.daml.network.http.v0.{definitions, app_manager as v0}

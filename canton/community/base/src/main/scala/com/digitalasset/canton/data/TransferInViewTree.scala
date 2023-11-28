@@ -120,7 +120,6 @@ object TransferInViewTree
     )((commonData, view) => new TransferInViewTree(commonData, view)(hashOps))(transferInViewTreeP)
 }
 
-// TODO(#12373) replace "protocol version dev" in the documentation for transferCounter
 /** Aggregates the data of a transfer-in request that is sent to the mediator and the involved participants.
   *
   * @param salt Salt for blinding the Merkle hash
@@ -277,7 +276,7 @@ object TransferInCommonData
         uuidP,
         targetMediatorP,
       )
-      protocolVersion = ProtocolVersion.fromProtoPrimitive(protocolVersionP)
+      protocolVersion <- ProtocolVersion.fromProtoPrimitive(protocolVersionP)
       _ <- checkMediatorGroupForProtocolVersion(commonData, protocolVersion)
     } yield TransferInCommonData(
       commonData.salt,
@@ -324,6 +323,7 @@ object TransferInCommonData
   }
 }
 
+// TODO(#15159) For transfer counter, remove the note that it is defined iff...
 /** Aggregates the data of a transfer-in request that is only sent to the involved participants
   *
   * @param salt The salt to blind the Merkle hash
@@ -342,7 +342,7 @@ final case class TransferInView private (
     creatingTransactionId: TransactionId,
     transferOutResultEvent: DeliveredTransferOutResult,
     sourceProtocolVersion: SourceProtocolVersion,
-    // TODO(#9014) Remove the option
+    // TODO(#15179) Remove the option
     transferCounter: TransferCounterO,
 )(
     hashOps: HashOps,
@@ -628,13 +628,14 @@ object TransferInView
     ) =
       transferInViewP
     for {
+      protocolVersion <- ProtocolVersion.fromProtoPrimitive(sourceProtocolVersionP)
       commonData <- CommonData.fromProto(
         hashOps,
         saltP,
         submitterP,
         transferOutResultEventPO,
         creatingTransactionIdP,
-        ProtocolVersion.fromProtoPrimitive(sourceProtocolVersionP),
+        protocolVersion,
       )
       contract <- ProtoConverter
         .required("contract", contractP)
@@ -676,13 +677,14 @@ object TransferInView
     ) =
       transferInViewP
     for {
+      protocolVersion <- ProtocolVersion.fromProtoPrimitive(sourceProtocolVersionP)
       commonData <- CommonData.fromProto(
         hashOps,
         saltP,
         submitterP,
         transferOutResultEventPO,
         creatingTransactionIdP,
-        ProtocolVersion.fromProtoPrimitive(sourceProtocolVersionP),
+        protocolVersion,
       )
       contract <- ProtoConverter
         .required("contract", contractP)

@@ -1,7 +1,7 @@
 package com.daml.network.sv.admin.api.client.commands
 
-import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, StatusCodes}
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, StatusCodes}
+import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.coinrules.CoinRules

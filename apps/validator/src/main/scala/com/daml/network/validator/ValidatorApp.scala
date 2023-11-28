@@ -1,13 +1,13 @@
 package com.daml.network.validator
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.HttpMethods
-import akka.http.scaladsl.server.Directives.*
-import akka.http.scaladsl.server.directives.BasicDirectives
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.HttpMethods
+import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
 import cats.implicits.{catsSyntaxApplicativeByValue as _, *}
-import ch.megard.akka.http.cors.scaladsl.CorsDirectives.*
-import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
+import org.apache.pekko.http.cors.scaladsl.CorsDirectives.*
+import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
@@ -390,8 +390,8 @@ class ValidatorApp(
         case Some(nonEmptyConnections) =>
           DomainConnectionConfig(
             alias,
-            SequencerConnections.many(
-              nonEmptyConnections,
+            SequencerConnections.tryMany(
+              nonEmptyConnections.forgetNE,
               CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
             ),
           )

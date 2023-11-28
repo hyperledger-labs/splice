@@ -1,9 +1,9 @@
 package com.daml.network.auth
 
-import akka.http.scaladsl.model.{HttpEntity, HttpResponse, MediaTypes, StatusCodes}
-import akka.http.scaladsl.server.Directive1
-import akka.http.scaladsl.server.Directives.{complete, onComplete, provide}
-import akka.util.ByteString
+import org.apache.pekko.http.scaladsl.model.{HttpEntity, HttpResponse, MediaTypes, StatusCodes}
+import org.apache.pekko.http.scaladsl.server.Directive1
+import org.apache.pekko.http.scaladsl.server.Directives.{complete, onComplete, provide}
+import org.apache.pekko.util.ByteString
 import com.daml.network.auth.{AuthExtractor, SignatureVerifier}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.http.v0.definitions.ErrorResponse

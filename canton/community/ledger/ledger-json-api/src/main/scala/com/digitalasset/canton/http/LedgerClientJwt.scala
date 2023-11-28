@@ -3,13 +3,23 @@
 
 package com.digitalasset.canton.http
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Source
 import com.daml.jwt.domain.Jwt
 import com.daml.ledger.api.v1.active_contracts_service.GetActiveContractsResponse
-import com.daml.ledger.api.v1.admin.metering_report_service.{GetMeteringReportRequest, GetMeteringReportResponse}
-import com.daml.ledger.api.v1.command_service.{SubmitAndWaitForTransactionResponse, SubmitAndWaitForTransactionTreeResponse, SubmitAndWaitRequest}
-import com.daml.ledger.api.v1.event_query_service.{GetEventsByContractIdResponse, GetEventsByContractKeyResponse}
+import com.daml.ledger.api.v1.admin.metering_report_service.{
+  GetMeteringReportRequest,
+  GetMeteringReportResponse,
+}
+import com.daml.ledger.api.v1.command_service.{
+  SubmitAndWaitForTransactionResponse,
+  SubmitAndWaitForTransactionTreeResponse,
+  SubmitAndWaitRequest,
+}
+import com.daml.ledger.api.v1.event_query_service.{
+  GetEventsByContractIdResponse,
+  GetEventsByContractKeyResponse,
+}
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.ledger.api.v1.package_service
 import com.daml.ledger.api.v1.transaction.Transaction
@@ -23,7 +33,11 @@ import com.digitalasset.canton.ledger.api.domain as LedgerApiDomain
 import com.digitalasset.canton.ledger.api.domain.PartyDetails as domainPartyDetails
 import com.digitalasset.canton.ledger.client.services.EventQueryServiceClient
 import com.digitalasset.canton.ledger.client.services.acs.ActiveContractSetClient
-import com.digitalasset.canton.ledger.client.services.admin.{MeteringReportClient, PackageManagementClient, PartyManagementClient}
+import com.digitalasset.canton.ledger.client.services.admin.{
+  MeteringReportClient,
+  PackageManagementClient,
+  PartyManagementClient,
+}
 import com.digitalasset.canton.ledger.client.services.commands.SynchronousCommandClient
 import com.digitalasset.canton.ledger.client.services.pkg.withoutledgerid.PackageClient
 import com.digitalasset.canton.ledger.client.services.transactions.withoutledgerid.TransactionClient

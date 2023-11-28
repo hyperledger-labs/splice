@@ -6,6 +6,7 @@ import com.daml.network.config.{
   BackupDumpConfig,
   CNDbConfig,
   CNNodeBackendConfig,
+  CNNodeParametersConfig,
   CNParticipantClientConfig,
   GcpBucketConfig,
   HttpCNNodeClientConfig,
@@ -155,6 +156,7 @@ case class SvAppBackendConfig(
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     acsStoreDump: Option[BackupDumpConfig] = None,
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(6),
+    parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 

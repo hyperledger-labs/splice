@@ -4,13 +4,13 @@
 package com.daml.http.perf
 
 import java.nio.file.{Files, Path}
-import akka.actor.ActorSystem
-import akka.stream.Materializer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
 import com.daml.gatling.stats.{SimulationLog, SimulationLogSyntax}
-import com.daml.grpc.adapter.{AkkaExecutionSequencerPool, ExecutionSequencerFactory}
+import com.daml.grpc.adapter.{PekkoExecutionSequencerPool, ExecutionSequencerFactory}
 import com.daml.http.HttpServiceTestFixture.{withHttpService, withLedger}
 import com.daml.http.perf.scenario.SimulationConfig
-import com.daml.http.util.FutureUtil._
+import com.daml.http.util.FutureUtil.*
 import com.daml.integrationtest.CantonRunner
 import com.daml.ledger.api.domain.{User, UserRight}
 import com.daml.ledger.client.withoutledgerid.LedgerClient
@@ -20,12 +20,12 @@ import com.typesafe.scalalogging.StrictLogging
 import io.gatling.core.scenario.Simulation
 import io.gatling.netty.util.Transports
 import io.netty.channel.EventLoopGroup
-import org.scalatest.OptionValues._
-import scalaz.std.string._
-import scalaz.syntax.tag._
+import org.scalatest.OptionValues.*
+import scalaz.std.string.*
+import scalaz.syntax.tag.*
 import scalaz.\/
 
-import scala.concurrent.duration.{Duration, _}
+import scala.concurrent.duration.{Duration, *}
 import scala.concurrent.{Await, ExecutionContext, Future, Promise, TimeoutException}
 import scala.util.{Failure, Success, Try}
 
@@ -93,7 +93,7 @@ object Main extends StrictLogging {
   }
 
   private def generateReport(dir: Path): String \/ Unit = {
-    import SimulationLogSyntax._
+    import SimulationLogSyntax.*
 
     require(Files.isDirectory(dir), s"input path $dir should be a directory")
 
@@ -116,7 +116,7 @@ object Main extends StrictLogging {
     implicit val asys: ActorSystem = ActorSystem(name)
     implicit val mat: Materializer = Materializer(asys)
     implicit val aesf: ExecutionSequencerFactory =
-      new AkkaExecutionSequencerPool(poolName = name, terminationTimeout = terminationTimeout)
+      new PekkoExecutionSequencerPool(poolName = name, terminationTimeout = terminationTimeout)
     implicit val elg: EventLoopGroup = Transports.newEventLoopGroup(true, 0, "gatling")
     implicit val ec: ExecutionContext = asys.dispatcher
 

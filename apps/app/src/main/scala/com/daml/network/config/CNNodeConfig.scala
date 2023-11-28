@@ -1,6 +1,6 @@
 package com.daml.network.config
 
-import akka.http.scaladsl.model.Uri
+import org.apache.pekko.http.scaladsl.model.Uri
 import cats.data.Validated
 import cats.syntax.either.*
 import cats.syntax.functor.*
@@ -92,7 +92,7 @@ case class CNNodeConfig(
       )
     ),
     features: CantonFeatures = CantonFeatures(),
-    override val akkaConfig: Option[Config] = None,
+    override val pekkoConfig: Option[Config] = None,
 ) extends CantonConfig // TODO(#736): generalize or fork this trait.
     with ConfigDefaults[DefaultPorts, CNNodeConfig] {
 
@@ -120,6 +120,7 @@ case class CNNodeConfig(
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = true,
         skipTopologyManagerSignatureValidation = false,
+        batchingConfig = validatorConfig.parameters.batching,
       )
     }
 
@@ -161,6 +162,7 @@ case class CNNodeConfig(
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = true,
         skipTopologyManagerSignatureValidation = false,
+        batchingConfig = new BatchingConfig(),
       )
     }
 
@@ -201,6 +203,7 @@ case class CNNodeConfig(
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = true,
         skipTopologyManagerSignatureValidation = false,
+        batchingConfig = new BatchingConfig(),
       )
     }
 
@@ -247,6 +250,7 @@ case class CNNodeConfig(
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = true,
         skipTopologyManagerSignatureValidation = false,
+        batchingConfig = new BatchingConfig(),
       )
     }
 
@@ -293,6 +297,7 @@ case class CNNodeConfig(
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = true,
         skipTopologyManagerSignatureValidation = false,
+        batchingConfig = new BatchingConfig(),
       )
     }
 
@@ -390,6 +395,9 @@ object CNNodeConfig {
       ConfigReader.fromNonEmptyStringTry(s => Try(Uri.parseAbsolute(s)))
     implicit val networkAppClientConfigReader: ConfigReader[NetworkAppClientConfig] =
       deriveReader[NetworkAppClientConfig]
+
+    implicit val cnNodeParametersConfig: ConfigReader[CNNodeParametersConfig] =
+      deriveReader[CNNodeParametersConfig]
 
     implicit val postgresCNDbConfigReader: ConfigReader[CNDbConfig.Postgres] =
       deriveReader[CNDbConfig.Postgres]
@@ -593,6 +601,9 @@ object CNNodeConfig {
     implicit val authConfig: ConfigWriter[AuthConfig] =
       confidentialWriter[AuthConfig](AuthConfig.hideConfidential)
 
+    implicit val cnNodeParametersConfig: ConfigWriter[CNNodeParametersConfig] =
+      deriveWriter[CNNodeParametersConfig]
+
     implicit val authTokenSourceConfigHint: FieldCoproductHint[AuthTokenSourceConfig] =
       new FieldCoproductHint[AuthTokenSourceConfig]("type")
     implicit val authTokenSourceNoneWriter: ConfigWriter[AuthTokenSourceConfig.None] =
@@ -767,6 +778,7 @@ object CNNodeConfig {
 
     implicit val cnNodeConfigWriter: ConfigWriter[CNNodeConfig] =
       deriveWriter[CNNodeConfig]
+
   }
 
   private implicit def configReader(implicit

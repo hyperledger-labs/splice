@@ -3,30 +3,30 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "2.8.0-snapshot.20231026.12262.0.vb12eb2ad"
+  val version: String = "2.8.0-snapshot.20231114.12362.0.vb81ee69a"
   val daml_language_versions = Seq("1.14", "1.15", "1.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
   val daml_libraries_version = version
   val daml_compiler_version = version
   // TODO(#8069) Revert this back to daml_libraries_version.
-  val daml_java_codegen_version = "2.8.0-snapshot.20231031.12282.0.v59992d63"
+  val daml_java_codegen_version = "2.8.0-snapshot.20231114.12362.0.vb81ee69a"
   val use_custom_daml_version = false
 
   lazy val osClassifier: String =
     if (sys.props("os.name").contains("Mac")) "osx"
     else sys.props("os.name").toLowerCase
 
-  lazy val scala_version = "2.13.10"
+  lazy val scala_version = "2.13.11"
   lazy val scala_version_short = "2.13"
 
   lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
-  lazy val akka_version = "2.6.21"
-  lazy val akka_http_version = "10.2.10"
+  lazy val pekko_version = "1.0.1"
+  lazy val pekko_http_version = "1.0.0"
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
   lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"
   lazy val awaitility = "org.awaitility" % "awaitility" % "4.2.0"
-  lazy val grpc_version = "1.44.0"
+  lazy val grpc_version = "1.59.0"
   lazy val logback_version = "1.4.5"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
@@ -42,7 +42,7 @@ object CantonDependencies {
 
   lazy val scalatest_version = "3.2.9"
 
-  lazy val netty_version = "4.1.72.Final"
+  lazy val netty_version = "4.1.97.Final"
 
   lazy val reflections = "org.reflections" % "reflections" % "0.9.12"
   lazy val pureconfig = "com.github.pureconfig" %% "pureconfig" % pureconfig_version
@@ -100,7 +100,7 @@ object CantonDependencies {
     "com.daml" %% "contextualized-logging" % daml_libraries_version
   lazy val daml_ledger_rxjava_client = "com.daml" % "bindings-rxjava" % daml_libraries_version
   lazy val daml_telemetry = "com.daml" %% "telemetry" % daml_libraries_version
-  lazy val daml_akka_http_metrics = "com.daml" %% "akka-http-metrics" % daml_libraries_version
+  lazy val daml_pekko_http_metrics = "com.daml" %% "pekko-http-metrics" % daml_libraries_version
   lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
   lazy val daml_tracing_test_lib = "com.daml" %% "tracing-test-lib" % daml_libraries_version
   lazy val daml_executors = "com.daml" %% "executors" % daml_libraries_version
@@ -110,7 +110,7 @@ object CantonDependencies {
   lazy val daml_bindings_scala = "com.daml" %% "bindings-scala" % daml_java_codegen_version
   lazy val daml_ledger_resources = "com.daml" %% "ledger-resources" % daml_libraries_version
   lazy val daml_timer_utils = "com.daml" %% "timer-utils" % daml_libraries_version
-  lazy val daml_rs_grpc_akka = "com.daml" %% "rs-grpc-akka" % daml_libraries_version
+  lazy val daml_rs_grpc_pekko = "com.daml" %% "rs-grpc-pekko" % daml_libraries_version
   lazy val daml_rs_grpc_testing_utils =
     "com.daml" %% "rs-grpc-testing-utils" % daml_libraries_version
   lazy val daml_test_common = "com.daml" %% "test-common-1.15" % daml_libraries_version
@@ -133,12 +133,12 @@ object CantonDependencies {
 
   lazy val scopt = "com.github.scopt" %% "scopt" % "4.0.0"
 
-  lazy val akka_stream = "com.typesafe.akka" %% "akka-stream" % akka_version
-  lazy val akka_stream_testkit = "com.typesafe.akka" %% "akka-stream-testkit" % akka_version
-  lazy val akka_slf4j = "com.typesafe.akka" %% "akka-slf4j" % akka_version
-  lazy val akka_http = "com.typesafe.akka" %% "akka-http" % akka_http_version
-  lazy val akka_http_core = "com.typesafe.akka" %% "akka-http-core" % akka_http_version
-  lazy val akka_http_testkit = "com.typesafe.akka" %% "akka-http-testkit" % akka_http_version
+  lazy val pekko_stream = "org.apache.pekko" %% "pekko-stream" % pekko_version
+  lazy val pekko_stream_testkit = "org.apache.pekko" %% "pekko-stream-testkit" % pekko_version
+  lazy val pekko_slf4j = "org.apache.pekko" %% "pekko-slf4j" % pekko_version
+  lazy val pekko_http = "org.apache.pekko" %% "pekko-http" % pekko_http_version
+  lazy val pekko_http_core = "org.apache.pekko" %% "pekko-http-core" % pekko_http_version
+  lazy val pekko_http_testkit = "org.apache.pekko" %% "pekko-http-testkit" % pekko_http_version
 
   lazy val scala_logging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
   lazy val scalacheck = "org.scalacheck" %% "scalacheck" % "1.15.4"

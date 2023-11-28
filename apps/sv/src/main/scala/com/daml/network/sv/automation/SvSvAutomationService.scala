@@ -1,6 +1,6 @@
 package com.daml.network.sv.automation
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.{AssignTrigger, CNNodeAppAutomationService}
 import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIdentity
 import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}

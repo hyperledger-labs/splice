@@ -1,6 +1,6 @@
 package com.daml.network.wallet
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{
   CNLedgerClient,

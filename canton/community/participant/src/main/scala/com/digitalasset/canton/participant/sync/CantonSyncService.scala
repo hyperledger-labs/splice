@@ -3,9 +3,6 @@
 
 package com.digitalasset.canton.participant.sync
 
-import akka.NotUsed
-import akka.stream.Materializer
-import akka.stream.scaladsl.Source
 import cats.Eval
 import cats.data.EitherT
 import cats.syntax.either.*
@@ -107,6 +104,9 @@ import com.digitalasset.canton.util.*
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetProtocolVersion}
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
 import org.slf4j.event.Level
 
 import java.util.concurrent.atomic.AtomicReference
@@ -142,7 +142,7 @@ class CantonSyncService(
     identityPusher: ParticipantTopologyDispatcherCommon,
     partyNotifier: LedgerServerPartyNotifier,
     val syncCrypto: SyncCryptoApiProvider,
-    pruningProcessor: PruningProcessor,
+    val pruningProcessor: PruningProcessor,
     engine: Engine,
     syncDomainStateFactory: SyncDomainEphemeralStateFactory,
     clock: Clock,
@@ -150,6 +150,7 @@ class CantonSyncService(
     parameters: ParticipantNodeParameters,
     syncDomainFactory: SyncDomain.Factory[SyncDomain],
     indexedStringStore: IndexedStringStore,
+    storage: Storage,
     metrics: ParticipantMetrics,
     sequencerInfoLoader: SequencerInfoLoader,
     val isActive: () => Boolean,
@@ -262,7 +263,7 @@ class CantonSyncService(
       loggerFactory,
     )(ec)
 
-  val protocolVersionGetter: Traced[DomainId] => Future[Option[ProtocolVersion]] =
+  val protocolVersionGetter: Traced[DomainId] => Option[ProtocolVersion] =
     (tracedDomainId: Traced[DomainId]) =>
       syncDomainPersistentStateManager.protocolVersionFor(tracedDomainId.value)
 
@@ -333,6 +334,7 @@ class CantonSyncService(
     syncDomainPersistentStateManager,
     aliasManager,
     parameters,
+    Storage.threadsAvailableForWriting(storage),
     indexedStringStore,
     connectedDomainsLookup.isConnected,
     futureSupervisor,
@@ -347,6 +349,14 @@ class CantonSyncService(
       repairService,
       prepareDomainConnectionForMigration,
       parameters.processingTimeouts,
+      loggerFactory,
+    )
+
+  val dynamicDomainParameterGetter =
+    new CantonDynamicDomainParameterGetter(
+      syncCrypto,
+      syncDomainPersistentStateManager.protocolVersionFor,
+      aliasManager,
       loggerFactory,
     )
 
@@ -656,7 +666,7 @@ class CantonSyncService(
           None,
         )
         unpublishedEvents = unpublished.mapFilter {
-          case RecordOrderPublisher.PendingTransferPublish(ts, eventLogId) =>
+          case RecordOrderPublisher.PendingTransferPublish(ts, _eventLogId) =>
             logger.error(
               s"Pending transfer event with timestamp $ts found in participant event log " +
                 s"$participantEventLogId. Participant event log should not contain transfers."
@@ -1187,6 +1197,7 @@ class CantonSyncService(
               domainHandle.topologyClient,
               domainCrypto,
               trafficStateController,
+              ephemeral.recordOrderPublisher,
               domainHandle.staticParameters.protocolVersion,
             ),
           missingKeysAlerter,
@@ -1252,7 +1263,7 @@ class CantonSyncService(
         this.resolveReconnectAttempts(domainAlias)
       }
 
-      def disconnectOn(cause: String): Unit = {
+      def disconnectOn(): Unit = {
         // only invoke domain disconnect if we actually got so far that the domain-id has been read from the remote node
         if (aliasManager.domainIdForAlias(domainAlias).nonEmpty)
           performDomainDisconnect(
@@ -1268,14 +1279,14 @@ class CantonSyncService(
             connectionListeners.get().foreach(_(domainAlias))
             x
           case UnlessShutdown.AbortedDueToShutdown =>
-            disconnectOn("shutdown")
+            disconnectOn()
             UnlessShutdown.AbortedDueToShutdown
           case x @ UnlessShutdown.Outcome(
                 Left(SyncServiceError.SyncServiceAlreadyAdded.Error(_))
               ) =>
             x
           case x @ UnlessShutdown.Outcome(Left(_)) =>
-            disconnectOn("failed connect")
+            disconnectOn()
             x
         }
 
@@ -1480,7 +1491,7 @@ class CantonSyncService(
             ifNone = RequestValidationErrors.InvalidArgument
               .Reject(s"Domain ID not found: $domain"): DamlError,
           )
-          remoteProtocolVersion <- EitherT.fromOptionF(
+          remoteProtocolVersion <- EitherT.fromOption[Future](
             protocolVersionGetter(Traced(remoteDomain)),
             ifNone = RequestValidationErrors.InvalidArgument
               .Reject(s"Domain ID's protocol version not found: $remoteDomain"): DamlError,
@@ -1692,6 +1703,7 @@ object CantonSyncService {
         cantonParameterConfig,
         SyncDomain.DefaultFactory,
         indexedStringStore,
+        storage,
         metrics,
         sequencerInfoLoader,
         () => storage.isActive,

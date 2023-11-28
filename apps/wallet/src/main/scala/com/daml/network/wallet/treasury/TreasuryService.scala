@@ -1,9 +1,9 @@
 package com.daml.network.wallet.treasury
 
-import akka.Done
-import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
-import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
-import akka.stream.scaladsl.{Keep, Sink, Source}
+import org.apache.pekko.Done
+import org.apache.pekko.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
+import org.apache.pekko.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import com.daml.ledger.javaapi.data.codegen.Exercised
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc

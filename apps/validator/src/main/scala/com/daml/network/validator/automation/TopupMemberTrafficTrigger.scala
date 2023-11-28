@@ -1,6 +1,6 @@
 package com.daml.network.validator.automation
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_BuyMemberTraffic
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{

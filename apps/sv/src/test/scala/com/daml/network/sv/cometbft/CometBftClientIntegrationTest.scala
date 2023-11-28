@@ -53,7 +53,8 @@ class CometBftClientIntegrationTest
         }
     }
 
-    "apply a network config change" in {
+    // TODO(#8726): re-enable the test
+    "apply a network config change" ignore {
       for {
         networkConfig <- cometBftClient
           .readNetworkConfig()

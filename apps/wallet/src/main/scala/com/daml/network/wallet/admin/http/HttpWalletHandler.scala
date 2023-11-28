@@ -1,6 +1,6 @@
 package com.daml.network.wallet.admin.http
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
 import com.daml.network.codegen.java.cc.coin as coinCodegen

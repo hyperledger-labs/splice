@@ -44,14 +44,14 @@ object Dependencies {
   lazy val daml_lf_validation =
     "com.daml" %% "daml-lf-validation" % CantonDependencies.daml_libraries_version
 
-  lazy val akka_http_cors =
-    "ch.megard" %% "akka-http-cors" % "1.1.3"
+  lazy val pekko_http_cors =
+    "org.apache.pekko" %% "pekko-http-cors" % "1.0.0"
 
   lazy val spray_json =
     "io.spray" %% "spray-json" % "1.3.6"
 
-  lazy val akka_spray_json =
-    "com.typesafe.akka" %% "akka-http-spray-json" % CantonDependencies.akka_http_version
+  lazy val pekko_spray_json =
+    "org.apache.pekko" %% "pekko-http-spray-json" % CantonDependencies.pekko_http_version
 
   lazy val better_files = CantonDependencies.better_files
 
@@ -66,4 +66,5 @@ object Dependencies {
   lazy val commons_compress = "org.apache.commons" % "commons-compress" % "1.23.0"
 
   lazy val kubernetes_client = "io.fabric8" % "kubernetes-client" % "6.8.1" % "provided"
+
 }

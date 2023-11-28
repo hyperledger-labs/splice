@@ -87,7 +87,7 @@ trait SyncDomainPersistentStateManager extends AutoCloseable with SyncDomainPers
 
   def protocolVersionFor(
       domainId: DomainId
-  ): Future[Option[ProtocolVersion]]
+  ): Option[ProtocolVersion]
 
   def get(domainId: DomainId): Option[SyncDomainPersistentState]
 
@@ -260,12 +260,8 @@ abstract class SyncDomainPersistentStateManagerImpl[S <: SyncDomainPersistentSta
     } yield ()
   }
 
-  def protocolVersionFor(
-      domainId: DomainId
-  ): Future[Option[ProtocolVersion]] = {
-    // TODO(#14048) remove future
-    Future.successful(get(domainId).map(_.protocolVersion))
-  }
+  def protocolVersionFor(domainId: DomainId): Option[ProtocolVersion] =
+    get(domainId).map(_.protocolVersion)
 
   private val domainStates: concurrent.Map[DomainId, S] =
     TrieMap[DomainId, S]()
@@ -334,7 +330,7 @@ class SyncDomainPersistentStateManagerOld(
       pureCrypto,
       parameters.stores,
       parameters.cachingConfigs,
-      parameters.maxDbConnections,
+      parameters.batchingConfig,
       parameters.processingTimeouts,
       parameters.enableAdditionalConsistencyChecks,
       indexedStringStore,
@@ -352,8 +348,9 @@ class SyncDomainPersistentStateManagerOld(
         parameters.processingTimeouts,
         futureSupervisor,
         parameters.cachingConfigs,
+        parameters.batchingConfig,
         state.topologyStore,
-        loggerFactory.append("domainId", domainId.toString),
+        loggerFactory,
       )
     )
   }
@@ -400,7 +397,7 @@ class SyncDomainPersistentStateManagerX(
       parameters.stores,
       topologyXConfig,
       parameters.cachingConfigs,
-      parameters.maxDbConnections,
+      parameters.batchingConfig,
       parameters.processingTimeouts,
       parameters.enableAdditionalConsistencyChecks,
       indexedStringStore,
@@ -417,6 +414,7 @@ class SyncDomainPersistentStateManagerX(
         parameters.processingTimeouts,
         futureSupervisor,
         parameters.cachingConfigs,
+        parameters.batchingConfig,
         topologyXConfig,
         state.topologyStore,
         loggerFactory.append("domainId", domainId.toString),

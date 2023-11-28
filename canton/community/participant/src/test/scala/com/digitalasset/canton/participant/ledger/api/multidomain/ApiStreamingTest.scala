@@ -3,12 +3,12 @@
 
 package com.digitalasset.canton.participant.ledger.api.multidomain
 
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Keep, Sink, Source}
-import akka.stream.{KillSwitches, ThrottleMode}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
+import org.apache.pekko.stream.{KillSwitches, ThrottleMode}
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.participant.ledger.api.multidomain.ApiStreaming.IndexRange
-import com.digitalasset.canton.util.{AkkaUtil, DelayUtil}
+import com.digitalasset.canton.util.{PekkoUtil, DelayUtil}
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AsyncWordSpec
@@ -445,7 +445,7 @@ class ApiStreamingTest
   }
 
   private implicit val actorSystem: ActorSystem =
-    AkkaUtil.createActorSystem(loggerFactory.threadName)(parallelExecutionContext)
+    PekkoUtil.createActorSystem(loggerFactory.threadName)(parallelExecutionContext)
 
   override def afterAll(): Unit = {
     Lifecycle.toCloseableActorSystem(actorSystem, logger, timeouts).close()

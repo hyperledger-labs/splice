@@ -1,7 +1,7 @@
 package com.daml.network.environment
 
-import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
+import org.apache.pekko.stream.Materializer
 import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.TraceContextPropagation.*
 import com.daml.network.admin.api.client.commands.HttpCommand

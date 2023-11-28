@@ -1,6 +1,6 @@
 package com.daml.network.console
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.config.NetworkAppClientConfig

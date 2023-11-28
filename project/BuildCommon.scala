@@ -238,7 +238,7 @@ object BuildCommon {
     sbt.Project
       .apply("canton-util-external", file("canton/community/util-external"))
       .dependsOn(
-        `canton-akka-fork`,
+        `canton-pekko-fork`,
         `canton-wartremover-extension` % "compile->compile;test->test",
         `canton-ledger-common`,
         `canton-util-logging`,
@@ -378,9 +378,9 @@ object BuildCommon {
           scopt,
           logback_classic,
           logback_core,
-          akka_stream_testkit % Test,
-          akka_http,
-          akka_http_testkit % Test,
+          pekko_stream_testkit % Test,
+          pekko_http,
+          pekko_http_testkit % Test,
           pureconfig_cats,
           cats,
           daml_ledger_rxjava_client % Test,
@@ -427,7 +427,7 @@ object BuildCommon {
         removeTestSources,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
-          akka_http,
+          pekko_http,
           ammonite,
           dropwizard_metrics_jmx,
           jul_to_slf4j,
@@ -586,12 +586,10 @@ object BuildCommon {
       .enablePlugins(BuildInfoPlugin, DamlPlugin)
       .dependsOn(
         `canton-blake2b`,
-        `canton-akka-fork` % "compile->compile;test->test",
+        `canton-pekko-fork` % "compile->compile;test->test",
         `canton-community-base`,
-        `canton-slick-fork`,
         `canton-wartremover-extension` % "compile->compile;test->test",
         `canton-util-external` % "compile->compile;test->test",
-        `canton-util-internal` % "compile->compile;test->test",
         `canton-community-testing` % "test",
         `canton-ledger-common` % "compile->compile;test->test",
       )
@@ -599,7 +597,7 @@ object BuildCommon {
         disableTests,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
-          akka_slf4j, // not used at compile time, but required by com.digitalasset.canton.util.AkkaUtil.createActorSystem
+          pekko_slf4j, // not used at compile time, but required by com.digitalasset.canton.util.pekkoUtil.createActorSystem
           daml_lf_archive_reader,
           daml_lf_engine,
           daml_lf_value_java_proto % "protobuf", // needed for protobuf import
@@ -768,8 +766,8 @@ object BuildCommon {
           daml_ledger_api_proto % "protobuf",
           logback_classic % Runtime,
           logback_core % Runtime,
-          akka_stream,
-          akka_stream_testkit % Test,
+          pekko_stream,
+          pekko_stream_testkit % Test,
           cats,
           chimney,
           scalapb_runtime, // not sufficient to include only through the `common` dependency - race conditions ensue
@@ -865,17 +863,17 @@ object BuildCommon {
   }
 
   // https://github.com/DACH-NY/canton/issues/10617: remove when no longer needed
-  lazy val `canton-akka-fork` = {
+  lazy val `canton-pekko-fork` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-akka-fork", file("canton/community/lib/akka"))
+      .apply("canton-pekko-fork", file("canton/community/lib/pekko"))
       .disablePlugins(ScalafixPlugin, ScalafmtPlugin, WartRemover)
       .settings(
         sharedSettings,
         libraryDependencies ++= Seq(
-          akka_stream,
-          akka_stream_testkit % Test,
-          akka_slf4j,
+          pekko_stream,
+          pekko_stream_testkit % Test,
+          pekko_slf4j,
           scalatest % Test,
         ),
         // commented out from Canton OS repo as settings don't apply to us (yet)
@@ -936,10 +934,10 @@ object BuildCommon {
           daml_bindings_scala,
           daml_ledger_resources,
           daml_timer_utils,
-          daml_rs_grpc_akka,
+          daml_rs_grpc_pekko,
           dropwizard_metrics_core,
           opentelemetry_api,
-          akka_stream,
+          pekko_stream,
           slf4j_api,
           grpc_api,
           reflections,
@@ -954,7 +952,7 @@ object BuildCommon {
           scalatest % Test,
           mockito_scala % Test,
           scalatestMockito % Test,
-          akka_stream_testkit % Test,
+          pekko_stream_testkit % Test,
           scalacheck % Test,
           opentelemetry_sdk_testing % Test,
           scalatestScalacheck % Test,
@@ -1059,12 +1057,12 @@ object BuildCommon {
           .map(cat => s"cat=$cat:silent")
           .mkString(",", ",", ""),
         libraryDependencies ++= Seq(
-          akka_http,
-          akka_http_core,
-          daml_akka_http_metrics,
+          pekko_http,
+          pekko_http_core,
+          daml_pekko_http_metrics,
           daml_lf_api_type_signature,
           spray_json_derived_codecs,
-          akka_stream_testkit % Test,
+          pekko_stream_testkit % Test,
           scalatest % Test,
           scalacheck % Test,
           scalaz_scalacheck % Test,

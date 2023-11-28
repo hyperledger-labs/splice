@@ -1,7 +1,7 @@
 package com.daml.network.admin.api.client
 
-import akka.http.scaladsl.model.HttpHeader
-import akka.http.scaladsl.model.headers.RawHeader
+import org.apache.pekko.http.scaladsl.model.HttpHeader
+import org.apache.pekko.http.scaladsl.model.headers.RawHeader
 import com.digitalasset.canton.tracing.TraceContext
 
 object TraceContextPropagation {

@@ -497,4 +497,7 @@ retain_blocks = {{ $.Values.node.retainBlocks }}
 # Interval in which a new snapshot should be generated, in order to assist new peers to sync quickly.
 snapshot_height_delta = {{ $.Values.node.snapshotHeightDelta }}
 
+# TODO(#8726): enable it
+require-submitter-key-id = false
+
 {{- end }}

@@ -1,6 +1,6 @@
 package com.daml.network.console
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight

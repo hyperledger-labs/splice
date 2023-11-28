@@ -1,6 +1,6 @@
 package com.daml.network.sv.automation
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.AutomationService
 import com.daml.network.environment.RetryProvider
 import com.daml.network.sv.automation.leaderbased.*

@@ -3,9 +3,6 @@
 
 package com.digitalasset.canton.platform.store.dao.events
 
-import akka.NotUsed
-import akka.stream.Attributes
-import akka.stream.scaladsl.Source
 import com.daml.ledger.api.v1.transaction.TreeEvent
 import com.daml.ledger.api.v2.update_service.GetUpdateTreesResponse
 import com.daml.metrics.{DatabaseMetrics, Timed}
@@ -39,8 +36,10 @@ import com.digitalasset.canton.platform.store.utils.{
 }
 import com.digitalasset.canton.platform.{ApiOffset, Party, TemplatePartiesFilter}
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Attributes
+import org.apache.pekko.stream.scaladsl.Source
 
-import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.chaining.*
 
@@ -175,12 +174,12 @@ class TransactionsTreeStreamReader(
     }
 
     def fetchPayloads(
-        ids: Source[ArrayBuffer[Long], NotUsed],
+        ids: Source[Iterable[Long], NotUsed],
         target: EventPayloadSourceForTreeTx,
         maxParallelPayloadQueries: Int,
         metric: DatabaseMetrics,
     ): Source[EventStorageBackend.Entry[Raw.TreeEvent], NotUsed] = {
-      // Akka requires for this buffer's size to be a power of two.
+      // Pekko requires for this buffer's size to be a power of two.
       val inputBufferSize = Utils.largestSmallerOrEqualPowerOfTwo(maxParallelPayloadQueries)
       ids.async
         .addAttributes(Attributes.inputBuffer(initial = inputBufferSize, max = inputBufferSize))
@@ -335,7 +334,7 @@ class TransactionsTreeStreamReader(
   private def mergeSortAndBatch(
       maxOutputBatchSize: Int,
       maxOutputBatchCount: Int,
-  )(sourcesOfIds: Vector[Source[Long, NotUsed]]): Source[ArrayBuffer[Long], NotUsed] = {
+  )(sourcesOfIds: Vector[Source[Long, NotUsed]]): Source[Iterable[Long], NotUsed] = {
     EventIdsUtils
       .sortAndDeduplicateIds(sourcesOfIds)
       .via(

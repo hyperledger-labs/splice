@@ -1,7 +1,7 @@
 package com.daml.network.validator.admin.http
 
-import akka.http.scaladsl.model.{ContentType, HttpRequest, HttpResponse}
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.{ContentType, HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*

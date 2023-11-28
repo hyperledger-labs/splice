@@ -1,7 +1,7 @@
 package com.daml.network.validator.admin
 
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
 import com.daml.network.environment.{
   CNLedgerConnection,
   CommandPriority,

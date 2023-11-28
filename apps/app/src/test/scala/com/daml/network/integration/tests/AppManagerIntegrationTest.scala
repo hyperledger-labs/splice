@@ -1,10 +1,16 @@
 package com.daml.network.integration.tests
 
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.client.RequestBuilding.{Options, Post}
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, StatusCodes, Uri}
-import akka.http.scaladsl.model.headers
-import akka.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Options, Post}
+import org.apache.pekko.http.scaladsl.model.{
+  ContentTypes,
+  HttpEntity,
+  HttpMethods,
+  StatusCodes,
+  Uri,
+}
+import org.apache.pekko.http.scaladsl.model.headers
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import com.auth0.jwk.UrlJwkProvider
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm

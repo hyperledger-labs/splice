@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.http.endpoints
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Source
 import com.digitalasset.canton.http.EndpointsCompanion.*
 import com.digitalasset.canton.http.Endpoints.ET
 import com.digitalasset.canton.http.EndpointsCompanion.CreateFromUserToken.userIdFromToken
@@ -21,13 +21,13 @@ import com.daml.lf.data.Ref.UserId
 
 import scala.concurrent.{ExecutionContext, Future}
 
- final class UserManagement(
+final class UserManagement(
     decodeJwt: EndpointsCompanion.ValidateJwt,
     userManagementClient: UserManagementClient,
 )(implicit
     ec: ExecutionContext
 ) {
-  import UserManagement._
+  import UserManagement.*
 
   def getUser(jwt: Jwt, req: domain.GetUserRequest): ET[domain.SyncResponse[domain.UserDetails]] =
     for {
@@ -41,9 +41,9 @@ import scala.concurrent.{ExecutionContext, Future}
       jwt: Jwt,
       createUserRequest: domain.CreateUserRequest,
   ): ET[domain.SyncResponse[spray.json.JsObject]] = {
-    import scalaz.std.option._
-    import scalaz.syntax.traverse._
-    import scalaz.syntax.std.either._
+    import scalaz.std.option.*
+    import scalaz.syntax.traverse.*
+    import scalaz.syntax.std.either.*
     import com.daml.lf.data.Ref
     val input =
       for {
@@ -167,7 +167,7 @@ import scala.concurrent.{ExecutionContext, Future}
       token: Option[String],
       pageSize: Int = 1000, // TODO could be made configurable in the future
   ): Source[Error \/ User, NotUsed] = {
-    import scalaz.std.option._
+    import scalaz.std.option.*
     Source.unfoldAsync(some("")) {
       _ traverse { pageToken =>
         userManagementClient
@@ -189,11 +189,11 @@ import scala.concurrent.{ExecutionContext, Future}
     decodeAndParseUserIdFromToken(jwt, decodeJwt).leftMap(identity[Error])
 }
 
- object UserManagement {
+object UserManagement {
   private def parseUserId(rawUserId: String)(implicit
       ec: ExecutionContext
   ): ET[UserId] = {
-    import scalaz.syntax.std.either._
+    import scalaz.syntax.std.either.*
     either(
       UserId.fromString(rawUserId).disjunction.leftMap(InvalidUserInput)
     )

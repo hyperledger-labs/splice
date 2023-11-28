@@ -3,11 +3,11 @@
 
 package com.daml.network.console
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
-import akka.http.scaladsl.{ConnectionContext, Http}
-import akka.stream.Materializer
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.{ConnectionContext, Http}
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.network.admin.api.client.HttpCtlRunner
 import com.daml.network.admin.api.client.commands.{HttpCommand, HttpCommandException}
 import com.daml.network.config.NetworkAppClientConfig
@@ -46,7 +46,7 @@ class ConsoleHttpCommandRunner(
   private val httpRunner = new HttpCtlRunner(
     loggerFactory
   )
-  implicit val actorSystem = ActorSystem("ConsoleHttpCommandRunner", environment.config.akkaConfig)
+  implicit val actorSystem = ActorSystem("ConsoleHttpCommandRunner", environment.config.pekkoConfig)
   implicit val mat: Materializer = Materializer(actorSystem)
 
   def runCommand[Result](

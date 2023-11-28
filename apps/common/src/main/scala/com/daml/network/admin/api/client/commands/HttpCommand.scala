@@ -3,9 +3,9 @@
 
 package com.daml.network.admin.api.client.commands
 
-import akka.http.scaladsl.model.*
-import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.Materializer
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import io.circe.parser.*
 
