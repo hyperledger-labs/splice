@@ -1733,6 +1733,41 @@ function subcmd_revive_sv_app() {
 
 ###
 
+subcommand_whitelist[debug_shell]='Spin up a debug container on the cluster, and open a shell terminal in it'
+
+function subcmd_debug_shell() {
+  _cluster_must_exist
+
+  VERSION_NUMBER=$(get-snapshot-version)
+
+  _info "Deploying debug pod"
+  kubectl apply --wait -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cn-debug
+  labels:
+    app: cn-debug
+spec:
+  containers:
+  - name: cn-debug
+    image: us-central1-docker.pkg.dev/da-cn-images/cn-images/cn-debug:${VERSION_NUMBER}
+    command: ["/bin/sleep", "2h"]
+    imagePullPolicy: Always
+  restartPolicy: Never
+EOF
+
+  ( _info "Waiting for debug pod to become ready" && \
+    kubectl wait --for=condition=Ready pod cn-debug --timeout=30s && \
+    _info "Opening terminal on debug pod" && \
+    kubectl exec -it cn-debug -- /bin/bash ) || true
+
+  _info "Deleting debug pod"
+  kubectl delete pod cn-debug
+}
+
+###
+
 subcommand_whitelist[participant_console]='Open a Canton console against a single participant running in the target namespace'
 
 function subcmd_participant_console() {

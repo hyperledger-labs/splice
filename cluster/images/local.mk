@@ -8,6 +8,7 @@ images := \
 	cometbft \
 	\
 	cn-app \
+	cn-debug \
 	sv-app \
 	sv-web-ui \
 	scan-app \

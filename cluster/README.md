@@ -36,6 +36,8 @@
         - [Grafana Dashboards](#grafana-dashboards)
         - [The Observability Cluster](#the-observability-cluster)
       - [Alerts](#alerts)
+      - [JVM debug information](#jvm-debug-information)
+      - [Connecting to a Postgres database](#connecting-to-a-postgres-database)
     - [Checking Pod Node Assignments and Memory Usage](#checking-pod-node-assignments-and-memory-usage)
     - [Managing GKE Kubernetes Versions](#managing-gke-kubernetes-versions)
       - [Automatic GKE Cluster Upgrades](#automatic-gke-cluster-upgrades)
@@ -856,6 +858,18 @@ To collect low-level debug information for a JVM process running in the cluster,
    9010 from the pod to your local network.
 1. In your JMX client application, open a connection to `localhost:9010`, without SSL or authentication.
 1. In your JMX client application, start a Java Flight Recorder with the desired settings and analyze the result.
+
+#### Connecting to a Postgres database
+
+For a cluster using CloudSQL, the database is exposed only through a private IP, accessible through a dedicated VPN.
+It is by default configured to allow connections from the corresponding cluster, so by running a debug container in the cluster,
+one can connect to it for debug purposes. To do that, run `cncluster debug_shell` in the cluster deployment directory.
+This should get you a terminal in an Ubuntu pod running on the cluster, in which `psql` client is installed.
+
+You can then run, e.g. `psql -h <hostname> -U cnadmin -l` to list all databases in the Postgres server.
+The hostname and password can be found by describing the relevant pods that use the database you wish to connect to
+(e.g. using `kubectl describe pod -n sv-1 sv-app`) and/or secrets that hold the password
+(e.g. using `kubectl get secret participant-secrets -n sv-1 -o jsonpath='{.data.cantonParticipantPostgresPassword}' | base64 -d`).
 
 ### Checking Pod Node Assignments and Memory Usage
 
