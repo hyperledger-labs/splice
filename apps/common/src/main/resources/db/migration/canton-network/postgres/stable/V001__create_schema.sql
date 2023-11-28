@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- allow digest function
-create extension "pgcrypto";
+create extension if not exists "pgcrypto";
 
 -- We allow many stores to ingest into the same tables to enable:
 --   - fast rollbacks on app upgrades (the new app can start re-ingesting w/o deleting the data ingested by its previous version)
