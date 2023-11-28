@@ -3,6 +3,13 @@
 Release Notes
 =============
 
+2023-12-04
+----------
+
+* Documentation:
+
+  * Clarify that using custom auth audiences is recommended.
+
 2023-11-27
 ----------
 

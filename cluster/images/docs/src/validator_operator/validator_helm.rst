@@ -160,8 +160,11 @@ DIRECTORY_UI_CLIENT_ID  The client id of the Auth0 app for the directory UI.
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-validator-auth-secrets-config` and :ref:`helm-validator-install`.
 
-(Optional) By default, all audience values are configured to be ``https://canton.network.global``.
-If you want to configure audience of your choice, your may do so for two APIs: the participant ledger API, and the validator backend API. We will refer to these using the following configuration values:
+By default, all audience values are configured to be ``https://canton.network.global``.
+Once you can confirm that your setup is working correctly using this (simple) default,
+we recommend that you configure dedicated audience values that match your deployment and URLs.
+You can configure audiences of your choice for the participant ledger API and the validator backend API.
+We will refer to these using the following configuration values:
 
 ==================================== ===========================================================================
 Name                                 Value
