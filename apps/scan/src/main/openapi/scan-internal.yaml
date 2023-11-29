@@ -865,6 +865,7 @@ components:
         - provider
         - sender
         - receivers
+        - balance_changes
       properties:
         provider:
           description: |
@@ -880,6 +881,32 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ReceiverAmount"
+        balance_changes:
+          description: |
+            Normalized balance changes per party caused by this transfer.
+          type: array
+          items:
+            $ref: "#/components/schemas/BalanceChange"
+    BalanceChange:
+      type: object
+      required:
+        - party
+        - change_to_initial_amount_as_of_round_zero
+        - change_to_holding_fees_rate
+      properties:
+        party:
+          description: |
+            The party for which the balance changes.
+          type: string
+        change_to_initial_amount_as_of_round_zero:
+          description: |
+            The change to the total balance introduced by this balance change, normalized to round zero, i.e.,
+            a coin created in round 3 is treated as a coin created in round 0 with a higher initial amount.
+          type: string
+        change_to_holding_fees_rate:
+          description: |
+            The change of total holding fees introduced by this balance change.
+          type: string
     CoinAmount:
       type: object
       required:

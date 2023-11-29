@@ -21,6 +21,7 @@ import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.store.Limit
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
+import com.daml.network.http.v0.definitions.BalanceChange
 
 class InMemoryScanIntegrationTest extends ScanIntegrationTest {
   registerPlugin(new UseInMemoryStores(loggerFactory))
@@ -240,6 +241,7 @@ class ScanIntegrationTest
       val coinConfig =
         sv1ScanBackend.getCoinConfigForRound(latestRound)
 
+      val holdingFee = coinConfig.holdingFee
       val bobTapAmount = 100000.0
       val aliceTapAmount = 100000.0
 
@@ -292,6 +294,7 @@ class ScanIntegrationTest
               })
 
           activities should have size (1)
+          val round = activities.loneElement.round
           activities.loneElement.round shouldBe openRoundForTransfer
           val transfer = activities.flatMap(_.transfer).loneElement
           val inputCoinAmount =
@@ -312,6 +315,29 @@ class ScanIntegrationTest
           transfer.receivers
             .map(r => BigDecimal(r.amount))
             .sum shouldBe transferAmount
+          val coinAsOfRoundZeroAdjustment = round * holdingFee
+          transfer.balanceChanges shouldBe Vector(
+            BalanceChange(
+              aliceUserParty.toProtoPrimitive,
+              Codec.encode(
+                transferAmount + round * holdingFee
+              ),
+              Codec.encode(
+                1 * holdingFee
+              ),
+            ),
+            BalanceChange(
+              bobUserParty.toProtoPrimitive,
+              Codec.encode(
+                senderChangeAmount + coinAsOfRoundZeroAdjustment - (inputCoinAmount + holdingFee * round) // See CoinRules: senderChangeAmount + coinAsOfRoundZeroAdjustment - inp.amountArchivedAsOfRoundZero
+              ),
+              Codec.encode(
+                BigDecimal(
+                  0 // See CoinRules: transferConfigCC.holdingFee.rate - coin.amount.ratePerRound.rate
+                )
+              ),
+            ),
+          )
 
           // receiverFee is by default set to 0, sender pays all fees.
           transfer.receivers

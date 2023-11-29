@@ -731,6 +731,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               zero,
               zero,
             ),
+            balanceChanges = Seq(),
             receivers = Seq(ReceiverAmount(user2.toProtoPrimitive, BigDecimal(i), zero)),
             round = new roundCodegen.types.Round(round),
             coinPrice = BigDecimal(1.0),

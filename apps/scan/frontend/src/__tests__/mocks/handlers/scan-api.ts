@@ -49,6 +49,14 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                 sender_fee: '0.0000000000',
                 holding_fees: '0.0000000000',
               },
+              balance_changes: [
+                {
+                  party:
+                    'charlie__wallet__user::12200d3c885d2cb51226911f828da25f7f0fc0d06b8c6bf00c714266729033f138f7',
+                  change_to_holding_fees_rate: '0.0000000000',
+                  change_to_initial_amount_as_of_round_zero: '1.1050000000',
+                },
+              ],
               receivers: [],
             },
           },

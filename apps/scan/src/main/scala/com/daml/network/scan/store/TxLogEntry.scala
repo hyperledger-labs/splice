@@ -86,6 +86,18 @@ object TxLogEntry {
     )
   }
 
+  final case class BalanceChange(
+      party: String,
+      changeToInitialAmountAsOfRoundZero: BigDecimal,
+      changeToHoldingFeesRate: BigDecimal,
+  ) {
+    def toResponse = httpDef.BalanceChange(
+      party = party,
+      changeToInitialAmountAsOfRoundZero = Codec.encode(changeToInitialAmountAsOfRoundZero),
+      changeToHoldingFeesRate = Codec.encode(changeToHoldingFeesRate),
+    )
+  }
+
   sealed trait TransactionLogEntry extends TxLogEntry {
     def transactionType: TransactionType
     def toResponseItem: httpDef.TransactionHistoryResponseItem
@@ -102,12 +114,23 @@ object TxLogEntry {
       val coinPrice = node.result.value.summary.coinPrice
       val sender = parseSenderAmount(node.argument.value, node.result.value)
       val receivers = parseReceiverAmounts(node.argument.value, node.result.value)
+
       TransferLogEntry(
         indexRecord = TransactionIndexRecord(tx, event, domainId),
         date = tx.getEffectiveAt,
         provider = node.argument.value.transfer.provider,
         sender = sender,
         receivers = receivers,
+        balanceChanges = node.result.value.summary.balanceChanges.asScala
+          .map { case (party, bc) =>
+            BalanceChange(
+              party = party,
+              changeToInitialAmountAsOfRoundZero = bc.changeToInitialAmountAsOfRoundZero,
+              changeToHoldingFeesRate = bc.changeToHoldingFeesRate,
+            )
+          }
+          .toSeq
+          .sortBy(_.party),
         round = node.result.value.round,
         coinPrice = coinPrice,
       )
@@ -120,6 +143,7 @@ object TxLogEntry {
       provider: String,
       sender: SenderAmount,
       receivers: Seq[ReceiverAmount],
+      balanceChanges: Seq[BalanceChange],
       round: cc.round.types.Round,
       coinPrice: BigDecimal,
   ) extends TransactionLogEntry {
@@ -135,6 +159,7 @@ object TxLogEntry {
           provider = provider,
           sender = sender.toResponse,
           receivers = receivers.map(_.toResponse).toVector,
+          balanceChanges = balanceChanges.map(_.toResponse).toVector,
         )
       ),
       round = Codec.encode(round),

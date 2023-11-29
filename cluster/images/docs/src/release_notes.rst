@@ -19,6 +19,9 @@ Release Notes
 
   * Updated SV runbook with a list of outbound traffic.
 
+* The `/v0/activities` and `/v0/transactions` Scan APIs now include normalized balance changes per party. 
+  Please see the Scan OpenAPI specification.
+
 2023-11-27
 ----------
 
