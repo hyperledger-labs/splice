@@ -2,8 +2,6 @@ package com.daml.network.environment
 
 import cats.syntax.either.*
 import com.daml.network.config.CNNodeConfig
-import com.daml.network.directory.DirectoryAppBootstrap
-import com.daml.network.directory.config.DirectoryAppBackendConfig
 import com.daml.network.metrics.CNNodeMetricsFactory
 import com.daml.network.scan.ScanAppBootstrap
 import com.daml.network.scan.config.ScanAppBackendConfig
@@ -134,37 +132,6 @@ trait CNNodeEnvironment extends Environment {
     loggerFactory,
   )
 
-  protected def createDirectory(
-      name: String,
-      directoryConfig: DirectoryAppBackendConfig,
-  ): DirectoryAppBootstrap = {
-    val appLoggerFactory = loggerFactory.append(DirectoryAppBootstrap.LoggerFactoryKeyName, name)
-    DirectoryAppBootstrap(
-      name,
-      directoryConfig,
-      config.tryDirectoryAppParametersByString(name),
-      createClock(Some(DirectoryAppBootstrap.LoggerFactoryKeyName -> name)),
-      cnNodeMetrics.forDirectory(name),
-      testingConfig,
-      futureSupervisor,
-      appLoggerFactory,
-      configuredOpenTelemetry,
-    ).valueOr(err =>
-      throw new RuntimeException(
-        s"Failed to create participant bootstrap: $err"
-      )
-    )
-  }
-
-  lazy val directories = new DirectoryApps(
-    createDirectory,
-    migrationsFactory,
-    timeouts,
-    config.directoriesByString,
-    config.tryDirectoryAppParametersByString,
-    loggerFactory,
-  )
-
   protected def createSplitwell(
       name: String,
       splitwellConfig: SplitwellAppBackendConfig,
@@ -199,7 +166,7 @@ trait CNNodeEnvironment extends Environment {
 
   // Ordering here matches CNNodeConsoleEnvironment.startupOrderPrecedence
   def allCNNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
-    List(svs, scans, validators, directories, splitwells)
+    List(svs, scans, validators, splitwells)
 
   override def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
     super.allNodes ::: allCNNodes

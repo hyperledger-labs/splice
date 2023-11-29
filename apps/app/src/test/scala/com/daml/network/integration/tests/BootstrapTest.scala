@@ -42,7 +42,7 @@ class BootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
         }
       },
       lines => {
-        forAll(lines) { line => line.message should (include("No directory entry found for name")) }
+        forAll(lines) { line => line.message should (include("No cns entry found for name")) }
       },
     )
   }

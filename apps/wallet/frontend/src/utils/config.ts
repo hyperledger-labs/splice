@@ -2,7 +2,6 @@ import { ConfigReader, authSchema, testAuthSchema, serviceSchema } from 'common-
 import { z } from 'zod';
 
 type WalletServicesConfig = {
-  directory: z.infer<typeof serviceSchema>;
   scan: z.infer<typeof serviceSchema>;
   validator: z.infer<typeof serviceSchema>;
 };
@@ -19,7 +18,6 @@ const reader = new ConfigReader(
     testAuth: testAuthSchema.optional(),
     services: z.object({
       validator: serviceSchema,
-      directory: serviceSchema,
       scan: serviceSchema,
     }),
   })

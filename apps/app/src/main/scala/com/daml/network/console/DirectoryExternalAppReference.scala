@@ -4,9 +4,9 @@ import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.http.v0.definitions
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.participant.ParticipantNode
-import com.daml.network.directory.admin.api.client.commands.HttpDirectoryAppClient
 import com.daml.network.auth.AuthUtil
-import com.daml.network.directory.config.DirectoryAppExternalClientConfig
+import com.daml.network.validator.admin.api.client.commands.HttpDirectoryAppClient
+import com.daml.network.validator.config.DirectoryAppExternalClientConfig
 
 abstract class DirectoryExternalAppReference(
     override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,

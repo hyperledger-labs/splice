@@ -260,7 +260,6 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     initSvcWithSv1Only()
     aliceValidatorBackend.startSync()
     aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
-    directoryBackend.waitForInitialization()
     aliceWalletClient.tap(10)
 
     val name = "alice.unverified.cns"

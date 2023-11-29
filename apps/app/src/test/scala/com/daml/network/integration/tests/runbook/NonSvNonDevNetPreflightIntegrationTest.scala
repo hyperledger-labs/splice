@@ -16,7 +16,6 @@ final class NonSvNonDevNetPreflightIntegrationTestBase
 
   // For now treating this as a non-SV app since it is really run directly as the SVC
   // rather than as SV-1. It just happens to be in SV-1's namespace.
-  def directoryClient(implicit env: CNNodeTestConsoleEnvironment) = rdp("directory")
   def splitwellClient(implicit env: CNNodeTestConsoleEnvironment) = rsw("splitwell")
   def splitwellValidatorClient(implicit env: CNNodeTestConsoleEnvironment) = vc(
     "splitwellValidator"
@@ -33,7 +32,6 @@ final class NonSvNonDevNetPreflightIntegrationTestBase
     eventually() {
       forAll(
         Seq(
-          directoryClient,
           validator1Client,
           splitwellValidatorClient,
           splitwellClient,

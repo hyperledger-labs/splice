@@ -176,3 +176,10 @@ case class AppManagerAppClientConfig(
 ) extends HttpCNNodeClientConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }
+
+case class DirectoryAppExternalClientConfig(
+    adminApi: NetworkAppClientConfig,
+    ledgerApiUser: String,
+) extends HttpCNNodeClientConfig {
+  override def clientAdminApi: NetworkAppClientConfig = adminApi
+}

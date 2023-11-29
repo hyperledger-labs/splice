@@ -1,8 +1,8 @@
 package com.daml.network.util
 
-import com.daml.network.directory.DirectoryUtil
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
+import com.daml.network.sv.util.CnsUtil
 import org.openqa.selenium.support.ui.ExpectedConditions
 import org.scalatest.compatible.Assertion
 
@@ -19,7 +19,7 @@ trait DirectoryFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
   )(implicit
       webDriver: WebDriverType
   ) = {
-    val entryNameWithoutSuffix = entryName.stripSuffix(DirectoryUtil.entryNameSuffix)
+    val entryNameWithoutSuffix = entryName.stripSuffix(CnsUtil.entryNameSuffix)
     directoryUiLogin()
 
     // 100 seconds waiting here because we need to wait on the JSON API being ready which is sloooow.

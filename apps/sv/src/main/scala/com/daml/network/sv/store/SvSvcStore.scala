@@ -28,7 +28,6 @@ import com.daml.network.codegen.java.cn.svcrules.{
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{BaseLedgerConnection, PackageIdResolver, RetryProvider}
 import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
@@ -934,6 +933,7 @@ object SvSvcStore {
     cn.cns.CnsEntryContext.COMPANION,
     cn.cns.CnsRules.COMPANION,
     cn.svc.coinprice.CoinPriceVote.COMPANION,
+    cn.wallet.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8782) move it to UserWalletStore.templatesMovedByMyAutomation
   )
 
   private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
@@ -1166,21 +1166,20 @@ object SvSvcStore {
             Some(Timestamp.assertFromInstant(contract.payload.nextPaymentDueAt)),
         )
       },
-    )
-    val copiedDirectoryFilters =
-      DirectoryStore.directoryTemplateFilters(svcParty).map { case (template, filter) =>
-        template -> filter.mapEncode(directoryRowData =>
-          SvcAcsStoreRowData(
-            contract = directoryRowData.contract,
-            contractExpiresAt = directoryRowData.contractExpiresAt,
-          )
+      // TODO (#8782) revisit if it makes sense
+      mkFilter(sub.TerminatedSubscription.COMPANION)(co =>
+        co.payload.subscriptionData.svc == svc && co.payload.subscriptionData.provider == svc
+      ) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          subscriptionReferenceContractId = Some(contract.payload.reference),
         )
-      }
-    val allFilters = svcFilters ++ (copiedDirectoryFilters -- svcFilters.keys)
+      },
+    )
 
     MultiDomainAcsStore.SimpleContractFilter(
       svcParty,
-      allFilters,
+      svcFilters,
     )
   }
 

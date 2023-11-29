@@ -54,7 +54,6 @@ lazy val root = (project in file("."))
     `apps-sv`,
     `apps-app`,
     `apps-wallet`,
-    `apps-directory`,
     `apps-frontends`,
     `cn-util-daml`,
     `canton-coin-daml`,
@@ -457,8 +456,13 @@ lazy val `apps-validator` =
         openApiSpec = "json-api-proxy-internal.yaml",
         directory = "jsonapi-proxy-ts-client",
       ),
+      BuildCommon.TS.openApiSettings(
+        npmName = "directory-external-openapi",
+        openApiSpec = "directory-external.yaml",
+        directory = "external-openapi-ts-client",
+      ),
       Compile / guardrailTasks :=
-        List("validator-internal", "json-api-proxy-internal").flatMap(api =>
+        List("validator-internal", "json-api-proxy-internal", "directory-external").flatMap(api =>
           List(
             ScalaServer(
               new File(s"apps/validator/src/main/openapi/${api}.yaml"),
@@ -481,7 +485,7 @@ lazy val `apps-sv` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `directory-daml`,
-      `apps-directory`, // Required for the SvSvcStore to also store all CNS entries and related contracts
+      `apps-scan`,
       `validator-lifecycle-daml`,
       `svc-governance-daml`,
       `sv-local-daml`,
@@ -550,7 +554,6 @@ lazy val `apps-common-frontend` = {
     .in(file("apps/common/frontend"))
     .dependsOn(
       `apps-common`,
-      `apps-directory`,
       `apps-wallet`,
       `apps-splitwell`,
       `apps-validator`,
@@ -578,11 +581,6 @@ lazy val `apps-common-frontend` = {
           (
             (`apps-validator` / Compile / compile).value,
             (`apps-validator` / Compile / baseDirectory).value,
-            false,
-          ),
-          (
-            (`apps-directory` / Compile / compile).value,
-            (`apps-directory` / Compile / baseDirectory).value,
             false,
           ),
           (
@@ -628,12 +626,6 @@ lazy val `apps-common-frontend` = {
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
-              "directory/openapi-ts-client",
-              log,
-            )
-            BuildCommon.TS.runWorkspaceCommand(
-              npmRootDir.value,
-              "build",
               "sv/openapi-ts-client",
               log,
             )
@@ -647,6 +639,12 @@ lazy val `apps-common-frontend` = {
               npmRootDir.value,
               "build",
               "validator/jsonapi-proxy-ts-client",
+              log,
+            )
+            BuildCommon.TS.runWorkspaceCommand(
+              npmRootDir.value,
+              "build",
+              "validator/external-openapi-ts-client",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(
@@ -837,53 +835,12 @@ lazy val `apps-wallet` =
         },
     )
 
-lazy val `apps-directory` =
-  project
-    .in(file("apps/directory"))
-    .dependsOn(
-      `apps-common` % "compile->compile;test->test",
-      `apps-scan` % "compile->compile;test->test",
-      `apps-wallet`,
-      `wallet-daml`,
-      `directory-daml`,
-    )
-    .settings(
-      libraryDependencies ++= Seq(pekko_http_cors),
-      templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
-      BuildCommon.TS.openApiSettings(
-        npmName = "directory-openapi",
-        openApiSpec = "directory-internal.yaml",
-      ),
-      BuildCommon.TS.openApiSettings(
-        npmName = "directory-external-openapi",
-        openApiSpec = "directory-external.yaml",
-        directory = "external-openapi-ts-client",
-      ),
-      BuildCommon.sharedAppSettings,
-      Compile / guardrailTasks :=
-        List("internal", "external").flatMap { scope =>
-          List(
-            ScalaServer(
-              new File(s"apps/directory/src/main/openapi/directory-$scope.yaml"),
-              pkg = "com.daml.network.http.v0",
-              framework = "pekko-http",
-              customExtraction = true,
-            ),
-            ScalaClient(
-              new File(s"apps/directory/src/main/openapi/directory-$scope.yaml"),
-              pkg = "com.daml.network.http.v0",
-              framework = "pekko-http",
-            ),
-          )
-        },
-    )
-
 lazy val `apps-splitwell` =
   project
     .in(file("apps/splitwell"))
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
-      `apps-directory` % "compile->compile;test->test",
+      `apps-scan` % "compile->compile;test->test",
       `splitwell-daml`,
     )
     .settings(
@@ -1227,7 +1184,6 @@ lazy val `apps-app` =
       `wallet-payments-daml`,
       `wallet-daml`,
       `apps-splitwell`,
-      `apps-directory`,
       `apps-validator`,
       `apps-sv` % "compile->compile;test->test",
       `apps-scan`,

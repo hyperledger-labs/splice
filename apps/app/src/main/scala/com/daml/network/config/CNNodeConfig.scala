@@ -5,11 +5,6 @@ import cats.data.Validated
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import com.daml.network.auth.AuthConfig
-import com.daml.network.directory.config.{
-  DirectoryAppBackendConfig,
-  DirectoryAppClientConfig,
-  DirectoryAppExternalClientConfig,
-}
 import com.daml.network.http.v0.definitions.{
   AppConfiguration,
   Domain,
@@ -70,8 +65,6 @@ case class CNNodeConfig(
     scanAppClients: Map[InstanceName, ScanAppClientConfig] = Map.empty,
     walletAppClients: Map[InstanceName, WalletAppClientConfig] = Map.empty,
     appManagerAppClients: Map[InstanceName, AppManagerAppClientConfig] = Map.empty,
-    directoryApp: Option[DirectoryAppBackendConfig] = None,
-    directoryAppClients: Map[InstanceName, DirectoryAppClientConfig] = Map.empty,
     directoryAppExternalClients: Map[InstanceName, DirectoryAppExternalClientConfig] = Map.empty,
     splitwellApps: Map[InstanceName, SplitwellAppBackendConfig] = Map.empty,
     splitwellAppClients: Map[InstanceName, SplitwellAppClientConfig] = Map.empty,
@@ -224,59 +217,6 @@ case class CNNodeConfig(
   def scansByString: Map[String, ScanAppBackendConfig] = scanApps.map { case (n, c) =>
     n.unwrap -> c
   }
-
-  // The config contains one optional unnamed directory app (because in M3, there can only be one)
-  // Since the rest of the code generally expects a map of nodes, we'll create one.
-  private lazy val directoryAppInstanceName = InstanceName.tryCreate("directory-app")
-  private lazy val directoryApps =
-    directoryApp.toList.map(config => directoryAppInstanceName -> config).toMap
-
-  private lazy val directoryAppParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
-    directoryApps.fmap { directoryConfig =>
-      SharedCNNodeAppParameters(
-        monitoring.tracing,
-        monitoring.delayLoggingThreshold,
-        monitoring.getLoggingConfig,
-        monitoring.logQueryCost,
-        parameters.timeouts.processing,
-        parameters.timeouts.console.requestTimeout,
-        directoryConfig.caching,
-        parameters.enableAdditionalConsistencyChecks,
-        features.enablePreviewCommands,
-        parameters.nonStandardConfig,
-        directoryConfig.sequencerClient,
-        devVersionSupport = false,
-        dontWarnOnDeprecatedPV = false,
-        initialProtocolVersion = ProtocolVersion.latest,
-        dbMigrateAndStart = true,
-        skipTopologyManagerSignatureValidation = false,
-        batchingConfig = new BatchingConfig(),
-      )
-    }
-
-  private[network] def directoryAppParameters(
-      appName: InstanceName
-  ): SharedCNNodeAppParameters =
-    nodeParametersFor(directoryAppParameters_, "directory-app", appName)
-
-  /** Use `directoryAppParameters` instead!
-    */
-  def tryDirectoryAppParametersByString(name: String): SharedCNNodeAppParameters =
-    directoryAppParameters(
-      InstanceName.tryCreate(name)
-    )
-
-  /** Use `directories` instead!
-    */
-  def directoriesByString: Map[String, DirectoryAppBackendConfig] =
-    directoryApps.map { case (n, c) =>
-      n.unwrap -> c
-    }
-
-  def directoryClientsByString: Map[String, DirectoryAppClientConfig] =
-    directoryAppClients.map { case (n, c) =>
-      n.unwrap -> c
-    }
 
   private lazy val splitwellAppParameters_ : Map[InstanceName, SharedCNNodeAppParameters] =
     splitwellApps.fmap { splitwellConfig =>
@@ -553,10 +493,6 @@ object CNNodeConfig {
       deriveReader[WalletAppClientConfig]
     implicit val AppManagerAppClientConfigReader: ConfigReader[AppManagerAppClientConfig] =
       deriveReader[AppManagerAppClientConfig]
-    implicit val directoryConfigReader: ConfigReader[DirectoryAppBackendConfig] =
-      deriveReader[DirectoryAppBackendConfig]
-    implicit val directoryClientConfigReader: ConfigReader[DirectoryAppClientConfig] =
-      deriveReader[DirectoryAppClientConfig]
     implicit val directoryExternalClientConfigReader
         : ConfigReader[DirectoryAppExternalClientConfig] =
       deriveReader[DirectoryAppExternalClientConfig]
@@ -755,10 +691,6 @@ object CNNodeConfig {
       deriveWriter[WalletAppClientConfig]
     implicit val AppManagerAppClientConfigWriter: ConfigWriter[AppManagerAppClientConfig] =
       deriveWriter[AppManagerAppClientConfig]
-    implicit val directoryConfigWriter: ConfigWriter[DirectoryAppBackendConfig] =
-      deriveWriter[DirectoryAppBackendConfig]
-    implicit val directoryClientConfigWriter: ConfigWriter[DirectoryAppClientConfig] =
-      deriveWriter[DirectoryAppClientConfig]
     implicit val directoryExternalClientConfigWriter
         : ConfigWriter[DirectoryAppExternalClientConfig] =
       deriveWriter[DirectoryAppExternalClientConfig]

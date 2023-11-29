@@ -16,7 +16,6 @@ const reader = new ConfigReader(
     services: z.object({
       wallet: walletSchema.optional(),
       scan: serviceSchema,
-      directory: serviceSchema,
       splitwell: serviceSchema,
       jsonApi: serviceSchema.optional(),
     }),
@@ -26,7 +25,6 @@ const reader = new ConfigReader(
 type SplitwellServicesConfig = {
   wallet: z.infer<typeof walletSchema>;
   scan: z.infer<typeof serviceSchema>;
-  directory: z.infer<typeof serviceSchema>;
   splitwell: z.infer<typeof serviceSchema>;
   jsonApi: z.infer<typeof serviceSchema>;
 };
@@ -69,7 +67,6 @@ export const useConfig = (): SplitwellConfig => {
     services: {
       wallet: walletConfig,
       scan: staticConfig.services.scan,
-      directory: staticConfig.services.directory,
       splitwell: staticConfig.services.splitwell,
       jsonApi: jsonApiConfig,
     },

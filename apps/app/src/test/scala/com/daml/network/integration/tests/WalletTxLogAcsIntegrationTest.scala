@@ -47,7 +47,6 @@ class WalletTxLogAcsIntegrationTest
         val localToStart = env.mergeLocalCNNodeInstances(
           env.svs.local,
           env.scans.local,
-          env.directories.local,
         )
         localToStart.foreach(_.start())
         localToStart.foreach(_.waitForInitialization())

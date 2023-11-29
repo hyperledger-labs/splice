@@ -118,19 +118,6 @@ spec:
             port:
               number: 5003
             host: validator-app.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
-{{- if .Values.withDirectoryBackend }}
-    - match:
-        - port: 443
-          uri:
-            prefix: "/api/v0/directory/"
-      rewrite:
-        uri: "/"
-      route:
-        - destination:
-            port:
-              number: 5010
-            host: directory-app.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
-{{- end }}
     - match:
         - port: 443
       route:

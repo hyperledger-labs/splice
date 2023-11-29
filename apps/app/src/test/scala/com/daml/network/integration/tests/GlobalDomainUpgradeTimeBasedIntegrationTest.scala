@@ -628,7 +628,8 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       allContractsMigrated(
         SvSvcStore.coinRulesFollowers
           filterNot Set(
-            cc.coin.SvcReward.COMPANION // TODO (#7210)
+            cc.coin.SvcReward.COMPANION, // TODO (#7210)
+            cnw.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8386)
           )
           map (c(_)): _*
       )
@@ -657,23 +658,13 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       import com.daml.network.wallet.store.UserWalletStore.templatesMovedByMyAutomation as templatesMovedByUserWalletAutomation
       allContractsMigrated(
         templatesMovedByUserWalletAutomation
-          map (c(_, sv1WalletUser)): _*
-      )
-    }
-
-    clue("see whether directory contracts follow coinrules") {
-      import com.daml.network.directory.store.DirectoryStore.templatesMovedByMyAutomation as templatesMovedByDirectoryAutomation
-      allContractsMigrated(
-        templatesMovedByDirectoryAutomation
           filterNot Set( // TODO (#8386) remove filtering
             dir.DirectoryInstall.COMPANION,
             dir.DirectoryEntry.COMPANION,
             dir.DirectoryEntryContext.COMPANION,
-            dir.DirectoryInstallRequest.COMPANION,
             cnw.subscriptions.SubscriptionInitialPayment.COMPANION,
             cnw.subscriptions.SubscriptionIdleState.COMPANION,
             cnw.subscriptions.SubscriptionPayment.COMPANION,
-            cnw.subscriptions.TerminatedSubscription.COMPANION,
           )
           map (c(_, sv1WalletUser)): _*
       )

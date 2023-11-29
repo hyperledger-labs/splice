@@ -117,7 +117,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       ) {
         clue("Creating a CNS entry that expires immediately") {
           sv1ScanBackend.listEntries("", 25) shouldBe empty
-          directoryBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
             .submitJava(
               actAs = Seq(svcParty),
               commands = new CnsEntry(

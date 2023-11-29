@@ -1062,7 +1062,6 @@ commands:
             query="timestamp>=\"$before\" AND timestamp<=\"$now_formatted\""
             apps=(
               "sv-1 sv-app"
-              "sv-1 directory-app"
               "sv-1 participant"
               "sv-1 scan-app"
               "sv-2 sv-app"

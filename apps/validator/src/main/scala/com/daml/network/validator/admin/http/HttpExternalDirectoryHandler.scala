@@ -1,15 +1,14 @@
-package com.daml.network.directory.admin.http
+package com.daml.network.validator.admin.http
 
 import org.apache.pekko.stream.Materializer
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn.directory.DirectoryInstallRequest
-import com.daml.network.http.v0.external
+import com.daml.network.http.v0.{external, definitions as d0}
 import com.daml.network.http.v0.external.directory.DirectoryResource as r0
-import com.daml.network.http.v0.definitions as d0
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.DisclosedContracts
-import com.daml.network.wallet.admin.http.HttpWalletHandlerUtil
 import com.daml.network.wallet.UserWalletManager
+import com.daml.network.wallet.admin.http.HttpWalletHandlerUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -17,8 +16,7 @@ import com.digitalasset.canton.util.retry.RetryUtil
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 class HttpExternalDirectoryHandler(

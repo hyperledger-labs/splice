@@ -2,8 +2,6 @@ package com.daml.network.util
 
 import com.daml.network.console.{
   AppManagerAppClientReference,
-  DirectoryAppBackendReference,
-  DirectoryAppClientReference,
   ScanAppBackendReference,
   ScanAppClientReference,
   SplitwellAppBackendReference,
@@ -163,15 +161,6 @@ trait CommonCNNodeAppInstanceReferences {
       "splitwellProviderWallet"
     )
 
-  def directoryBackend(implicit
-      env: CNNodeTestConsoleEnvironment
-  ): DirectoryAppBackendReference =
-    env.directories.local.headOption.getOrElse(
-      sys.error(
-        "Tried to access the Directory app but it isn't defined in the test's configuration file"
-      )
-    )
-
   def aliceDirectoryExternalClient(implicit
       env: CNNodeTestConsoleEnvironment
   ): DirectoryExternalAppClientReference = rdpe(
@@ -249,13 +238,6 @@ trait CommonCNNodeAppInstanceReferences {
     env.validators.remote
       .find(_.name == name)
       .getOrElse(sys.error(s"validator client [$name] not configured"))
-
-  def rdp(
-      name: String
-  )(implicit env: CNNodeTestConsoleEnvironment): DirectoryAppClientReference =
-    env.directories.remote
-      .find(_.name == name)
-      .getOrElse(sys.error(s"remote directory [$name] not configured"))
 
   def rdpe(
       name: String

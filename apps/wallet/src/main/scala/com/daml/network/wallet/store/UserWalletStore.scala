@@ -498,10 +498,17 @@ object UserWalletStore {
       coinCodegen.ValidatorRewardCoupon.COMPANION,
       subsCodegen.Subscription.COMPANION,
       subsCodegen.SubscriptionRequest.COMPANION,
+      subsCodegen.SubscriptionInitialPayment.COMPANION,
+      subsCodegen.SubscriptionIdleState.COMPANION,
+      subsCodegen.SubscriptionPayment.COMPANION,
       transferOffersCodegen.AcceptedTransferOffer.COMPANION,
       transferOffersCodegen.TransferOffer.COMPANION,
       walletCodegen.AcceptedAppPayment.COMPANION,
       walletCodegen.AppPaymentRequest.COMPANION,
+      // TODO (#7260) remove
+      directoryCodegen.DirectoryInstall.COMPANION,
+      directoryCodegen.DirectoryEntry.COMPANION,
+      directoryCodegen.DirectoryEntryContext.COMPANION,
     )
   }
 

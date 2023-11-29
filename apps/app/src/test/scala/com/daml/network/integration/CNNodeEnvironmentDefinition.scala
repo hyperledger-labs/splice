@@ -312,9 +312,6 @@ case class CNNodeEnvironmentDefinition(
       // we bump remote app ports separately in order to not confuse
       // the PreflightIntegrationTest which also uses bumpCantonPortsBy
       .addConfigTransformsToFront((_, conf) =>
-        CNNodeConfigTransforms.bumpDirectoryClientsPortsBy(10_000)(conf)
-      )
-      .addConfigTransformsToFront((_, conf) =>
         CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(10_000)(conf)
       )
       .withTrafficTopupsDisabled

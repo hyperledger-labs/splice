@@ -80,7 +80,6 @@ export type SvConfig = {
   onboarding: SvOnboarding;
   approvedSvIdentities: ApprovedSvIdentity[];
   withScan: boolean;
-  withDirectoryBackend: boolean;
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[];
   isDevNet: boolean;
   backupConfig?: BackupConfig;
@@ -271,27 +270,11 @@ export async function installSvNode(
       persistence: persistenceConfig(postgresDb, scanDbName),
       additionalJvmOptions: jmxOptions(),
     };
-    const scanApp = installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, [
+    installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, [
       svApp,
       postgresDb,
       scanDb,
     ]);
-    if (config.onboarding.type == 'found-collective') {
-      const directoryDbName = `directory_${svAppName}`;
-      const directoryDb = postgresDb.createDatabase(directoryDbName);
-      const directoryValues = {
-        metrics: {
-          enable: true,
-        },
-        persistence: persistenceConfig(postgresDb, directoryDbName),
-        additionalJvmOptions: jmxOptions(),
-      };
-      installCNHelmChart(xns, 'directory-' + xns.logicalName, 'cn-directory', directoryValues, [
-        scanApp,
-        postgresDb,
-        directoryDb,
-      ]);
-    }
   }
 
   const validatorDbName = `validator_${svAppName}`;
@@ -323,7 +306,6 @@ export async function installSvNode(
     'cn-cluster-ingress-runbook',
     {
       withScan: config.withScan,
-      withDirectoryBackend: config.withDirectoryBackend,
       withDomainNode: config.withDomainNode,
       cluster: {
         hostname: `${CLUSTER_BASENAME}.network.canton.global`,

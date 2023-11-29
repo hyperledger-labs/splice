@@ -1,7 +1,6 @@
 package com.daml.network.metrics
 
 import com.daml.metrics.api.MetricsContext
-import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.daml.network.splitwell.metrics.SplitwellAppMetrics
 import com.daml.network.sv.metrics.SvAppMetrics
@@ -21,7 +20,6 @@ case class CNNodeMetricsFactory(
   private val validators = TrieMap[String, ValidatorAppMetrics]()
   private val svs = TrieMap[String, SvAppMetrics]()
   private val scans = TrieMap[String, ScanAppMetrics]()
-  private val directories = TrieMap[String, DirectoryAppMetrics]()
   private val splitwells = TrieMap[String, SplitwellAppMetrics]()
 
   def forValidator(name: String): ValidatorAppMetrics = {
@@ -51,17 +49,6 @@ case class CNNodeMetricsFactory(
       name, {
         val metricsContext = MetricsContext("node_name" -> name, "node_type" -> "scan")
         new ScanAppMetrics(
-          createLabeledMetricsFactory(metricsContext)
-        )
-      },
-    )
-  }
-
-  def forDirectory(name: String): DirectoryAppMetrics = {
-    directories.getOrElseUpdate(
-      name, {
-        val metricsContext = MetricsContext("node_name" -> name, "node_type" -> "directory")
-        new DirectoryAppMetrics(
           createLabeledMetricsFactory(metricsContext)
         )
       },

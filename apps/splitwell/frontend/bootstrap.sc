@@ -1,7 +1,7 @@
 import com.daml.lf.value.Value.ContractId
 import com.daml.network.codegen.java.cn.{directory => codegen}
 import com.daml.network.codegen.java.cn.{splitwell => splitwellCodegen}
-import com.daml.network.console.{DirectoryAppClientReference, WalletAppClientReference}
+import com.daml.network.console.{DirectoryExternalAppClientReference, WalletAppClientReference}
 import com.daml.network.console.LedgerApiExtensions._
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.CommandFailure
@@ -19,6 +19,9 @@ println("Waiting for validator initialization...")
 aliceValidator.waitForInitialization()
 bobValidator.waitForInitialization()
 
+println("Waiting for scan initialization...")
+sv1Scan.waitForInitialization()
+
 println("Uploading DAR files...")
 Seq(aliceValidator.participantClient, bobValidator.participantClient).foreach { p =>
   p.upload_dar_unless_exists("daml/splitwell/.daml/dist/splitwell-0.1.0.dar")
@@ -26,24 +29,11 @@ Seq(aliceValidator.participantClient, bobValidator.participantClient).foreach { 
 
 println("Onboarding users...")
 val charlieValidator = aliceValidator
+val charlieDirectory = aliceDirectory
 
 val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
 val bobUserParty = bobValidator.onboardUser(bobWallet.config.ledgerApiUser)
 val charlieUserParty = charlieValidator.onboardUser(charlieWallet.config.ledgerApiUser)
-
-println("Waiting for directory initialization...")
-`directory-app`.waitForInitialization()
-
-val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
-val bobRequestCid = bobDirectory.requestDirectoryInstall()
-val charlieRequestCid = charlieDirectory.requestDirectoryInstall()
-
-aliceValidator.participantClient.ledger_api_extensions.acs
-  .awaitJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
-bobValidator.participantClient.ledger_api_extensions.acs
-  .awaitJava(codegen.DirectoryInstall.COMPANION)(bobUserParty)
-charlieValidator.participantClient.ledger_api_extensions.acs
-  .awaitJava(codegen.DirectoryInstall.COMPANION)(charlieUserParty)
 
 println("Ensuring that directory entries are allocated correctly...")
 def ensureDirectoryEntry(
@@ -51,11 +41,11 @@ def ensureDirectoryEntry(
     name: String,
     url: String,
     description: String,
-    directory: DirectoryAppClientReference,
+    directory: DirectoryExternalAppClientReference,
     wallet: WalletAppClientReference,
 ) {
   try {
-    val nameUser = directory.lookupEntryByName(name).payload.user
+    val nameUser = sv1Scan.lookupEntryByName(name).payload.user
     if (nameUser == user.toProtoPrimitive) {
       println(s"CNS name \"$name\" already allocated to \"$user\". Doing nothing.")
     } else {
@@ -64,7 +54,7 @@ def ensureDirectoryEntry(
   } catch {
     case e: CommandFailure => {
       println(s"Requesting CNS name \"$name\" for user \"$user\".")
-      directory.requestDirectoryEntry(name, url, description)
+      directory.createDirectoryEntry(name, url, description)
       println("Waiting for wallet initialization to complete")
       wallet.waitForInitialization()
       println("Wallet initialization complete, tapping coin")

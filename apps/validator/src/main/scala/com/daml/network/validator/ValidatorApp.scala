@@ -63,7 +63,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import com.daml.network.directory.admin.http.HttpExternalDirectoryHandler
+import com.daml.network.validator.admin.http.HttpExternalDirectoryHandler
 import com.daml.network.http.v0.external.directory.DirectoryResource
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequencer
 import com.daml.nonempty.NonEmpty

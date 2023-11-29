@@ -13,7 +13,6 @@ images := \
 	sv-web-ui \
 	scan-app \
 	scan-web-ui \
-	directory-app \
 	wallet-web-ui \
 	validator-app \
 	splitwell-app \

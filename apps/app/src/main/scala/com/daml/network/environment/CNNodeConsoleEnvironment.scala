@@ -1,11 +1,11 @@
 package com.daml.network.environment
 
 import com.daml.network.console.*
-import com.daml.network.directory.config.DirectoryAppExternalClientConfig
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvAppClientConfig
 import com.daml.network.util.ResourceTemplateDecoder
 import com.daml.network.validator.config.AppManagerAppClientConfig
+import com.daml.network.validator.config.DirectoryAppExternalClientConfig
 import com.daml.network.validator.config.ValidatorAppClientConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
@@ -105,13 +105,11 @@ class CNNodeConsoleEnvironment(
     mergeLocalCNNodeInstances(
       svs.local,
       scans.local,
-      directories.local,
       validators.local.filter(v => v.name.startsWith("sv")),
     ),
     mergeRemoteCNNodeInstances(
       svs.remote,
       scans.remote,
-      directories.remote,
       validators.remote.filter(v => v.name.startsWith("sv")),
     ),
   )
@@ -122,20 +120,18 @@ class CNNodeConsoleEnvironment(
       svs.local.filter(sv => sv.name == "sv1"),
       scans.local.filter(sv => sv.name == "sv1Scan"),
       validators.local.filter(v => v.name == "sv1Validator"),
-      directories.local,
     ),
     mergeRemoteCNNodeInstances(
       svs.remote.filter(sv => sv.name == "sv1"),
       scans.remote.filter(sv => sv.name == "sv1Scan"),
       validators.remote.filter(v => v.name == "sv1Validator"),
-      directories.remote,
     ),
   )
 
   /* Local apps that are (in the target deployment) operated by a self-hosted validator */
   lazy val appsHostedByValidator = NodeReferences(
     validators.local,
-    mergeRemoteCNNodeInstances(validators.remote, wallets),
+    mergeRemoteCNNodeInstances(validators.remote, wallets, externalDirectories),
   )
 
   /* Local apps that are (in the target deployment) operated by a third party */
@@ -182,20 +178,6 @@ class CNNodeConsoleEnvironment(
     environment.config.directoryAppExternalClients.toSeq
       .map(createDirectoryExternalAppClientReference)
 
-  lazy val directories: NodeReferences[
-    DirectoryAppReference,
-    DirectoryAppClientReference,
-    DirectoryAppBackendReference,
-  ] =
-    NodeReferences(
-      environment.config.directoriesByString.keys
-        .map(createDirectoryReference)
-        .toSeq,
-      environment.config.directoryClientsByString.keys
-        .map(createDirectoryClientReference)
-        .toSeq,
-    )
-
   lazy val splitwells: NodeReferences[
     SplitwellAppReference,
     SplitwellAppClientReference,
@@ -239,16 +221,6 @@ class CNNodeConsoleEnvironment(
       conf: (InstanceName, AppManagerAppClientConfig)
   ): AppManagerAppClientReference =
     new AppManagerAppClientReference(this, conf._1.unwrap, conf._2)
-
-  private def createDirectoryReference(name: String): DirectoryAppBackendReference =
-    new DirectoryAppBackendReference(this, name)
-
-  private def createDirectoryClientReference(name: String): DirectoryAppClientReference =
-    new DirectoryAppClientReference(
-      this,
-      name,
-      this.environment.config.directoryClientsByString(name),
-    )
 
   private def createDirectoryExternalAppClientReference(
       conf: (
@@ -326,23 +298,7 @@ class CNNodeConsoleEnvironment(
         appManagers,
         Seq("App References"),
       ) :++
-      directories.local.map(v =>
-        TopLevelValue(
-          v.name,
-          helpText("local directory app", v.name),
-          v,
-          Seq("App References"),
-        )
-      ) :+ TopLevelValue(
-        "directories",
-        helpText(
-          "All local directory app instances" + genericNodeReferencesDoc,
-          "Directory apps",
-        ),
-        directories.local,
-        Seq("App References"),
-      ) :++
-      directories.remote.map(v =>
+      externalDirectories.map(v =>
         TopLevelValue(
           v.name,
           helpText("directory app clients", v.name),
@@ -355,7 +311,7 @@ class CNNodeConsoleEnvironment(
           "All directory app client instances" + genericNodeReferencesDoc,
           "directory app clients",
         ),
-        directories.remote,
+        externalDirectories,
         Seq("App References"),
       ) :++ splitwells.local.map(v =>
         TopLevelValue(v.name, helpText("local splitwell app", v.name), v, Seq("App References"))

@@ -2,11 +2,6 @@ package com.daml.network.config
 
 import org.apache.pekko.http.scaladsl.model.Uri
 import com.daml.network.auth.AuthUtil
-import com.daml.network.directory.config.{
-  DirectoryAppBackendConfig,
-  DirectoryAppClientConfig,
-  DirectoryAppExternalClientConfig,
-}
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.splitwell.config.{
   SplitwellAppBackendConfig,
@@ -18,6 +13,7 @@ import com.daml.network.validator.config.{
   AppManagerConfig,
   AppManagerAppClientConfig,
   ValidatorAppBackendConfig,
+  DirectoryAppExternalClientConfig,
 }
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.DomainAlias
@@ -102,12 +98,8 @@ object CNNodeConfigTransforms {
       updateAllAppManagerAppClientConfigs_(c =>
         c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
       ),
-      updateDirectoryAppConfig(c => c.copy(svUser = s"${c.svUser}-$suffix")),
       updateAllSplitwellAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix")),
       updateAllRemoteSplitwellAppConfigs_(c =>
-        c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
-      ),
-      updateAllDirectoryAppClientConfigs_(c =>
         c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
       ),
       updateAllDirectoryAppExternalClientConfigs_(c =>
@@ -125,7 +117,6 @@ object CNNodeConfigTransforms {
         updateAllSvAppConfigs_(c => c.focus(_.automation).modify(transform)),
         updateAllScanAppConfigs_(c => c.focus(_.automation).modify(transform)),
         updateAllValidatorConfigs_(c => c.focus(_.automation).modify(transform)),
-        updateDirectoryAppConfig(c => c.focus(_.automation).modify(transform)),
         updateAllSplitwellAppConfigs_(c => c.focus(_.automation).modify(transform)),
       )
       transforms.foldLeft(config)((c, tf) => tf(c))
@@ -172,8 +163,6 @@ object CNNodeConfigTransforms {
   }
 
   type CnAppConfigTransform[A] = A => A
-  type DirectoryAppTransform = CnAppConfigTransform[DirectoryAppBackendConfig]
-  type DirectoryClientConfigReader = CnAppConfigTransform[DirectoryAppClientConfig]
   type DirectoryExternalClientConfigReader = CnAppConfigTransform[DirectoryAppExternalClientConfig]
   type ValidatorAppTransform = CnAppConfigTransform[ValidatorAppBackendConfig]
   type WalletAppClientTransform = CnAppConfigTransform[WalletAppClientConfig]
@@ -189,22 +178,6 @@ object CNNodeConfigTransforms {
         updateAllSvAppFoundCollectiveConfigs_(c => c.focus(_.initialCoinPrice).replace(price)),
         updateAllSvAppConfigs_(c => c.focus(_.initialCoinPriceVote).replace(Some(price))),
       ).foldLeft(config)((c, tf) => tf(c))
-
-  def updateDirectoryAppConfig(update: DirectoryAppTransform): CNNodeConfigTransform =
-    cantonConfig =>
-      cantonConfig
-        .focus(_.directoryApp)
-        .replace(cantonConfig.directoryApp match {
-          case None => None
-          case Some(directoryApp) => Some(update(directoryApp))
-        })
-
-  def updateAllDirectoryAppClientConfigs_(
-      update: DirectoryClientConfigReader
-  ): CNNodeConfigTransform =
-    _.focus(_.directoryAppClients).modify(_.map { case (name, config) =>
-      (name, update(config))
-    })
 
   def updateAllWalletAppClientConfigs_(
       update: WalletAppClientTransform
@@ -379,9 +352,6 @@ object CNNodeConfigTransforms {
         _.focus(_.participantClient)
           .modify(portTransform(bump, _))
       ),
-      updateDirectoryAppConfig(
-        _.focus(_.participantClient).modify(portTransform(bump, _))
-      ),
       updateAllSplitwellAppConfigs_(
         _.focus(_.participantClient).modify(portTransform(bump, _))
       ),
@@ -389,12 +359,6 @@ object CNNodeConfigTransforms {
 
     transforms.foldLeft((c: CNNodeConfig) => c)((f, tf) => f compose tf)
 
-  }
-
-  def bumpDirectoryClientsPortsBy(bump: Int): CNNodeConfigTransform = {
-    updateAllDirectoryAppClientConfigs_(
-      _.focus(_.ledgerApi).modify(portTransform(bump, _))
-    )
   }
 
   def bumpRemoteSplitwellPortsBy(bump: Int): CNNodeConfigTransform = {
@@ -469,12 +433,6 @@ object CNNodeConfigTransforms {
       updateAllScanAppConfigs_(c => {
         c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.svUser, _))
       }),
-      updateDirectoryAppConfig(c => {
-        c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.svUser, _))
-      }),
-      updateAllDirectoryAppClientConfigs_(c => {
-        c.focus(_.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
-      }),
       updateAllSplitwellAppConfigs_(c => {
         c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.providerUser, _))
       }),
@@ -534,11 +492,6 @@ object CNNodeConfigTransforms {
       ) => CNDbConfig
   ): CNNodeConfigTransform = { config =>
     val transforms: Seq[CNNodeConfigTransform] = Seq(
-      updateDirectoryAppConfig { config =>
-        config
-          .focus(_.storage)
-          .modify(storage => storageConfigModifier("directory_app", storage))
-      },
       updateAllValidatorConfigs((name, config) =>
         config
           .focus(_.storage)

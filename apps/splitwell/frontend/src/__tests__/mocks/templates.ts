@@ -1,4 +1,4 @@
-import { Contract } from 'directory-openapi';
+import { Contract } from 'scan-openapi';
 
 import {
   AcceptedGroupInvite,

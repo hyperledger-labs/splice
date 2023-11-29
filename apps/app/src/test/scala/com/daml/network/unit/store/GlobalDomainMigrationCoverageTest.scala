@@ -96,7 +96,6 @@ class GlobalDomainMigrationCoverageTest
 }
 
 object GlobalDomainMigrationCoverageTest {
-  import directory.store.DirectoryStore
   import scan.store.ScanStore
   import sv.store.{SvStore, SvSvStore, SvSvcStore}
   import validator.store.ValidatorStore
@@ -134,11 +133,6 @@ object GlobalDomainMigrationCoverageTest {
           UserWalletStore.Key(dummyParty, dummyParty, "irrelevant username", dummyParty)
         ),
         UserWalletStore.templatesMovedByMyAutomation,
-      ),
-      (
-        DirectoryStore,
-        DirectoryStore.contractFilter(dummyParty),
-        DirectoryStore.templatesMovedByMyAutomation,
       ),
       (ScanStore, ScanStore.contractFilter(dummyParty), Seq.empty),
     )
