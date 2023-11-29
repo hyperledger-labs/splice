@@ -371,11 +371,43 @@
       "namespace": "istio-system",
       "repositoryOpts": {
         "repo": "https://istio-release.storage.googleapis.com/charts"
-      }
+      },
+      "version": "1.20.0"
     },
     "name": "istio-base",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "monitoring.coreos.com/v1",
+      "kind": "PodMonitor",
+      "metadata": {
+        "name": "istio-gateway-monitor",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "namespaceSelector": {
+          "any": true
+        },
+        "podMetricsEndpoints": [
+          {
+            "path": "/stats/prometheus",
+            "port": "http-envoy-prom"
+          }
+        ],
+        "selector": {
+          "matchLabels": {
+            "istio": "ingress"
+          }
+        }
+      }
+    },
+    "name": "istio-gateway-monitor",
+    "provider": "",
+    "type": "kubernetes:monitoring.coreos.com/v1:PodMonitor"
   },
   {
     "custom": true,
@@ -572,11 +604,43 @@
             }
           ]
         }
-      }
+      },
+      "version": "1.20.0"
     },
     "name": "istio-ingress",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "monitoring.coreos.com/v1",
+      "kind": "PodMonitor",
+      "metadata": {
+        "name": "istio-sidecar-monitor",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "namespaceSelector": {
+          "any": true
+        },
+        "podMetricsEndpoints": [
+          {
+            "path": "/stats/prometheus",
+            "port": "http-envoy-prom"
+          }
+        ],
+        "selector": {
+          "matchLabels": {
+            "security.istio.io/tlsMode": "istio"
+          }
+        }
+      }
+    },
+    "name": "istio-sidecar-monitor",
+    "provider": "",
+    "type": "kubernetes:monitoring.coreos.com/v1:PodMonitor"
   },
   {
     "custom": true,
@@ -596,6 +660,36 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "monitoring.coreos.com/v1",
+      "kind": "ServiceMonitor",
+      "metadata": {
+        "name": "istiod-service-monitor",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "endpoints": [
+          {
+            "port": "http-monitoring"
+          }
+        ],
+        "namespaceSelector": {
+          "any": true
+        },
+        "selector": {
+          "matchLabels": {
+            "istio": "pilot"
+          }
+        }
+      }
+    },
+    "name": "istiod-service-monitor",
+    "provider": "",
+    "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "istiod",
       "compat": "true",
       "name": "istiod",
@@ -608,9 +702,11 @@
           "istioNamespace": "cluster-ingress"
         },
         "meshConfig": {
-          "accessLogFile": "/dev/stdout"
+          "accessLogFile": "/dev/stdout",
+          "enablePrometheusMerge": false
         }
-      }
+      },
+      "version": "1.20.0"
     },
     "name": "istiod",
     "provider": "",
@@ -671,6 +767,58 @@
         "grafana": {
           "adminPassword": "canton_network_!password",
           "adminUser": "cn-admin",
+          "dashboardProviders": {
+            "dashboardproviders.yaml": {
+              "apiVersion": 1,
+              "providers": [
+                {
+                  "disableDeletion": false,
+                  "editable": true,
+                  "folder": "Istio",
+                  "name": "istio",
+                  "options": {
+                    "path": "/var/lib/grafana/dashboards/istio"
+                  },
+                  "orgId": 1,
+                  "type": "file"
+                }
+              ]
+            }
+          },
+          "dashboards": {
+            "istio": {
+              "control_plane": {
+                "datasource": "Prometheus",
+                "gnetId": 7645,
+                "revision": 188
+              },
+              "mesh": {
+                "datasource": "Prometheus",
+                "gnetId": 7639,
+                "revision": 188
+              },
+              "performance": {
+                "datasource": "Prometheus",
+                "gnetId": 11829,
+                "revision": 188
+              },
+              "service": {
+                "datasource": "Prometheus",
+                "gnetId": 7636,
+                "revision": 188
+              },
+              "wasm": {
+                "datasource": "Prometheus",
+                "gnetId": 13277,
+                "revision": 145
+              },
+              "workload": {
+                "datasource": "Prometheus",
+                "gnetId": 7630,
+                "revision": 188
+              }
+            }
+          },
           "fullnameOverride": "grafana",
           "grafana.ini": {
             "server": {
@@ -685,6 +833,7 @@
               "enabled": true
             },
             "dashboards": {
+              "enabled": true,
               "folderAnnotation": "folder",
               "provider": {
                 "allowUiUpdates": true,

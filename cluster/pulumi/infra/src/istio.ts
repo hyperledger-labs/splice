@@ -1,8 +1,18 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import { PodMonitor, ServiceMonitor } from 'cn-pulumi-common/src/metrics';
 
 import { loadIPRanges } from '../../common';
 import { clusterBasename } from './config';
+
+export const istioVersion = {
+  istio: '1.20.0',
+  //   updated from https://grafana.com/orgs/istio/dashboards, must be updated on each istio version
+  dashboards: {
+    general: 188,
+    wasm: 145,
+  },
+};
 
 function configureIstioBase(ns: k8s.core.v1.Namespace): k8s.helm.v3.Release {
   return new k8s.helm.v3.Release(
@@ -10,6 +20,7 @@ function configureIstioBase(ns: k8s.core.v1.Namespace): k8s.helm.v3.Release {
     {
       name: 'istio-base',
       chart: 'base',
+      version: istioVersion.istio,
       namespace: ns.metadata.name,
       repositoryOpts: {
         repo: 'https://istio-release.storage.googleapis.com/charts',
@@ -25,11 +36,12 @@ function configureIstiod(
   ingressNs: k8s.core.v1.Namespace,
   base: k8s.helm.v3.Release
 ): k8s.helm.v3.Release {
-  return new k8s.helm.v3.Release(
+  const istiodRelease = new k8s.helm.v3.Release(
     'istiod',
     {
       name: 'istiod',
       chart: 'istiod',
+      version: istioVersion.istio,
       namespace: ingressNs.metadata.name,
       repositoryOpts: {
         repo: 'https://istio-release.storage.googleapis.com/charts',
@@ -41,6 +53,8 @@ function configureIstiod(
         meshConfig: {
           // Turns on envoy logging
           accessLogFile: '/dev/stdout',
+          // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging disable as we don't use annotations
+          enablePrometheusMerge: false,
         },
       },
     },
@@ -48,6 +62,16 @@ function configureIstiod(
       dependsOn: [ingressNs, base],
     }
   );
+  new ServiceMonitor(
+    'istiod-service-monitor',
+    {
+      istio: 'pilot',
+    },
+    'http-monitoring',
+    ingressNs.metadata.name,
+    { dependsOn: istiodRelease }
+  );
+  return istiodRelease;
 }
 
 function ingressPort(
@@ -71,11 +95,12 @@ function configureGatewayService(
   istiod: k8s.helm.v3.Release
 ) {
   const externalIPRanges = loadIPRanges();
-  return new k8s.helm.v3.Release(
+  const gateway = new k8s.helm.v3.Release(
     'istio-ingress',
     {
       name: 'istio-ingress',
       chart: 'gateway',
+      version: istioVersion.istio,
       namespace: ingressNs.metadata.name,
       repositoryOpts: {
         repo: 'https://istio-release.storage.googleapis.com/charts',
@@ -119,6 +144,29 @@ function configureGatewayService(
       dependsOn: [ingressNs, istiod],
     }
   );
+  new PodMonitor(
+    'istio-sidecar-monitor',
+    {
+      'security.istio.io/tlsMode': 'istio',
+    },
+    [{ port: 'http-envoy-prom', path: '/stats/prometheus' }],
+    ingressNs.metadata.name,
+    {
+      dependsOn: [gateway],
+    }
+  );
+  new PodMonitor(
+    'istio-gateway-monitor',
+    {
+      istio: 'ingress',
+    },
+    [{ port: 'http-envoy-prom', path: '/stats/prometheus' }],
+    ingressNs.metadata.name,
+    {
+      dependsOn: [gateway],
+    }
+  );
+  return gateway;
 }
 
 function configureGateway(

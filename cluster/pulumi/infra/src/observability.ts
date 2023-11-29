@@ -8,6 +8,7 @@ import { REPO_ROOT } from 'cn-pulumi-common';
 
 import { clusterBasename } from './config';
 import { createGrafanaDashboards } from './grafana-dashboards';
+import { istioVersion } from './istio';
 
 function istioVirtualService(
   ns: k8s.core.v1.Namespace,
@@ -141,8 +142,61 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
         ingress: {
           enabled: false,
         },
+        dashboardProviders: {
+          'dashboardproviders.yaml': {
+            apiVersion: 1,
+            providers: [
+              {
+                name: 'istio',
+                orgId: 1,
+                folder: 'Istio',
+                type: 'file',
+                disableDeletion: false,
+                editable: true,
+                options: {
+                  path: '/var/lib/grafana/dashboards/istio',
+                },
+              },
+            ],
+          },
+        },
+        dashboards: {
+          istio: {
+            control_plane: {
+              gnetId: 7645,
+              datasource: 'Prometheus',
+              revision: istioVersion.dashboards.general,
+            },
+            mesh: {
+              gnetId: 7639,
+              datasource: 'Prometheus',
+              revision: istioVersion.dashboards.general,
+            },
+            performance: {
+              gnetId: 11829,
+              datasource: 'Prometheus',
+              revision: istioVersion.dashboards.general,
+            },
+            service: {
+              gnetId: 7636,
+              datasource: 'Prometheus',
+              revision: istioVersion.dashboards.general,
+            },
+            workload: {
+              gnetId: 7630,
+              datasource: 'Prometheus',
+              revision: istioVersion.dashboards.general,
+            },
+            wasm: {
+              gnetId: 13277,
+              datasource: 'Prometheus',
+              revision: istioVersion.dashboards.wasm,
+            },
+          },
+        },
         sidecar: {
           dashboards: {
+            enabled: true,
             folderAnnotation: 'folder',
             provider: { foldersFromFilesStructure: true, allowUiUpdates: true },
           },
