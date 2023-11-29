@@ -1193,6 +1193,7 @@ jobs:
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "Test/compile lint"
+          cmd_retry_count: 3
       - run_todo_script
       - cleanup_sbt_test_job
       - collect_test_timings_and_send_to_datadog
@@ -1303,6 +1304,7 @@ jobs:
       - execute_sbt_command:
           # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
           cmd: "Test/compile bundle"
+          cmd_retry_count: 3
       - run:
           name: Copy bundle
           command: |
@@ -1639,6 +1641,7 @@ jobs:
           # TODO(#6153): we bumped this up to allow nix to rebuild everything if needed.
           # Instead, we should fetch the correct nix cache and avoid those rebuilds
           no_output_timeout: "20m"
+          cmd_retry_count: 3
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - run_bash_command_in_nix:
@@ -1756,6 +1759,7 @@ jobs:
       - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
+          cmd_retry_count: 3
       - run_bash_command_in_nix:
           cmd_name: wait for sv-runbook deployment to finish
           cluster: << parameters.cluster >>
@@ -1856,6 +1860,7 @@ jobs:
       - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
+          cmd_retry_count: 3
       - run_bash_command_in_nix:
           cmd_name: wait for validator-runbook deployment to finish
           cluster: << parameters.cluster >>
