@@ -322,7 +322,6 @@ function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): Persi
   const dbNameO = pulumi.Output.create(dbName);
   return {
     host: postgresDb.address,
-    password: postgresDb.password,
     databaseName: dbNameO,
     schema: dbNameO,
     user: pulumi.Output.create('cnadmin'),

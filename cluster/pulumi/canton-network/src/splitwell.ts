@@ -59,7 +59,6 @@ export async function installSplitwell(
     'cn-splitwell-app',
     {
       postgres: postgresDb.address,
-      postgresPassword: postgresDb.password,
       metrics: {
         enable: true,
       },
@@ -102,7 +101,6 @@ export async function installSplitwell(
     svValidator: false,
     persistenceConfig: {
       host: postgresDb.address,
-      password: postgresDb.password,
       databaseName: pulumi.Output.create(validatorDbName),
       schema: pulumi.Output.create(validatorDbName),
       user: pulumi.Output.create('cnadmin'),

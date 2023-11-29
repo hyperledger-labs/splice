@@ -32,8 +32,8 @@ spec:
             - name: CANTON_DOMAIN_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: "{{ .Release.Name }}-secrets"
-                  key: cantonDomainPostgresPassword
+                  name: "postgres-secrets"
+                  key: postgresPassword
         {{- if .Values.postgresSequencerDb }}
             - name: CANTON_SEQUENCER_POSTGRES_DB
               value: {{ .Values.postgresSequencerDb }}
@@ -44,8 +44,8 @@ spec:
             - name: SEQUENCER_DRIVER_DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: "{{ .Release.Name }}-secrets"
-                  key: sequencerDriverPostgresPassword
+                  name: "postgres-secrets"
+                  key: postgresPassword
         {{- else if eq .Values.sequencerDriver.type "cometbft"}}
             - name: SEQUENCER_DRIVER_COMETBFT_HOST
               value: {{ .Values.sequencerDriver.host }}

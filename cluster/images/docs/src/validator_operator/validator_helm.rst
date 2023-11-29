@@ -78,6 +78,21 @@ Create the application namespace within Kubernetes and ensure it has image pull 
     kubectl patch serviceaccount default -n validator \
         -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
 
+.. _validator-postgres-auth:
+
+Configuring PostgreSQL authentication
+-------------------------------------
+
+The PostgreSQL instance that the helm charts create, and all apps that depend on it, require the user's password to be set through Kubernetes secrets.
+Currently, all apps use the Postgres user ``cnadmin``.
+The password can be setup with the following command, assuming you set the environment variable ``POSTGRES_PASSWORD`` to a secure value:
+
+.. code-block:: bash
+
+    kubectl create secret generic postgres-secrets \
+        --from-literal=postgresPassword=${POSTGRES_PASSWORD} \
+        -n validator
+
 Preparing for Validator Onboarding
 ----------------------------------
 
@@ -303,7 +318,6 @@ Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-val
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
-- Optionally, you might want to modify the `postgresPassword` entry setting it to a secure value. If you do that, remember to change it in ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values.yaml`` too.
 
 To configure the validator app, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
 
@@ -312,7 +326,6 @@ To configure the validator app, please modify the file ``cn-node-0.1.0-SNAPSHOT/
 - If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
 - Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the validator operator party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
-- Replace `persistence.password` with the value you set in ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values.yaml``.
 
 You also need to specify a URL for the an existing SV that will sponsor the onboarding of your validator. To do so, please update the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml`` by replacing ``SPONSOR_SV_URL`` with this URL, e.g. ``https://sv.sv-1.svc.dev.network.canton.global``
 
@@ -351,7 +364,7 @@ reaches a stable state prior to moving on to the next step.
 .. code-block:: bash
 
     helm repo update
-    helm install postgres canton-network-helm/cn-postgres -n validator --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values.yaml --wait
+    helm install postgres canton-network-helm/cn-postgres -n validator --version ${CHART_VERSION} --wait
     helm install participant canton-network-helm/cn-participant -n validator --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-participant-values.yaml --wait
     helm install validator canton-network-helm/cn-validator -n validator --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml --wait
 

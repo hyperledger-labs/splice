@@ -6,8 +6,6 @@
 {{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
 {{ $_ := required ".Values.globalDomainUrl is required." .Values.globalDomainUrl }}
 
-{{ $_ := required ".Values.persistence.password is required." .Values.persistence.password }}
-
 {{- if (.Values.topup).enabled }}
 {{ $_ := required ".Values.topup.targetThroughput is required when topup is enabled." .Values.topup.targetThroughput }}
 {{ $_ := required ".Values.topup.minTopupInterval is required when topup is enabled." .Values.topup.minTopupInterval }}

@@ -139,3 +139,26 @@ export function svKeySecret(ns: ExactNamespace, keys: CnInput<SvIdKey>): k8s.cor
     }
   );
 }
+
+export function installPostgresPasswordSecret(
+  ns: ExactNamespace,
+  password: pulumi.Output<string>
+): k8s.core.v1.Secret {
+  const secretName = 'postgres-secrets';
+  return new k8s.core.v1.Secret(
+    `cn-app-${ns.logicalName}-${secretName}`,
+    {
+      metadata: {
+        name: secretName,
+        namespace: ns.logicalName,
+      },
+      type: 'Opaque',
+      data: {
+        postgresPassword: password.apply(p => btoa(p || '')), // password is undefined in dump-config
+      },
+    },
+    {
+      dependsOn: [ns.ns],
+    }
+  );
+}

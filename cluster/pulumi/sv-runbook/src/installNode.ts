@@ -30,6 +30,7 @@ import {
   installLoopback,
   imagePullSecret,
   CnInput,
+  installPostgresPasswordSecret,
 } from 'cn-pulumi-common';
 
 import { auth0Cfg } from './auth0cfg';
@@ -102,6 +103,7 @@ export async function installNode(
     overrideSpecial: '_%@',
     special: true,
   }).result;
+  const passwordSecret = installPostgresPasswordSecret(xns, password);
 
   const svKey = svKeyFromSecret('sv');
 
@@ -112,7 +114,6 @@ export async function installNode(
 
   const { sv, validator } = await installSvAndValidator({
     xns,
-    password,
     participantBootstrapDumpSecret,
     auth0Client,
     imagePullDeps,
@@ -124,6 +125,7 @@ export async function installNode(
     onboardingName: svAppConfig.onboardingName,
     cometBftConnectionUri: svAppConfig.cometBftConnectionUri,
     validatorWalletUserName: validatorAppConfig.walletUserName,
+    otherDeps: [passwordSecret],
   });
 
   const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
@@ -150,8 +152,8 @@ type SvConfig = {
   backupConfig?: BackupConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
-  password: pulumi.Output<string>;
   imagePullDeps: CnInput<pulumi.Resource>[];
+  otherDeps: pulumi.Resource[];
   loopback: k8s.helm.v3.Release | null;
   backupConfigSecret?: pulumi.Resource;
   svKey: CnInput<SvIdKey>;
@@ -163,11 +165,11 @@ type SvConfig = {
 async function installSvAndValidator(config: SvConfig) {
   const {
     xns,
-    password,
     participantBootstrapDumpSecret,
     topupConfig,
     auth0Client,
     imagePullDeps,
+    otherDeps,
     loopback,
     backupConfigSecret,
     backupConfig,
@@ -181,16 +183,14 @@ async function installSvAndValidator(config: SvConfig) {
     xns,
     'postgres',
     'cn-postgres',
-    {
-      postgresPassword: password,
-    },
+    {},
     localCharts,
-    version
+    version,
+    otherDeps
   );
 
   const globalDomain = installGlobalDomainNode(
     xns,
-    password,
     onboardingName,
     imagePullDeps.concat([postgres])
   );
@@ -200,7 +200,6 @@ async function installSvAndValidator(config: SvConfig) {
       TARGET_CLUSTER: TARGET_CLUSTER,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
     }),
-    postgresPassword: password,
     disableAutoInit: !!participantBootstrapDumpSecret,
   };
 
@@ -250,25 +249,22 @@ async function installSvAndValidator(config: SvConfig) {
     ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv234NameSet.has(id.name))
     : allApprovedSvIdentities;
 
-  const svValues: ChartValues = addPersistencePassword(
-    {
-      ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`, {
-        TARGET_CLUSTER: TARGET_CLUSTER,
-        YOUR_SV_NAME: onboardingName,
-        OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
-        YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
-      }),
-      participantIdentitiesDumpImport: participantBootstrapDumpSecret
-        ? { secretName: participantBootstrapDumpSecretName }
-        : undefined,
-      approvedSvIdentities,
-      cometBFT: {
-        enabled: true,
-        connectionUri: cometBftConnectionUri,
-      },
+  const svValues: ChartValues = {
+    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`, {
+      TARGET_CLUSTER: TARGET_CLUSTER,
+      YOUR_SV_NAME: onboardingName,
+      OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+      YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
+    }),
+    participantIdentitiesDumpImport: participantBootstrapDumpSecret
+      ? { secretName: participantBootstrapDumpSecretName }
+      : undefined,
+    approvedSvIdentities,
+    cometBFT: {
+      enabled: true,
+      connectionUri: cometBftConnectionUri,
     },
-    password
-  );
+  };
 
   const svValuesWithSpecifiedAud: ChartValues = {
     ...svValues,
@@ -308,14 +304,11 @@ async function installSvAndValidator(config: SvConfig) {
       .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
   );
 
-  const scanValues: ChartValues = addPersistencePassword(
-    {
-      ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
-        TARGET_CLUSTER: TARGET_CLUSTER,
-      }),
-    },
-    password
-  );
+  const scanValues: ChartValues = {
+    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
+      TARGET_CLUSTER: TARGET_CLUSTER,
+    }),
+  };
 
   const scanValuesWithFixedTokens = {
     ...scanValues,
@@ -332,20 +325,15 @@ async function installSvAndValidator(config: SvConfig) {
     imagePullDeps.concat([sv, participant]).concat(svAppSecret)
   );
 
-  const validatorValues = addPersistencePassword(
-    {
-      ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
-        TARGET_CLUSTER: TARGET_CLUSTER,
-        OPERATOR_WALLET_USER_ID: validatorWalletUserName,
-        OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
-      }),
-      ...loadYamlFromFile(
-        `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`
-      ),
-      participantIdentitiesDumpPeriodicBackup: backupConfig,
-    },
-    password
-  );
+  const validatorValues = {
+    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
+      TARGET_CLUSTER: TARGET_CLUSTER,
+      OPERATOR_WALLET_USER_ID: validatorWalletUserName,
+      OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+    }),
+    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),
+    participantIdentitiesDumpPeriodicBackup: backupConfig,
+  };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {
     ...validatorValues,
@@ -381,10 +369,4 @@ async function installSvAndValidator(config: SvConfig) {
   );
 
   return { sv, validator };
-}
-
-function addPersistencePassword(values: ChartValues, password: pulumi.Output<string>): ChartValues {
-  const oldPersistence = values.persistence;
-  const newPersistence = { ...oldPersistence, password: password };
-  return { ...values, persistence: newPersistence };
 }

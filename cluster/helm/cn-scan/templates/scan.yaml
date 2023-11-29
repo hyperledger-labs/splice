@@ -36,10 +36,15 @@ spec:
                   serverName = "{{ .host }}"
                   portNumber = {{ .port }}
                   user = "{{ .user }}"
-                  password = "{{ .password }}"
+                  password = ${CN_APP_POSTGRES_PASSWORD}
                 }
               }
             }
+        - name: CN_APP_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "postgres-secrets"
+              key: postgresPassword
         {{- end }}
         {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         - name: CN_APP_SCAN_PARTICIPANT_ADDRESS

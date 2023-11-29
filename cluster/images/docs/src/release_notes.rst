@@ -8,6 +8,9 @@ Release Notes
 
 * The party representing the supervalidator collective is renamed from ``svc::...`` to ``SVC::...``, for consistency with SV party names.
 
+* The password for the PostgreSQL database is now set in Kubernetes secrets as opposed to Helm values files.
+  Please refer to the updated documentation on ``Configuring PostgreSQL authentication`` for :ref:`SV operators <sv-postgres-auth>` and :ref:`Validator operators <validator-postgres-auth>`.
+
 * Documentation:
 
   * Clarify that using custom auth audiences is recommended.

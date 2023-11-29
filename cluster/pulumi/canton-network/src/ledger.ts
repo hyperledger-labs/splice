@@ -26,7 +26,6 @@ export function installDomain(
     'cn-domain',
     {
       postgres: postgres.address,
-      postgresPassword: postgres.password,
       postgresMediatorDb: mediatorDbName,
       postgresSequencerDb: sequencerDbName,
       additionalJvmOptions: jmxOptions(),
@@ -56,7 +55,6 @@ export function installGlobalDomain(
     'cn-global-domain',
     {
       postgres: postgres.address,
-      postgresPassword: postgres.password,
       postgresMediatorDb: mediatorDbName,
       postgresSequencerDb: sequencerDbName,
       sequencerDriver:
@@ -69,7 +67,6 @@ export function installGlobalDomain(
           : {
               type: sequencer.driver,
               address: sequencer.postgres.address,
-              password: sequencer.postgres.password,
             },
       metrics: {
         enable: true,
@@ -99,7 +96,6 @@ export function installParticipant(
     'cn-participant',
     {
       postgres: postgres.address,
-      postgresPassword: postgres.password,
       postgresDb: postgresDbName,
       postgresSchema: postgresDbName,
       participantAdminUserNameFrom,

@@ -101,6 +101,28 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-secrets",
+        "namespace": "validator"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator-postgres-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "secret": "dmFsaWRhdG9yc2VjcmV0"
         }
       },
@@ -233,7 +255,9 @@
           }
         },
         "participantAddress": "participant",
-        "persistence": {},
+        "persistence": {
+          "password": "POSTGRES_USER_PASSWORD"
+        },
         "scanAddress": "https://scan.sv-1.svc.validatorrun.network.com.network.canton.global",
         "svSponsorAddress": "https://sv.sv-1.svc.validatorrun.network.canton.global",
         "topup": {

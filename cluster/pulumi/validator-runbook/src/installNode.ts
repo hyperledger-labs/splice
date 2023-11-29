@@ -24,6 +24,7 @@ import {
   installLoopback,
   imagePullSecret,
   CnInput,
+  installPostgresPasswordSecret,
 } from 'cn-pulumi-common';
 import { exit } from 'process';
 
@@ -91,6 +92,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     overrideSpecial: '_%@',
     special: true,
   }).result;
+  const passwordSecret = installPostgresPasswordSecret(xns, password);
 
   const topupConfig: ValidatorTopupConfig = {
     targetThroughput: domainFeesConfig.targetThroughput,
@@ -100,7 +102,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   const validator = await installValidator({
     xns,
     onboardingSecret,
-    password,
     participantBootstrapDumpSecret,
     auth0Client,
     imagePullDeps,
@@ -108,6 +109,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     backupConfigSecret,
     backupConfig,
     topupConfig,
+    otherDeps: [passwordSecret],
   });
 
   const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
@@ -138,8 +140,8 @@ type ValidatorConfig = {
   backupConfig?: BackupConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
-  password: pulumi.Output<string>;
   imagePullDeps: CnInput<pulumi.Resource>[];
+  otherDeps: CnInput<pulumi.Resource>[];
   loopback: k8s.helm.v3.Release | null;
   backupConfigSecret?: pulumi.Resource;
 };
@@ -148,10 +150,10 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
   const {
     xns,
     onboardingSecret,
-    password,
     participantBootstrapDumpSecret,
     auth0Client,
     imagePullDeps,
+    otherDeps,
     loopback,
     backupConfigSecret,
     backupConfig,
@@ -162,11 +164,10 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     xns,
     'postgres',
     'cn-postgres',
-    {
-      postgresPassword: password,
-    },
+    {},
     localCharts,
-    version
+    version,
+    otherDeps
   );
 
   const participantValues: ChartValues = {
@@ -178,7 +179,6 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
       {}
     ),
-    postgresPassword: password,
     disableAutoInit: !!participantBootstrapDumpSecret,
   };
 
@@ -212,23 +212,20 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     walletUIClientId
   );
 
-  const validatorValues = addPersistencePassword(
-    {
-      ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
-        TARGET_CLUSTER: TARGET_CLUSTER,
-        OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
-        OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
-      }),
-      ...loadYamlFromFile(
-        `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
-        {
-          SPONSOR_SV_URL: `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
-        }
-      ),
-      participantIdentitiesDumpPeriodicBackup: backupConfig,
-    },
-    password
-  );
+  const validatorValues = {
+    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
+      TARGET_CLUSTER: TARGET_CLUSTER,
+      OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
+      OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+    }),
+    ...loadYamlFromFile(
+      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
+      {
+        SPONSOR_SV_URL: `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
+      }
+    ),
+    participantIdentitiesDumpPeriodicBackup: backupConfig,
+  };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {
     ...validatorValues,
@@ -270,10 +267,4 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
   );
 
   return validator;
-}
-
-function addPersistencePassword(values: ChartValues, password: pulumi.Output<string>): ChartValues {
-  const oldPersistence = values.persistence;
-  const newPersistence = { ...oldPersistence, password: password };
-  return { ...values, persistence: newPersistence };
 }

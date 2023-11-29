@@ -867,9 +867,10 @@ one can connect to it for debug purposes. To do that, run `cncluster debug_shell
 This should get you a terminal in an Ubuntu pod running on the cluster, in which `psql` client is installed.
 
 You can then run, e.g. `psql -h <hostname> -U cnadmin -l` to list all databases in the Postgres server.
-The hostname and password can be found by describing the relevant pods that use the database you wish to connect to
-(e.g. using `kubectl describe pod -n sv-1 sv-app`) and/or secrets that hold the password
-(e.g. using `kubectl get secret participant-secrets -n sv-1 -o jsonpath='{.data.cantonParticipantPostgresPassword}' | base64 -d`).
+The hostname can be found by describing the relevant pods that use the database you wish to connect to,
+(e.g. using `kubectl describe pod -n sv-1 sv-app`).
+The password can be found in the `postgres-secrets` secret of the namespace:
+(e.g. using `kubectl get secret postgres-secrets -n sv-1 -o jsonpath='{.data.postgresPassword}' | base64 -d`).
 
 ### Checking Pod Node Assignments and Memory Usage
 

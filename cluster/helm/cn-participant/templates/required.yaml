@@ -6,7 +6,6 @@
 
 {{ $_ := required ".Values.defaultJvmOptions is required." .Values.defaultJvmOptions }}
 {{ $_ := required ".Values.postgres is required." .Values.postgres }}
-{{ $_ := required ".Values.postgresPassword is required." .Values.postgresPassword }}
 {{ $_ := required ".Values.postgresSchema is required." .Values.postgresSchema }}
 {{ $_ := required ".Values.participantAdminUserNameFrom is required." .Values.participantAdminUserNameFrom }}
 {{ $_ := required ".Values.auth.jwksUrl is required." .Values.auth.jwksUrl }}

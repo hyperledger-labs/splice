@@ -645,6 +645,28 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-secrets",
+        "namespace": "splitwell"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-splitwell-postgres-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "secret": "c3BsaXR3ZWxsc2VjcmV0"
         }
       },
@@ -656,6 +678,28 @@
       "type": "Opaque"
     },
     "name": "cn-app-splitwell-validator-onboarding-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-secrets",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-postgres-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -756,6 +800,28 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-secrets",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-2-postgres-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "private": "c3YzLWlkLXByaXZhdGUta2V5",
           "public": "c3YzLWlkLXB1YmxpYy1rZXk="
         }
@@ -779,6 +845,28 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-secrets",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-3-postgres-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "private": "c3Y0LWlkLXByaXZhdGUta2V5",
           "public": "c3Y0LWlkLXB1YmxpYy1rZXk="
         }
@@ -791,6 +879,50 @@
       "type": "Opaque"
     },
     "name": "cn-app-sv-4-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-secrets",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-4-postgres-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-secrets",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator1-postgres-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -2794,6 +2926,7 @@
         "persistence": {
           "databaseName": "sv_1",
           "host": "postgres.sv-1.svc.cluster.local",
+          "password": "POSTGRES_USER_PASSWORD",
           "port": 5432,
           "schema": "sv_1",
           "user": "cnadmin"
@@ -3725,6 +3858,7 @@
         "persistence": {
           "databaseName": "sv_2",
           "host": "postgres.sv-2.svc.cluster.local",
+          "password": "POSTGRES_USER_PASSWORD",
           "port": 5432,
           "schema": "sv_2",
           "user": "cnadmin"
@@ -4564,6 +4698,7 @@
         "persistence": {
           "databaseName": "sv_3",
           "host": "postgres.sv-3.svc.cluster.local",
+          "password": "POSTGRES_USER_PASSWORD",
           "port": 5432,
           "schema": "sv_3",
           "user": "cnadmin"
@@ -5403,6 +5538,7 @@
         "persistence": {
           "databaseName": "sv_4",
           "host": "postgres.sv-4.svc.cluster.local",
+          "password": "POSTGRES_USER_PASSWORD",
           "port": 5432,
           "schema": "sv_4",
           "user": "cnadmin"

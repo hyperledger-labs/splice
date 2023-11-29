@@ -1,5 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
-import { Output, Resource } from '@pulumi/pulumi';
+import { Resource } from '@pulumi/pulumi';
 import {
   ChartValues,
   CnInput,
@@ -14,7 +14,6 @@ import { localCharts, version } from './utils';
 
 export function installGlobalDomainNode(
   svNamespace: ExactNamespace,
-  postgresPassword: Output<string>,
   svName: string,
   dependencies: CnInput<Resource>[]
 ): k8s.helm.v3.Release {
@@ -25,7 +24,6 @@ export function installGlobalDomainNode(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
       {}
     ),
-    postgresPassword: postgresPassword,
   };
   return installCNRunbookHelmChart(
     svNamespace,

@@ -75,7 +75,6 @@ export async function installValidator1(
     onboardingSecret,
     persistenceConfig: {
       host: postgresDb.address,
-      password: postgresDb.password,
       databaseName: pulumi.Output.create(validatorDbName),
       schema: pulumi.Output.create(validatorDbName),
       user: pulumi.Output.create('cnadmin'),

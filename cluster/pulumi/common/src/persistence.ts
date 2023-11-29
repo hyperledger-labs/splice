@@ -6,5 +6,4 @@ export type PersistenceConfig = {
   databaseName: pulumi.Output<string>;
   schema: pulumi.Output<string>;
   user: pulumi.Output<string>;
-  password: pulumi.Output<string>;
 };
