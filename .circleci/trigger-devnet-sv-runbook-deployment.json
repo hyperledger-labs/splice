@@ -1,0 +1,18 @@
+{
+    "name": "DevNet SV Runbook Redeployment",
+    "description": "Daily DevNet SV Runbook Redeployment",
+    "attribution-actor": "system",
+    "parameters" : {
+      "branch": "deployment/devnet",
+      "run-job": "redeploy-sv-runbook-devnet"
+    },
+    "timetable" : {
+      "per-hour" : 1,
+      "hours-of-day": [
+        4
+      ],
+      "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
+      "days-of-month" : [ ],
+      "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
+    }
+}

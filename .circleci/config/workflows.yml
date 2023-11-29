@@ -905,6 +905,48 @@ workflows:
           requires:
             - deploy_sv_runbook
 
+  redeploy_sv_runbook_devnet:
+    when:
+      equal: [ redeploy-sv-runbook-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_devnet redeploy_sv_runbook_devnet devnet_health_check"
+      - deploy_sv_runbook:
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "devnet"
+          use_published_artifacts: false
+          requires:
+            - wait_for_previous_pipeline
+      - preflight_sv_check:
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "devnet"
+          wait_for_cluster_version: false
+          requires:
+            - deploy_sv_runbook
+
   auth0_user_cleanup:
     when:
       equal: [ auth0-user-cleanup, << pipeline.parameters.run-job >> ]

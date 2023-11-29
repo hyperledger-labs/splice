@@ -33,7 +33,8 @@ parameters:
     type: enum
     enum: [build, deploy-cidaily, deploy-cilr, deploy-devnet, deploy-testnet,
            healthcheck-cidaily, healthcheck-cidaily-testnet, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet,
-           redeploy-sv-runbook-cidaily, redeploy-sv-runbook-cilr, publish-public-artifacts, auth0-user-cleanup,
+           redeploy-sv-runbook-cidaily, redeploy-sv-runbook-cilr, redeploy-sv-runbook-devnet,
+           publish-public-artifacts, auth0-user-cleanup,
            cluster-lock-reaper, mark-for-testnet]
     default: build
   # Tag the current commit for the next DevNet release, overwriting the existing tag if it exists.
@@ -3208,6 +3209,48 @@ workflows:
             - datadog
             - slack-context
           cluster: "cilr"
+          wait_for_cluster_version: false
+          requires:
+            - deploy_sv_runbook
+
+  redeploy_sv_runbook_devnet:
+    when:
+      equal: [ redeploy-sv-runbook-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_devnet redeploy_sv_runbook_devnet devnet_health_check"
+      - deploy_sv_runbook:
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "devnet"
+          use_published_artifacts: false
+          requires:
+            - wait_for_previous_pipeline
+      - preflight_sv_check:
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "devnet"
           wait_for_cluster_version: false
           requires:
             - deploy_sv_runbook
