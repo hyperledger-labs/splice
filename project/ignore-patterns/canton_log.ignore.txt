@@ -41,9 +41,6 @@ GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)
 # We can't do log suppression for Canton, so instead we ignore this.
 NOT_FOUND/USER_NOT_FOUND.*: getting user failed for unknown user \\"sv_user\\".*invoked from sv-participant\.sc
 
-# TODO(#8124): Remove this once upstream changes permit us to do so
-Using approximate topology snapshot at .* for desired timestamp .*
-
 # TODO(#3933) We expect these logs when topology change during party migration.
 MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for informee participants
 ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to locked contracts
