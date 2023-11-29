@@ -64,8 +64,6 @@ lazy val root = (project in file("."))
     `wallet-payments-upgrade-daml`,
     `wallet-daml`,
     `wallet-upgrade-daml`,
-    `directory-daml`,
-    `directory-upgrade-daml`,
     `splitwell-daml`,
     `svc-governance-daml`,
     `svc-governance-upgrade-daml`,
@@ -289,26 +287,6 @@ lazy val `wallet-upgrade-daml` =
       Compile / damlDependencies := (`canton-coin-upgrade-daml` / Compile / damlBuild).value ++ (`wallet-payments-upgrade-daml` / Compile / damlBuild).value,
     )
 
-lazy val `directory-daml` =
-  project
-    .in(file("daml/directory-service"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
-      // We generate code for the latest version
-      Compile / damlEnableJavaCodegen := false,
-    )
-
-lazy val `directory-upgrade-daml` =
-  project
-    .in(file("daml/directory-service-upgrade"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies := (`wallet-upgrade-daml` / Compile / damlBuild).value,
-    )
-
 lazy val `canton-name-service-daml` =
   project
     .in(file("daml/canton-name-service"))
@@ -372,8 +350,6 @@ lazy val `apps-common` =
       `canton-coin-upgrade-daml`,
       `canton-name-service-daml`,
       `canton-name-service-upgrade-daml`,
-      `directory-daml`,
-      `directory-upgrade-daml`,
       `splitwell-daml`,
       `splitwell-upgrade-daml`,
       `sv-local-daml`,
@@ -484,7 +460,6 @@ lazy val `apps-sv` =
     .in(file("apps/sv"))
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
-      `directory-daml`,
       `apps-scan`,
       `validator-lifecycle-daml`,
       `svc-governance-daml`,
@@ -564,13 +539,11 @@ lazy val `apps-common-frontend` = {
         (`canton-coin-upgrade-daml` / Compile / damlBuild).value ++
           (`wallet-upgrade-daml` / Compile / damlBuild).value ++
           (`wallet-payments-upgrade-daml` / Compile / damlBuild).value ++
-          (`directory-upgrade-daml` / Compile / damlBuild).value ++
           (`canton-name-service-upgrade-daml` / Compile / damlBuild).value ++
           (`svc-governance-upgrade-daml` / Compile / damlBuild).value ++
           (`splitwell-upgrade-daml` / Compile / damlBuild).value ++
           (`validator-lifecycle-daml` / Compile / damlBuild).value ++
           // Generated for package id resolution only
-          (`directory-daml` / Compile / damlBuild).value ++
           (`splitwell-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
@@ -802,7 +775,6 @@ lazy val `apps-wallet` =
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
       `wallet-daml`,
-      `directory-daml`,
       `svc-governance-daml`,
     )
     .settings(
@@ -1068,7 +1040,6 @@ lazy val bundleTask = {
         (`canton-coin-daml` / Compile / damlBuild).value,
         (`wallet-daml` / Compile / damlBuild).value,
         (`splitwell-daml` / Compile / damlBuild).value,
-        (`directory-daml` / Compile / damlBuild).value,
       )
     val args: Seq[String] = license ++ examples ++ webUis.flatMap({ case ((source, _), name) =>
       Seq[String]("-r", source.toString, s"web-uis/$name")

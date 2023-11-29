@@ -1,13 +1,13 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
 import { Contract, PollingStrategy, useScanClient } from 'common-frontend';
 
-import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
+import { CnsEntry } from '@daml.js/cns/lib/CN/Cns';
 
 import { toFullEntryName } from '../../utils';
 import { usePrimaryParty } from './usePrimaryParty';
 
 type LookupEntryResponse = {
-  entryContract?: Contract<DirectoryEntry>;
+  entryContract?: Contract<CnsEntry>;
 };
 
 const useLookupEntryByName = (

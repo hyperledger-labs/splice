@@ -10,7 +10,6 @@ import com.daml.ledger.javaapi.data.codegen.{
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.{
   cns,
-  directory as dir,
   svcrules as svcr,
   svlocal,
   svonboarding as so,
@@ -659,9 +658,6 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       allContractsMigrated(
         templatesMovedByUserWalletAutomation
           filterNot Set( // TODO (#8386) remove filtering
-            dir.DirectoryInstall.COMPANION,
-            dir.DirectoryEntry.COMPANION,
-            dir.DirectoryEntryContext.COMPANION,
             cnw.subscriptions.SubscriptionInitialPayment.COMPANION,
             cnw.subscriptions.SubscriptionIdleState.COMPANION,
             cnw.subscriptions.SubscriptionPayment.COMPANION,

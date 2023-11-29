@@ -23,7 +23,6 @@ class SvPackageVettingTrigger(
 
   override protected val packages = Set(
     PackageIdResolver.Package.SvcGovernance,
-    PackageIdResolver.Package.DirectoryService,
     PackageIdResolver.Package.ValidatorLifecycle,
   )
 }

@@ -38,8 +38,7 @@ class CNNodeConsoleEnvironment(
     {
 
   val packageSignatures = ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-    DarResources.directoryService.all ++
-      DarResources.splitwell.all ++
+    DarResources.splitwell.all ++
       DarResources.validatorLifecycle.all ++
       DarResources.wallet.all ++
       DarResources.cantonCoin.all ++

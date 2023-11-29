@@ -45,7 +45,6 @@ object CNNodeUtil {
     new cc.coinconfig.PackageConfig(
       readDarVersion(DarResources.cantonCoin.bootstrap),
       readDarVersion(DarResources.cantonNameService.bootstrap),
-      readDarVersion(DarResources.directoryService.bootstrap),
       readDarVersion(DarResources.svcGovernance.bootstrap),
       readDarVersion(DarResources.validatorLifecycle.bootstrap),
       readDarVersion(DarResources.wallet.bootstrap),

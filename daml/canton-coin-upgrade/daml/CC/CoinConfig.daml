@@ -51,7 +51,6 @@ data PackageConfig = PackageConfig
   with
     cantonCoin : Text
     cantonNameService : Text
-    directoryService : Text
     svcGovernance : Text
     validatorLifecycle : Text
     wallet : Text

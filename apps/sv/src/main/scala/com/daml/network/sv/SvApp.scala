@@ -101,7 +101,7 @@ class SvApp(
     .filter(_.enabled)
 
   override def packages =
-    super.packages ++ DarResources.svcGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.directoryService.all ++ DarResources.cantonNameService.all ++ DarResources.svLocal.all
+    super.packages ++ DarResources.svcGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.cantonNameService.all ++ DarResources.svLocal.all
 
   override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
@@ -426,7 +426,6 @@ class SvApp(
       SvApp.coinPackage,
       SvApp.svcGovernancePackage,
       SvApp.validatorLifecyclePackage,
-      SvApp.directoryPackage,
       SvApp.svLocal,
     )
 
@@ -1247,8 +1246,6 @@ object SvApp {
     UploadablePackage.fromResource(DarResources.svcGovernance.bootstrap)
   val validatorLifecyclePackage: UploadablePackage =
     UploadablePackage.fromResource(DarResources.validatorLifecycle.bootstrap)
-  val directoryPackage: UploadablePackage =
-    UploadablePackage.fromResource(DarResources.directoryService.bootstrap)
   val svLocal: UploadablePackage =
     UploadablePackage.fromResource(DarResources.svLocal.bootstrap)
 }

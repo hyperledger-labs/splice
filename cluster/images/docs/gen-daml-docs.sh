@@ -39,4 +39,3 @@ ensure_damlc_exists
 
 gen_project_docs daml/canton-coin cc
 gen_project_docs daml/wallet-payments wallet
-gen_project_docs daml/directory-service directory-service

@@ -24,7 +24,6 @@ class ValidatorPackageVettingTrigger(
   override protected val packages = Set(
     PackageIdResolver.Package.CantonCoin,
     PackageIdResolver.Package.CantonNameService,
-    PackageIdResolver.Package.DirectoryService,
     PackageIdResolver.Package.ValidatorLifecycle,
     PackageIdResolver.Package.Wallet,
     PackageIdResolver.Package.WalletPayments,

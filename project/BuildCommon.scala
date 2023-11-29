@@ -163,7 +163,7 @@ object BuildCommon {
         // so we explicitly remove all CN DARs here, just in case
         addCommandAlias(
           "clean-cn",
-          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-sv/clean; apps-wallet/clean; apps-app/clean; cn-util-daml/clean; canton-coin-daml/clean; canton-coin-upgrade-daml/clean; svc-governance-daml/clean; svc-governance-upgrade-daml/clean; wallet-daml/clean; wallet-upgrade-daml/clean; wallet-payments-daml/clean; wallet-payments-upgrade-daml/clean; directory-daml/clean; directory-upgrade-daml/clean; canton-name-service-daml/clean; canton-name-service-upgrade-daml/clean; splitwell-daml/clean; splitwell-upgrade-daml/clean; validator-lifecycle-daml/clean; app-manager-daml/clean; apps-frontends/clean; cleanCnDars",
+          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-sv/clean; apps-wallet/clean; apps-app/clean; cn-util-daml/clean; canton-coin-daml/clean; canton-coin-upgrade-daml/clean; svc-governance-daml/clean; svc-governance-upgrade-daml/clean; wallet-daml/clean; wallet-upgrade-daml/clean; wallet-payments-daml/clean; wallet-payments-upgrade-daml/clean; canton-name-service-daml/clean; canton-name-service-upgrade-daml/clean; splitwell-daml/clean; splitwell-upgrade-daml/clean; validator-lifecycle-daml/clean; app-manager-daml/clean; apps-frontends/clean; cleanCnDars",
         ) ++
         addCommandAlias("cn-clean", "; clean-cn")
     val buildSettings = inThisBuild(

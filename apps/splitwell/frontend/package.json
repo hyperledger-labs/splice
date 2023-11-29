@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@daml.js/canton-coin": "file:../../common/frontend/daml.js/canton-coin-0.2.0",
-    "@daml.js/directory": "file:../../common/frontend/daml.js/directory-service-0.2.0",
     "@daml.js/cns": "file:../../common/frontend/daml.js/canton-name-service-0.2.0",
     "@daml.js/splitwell": "file:../../common/frontend/daml.js/splitwell-0.2.0",
     "@daml.js/splitwell-old": "file:../../common/frontend/daml.js/splitwell-0.1.0",

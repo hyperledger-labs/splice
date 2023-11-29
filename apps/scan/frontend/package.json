@@ -14,7 +14,6 @@
     ]
   },
   "dependencies": {
-    "@daml.js/directory": "file:../../common/frontend/daml.js/directory-service-0.2.0",
     "@daml.js/cns": "file:../../common/frontend/daml.js/canton-name-service-0.2.0",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",

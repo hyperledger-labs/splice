@@ -21,5 +21,4 @@ API Reference
 
    api/cc/index
    api/wallet/index
-   api/directory-service/index
    cn_app_apis/index

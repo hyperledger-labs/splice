@@ -108,7 +108,6 @@ object PackageIdResolver {
             pkg match {
               case Package.CantonCoin => DarResources.cantonCoin
               case Package.CantonNameService => DarResources.cantonNameService
-              case Package.DirectoryService => DarResources.directoryService
               case Package.SvcGovernance => DarResources.svcGovernance
               case Package.ValidatorLifecycle => DarResources.validatorLifecycle
               case Package.Wallet => DarResources.wallet
@@ -189,7 +188,6 @@ object PackageIdResolver {
     val version = pkg match {
       case CantonCoin => packageConfig.cantonCoin
       case CantonNameService => packageConfig.cantonNameService
-      case DirectoryService => packageConfig.directoryService
       case SvcGovernance => packageConfig.svcGovernance
       case ValidatorLifecycle => packageConfig.validatorLifecycle
       case Wallet => packageConfig.wallet
@@ -202,7 +200,6 @@ object PackageIdResolver {
     Seq(
       DarResources.cantonCoin,
       DarResources.cantonNameService,
-      DarResources.directoryService,
       DarResources.svcGovernance,
       DarResources.validatorLifecycle,
       DarResources.wallet,
@@ -218,7 +215,6 @@ object PackageIdResolver {
     "CC.ValidatorLicense" -> Package.CantonCoin,
     "CC.Round" -> Package.CantonCoin,
     "CN.Cns" -> Package.CantonNameService,
-    "CN.Directory" -> Package.DirectoryService,
     "CN.SvcBootstrap" -> Package.SvcGovernance,
     "CN.SvcRules" -> Package.SvcGovernance,
     "CN.SVC.CoinPrice" -> Package.SvcGovernance,
@@ -245,7 +241,6 @@ object PackageIdResolver {
   object Package {
     final case object CantonCoin extends Package
     final case object CantonNameService extends Package
-    final case object DirectoryService extends Package
     final case object SvcGovernance extends Package
     final case object ValidatorLifecycle extends Package
     final case object Wallet extends Package

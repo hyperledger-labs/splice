@@ -17,7 +17,6 @@ projects=(
     wallet
     wallet-payments
     svc-governance
-    directory-service
     canton-name-service
     splitwell
 )

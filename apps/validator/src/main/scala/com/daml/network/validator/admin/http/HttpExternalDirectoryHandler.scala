@@ -2,26 +2,20 @@ package com.daml.network.validator.admin.http
 
 import org.apache.pekko.stream.Materializer
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.codegen.java.cn.directory.DirectoryInstallRequest
 import com.daml.network.http.v0.{external, definitions as d0}
 import com.daml.network.http.v0.external.directory.DirectoryResource as r0
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.DisclosedContracts
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.HttpWalletHandlerUtil
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.retry.RetryUtil
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
 
 class HttpExternalDirectoryHandler(
     override val walletManager: UserWalletManager,
-    directoryProvider: PartyId,
     scanConnection: ScanConnection,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -109,64 +103,4 @@ class HttpExternalDirectoryHandler(
     }
   }
 
-  def createDirectoryInstall(respond: r0.CreateDirectoryInstallResponse.type)()(
-      tuser: TracedUser
-  ): Future[r0.CreateDirectoryInstallResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
-
-    withSpan(s"$workflowId.createDirectoryInstall") { implicit traceContext => _ =>
-      val userWallet = getUserWallet(user)
-      val connection = userWallet.connection
-      for {
-        partyId <- connection.getPrimaryParty(user)
-        domainId <- userWallet.store.getInstall() map (_.domain)
-        create <- connection
-          .submit(
-            Seq(partyId),
-            Seq(partyId),
-            new DirectoryInstallRequest(
-              directoryProvider.toProtoPrimitive,
-              partyId.toProtoPrimitive,
-            ).create,
-          )
-          .withDomainId(domainId)
-          .noDedup
-          .yieldResult()
-        res <- Future.successful {
-          r0.CreateDirectoryInstallResponse.OK(
-            d0.CreateDirectoryInstallResponse(
-              create.contractId.contractId
-            )
-          )
-        }
-      } yield res
-    }
-  }
-
-  def fetchDirectoryInstall(
-      respond: r0.FetchDirectoryInstallResponse.type
-  )()(tuser: TracedUser): Future[r0.FetchDirectoryInstallResponse] = {
-    implicit val TracedUser(user, traceContext) = tuser
-
-    withSpan(s"$workflowId.fetchDirectoryInstall") { implicit traceContext => _ =>
-      for {
-        installContract <- getUserStore(user).flatMap(_.getDirectoryInstall())
-        res <- Future.successful {
-          r0.FetchDirectoryInstallResponse.OK(
-            d0.FetchDirectoryInstallResponse(
-              contractId = installContract.contractId.toString(),
-              entryFee = installContract.payload.entryFee.toString(),
-              entryLifetime = installContract.payload.entryLifetime.microseconds.toString(),
-            )
-          )
-        }
-      } yield res
-    }
-  }
-
-  case class DirectoryInstallNotFound(operationName: String) extends RetryUtil.ExceptionRetryable {
-    override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
-        tc: TraceContext
-    ): RetryUtil.ErrorKind = RetryUtil.TransientErrorKind
-  }
 }

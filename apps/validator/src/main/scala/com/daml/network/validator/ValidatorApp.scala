@@ -97,7 +97,7 @@ class ValidatorApp(
     with BasicDirectives {
 
   override def packages =
-    super.packages ++ DarResources.wallet.all ++ DarResources.directoryService.all ++ DarResources.cantonNameService.all ++ DarResources.appManager.all
+    super.packages ++ DarResources.wallet.all ++ DarResources.cantonNameService.all ++ DarResources.appManager.all
 
   override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
@@ -156,7 +156,6 @@ class ValidatorApp(
     logger.info(s"Attempting to setup wallet...")
     val darFiles = Seq(
       UploadablePackage.fromResource(DarResources.wallet.bootstrap),
-      UploadablePackage.fromResource(DarResources.directoryService.bootstrap),
       UploadablePackage.fromResource(DarResources.cantonNameService.bootstrap),
     )
     for {
@@ -607,7 +606,6 @@ class ValidatorApp(
 
       directoryExternalHandler = new HttpExternalDirectoryHandler(
         walletManager,
-        svcParty, // making an assumption here that the SVC party is the Directory provider party
         scanConnection,
         loggerFactory,
       )

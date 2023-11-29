@@ -4,7 +4,7 @@ import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpRespon
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.cn.directory as codegen
+import com.daml.network.codegen.java.cn.cns as codegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionRequest
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.external.directory as externalHttp
@@ -27,7 +27,7 @@ object HttpDirectoryAppClient {
   }
 
   case class CreateDirectoryEntryResponse(
-      entryContextCid: codegen.DirectoryEntryContext.ContractId,
+      entryContextCid: codegen.CnsEntryContext.ContractId,
       subscriptionRequestCid: SubscriptionRequest.ContractId,
       name: String,
       url: String,
@@ -56,7 +56,7 @@ object HttpDirectoryAppClient {
         decoder: TemplateJsonDecoder
     ) = { case externalHttp.CreateDirectoryEntryResponse.OK(res) =>
       for {
-        entryContextCid <- Codec.decodeJavaContractId(codegen.DirectoryEntryContext.COMPANION)(
+        entryContextCid <- Codec.decodeJavaContractId(codegen.CnsEntryContext.COMPANION)(
           res.entryContextCid
         )
         subscriptionRequestCid <- Codec.decodeJavaContractId(SubscriptionRequest.COMPANION)(

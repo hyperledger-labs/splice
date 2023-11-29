@@ -1,5 +1,4 @@
 import com.daml.lf.value.Value.ContractId
-import com.daml.network.codegen.java.cn.{directory => codegen}
 import com.daml.network.codegen.java.cn.{splitwell => splitwellCodegen}
 import com.daml.network.console.{DirectoryExternalAppClientReference, WalletAppClientReference}
 import com.daml.network.console.LedgerApiExtensions._

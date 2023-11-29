@@ -50,36 +50,6 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /v0/directory/install:
-    post:
-      tags: [ directory ]
-      x-jvm-package: external.directory
-      operationId: "createDirectoryInstall"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CreateDirectoryInstallResponse"
-        "500":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-    get:
-      tags: [ directory ]
-      x-jvm-package: external.directory
-      operationId: "fetchDirectoryInstall"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FetchDirectoryInstallResponse"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-        "500":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-
 
 components:
   schemas:

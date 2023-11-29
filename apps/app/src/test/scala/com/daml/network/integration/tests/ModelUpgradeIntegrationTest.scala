@@ -59,7 +59,6 @@ class ModelUpgradeIntegrationTest
             "0.1.0",
             "0.1.0",
             "0.1.0",
-            "0.1.0",
           ),
         ),
         Seq(
@@ -71,7 +70,6 @@ class ModelUpgradeIntegrationTest
               coinConfig.globalDomain,
               coinConfig.tickDuration,
               new cc.coinconfig.PackageConfig(
-                "0.2.0",
                 "0.2.0",
                 "0.2.0",
                 "0.2.0",

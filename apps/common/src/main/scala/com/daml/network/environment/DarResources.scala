@@ -20,13 +20,6 @@ object DarResources {
     Seq(svcGovernance_0_2_0),
   )
 
-  val directoryService_0_1_0 = DarResource("directory-service-0.1.0.dar")
-  val directoryService_0_2_0 = DarResource("directory-service-0.2.0.dar")
-  val directoryService = PackageResource(
-    directoryService_0_1_0,
-    Seq(directoryService_0_2_0),
-  )
-
   val cantonNameService_0_1_0 = DarResource("canton-name-service-0.1.0.dar")
   val cantonNameService_0_2_0 = DarResource("canton-name-service-0.2.0.dar")
   val cantonNameService = PackageResource(

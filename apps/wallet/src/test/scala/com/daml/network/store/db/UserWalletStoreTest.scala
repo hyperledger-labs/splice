@@ -1278,7 +1278,6 @@ class DbUserWalletStoreTest
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         DarResources.cantonCoin.all ++
           DarResources.wallet.all ++
-          DarResources.directoryService.all ++
           DarResources.cantonNameService.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =

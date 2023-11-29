@@ -14,8 +14,6 @@
     ]
   },
   "dependencies": {
-    "@daml.js/directory": "file:../../common/frontend/daml.js/directory-service-0.2.0",
-    "@daml.js/directory-old": "file:../../common/frontend/daml.js/directory-service-0.1.0",
     "@daml.js/wallet-payments": "file:../../common/frontend/daml.js/wallet-payments-0.2.0",
     "@daml.js/wallet-payments-old": "file:../../common/frontend/daml.js/wallet-payments-0.1.0",
     "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",

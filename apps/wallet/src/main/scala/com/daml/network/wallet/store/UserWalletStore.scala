@@ -9,7 +9,6 @@ import com.daml.network.codegen.java.cc.{
   coinrules as coinrulesCodegen,
   round as roundCodegen,
 }
-import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
@@ -51,15 +50,6 @@ trait UserWalletStore
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
 
-  final def lookupDirectoryInstall()(implicit tc: TraceContext): Future[
-    Option[
-      ContractWithState[
-        directoryCodegen.DirectoryInstall.ContractId,
-        directoryCodegen.DirectoryInstall,
-      ]
-    ]
-  ] = lookupArbitraryPreferAssigned(directoryCodegen.DirectoryInstall.COMPANION)
-
   final def lookupInstall()(implicit tc: TraceContext): Future[
     Option[
       ContractWithState[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
@@ -68,15 +58,6 @@ trait UserWalletStore
     // Note: there is nothing that prevents a party from having multiple WalletAppInstall contracts
     // here we just take the first one, preferring an assigned one if available
     lookupArbitraryPreferAssigned(installCodegen.WalletAppInstall.COMPANION)
-
-  final def getDirectoryInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
-    AssignedContract[
-      directoryCodegen.DirectoryInstall.ContractId,
-      directoryCodegen.DirectoryInstall,
-    ]
-  ] = for {
-    ct <- lookupDirectoryInstall()
-  } yield assignedOrNotFound(directoryCodegen.DirectoryInstall.COMPANION)(ct)
 
   final def getInstall()(implicit ec: ExecutionContext, tc: TraceContext): Future[
     AssignedContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
@@ -505,10 +486,6 @@ object UserWalletStore {
       transferOffersCodegen.TransferOffer.COMPANION,
       walletCodegen.AcceptedAppPayment.COMPANION,
       walletCodegen.AppPaymentRequest.COMPANION,
-      // TODO (#7260) remove
-      directoryCodegen.DirectoryInstall.COMPANION,
-      directoryCodegen.DirectoryEntry.COMPANION,
-      directoryCodegen.DirectoryEntryContext.COMPANION,
     )
   }
 
@@ -545,9 +522,6 @@ object UserWalletStore {
           co.payload.svcParty == svc &&
             co.payload.endUserParty == endUser
         )(UserWalletAcsStoreRowData(_)),
-        mkFilter(directoryCodegen.DirectoryInstall.COMPANION)(co => co.payload.user == endUser)(
-          UserWalletAcsStoreRowData(_)
-        ),
         // Coins
         mkFilter(coinCodegen.Coin.COMPANION)(co =>
           co.payload.svc == svc &&
@@ -632,13 +606,6 @@ object UserWalletStore {
         // Featured app right
         mkFilter(coinCodegen.FeaturedAppRight.COMPANION)(co =>
           co.payload.svc == svc && co.payload.provider == endUser
-        )(UserWalletAcsStoreRowData(_)),
-        // Directory entry
-        mkFilter(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.user == endUser)(
-          UserWalletAcsStoreRowData(_)
-        ),
-        mkFilter(directoryCodegen.DirectoryEntryContext.COMPANION)(co =>
-          co.payload.user == endUser
         )(UserWalletAcsStoreRowData(_)),
         // Cns entry
         mkFilter(cnsCodegen.CnsEntry.COMPANION)(co => co.payload.user == endUser)(

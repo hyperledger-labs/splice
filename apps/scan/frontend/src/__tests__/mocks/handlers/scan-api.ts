@@ -203,7 +203,6 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                   packageConfig: {
                     cantonCoin: '0.1.0',
                     cantonNameService: '0.1.0',
-                    directoryService: '0.1.0',
                     svcGovernance: '0.1.0',
                     validatorLifecycle: '0.1.0',
                     wallet: '0.1.0',
