@@ -12,6 +12,10 @@ Release Notes
 
   * Clarify that using custom auth audiences is recommended.
 
+  * Updated SV runbook to explain also ip white-listing.
+
+  * Updated SV runbook with a list of outbound traffic.
+
 2023-11-27
 ----------
 

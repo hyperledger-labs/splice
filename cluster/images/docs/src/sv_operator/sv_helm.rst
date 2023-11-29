@@ -602,13 +602,19 @@ particularly if all helm charts are deployed at the same time. The
 Configuring the Cluster Ingress
 -------------------------------
 
+An IP whitelisting json file ``allowed-ip-ranges-external.json`` will be provided in each SV operations announcement.
+This file contains other clusters' egress IPs that require access to your super validator's components. These IPs typically belong to peer super-validators, validators and the Digital Asset VPN.
+
+Each SV member is required to configure their cluster ingress to allow traffic from these IPs to be operational.
+
 * ``https://wallet.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``sv`` namespace
 * ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace. (note that no url rewrite is required for this rule)
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``sv-web-ui`` in the ``sv`` namespace
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/sv`` should be routed to ``/api/sv`` at port 5014 of service ``sv-app`` in the ``sv`` namespace. (note that no url rewrite is required for this rule)
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``scan-web-ui`` in the ``sv`` namespace
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan`` should be routed to ``/api/scan`` at port 5012 in service ``scan-app`` in the ``sv`` namespace. (note that no url rewrite is required for this rule)
-* ``cometbft.sv.svc.<YOUR_HOSTNAME>:26656`` should be routed to port 26656 of service ``cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol
+* ``cometbft.sv.svc.<YOUR_HOSTNAME>:26656`` should be routed to port 26656 of service ``cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol.
+  Please note that cometBFT traffic is purely TCP. TLS is not supported so SNI host routing for these traffic is not possible.
 * ``https://directory.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``directory-web-ui`` in the ``sv`` namespace
 * ``https://directory.sv.svc.<YOUR_HOSTNAME>/api/json-api/*`` should be routed to port 7575 in service ``participant`` in the ``sv`` namespace.
   Please note that this rule requires a URL rewrite. The `/api/json-api` prefix should be stripped, and only the suffix under ``*`` should end up at the pod.
@@ -637,6 +643,7 @@ If you see the response below, it means the sequencer is up and accessible throu
     {
       "status": "SERVING"
     }
+
 
 Requirements
 ++++++++++++
@@ -725,6 +732,24 @@ Another reference Helm chart is provided for that, which can be installed using:
 
     helm install cluster-ingress-sv canton-network-helm/cn-cluster-ingress-runbook -n cluster-ingress --version ${CHART_VERSION} --set cluster.hostname=$YOUR_HOSTNAME --set cluster.svNamespace=sv
 
+
+Configuring the Cluster Egress
+-------------------------------
+
+Here is a list of destinations of all outbound traffic from the Super Validator node.
+This list is useful for an SV that wishes to limit egress to only allow the minimum necessary outbound traffic.
+
+====================== ================================================================================================ ========= ==============
+Destination            Url                                                                                              Protocol  Source pod
+---------------------- ------------------------------------------------------------------------------------------------ --------- --------------
+Sponsor SV             sv.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                           HTTPS     sv-app
+Sponsor SV Sequencer   sequencer.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                    HTTPS     participant
+Sponsor SV Scan        scan.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                         HTTPS     validator-app
+CometBft P2P           CometBft p2p IPs and ports 26656, 26666, 26676, 26686, 26696                                     TCP       cometbft
+CometBft JSON RPC      sv.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc  HTTPS     cometbft
+====================== ================================================================================================ ========= ==============
+
+At present, we designate the founding SV as the sponsor SV. However, in the long term, any onboarded SV can function as a sponsor SV.
 
 .. _helm-sv-wallet-ui:
 
