@@ -79,7 +79,6 @@ export type SvConfig = {
   validatorWalletUser: string;
   onboarding: SvOnboarding;
   approvedSvIdentities: ApprovedSvIdentity[];
-  withScan: boolean;
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[];
   isDevNet: boolean;
   backupConfig?: BackupConfig;
@@ -254,28 +253,21 @@ export async function installSvNode(
     )
   );
 
-  if (config.onboarding.type == 'found-collective' && !config.withScan) {
-    console.error('Founding node always needs to have CC Scan enabled');
-    process.exit(1);
-  }
-
-  if (config.withScan) {
-    const scanDbName = `scan_${svAppName}`;
-    const scanDb = postgresDb.createDatabase(scanDbName);
-    const scanValues = {
-      clusterUrl: `${CLUSTER_BASENAME}.network.canton.global`,
-      metrics: {
-        enable: true,
-      },
-      persistence: persistenceConfig(postgresDb, scanDbName),
-      additionalJvmOptions: jmxOptions(),
-    };
-    installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, [
-      svApp,
-      postgresDb,
-      scanDb,
-    ]);
-  }
+  const scanDbName = `scan_${svAppName}`;
+  const scanDb = postgresDb.createDatabase(scanDbName);
+  const scanValues = {
+    clusterUrl: `${CLUSTER_BASENAME}.network.canton.global`,
+    metrics: {
+      enable: true,
+    },
+    persistence: persistenceConfig(postgresDb, scanDbName),
+    additionalJvmOptions: jmxOptions(),
+  };
+  installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, [
+    svApp,
+    postgresDb,
+    scanDb,
+  ]);
 
   const validatorDbName = `validator_${svAppName}`;
   const validatorDb = postgresDb.createDatabase(validatorDbName);
@@ -305,7 +297,6 @@ export async function installSvNode(
     'ingress-sv-' + xns.logicalName,
     'cn-cluster-ingress-runbook',
     {
-      withScan: config.withScan,
       withDomainNode: config.withDomainNode,
       cluster: {
         hostname: `${CLUSTER_BASENAME}.network.canton.global`,

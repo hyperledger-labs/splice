@@ -660,6 +660,15 @@ In order to install the reference charts, the following must be satisfied in you
 * cert-manager must be available in the cluster (See `cert-manager documentation <https://cert-manager.io/docs/installation/helm/>`_)
 * istio should be installed in the cluster (See `istio documentation <https://istio.io/latest/docs/setup/>`_)
 
+**Example of Istio installation:**
+
+.. code-block:: bash
+
+    helm repo add istio https://istio-release.storage.googleapis.com/charts
+    helm repo update
+    helm install istio-base istio/base -n istio-system --wait
+    helm install istiod istio/istiod -n cluster-ingress --set global.istioNamespace="cluster-ingress" --set meshConfig.accessLogFile="/dev/stdout"  --wait
+
 Installation Instructions
 +++++++++++++++++++++++++
 
@@ -717,18 +726,15 @@ And install it to your cluster:
 
 .. code-block:: bash
 
-    helm repo add istio https://istio-release.storage.googleapis.com/charts
-    helm repo update
     helm install istio-ingress istio/gateway -n cluster-ingress -f istio-gateway-values.yaml
 
 
-A reference Helm chart that installs a gateway that uses this service is also provided.
-To install it, run the following (assuming environment variable `YOUR_HOSTNAME` set to to your hostname):
+A reference Helm chart installing a gateway that uses this service is also provided.
+To install it, run the following (assuming the environment variable `YOUR_HOSTNAME` is set to your hostname):
 
 .. code-block:: bash
 
-    helm install cluster-gateway canton-network-helm/cn-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.hostname=$YOUR_HOSTNAME
-
+    helm install cluster-gateway canton-network-helm/cn-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.hostname=${YOUR_HOSTNAME}
 
 This gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
 Istio VirtualServices can now be created to route traffic from there to the required pods within the cluster.
@@ -737,7 +743,8 @@ Another reference Helm chart is provided for that, which can be installed using:
 
 .. code-block:: bash
 
-    helm install cluster-ingress-sv canton-network-helm/cn-cluster-ingress-runbook -n cluster-ingress --version ${CHART_VERSION} --set cluster.hostname=$YOUR_HOSTNAME --set cluster.svNamespace=sv
+    helm install cluster-ingress-sv canton-network-helm/cn-cluster-ingress-runbook -n cluster-ingress --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-cluster-ingress-values.yaml
+
 
 
 Configuring the Cluster Egress

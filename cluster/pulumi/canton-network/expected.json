@@ -1004,6 +1004,26 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_3\""
+    },
+    "name": "createdb-scan_sv_3",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_4\""
+    },
+    "name": "createdb-scan_sv_4",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database splitwell_domain_mediator\""
     },
     "name": "createdb-splitwell_domain_mediator",
@@ -2387,8 +2407,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "withDomainNode": true,
-        "withScan": true,
-        "withSv": true
+        "withSvIngress": true
       }
     },
     "name": "helm-sv-1-ingress-sv-sv-1",
@@ -3347,8 +3366,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "withDomainNode": true,
-        "withScan": true,
-        "withSv": true
+        "withSvIngress": true
       }
     },
     "name": "helm-sv-2-ingress-sv-sv-2",
@@ -4279,8 +4297,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "withDomainNode": true,
-        "withScan": false,
-        "withSv": true
+        "withSvIngress": true
       }
     },
     "name": "helm-sv-3-ingress-sv-sv-3",
@@ -4551,6 +4568,98 @@
       }
     },
     "name": "helm-sv-3-postgres",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-scan/",
+      "compat": "true",
+      "name": "scan-sv-3",
+      "namespace": "sv-3",
+      "timeout": 480,
+      "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
+        "persistence": {
+          "databaseName": "scan_sv_3",
+          "host": "postgres.sv-3.svc.cluster.local",
+          "port": 5432,
+          "schema": "scan_sv_3",
+          "user": "cnadmin"
+        },
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1536Mi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-3-scan-sv-3",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5119,8 +5228,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "withDomainNode": true,
-        "withScan": false,
-        "withSv": true
+        "withSvIngress": true
       }
     },
     "name": "helm-sv-4-ingress-sv-sv-4",
@@ -5391,6 +5499,98 @@
       }
     },
     "name": "helm-sv-4-postgres",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-scan/",
+      "compat": "true",
+      "name": "scan-sv-4",
+      "namespace": "sv-4",
+      "timeout": 480,
+      "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
+        "persistence": {
+          "databaseName": "scan_sv_4",
+          "host": "postgres.sv-4.svc.cluster.local",
+          "port": 5432,
+          "schema": "scan_sv_4",
+          "user": "cnadmin"
+        },
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1536Mi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-4-scan-sv-4",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -6447,6 +6647,26 @@
       "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-scan_sv_2",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "waitdb-scan_sv_3",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "waitdb-scan_sv_4",
     "provider": "",
     "type": "command:local:Command"
   },

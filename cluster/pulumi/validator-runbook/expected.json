@@ -85,8 +85,7 @@
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "withDomainNode": true,
-        "withScan": false,
-        "withSv": false
+        "withSvIngress": false
       }
     },
     "name": "cluster-ingress-validator",

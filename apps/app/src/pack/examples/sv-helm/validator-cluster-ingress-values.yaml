@@ -1,0 +1,6 @@
+cluster:
+  hostname: "YOUR_HOSTNAME" # value to complete!
+  svNamespace: "validator"
+  hostPrefix: ""
+withSvIngress: false
+withDomainNode: false

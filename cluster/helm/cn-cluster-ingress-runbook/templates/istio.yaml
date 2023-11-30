@@ -26,7 +26,7 @@ spec:
           number: 80
         host: wallet-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
-{{- if .Values.withSv }}
+{{- if .Values.withSvIngress }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
@@ -56,7 +56,7 @@ spec:
         host: sv-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 {{- end }}
 ---
-{{- if .Values.withScan }}
+{{- if .Values.withSvIngress }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:

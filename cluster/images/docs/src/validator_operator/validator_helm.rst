@@ -396,6 +396,15 @@ Configuring the Cluster Ingress
 The following routes should be configured in your cluster ingress
 controller.
 
+====================== ============ ===========================================================================
+Services               Port         Routes
+---------------------- ------------ ---------------------------------------------------------------------------
+``wallet-web-ui``                   ``https://wallet.validator.<YOUR_HOSTNAME>``
+``validator-app``      5003         ``https://wallet.validator.<YOUR_HOSTNAME>/api/validator``
+``directory-web-ui``                ``https://directory.validator.<YOUR_HOSTNAME>``
+``participant``        7575         ``https://directory.validator.<YOUR_HOSTNAME>/api/json-api/*``
+====================== ============ ===========================================================================
+
 * ``https://wallet.validator.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``validator`` namespace
 * ``https://wallet.validator.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``validator`` namespace
 * ``https://directory.validator.<YOUR_HOSTNAME>`` should be routed to service ``directory-web-ui`` in the ``validator`` namespace
@@ -411,8 +420,19 @@ Requirements
 
 In order to install the reference charts, the following must be satisfied in your cluster:
 
-* cert-manager must be available in the cluster (See `cert-manager documentation <https://cert-manager.io/docs/installation/helm/>`_)
-* istio should be installed in the cluster (See `istio documentation <https://istio.io/latest/docs/setup/>`_)
+* *cert-manager* must be available in the cluster (See `cert-manager documentation <https://cert-manager.io/docs/installation/helm/>`_)
+* *istio* should be installed in the cluster (See `istio documentation <https://istio.io/latest/docs/setup/>`_)
+
+*Note that their deployments are often platform-dependent and good documentations on how to set them up can be found online.*
+
+**Example of Istio installation:**
+
+.. code-block:: bash
+
+    helm repo add istio https://istio-release.storage.googleapis.com/charts
+    helm repo update
+    helm install istio-base istio/base -n istio-system --wait
+    helm install istiod istio/istiod -n cluster-ingress --set global.istioNamespace="cluster-ingress" --set meshConfig.accessLogFile="/dev/stdout"  --wait
 
 Installation Instructions
 +++++++++++++++++++++++++
@@ -471,17 +491,15 @@ And install it to your cluster:
 
 .. code-block:: bash
 
-    helm repo add istio https://istio-release.storage.googleapis.com/charts
-    helm repo update
     helm install istio-ingress istio/gateway -n cluster-ingress -f istio-gateway-values.yaml
 
 
-A reference Helm chart that installs a gateway that uses this service is also provided.
-To install it, run the following (assuming environment variable `YOUR_HOSTNAME` set to to your hostname):
+A reference Helm chart installing a gateway that uses this service is also provided.
+To install it, run the following (assuming the environment variable `YOUR_HOSTNAME` is set to your hostname):
 
 .. code-block:: bash
 
-    helm install cluster-gateway canton-network-helm/cn-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.hostname=$YOUR_HOSTNAME
+    helm install cluster-gateway canton-network-helm/cn-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.hostname=${YOUR_HOSTNAME}
 
 
 This gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
@@ -491,7 +509,7 @@ Another reference Helm chart is provided for that, which can be installed using:
 
 .. code-block:: bash
 
-    helm install cluster-ingress-validator canton-network-helm/cn-cluster-ingress-runbook -n cluster-ingress --version ${CHART_VERSION} --set cluster.hostname=$YOUR_HOSTNAME --set cluster.svNamespace=validator --set cluster.hostPrefix="" --set withSv=false --set withScan=false --set withDomainNode=false
+    helm install cluster-ingress-validator canton-network-helm/cn-cluster-ingress-runbook -n cluster-ingress --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-cluster-ingress-values.yaml
 
 
 .. _helm-validator-wallet-ui:
