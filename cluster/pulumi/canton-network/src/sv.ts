@@ -84,7 +84,6 @@ export type SvConfig = {
   backupConfig?: BackupConfig;
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
-  withDomainNode: boolean;
   auth0ValidatorAppName: string;
   sequencerDriver: 'cometbft' | 'postgres';
 };
@@ -159,27 +158,23 @@ export async function installSvNode(
     cometBftSyncSource
   );
 
-  let domain = undefined;
+  const sequencerDatabase =
+    config.onboarding.type === 'join-with-key' ? config.onboarding.sequencerDatabase : postgresDb;
 
-  if (config.withDomainNode) {
-    const sequencerDatabase =
-      config.onboarding.type === 'join-with-key' ? config.onboarding.sequencerDatabase : postgresDb;
-
-    domain = installGlobalDomain(
-      xns,
-      'global-domain',
-      postgresDb,
-      config.sequencerDriver === 'cometbft'
-        ? {
-            driver: 'cometbft',
-            service: cometBftRpcService,
-          }
-        : {
-            driver: 'postgres',
-            postgres: sequencerDatabase,
-          }
-    );
-  }
+  const domain = installGlobalDomain(
+    xns,
+    'global-domain',
+    postgresDb,
+    config.sequencerDriver === 'cometbft'
+      ? {
+          driver: 'cometbft',
+          service: cometBftRpcService,
+        }
+      : {
+          driver: 'postgres',
+          postgres: sequencerDatabase,
+        }
+  );
 
   const participant = installParticipant(
     xns,
@@ -207,7 +202,6 @@ export async function installSvNode(
       // we need to include a dummy value though
       // because helm does not distinguish between an empty object and unset.
       {
-        enable: config.withDomainNode,
         sequencerPublicUrl: `https://sequencer.${config.nodename}.svc.${CLUSTER_BASENAME}.network.canton.global`,
       },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
@@ -248,9 +242,7 @@ export async function installSvNode(
     config.nodename + '-sv-app',
     'cn-sv-node',
     svValues,
-    dependsOn.concat(
-      [participant, cometBftRpcService, postgresDb, svDb].concat(domain ? [domain] : [])
-    )
+    dependsOn.concat([participant, cometBftRpcService, postgresDb, svDb, domain])
   );
 
   const scanDbName = `scan_${svAppName}`;
@@ -297,7 +289,7 @@ export async function installSvNode(
     'ingress-sv-' + xns.logicalName,
     'cn-cluster-ingress-runbook',
     {
-      withDomainNode: config.withDomainNode,
+      withSvIngress: true,
       cluster: {
         hostname: `${CLUSTER_BASENAME}.network.canton.global`,
         svNamespace: xns.logicalName,

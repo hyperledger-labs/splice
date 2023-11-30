@@ -3,4 +3,3 @@ cluster:
   svNamespace: "sv"
   hostPrefix: "svc."
 withSvIngress: true
-withDomainNode: true

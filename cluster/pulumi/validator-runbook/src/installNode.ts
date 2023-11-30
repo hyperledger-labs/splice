@@ -124,7 +124,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
         svNamespace: RUNBOOK_NAMESPACE,
       },
       withSvIngress: false,
-      withDomainNode: true,
     },
     localCharts,
     version,

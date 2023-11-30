@@ -3,4 +3,3 @@ cluster:
   svNamespace: "validator"
   hostPrefix: ""
 withSvIngress: false
-withDomainNode: false

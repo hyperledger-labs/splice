@@ -2406,7 +2406,6 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "withDomainNode": true,
         "withSvIngress": true
       }
     },
@@ -2896,7 +2895,6 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
-          "enable": true,
           "sequencerPublicUrl": "https://sequencer.sv-1.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [
@@ -3365,7 +3363,6 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "withDomainNode": true,
         "withSvIngress": true
       }
     },
@@ -3855,7 +3852,6 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
-          "enable": true,
           "sequencerPublicUrl": "https://sequencer.sv-2.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [],
@@ -4296,7 +4292,6 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "withDomainNode": true,
         "withSvIngress": true
       }
     },
@@ -4786,7 +4781,6 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
-          "enable": true,
           "sequencerPublicUrl": "https://sequencer.sv-3.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [],
@@ -5227,7 +5221,6 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "withDomainNode": true,
         "withSvIngress": true
       }
     },
@@ -5717,7 +5710,6 @@
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
-          "enable": true,
           "sequencerPublicUrl": "https://sequencer.sv-4.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [],
