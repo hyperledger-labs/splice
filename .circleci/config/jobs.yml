@@ -921,21 +921,18 @@ jobs:
       image: ubuntu-2004:2023.04.2
     environment:
       <<: *env
+    parameters:
+      skip_if_exists:
+        type: boolean
+        default: false
     steps:
       - checkout
       - record_job_start_time
       - restore_frontend_builds
       - setup_sbt_test_job
-      - run_bash_command_in_nix:
-         cmd_name: Build app
-         cmd: make build -j
-         cmd_retry_count: 5 # Retry in case of dependency download errors
-         additional_nix_args: "--keep ARTIFACTORY_USER \
-           --keep ARTIFACTORY_PASSWORD"
       - docker_login_artifactory
-      - docker_build
       - run_bash_command_in_nix:
-         cmd_name: Push Docker images
+         cmd_name: GCloud authorization
          additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
            --keep DOCKER_CERT_PATH \
            --keep DOCKER_HOST \
@@ -945,7 +942,41 @@ jobs:
          cmd: |
            echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
-           make docker-push -j
+      - when:
+          condition: << parameters.skip_if_exists >>
+          steps:
+          - run_bash_command_in_nix:
+             cmd_name: Check if images already exist
+             cmd: |
+               if make docker-check; then
+                  echo "Docker images already exist"
+                  # Running a circleci-agent command from within run_bash_command_in_nix does not work, so we create a file
+                  # that represents the need to halt, and call `circleci-agent step halt` in a separate `run` step
+                  touch .halt-build-step
+               fi
+          - run:
+              name: Halt build step if images already exist
+              command: |
+                if [ -f ".halt-build-step" ]; then
+                  echo "skipping rebuilding and pushing"
+                  circleci-agent step halt
+                fi
+      - run_bash_command_in_nix:
+         cmd_name: Build app
+         cmd: make build -j
+         cmd_retry_count: 5 # Retry in case of dependency download errors
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD"
+      - docker_build
+      - run_bash_command_in_nix:
+         cmd_name: Push Docker images
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+           --keep DOCKER_CERT_PATH \
+           --keep DOCKER_HOST \
+           --keep DOCKER_MACHINE_NAME \
+           --keep DOCKER_TLS_VERIFY \
+           --keep NO_PROXY"
+         cmd: make docker-push -j
          cmd_retry_count: 5
       - save_frontend_builds
       - cleanup_sbt_test_job

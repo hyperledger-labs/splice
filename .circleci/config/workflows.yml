@@ -835,6 +835,13 @@ workflows:
             - artifactory
             - slack-context
           workflow_names: "deploy_cidaily_and_cidaily_testnet redeploy_sv_runbook_cidaily cidaily_health_check"
+      - docker_images_push:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          skip_if_exists: true
       - deploy_sv_runbook:
           filters:
             branches:
@@ -848,6 +855,7 @@ workflows:
           use_published_artifacts: false
           requires:
             - wait_for_previous_pipeline
+            - docker_images_push
       - preflight_sv_check:
           filters:
             branches:
@@ -877,6 +885,13 @@ workflows:
             - artifactory
             - slack-context
           workflow_names: "deploy_cilr redeploy_sv_runbook_cilr cilr_health_check"
+      - docker_images_push:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          skip_if_exists: true
       - deploy_sv_runbook:
           filters:
             branches:
@@ -890,6 +905,7 @@ workflows:
           use_published_artifacts: false
           requires:
             - wait_for_previous_pipeline
+            - docker_images_push
       - preflight_sv_check:
           filters:
             branches:
@@ -919,6 +935,13 @@ workflows:
             - artifactory
             - slack-context
           workflow_names: "deploy_devnet redeploy_sv_runbook_devnet devnet_health_check"
+      - docker_images_push:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          skip_if_exists: true
       - deploy_sv_runbook:
           filters:
             branches:
@@ -932,6 +955,7 @@ workflows:
           use_published_artifacts: false
           requires:
             - wait_for_previous_pipeline
+            - docker_images_push
       - preflight_sv_check:
           filters:
             branches:
