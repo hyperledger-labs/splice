@@ -3,6 +3,7 @@ package com.daml.network.automation
 import org.apache.pekko.Done
 import com.daml.network.environment.{CNLedgerSubscription, RetryFor, RetryProvider}
 import com.daml.network.util.HasHealth
+import com.digitalasset.canton.config.{NonNegativeDuration}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -103,7 +104,7 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
       AsyncCloseable(
         "waiting for termination of ledger ingestion loop",
         ingestionLoopTerminatedF.get(),
-        timeouts.shutdownNetwork.duration,
+        NonNegativeDuration.tryFromDuration(timeouts.shutdownNetwork.duration),
       )
     )
   }

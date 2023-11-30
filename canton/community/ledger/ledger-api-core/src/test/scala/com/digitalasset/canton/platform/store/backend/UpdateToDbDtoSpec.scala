@@ -248,7 +248,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         someRecordTime,
         completionInfo,
         state.Update.CommandRejected.FinalReason(status),
-        domainId = Some(someDomainId1),
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update)
 
@@ -280,7 +280,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         someRecordTime,
         completionInfo,
         state.Update.CommandRejected.FinalReason(status),
-        domainId = Some(someDomainId1),
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update, multiDomainEnabled = true)
 
@@ -337,6 +337,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         hostedWitnesses = Nil,
         contractMetadata = Map(contractId -> someContractDriverMetadata),
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update)
 
@@ -436,6 +437,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         contractMetadata = Map(contractId -> someContractDriverMetadata),
         hostedWitnesses = Nil,
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update, multiDomainEnabled = true)
 
@@ -543,6 +545,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         hostedWitnesses = Nil,
         contractMetadata = Map.empty,
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update)
 
@@ -645,6 +648,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         contractMetadata = Map.empty,
         hostedWitnesses = Nil,
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update, multiDomainEnabled = true)
 
@@ -749,6 +753,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         hostedWitnesses = Nil,
         contractMetadata = Map.empty,
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update)
 
@@ -845,6 +850,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         contractMetadata = Map.empty,
         hostedWitnesses = Nil,
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update, multiDomainEnabled = true)
 
@@ -969,6 +975,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         hostedWitnesses = Nil,
         contractMetadata = Map.empty,
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update)
 
@@ -1443,6 +1450,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         contractMetadata = Map.empty,
         hostedWitnesses = Nil,
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update, multiDomainEnabled = true)
 
@@ -1618,6 +1626,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         hostedWitnesses = Nil,
         contractMetadata = Map.empty,
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update)
 
@@ -1686,6 +1695,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         hostedWitnesses = Nil,
         contractMetadata = Map.empty,
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update)
 
@@ -1810,6 +1820,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         hostedWitnesses = Nil,
         blindingInfoO = None,
         contractMetadata = Map(contractId -> someContractDriverMetadata),
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update)
 
@@ -1965,6 +1976,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         ),
         hostedWitnesses = Nil,
         contractMetadata = Map.empty,
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update)
 
@@ -2090,6 +2102,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         hostedWitnesses = Nil,
         contractMetadata = Map.empty,
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update)
 
@@ -2161,6 +2174,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         hostedWitnesses = Nil,
         contractMetadata = Map(contractId -> someContractDriverMetadata),
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update)
 
@@ -2224,6 +2238,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
         blindingInfoO = None,
         hostedWitnesses = Nil,
         contractMetadata = Map.empty,
+        domainId = someDomainId1,
       )
       val dtos = updateToDtos(update)
 
@@ -2303,7 +2318,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
             someRecordTime,
             completionInfo,
             state.Update.CommandRejected.FinalReason(status),
-            domainId = None,
+            domainId = someDomainId1,
           )
           val dtos = updateToDtos(update)
 
@@ -2361,6 +2376,7 @@ class UpdateToDbDtoSpec extends AnyWordSpec with Matchers {
             blindingInfoO = None,
             hostedWitnesses = Nil,
             contractMetadata = Map(contractId -> someContractDriverMetadata),
+            domainId = someDomainId1,
           )
           val dtos = updateToDtos(update)
 
@@ -2720,7 +2736,6 @@ object UpdateToDbDtoSpec {
     optUsedPackages = None,
     optNodeSeeds = None,
     optByKeyNodes = None,
-    optDomainId = Some(someDomainId1),
   )
   private val someContractDriverMetadata = Bytes.assertFromString("00abcd")
 

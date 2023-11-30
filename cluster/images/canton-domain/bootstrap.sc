@@ -13,7 +13,7 @@ def main() {
   def staticParameters(sequencer: LocalInstanceReferenceX) =
     domainParametersConfig
       .toStaticDomainParameters(sequencer.config.crypto)
-      .flatMap(StaticDomainParameters(_).leftMap(_.toString))
+      .map(StaticDomainParameters(_))
       .getOrElse(sys.error("whatever"))
   utils.retry_until_true {
     sequencer.health.status match {

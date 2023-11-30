@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.console
 
+import scala.annotation.unused
 import scala.util.control.NoStackTrace
 
 /** Handle an error from a console.
@@ -14,28 +15,20 @@ trait ConsoleErrorHandler {
   def handleInternalError(): Nothing
 }
 
-/** @deprecated use [[CommandFailure]] or [[CantonInternalError]] instead.
-  */
-trait CommandExecutionFailedException extends Throwable
+final class CommandFailure() extends Throwable("Command execution failed.") with NoStackTrace
 
-class CommandFailure(cause: Option[String] = None)
-    extends Throwable(s"Command execution failed. ${cause.getOrElse("")}")
-    with NoStackTrace
-    with CommandExecutionFailedException
-
-class CantonInternalError()
+final class CantonInternalError()
     extends Throwable(
-      s"Command execution failed due to an internal error. Please file a bug report."
+      "Command execution failed due to an internal error. Please file a bug report."
     )
     with NoStackTrace
-    with CommandExecutionFailedException
 
 /** Throws a [[CommandFailure]] or [[CantonInternalError]] when a command fails.
   * The throwables do not have a stacktraces, to avoid noise in the interactive console.
   */
 object ThrowErrorHandler extends ConsoleErrorHandler {
-  override def handleCommandFailure(cause: Option[String] = None): Nothing =
-    throw new CommandFailure(cause)
+  override def handleCommandFailure(@unused cause: Option[String] = None): Nothing =
+    throw new CommandFailure()
 
   override def handleInternalError(): Nothing = throw new CantonInternalError()
 }

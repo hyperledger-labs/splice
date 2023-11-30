@@ -17,7 +17,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.store.MultiDomainAcsStore.ContractState
-import com.digitalasset.canton.console.CommandExecutionFailedException
+import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
@@ -45,7 +45,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       coins
         .zip(expectedAmountRanges)
         .foreach { case (coin, amountBounds) =>
-          coin.contract.payload.owner shouldBe walletParty.toPrim
+          coin.contract.payload.owner shouldBe walletParty.toProtoPrimitive
           val coinAmount =
             coin.contract.payload.amount
           assertInRange(coinAmount.initialAmount, amountBounds)
@@ -961,7 +961,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       try {
         f
       } catch {
-        case ex: CommandExecutionFailedException => {
+        case ex: CommandFailure => {
           logger.debug(s"command failed, triggering retry...")
           fail(ex)
         }

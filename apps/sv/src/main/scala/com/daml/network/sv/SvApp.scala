@@ -658,7 +658,7 @@ object SvApp {
         AsyncCloseable(
           "http binding",
           binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
-          timeouts.shutdownNetwork.unwrap,
+          timeouts.shutdownNetwork,
         ),
         SyncCloseable("sv automation", svAutomation.close()),
         SyncCloseable("svc automation", svcAutomation.close()),

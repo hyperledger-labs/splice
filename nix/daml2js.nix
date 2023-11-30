@@ -6,7 +6,7 @@ stdenv.mkDerivation rec {
   version = sources.version;
   src = builtins.fetchurl {
     url = "https://github.com/digital-asset/daml/releases/download/v${sources.daml_version}/daml-sdk-${sources.sdk_version}-${if stdenv.isDarwin then "macos" else "linux"}.tar.gz";
-    sha256 = if stdenv.isDarwin then "3e58ca38285baab4712fde2830beef294461665a672480d3e772deecdcba36d6" else "ac85b1703386ca253c876edc6615137e889f0f4fa3056c6010e50090419a4aef";
+    sha256 = if stdenv.isDarwin then "570d8f637ccd27f0e5e7eb7aca1c61be75a40464c4f7ed044b81ac4dc9680986" else "767aa755aff2263d12d97e687c70e59d7a5e6dc5f12f318d896d3391567d5619";
   };
   dontUnpack = true;
   installPhase = ''

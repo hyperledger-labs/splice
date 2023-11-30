@@ -3,6 +3,7 @@ package com.daml.network.automation
 import org.apache.pekko.Done
 import com.daml.network.environment.RetryProvider
 import com.daml.metrics.api.MetricsContext
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.tracing.TraceContext
@@ -125,7 +126,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
           previousResult.transformWith {
             case Failure(ex) =>
               // We only call this to get logging
-              (retryable.retryOK(Failure(ex), logger)).discard[ErrorKind]
+              retryable.retryOK(Failure(ex), logger, None).discard[ErrorKind]
               loopWithDelay()
 
             case Success(workDone) => {
@@ -166,7 +167,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
       AsyncCloseable(
         "trigger polling loop",
         pollingLoopRef.get().getOrElse(Future.successful(Done)),
-        timeouts.shutdownNetwork.duration,
+        NonNegativeDuration.tryFromDuration(timeouts.shutdownNetwork.duration),
       )
     )
 

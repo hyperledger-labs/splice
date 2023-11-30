@@ -27,7 +27,7 @@ val domainParametersConfig = DomainParametersConfig(
 def staticParameters(sequencer: LocalInstanceReferenceX) =
   domainParametersConfig
     .toStaticDomainParameters(sequencer.config.crypto)
-    .flatMap(StaticDomainParameters(_).leftMap(_.toString))
+    .map(StaticDomainParameters(_))
     .getOrElse(sys.error("whatever"))
 
 def bootstrapOtherDomain(

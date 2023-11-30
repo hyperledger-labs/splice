@@ -672,8 +672,8 @@ class HttpWalletHandler(
 
 object HttpWalletHandler {
   case class TapRetryable(operationName: String) extends ExceptionRetryable {
-    override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
-        tc: TraceContext
+    override def retryOK(outcome: Try[_], logger: TracedLogger, lastErrorKind: Option[ErrorKind])(
+        implicit tc: TraceContext
     ): ErrorKind = outcome match {
       case Failure(ex: io.grpc.StatusRuntimeException) if isInactiveContract(ex) =>
         logger.info(

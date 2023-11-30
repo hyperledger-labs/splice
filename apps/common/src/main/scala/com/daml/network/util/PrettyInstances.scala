@@ -19,6 +19,17 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
   import scala.jdk.CollectionConverters.*
   import scala.jdk.OptionConverters.*
 
+  private def prettyPrimitiveContractId: Pretty[Primitive.ContractId[_]] = prettyOfString { coid =>
+    val coidStr = scalaz.Tag.unwrap(coid)
+    val tokens = coidStr.split(':')
+    if (tokens.lengthCompare(2) == 0) {
+      tokens(0).readableHash.toString + ":" + tokens(1).readableHash.toString
+    } else {
+      // Don't abbreviate anything for unusual contract ids
+      coidStr
+    }
+  }
+
   // Not made implicit to avoid interpreting all Strings as contract-ids
   private[PrettyInstances] def prettyContractIdString: Pretty[String] =
     coid => prettyPrimitiveContractId.treeOf(Primitive.ContractId[Any].apply(coid))
@@ -37,7 +48,7 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
     r => prettyDamlVariant.treeOf(r.toValue)
 
   implicit def prettyDamlParty: Pretty[javaapi.data.Party] =
-    prettyNode("PartyId", v => Some(prettyOfString(prettyUidString).treeOf(v.getValue)))
+    prettyNode("PartyId", v => Some(prettyPrimitiveParty.treeOf(v)))
 
   implicit def prettyDamlContractId: Pretty[javaapi.data.ContractId] =
     prettyNode("ContractId", v => Some(prettyContractIdString.treeOf(v.getValue)))

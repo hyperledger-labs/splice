@@ -3,9 +3,9 @@
 
 package com.digitalasset.canton.integration
 
-import com.digitalasset.canton.admin.api.client.data.TemplateId.templateIds
+import com.digitalasset.canton.admin.api.client.data.TemplateId.templateIdsFromJava
 import com.digitalasset.canton.config.NonNegativeDuration
-import com.digitalasset.canton.console.{CommandFailure, ParticipantReference}
+import com.digitalasset.canton.console.{CommandFailure, ParticipantReferenceCommon}
 import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.{
@@ -86,8 +86,8 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     * But unlike `ping`, this version mixes nicely with `eventually`.
     */
   def assertPingSucceeds(
-      sender: ParticipantReference,
-      receiver: ParticipantReference,
+      sender: ParticipantReferenceCommon,
+      receiver: ParticipantReferenceCommon,
       timeoutMillis: Long = 20000,
       workflowId: String = "",
       id: String = "",
@@ -105,8 +105,8 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     * But unlike `ping`, this version mixes nicely with `eventually` and it waits until all pong contracts have been archived.
     */
   def assertPingSucceedsAndIsClean(
-      sender: ParticipantReference,
-      receiver: ParticipantReference,
+      sender: ParticipantReferenceCommon,
+      receiver: ParticipantReferenceCommon,
       timeoutMillis: Long = 20000,
       workflowId: String = "",
       id: String = "",
@@ -114,12 +114,12 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     assertPingSucceeds(sender, receiver, timeoutMillis, workflowId, id)
     // wait for pong to be archived before proceeding to avoid race conditions
     eventually() {
-      import com.digitalasset.canton.participant.admin.{workflows as W}
+      import com.digitalasset.canton.participant.admin.workflows.java as W
       forEvery(Seq(sender, receiver)) { p =>
         p.ledger_api.acs
           .of_party(
             p.id.adminParty,
-            filterTemplates = templateIds(W.PingPong.Pong.id),
+            filterTemplates = templateIdsFromJava(W.pingpong.Pong.TEMPLATE_ID),
           ) shouldBe empty
       }
     }

@@ -39,7 +39,9 @@ class MergeMemberTrafficContractsTrigger(
     for {
       svcRules <- store.getSvcRules()
       threshold = svcRules.payload.config.numMemberTrafficContractsThreshold
-      memberId = Member.tryFromProtoPrimitive(memberTraffic.payload.memberId)
+      memberId = Member
+        .fromProtoPrimitive_(memberTraffic.payload.memberId)
+        .fold(e => throw new IllegalArgumentException(e), identity)
       domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
       memberTraffics <- store.listMemberTrafficContracts(
         memberId,

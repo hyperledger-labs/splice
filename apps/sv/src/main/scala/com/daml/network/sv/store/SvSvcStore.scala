@@ -1121,7 +1121,9 @@ object SvSvcStore {
       mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt => vt.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,
-          memberTrafficMember = Some(Member.tryFromProtoPrimitive(contract.payload.memberId)),
+          memberTrafficMember = Member
+            .fromProtoPrimitive_(contract.payload.memberId)
+            .fold(e => throw new IllegalArgumentException(e), Some(_)),
           totalTrafficPurchased = Some(contract.payload.totalPurchased),
         )
       },

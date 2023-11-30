@@ -440,8 +440,8 @@ object RetryProvider {
     private val retryCounter =
       metricsFactory.counter(CNMetrics.MetricsPrefix :+ "retries" :+ "failures")
 
-    override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
-        tc: TraceContext
+    override def retryOK(outcome: Try[_], logger: TracedLogger, lastErrorKind: Option[ErrorKind])(
+        implicit tc: TraceContext
     ): ErrorKind = {
       val errorKind = outcome match {
         case Failure(
@@ -595,6 +595,7 @@ object RetryProvider {
       retryCounter.inc()
       errorKind
     }
+
   }
 
   sealed abstract class Retryable[-A] {

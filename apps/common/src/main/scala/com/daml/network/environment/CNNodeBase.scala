@@ -19,6 +19,7 @@ import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParame
 import com.daml.network.util.{HasHealth, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
@@ -292,6 +293,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     logger.info(s"Stopping $name node")
+    val nonNegativeDuration = NonNegativeDuration.tryFromDuration(closingTimeout)
     Seq(
       // Close first to trigger the node-wide shutdown signal before shutting down actual services
       SyncCloseable(
@@ -305,17 +307,17 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
           case Failure(e) => Failure(e)
           case Success(node) => Success(node.close())
         },
-        closingTimeout,
+        nonNegativeDuration,
       ),
       AsyncCloseable(
         s"$name Ledger API connection",
         ledgerClientF.map(_.close()),
-        closingTimeout,
+        nonNegativeDuration,
       ),
       AsyncCloseable(
         "http pool",
         httpExt.shutdownAllConnectionPools(),
-        closingTimeout,
+        nonNegativeDuration,
       ),
     )
   }

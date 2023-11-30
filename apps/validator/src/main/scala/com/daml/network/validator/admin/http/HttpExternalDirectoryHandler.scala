@@ -102,5 +102,4 @@ class HttpExternalDirectoryHandler(
       } yield res
     }
   }
-
 }

@@ -40,7 +40,9 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
         cc.globaldomain.MemberTraffic,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val memberId = Member.tryFromProtoPrimitive(memberTraffic.payload.memberId)
+    val memberId = Member
+      .fromProtoPrimitive_(memberTraffic.payload.memberId)
+      .fold(e => throw new IllegalArgumentException(e), identity)
     val domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
     for {
       // Compute new extra traffic limit

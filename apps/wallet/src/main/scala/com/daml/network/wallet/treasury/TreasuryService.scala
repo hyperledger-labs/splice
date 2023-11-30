@@ -142,7 +142,7 @@ class TreasuryService(
       AsyncCloseable(
         "waiting for coin operation batch executor shutdown",
         queueTerminationResult.future,
-        timeouts.shutdownShort.unwrap,
+        timeouts.shutdownShort,
       )
     )
 

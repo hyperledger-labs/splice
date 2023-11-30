@@ -794,7 +794,7 @@ object BuildCommon {
             ),
             (
               (Compile / baseDirectory).value,
-              (Compile / damlDarOutput).value / "AdminWorkflowsWithVacuuming-2.8.0.dar",
+              (Compile / damlDarOutput).value / "AdminWorkflowsWithVacuuming-3.0.0.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             ),
           ),
@@ -959,7 +959,7 @@ object BuildCommon {
           daml_metrics,
           daml_lf_data,
           daml_lf_transaction,
-          daml_test_common % Test,
+          daml_http_test_utils % Test,
           daml_testing_utils % Test,
           daml_ports % Test,
           daml_tracing_test_lib % Test,

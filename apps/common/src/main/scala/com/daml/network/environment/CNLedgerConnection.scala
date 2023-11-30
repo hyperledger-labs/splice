@@ -529,7 +529,7 @@ class CNLedgerSubscription[S](
             Success(Done)
           case Failure(ex) => Failure(ex)
         },
-        timeouts.shutdownShort.unwrap,
+        timeouts.shutdownShort,
       ),
     )
   }

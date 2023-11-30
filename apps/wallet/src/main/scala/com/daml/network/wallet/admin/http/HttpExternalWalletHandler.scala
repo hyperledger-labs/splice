@@ -149,8 +149,8 @@ class HttpExternalWalletHandler(
 
 object HttpExternalWalletHandler {
   case class CreateTransferOfferRetryable(operationName: String) extends ExceptionRetryable {
-    override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
-        tc: TraceContext
+    override def retryOK(outcome: Try[_], logger: TracedLogger, lastErrorKind: Option[ErrorKind])(
+        implicit tc: TraceContext
     ): ErrorKind = outcome match {
       // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
       case Failure(ex: io.grpc.StatusRuntimeException)

@@ -3,14 +3,14 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "2.8.0-snapshot.20231114.12362.0.vb81ee69a"
+  val version: String = "2.9.0-snapshot.20231127.12418.0.v59ebefde"
   val daml_language_versions = Seq("1.14", "1.15", "1.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
   val daml_libraries_version = version
   val daml_compiler_version = version
   // TODO(#8069) Revert this back to daml_libraries_version.
-  val daml_java_codegen_version = "2.8.0-snapshot.20231114.12362.0.vb81ee69a"
+  val daml_java_codegen_version = "2.9.0-snapshot.20231127.12418.0.v59ebefde"
   val use_custom_daml_version = false
 
   lazy val osClassifier: String =
@@ -113,7 +113,7 @@ object CantonDependencies {
   lazy val daml_rs_grpc_pekko = "com.daml" %% "rs-grpc-pekko" % daml_libraries_version
   lazy val daml_rs_grpc_testing_utils =
     "com.daml" %% "rs-grpc-testing-utils" % daml_libraries_version
-  lazy val daml_test_common = "com.daml" %% "test-common-1.15" % daml_libraries_version
+  lazy val daml_http_test_utils = "com.daml" %% "http-test-utils" % daml_libraries_version
   lazy val daml_testing_utils = "com.daml" %% "testing-utils" % daml_libraries_version
 
   lazy val bouncycastle_bcprov_jdk15on =

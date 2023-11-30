@@ -132,7 +132,7 @@ case class CNNodeEnvironmentDefinition(
                     def proposeUnionspaceReset(client: CNParticipantClientReference): Unit = {
                       client.topology.unionspaces
                         .propose(
-                          Set(sv1Party.fingerprint),
+                          Set(sv1Party),
                           PositiveInt.one,
                           store,
                           serial = Some(existingUnionspace.context.serial + PositiveInt.one),

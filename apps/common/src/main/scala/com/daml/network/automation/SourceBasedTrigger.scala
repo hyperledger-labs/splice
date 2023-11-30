@@ -96,7 +96,7 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
       AsyncCloseable(
         "waiting for termination of source processing loop",
         executionHandleRef.get().fold(Future.successful(Done.done()))(_.completed),
-        timeouts.shutdownProcessing.unwrap,
+        timeouts.shutdownProcessing,
       )
     )
   }

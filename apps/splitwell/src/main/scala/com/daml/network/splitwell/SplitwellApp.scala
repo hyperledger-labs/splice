@@ -221,7 +221,7 @@ object SplitwellApp {
         AsyncCloseable(
           "http binding",
           binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
-          timeouts.shutdownNetwork.unwrap,
+          timeouts.shutdownNetwork,
         ),
         automation,
         storage,
