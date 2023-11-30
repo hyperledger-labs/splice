@@ -614,18 +614,17 @@ This file contains other clusters' egress IPs that require access to your super 
 
 Each SV member is required to configure their cluster ingress to allow traffic from these IPs to be operational.
 
-* ``https://wallet.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``sv`` namespace
-* ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace. (note that no url rewrite is required for this rule)
-* ``https://sv.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``sv-web-ui`` in the ``sv`` namespace
-* ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/sv`` should be routed to ``/api/sv`` at port 5014 of service ``sv-app`` in the ``sv`` namespace. (note that no url rewrite is required for this rule)
-* ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``scan-web-ui`` in the ``sv`` namespace
-* ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan`` should be routed to ``/api/scan`` at port 5012 in service ``scan-app`` in the ``sv`` namespace. (note that no url rewrite is required for this rule)
+* ``https://wallet.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``sv`` namespace.
+* ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
+* ``https://sv.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``sv-web-ui`` in the ``sv`` namespace.
+* ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/sv`` should be routed to ``/api/sv`` at port 5014 of service ``sv-app`` in the ``sv`` namespace.
+* ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``scan-web-ui`` in the ``sv`` namespace.
+* ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan`` should be routed to ``/api/scan`` at port 5012 in service ``scan-app`` in the ``sv`` namespace.
 * ``cometbft.sv.svc.<YOUR_HOSTNAME>:26656`` should be routed to port 26656 of service ``cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol.
   Please note that cometBFT traffic is purely TCP. TLS is not supported so SNI host routing for these traffic is not possible.
-* ``https://directory.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``directory-web-ui`` in the ``sv`` namespace
-* ``https://directory.sv.svc.<YOUR_HOSTNAME>/api/json-api/*`` should be routed to port 7575 in service ``participant`` in the ``sv`` namespace.
-  Please note that this rule requires a URL rewrite. The `/api/json-api` prefix should be stripped, and only the suffix under ``*`` should end up at the pod.
-* ``https://sequencer.sv.svc.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-sequencer`` in the ``sv`` namespace
+* ``https://directory.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``directory-web-ui`` in the ``sv`` namespace.
+* ``https://directory.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
+* ``https://sequencer.sv.svc.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-sequencer`` in the ``sv`` namespace.
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of an SV node ingress, we have

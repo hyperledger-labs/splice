@@ -402,13 +402,13 @@ Services               Port         Routes
 ``wallet-web-ui``                   ``https://wallet.validator.<YOUR_HOSTNAME>``
 ``validator-app``      5003         ``https://wallet.validator.<YOUR_HOSTNAME>/api/validator``
 ``directory-web-ui``                ``https://directory.validator.<YOUR_HOSTNAME>``
-``participant``        7575         ``https://directory.validator.<YOUR_HOSTNAME>/api/json-api/*``
+``validator-app``      5003         ``https://directory.validator.<YOUR_HOSTNAME>/api/validator``
 ====================== ============ ===========================================================================
 
 * ``https://wallet.validator.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``validator`` namespace
 * ``https://wallet.validator.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``validator`` namespace
 * ``https://directory.validator.<YOUR_HOSTNAME>`` should be routed to service ``directory-web-ui`` in the ``validator`` namespace
-* ``https://directory.validator.<YOUR_HOSTNAME>/api/json-api/*`` should be routed to port 7575 in service ``participant`` in the ``validator`` namespace. Note that the path should be stripped and only the suffix under ``*`` should end up at the pod.
+* ``https://directory.validator.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``validator`` namespace
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of a Validator node ingress, we have

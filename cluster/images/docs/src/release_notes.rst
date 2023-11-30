@@ -3,6 +3,18 @@
 Release Notes
 =============
 
+2023-12-11
+----------
+
+* Deployment:
+
+  * The `https://directory.sv.svc.<YOUR_HOSTNAME>/api/json-api/*` ingress rule is no longer required for validators and super-validators
+
+* Documentation:
+
+  * Added an ingress rule for `https://directory.sv.svc.<YOUR_HOSTNAME>/api/validator`, which was accidentally omitted from the instructions.
+
+
 2023-12-04
 ----------
 
@@ -19,7 +31,7 @@ Release Notes
 
   * Updated SV runbook with a list of outbound traffic.
 
-* The `/v0/activities` and `/v0/transactions` Scan APIs now include normalized balance changes per party. 
+* The `/v0/activities` and `/v0/transactions` Scan APIs now include normalized balance changes per party.
   Please see the Scan OpenAPI specification.
 
 2023-11-27

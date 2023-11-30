@@ -97,18 +97,6 @@ spec:
   gateways:
     - cluster-ingress/cn-http-gateway
   http:
-    # TODO(#8269) remove this config
-    - match:
-        - port: 443
-          uri:
-            prefix: "/api/json-api/"
-      rewrite:
-        uri: "/"
-      route:
-        - destination:
-            port:
-              number: 7575
-            host: participant.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
     - match:
         - port: 443
           uri:
