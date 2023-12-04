@@ -1,0 +1,58 @@
+module CN.Wallet.BuyTrafficRequest where
+
+import CC.Coin
+import CC.CoinRules
+import CC.GlobalDomain (MemberTraffic)
+import CN.Util.Assert
+
+
+data BuyTrafficRequestTrackingInfo = BuyTrafficRequestTrackingInfo
+  with
+    trackingId : Text -- ^ used to deduplicate requests and query for the status
+    endUserParty : Party -- ^ used in UserWalletTxLogParser's filterByParty
+  deriving (Eq, Show)
+
+-- | A request by an end-user to the wallet's automation to buy traffic
+-- for a member of a domain.
+template BuyTrafficRequest
+  with
+    svc : Party
+    endUserParty : Party
+    expiresAt : Time -- ^ Buy the traffic before this time.
+    trackingId : Text -- ^ Used to deduplicate requests
+    trafficAmount : Int
+    memberId : Text
+    domainId : Text
+  where
+    signatory endUserParty
+
+    choice BuyTrafficRequest_Complete
+      : ((ContractId MemberTraffic, BuyTrafficRequestTrackingInfo), Optional (ContractId Coin))
+      with
+        inputs : [TransferInput]
+        context : PaymentTransferContext
+        walletProvider : Party
+      controller endUserParty, walletProvider
+      do
+        now <- getTime
+        require "Contract has not expired" (now < expiresAt)
+        (trafficCid, changeCoin) <- exercise context.coinRules (CoinRules_BuyMemberTraffic inputs context endUserParty memberId domainId trafficAmount)
+        let trackingInfo = BuyTrafficRequestTrackingInfo with ..
+        pure ((trafficCid, trackingInfo), changeCoin)
+
+    choice BuyTrafficRequest_Cancel : BuyTrafficRequestTrackingInfo
+      with
+        reason : Text
+      controller endUserParty
+      do
+        now <- getTime
+        require "Contract has not expired" (now < expiresAt)
+        pure BuyTrafficRequestTrackingInfo with ..
+
+    choice BuyTrafficRequest_Expire : BuyTrafficRequestTrackingInfo
+      with
+      controller endUserParty
+      do
+        now <- getTime
+        require "Contract has expired" (now >= expiresAt)
+        pure BuyTrafficRequestTrackingInfo with ..

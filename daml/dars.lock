@@ -4,13 +4,13 @@ daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar 7b803967e5865916ef6c26f38a5268
 daml/canton-name-service-upgrade/.daml/dist/canton-name-service-0.2.0.dar 16175052dbd509367d11411cd11255b9af69b54d71f03897ed50a42fbb1de999
 daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar 7bbf32db65e9d65428f63764a8a4c6662caadd680d6199d02cab4b9439c631e8
 daml/cn-util/.daml/dist/cn-util-0.1.0.dar 903fbe0f851785a01d6afee8cca98b955745a204a84e3deee9529392fde908b2
-daml/splitwell-upgrade/.daml/dist/splitwell-0.2.0.dar 6901cfb63b976989b4bf44584760f5c323d2ec3b7d438b120cf38d4a1fd92a61
-daml/splitwell/.daml/dist/splitwell-0.1.0.dar cfcabad74ec3519dab92776e0dbfff6f4ad2256f42e278302b0d78b939c9de09
+daml/splitwell-upgrade/.daml/dist/splitwell-0.2.0.dar 85ae0c37aadbf85080112a015ac5ecaf48a444a572849982f9a2de1fc7a95051
+daml/splitwell/.daml/dist/splitwell-0.1.0.dar e9780878d1b5bb3fe2c537b18f16836e6b4ec2af518ade98d4bb463d4a7a0420
 daml/sv-local/.daml/dist/sv-local-0.1.0.dar 97b5a7615e5737a85d6ecb7bf5458a9523c84d22bae29eaa227e646ebc7e04a2
 daml/svc-governance-upgrade/.daml/dist/svc-governance-0.2.0.dar 55346d11ad33c2dada5f1e295f01108d0bc51e6a0347e45050b644180388ab27
 daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar 114efeccd2562460850f3758646e6262701ce4c23eda48f6663afab7f06c2f78
 daml/validator-lifecycle/.daml/dist/validator-lifecycle-0.1.0.dar 582fef12caa94d4140cfbbc34d4d95fe33fdbdabba8a18354f3b42213ecb0f6c
 daml/wallet-payments-upgrade/.daml/dist/wallet-payments-0.2.0.dar 166fbf6269786cf03abf0d800db51bf0060522227bd73ca8535a32c033b0ea3f
 daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar 1461fc0a9e7fbf83c5f320288a4d6ced91f8a0f082e5bba21d1e9ae509314ba1
-daml/wallet-upgrade/.daml/dist/wallet-0.2.0.dar 4ded7afb2d624640f2b5b429fa6f8d48491bd62d2a435ef0a45087bced3e21e1
-daml/wallet/.daml/dist/wallet-0.1.0.dar 8fc8ffa0ced3564eb72fc32b9097e7d54b4ad7efa2683f66298345d7d6747e9f
+daml/wallet-upgrade/.daml/dist/wallet-0.2.0.dar e8f5127cc8a9ea4aae56c4d20fe19529acdd8d6474857a823e9ba68ff14c5671
+daml/wallet/.daml/dist/wallet-0.1.0.dar f3296ac17121e985d24b9d3e5025bbb20b3ee6726078722ad4800034ab7ffd6a

@@ -13,6 +13,7 @@ import CC.GlobalDomain
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 import CN.Wallet.TransferOffer
+import CN.Wallet.BuyTrafficRequest
 import CN.Wallet.TopUpState
 import Prelude hiding (forA)
 import CN.Util.Assert (require)
@@ -41,6 +42,7 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
     CO_BuyMemberTraffic trafficAmount memberId domainId minTopupInterval topupStateCid -> do
       resultE <- catchAll $ handleBuyMemberTraffic trafficAmount memberId domainId minTopupInterval topupStateCid
       handleResult COO_BuyMemberTraffic resultE
+    CO_CompleteBuyTrafficRequest cid -> handle BuyTrafficRequest_Complete COO_CompleteBuyTrafficRequest cid
     CO_MergeTransferInputs -> do
         let transfer = mkMergeCoinAndRewardsTransfer endUserP inputs
         result <- catchAll (exercisePaymentTransfer context transfer)
@@ -155,6 +157,8 @@ data CoinOperation
       domainId : Text
       minTopupInterval: RelTime
       topupStateCid : Optional (ContractId ValidatorTopUpState)
+  | CO_CompleteBuyTrafficRequest with
+      trafficRequestCid: ContractId BuyTrafficRequest
   | CO_Tap with
       tapAmount: Decimal
   deriving (Eq, Show)
@@ -169,6 +173,7 @@ data CoinOperationOutcome
   -- and needs to communicate to the caller whether a merge happend.
   | COO_MergeTransferInputs (Optional (ContractId Coin))
   | COO_BuyMemberTraffic (ContractId MemberTraffic)
+  | COO_CompleteBuyTrafficRequest ((ContractId MemberTraffic), BuyTrafficRequestTrackingInfo)
   | COO_Tap (ContractId Coin)
   | COO_Error InvalidTransferReason
   deriving (Eq, Show)
@@ -283,6 +288,32 @@ template WalletAppInstall
         cid : ContractId AcceptedTransferOffer
       controller validatorParty
       do exercise cid $ AcceptedTransferOffer_Expire with actor = endUserParty
+
+    nonconsuming choice WalletAppInstall_CreateBuyTrafficRequest : ContractId BuyTrafficRequest
+      with
+        memberId : Text
+        domainId : Text
+        trafficAmount : Int
+        expiresAt : Time
+        trackingId : Text
+      controller validatorParty
+      do
+        create BuyTrafficRequest with
+          svc = svcParty
+          ..
+
+    nonconsuming choice WalletAppInstall_BuyTrafficRequest_Cancel : BuyTrafficRequestTrackingInfo
+      with
+        requestCid : ContractId BuyTrafficRequest
+        reason : Text
+      controller validatorParty
+      do exercise requestCid $ BuyTrafficRequest_Cancel with reason
+
+    nonconsuming choice WalletAppInstall_BuyTrafficRequest_Expire : BuyTrafficRequestTrackingInfo
+      with
+        requestCid : ContractId BuyTrafficRequest
+      controller validatorParty
+      do exercise requestCid $ BuyTrafficRequest_Expire
 
     nonconsuming choice WalletAppInstall_FeaturedAppRights_Cancel : ()
       with

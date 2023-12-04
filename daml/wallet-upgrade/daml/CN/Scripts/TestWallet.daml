@@ -15,6 +15,7 @@ import CN.Wallet.Install
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 import CN.Wallet.TopUpState
+import CN.Wallet.BuyTrafficRequest
 import CN.Scripts.Wallet.TestSubscriptions
 
 import CC.Fees
@@ -533,7 +534,6 @@ testBuyMemberTraffic = script do
   now <- getTime
   [(coinRulesCid, coinRules)] <- query @CoinRules app.svc
   let globalDomainConfig = (CC.Schedule.getValueAsOf now coinRules.configSchedule).globalDomain
-  let extraTrafficPrice = globalDomainConfig.fees.extraTrafficPrice
   let domainId = globalDomainConfig.activeDomain
   let testParticipantId = "alice_validator_participant_id"
 
@@ -572,10 +572,8 @@ testBuyMemberTraffic = script do
 
   -- validate the state of the member traffic contract
   Some traffic1 <- queryContractId @MemberTraffic app.svc trafficCid1
-  let totalPurchased = minTopupAmount
-  let usdSpent = intToDecimal totalPurchased / 1e6 * extraTrafficPrice
-  let ccSpent = usdSpent / openRound.coinPrice
-  traffic1.totalPurchased === totalPurchased
+  (ccSpent, usdSpent) <- calculateDomainFees app minTopupAmount
+  traffic1.totalPurchased === minTopupAmount
   traffic1.numPurchases === 1
   traffic1.ccSpent === ccSpent
   traffic1.usdSpent === usdSpent
@@ -630,8 +628,7 @@ testBuyMemberTraffic = script do
   -- validate the state of the member traffic contract
   Some providerTraffic <- queryContractId @MemberTraffic app.svc providerTrafficCid
   let totalPurchased = minTopupAmount + 1
-  let usdSpent = intToDecimal totalPurchased / 1e6 * extraTrafficPrice
-  let ccSpent = usdSpent / openRound2.coinPrice
+  (ccSpent, usdSpent) <- calculateDomainFees app totalPurchased
   providerTraffic.totalPurchased === totalPurchased
   providerTraffic.numPurchases === 1
   providerTraffic.ccSpent === ccSpent
@@ -644,15 +641,73 @@ testBuyMemberTraffic = script do
   providerCoupon.provider === provider1Validator.primaryParty
   providerCoupon.round === openRound2.round
 
+  -- Test that top-ups by means of BuyTrafficRequest contracts work
+
+  -- advance rounds to ensure that reward coupons issued have a different round number
+  runNextIssuance app
+  (_, openRound3) <- getLatestOpenRound app
+  openRound3.round.number === openRound2.round.number + 1
+
+  -- create a wallet install contract and tap some coins for provider2
+  provider2Install <- submitMulti [provider2.primaryParty, provider2Validator.primaryParty] [] $ createCmd $ WalletAppInstall with
+      endUserParty = provider2.primaryParty
+      endUserName = "provider2_wallet_user"
+      svcParty = app.svc
+      validatorParty = provider2Validator.primaryParty
+  _ <- tap app provider2 10.0
+
+  let createTrafficRequest amount memberId domainId trackingId expiresAt = submitMulti [provider2Validator.primaryParty] [provider2.primaryParty] $
+        exerciseCmd provider2Install $ WalletAppInstall_CreateBuyTrafficRequest with
+          trafficAmount = amount
+          memberId = memberId
+          domainId = domainId
+          trackingId = trackingId
+          expiresAt = expiresAt
+
+  now <- getTime
+  -- time-expired traffic requests cannot be completed or cancelled, only archived
+  request1 <- createTrafficRequest minTopupAmount testParticipantId domainId "request1" now
+  COO_Error (ITR_Other ("The requirement 'Contract has not expired' was not met.")) <- executeCoinOperation app provider2 $
+    CO_CompleteBuyTrafficRequest request1
+  submitMustFail provider2.primaryParty $ exerciseCmd request1 BuyTrafficRequest_Cancel with reason = "not required"
+  trackingInfo <- submit provider2.primaryParty $ exerciseCmd request1 BuyTrafficRequest_Expire
+  trackingInfo.endUserParty === provider2.primaryParty
+  trackingInfo.trackingId === "request1"
+
+  -- unexpired traffic requests are completed successfully
+  request2 <- createTrafficRequest minTopupAmount testParticipantId domainId "request2" (now `addRelTime` minutes 1)
+  COO_CompleteBuyTrafficRequest (requestTrafficCid, trackingInfo) <- executeCoinOperation app provider2 $
+    CO_CompleteBuyTrafficRequest request2
+  Some requestedTraffic <- queryContractId @MemberTraffic app.svc requestTrafficCid
+  requestedTraffic.totalPurchased === minTopupAmount
+  requestedTraffic.memberId === testParticipantId
+  requestedTraffic.domainId === domainId
+  trackingInfo.trackingId === "request2"
+  trackingInfo.endUserParty === provider2.primaryParty
+  -- check that the app reward coupons were issued to the provider
+  [(_, providerCoupon)] <- query @AppRewardCoupon provider2.primaryParty
+  providerCoupon.provider === provider2.primaryParty
+  providerCoupon.round === openRound3.round
+
+  -- check that traffic requests can be cancelled by the requester
+  request3 <- createTrafficRequest minTopupAmount testParticipantId domainId "request3" (now `addRelTime` minutes 1)
+  trackingInfo <- submit provider2.primaryParty $
+    exerciseCmd request3 BuyTrafficRequest_Cancel with reason = "not required"
+  trackingInfo.trackingId === "request3"
+  trackingInfo.endUserParty === provider2.primaryParty
+  None <- queryContractId @BuyTrafficRequest provider2.primaryParty request3
+
+  -- Merging traffic contracts
+
   -- test that the SVC can merge multiple member traffic contracts
-  let trafficCids = [trafficCid1, trafficCid2, providerTrafficCid]
+  let trafficCids = [trafficCid1, trafficCid2, providerTrafficCid, requestTrafficCid]
   submit app.svc $ exerciseCmd coinRulesCid CoinRules_MergeMemberTrafficContracts with trafficCids
   [(mergedTrafficCid, mergedTraffic)] <- queryFilter @MemberTraffic app.svc (\t -> t.memberId == testParticipantId)
   assert $ notElem mergedTrafficCid trafficCids
-  mergedTraffic.totalPurchased === 3 * minTopupAmount + 1
-  mergedTraffic.numPurchases === 3
-  mergedTraffic.usdSpent === traffic1.usdSpent + traffic2.usdSpent + providerTraffic.usdSpent
-  mergedTraffic.ccSpent === traffic1.ccSpent + traffic2.ccSpent + providerTraffic.ccSpent
+  mergedTraffic.totalPurchased === 4 * minTopupAmount + 1
+  mergedTraffic.numPurchases === 4
+  mergedTraffic.usdSpent === traffic1.usdSpent + traffic2.usdSpent + providerTraffic.usdSpent + requestedTraffic.usdSpent
+  mergedTraffic.ccSpent === traffic1.ccSpent + traffic2.ccSpent + providerTraffic.ccSpent + requestedTraffic.ccSpent
 
   -- at least 1 contract must be provided to merge
   submitMustFail app.svc $ exerciseCmd coinRulesCid CoinRules_MergeMemberTrafficContracts with
@@ -748,12 +803,26 @@ withError outcomes f = case outcomes of
 
 executeCoinOperation : CCApp -> CCUser -> CoinOperation -> Script CoinOperationOutcome
 executeCoinOperation app user op = do
-  [(installCid, _)] <- query @WalletAppInstall user.primaryParty
+  [(installCid, install)] <- queryFilter @WalletAppInstall user.primaryParty (\i -> i.endUserParty == user.primaryParty)
   context <- getPaymentTransferContext app user
   coins <- queryFilter @Coin user.primaryParty (\coin -> coin.owner == user.primaryParty)
-  result <- submitUser user.userId $ exerciseCmd installCid WalletAppInstall_ExecuteBatch with
-    inputs = [InputCoin coin._1 | coin <- coins]
-    operations = [op]
-    context
+  -- TODO(#2957): remove read-as SVC.
+  result <- submitMulti [install.validatorParty] [install.endUserParty, install.validatorParty, app.svc] $
+    exerciseCmd installCid WalletAppInstall_ExecuteBatch with
+      inputs = [InputCoin coin._1 | coin <- coins]
+      operations = [op]
+      context
   let [outcome] = result.outcomes
   pure outcome
+
+calculateDomainFees : CCApp -> Int -> Script (Decimal, Decimal)
+calculateDomainFees app trafficAmount = do
+  now <- getTime
+  [(_, coinRules)] <- query @CoinRules app.svc
+  let globalDomainConfig = (CC.Schedule.getValueAsOf now coinRules.configSchedule).globalDomain
+  let extraTrafficPrice = globalDomainConfig.fees.extraTrafficPrice
+  (_, openRound) <- getLatestOpenRound app
+  let coinPrice = openRound.coinPrice
+  let trafficCostUsd = intToDecimal trafficAmount / 1e6 * extraTrafficPrice
+  let trafficCostCc = trafficCostUsd / coinPrice
+  pure (trafficCostCc, trafficCostUsd)
