@@ -7,7 +7,12 @@ import { PollingStrategy } from '../..';
 import { Contract } from '../../utils';
 import { useScanClient } from './ScanClientContext';
 
-const useLookupCnsEntryByName = (name: string): UseQueryResult<Contract<CnsEntry>> => {
+const useLookupCnsEntryByName = (
+  name: string,
+  enabled: boolean = true,
+  retryWhenNotFound: boolean = false,
+  retry: number = 3
+): UseQueryResult<Contract<CnsEntry>> => {
   const scanClient = useScanClient();
 
   return useQuery({
@@ -19,13 +24,20 @@ const useLookupCnsEntryByName = (name: string): UseQueryResult<Contract<CnsEntry
         return Contract.decodeOpenAPI(response.entry, CnsEntry);
       } catch (e: unknown) {
         if ((e as ApiException<undefined>).code === 404) {
-          console.debug(`No CNS entry for name ${name} found`);
-          return null;
+          console.info(`No CNS entry for name ${name} found`);
+          if (retryWhenNotFound) {
+            throw e;
+          } else {
+            return null;
+          }
         } else {
+          console.info(`what ${e} found`);
           throw e;
         }
       }
     },
+    enabled: name !== '' && enabled,
+    retry,
   });
 };
 

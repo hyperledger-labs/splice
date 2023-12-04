@@ -1,11 +1,11 @@
 import { Loading } from 'common-frontend';
+import { useLookupCnsEntryByName } from 'common-frontend/scan-api';
 import React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { CloseRounded, DoneRounded } from '@mui/icons-material';
 import { Button, Stack, Typography } from '@mui/material';
 
-import { useLookupEntryByName } from '../hooks';
 import { usePrimaryParty } from '../hooks/queries/usePrimaryParty';
 import { ENTRY_NAME_SUFFIX, toFullEntryName } from '../utils';
 
@@ -19,7 +19,12 @@ export const PostPayment: React.FC = () => {
     isLoading: directoryEntryIsLoading,
     isError: directoryEntryIsError,
     error: directoryEntryError,
-  } = useLookupEntryByName(entryName, ENTRY_NAME_SUFFIX, true);
+  } = useLookupCnsEntryByName(
+    toFullEntryName(entryName, ENTRY_NAME_SUFFIX),
+    !!primaryPartyId,
+    true,
+    10
+  );
 
   if (!entryName) {
     console.error('PostPayment rendered without entryName.');
@@ -28,7 +33,7 @@ export const PostPayment: React.FC = () => {
 
   const fullEntryName = toFullEntryName(entryName, ENTRY_NAME_SUFFIX);
 
-  const directoryEntryOwner = directoryEntry?.entryContract?.payload.user;
+  const directoryEntryOwner = directoryEntry?.payload.user;
 
   if (!primaryPartyId || !directoryEntryOwner || directoryEntryIsLoading) {
     return <DirectoryLoading fullEntryName={fullEntryName} />;

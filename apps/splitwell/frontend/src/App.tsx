@@ -6,7 +6,6 @@ import {
   theme,
   cnReplaceEqualDeep,
   useUserState,
-  ScanClientProvider as OldScanClientProvider,
   PackageIdResolver,
 } from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
@@ -64,23 +63,20 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 
   const config = useConfig();
 
-  // TODO: (#8692) remove OldScanClientProvider when we no longer use it.
   return (
     <AuthProvider authConf={config.auth}>
       <QueryClientProvider client={queryClient}>
         <ReactQueryDevtools initialIsOpen={false} />
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
           <SplitwellClientProvider url={config.services.splitwell.url}>
-            <OldScanClientProvider url={config.services.scan.url}>
-              <ScanClientProvider url={config.services.scan.url}>
-                <SplitwellLedgerApiClientProvider
-                  jsonApiUrl={config.services.jsonApi.url}
-                  packageIdResolver={new SplitwellPackageIdResolver()}
-                >
-                  {children}
-                </SplitwellLedgerApiClientProvider>
-              </ScanClientProvider>
-            </OldScanClientProvider>
+            <ScanClientProvider url={config.services.scan.url}>
+              <SplitwellLedgerApiClientProvider
+                jsonApiUrl={config.services.jsonApi.url}
+                packageIdResolver={new SplitwellPackageIdResolver()}
+              >
+                {children}
+              </SplitwellLedgerApiClientProvider>
+            </ScanClientProvider>
           </SplitwellClientProvider>
         </UserProvider>
       </QueryClientProvider>

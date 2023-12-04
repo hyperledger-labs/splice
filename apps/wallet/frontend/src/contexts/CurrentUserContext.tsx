@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { PollingStrategy, useScanClient } from 'common-frontend';
+import { PollingStrategy } from 'common-frontend';
+import { useLookupCnsEntryByParty } from 'common-frontend/scan-api';
 import { createContext, useContext, useState } from 'react';
 
 import { Party } from '@daml/types';
@@ -15,19 +16,19 @@ const CurrentUserContext: React.Context<CurrentUser> = createContext<CurrentUser
 });
 
 export const CurrentUserProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
-  const scanClient = useScanClient();
   const primaryPartyId = usePrimaryParty();
 
   const [currentUser, setCurrentUser] = useState<CurrentUser>({ state: 'not_onboarded' });
+  const { data: directoryEntry } = useLookupCnsEntryByParty(primaryPartyId);
+  const directoryEntryName = directoryEntry?.payload.name;
 
   useQuery({
     refetchInterval: PollingStrategy.NONE,
-    queryKey: ['lookupEntryByParty', primaryPartyId],
+    queryKey: ['lookupEntryByParty', primaryPartyId, directoryEntry, directoryEntryName],
     queryFn: async () => {
-      const directoryEntry = await scanClient.lookupEntryByParty(primaryPartyId!);
       setCurrentUser({
         state: 'onboarded',
-        directoryEntry: directoryEntry?.name,
+        directoryEntry: directoryEntryName,
         primaryParty: primaryPartyId!,
       });
       return directoryEntry;

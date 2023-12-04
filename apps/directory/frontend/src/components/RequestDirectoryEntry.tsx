@@ -1,5 +1,5 @@
 import { AmountDisplay, IntervalDisplay, SubscriptionButton } from 'common-frontend';
-import { useGetCnsRules } from 'common-frontend/scan-api';
+import { useGetCnsRules, useLookupCnsEntryByName } from 'common-frontend/scan-api';
 import React, { useState } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 
@@ -7,7 +7,8 @@ import { CheckCircleOutline, ErrorOutline } from '@mui/icons-material';
 import { Box, Button, Stack, Typography, styled } from '@mui/material';
 
 import Searchbar from '../components/Searchbar';
-import { useLookupEntryByName, useRequestEntry } from '../hooks';
+import { useRequestEntry } from '../hooks';
+import { usePrimaryParty } from '../hooks/queries/usePrimaryParty';
 import { config, ENTRY_NAME_SUFFIX, toFullEntryName } from '../utils';
 
 type NameLookupStatus = 'available' | 'taken' | 'loading';
@@ -25,11 +26,15 @@ const RequestDirectoryEntry: React.FC = () => {
   }, 500);
 
   const [displayValidationResult, setDisplayValidationResult] = useState(false);
-  const { data: entryLookupResult, isLoading } = useLookupEntryByName(entryName, ENTRY_NAME_SUFFIX);
+  const primaryPartyId = usePrimaryParty();
+  const { data: entryLookupResult, isLoading } = useLookupCnsEntryByName(
+    toFullEntryName(entryName, ENTRY_NAME_SUFFIX),
+    !!primaryPartyId
+  );
 
   const nameLookupStatus: NameLookupStatus = isLoading
     ? 'loading'
-    : entryLookupResult?.entryContract === undefined
+    : entryLookupResult === null
     ? 'available'
     : 'taken';
   const searchButtonDisabled = nameLookupStatus === 'loading';

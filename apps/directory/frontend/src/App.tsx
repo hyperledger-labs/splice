@@ -1,12 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import {
-  AuthProvider,
-  theme,
-  UserProvider,
-  ScanClientProvider as OldScanClientProvider,
-  cnReplaceEqualDeep,
-} from 'common-frontend';
+import { AuthProvider, theme, UserProvider, cnReplaceEqualDeep } from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
 import {
@@ -35,20 +29,17 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     },
   });
 
-  // TODO: (#8692) remove OldScanClientProvider when we no longer use it.
   return (
     <AuthProvider authConf={config.auth}>
       <QueryClientProvider client={queryClient}>
         <ReactQueryDevtools initialIsOpen={false} />
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
           <WalletClientProvider url={config.services.validator.url}>
-            <OldScanClientProvider url={config.services.scan.url}>
-              <ScanClientProvider url={config.services.scan.url}>
-                <ExternalDirectoryClientProvider url={config.services.validator.url}>
-                  {children}
-                </ExternalDirectoryClientProvider>
-              </ScanClientProvider>
-            </OldScanClientProvider>
+            <ScanClientProvider url={config.services.scan.url}>
+              <ExternalDirectoryClientProvider url={config.services.validator.url}>
+                {children}
+              </ExternalDirectoryClientProvider>
+            </ScanClientProvider>
           </WalletClientProvider>
         </UserProvider>
       </QueryClientProvider>

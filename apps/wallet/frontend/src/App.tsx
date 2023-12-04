@@ -1,13 +1,7 @@
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import {
-  AuthProvider,
-  cnReplaceEqualDeep,
-  theme,
-  UserProvider,
-  ScanClientProvider as OldScanClientProvider,
-} from 'common-frontend';
+import { AuthProvider, cnReplaceEqualDeep, theme, UserProvider } from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import {
   createBrowserRouter,
@@ -47,7 +41,6 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
     },
   });
 
-  // TODO: (#8692) remove OldScanClientProvider when we no longer use it.
   return (
     <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
       <QueryClientProvider client={queryClient}>
@@ -56,9 +49,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
           <ValidatorClientProvider url={config.services.validator.url}>
             <WalletClientProvider url={config.services.validator.url}>
               <ScanClientProvider url={config.services.scan.url}>
-                <OldScanClientProvider url={config.services.scan.url}>
-                  <CurrentUserProvider>{children}</CurrentUserProvider>
-                </OldScanClientProvider>
+                <CurrentUserProvider>{children}</CurrentUserProvider>
               </ScanClientProvider>
             </WalletClientProvider>
           </ValidatorClientProvider>

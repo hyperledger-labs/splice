@@ -1,5 +1,4 @@
 export { SvClientProvider, useSvClient } from './SvServiceContext';
-export { ScanClientProvider, useScanClient } from './ScanServiceContext';
 
 export { useUserState, UserContext, UserProvider } from './UserContext';
 export {

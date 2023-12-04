@@ -1,11 +1,12 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useEffect } from 'react';
 
 import { Autocomplete, StandardTextFieldProps, TextField } from '@mui/material';
 
 import { CnsEntry } from '@daml.js/cns/lib/CN/Cns';
 import { Party } from '@daml/types';
 
-import { useScanClient } from '../contexts';
+import useListCnsEntries from '../api/scan/useListCnsEntries';
+import useLookupCnsEntryByName from '../api/scan/useLookupCnsEntryByName';
 import { Contract } from '../utils';
 
 interface Props extends StandardTextFieldProps {
@@ -15,38 +16,35 @@ interface Props extends StandardTextFieldProps {
 type UserInput = { type: 'typed'; value: string } | { type: 'selected'; value: string };
 
 const DirectoryField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
-  const scanClient = useScanClient();
-  const [options, setOptions] = React.useState<Contract<CnsEntry>[]>([]);
-  const [resolvedParty, setResolvedPartyId] = React.useState<string>('');
   const [userInput, setUserInput] = React.useState<UserInput>({ type: 'typed', value: '' });
-  const onInputChange = async (event: React.SyntheticEvent, newValue: string, reason: string) => {
+  const [resolvedPartyId, setResolvedPartyId] = React.useState<string>('');
+  const cnsEntriesQuery = useListCnsEntries(20, userInput.value);
+  const cnsEntryQuery = useLookupCnsEntryByName(userInput.value, userInput.type === 'typed');
+
+  useEffect(() => {
+    const setPartyAndNotify = (party: string) => {
+      onPartyChanged(party);
+      setResolvedPartyId(party);
+    };
+    const directoryEntryParty = cnsEntryQuery.data?.payload.user || userInput.value;
+    setPartyAndNotify(directoryEntryParty);
+  }, [userInput, cnsEntryQuery, onPartyChanged]);
+
+  const onInputChange = async (_: React.SyntheticEvent, newValue: string, reason: string) => {
     if (reason === 'reset') {
       return;
     }
+
+    if (reason === 'clear') {
+      setUserInput({ type: 'typed', value: '' });
+    }
+
     setUserInput({ type: 'typed', value: newValue });
   };
 
-  useEffect(() => {
-    let effectCancelled = false;
-    const fetchCompletions = async () => {
-      if (userInput.type === 'typed') {
-        // TODO: (#8692) replace this with react query
-        const entries = (await scanClient.listEntries(20, userInput.value)).entries;
-        const decoded = entries.map(c => Contract.decodeOpenAPI(c, CnsEntry));
-        if (!effectCancelled) {
-          setOptions(decoded);
-        }
-      }
-    };
-    fetchCompletions();
-    return () => {
-      effectCancelled = true;
-    };
-  }, [userInput, scanClient]);
-
   const onItemSelected = async (
-    event: React.SyntheticEvent,
-    item: string | Contract<CnsEntry> | null
+    _: React.SyntheticEvent,
+    item: Contract<CnsEntry> | string | null
   ) => {
     if (item === null || typeof item === 'string') {
       return;
@@ -55,77 +53,26 @@ const DirectoryField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
     setUserInput({ type: 'selected', value: item.payload.user });
   };
 
-  const resolveUserInput = useCallback(
-    async (input: string) => {
-      if (input !== undefined || input !== null || input !== '') {
-        try {
-          // TODO: (#8692) replace this with react query
-          const entry = await scanClient.lookupEntryByName(input);
-          if (entry === undefined) {
-            // Could not lookup cns name - assume input is a party ID
-            return input;
-          } else {
-            // Lookup succeeded - the user typed a valid cns entry - use the resolved party ID
-            return entry.payload.user;
-          }
-        } catch {
-          // Input is not a known cns name - assume it is as a party ID
-          return input;
-        }
-      } else {
-        return input;
-      }
-    },
-    [scanClient]
-  );
-
-  useEffect(() => {
-    const setPartyAndNotify = (party: string) => {
-      onPartyChanged(party);
-      setResolvedPartyId(party);
-    };
-
-    let effectCancelled = false;
-
-    const resolveParty = async () => {
-      switch (userInput.type) {
-        case 'selected':
-          setPartyAndNotify(userInput.value);
-          break;
-        case 'typed':
-          const resolved = await resolveUserInput(userInput.value);
-          if (!effectCancelled) {
-            setPartyAndNotify(resolved);
-          }
-          break;
-      }
-    };
-    resolveParty();
-    return () => {
-      effectCancelled = true;
-    };
-  }, [userInput, resolveUserInput, onPartyChanged]);
-
   return (
     <Autocomplete
+      freeSolo
+      id={props.id}
+      sx={{ width: 200 }}
+      className={props.className}
       filterOptions={x => x}
       renderInput={params => (
         <TextField
           {...params}
           fullWidth
-          inputProps={{ ...params.inputProps, 'data-resolved-party-id': resolvedParty }}
+          inputProps={{ ...params.inputProps, 'data-resolved-party-id': resolvedPartyId }}
         />
       )}
-      options={options}
-      getOptionLabel={(option: string | Contract<CnsEntry>) =>
+      options={cnsEntriesQuery.data || []}
+      getOptionLabel={(option: Contract<CnsEntry> | string) =>
         typeof option === 'string' ? option : option.payload.name
       }
       onInputChange={onInputChange}
       onChange={onItemSelected}
-      freeSolo
-      id={props.id}
-      className={props.className}
-      sx={{ width: 200 }}
     />
   );
 };
