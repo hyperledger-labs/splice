@@ -750,6 +750,8 @@ function subcmd_create() {
     fi
 
     _log "Cluster at IP ${IPADDR} ready"
+
+    _warning "Please note that Auth0 applications are not automatically updated at the moment. Make sure to add URLs for your new cluster as allowed callback URLs, allowed logout URLs, etc. in the relevant Auth0 UI applications."
 }
 
 ###
