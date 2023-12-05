@@ -72,11 +72,6 @@ while getopts "hdap:c:wsbtfgm" arg; do
   esac
 done
 
-if [ $globalUpgradeDomain -ne 0 ] && [ $wallclocktime -ne 0 ]; then
-  >&2 echo "-g requires -s to be passed as well"
-  exit 1
-fi
-
 tmux_session="canton"
 tmux_window=0
 
@@ -120,9 +115,15 @@ any_time_db_names=(
   "participant_bob"
   "participant_splitwell"
   "sequencer_driver_global_upgrade"
-  "sequencer_global_upgrade"
-  "mediator_global_upgrade"
 )
+
+for (( domain_node = 0; domain_node < 5; domain_node++ )); do
+  any_time_db_names+=(
+  "participant_sv${domain_node}_upgrade"
+  "sequencer_global_upgrade_$domain_node"
+  "mediator_global_upgrade_$domain_node"
+  )
+done
 
 db_names=()
 if [ $wallclocktime -eq 1 ]; then
@@ -173,7 +174,8 @@ if [[ $global_cometbft -eq 1 ]]; then
   config_overrides="$config_overrides -c ./apps/app/src/test/resources/cometbft-sequencer-global-domain-overrides.conf"
 fi;
 
-if [ $globalUpgradeDomain -eq 1 ]; then
+
+if [ $globalUpgradeDomain -eq 1 ] && [ $wallclocktime -eq 0 ]; then
   combinedBootstrapScriptPath="$(mktemp --suffix=.sc)"
   sed -e '/Inserting extra commands here (do not edit this line)/r bootstrap-canton-global-upgrade.sc' \
       "$bootstrapScriptPath" > "$combinedBootstrapScriptPath"

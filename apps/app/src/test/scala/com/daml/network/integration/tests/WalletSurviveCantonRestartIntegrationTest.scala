@@ -13,7 +13,6 @@ import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.duration.*
-import scala.util.Using
 
 class WalletSurviveCantonRestartIntegrationTest
     extends CNNodeIntegrationTest
@@ -21,23 +20,20 @@ class WalletSurviveCantonRestartIntegrationTest
     with WalletTestUtil {
 
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
-  val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources" / "include"
+  val includeTestResourcesPath: File = testResourcesPath / "include"
   val validatorPath: File = examplesPath / "validator"
 
-  val cantonArgs: Seq[String] = Seq(
-    "-c",
-    (validatorPath / "validator-participant.conf").toString,
-    "-c",
-    (testResourcesPath / "self-hosted-validator-disable-json-api.conf").toString,
-    "-c",
-    (testResourcesPath / "self-hosted-validator-participant-postgres-storage.conf").toString,
-    "-c",
-    (testResourcesPath / "storage-postgres.conf").toString,
-    "-C",
-    "canton.participants-x.validatorParticipant.ledger-api.port=7201",
-    "-C",
-    "canton.participants-x.validatorParticipant.admin-api.port=7202",
+  val cantonArgs: Seq[File] = Seq(
+    validatorPath / "validator-participant.conf",
+    includeTestResourcesPath / "self-hosted-validator-disable-json-api.conf",
+    includeTestResourcesPath / "self-hosted-validator-participant-postgres-storage.conf",
+    includeTestResourcesPath / "storage-postgres.conf",
   )
+  val cantonExtraConfig: Seq[String] =
+    Seq(
+      "canton.participants-x.validatorParticipant.ledger-api.port=7201",
+      "canton.participants-x.validatorParticipant.admin-api.port=7202",
+    )
 
   override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
     ("ParticipantLedgerApi", 7201),
@@ -64,7 +60,7 @@ class WalletSurviveCantonRestartIntegrationTest
       initSvc()
       aliceValidatorBackend.start()
       clue("First run of Canton participant") {
-        Using.resource(startCanton(cantonArgs, "wallet-survives-canton-restarts-1")) { _ =>
+        withCanton(cantonArgs, cantonExtraConfig, "wallet-survives-canton-restarts-1") {
           clue("Wait for validator initialization") {
             // Need to wait for the participant node to startup for the user allocation to go through
             eventuallySucceeds(timeUntilSuccess = 40.seconds) {
@@ -85,7 +81,7 @@ class WalletSurviveCantonRestartIntegrationTest
         }
       }
       clue("Second run of Canton participant") {
-        Using.resource(startCanton(cantonArgs, "wallet-survives-canton-restarts-2")) { _ =>
+        withCanton(cantonArgs, cantonExtraConfig, "wallet-survives-canton-restarts-2") {
           clue("We can tap and list after Canton restart and domain reconnection") {
             eventuallySucceeds() {
               aliceWalletClient.tap(2)

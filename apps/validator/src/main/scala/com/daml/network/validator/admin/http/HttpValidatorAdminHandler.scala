@@ -81,7 +81,7 @@ class HttpValidatorAdminHandler(
     implicit val TracedUser(_, tracedContext) = tuser
     withSpan(s"$workflowId.dumpParticipantIdentities") { _ => _ =>
       identitiesStore
-        .getParticipantIdentitiesDump()
+        .getNodeIdentitiesDump()
         .map(response =>
           v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse.OK(response.toHttp)
         )

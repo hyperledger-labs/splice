@@ -23,7 +23,7 @@ class LocalRunbookIntegrationTest
   import ProcessTestUtil.Process
 
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
-  val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources" / "include"
+  val testResourcesPathInclude: File = testResourcesPath / "include"
   val validatorPath: File = examplesPath / "validator"
 
   val svNodePath: File = "apps" / "app" / "src" / "test" / "resources" / "local-sv-node"
@@ -56,17 +56,13 @@ class LocalRunbookIntegrationTest
     // run tests in parallel on the same machine.
     val process = startCanton(
       Seq(
-        "-c",
-        (validatorPath / "validator-participant.conf").toString,
-        "-c",
-        (testResourcesPath / "self-hosted-validator-disable-json-api.conf").toString,
-        "-c",
-        (svParticipantPath / "canton.conf").toString,
-        "-c",
-        (svDomainPath / "canton.conf").toString,
-        "-C",
+        validatorPath / "validator-participant.conf",
+        testResourcesPathInclude / "self-hosted-validator-disable-json-api.conf",
+        svParticipantPath / "canton.conf",
+        svDomainPath / "canton.conf",
+      ),
+      Seq(
         "canton.participants-x.validatorParticipant.ledger-api.port=7001",
-        "-C",
         "canton.participants-x.validatorParticipant.admin-api.port=7002",
       ),
       "local-runbook",

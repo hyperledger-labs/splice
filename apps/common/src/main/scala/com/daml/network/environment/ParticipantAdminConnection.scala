@@ -63,8 +63,12 @@ class ParticipantAdminConnection(
   private val participantStatusCommand =
     new StatusAdminCommands.GetStatus(ParticipantStatus.fromProtoV0)
 
-  def getStatus()(implicit traceContext: TraceContext): Future[NodeStatus[ParticipantStatus]] =
-    runCmd(participantStatusCommand)
+  def isNodeInitialized()(implicit traceContext: TraceContext): Future[Boolean] =
+    runCmd(participantStatusCommand).map {
+      case NodeStatus.Failure(_) => false
+      case NodeStatus.NotInitialized(_) => false
+      case NodeStatus.Success(_) => true
+    }
 
   def getDomainId(domainAlias: DomainAlias)(implicit
       traceContext: TraceContext

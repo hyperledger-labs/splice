@@ -141,6 +141,8 @@ case class CNNodeEnvironmentDefinition(
                     }
                     existingUnionspace.item.owners.foreach { owner =>
                       svs.local
+                        // remove SV apps that end with local, as they are usually not yet started
+                        .filterNot(_.name.endsWith("Local"))
                         .map(_.participantClientWithAdminToken)
                         .find(_.id.uid.namespace == owner)
                         .foreach(proposeUnionspaceReset)
@@ -217,7 +219,7 @@ case class CNNodeEnvironmentDefinition(
       )
     )
 
-  private def withTrafficTopupsEnabled: CNNodeEnvironmentDefinition =
+  def withTrafficTopupsEnabled: CNNodeEnvironmentDefinition =
     addConfigTransform((_, config) =>
       CNNodeConfigTransforms.updateAllValidatorConfigs { case (name, validatorConfig) =>
         val domainFeesEnabledConfig = validatorConfig

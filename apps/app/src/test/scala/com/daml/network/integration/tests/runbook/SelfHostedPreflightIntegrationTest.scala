@@ -15,8 +15,6 @@ import com.daml.network.util.{
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 
-import scala.util.Using
-
 /** Preflight test that spins up a new validator following our runbook.
   */
 class SelfHostedPreflightIntegrationTest
@@ -60,17 +58,16 @@ class SelfHostedPreflightIntegrationTest
     // Start Canton as a separate process. We do that here rather than in the env setup
     // because it is only needed for this one test.
 
-    val cantonArgs = Seq(
-      "-c",
-      (validatorPath / "validator-participant.conf").toString,
-      "-C",
-      "canton.participants-x.validatorParticipant.ledger-api.port=6001",
-      "-C",
-      "canton.participants-x.validatorParticipant.admin-api.port=6002",
-    )
     checkFrontendsNetworkAppsAddress(sys.env("NETWORK_APPS_ADDRESS"))
 
-    Using.resource(startCanton(cantonArgs, "self-hosted-validator")) { _ =>
+    withCanton(
+      Seq(validatorPath / "validator-participant.conf"),
+      Seq(
+        "canton.participants-x.validatorParticipant.admin-api.port=6002",
+        "canton.participants-x.validatorParticipant.ledger-api.port=6001",
+      ),
+      "self-hosted-validator",
+    ) {
       runScript(validatorPath / "validator.sc")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
 
@@ -79,7 +76,7 @@ class SelfHostedPreflightIntegrationTest
 
       // Generate new random CNS names to avoid conflicts between multiple preflight check runs
       val id = (new scala.util.Random).nextInt().toHexString
-      val cnsName = s"alice_${id}.unverified.cns"
+      val cnsName = s"alice_$id.unverified.cns"
 
       startWebDriver("alice-selfhosted")
 
@@ -106,7 +103,7 @@ class SelfHostedPreflightIntegrationTest
   }
 
   private def checkFrontendsNetworkAppsAddress(networkAppsAddress: String): Unit = {
-    clue(s"Checking frontends match given network apps address: ${networkAppsAddress}") {
+    clue(s"Checking frontends match given network apps address: $networkAppsAddress") {
       eventually() {
         "start-frontends-network-address".toFile.lines.headOption shouldBe Some(networkAppsAddress)
       }

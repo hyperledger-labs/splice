@@ -13,8 +13,6 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
 
-import scala.util.Using
-
 /** Preflight test that spins up a new validator following our runbook.
   */
 class SelfHostedSplitwellPreflightIntegrationTest
@@ -66,22 +64,19 @@ class SelfHostedSplitwellPreflightIntegrationTest
   "run through runbook with self-hosted splitwell" in { implicit env =>
     // Start Canton as a separate process. We do that here rather than in the env setup
     // because it is only needed for this one test.
-    val cantonArgs = Seq(
-      "-c",
-      (validatorPath / "validator-participant.conf").toString,
-      "-C",
-      "canton.participants-x.validatorParticipant.ledger-api.port=7001",
-      "-C",
-      "canton.participants-x.validatorParticipant.admin-api.port=7002",
-      "-c",
-      (splitwellPath / "splitwell-participant.conf").toString,
-      "-C",
-      "canton.participants-x.splitwellParticipant.ledger-api.port=7101",
-      "-C",
-      "canton.participants-x.splitwellParticipant.admin-api.port=7102",
-    )
-
-    Using.resource(startCanton(cantonArgs, "self-hosted-splitwell")) { _ =>
+    withCanton(
+      Seq(
+        validatorPath / "validator-participant.conf",
+        splitwellPath / "splitwell-participant.conf",
+      ),
+      Seq(
+        "canton.participants-x.validatorParticipant.ledger-api.port=7001",
+        "canton.participants-x.validatorParticipant.admin-api.port=7002",
+        "canton.participants-x.splitwellParticipant.ledger-api.port=7101",
+        "canton.participants-x.splitwellParticipant.admin-api.port=7102",
+      ),
+      "self-hosted-splitwell",
+    ) {
       runScript(validatorPath / "validator.sc")(env.environment)
 
       v("validatorApp").participantClient.dars
@@ -93,7 +88,10 @@ class SelfHostedSplitwellPreflightIntegrationTest
         v("validatorApp").onboardUser(aliceUserName)
       }
 
-      actAndCheck("Create spliwell install requests", aliceSplitwellClient.createInstallRequests())(
+      actAndCheck(
+        "Create spliwell install requests",
+        aliceSplitwellClient.createInstallRequests(),
+      )(
         "Wait for splitwell installs",
         requests => {
           aliceSplitwellClient.listSplitwellInstalls().keys shouldBe requests.keys

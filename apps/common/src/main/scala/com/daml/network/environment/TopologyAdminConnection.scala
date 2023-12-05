@@ -5,11 +5,11 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
-import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import com.daml.network.environment.TopologyAdminConnection.{
   AuthorizedStateChanged,
   TopologyTransactionType,
 }
+import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.admin.api.client.commands.{
@@ -25,14 +25,19 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt,
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.time.{Clock, RemoteClock, WallClock}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
+import com.digitalasset.canton.topology.store.{
+  StoredTopologyTransactionX,
+  TimeQueryX,
+  TopologyStoreId,
+}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
-import com.digitalasset.canton.topology.store.{TimeQueryX, TopologyStoreId}
+import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
@@ -71,6 +76,8 @@ abstract class TopologyAdminConnection(
   )(implicit traceContext: TraceContext): Future[UniqueIdentifier] = runCmd(
     TopologyAdminCommandsX.Init.GetId()
   )
+
+  def isNodeInitialized()(implicit traceContext: TraceContext): Future[Boolean]
 
   def listPartyToParticipant(
       filterStore: String = "",
@@ -229,44 +236,55 @@ abstract class TopologyAdminConnection(
       domainId,
     )
 
+  def listALlTransactions(
+      store: Option[TopologyStoreId],
+      timeQuery: TimeQueryX = TimeQueryX.HeadState,
+      proposals: Boolean = false,
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]]] = {
+    runCmd(
+      TopologyAdminCommandsX.Read.ListAll(
+        BaseQueryX(
+          filterStore = store.map(_.filterName).getOrElse(""),
+          proposals = proposals,
+          timeQuery = timeQuery,
+          ops = None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        )
+      )
+    ).map(_.result)
+  }
+
   private def getTransactions(
       transactionType: Set[TopologyMappingX.Code],
       id: Option[UniqueIdentifier],
       domainId: Option[DomainId],
       proposals: Boolean = false,
   )(implicit traceContext: TraceContext): Future[Seq[GenericSignedTopologyTransactionX]] =
-    runCmd(
-      TopologyAdminCommandsX.Read.ListAll(
-        BaseQueryX(
-          filterStore = domainId.fold("")(_.filterString),
-          proposals = proposals,
-          timeQuery = TimeQueryX.HeadState,
-          ops = None,
-          filterSigningKey = "",
-          protocolVersion = None,
-        )
-      )
-    ).map { transactions =>
-      transactions.result
-        .map(_.transaction)
-        .filter(tx =>
-          transactionType.contains(
-            tx.transaction.mapping.code
-          ) && id.forall(id =>
-            tx.transaction.mapping.maybeUid.contains(
-              id
-            ) || tx.transaction.mapping.namespace == id.namespace
+    listALlTransactions(domainId.map(TopologyStoreId.DomainStore(_)), proposals = proposals)
+      .map(_.map(_.transaction))
+      .map { transactions =>
+        transactions
+          .filter(tx =>
+            transactionType.contains(
+              tx.transaction.mapping.code
+            ) && id.forall(id =>
+              tx.transaction.mapping.maybeUid.contains(
+                id
+              ) || tx.transaction.mapping.namespace == id.namespace
+            )
           )
-        )
-    }
+      }
 
-  def getIdentityBootstrapTransactions(id: UniqueIdentifier)(implicit
+  def getIdentityBootstrapTransactions(domainId: Option[DomainId], id: UniqueIdentifier)(implicit
       traceContext: TraceContext
   ): Future[Seq[GenericSignedTopologyTransactionX]] =
     runCmd(
       TopologyAdminCommandsX.Read.ListAll(
         BaseQueryX(
-          filterStore = "Authorized",
+          filterStore = domainId.map(_.filterString).getOrElse(AuthorizedStore.filterName),
           proposals = false,
           timeQuery = TimeQueryX.HeadState,
           ops = None,
@@ -800,6 +818,53 @@ abstract class TopologyAdminConnection(
       serial = PositiveInt.one,
       isProposal = false,
     )
+
+  def ensureDomainParameters(
+      domainId: DomainId,
+      parametersBuilder: DynamicDomainParameters => DynamicDomainParameters,
+      signedBy: Fingerprint,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[TopologyResult[DomainParametersStateX]] =
+    ensureTopologyMapping[DomainParametersStateX](
+      TopologyStoreId.DomainStore(domainId),
+      "update dynamic domain parameters",
+      EitherT(
+        getDomainParametersState(domainId).map(state =>
+          Either.cond(
+            state.mapping.parameters == parametersBuilder(state.mapping.parameters),
+            state,
+            state,
+          )
+        )
+      ),
+      previous => Right(previous.copy(parameters = parametersBuilder(previous.parameters))),
+      signedBy = signedBy,
+      retryFor = RetryFor.ClientCalls,
+    )
+
+  private def getDomainParametersState(
+      domainId: DomainId
+  )(implicit tc: TraceContext): Future[TopologyResult[DomainParametersStateX]] = {
+    runCmd(
+      TopologyAdminCommandsX.Read.DomainParametersState(
+        BaseQueryX(
+          domainId.filterString,
+          proposals = false,
+          TimeQueryX.HeadState,
+          None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        ),
+        domainId.filterString,
+      )
+    ).map(_.map(r => TopologyResult(r.context, DomainParametersStateX(domainId, r.item))))
+      .map(_.headOption.getOrElse {
+        throw Status.NOT_FOUND
+          .withDescription(s"No DomainParametersState state domain $domainId")
+          .asRuntimeException
+      })
+  }
 
   def waitForTopologyChangeToBeValid(description: String, validFrom: Instant)(implicit
       traceContext: TraceContext

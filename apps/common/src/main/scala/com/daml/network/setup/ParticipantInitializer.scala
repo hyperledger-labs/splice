@@ -3,15 +3,13 @@
 
 package com.daml.network.setup
 
-import cats.implicits.*
-import com.digitalasset.canton.health.admin.data.NodeStatus
-import com.digitalasset.canton.logging.{NamedLogging, NamedLoggerFactory}
-import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.ParticipantId
-import com.digitalasset.canton.tracing.TraceContext
 import com.daml.network.config.{CNParticipantClientConfig, ParticipantBootstrapDumpConfig}
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.util.NodeIdentitiesDump
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
 import java.nio.file.Path
@@ -59,36 +57,23 @@ class ParticipantInitializer(
     tc: TraceContext,
 ) extends NamedLogging {
 
+  private val nodeInitializer =
+    new NodeInitializer(participantAdminConnection, retryProvider, loggerFactory)
+
   def ensureInitializedWithExpectedId(): Future[Unit] =
     dumpConfig match {
       case Some(c) =>
         for {
           dump <- getDump(c)
-          _ <- retryProvider.ensureThatB(
-            RetryFor.WaitingOnInitDependency,
-            "participant is initialized",
-            isInitialized,
-            initializeFromDump(dump),
-            logger,
-          )
-          id <- getId
-          result <-
-            if (id == dump.id) {
-              Future.unit
-            } else {
-              Future.failed(
-                Status.INTERNAL
-                  .withDescription(s"Participant has ID $id instead of expected ID ${dump.id}.")
-                  .asRuntimeException()
-              )
-            }
+          result <- nodeInitializer.initializeAndWait(dump)
         } yield result
       case None =>
         retryProvider
           .waitUntil(
             RetryFor.WaitingOnInitDependency,
             "participant is initialized",
-            isInitialized
+            participantAdminConnection
+              .isNodeInitialized()
               .flatMap(if (_) {
                 Future.unit
               } else {
@@ -107,32 +92,6 @@ class ParticipantInitializer(
             logger,
           )
     }
-
-  private def isInitialized: Future[Boolean] = participantAdminConnection.getStatus().map {
-    case NodeStatus.NotInitialized(_) => false
-    case _ => true
-  }
-
-  private def getId: Future[ParticipantId] = participantAdminConnection.getParticipantId()
-
-  private def initializeFromDump(dump: NodeIdentitiesDump): Future[Unit] = for {
-    _ <- {
-      logger.info("Uploading participant keys from dump")
-      // this is idempotent
-      dump.keys.traverse_(key => participantAdminConnection.importKeyPair(key.keyPair, key.name))
-    }
-    uploadedBootstrapTxs <- participantAdminConnection.getIdentityBootstrapTransactions(dump.id.uid)
-    missingBootstrapTxs = dump.bootstrapTxs.filter(!uploadedBootstrapTxs.contains(_))
-    // things blow up later in init if we upload the same tx multiple times ¯\_(ツ)_/¯
-    _ <- {
-      logger.info(s"Uploading ${missingBootstrapTxs.size} missing bootstrap transactions from dump")
-      participantAdminConnection.addTopologyTransactions(None, missingBootstrapTxs)
-    }
-    _ <- {
-      logger.info(s"Triggering participant initialization for participant ID ${dump.id}")
-      participantAdminConnection.initId(dump.id)
-    }
-  } yield ()
 
   private def getDump(config: ParticipantBootstrapDumpConfig): Future[NodeIdentitiesDump] =
     config match {

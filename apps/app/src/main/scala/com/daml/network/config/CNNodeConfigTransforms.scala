@@ -448,9 +448,11 @@ object CNNodeConfigTransforms {
       c: CNLedgerApiClientConfig,
   ): CNLedgerApiClientConfig = {
     val userToken = AuthUtil.LedgerApi.testToken(user = user, secret = secret)
-    val adminToken = getAdminToken(clockConfig, c.clientConfig)
     c.copy(
-      authConfig = AuthTokenSourceConfig.Static(userToken, Some(adminToken))
+      authConfig = AuthTokenSourceConfig.Static(
+        userToken,
+        getAdminToken(clockConfig, c.clientConfig),
+      )
     )
   }
 
@@ -526,22 +528,17 @@ object CNNodeConfigTransforms {
     }
     for (line <- tokenDataSource.getLines()) {
       val parts = line.split(" ")
-      tokens.put(parts(0).toInt, parts(1))
+      if (parts.length == 2)
+        tokens.put(parts(0).toInt, parts(1))
     }
     tokenDataSource.close
 
     tokens.toMap
   }
 
-  def getAdminToken(clockConfig: ClockConfig, ledgerApi: ClientConfig): String = {
+  private def getAdminToken(clockConfig: ClockConfig, ledgerApi: ClientConfig): Option[String] = {
     val port = ledgerApi.port.unwrap
-    val token = {
-      readTokenDataFile(clockConfig).getOrElse(
-        port,
-        sys.error(s"No admin token found for ledger API at port $port"),
-      )
-    }
-    token
+    readTokenDataFile(clockConfig).get(port)
   }
 
 }

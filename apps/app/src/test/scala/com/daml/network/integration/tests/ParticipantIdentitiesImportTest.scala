@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import better.files.{File, *}
+import better.files.File
 import com.daml.network.config.{CNNodeConfig, ParticipantBootstrapDumpConfig}
 import com.daml.network.config.CNNodeConfigTransforms.{
   ensureNovelDamlNames,
@@ -24,7 +24,6 @@ abstract class ParticipantIdentitiesImportTestBase
     extends CNNodeIntegrationTest
     with ProcessTestUtil {
 
-  val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
   val svNodePath: File = testResourcesPath / "local-sv-node"
   val validatorNodePath: File = testResourcesPath / "local-validator-node"
 
@@ -86,27 +85,24 @@ abstract class ParticipantIdentitiesImportTestBase
     Using.resource(startStandaloneCanton()) { _ => action }
 
   private def startStandaloneCanton()(implicit env: CNNodeTestConsoleEnvironment) = {
-    val cantonArgs = Seq(
-      "-c",
-      (svParticipantPath / "canton.conf").toString,
-      "-c",
-      (svDomainPath / "canton.conf").toString,
-      "-c",
-      (validatorParticipantPath / "canton.conf").toString,
-      // avoid creating new identities
-      "-C",
-      "canton.participants-x.sv_participant.init.auto-init=false",
-      "-C",
-      "canton.participants-x.validator_participant.init.auto-init=false",
-      // adjust user ids to account for the suffixing done by ensureNovelDamlNames
-      "-C",
-      "canton.participants-x.sv_participant.ledger-api.user-management-service." +
-        s"additional-admin-user-id=${sv1LocalBackend.config.ledgerApiUser}",
-      "-C",
-      "canton.participants-x.validator_participant.ledger-api.user-management-service." +
-        s"additional-admin-user-id=${aliceValidatorLocalBackend.config.ledgerApiUser}",
+    startCanton(
+      Seq(
+        svParticipantPath / "canton.conf",
+        svDomainPath / "canton.conf",
+        validatorParticipantPath / "canton.conf",
+      ),
+      Seq(
+        // avoid creating new identities
+        "canton.participants-x.sv_participant.init.auto-init=false",
+        "canton.participants-x.validator_participant.init.auto-init=false",
+        // adjust user ids to account for the suffixing done by ensureNovelDamlNames
+        "canton.participants-x.sv_participant.ledger-api.user-management-service." +
+          s"additional-admin-user-id=${sv1LocalBackend.config.ledgerApiUser}",
+        "canton.participants-x.validator_participant.ledger-api.user-management-service." +
+          s"additional-admin-user-id=${aliceValidatorLocalBackend.config.ledgerApiUser}",
+      ),
+      "participant-export-import",
     )
-    startCanton(cantonArgs, "participant-export-import")
   }
 
   // TODO(tech-debt) Consider removing this method in favor of making `useSelfSignedTokensForLedgerApiAuth` take an `ignore` parameter

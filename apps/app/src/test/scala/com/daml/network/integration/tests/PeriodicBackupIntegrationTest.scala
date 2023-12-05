@@ -78,7 +78,7 @@ abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig]
       }
 
       val participantIdentitiesLogLineRegex =
-        "Wrote participant identities dump.*at path: (.*\\.json)".r
+        "Wrote node identities dump.*at path: (.*\\.json)".r
       clue("start alice's validator and observe participant identities dump being produced ")(
         loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
           aliceValidatorBackend.startSync(),

@@ -1,7 +1,10 @@
 package com.daml.network.util
 
-import java.io.File
+import better.files.{File, *}
+
 import scala.util.Using.Releasable
+import java.io.File as JFile
+import scala.util.Using
 
 /** Utilities for starting Canton within our tests.
   * For most tests, we use the Canton environment started up by `./start-canton.sh` but
@@ -16,19 +19,19 @@ object ProcessTestUtil {
   }
 
   object Process {
-    implicit val releasable: Releasable[Process] = new Releasable[Process] {
-      override def release(process: Process) = process.destroyAndWait()
-    }
+    implicit val releasable: Releasable[Process] = (process: Process) => process.destroyAndWait()
   }
 }
 
 trait ProcessTestUtil {
   import ProcessTestUtil.Process
 
-  protected def startProcess(
+  val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
+
+  private def startProcess(
       args: Seq[String],
-      outputFile: Option[File] = None,
-      extraEnv: Seq[(String, String)] = Seq.empty,
+      extraEnv: Seq[(String, String)],
+      outputFile: Option[JFile] = None,
   ): Process = {
     // We use the Java process management APIs here since they
     // support proper stream inheritance. Scala implements that by
@@ -43,11 +46,49 @@ trait ProcessTestUtil {
       builder.environment.put(k, v)
     }
     builder.inheritIO()
-    outputFile.foreach(builder.redirectOutput(_))
+    outputFile.foreach(builder.redirectOutput)
     Process(
       builder.start()
     )
   }
+
+  protected def withCanton[A](
+      configs: Seq[File],
+      extraConfigs: Seq[String],
+      logSuffix: String,
+      extraEnv: (String, String)*
+  )(test: => A): A = {
+    Using.resource(
+      startCantonInternal(
+        configs.flatMap(config => Seq("-c", config.toString)) ++ extraConfigs.flatMap(Seq("-C", _)),
+        logSuffix,
+        extraEnv: _*
+      )
+    )(_ => test)
+  }
+
+  protected def startCanton(
+      configs: Seq[File],
+      extraConfigs: Seq[String],
+      logSuffix: String,
+      extraEnv: (String, String)*
+  ): Process = {
+    startCantonInternal(
+      configs.flatMap(config => Seq("-c", config.toString)) ++ extraConfigs.flatMap(Seq("-C", _)),
+      logSuffix,
+      extraEnv: _*
+    )
+  }
+
+  private def startCantonInternal(
+      args: Seq[String],
+      logSuffix: String,
+      extraEnv: (String, String)*
+  ): Process =
+    startProcess(
+      defaultArgsCanton(logSuffix) ++ args,
+      extraEnv = extraEnv,
+    )
 
   private def defaultArgsCanton(logSuffix: String) =
     Seq(
@@ -60,15 +101,5 @@ trait ProcessTestUtil {
       "json",
       "--log-file-name",
       s"log/canton-standalone-$logSuffix.clog",
-    )
-
-  protected def startCanton(
-      args: Seq[String],
-      logSuffix: String,
-      extraEnv: (String, String)*
-  ): Process =
-    startProcess(
-      defaultArgsCanton(logSuffix) ++ args,
-      extraEnv = extraEnv,
     )
 }

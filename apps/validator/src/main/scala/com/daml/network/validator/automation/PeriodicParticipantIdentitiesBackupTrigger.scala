@@ -29,7 +29,7 @@ class PeriodicParticipantIdentitiesBackupTrigger(
       .retry(
         RetryFor.Automation,
         s"backup participant identities to: ${config.locationDescription}",
-        participantIdentitiesStore.backupParticipantIdentities(),
+        participantIdentitiesStore.backupNodeIdentities(),
         logger,
       )
       .map(_ =>

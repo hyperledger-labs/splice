@@ -60,6 +60,7 @@ all network indices must be odd numbers.
 - `25`: Toxi-proxy ports
   - See `simple-topology.conf` with ports bumped by 20k (currently for the ledger API, but may be extended for other connections in the future)
 - `26`: Reserved for CometBFT
+- `27`: Global Domain migration using wall clock
 
 ### Allocated APIs
 

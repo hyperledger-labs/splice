@@ -21,7 +21,7 @@ class NodeIdentitiesStore(
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
-  def getParticipantIdentitiesDump()(implicit
+  def getNodeIdentitiesDump()(implicit
       tc: TraceContext
   ): Future[NodeIdentitiesDump] =
     for {
@@ -37,7 +37,7 @@ class NodeIdentitiesStore(
             )
           )
       )
-      bootstrapTxs <- adminConnection.getIdentityBootstrapTransactions(id.uid)
+      bootstrapTxs <- adminConnection.getIdentityBootstrapTransactions(None, id.uid)
     } yield NodeIdentitiesDump(
       id,
       keys,
@@ -45,13 +45,13 @@ class NodeIdentitiesStore(
       Some(BuildInfo.compiledVersion),
     )
 
-  /** Write a dump of the participant identities to the configured backup location.
+  /** Write a dump of the node identities to the configured backup location.
     *
     * Fails if no backup location is configured.
     *
     * @return: the name of the file to which the backup was written
     */
-  def backupParticipantIdentities()(implicit traceContext: TraceContext): Future[Path] = for {
+  def backupNodeIdentities()(implicit traceContext: TraceContext): Future[Path] = for {
     dumpConfig <- Future {
       backupDumpConfig.getOrElse(
         throw new IllegalStateException(
@@ -59,7 +59,7 @@ class NodeIdentitiesStore(
         )
       )
     }
-    dump <- getParticipantIdentitiesDump()
+    dump <- getNodeIdentitiesDump()
     path <- Future {
       blocking {
         // determine target file
@@ -69,7 +69,7 @@ class NodeIdentitiesStore(
         // then makes all the logging stuff below very confusing.
         val filename = NodeIdentitiesStore.dumpFilename(now)
         val fileDesc =
-          s"participant identities dump containing ${dump.keys.size} keys to ${dumpConfig.locationDescription} at path: $filename"
+          s"node identities dump containing ${dump.keys.size} keys to ${dumpConfig.locationDescription} at path: $filename"
         logger.debug(s"Attempting to write $fileDesc")
         val path = BackupDump.write(
           dumpConfig,
