@@ -4,7 +4,7 @@ import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.codegen.java.cn.wallet.transferoffer as transferOffersCodegen
-import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
+import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.external.wallet.WalletResource as r0
 import com.daml.network.http.v0.{external, definitions as d0}
@@ -30,6 +30,7 @@ class HttpExternalWalletHandler(
     override protected val walletManager: UserWalletManager,
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
+    participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
@@ -139,8 +140,97 @@ class HttpExternalWalletHandler(
   }
 
   override def createBuyTrafficRequest(respond: r0.CreateBuyTrafficRequestResponse.type)(
-      body: d0.RequestBuyTrafficRequest
-  )(tuser: TracedUser): Future[r0.CreateBuyTrafficRequestResponse] = ???
+      request: d0.CreateBuyTrafficRequest
+  )(tuser: TracedUser): Future[r0.CreateBuyTrafficRequestResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    withSpan(s"$workflowId.createBuyTrafficRequest") { _ => _ =>
+      val userWalletStore = getUserWallet(user).store
+      val domainId = Codec.tryDecode(Codec.DomainId)(request.domainId)
+      val receivingValidator = Codec.tryDecode(Codec.Party)(request.receivingValidatorPartyId)
+      for {
+        participantId <- participantAdminConnection
+          .getPartyToParticipant(
+            domainId,
+            receivingValidator,
+          )
+          .map(_.mapping.participantIds.toList)
+          .map {
+            case Nil =>
+              throw io.grpc.Status.NOT_FOUND
+                .withDescription(
+                  s"Could not find participant hosting receivingValidator ${receivingValidator}"
+                )
+                .asRuntimeException()
+            case only :: Nil => only
+            case first :: _ =>
+              logger.info(
+                s"Receiving validator party ${receivingValidator} is hosted on multiple participants. " +
+                  s"Selecting the first one ${first} to buy extra traffic for."
+              )
+              first
+          }
+        result <- userWalletStore
+          .getLatestTransferOfferEventByTrackingId(request.trackingId)
+          .flatMap {
+            case QueryResult(_, Some(_)) =>
+              Future.failed(
+                io.grpc.Status.ALREADY_EXISTS
+                  .withDescription(
+                    s"Buy traffic request with trackingId ${request.trackingId} already exists."
+                  )
+                  .asRuntimeException()
+              )
+            case QueryResult(dedupOffset, None) =>
+              val buyer = userWalletStore.key.endUserParty
+              // TODO(#8300) revisit if we want to retry here.
+              retryProvider
+                .retryForClientCalls(
+                  "createBuyTrafficRequest",
+                  exerciseWalletAction((installCid, _) => {
+                    val expiresAt = Codec.tryDecode(Codec.Timestamp)(request.expiresAt)
+                    Future.successful(
+                      installCid
+                        .exerciseWalletAppInstall_CreateBuyTrafficRequest(
+                          participantId.toProtoPrimitive,
+                          domainId.toProtoPrimitive,
+                          request.trafficAmount,
+                          expiresAt.toInstant,
+                          request.trackingId,
+                        )
+                        .map { cid =>
+                          r0.CreateBuyTrafficRequestResponse.OK(
+                            d0.CreateBuyTrafficRequestResponse(
+                              Codec.encodeContractId(cid.exerciseResult)
+                            )
+                          )
+                        }
+                    )
+                  })(
+                    user,
+                    dedup = Some(
+                      (
+                        CNLedgerConnection.CommandId(
+                          "com.daml.network.wallet.createBuyTrafficRequest",
+                          Seq(
+                            receivingValidator,
+                            buyer,
+                          ),
+                          request.trackingId,
+                        ),
+                        DedupOffset(dedupOffset),
+                      )
+                    ),
+                  ),
+                  logger,
+                  HttpExternalWalletHandler.CreateTransferOfferRetryable(_),
+                )
+                .transform(
+                  HttpErrorHandler.onGrpcAlreadyExists("CreateBuyTrafficRequest duplicate command")
+                )
+          }
+      } yield result
+    }
+  }
 
   override def getBuyTrafficRequestStatus(
       respond: r0.GetBuyTrafficRequestStatusResponse.type

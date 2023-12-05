@@ -602,6 +602,7 @@ class ValidatorApp(
         walletManager,
         loggerFactory,
         retryProvider,
+        participantAdminConnection,
       )
 
       directoryExternalHandler = new HttpExternalDirectoryHandler(

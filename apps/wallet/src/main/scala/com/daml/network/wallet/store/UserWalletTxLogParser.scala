@@ -774,13 +774,31 @@ object UserWalletTxLogParser {
     override val txLogId: String3 = String3.tryCreate("tos")
   }
 
+  final case class BuyTrafficRequestStatusTxLogIndexRecord(
+      optOffset: Option[String],
+      eventId: String,
+      domainId: DomainId,
+      acsContractId: Option[codegen.ContractId[?]],
+      trackingId: String,
+  ) extends WalletTxLogIndexRecord {
+    override val companion: WalletTxLogIndexRecordCompanion =
+      BuyTrafficRequestStatusTxLogIndexRecord
+  }
+
+  object BuyTrafficRequestStatusTxLogIndexRecord extends WalletTxLogIndexRecordCompanion {
+    override val txLogId: String3 = String3.tryCreate("btr")
+  }
+
   sealed trait TxLogEntry extends TxLogStore.Entry[WalletTxLogIndexRecord] {
     def setEventId(eventId: String): TxLogEntry
   }
   sealed trait TransactionHistoryTxLogEntry extends TxLogEntry {
     def toResponseItem: httpDef.ListTransactionsResponseItem
   }
-  sealed trait TransferOfferTxLogEntry extends TxLogEntry
+  // base trait for tx log entries that are not listed in the tx history
+  sealed trait NonTxnHistoryTxLogEntry extends TxLogEntry
+  sealed trait TransferOfferTxLogEntry extends NonTxnHistoryTxLogEntry
+  sealed trait BuyTrafficRequestTxLogEntry extends NonTxnHistoryTxLogEntry
 
   object TxLogEntry {
 
@@ -889,6 +907,56 @@ object UserWalletTxLogParser {
         sender: String,
         receiver: String,
     ) extends TransferOfferTxLogEntry {
+      override def setEventId(eventId: String): TxLogEntry =
+        copy(indexRecord = indexRecord.copy(eventId = eventId))
+    }
+
+    sealed trait BuyTrafficRequestStatus {
+      def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse
+    }
+    object BuyTrafficRequestStatus {
+      case class Created(
+          transactionId: String
+      ) extends BuyTrafficRequestStatus {
+        override def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse =
+          httpDef.GetBuyTrafficRequestStatusResponse(
+            status = httpDef.GetBuyTrafficRequestStatusResponse.Status.Created,
+            transactionId = Some(transactionId),
+          )
+      }
+      case class Completed(
+          transactionId: String
+      ) extends BuyTrafficRequestStatus {
+        override def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse =
+          httpDef.GetBuyTrafficRequestStatusResponse(
+            status = httpDef.GetBuyTrafficRequestStatusResponse.Status.Completed,
+            transactionId = Some(transactionId),
+          )
+      }
+      sealed trait Failed extends BuyTrafficRequestStatus
+      case class Rejected(reason: String) extends Failed {
+        override def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse =
+          httpDef.GetBuyTrafficRequestStatusResponse(
+            status = httpDef.GetBuyTrafficRequestStatusResponse.Status.Failed,
+            failureReason = Some(httpDef.GetBuyTrafficRequestStatusResponse.FailureReason.Rejected),
+            rejectionReason = Some(reason),
+          )
+      }
+      case object Expired extends Failed {
+        override def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse =
+          httpDef.GetBuyTrafficRequestStatusResponse(
+            status = httpDef.GetBuyTrafficRequestStatusResponse.Status.Failed,
+            failureReason = Some(httpDef.GetBuyTrafficRequestStatusResponse.FailureReason.Expired),
+          )
+      }
+    }
+
+    final case class BuyTrafficRequest(
+        indexRecord: BuyTrafficRequestStatusTxLogIndexRecord,
+        status: TransferOfferStatus,
+        buyer: String,
+        memberId: String,
+    ) extends BuyTrafficRequestTxLogEntry {
       override def setEventId(eventId: String): TxLogEntry =
         copy(indexRecord = indexRecord.copy(eventId = eventId))
     }
@@ -1255,6 +1323,7 @@ object UserWalletTxLogParser {
       entries = entries.filter {
         case t: TxLogEntry.Transfer => t.sender._1 == party || t.receivers.exists(_._1 == party)
         case to: TxLogEntry.TransferOffer => to.sender == party || to.receiver == party
+        case btr: TxLogEntry.BuyTrafficRequest => btr.buyer == party
         case b: TxLogEntry.BalanceChange => b.receiver == party
         // Only relevant notifications are added to parsing state
         case _: TxLogEntry.Notification => true
@@ -1320,6 +1389,7 @@ object UserWalletTxLogParser {
           )
         case _: TxLogEntry.BalanceChange => None
         case n: TxLogEntry.TransferOffer => Some(n)
+        case n: TxLogEntry.BuyTrafficRequest => Some(n)
         case n: TxLogEntry.Notification => Some(n)
         case n: TxLogEntry.Unknown => Some(n)
       }

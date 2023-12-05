@@ -92,6 +92,12 @@ trait UserWalletStore
       tc: TraceContext
   ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]]]
 
+  def getLatestBuyTrafficRequestEventByTrackingId(
+      trackingId: String
+  )(implicit
+      tc: TraceContext
+  ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.BuyTrafficRequest]]]
+
   final def listAppPaymentRequests(
       limit: Limit = Limit.DefaultLimit
   )(implicit tc: TraceContext): Future[

@@ -25,7 +25,7 @@ object WalletTables extends AcsTables {
       domainId: DomainId,
       acsContractId: Option[ContractId[?]],
       txLogId: String3,
-      transferOfferTrackingId: Option[String],
+      trackingId: Option[String],
   )
 
   object UserWalletTxLogStoreRowData {
@@ -40,10 +40,11 @@ object WalletTables extends AcsTables {
           indexRecord.acsContractId,
           indexRecord.txLogId,
           indexRecord match {
-            case _: UserWalletTxLogParser.TransactionHistoryTxLogIndexRecord =>
-              None
             case to: UserWalletTxLogParser.TransferOfferStatusTxLogIndexRecord =>
               Some(to.trackingId)
+            case btr: UserWalletTxLogParser.BuyTrafficRequestStatusTxLogIndexRecord =>
+              Some(btr.trackingId)
+            case _ => None
           },
         )
       )

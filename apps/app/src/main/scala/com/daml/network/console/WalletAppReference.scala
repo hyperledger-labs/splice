@@ -6,6 +6,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOfferCodegen,
+  buytrafficrequest as trafficRequestCodegen,
 }
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.http.v0.definitions.GetTransferOfferStatusResponse
@@ -20,7 +21,7 @@ import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 abstract class WalletAppReference(
     override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
@@ -324,6 +325,30 @@ abstract class WalletAppReference(
       )
     }
   }
+
+  @Help.Summary("Make a request to buy domain traffic")
+  @Help.Description(
+    "Creates a request to buy extra traffic on the specified domain for the specified validator's participant"
+  )
+  def createBuyTrafficRequest(
+      receivingValidator: PartyId,
+      domainId: DomainId,
+      trafficAmount: Long,
+      trackingId: String,
+      expiresAt: CantonTimestamp,
+  ): trafficRequestCodegen.BuyTrafficRequest.ContractId =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient
+          .CreateBuyTrafficRequest(
+            receivingValidator,
+            domainId,
+            trafficAmount,
+            expiresAt,
+            trackingId,
+          )
+      )
+    }
 
   @Help.Summary("List app rewards")
   @Help.Description("List all open app rewards for the configured user")

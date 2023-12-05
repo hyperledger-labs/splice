@@ -231,13 +231,13 @@ create table user_wallet_txlog_store(
     -- which txlog this entry belongs to TODO (#7153): this might be separate tables, so this column would be unnecessary
     tx_log_id text not null,
 
-    -- the tracking_id in all transfer offer tx log entries
-    transfer_offer_tracking_id text
+    -- the tracking_id for transfer offer or buy traffic request tx log entries
+    tracking_id text
 );
 
-create index user_wallet_txlog_store_sid_totid
-    on user_wallet_txlog_store (store_id, transfer_offer_tracking_id)
-    where transfer_offer_tracking_id is not null;
+create index user_wallet_txlog_store_sid_tid
+    on user_wallet_txlog_store (store_id, tracking_id)
+    where tracking_id is not null;
 
 
 -- Directory store

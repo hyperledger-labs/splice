@@ -113,10 +113,14 @@ paths:
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/RequestBuyTrafficRequest"
+              "$ref": "#/components/schemas/CreateBuyTrafficRequest"
       responses:
         "200":
-          description: Request to buy  traffic got created
+          description: Request to buy traffic got created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateBuyTrafficRequestResponse"
         "400":
           description: Request was invalid, adjust parameters
           content:
@@ -281,7 +285,7 @@ components:
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
-    RequestBuyTrafficRequest:
+    CreateBuyTrafficRequest:
       type: object
       required:
         - receiving_validator_party_id
@@ -321,6 +325,14 @@ components:
             for how ledger effective time is bound to the record time of a transaction on a domain.
           type: integer
           format: int64
+
+    CreateBuyTrafficRequestResponse:
+      type: object
+      required:
+        - request_contract_id
+      properties:
+        request_contract_id:
+          type: string
 
     GetBuyTrafficRequestStatusResponse:
       type: object

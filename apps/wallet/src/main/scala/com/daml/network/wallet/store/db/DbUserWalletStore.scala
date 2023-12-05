@@ -76,7 +76,7 @@ class DbUserWalletStore(
         val safeOffset = optOffset.map(lengthLimited)
         val safeTrackingId = optTrackingId.map(lengthLimited)
         sqlu"""
-              insert into user_wallet_txlog_store(store_id, event_id, "offset", domain_id, acs_contract_id, tx_log_id, transfer_offer_tracking_id)
+              insert into user_wallet_txlog_store(store_id, event_id, "offset", domain_id, acs_contract_id, tx_log_id, tracking_id)
               values ($storeId, $safeEventId, $safeOffset, $domainId, $acsContractId, $txLogId, $safeTrackingId)
               on conflict do nothing
             """
@@ -194,7 +194,7 @@ class DbUserWalletStore(
         }
       } yield entries.map {
         case entry: UserWalletTxLogParser.TransactionHistoryTxLogEntry => entry
-        case _: UserWalletTxLogParser.TransferOfferTxLogEntry => throw txLogIsOfWrongType()
+        case _: UserWalletTxLogParser.NonTxnHistoryTxLogEntry => throw txLogIsOfWrongType()
       }
     }
   }
@@ -204,13 +204,14 @@ class DbUserWalletStore(
   ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]]] =
     waitUntilAcsIngested {
       import cats.implicits.*
+      val txLogId = UserWalletTxLogParser.TransferOfferStatusTxLogIndexRecord.txLogId
       for {
         resultWithOffset <- storage
           .querySingle(
             selectFromTxLogTableWithOffset(
               WalletTables.txLogTableName,
               storeId,
-              sql"transfer_offer_tracking_id = ${lengthLimited(trackingId)}",
+              sql"tx_log_id = $txLogId and tracking_id = ${lengthLimited(trackingId)}",
               sql"order by entry_number desc limit 1",
             )
               .as[TxLogStoreRowTemplateWithOffset]
@@ -232,6 +233,50 @@ class DbUserWalletStore(
           case Some(entry: UserWalletTxLogParser.TxLogEntry.TransferOffer) =>
             Future.successful(
               QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]](
+                resultWithOffset.offset,
+                Some(entry),
+              )
+            )
+          case Some(_) =>
+            Future.failed(txLogIsOfWrongType())
+        }
+      } yield result
+    }
+
+  override def getLatestBuyTrafficRequestEventByTrackingId(trackingId: String)(implicit
+      tc: TraceContext
+  ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.BuyTrafficRequest]]] =
+    waitUntilAcsIngested {
+      import cats.implicits.*
+      val txLogId = UserWalletTxLogParser.BuyTrafficRequestStatusTxLogIndexRecord.txLogId
+      for {
+        resultWithOffset <- storage
+          .querySingle(
+            selectFromTxLogTableWithOffset(
+              WalletTables.txLogTableName,
+              storeId,
+              sql"tx_log_id = $txLogId and tracking_id = ${lengthLimited(trackingId)}",
+              sql"order by entry_number desc limit 1",
+            )
+              .as[TxLogStoreRowTemplateWithOffset]
+              .headOption,
+            "getLatestBuyTrafficRequestEventByTrackingId",
+          )
+          .getOrElse(throw offsetExpectedError())
+        entry <- resultWithOffset.row.traverse(row =>
+          txLogReader.loadTxLogEntry(row.eventId, row.domainId, row.acsContractId)
+        )
+        result <- entry match {
+          case None =>
+            Future.successful(
+              QueryResult[Option[UserWalletTxLogParser.TxLogEntry.BuyTrafficRequest]](
+                resultWithOffset.offset,
+                None,
+              )
+            )
+          case Some(entry: UserWalletTxLogParser.TxLogEntry.BuyTrafficRequest) =>
+            Future.successful(
+              QueryResult[Option[UserWalletTxLogParser.TxLogEntry.BuyTrafficRequest]](
                 resultWithOffset.offset,
                 Some(entry),
               )

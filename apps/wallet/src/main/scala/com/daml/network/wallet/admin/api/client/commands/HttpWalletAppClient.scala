@@ -8,12 +8,13 @@ import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.{
+  buytrafficrequest as trafficRequestCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOfferCodegen,
 }
 import com.daml.network.http.v0.{definitions, wallet as http}
-import com.daml.network.http.v0.external.{wallet as externalHttp}
+import com.daml.network.http.v0.external.wallet as externalHttp
 import com.daml.network.http.v0.wallet.{
   GetAppPaymentRequestResponse,
   GetSubscriptionRequestResponse,
@@ -22,7 +23,7 @@ import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.daml.network.wallet.store.UserWalletTxLogParser
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -678,6 +679,43 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.WithdrawTransferOfferResponse.OK =>
       Right(())
+    }
+  }
+
+  case class CreateBuyTrafficRequest(
+      receivingValidator: PartyId,
+      domainId: DomainId,
+      trafficAmount: Long,
+      expiresAt: CantonTimestamp,
+      trackingId: String,
+  ) extends ExternalBaseCommand[
+        externalHttp.CreateBuyTrafficRequestResponse,
+        trafficRequestCodegen.BuyTrafficRequest.ContractId,
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[
+      Future,
+      Either[Throwable, HttpResponse],
+      externalHttp.CreateBuyTrafficRequestResponse,
+    ] = {
+      val request = definitions.CreateBuyTrafficRequest(
+        Codec.encode(receivingValidator),
+        Codec.encode(domainId),
+        trafficAmount,
+        trackingId,
+        Codec.encode(expiresAt),
+      )
+      client.createBuyTrafficRequest(request, headers = headers)
+    }
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case externalHttp.CreateBuyTrafficRequestResponse.OK(response) =>
+      Codec.decodeJavaContractId(trafficRequestCodegen.BuyTrafficRequest.COMPANION)(
+        response.requestContractId
+      )
     }
   }
 

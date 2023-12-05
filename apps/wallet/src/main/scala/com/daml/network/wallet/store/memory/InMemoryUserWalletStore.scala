@@ -108,7 +108,8 @@ class InMemoryUserWalletStore(
     def filter(txi: UserWalletTxLogParser.WalletTxLogIndexRecord) = txi match {
       case _: UserWalletTxLogParser.TransactionHistoryTxLogIndexRecord =>
         true
-      case _: UserWalletTxLogParser.TransferOfferStatusTxLogIndexRecord =>
+      case _: UserWalletTxLogParser.TransferOfferStatusTxLogIndexRecord |
+          _: UserWalletTxLogParser.BuyTrafficRequestStatusTxLogIndexRecord =>
         false
     }
     val indices = beginAfterEventId.fold(
@@ -122,7 +123,7 @@ class InMemoryUserWalletStore(
       )
     } yield entries.map {
       case entry: UserWalletTxLogParser.TransactionHistoryTxLogEntry => entry
-      case _: UserWalletTxLogParser.TransferOfferTxLogEntry => throw txLogIsOfWrongType()
+      case _: UserWalletTxLogParser.NonTxnHistoryTxLogEntry => throw txLogIsOfWrongType()
     }
   }
 
@@ -143,6 +144,29 @@ class InMemoryUserWalletStore(
     } yield entry match {
       case Some(offer: UserWalletTxLogParser.TxLogEntry.TransferOffer) =>
         QueryResult(offset, Some(offer))
+      case None =>
+        QueryResult(offset, None)
+      case _ => throw txLogIsOfWrongType()
+    }
+  }
+
+  override def getLatestBuyTrafficRequestEventByTrackingId(
+      trackingId: String
+  )(implicit
+      tc: TraceContext
+  ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.BuyTrafficRequest]]] = {
+    for {
+      (offset, indexOpt) <- txLog.collectLatestTxLogIndexWithOffset {
+        case btr: UserWalletTxLogParser.BuyTrafficRequestStatusTxLogIndexRecord
+            if btr.trackingId == trackingId =>
+          btr
+      }
+      entry <- indexOpt.traverse(index =>
+        txLogReader.loadTxLogEntry(index.eventId, index.domainId, index.acsContractId)
+      )
+    } yield entry match {
+      case Some(request: UserWalletTxLogParser.TxLogEntry.BuyTrafficRequest) =>
+        QueryResult(offset, Some(request))
       case None =>
         QueryResult(offset, None)
       case _ => throw txLogIsOfWrongType()
