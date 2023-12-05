@@ -1071,7 +1071,10 @@ function subcmd_preflight_validator() {
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
             sbt "apps-app/testOnly *PreflightValidatorIntegrationTest"
   else
-    _error "Non-devnet preflights not implemented yet"
+    _log "Starting Validator preflight on non-DevNet"
+    cd "${REPO_ROOT}" && \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+            sbt "apps-app/testOnly *NonDevNetPreflightValidatorIntegrationTest"
   fi
 }
 

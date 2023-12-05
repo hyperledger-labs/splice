@@ -1216,9 +1216,11 @@ printTests := {
   def isNonDevNetPreflightSvIntegrationTest(name: String): Boolean =
     name.contains("PreflightSvNonDevNetIntegrationTest") && isNonDevNetTest(name)
   def isPreflightSvIntegrationTest(name: String): Boolean =
-    name.contains("PreflightSvIntegrationTest")
+    name.contains("PreflightSvIntegrationTest") && !isNonDevNetTest(name)
   def isPreflightValidatorIntegrationTest(name: String): Boolean =
-    name.contains("PreflightValidatorIntegrationTest")
+    name.contains("PreflightValidatorIntegrationTest") && !isNonDevNetTest(name)
+  def isNonDevNetPreflightValidatorIntegrationTest(name: String): Boolean =
+    name.contains("PreflightValidatorIntegrationTest") && isNonDevNetTest(name)
   def isGlobalUpgradeTest(name: String): Boolean = name contains "GlobalDomainUpgrade"
   def isAppManagerTest(name: String): Boolean = name contains "AppManager"
 
@@ -1246,6 +1248,11 @@ printTests := {
       "Non DevNet Preflight SV tests",
       "test-full-class-names-preflight-sv-non-devnet.log",
       (t: String) => isNonDevNetPreflightSvIntegrationTest(t),
+    ),
+    (
+      "Non DevNet Preflight Validator tests",
+      "test-full-class-names-preflight-validator-non-devnet.log",
+      (t: String) => isNonDevNetPreflightValidatorIntegrationTest(t),
     ),
     // This file is only used in sbt printTests for checking the pattern matching, but not used in ci
     (

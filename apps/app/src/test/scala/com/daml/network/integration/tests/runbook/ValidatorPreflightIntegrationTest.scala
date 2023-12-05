@@ -31,15 +31,14 @@ abstract class PreflightValidatorIntegrationTestBase
   protected val validatorAuth0Secret: String
   protected val validatorAuth0Audience: String
   protected val validatorWalletUser: String
-  protected val validatorUrlPrefix: String
   protected val includeSplitwellTests = true
 
   private lazy val walletUiUrl =
-    s"https://wallet.${validatorUrlPrefix}.${sys.env("NETWORK_APPS_ADDRESS")}/"
+    s"https://wallet.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
   private lazy val directoryUiUrl =
-    s"https://directory.${validatorUrlPrefix}.${sys.env("NETWORK_APPS_ADDRESS")}/"
+    s"https://directory.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
   private lazy val splitwellUiUrl =
-    s"https://splitwell.${validatorUrlPrefix}.${sys.env("NETWORK_APPS_ADDRESS")}/"
+    s"https://splitwell.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
 
   override def beforeEach() = {
     super.beforeEach();
@@ -373,6 +372,7 @@ abstract class PreflightValidatorIntegrationTestBase
       url: String,
       onboardUserToWallet: Boolean,
   )(implicit webDriver: WebDriverType): String = {
+
     clue(s"Logging in to wallet UI at: ${url}") {
       auth0Login(
         user,
@@ -399,7 +399,7 @@ abstract class PreflightValidatorIntegrationTestBase
   }
 }
 
-final class PreflightValidatorIntegrationTest extends PreflightValidatorIntegrationTestBase {
+class PreflightValidatorIntegrationTest extends PreflightValidatorIntegrationTestBase {
 
   override protected val isDevNet = true
   override protected val auth0 =
@@ -408,7 +408,6 @@ final class PreflightValidatorIntegrationTest extends PreflightValidatorIntegrat
   override protected val validatorName = "validator"
   override protected val validatorAuth0Secret = "cznBUeB70fnpfjaq9TzblwiwjkVyvh5z"
   override protected val validatorAuth0Audience = "https://validator.example.com/api"
-  override protected val validatorUrlPrefix = "validator"
   override protected val includeSplitwellTests = false
 
   // TODO(tech-debt): consider de-hardcoding this
@@ -416,7 +415,7 @@ final class PreflightValidatorIntegrationTest extends PreflightValidatorIntegrat
     "auth0|6526fab5214c99a9a8e1e3cc"
 }
 
-final class Validator1PreflightIntegrationTest extends PreflightValidatorIntegrationTestBase {
+class Validator1PreflightIntegrationTest extends PreflightValidatorIntegrationTestBase {
 
   override protected val isDevNet = true
   override protected val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com")
@@ -428,5 +427,4 @@ final class Validator1PreflightIntegrationTest extends PreflightValidatorIntegra
   // TODO(tech-debt): consider de-hardcoding this
   override protected val validatorWalletUser =
     "auth0|63e3d75ff4114d87a2c1e4f5"
-  override protected val validatorUrlPrefix = "validator1"
 }

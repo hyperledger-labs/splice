@@ -15,7 +15,6 @@ import {
   infraStack,
   installCNRunbookHelmChart,
   installCNRunbookHelmChartByNamespaceName,
-  isDevNet,
   loadYamlFromFile,
   domainFeesConfig,
   ValidatorTopupConfig,
@@ -26,7 +25,6 @@ import {
   CnInput,
   installPostgresPasswordSecret,
 } from 'cn-pulumi-common';
-import { exit } from 'process';
 
 import { auth0Cfg } from './auth0cfg';
 import { walletUIClientId, directoryClientId } from './secrets';
@@ -37,11 +35,6 @@ import {
   localCharts,
   version,
 } from './utils';
-
-if (!isDevNet) {
-  console.error('Launching in non-devnet mode is currently unsupported!');
-  exit(1);
-}
 
 type BootstrapCliConfig = {
   cluster: string;
