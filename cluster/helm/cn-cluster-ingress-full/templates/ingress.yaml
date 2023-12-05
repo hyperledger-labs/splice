@@ -16,12 +16,6 @@ spec:
   - name: grpc-cd-pub-api
     port: 5008
     protocol: TCP
-  - name: grpc-cd-adm-api
-    port: 5009
-    protocol: TCP
-  - name: cd-metrics
-    port: 10313
-    protocol: TCP
   - name: grpc-svcp-adm
     port: 5002
     protocol: TCP
@@ -109,12 +103,6 @@ spec:
           protocol: TCP
         - containerPort: 5008
           name: grpc-cd-pub-api
-          protocol: TCP
-        - containerPort: 5009
-          name: grpc-cd-adm-api
-          protocol: TCP
-        - containerPort: 10313
-          name: cd-metrics
           protocol: TCP
         - containerPort: 5002
           name: grpc-svcp-adm

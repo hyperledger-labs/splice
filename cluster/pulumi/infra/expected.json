@@ -477,18 +477,6 @@
               "targetPort": 5008
             },
             {
-              "name": "grpc-cd-adm-api",
-              "port": 5009,
-              "protocol": "TCP",
-              "targetPort": 5009
-            },
-            {
-              "name": "cd-metrics",
-              "port": 10313,
-              "protocol": "TCP",
-              "targetPort": 10313
-            },
-            {
               "name": "grpc-svcp-adm",
               "port": 5002,
               "protocol": "TCP",

@@ -114,8 +114,6 @@ function configureGatewayService(
             ingressPort('http2', 80),
             ingressPort('https', 443),
             ingressPort('grpc-cd-pub-api', 5008),
-            ingressPort('grpc-cd-adm-api', 5009),
-            ingressPort('cd-metrics', 10313),
             ingressPort('grpc-svcp-adm', 5002),
             ingressPort('grpc-svcp-lg', 5001),
             ingressPort('svcp-metrics', 10013),

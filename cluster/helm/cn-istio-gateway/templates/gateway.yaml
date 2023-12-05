@@ -45,21 +45,6 @@ spec:
     hosts:
     - "*.{{ (.Values.cluster).hostname }}"
   - port:
-      number: 5009
-      name: grpc-cd-adm-api
-      protocol: GRPC
-    hosts:
-    - "*.{{ (.Values.cluster).hostname }}"
-  - port:
-      number: 10313
-      name: cd-metrics
-      protocol: HTTPS
-    tls:
-      mode: SIMPLE
-      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
-    hosts:
-    - "*.{{ (.Values.cluster).hostname }}"
-  - port:
       number: 5002
       name: grpc-svcp-adm
       protocol: GRPC
