@@ -332,10 +332,7 @@
       "timeout": 480,
       "values": {
         "clusterUrl": "svrun.network.com.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "persistence": {
-          "password": "POSTGRES_USER_PASSWORD"
-        }
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
       }
     },
     "name": "scan",
@@ -423,10 +420,7 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global"
         },
-        "onboardingName": "DA-Helm-Test-Node",
-        "persistence": {
-          "password": "POSTGRES_USER_PASSWORD"
-        }
+        "onboardingName": "DA-Helm-Test-Node"
       }
     },
     "name": "sv-app",
@@ -481,9 +475,6 @@
         "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "participantAddress": "participant",
-        "persistence": {
-          "password": "POSTGRES_USER_PASSWORD"
-        },
         "scanAddress": "https://scan.sv-1.svc.svrun.network.com.network.canton.global",
         "svValidator": true,
         "topup": {

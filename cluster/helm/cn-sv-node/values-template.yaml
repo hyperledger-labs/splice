@@ -24,4 +24,5 @@ persistence:
   host: postgres
   port: 5432
   user: cnadmin
-  password: "POSTGRES_USER_PASSWORD" # Replace with the password you created
+
+postgresSecretsName: "postgres-secrets"

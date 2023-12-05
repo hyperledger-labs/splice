@@ -13,3 +13,4 @@ db:
   volumeSize: 240Gi
   volumeStorageClass: standard-rwo
 
+postgresSecretsName: "postgres-secrets"

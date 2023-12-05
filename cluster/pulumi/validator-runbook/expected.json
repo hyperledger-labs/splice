@@ -253,9 +253,6 @@
           }
         },
         "participantAddress": "participant",
-        "persistence": {
-          "password": "POSTGRES_USER_PASSWORD"
-        },
         "scanAddress": "https://scan.sv-1.svc.validatorrun.network.com.network.canton.global",
         "svSponsorAddress": "https://sv.sv-1.svc.validatorrun.network.canton.global",
         "topup": {

@@ -10,6 +10,8 @@ Release Notes
 
   * The `https://directory.sv.svc.<YOUR_HOSTNAME>/api/json-api/*` ingress rule is no longer required for validators and super-validators
 
+  * The helm charts now allow configuring the secret in which the postgres password is stored. Default is ``postgres-secrets``.
+
 * Documentation:
 
   * Added an ingress rule for `https://directory.sv.svc.<YOUR_HOSTNAME>/api/validator`, which was accidentally omitted from the instructions.

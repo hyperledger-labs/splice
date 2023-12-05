@@ -43,7 +43,7 @@ spec:
         - name: CN_APP_POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: "postgres-secrets"
+              name: {{ $.Values.postgresSecretsName }}
               key: postgresPassword
         {{- end }}
         {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}

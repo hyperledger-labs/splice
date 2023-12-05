@@ -23,3 +23,5 @@ persistence:
   host: postgres
   port: 5432
   user: cnadmin
+
+postgresSecretsName: "postgres-secrets"

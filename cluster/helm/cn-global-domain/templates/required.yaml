@@ -5,6 +5,7 @@
 {{ $_ := required ".Values.defaultJvmOptions is required." .Values.defaultJvmOptions }}
 {{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
 {{ $_ := required ".Values.postgres is required." .Values.postgres }}
+{{ $_ := required ".Values.postgresSecretsName is required" .Values.postgresSecretsName }}
 {{ $_ := required ".Values.sequencerDriver.type is required." (.Values.sequencerDriver).type }}
 {{- if eq .Values.sequencerDriver.type "postgres"}}
 {{ $_ := required ".Values.sequencerDriver.address is required." (.Values.sequencerDriver).address }}

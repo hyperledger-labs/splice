@@ -10,3 +10,5 @@
 {{ $_ := required ".Values.topup.targetThroughput is required when topup is enabled." .Values.topup.targetThroughput }}
 {{ $_ := required ".Values.topup.minTopupInterval is required when topup is enabled." .Values.topup.minTopupInterval }}
 {{- end }}
+
+{{ $_ := required ".Values.postgresSecretsName is required" .Values.postgresSecretsName }}

@@ -1,1 +1,2 @@
 {{ $_ := required ".Values.clusterUrl is required." .Values.clusterUrl }}
+{{ $_ := required ".Values.postgresSecretsName is required" .Values.postgresSecretsName }}

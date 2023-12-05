@@ -10,3 +10,4 @@ postgres:
   hostname: "postgres"
   port: "5432"
 
+postgresSecretsName: "postgres-secrets"
