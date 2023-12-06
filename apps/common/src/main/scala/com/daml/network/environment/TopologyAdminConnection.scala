@@ -309,7 +309,7 @@ abstract class TopologyAdminConnection(
         BaseQueryX(
           filterStore = domainId.filterString,
           proposals = false,
-          timeQuery = TimeQueryX.HeadState,
+          timeQuery = TimeQueryX.Range(None, None),
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,
