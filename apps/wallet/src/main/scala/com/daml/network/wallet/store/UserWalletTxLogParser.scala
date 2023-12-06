@@ -26,14 +26,17 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
   COO_Error,
   COO_MergeTransferInputs,
 }
-import com.daml.network.codegen.java.cn.wallet.transferoffer as transferCodegen
+import com.daml.network.codegen.java.cn.wallet.{
+  buytrafficrequest as trafficRequestCodegen,
+  transferoffer as transferCodegen,
+}
 import com.daml.network.history.{
+  CnsRules_CollectEntryRenewalPayment,
+  CnsRules_CollectInitialEntryPayment,
   CoinArchive,
   CoinCreate,
   CoinExpire,
   CoinRules_BuyMemberTraffic,
-  CnsRules_CollectInitialEntryPayment,
-  CnsRules_CollectEntryRenewalPayment,
   ImportCrate_ReceiveCoin,
   LockedCoinExpireCoin,
   LockedCoinOwnerExpireLock,
@@ -307,17 +310,19 @@ class UserWalletTxLogParser(
 
           case AcceptedTransferOffer_Complete(node) =>
             // this creates different entries with different event ids:
-            // one is the AcceptedTransferOffer_Complete itself, the others are the children
+            // one is from parsing the AcceptedTransferOffer_Complete itself, the others are from parsing the children
             for {
-              offer <- now(State.fromTransferOfferComplete(tree, exercised, domainId, node))
-              transfer <- defer {
+              stateFromOfferCompletion <- now(
+                State.fromTransferOfferComplete(tree, exercised, domainId, node)
+              )
+              stateFromChildren <- defer {
                 parseTrees(
                   tree,
                   exercised.getChildEventIds.asScala.toList,
                   domainId,
                 )
               }.map(_.setTransferSubtype(TxLogEntry.Transfer.P2PPaymentCompleted))
-            } yield offer.appended(transfer)
+            } yield stateFromOfferCompletion.appended(stateFromChildren)
 
           case AcceptedTransferOffer_Abort(node) =>
             now(
@@ -345,6 +350,51 @@ class UserWalletTxLogParser(
             now(
               State.fromTransferOfferFailure(
                 TxLogEntry.TransferOfferStatus.Withdrawn(node.argument.value.reason),
+                tree,
+                exercised,
+                domainId,
+                node,
+              )
+            )
+
+          // ------------------------------------------------------------------
+          // Buy Traffic Requests
+          // ------------------------------------------------------------------
+
+          case WalletAppInstall_CreateBuyTrafficRequest(_) =>
+            now(State.fromCreateBuyTrafficRequest(tree, exercised, domainId))
+
+          case BuyTrafficRequest_Complete(node) =>
+            // this creates different entries with different event ids:
+            // one is from parsing the BuyTrafficRequest_Complete itself, the others are from parsing the children
+            for {
+              stateFromRequestCompletion <- now(
+                State.fromBuyTrafficRequestComplete(tree, exercised, domainId, node)
+              )
+              stateFromChildren <- defer {
+                parseTrees(
+                  tree,
+                  exercised.getChildEventIds.asScala.toList,
+                  domainId,
+                )
+              }
+            } yield stateFromRequestCompletion.appended(stateFromChildren)
+
+          case BuyTrafficRequest_Cancel(node) =>
+            now(
+              State.fromBuyTrafficRequestFailure(
+                TxLogEntry.BuyTrafficRequestStatus.Rejected(node.argument.value.reason),
+                tree,
+                exercised,
+                domainId,
+                node,
+              )
+            )
+
+          case BuyTrafficRequest_Expire(node) =>
+            now(
+              State.fromBuyTrafficRequestFailure(
+                TxLogEntry.BuyTrafficRequestStatus.Expired,
                 tree,
                 exercised,
                 domainId,
@@ -915,13 +965,10 @@ object UserWalletTxLogParser {
       def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse
     }
     object BuyTrafficRequestStatus {
-      case class Created(
-          transactionId: String
-      ) extends BuyTrafficRequestStatus {
+      case object Created extends BuyTrafficRequestStatus {
         override def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse =
           httpDef.GetBuyTrafficRequestStatusResponse(
-            status = httpDef.GetBuyTrafficRequestStatusResponse.Status.Created,
-            transactionId = Some(transactionId),
+            status = httpDef.GetBuyTrafficRequestStatusResponse.Status.Created
           )
       }
       case class Completed(
@@ -953,9 +1000,8 @@ object UserWalletTxLogParser {
 
     final case class BuyTrafficRequest(
         indexRecord: BuyTrafficRequestStatusTxLogIndexRecord,
-        status: TransferOfferStatus,
+        status: BuyTrafficRequestStatus,
         buyer: String,
-        memberId: String,
     ) extends BuyTrafficRequestTxLogEntry {
       override def setEventId(eventId: String): TxLogEntry =
         copy(indexRecord = indexRecord.copy(eventId = eventId))
@@ -1592,6 +1638,90 @@ object UserWalletTxLogParser {
       State(
         entries = immutable.Queue(newEntry)
       )
+    }
+
+    def fromCreateBuyTrafficRequest(
+        tx: TransactionTree,
+        event: ExercisedEvent,
+        domainId: DomainId,
+    ): State = {
+      val buyTrafficRequest = tx.getEventsById.get(event.getChildEventIds.get(0)) match {
+        case event: CreatedEvent =>
+          trafficRequestCodegen.BuyTrafficRequest
+            .valueDecoder()
+            .decode(event.getArguments)
+        case x =>
+          throw new RuntimeException(
+            s"Expected first child to be the CreatedEvent of a BuyTrafficRequest, but was $x"
+          )
+      }
+      fromBuyTrafficRequestOperation(
+        tx,
+        event,
+        domainId,
+        buyTrafficRequest.trackingId,
+        TxLogEntry.BuyTrafficRequestStatus.Created,
+        buyTrafficRequest.endUserParty,
+      )
+    }
+
+    def fromBuyTrafficRequestComplete(
+        tx: TransactionTree,
+        event: ExercisedEvent,
+        domainId: DomainId,
+        node: ExerciseNode[?, BuyTrafficRequest_Complete.Res],
+    ): State = {
+      val trackingInfo = node.result.value._1._2
+      fromBuyTrafficRequestOperation(
+        tx,
+        event,
+        domainId,
+        trackingInfo.trackingId,
+        TxLogEntry.BuyTrafficRequestStatus.Completed(
+          tx.getTransactionId
+        ),
+        trackingInfo.endUserParty,
+      )
+    }
+
+    def fromBuyTrafficRequestFailure(
+        failureReason: TxLogEntry.BuyTrafficRequestStatus.Failed,
+        tx: TransactionTree,
+        event: ExercisedEvent,
+        domainId: DomainId,
+        node: ExerciseNode[?, trafficRequestCodegen.BuyTrafficRequestTrackingInfo],
+    ): State = {
+      val trackingInfo = node.result.value
+      fromBuyTrafficRequestOperation(
+        tx,
+        event,
+        domainId,
+        trackingInfo.trackingId,
+        failureReason,
+        trackingInfo.endUserParty,
+      )
+    }
+
+    private def fromBuyTrafficRequestOperation(
+        tx: TransactionTree,
+        event: ExercisedEvent,
+        domainId: DomainId,
+        trackingId: String,
+        status: TxLogEntry.BuyTrafficRequestStatus,
+        buyer: String,
+    ) = {
+      val newEntry = TxLogEntry.BuyTrafficRequest(
+        indexRecord = BuyTrafficRequestStatusTxLogIndexRecord(
+          optOffset = Some(tx.getOffset),
+          eventId = event.getEventId,
+          domainId = domainId,
+          acsContractId = None,
+          trackingId = trackingId,
+        ),
+        status,
+        buyer,
+      )
+      State(entries = immutable.Queue(newEntry))
     }
 
     def fromBuyMemberTraffic(

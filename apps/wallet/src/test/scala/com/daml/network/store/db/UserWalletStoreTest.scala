@@ -7,12 +7,14 @@ import com.daml.network.codegen.java.cc.{
 }
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cn.wallet.{
+  buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
   payment as paymentCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
+import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall_CreateBuyTrafficRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
 import com.daml.network.wallet.store.db.DbUserWalletStore
@@ -21,13 +23,16 @@ import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.{Limit, PageLimit, StoreTest}
 import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
-import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.TransferOfferStatus
+import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.{
+  BuyTrafficRequestStatus,
+  TransferOfferStatus,
+}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import org.scalatest.{Assertion, Succeeded}
@@ -237,6 +242,78 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
                 ),
                 acceptedTree.getTransactionId,
               )
+            )
+          )
+        }
+      }
+
+    }
+
+    "getLatestBuyTrafficRequestEventByTrackingId" should {
+
+      "return None when missing" in {
+        for {
+          store <- mkStore(user1)
+          result <- store.getLatestBuyTrafficRequestEventByTrackingId("nope")
+        } yield {
+          result.offset should be(initialOffset.toHexString)
+          result.value should be(None)
+        }
+      }
+
+      "return None after ingesting unrelated entries only" in {
+        val treeSource = TransactionTreeSource.ForTesting()
+
+        def mkUnrelatedEntry()(offset: String) = {
+          val result = mintTransaction(user1, 11.0, 1L, 1.0)(offset)
+          treeSource.addTree(result)
+          result
+        }
+
+        for {
+          store <- mkStore(user1, treeSource)
+          _ <- dummyDomain.ingest(mkUnrelatedEntry())(store.multiDomainAcsStore)
+          result <- store.getLatestBuyTrafficRequestEventByTrackingId("nope")
+        } yield {
+          result.value should be(None)
+        }
+      }
+
+      "return the latest entry" in {
+        val treeSource = TransactionTreeSource.ForTesting()
+        val trafficRequestCid = nextCid()
+
+        def mkBuyTrafficRequest(trackingId: String, cid: String)(offset: String) = {
+          val result =
+            mkBuyTrafficRequestTx(offset, trackingId, user1, participantId, dummyDomain, cid)
+          treeSource.addTree(result)
+          result
+        }
+        def mkCancelTrafficRequest(trackingId: String, reason: String, cid: String)(
+            offset: String
+        ) = {
+          val result =
+            mkCancelTrafficRequestTx(offset, trackingId, user1, reason, cid)
+          treeSource.addTree(result)
+          result
+        }
+
+        for {
+          store <- mkStore(user1, treeSource)
+          _ <- dummyDomain.ingest(mkBuyTrafficRequest("trackingId", trafficRequestCid))(
+            store.multiDomainAcsStore
+          )
+          cancelledTree <- dummyDomain.ingest(
+            mkCancelTrafficRequest("trackingId", "just because", trafficRequestCid)
+          )(
+            store.multiDomainAcsStore
+          )
+          result <- store.getLatestBuyTrafficRequestEventByTrackingId("trackingId")
+        } yield {
+          result.offset should be(cancelledTree.getOffset)
+          result.value.map(_.status) should be(
+            Some(
+              BuyTrafficRequestStatus.Rejected("just because")
             )
           )
         }
@@ -826,6 +903,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   private lazy val user1 = userParty(1)
   private lazy val user2 = userParty(2)
   private lazy val validator = mkPartyId(s"validator")
+  private lazy val participantId = mkParticipantId("user-1")
   protected def storeKey(endUserParty: PartyId) = UserWalletStore.Key(
     svcParty = svcParty,
     validatorParty = validator,
@@ -896,6 +974,32 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     contract(
       identifier = templateId,
       contractId = new transferOffersCodegen.AcceptedTransferOffer.ContractId(cid),
+      payload = template,
+    )
+  }
+
+  private def buyTrafficRequest(
+      buyer: PartyId,
+      memberId: Member,
+      domainId: DomainId,
+      trafficAmount: Long,
+      expiresAt: CantonTimestamp,
+      trackingId: String,
+      cid: String = nextCid(),
+  ) = {
+    val templateId = trafficRequestCodegen.BuyTrafficRequest.TEMPLATE_ID
+    val template = new trafficRequestCodegen.BuyTrafficRequest(
+      svcParty.toProtoPrimitive,
+      buyer.toProtoPrimitive,
+      expiresAt.toInstant,
+      trackingId,
+      trafficAmount,
+      memberId.toProtoPrimitive,
+      domainId.toProtoPrimitive,
+    )
+    contract(
+      identifier = templateId,
+      contractId = new trafficRequestCodegen.BuyTrafficRequest.ContractId(cid),
       payload = template,
     )
   }
@@ -1226,6 +1330,75 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           Seq(sender, receiver),
         )
       ),
+    )
+  }
+
+  private def mkBuyTrafficRequestTx(
+      offset: String,
+      trackingId: String,
+      buyer: PartyId,
+      memberId: Member,
+      domainId: DomainId,
+      trafficRequestCid: String,
+      trafficAmount: Long = 1_000_000L,
+  ) = {
+    val walletAppInstallCid = nextCid()
+
+    mkExerciseTx(
+      offset,
+      exercisedEvent(
+        walletAppInstallCid,
+        installCodegen.WalletAppInstall.TEMPLATE_ID,
+        None,
+        installCodegen.WalletAppInstall.CHOICE_WalletAppInstall_CreateBuyTrafficRequest.name,
+        consuming = false,
+        new WalletAppInstall_CreateBuyTrafficRequest(
+          memberId.toProtoPrimitive,
+          domainId.toProtoPrimitive,
+          trafficAmount,
+          Instant.now().plusSeconds(60),
+          trackingId,
+        ).toValue,
+        new trafficRequestCodegen.BuyTrafficRequest.ContractId(trafficRequestCid).toValue,
+      ),
+      Seq(
+        toCreatedEvent(
+          buyTrafficRequest(
+            buyer,
+            memberId,
+            domainId,
+            trafficAmount,
+            CantonTimestamp.now().plusSeconds(60),
+            trackingId,
+          ),
+          Seq(buyer),
+        )
+      ),
+    )
+  }
+
+  private def mkCancelTrafficRequestTx(
+      offset: String,
+      trackingId: String,
+      buyer: PartyId,
+      reason: String,
+      requestCid: String,
+  ) = {
+    mkExerciseTx(
+      offset,
+      exercisedEvent(
+        requestCid,
+        trafficRequestCodegen.BuyTrafficRequest.TEMPLATE_ID,
+        None,
+        trafficRequestCodegen.BuyTrafficRequest.CHOICE_BuyTrafficRequest_Cancel.name,
+        consuming = false,
+        new trafficRequestCodegen.BuyTrafficRequest_Cancel(reason).toValue,
+        new trafficRequestCodegen.BuyTrafficRequestTrackingInfo(
+          trackingId,
+          buyer.toProtoPrimitive,
+        ).toValue,
+      ),
+      Seq(),
     )
   }
 
