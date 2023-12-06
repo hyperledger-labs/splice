@@ -892,12 +892,12 @@ jobs:
       - checkout
       - setup_nix
       - run_bash_command_in_nix:
-          cmd_name: Mark branch point from main for next TestNet release
+          cmd_name: Mark latest snapshot in branch for next TestNet release
           additional_nix_args: "--keep GITHUB_TOKEN"
           cmd: |
             git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            FORK_POINT=`git merge-base --fork-point main`
-            git tag --force testnet-next $FORK_POINT
+            LATEST_SNAPSHOT=`git describe --tags --match '*-snapshot.*' --abbrev=0 HEAD`
+            git tag --force testnet-next $LATEST_SNAPSHOT
             git push --force origin testnet-next
 
   update_pipeline_schedule:
