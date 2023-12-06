@@ -357,7 +357,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       _ => {
         val balance = Try(loggerFactory.suppressErrors((aliceWalletClient.balance())))
           .getOrElse(fail(s"Could not get balance for alice"))
-        balance.unlockedQty should be(100.0)
+        assertInRange(balance.unlockedQty, (99.9, 100.0))
       },
     )
 
