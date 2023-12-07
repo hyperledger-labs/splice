@@ -2727,6 +2727,18 @@ workflows:
         requires:
           - deploy_cluster_cidaily
           - publish_public_release
+    - deploy_validator_runbook:
+        name: deploy_validator_runbook_testnet
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - datadog
+          - slack-context:wq
+        cluster: "cidaily-testnet"
+        use_published_artifacts: true
+        requires:
+          - deploy_cluster_cidaily_testnet
+          - publish_public_release
     - preflight_sv_check:
         name: preflight_sv_check_devnet
         <<: *main-branch-only
