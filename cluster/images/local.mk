@@ -70,9 +70,11 @@ $$(prefix)/docker-promote: $$(prefix)/$(docker-promote)
 $$(prefix)/docker-check: $$(prefix)/$(docker-image-tag)
 	docker-check $$$$(cat $$(abspath $$<))
 
+# The "app_dev/api" dir removal is to accommodate the docs image
 .PHONY: $$(prefix)/clean
 $$(prefix)/clean:
 	-rm -vfr $$(@D)/target
+	-rm -vfr $$(@D)/src/app_dev/api
 endef # end DEFINE_PHONY_RULES
 
 $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
