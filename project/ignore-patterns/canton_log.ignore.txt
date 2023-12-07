@@ -76,6 +76,6 @@ MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received an unauthorized mediator response
 Late processing \(or clock skew\) of batch with counter.*after sequencing
 
 # Shows up during global domain migration test, when the domain is frozen
-Failed to submit submission due to Error(RequestRefused(Overloaded(Submission rate exceeds rate limit of 0/s.)))
+Failed to submit submission due to Error\(RequestRefused\(Overloaded\(Submission rate exceeds rate limit of 0/s\.\)\)\)
 
 # Make sure to have a trailing newline
