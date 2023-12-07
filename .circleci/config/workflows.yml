@@ -998,4 +998,5 @@ workflows:
       - mark_for_testnet:
           <<: *notify-fail
           context:
+            - artifactory
             - slack-context
