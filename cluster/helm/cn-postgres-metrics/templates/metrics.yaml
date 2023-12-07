@@ -31,7 +31,7 @@ spec:
           - name: DATA_SOURCE_USER
             value: cnadmin
           - name: DATA_SOURCE_URI
-            value: {{ .Values.postgres.hostname }}:{{ .Values.postgres.port }}/postgres?sslmode=disable
+            value: {{ .Values.postgres.hostname }}:{{ .Values.postgres.port }}/{{ .Values.postgres.database }}?sslmode=disable
         volumeMounts:
           - name: postgres-password
             mountPath: "/tmp/pwd"
@@ -52,6 +52,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Release.Name }}
+    server: {{ .Values.postgres.hostname }}
 spec:
   ports:
   - name: postgres-metrics
@@ -80,3 +81,6 @@ spec:
   namespaceSelector:
     matchNames:
     - {{ .Release.Namespace }}
+
+  targetLabels:
+      - server

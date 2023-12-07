@@ -254,3 +254,7 @@ export type ChartValues = { [key: string]: any };
 
 // btoa is only available in DOM so inline the definition here.
 export const btoa: (s: string) => string = (s: string) => Buffer.from(s).toString('base64');
+
+export function sanitizedForHelm(value: string): string {
+  return value.replaceAll('_', '-');
+}

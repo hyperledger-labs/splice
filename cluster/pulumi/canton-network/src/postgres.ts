@@ -9,6 +9,7 @@ import {
   ExactNamespace,
   installCNHelmChart,
   installPostgresPasswordSecret,
+  sanitizedForHelm,
 } from 'cn-pulumi-common';
 
 const enableCloudSql = envFlag('ENABLE_CLOUD_SQL', false);
@@ -114,7 +115,7 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
   }
 
   createDatabase(name: string): pulumi.Resource {
-    return new gcp.sql.Database(
+    const db = new gcp.sql.Database(
       `db-${this.name}-${name}`,
       {
         instance: this.pgSvc.name,
@@ -125,6 +126,19 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
         deletedWith: this.pgSvc,
       }
     );
+    installCNHelmChart(
+      this.namespace,
+      `pg-exporter-${sanitizedForHelm(name)}`,
+      'cn-postgres-metrics',
+      {
+        postgres: {
+          hostname: this.address,
+          database: name,
+        },
+      },
+      [db]
+    );
+    return db;
   }
 }
 
@@ -174,13 +188,26 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
       },
       { dependsOn: this.pg }
     );
-    return new command.local.Command(
+    const createCommand = new command.local.Command(
       `createdb-${name}`,
       {
         create: `kubectl exec -n ${this.namespace.logicalName} postgres-0 -- psql --username=cnadmin --dbname=\${POSTGRES_DB:-cantonnet} -c "create database ${name}"`,
       },
       { dependsOn: waitForPostgresToBeUp }
     );
+    installCNHelmChart(
+      this.namespace,
+      `pg-exporter-${sanitizedForHelm(name)}`,
+      'cn-postgres-metrics',
+      {
+        postgres: {
+          hostname: this.address,
+          database: name,
+        },
+      },
+      [createCommand]
+    );
+    return createCommand;
   }
 }
 
@@ -193,16 +220,5 @@ export function installPostgres(xns: ExactNamespace, name: string): Postgres {
   } else {
     ret = new CNPostgres(xns, name);
   }
-  installCNHelmChart(
-    xns,
-    'postgres-metrics',
-    'cn-postgres-metrics',
-    {
-      postgres: {
-        hostname: ret.address,
-      },
-    },
-    [ret]
-  );
   return ret;
 }
