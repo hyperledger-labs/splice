@@ -710,6 +710,8 @@ class SvFrontendIntegrationTest
                 element.underlying.sendKeys(requestReasonBody)
               }
 
+              // TODO(#8767): remove this screenshot
+              screenshot()
               if (expiresInNextMinute) {
                 setExpirationDate(
                   "sv1",
@@ -723,6 +725,8 @@ class SvFrontendIntegrationTest
                 )
               }
 
+              // TODO(#8767): remove this screenshot
+              screenshot()
               click on "create-voterequest-submit-button"
             },
           )(
