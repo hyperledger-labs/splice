@@ -4,6 +4,7 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvcInfo
 import com.digitalasset.canton.topology.PartyId
+import scala.concurrent.duration.*
 
 trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
 
@@ -105,7 +106,7 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
               if (secretsItr.hasNext) Some(secretsItr.next().text) else None
             },
           )
-          actAndCheck(
+          actAndCheck(timeUntilSuccess = 40.seconds)(
             "click",
             click on "create-validator-onboarding-secret",
           )(
