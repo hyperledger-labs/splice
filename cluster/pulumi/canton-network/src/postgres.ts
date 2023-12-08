@@ -91,6 +91,8 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
       }
     );
 
+    this.address = this.pgSvc.privateIpAddress;
+
     const pgDB = this.createDatabase('cantonnet');
 
     const password = generatePassword(`${logicalName}-passwd`, { parent: this }).result;
@@ -109,8 +111,6 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
         dependsOn: [passwordSecret],
       }
     );
-
-    this.address = this.pgSvc.privateIpAddress;
 
     this.registerOutputs({
       privateIpAddress: this.pgSvc.privateIpAddress,
