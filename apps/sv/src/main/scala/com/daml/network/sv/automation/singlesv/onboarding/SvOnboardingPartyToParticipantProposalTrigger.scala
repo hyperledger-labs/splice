@@ -37,38 +37,45 @@ class SvOnboardingPartyToParticipantProposalTrigger(
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[ParticipantId]] = {
-    for {
-      svcRules <- svcStore.getSvcRules()
-      currentlyHostingParticipants <- participantAdminConnection.getPartyToParticipant(
-        svcRules.domain,
-        svcParty,
-      )
-      svcPartyHostingProposals <- participantAdminConnection.listPartyToParticipant(
-        filterStore = svcRules.domain.filterString,
-        filterParty = svcParty.filterString,
-        proposals = AllProposals,
-      )
-      confirmedOnboardingNamespacesThatCorrespondToParticipants <- svcStore
-        .listSvOnboardingConfirmed()
-        .map(_.map(_.payload.svParty).map(PartyId.tryFromProtoPrimitive).map(_.uid.namespace))
-    } yield {
-      val proposalsSignedByCandidateAndSponsor =
-        svcPartyHostingProposals.filter(_.base.signedBy.size >= 2)
-      val proposalsNotSignedBySv = proposalsSignedByCandidateAndSponsor
-        .filterNot(_.base.signedBy.contains(svParty.uid.namespace.fingerprint))
-      val newlyAddedParticipantIds = proposalsNotSignedBySv
-        .map(_.mapping.participantIds.diff(currentlyHostingParticipants.mapping.participantIds))
-        .collect {
-          // for now we support onboarding just one participant at a time
-          case Seq(singleParticipant) => singleParticipant
-        }
-      newlyAddedParticipantIds
-        .filter(participantId =>
-          confirmedOnboardingNamespacesThatCorrespondToParticipants.contains(
-            participantId.uid.namespace
-          )
-        )
-    }
+    svcStore
+      .listSvOnboardingConfirmed()
+      .map(_.map(_.payload.svParty).map(PartyId.tryFromProtoPrimitive).map(_.uid.namespace))
+      .flatMap { confirmedOnboardingNamespacesThatCorrespondToParticipants =>
+        // avoid listing all the proposals if no onboarding contract is present
+        if (confirmedOnboardingNamespacesThatCorrespondToParticipants.nonEmpty) {
+          for {
+            svcRules <- svcStore.getSvcRules()
+            currentlyHostingParticipants <- participantAdminConnection.getPartyToParticipant(
+              svcRules.domain,
+              svcParty,
+            )
+            svcPartyHostingProposals <- participantAdminConnection.listPartyToParticipant(
+              filterStore = svcRules.domain.filterString,
+              filterParty = svcParty.filterString,
+              proposals = AllProposals,
+            )
+          } yield {
+            val proposalsSignedByCandidateAndSponsor =
+              svcPartyHostingProposals.filter(_.base.signedBy.size >= 2)
+            val proposalsNotSignedBySv = proposalsSignedByCandidateAndSponsor
+              .filterNot(_.base.signedBy.contains(svParty.uid.namespace.fingerprint))
+            val newlyAddedParticipantIds = proposalsNotSignedBySv
+              .map(
+                _.mapping.participantIds.diff(currentlyHostingParticipants.mapping.participantIds)
+              )
+              .collect {
+                // for now we support onboarding just one participant at a time
+                case Seq(singleParticipant) => singleParticipant
+              }
+            newlyAddedParticipantIds
+              .filter(participantId =>
+                confirmedOnboardingNamespacesThatCorrespondToParticipants.contains(
+                  participantId.uid.namespace
+                )
+              )
+          }
+        } else Future.successful(Seq.empty)
+      }
   }
 
   override protected def completeTask(task: ParticipantId)(implicit

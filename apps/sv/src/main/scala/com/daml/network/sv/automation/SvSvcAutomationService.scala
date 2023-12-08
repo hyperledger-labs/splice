@@ -31,7 +31,6 @@ import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
 import com.daml.network.util.QualifiedName
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.{Clock, WallClock}
 import io.opentelemetry.api.trace.Tracer
@@ -177,8 +176,6 @@ class SvSvcAutomationService(
       .replace(
         new WallClock(triggerContext.timeouts, triggerContext.loggerFactory)
       )
-      .focus(_.config.pollingInterval)
-      .replace(NonNegativeFiniteDuration.ofSeconds(1))
     registerTrigger(
       new ReconcileSequencerLimitWithMemberTrafficTrigger(
         triggerContext,
