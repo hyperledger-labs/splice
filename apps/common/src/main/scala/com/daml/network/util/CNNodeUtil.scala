@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.cc.globaldomain.{
   BaseRateTrafficLimits,
   DomainFeesConfig,
-  GlobalDomainConfig,
+  CoinGlobalDomainConfig,
 }
 import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
 import com.daml.network.codegen.java.cc.schedule.Schedule
@@ -278,10 +278,10 @@ object CNNodeUtil {
       initialBaseRateBurstAmount: Long,
       initialBaseRateBurstWindow: NonNegativeFiniteDuration,
       initialReadVsWriteScalingFactor: Int,
-  ): GlobalDomainConfig = {
+  ): CoinGlobalDomainConfig = {
     val domainId = initialDomainId.toProtoPrimitive
     val next = nextDomainId.map(_.toProtoPrimitive)
-    new GlobalDomainConfig(
+    new CoinGlobalDomainConfig(
       // requiredDomains
       new DamlSet(
         (Map(domainId -> DamlUnit.getInstance) ++ next

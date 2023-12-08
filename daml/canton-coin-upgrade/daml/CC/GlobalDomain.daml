@@ -11,7 +11,7 @@ import DA.Time
 -- | The configuration of the logical concept of a global domain, which consists over its lifetime
 -- of a series of actual Canton domains, which are introduced for handling the (rare) occasions of switching
 -- to a new Canton domain protocol version.
-data GlobalDomainConfig = GlobalDomainConfig with
+data CoinGlobalDomainConfig = CoinGlobalDomainConfig with
     requiredDomains : Set.Set Text -- ^ The domain-ids of all domains that CC and CNS users should be connected to.
     activeDomain : Text -- ^ The domain-id of the domain on which the SVC accepts transactions involving the
                         -- CoinRules and related contracts, which must be one of the `requiredDomains`.
@@ -39,8 +39,8 @@ data DomainFeesConfig = DomainFeesConfig with
   deriving (Eq, Show)
 
 
-validGlobalDomainConfig : GlobalDomainConfig -> Bool
-validGlobalDomainConfig config =
+validCoinGlobalDomainConfig : CoinGlobalDomainConfig -> Bool
+validCoinGlobalDomainConfig config =
   config.activeDomain `Set.member` config.requiredDomains
 
 
