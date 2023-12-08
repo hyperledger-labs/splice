@@ -285,7 +285,7 @@ data SvcRulesConfig = SvcRulesConfig with
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
     initialTrafficGrant: Int -- ^ Extra traffic granted to SVs at the time of joining
     svChallengeDeadline : RelTime -- ^ Deadline for each stage of the two-stage SV challenging protocol
-    globalDomain : GlobalDomainConfig
+    globalDomain : SvcGlobalDomainConfig
   deriving (Eq, Show)
 
 data TrafficState = TrafficState with

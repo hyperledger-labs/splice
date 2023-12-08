@@ -15,7 +15,7 @@ import com.daml.network.codegen.java.cn.cns.*
 import com.daml.network.codegen.java.cn.cometbft.CometBftConfigLimits
 import com.daml.network.codegen.java.cn.svc.globaldomain.{
   DomainNodeConfigLimits,
-  GlobalDomainConfig,
+  SvcGlobalDomainConfig,
 }
 import com.daml.network.sv.store.SvSvcStore.IdleCnsSubscription
 import com.daml.network.codegen.java.cn.svcrules.*
@@ -1285,7 +1285,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         1,
         1,
         new RelTime(1),
-        new GlobalDomainConfig(Collections.emptyMap(), newDomainId, newDomainId),
+        new SvcGlobalDomainConfig(Collections.emptyMap(), newDomainId, newDomainId),
       ),
       Collections.emptyMap(),
       true,

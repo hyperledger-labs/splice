@@ -44,7 +44,7 @@ initCollective initialOpenRounds isDevNet = do
   let initialDomainConfig = DomainConfig with
         state = DS_Operational
         cometBftGenesisJson = "<genesis-json-injected-by-founding-member>"
-  let initialGlobalDomainConfig =  GlobalDomainConfig with
+  let initialSvcGlobalDomainConfig =  SvcGlobalDomainConfig with
         domains = Map.fromList [("domain-id", initialDomainConfig)]
         lastDomainId = "domain-id"
         activeDomainId = "domain-id"
@@ -61,7 +61,7 @@ initCollective initialOpenRounds isDevNet = do
         maxTextLength = 1024
         initialTrafficGrant = 1_000_000
         svChallengeDeadline = minutes 30
-        globalDomain = initialGlobalDomainConfig
+        globalDomain = initialSvcGlobalDomainConfig
   let coinConfig = defaultCoinConfig
   let cnsRulesConfig = defaultCnsRulesConfig
 

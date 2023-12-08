@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
   DomainConfig,
   DomainNodeConfig,
   DomainNodeConfigLimits,
-  GlobalDomainConfig,
+  SvcGlobalDomainConfig,
   MediatorConfig,
   SequencerConfig,
 }
@@ -65,7 +65,7 @@ object SvUtil {
 
   private val defaultInitialTrafficGrant = 1000_000L
 
-  private def defaultSvcGlobalDomainConfig(domainId: DomainId) = new GlobalDomainConfig(
+  private def defaultSvcGlobalDomainConfig(domainId: DomainId) = new SvcGlobalDomainConfig(
     // domains
     Map(
       domainId.toProtoPrimitive -> new DomainConfig(

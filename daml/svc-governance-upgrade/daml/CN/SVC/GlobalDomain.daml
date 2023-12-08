@@ -15,7 +15,7 @@ import CN.CometBft
 -- Note that domains themselves are formed by a cluster of nodes run by the collective members.
 -- As can be seen form `DomainNodeConfig` each member runs multiple different kinds of
 -- physical nodes.
-data GlobalDomainConfig = GlobalDomainConfig with
+data SvcGlobalDomainConfig = SvcGlobalDomainConfig with
     domains : Map.Map Text DomainConfig
     -- ^ The actual domains, numbered sequentially.
     lastDomainId : Text

@@ -46,8 +46,8 @@ defaultTransferConfig = TransferConfig with
     maxNumLockHolders = 10
 
 -- | Global domain config to use for testing.
-defaultGlobalDomainConfig : GlobalDomainConfig
-defaultGlobalDomainConfig = GlobalDomainConfig with
+defaultCoinGlobalDomainConfig : CoinGlobalDomainConfig
+defaultCoinGlobalDomainConfig = CoinGlobalDomainConfig with
   requiredDomains = Set.fromList ["global-domain-id-0"]
   activeDomain = "global-domain-id-0"
   fees = defaultDomainFeesConfig
@@ -61,7 +61,7 @@ defaultCoinConfig = CoinConfig with
   -- Using issuance curve defined in the CC whitepaper
   issuanceCurve = defaultIssuanceCurve
 
-  globalDomain = defaultGlobalDomainConfig
+  globalDomain = defaultCoinGlobalDomainConfig
 
   -- Duration of one tick, which is half the target duration of one round
   -- default: 2.5 minutes
