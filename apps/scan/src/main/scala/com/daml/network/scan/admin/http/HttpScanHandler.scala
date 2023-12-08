@@ -604,4 +604,10 @@ class HttpScanHandler(
         }
     }
   }
+
+  override def getMemberTrafficStatus(
+      respond: ScanResource.GetMemberTrafficStatusResponse.type
+  )(domainId: String, memberId: String)(
+      extracted: TraceContext
+  ): Future[ScanResource.GetMemberTrafficStatusResponse] = ???
 }
