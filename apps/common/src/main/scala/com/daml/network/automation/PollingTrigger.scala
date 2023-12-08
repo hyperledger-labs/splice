@@ -22,7 +22,7 @@ import scala.util.{Failure, Success}
   */
 trait PollingTrigger extends Trigger with FlagCloseableAsync {
   private implicit val mc: MetricsContext = MetricsContext(
-    "trigger_name" -> this.getClass.getSimpleName(),
+    "trigger_name" -> this.getClass.getSimpleName,
     "trigger_type" -> "polling",
   )
 
@@ -54,9 +54,13 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
           )
           runningTaskFinishedVar = Some(Promise())
           // TODO(#8526) refactor for better latency reporting
-          metrics.latency
-            .timeFuture(performWorkIfAvailable())
-            .andThen { case _ =>
+          val latencyTimer = metrics.latency.startAsync()
+          performWorkIfAvailable()
+            .andThen { case performedWork =>
+              MetricsContext.withExtraMetricLabels(("work_done", performedWork.toString)) { m =>
+                latencyTimer.stop()(m)
+              }
+
               blocking {
                 synchronized {
                   assert(runningTaskFinishedVar.nonEmpty)
@@ -129,11 +133,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
               retryable.retryOK(Failure(ex), logger, None).discard[ErrorKind]
               loopWithDelay()
 
-            case Success(workDone) => {
-              MetricsContext.withExtraMetricLabels(("work_done", workDone.toString)) { m =>
-                metrics.completed.mark()(m)
-              }
-
+            case Success(workDone) =>
               if (context.retryProvider.isClosing) {
                 exitPollingLoop()
               } else if (workDone) {
@@ -145,7 +145,6 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
                 )
                 loopWithDelay()
               }
-            }
           }
         }(loggingContext)
 
