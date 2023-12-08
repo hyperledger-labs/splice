@@ -132,7 +132,7 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
     );
     installCNHelmChart(
       this.namespace,
-      `pg-exporter-${sanitizedForHelm(name)}`,
+      `${this.namespace.logicalName}-pg-exporter-${this.name}-${sanitizedForHelm(name)}`,
       'cn-postgres-metrics',
       {
         postgres: {
@@ -206,7 +206,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
     );
     installCNHelmChart(
       this.namespace,
-      `pg-exporter-${sanitizedForHelm(name)}`,
+      `${this.namespace.logicalName}-pg-exporter-${this.name}-${sanitizedForHelm(name)}`,
       'cn-postgres-metrics',
       {
         postgres: {
