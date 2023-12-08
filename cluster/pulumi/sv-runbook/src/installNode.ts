@@ -103,7 +103,7 @@ export async function installNode(
     overrideSpecial: '_%@',
     special: true,
   }).result;
-  const passwordSecret = installPostgresPasswordSecret(xns, password);
+  const passwordSecret = installPostgresPasswordSecret(xns, password, 'postgres-secrets');
 
   const svKey = svKeyFromSecret('sv');
 

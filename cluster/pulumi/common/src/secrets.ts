@@ -142,9 +142,9 @@ export function svKeySecret(ns: ExactNamespace, keys: CnInput<SvIdKey>): k8s.cor
 
 export function installPostgresPasswordSecret(
   ns: ExactNamespace,
-  password: pulumi.Output<string>
+  password: pulumi.Output<string>,
+  secretName: string
 ): k8s.core.v1.Secret {
-  const secretName = 'postgres-secrets';
   return new k8s.core.v1.Secret(
     `cn-app-${ns.logicalName}-${secretName}`,
     {

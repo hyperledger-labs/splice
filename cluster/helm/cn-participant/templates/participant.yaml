@@ -37,7 +37,7 @@ spec:
         - name: CANTON_PARTICIPANT_POSTGRES_PASSWORD
           valueFrom:
            secretKeyRef:
-             name: {{ .Values.postgresSecretsName }}
+             name: {{ .Values.postgresSecretName }}
              key: postgresPassword
         {{- if .Values.postgresDb }}
         - name: CANTON_PARTICIPANT_POSTGRES_DB

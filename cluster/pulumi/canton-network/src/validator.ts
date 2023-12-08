@@ -42,7 +42,7 @@ export type ValidatorConfig = {
   validatorWalletUser?: string;
   disableAllocateLedgerApiUserParty?: boolean;
   participant: pulumi.Resource;
-  persistenceConfig?: PersistenceConfig;
+  persistenceConfig: PersistenceConfig;
   backupConfig?: ValidatorBackupConfig;
   extraDependsOn?: pulumi.Resource[];
   appDars?: string[];
@@ -127,6 +127,7 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       metrics: {
         enable: true,
       },
+      postgresSecretName: config.persistenceConfig.secretName,
     },
     dependsOn
   );

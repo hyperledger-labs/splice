@@ -11,7 +11,7 @@ resources:
     memory: 4Gi
 
 postgres: postgres.sv-1.svc.cluster.local
-postgresSecretsName: "postgres-secrets"
+postgresSecretName: "postgres-secrets"
 
 metrics:
   enable: false

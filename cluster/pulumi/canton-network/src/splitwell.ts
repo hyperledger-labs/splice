@@ -102,6 +102,7 @@ export async function installSplitwell(
     persistenceConfig: {
       host: postgresDb.address,
       databaseName: pulumi.Output.create(validatorDbName),
+      secretName: postgresDb.secretName,
       schema: pulumi.Output.create(validatorDbName),
       user: pulumi.Output.create('cnadmin'),
       port: pulumi.Output.create(5432),

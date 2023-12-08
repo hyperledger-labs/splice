@@ -306,6 +306,7 @@ function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): Persi
   return {
     host: postgresDb.address,
     databaseName: dbNameO,
+    secretName: postgresDb.secretName,
     schema: dbNameO,
     user: pulumi.Output.create('cnadmin'),
     port: pulumi.Output.create(5432),

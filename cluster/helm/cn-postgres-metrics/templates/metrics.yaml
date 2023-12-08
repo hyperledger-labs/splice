@@ -18,7 +18,7 @@ spec:
       volumes:
         - name: postgres-password
           secret:
-            secretName: {{ .Values.postgresSecretsName }}
+            secretName: {{ .Values.postgresSecretName }}
             items:
               - key: postgresPassword
                 path: postgresPassword

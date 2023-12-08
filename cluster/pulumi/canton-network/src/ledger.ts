@@ -98,6 +98,7 @@ export function installParticipant(
       postgres: postgres.address,
       postgresDb: postgresDbName,
       postgresSchema: postgresDbName,
+      postgresSecretName: postgres.secretName,
       participantAdminUserNameFrom,
       disableAutoInit,
       metrics: {

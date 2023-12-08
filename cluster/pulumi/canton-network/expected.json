@@ -917,12 +917,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "postgres-secrets",
+        "name": "participant-postgres-secrets",
         "namespace": "validator1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-validator1-postgres-secrets",
+    "name": "cn-app-validator1-participant-postgres-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -945,6 +945,28 @@
       "type": "Opaque"
     },
     "name": "cn-app-validator1-validator-onboarding-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "validator-postgres-secrets",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator1-validator-postgres-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1214,7 +1236,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n validator1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator1_participant\""
+      "create": "kubectl exec -n validator1 participant-postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator1_participant\""
     },
     "name": "createdb-validator1_participant",
     "provider": "",
@@ -1224,7 +1246,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n validator1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator1\""
+      "create": "kubectl exec -n validator1 validator-postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator1\""
     },
     "name": "createdb-validator1",
     "provider": "",
@@ -1527,7 +1549,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": "postgres.splitwell.svc.cluster.local",
         "postgresMediatorDb": "splitwell_domain_mediator",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "postgresSequencerDb": "splitwell_domain_sequencer",
         "resources": {
           "limits": {
@@ -1708,7 +1730,7 @@
         "postgres": "postgres.splitwell.svc.cluster.local",
         "postgresDb": "splitwell_participant",
         "postgresSchema": "splitwell_participant",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -1792,7 +1814,7 @@
           "hostname": "postgres.splitwell.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -1877,7 +1899,7 @@
           "hostname": "postgres.splitwell.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -1962,7 +1984,7 @@
           "hostname": "postgres.splitwell.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -2047,7 +2069,7 @@
           "hostname": "postgres.splitwell.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -2131,7 +2153,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -2341,9 +2363,10 @@
           "host": "postgres.splitwell.svc.cluster.local",
           "port": 5432,
           "schema": "validator_splitwell",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -2579,7 +2602,7 @@
         },
         "postgres": "postgres.sv-1.svc.cluster.local",
         "postgresMediatorDb": "sv_1_global_domain_mediator",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "postgresSequencerDb": "sv_1_global_domain_sequencer",
         "resources": {
           "limits": {
@@ -2761,7 +2784,7 @@
         "postgres": "postgres.sv-1.svc.cluster.local",
         "postgresDb": "sv_1_participant",
         "postgresSchema": "sv_1_participant",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -2845,7 +2868,7 @@
           "hostname": "postgres.sv-1.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -2930,7 +2953,7 @@
           "hostname": "postgres.sv-1.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -3015,7 +3038,7 @@
           "hostname": "postgres.sv-1.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -3100,7 +3123,7 @@
           "hostname": "postgres.sv-1.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -3185,7 +3208,7 @@
           "hostname": "postgres.sv-1.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -3270,7 +3293,7 @@
           "hostname": "postgres.sv-1.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -3354,7 +3377,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -3446,9 +3469,10 @@
           "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
           "schema": "scan_sv_1",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "1536Mi"
@@ -3637,9 +3661,10 @@
           "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
           "schema": "sv_1",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -3734,9 +3759,10 @@
           "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
           "schema": "validator_sv_1",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -3968,7 +3994,7 @@
         },
         "postgres": "postgres.sv-2.svc.cluster.local",
         "postgresMediatorDb": "sv_2_global_domain_mediator",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "postgresSequencerDb": "sv_2_global_domain_sequencer",
         "resources": {
           "limits": {
@@ -4150,7 +4176,7 @@
         "postgres": "postgres.sv-2.svc.cluster.local",
         "postgresDb": "sv_2_participant",
         "postgresSchema": "sv_2_participant",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -4234,7 +4260,7 @@
           "hostname": "postgres.sv-2.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4319,7 +4345,7 @@
           "hostname": "postgres.sv-2.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4404,7 +4430,7 @@
           "hostname": "postgres.sv-2.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4489,7 +4515,7 @@
           "hostname": "postgres.sv-2.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4574,7 +4600,7 @@
           "hostname": "postgres.sv-2.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4659,7 +4685,7 @@
           "hostname": "postgres.sv-2.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4743,7 +4769,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4835,9 +4861,10 @@
           "host": "postgres.sv-2.svc.cluster.local",
           "port": 5432,
           "schema": "scan_sv_2",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "1536Mi"
@@ -4998,9 +5025,10 @@
           "host": "postgres.sv-2.svc.cluster.local",
           "port": 5432,
           "schema": "sv_2",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -5095,9 +5123,10 @@
           "host": "postgres.sv-2.svc.cluster.local",
           "port": 5432,
           "schema": "validator_sv_2",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -5329,7 +5358,7 @@
         },
         "postgres": "postgres.sv-3.svc.cluster.local",
         "postgresMediatorDb": "sv_3_global_domain_mediator",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "postgresSequencerDb": "sv_3_global_domain_sequencer",
         "resources": {
           "limits": {
@@ -5511,7 +5540,7 @@
         "postgres": "postgres.sv-3.svc.cluster.local",
         "postgresDb": "sv_3_participant",
         "postgresSchema": "sv_3_participant",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -5595,7 +5624,7 @@
           "hostname": "postgres.sv-3.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -5680,7 +5709,7 @@
           "hostname": "postgres.sv-3.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -5765,7 +5794,7 @@
           "hostname": "postgres.sv-3.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -5850,7 +5879,7 @@
           "hostname": "postgres.sv-3.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -5935,7 +5964,7 @@
           "hostname": "postgres.sv-3.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -6020,7 +6049,7 @@
           "hostname": "postgres.sv-3.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -6104,7 +6133,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -6196,9 +6225,10 @@
           "host": "postgres.sv-3.svc.cluster.local",
           "port": 5432,
           "schema": "scan_sv_3",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "1536Mi"
@@ -6359,9 +6389,10 @@
           "host": "postgres.sv-3.svc.cluster.local",
           "port": 5432,
           "schema": "sv_3",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -6456,9 +6487,10 @@
           "host": "postgres.sv-3.svc.cluster.local",
           "port": 5432,
           "schema": "validator_sv_3",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -6690,7 +6722,7 @@
         },
         "postgres": "postgres.sv-4.svc.cluster.local",
         "postgresMediatorDb": "sv_4_global_domain_mediator",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "postgresSequencerDb": "sv_4_global_domain_sequencer",
         "resources": {
           "limits": {
@@ -6872,7 +6904,7 @@
         "postgres": "postgres.sv-4.svc.cluster.local",
         "postgresDb": "sv_4_participant",
         "postgresSchema": "sv_4_participant",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -6956,7 +6988,7 @@
           "hostname": "postgres.sv-4.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -7041,7 +7073,7 @@
           "hostname": "postgres.sv-4.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -7126,7 +7158,7 @@
           "hostname": "postgres.sv-4.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -7211,7 +7243,7 @@
           "hostname": "postgres.sv-4.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -7296,7 +7328,7 @@
           "hostname": "postgres.sv-4.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -7381,7 +7413,7 @@
           "hostname": "postgres.sv-4.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -7465,7 +7497,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -7557,9 +7589,10 @@
           "host": "postgres.sv-4.svc.cluster.local",
           "port": 5432,
           "schema": "scan_sv_4",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "1536Mi"
@@ -7720,9 +7753,10 @@
           "host": "postgres.sv-4.svc.cluster.local",
           "port": 5432,
           "schema": "sv_4",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -7817,9 +7851,10 @@
           "host": "postgres.sv-4.svc.cluster.local",
           "port": 5432,
           "schema": "validator_sv_4",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -7925,6 +7960,90 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "participant-postgres",
+      "namespace": "validator1",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "db": {
+          "volumeSize": "240Gi",
+          "volumeStorageClass": "standard-rwo"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgresSecretName": "participant-postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "8Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "8Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-validator1-participant-postgres",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "/cluster/helm/cn-participant/",
       "compat": "true",
       "name": "participant",
@@ -8004,10 +8123,10 @@
             "optional": false
           }
         },
-        "postgres": "postgres.validator1.svc.cluster.local",
+        "postgres": "participant-postgres.validator1.svc.cluster.local",
         "postgresDb": "validator1_participant",
         "postgresSchema": "validator1_participant",
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "participant-postgres-secrets",
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -8088,10 +8207,10 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
           "database": "validator1_participant",
-          "hostname": "postgres.validator1.svc.cluster.local",
+          "hostname": "participant-postgres.validator1.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "participant-postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -8173,10 +8292,10 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
           "database": "validator1",
-          "hostname": "postgres.validator1.svc.cluster.local",
+          "hostname": "validator-postgres.validator1.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "validator-postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -8190,90 +8309,6 @@
       }
     },
     "name": "helm-validator1-pg-exporter-validator1",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
-      "compat": "true",
-      "name": "postgres",
-      "namespace": "validator1",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.41.138.150/32",
-              "54.228.250.8/32",
-              "34.31.226.101/32",
-              "34.27.176.33/32",
-              "34.173.27.241/32",
-              "35.76.230.119/32",
-              "3.133.222.39/32",
-              "3.14.21.185/32",
-              "3.18.254.138/32",
-              "52.3.116.188/32",
-              "34.41.138.150/32",
-              "34.41.138.150/32",
-              "20.250.62.34/32",
-              "52.220.114.41/32",
-              "20.250.62.103/32",
-              "20.250.60.187/32",
-              "20.250.127.247/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "35.224.32.176/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32"
-            ],
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "db": {
-          "volumeSize": "240Gi",
-          "volumeStorageClass": "standard-rwo"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretsName": "postgres-secrets",
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "8Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "8Gi"
-          }
-        }
-      }
-    },
-    "name": "helm-validator1-postgres",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8353,6 +8388,90 @@
       }
     },
     "name": "helm-validator1-splitwell-web-ui",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "validator-postgres",
+      "namespace": "validator1",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "db": {
+          "volumeSize": "240Gi",
+          "volumeStorageClass": "standard-rwo"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgresSecretName": "validator-postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "8Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "8Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-validator1-validator-postgres",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8446,12 +8565,13 @@
         },
         "persistence": {
           "databaseName": "validator1",
-          "host": "postgres.validator1.svc.cluster.local",
+          "host": "validator-postgres.validator1.svc.cluster.local",
           "port": 5432,
           "schema": "validator1",
+          "secretName": "validator-postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretsName": "postgres-secrets",
+        "postgresSecretName": "validator-postgres-secrets",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -8672,7 +8792,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "validator1-postgres-passwd",
+    "name": "validator1-participant-postgres-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -8680,7 +8800,27 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "validator1-postgres",
+    "name": "validator1-participant-postgres",
+    "provider": "",
+    "type": "canton:network:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "validator1-validator-postgres-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "validator1-validator-postgres",
     "provider": "",
     "type": "canton:network:postgres"
   },
@@ -8935,7 +9075,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n validator1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+      "create": "kubectl exec -n validator1 participant-postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-validator1_participant",
     "provider": "",
@@ -8945,7 +9085,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n validator1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+      "create": "kubectl exec -n validator1 validator-postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
     },
     "name": "waitdb-validator1",
     "provider": "",

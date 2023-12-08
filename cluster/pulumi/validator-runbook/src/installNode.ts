@@ -85,7 +85,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     overrideSpecial: '_%@',
     special: true,
   }).result;
-  const passwordSecret = installPostgresPasswordSecret(xns, password);
+  const passwordSecret = installPostgresPasswordSecret(xns, password, 'postgres-secrets');
 
   const topupConfig: ValidatorTopupConfig = {
     targetThroughput: domainFeesConfig.targetThroughput,

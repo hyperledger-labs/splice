@@ -29,7 +29,7 @@ export async function installValidator1(
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name, true);
 
-  const postgresDb = postgres.installPostgres(xns, 'postgres');
+  const participantPostgres = postgres.installPostgres(xns, 'participant-postgres', true);
 
   const loopback = installCNHelmChart(
     xns,
@@ -46,7 +46,7 @@ export async function installValidator1(
   const participant = installParticipant(
     xns,
     'participant',
-    postgresDb,
+    participantPostgres,
     auth0UserNameEnvVarSource('validator'),
     // We disable auto-init if we have a dump to bootstrap from.
     !!participantBootstrapDump,
@@ -58,10 +58,17 @@ export async function installValidator1(
     await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
   ]);
 
-  const validatorDbName = 'validator1';
-  const validatorDb = postgresDb.createDatabase(validatorDbName);
+  const validatorPostgres = postgres.installPostgres(xns, 'validator-postgres', true);
 
-  const extraDependsOn: pulumi.Resource[] = [svc, postgresDb, validatorDb];
+  const validatorDbName = 'validator1';
+  const validatorDb = validatorPostgres.createDatabase(validatorDbName);
+
+  const extraDependsOn: pulumi.Resource[] = [
+    svc,
+    participantPostgres,
+    validatorPostgres,
+    validatorDb,
+  ];
 
   return installValidatorApp({
     auth0Client,
@@ -74,8 +81,9 @@ export async function installValidator1(
     svSponsorAddress: 'http://sv-app.sv-1:5014',
     onboardingSecret,
     persistenceConfig: {
-      host: postgresDb.address,
+      host: validatorPostgres.address,
       databaseName: pulumi.Output.create(validatorDbName),
+      secretName: validatorPostgres.secretName,
       schema: pulumi.Output.create(validatorDbName),
       user: pulumi.Output.create('cnadmin'),
       port: pulumi.Output.create(5432),

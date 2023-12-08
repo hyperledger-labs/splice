@@ -3,4 +3,4 @@
 {{ $_ := required ".Values.postgres.hostname is required." .Values.postgres.hostname }}
 {{ $_ := required ".Values.postgres.port is required." .Values.postgres.port }}
 {{ $_ := required ".Values.postgres.database is required." .Values.postgres.database }}
-{{ $_ := required ".Values.postgresSecretsName is required" .Values.postgresSecretsName }}
+{{ $_ := required ".Values.postgresSecretName is required" .Values.postgresSecretName }}

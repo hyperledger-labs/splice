@@ -4,6 +4,7 @@ export type PersistenceConfig = {
   host: pulumi.Output<string>;
   port: pulumi.Output<number>;
   databaseName: pulumi.Output<string>;
+  secretName: string;
   schema: pulumi.Output<string>;
   user: pulumi.Output<string>;
 };
