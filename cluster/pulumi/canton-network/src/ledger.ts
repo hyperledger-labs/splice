@@ -11,13 +11,12 @@ export function installDomain(
   name: string,
   postgres: Postgres
 ): pulumi.Resource {
-  const sanitizedNs = xns.logicalName.replace('-', '_');
   const sanitizedName = name.replace('-', '_');
 
-  const mediatorDbName = `${sanitizedNs}_${sanitizedName}_mediator`;
+  const mediatorDbName = `${sanitizedName}_mediator`;
   const mediatorDb = postgres.createDatabase(mediatorDbName);
 
-  const sequencerDbName = `${sanitizedNs}_${sanitizedName}_sequencer`;
+  const sequencerDbName = `${sanitizedName}_sequencer`;
   const sequencerDb = postgres.createDatabase(sequencerDbName);
 
   return installCNHelmChart(
@@ -40,13 +39,12 @@ export function installGlobalDomain(
   postgres: Postgres,
   sequencer: PostgresSequencer | CometBftSequencer
 ): pulumi.Resource {
-  const sanitizedNs = xns.logicalName.replace('-', '_');
   const sanitizedName = name.replace('-', '_');
 
-  const mediatorDbName = `${sanitizedNs}_${sanitizedName}_mediator`;
+  const mediatorDbName = `${sanitizedName}_mediator`;
   const mediatorDb = postgres.createDatabase(mediatorDbName);
 
-  const sequencerDbName = `${sanitizedNs}_${sanitizedName}_sequencer`;
+  const sequencerDbName = `${sanitizedName}_sequencer`;
   const sequencerDb = postgres.createDatabase(sequencerDbName);
 
   return installCNHelmChart(
@@ -86,8 +84,7 @@ export function installParticipant(
   isDevNet: boolean,
   dependsOn: pulumi.Resource[] = []
 ): pulumi.Resource {
-  const sanitizedNs = xns.logicalName.replace('-', '_');
-  const postgresDbName = `${sanitizedNs}_participant`;
+  const postgresDbName = 'participant';
 
   const postgresDb = postgres.createDatabase(postgresDbName);
   return installCNHelmChart(

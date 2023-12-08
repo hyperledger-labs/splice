@@ -56,7 +56,7 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
   constructor(xns: ExactNamespace, name: string, uniqueSecretName: boolean) {
     const logicalName = xns.logicalName + '-' + name;
     super('canton:cloud:postgres', logicalName);
-    this.name = logicalName;
+    this.name = name;
     this.namespace = xns;
     this.secretName = uniqueSecretName ? this.name + '-secrets' : 'postgres-secrets';
 
@@ -120,7 +120,7 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
 
   createDatabase(name: string): pulumi.Resource {
     const db = new gcp.sql.Database(
-      `db-${this.name}-${name}`,
+      `${this.namespace.logicalName}-db-${this.name}-${name}`,
       {
         instance: this.pgSvc.name,
         name: name,
@@ -189,7 +189,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
   createDatabase(name: string): pulumi.Resource {
     // the DB is not immediately available even if you can connect to the pod, so psql might fail a few times at the beginning.
     const waitForPostgresToBeUp = new command.local.Command(
-      `waitdb-${name}`,
+      `${this.namespace.logicalName}-waitdb-${this.name}-${name}`,
       {
         create:
           `kubectl exec -n ${this.namespace.logicalName} ${this.name}-0 -- ` +
@@ -198,7 +198,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
       { dependsOn: this.pg }
     );
     const createCommand = new command.local.Command(
-      `createdb-${name}`,
+      `${this.namespace.logicalName}-createdb-${this.name}-${name}`,
       {
         create: `kubectl exec -n ${this.namespace.logicalName} ${this.name}-0 -- psql --username=cnadmin --dbname=\${POSTGRES_DB:-cantonnet} -c "create database ${name}"`,
       },

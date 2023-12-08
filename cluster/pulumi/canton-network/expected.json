@@ -917,12 +917,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "participant-postgres-secrets",
+        "name": "participant-pg-secrets",
         "namespace": "validator1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-validator1-participant-postgres-secrets",
+    "name": "cn-app-validator1-participant-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -961,12 +961,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "validator-postgres-secrets",
+        "name": "validator-pg-secrets",
         "namespace": "validator1"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-validator1-validator-postgres-secrets",
+    "name": "cn-app-validator1-validator-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1001,306 +1001,6 @@
     "name": "cometbft-sv-4-cometbft-rpc",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_1\""
-    },
-    "name": "createdb-scan_sv_1",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_2\""
-    },
-    "name": "createdb-scan_sv_2",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_3\""
-    },
-    "name": "createdb-scan_sv_3",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_4\""
-    },
-    "name": "createdb-scan_sv_4",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database splitwell_domain_mediator\""
-    },
-    "name": "createdb-splitwell_domain_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database splitwell_domain_sequencer\""
-    },
-    "name": "createdb-splitwell_domain_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database splitwell_participant\""
-    },
-    "name": "createdb-splitwell_participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_1_global_domain_mediator\""
-    },
-    "name": "createdb-sv_1_global_domain_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_1_global_domain_sequencer\""
-    },
-    "name": "createdb-sv_1_global_domain_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_1_participant\""
-    },
-    "name": "createdb-sv_1_participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_1\""
-    },
-    "name": "createdb-sv_1",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_2_global_domain_mediator\""
-    },
-    "name": "createdb-sv_2_global_domain_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_2_global_domain_sequencer\""
-    },
-    "name": "createdb-sv_2_global_domain_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_2_participant\""
-    },
-    "name": "createdb-sv_2_participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_2\""
-    },
-    "name": "createdb-sv_2",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_3_global_domain_mediator\""
-    },
-    "name": "createdb-sv_3_global_domain_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_3_global_domain_sequencer\""
-    },
-    "name": "createdb-sv_3_global_domain_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_3_participant\""
-    },
-    "name": "createdb-sv_3_participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_3\""
-    },
-    "name": "createdb-sv_3",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_4_global_domain_mediator\""
-    },
-    "name": "createdb-sv_4_global_domain_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_4_global_domain_sequencer\""
-    },
-    "name": "createdb-sv_4_global_domain_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_4_participant\""
-    },
-    "name": "createdb-sv_4_participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_4\""
-    },
-    "name": "createdb-sv_4",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n validator1 participant-postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator1_participant\""
-    },
-    "name": "createdb-validator1_participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n validator1 validator-postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator1\""
-    },
-    "name": "createdb-validator1",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_splitwell\""
-    },
-    "name": "createdb-validator_splitwell",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_1\""
-    },
-    "name": "createdb-validator_sv_1",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_2\""
-    },
-    "name": "createdb-validator_sv_2",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_3\""
-    },
-    "name": "createdb-validator_sv_3",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_4\""
-    },
-    "name": "createdb-validator_sv_4",
-    "provider": "",
-    "type": "command:local:Command"
   },
   {
     "custom": false,
@@ -1548,9 +1248,9 @@
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": "postgres.splitwell.svc.cluster.local",
-        "postgresMediatorDb": "splitwell_domain_mediator",
+        "postgresMediatorDb": "domain_mediator",
         "postgresSecretName": "postgres-secrets",
-        "postgresSequencerDb": "splitwell_domain_sequencer",
+        "postgresSequencerDb": "domain_sequencer",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -1728,8 +1428,8 @@
           }
         },
         "postgres": "postgres.splitwell.svc.cluster.local",
-        "postgresDb": "splitwell_participant",
-        "postgresSchema": "splitwell_participant",
+        "postgresDb": "participant",
+        "postgresSchema": "participant",
         "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
@@ -1922,7 +1622,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "splitwell-pg-exporter-postgres-splitwell-domain-mediator",
+      "name": "splitwell-pg-exporter-postgres-domain-mediator",
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
@@ -1980,7 +1680,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "splitwell_domain_mediator",
+          "database": "domain_mediator",
           "hostname": "postgres.splitwell.svc.cluster.local",
           "port": "5432"
         },
@@ -1997,7 +1697,7 @@
         }
       }
     },
-    "name": "helm-splitwell-splitwell-pg-exporter-postgres-splitwell-domain-mediator",
+    "name": "helm-splitwell-splitwell-pg-exporter-postgres-domain-mediator",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2007,7 +1707,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "splitwell-pg-exporter-postgres-splitwell-domain-sequencer",
+      "name": "splitwell-pg-exporter-postgres-domain-sequencer",
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
@@ -2065,7 +1765,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "splitwell_domain_sequencer",
+          "database": "domain_sequencer",
           "hostname": "postgres.splitwell.svc.cluster.local",
           "port": "5432"
         },
@@ -2082,7 +1782,7 @@
         }
       }
     },
-    "name": "helm-splitwell-splitwell-pg-exporter-postgres-splitwell-domain-sequencer",
+    "name": "helm-splitwell-splitwell-pg-exporter-postgres-domain-sequencer",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2092,7 +1792,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "splitwell-pg-exporter-postgres-splitwell-participant",
+      "name": "splitwell-pg-exporter-postgres-participant",
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
@@ -2150,7 +1850,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "splitwell_participant",
+          "database": "participant",
           "hostname": "postgres.splitwell.svc.cluster.local",
           "port": "5432"
         },
@@ -2167,7 +1867,7 @@
         }
       }
     },
-    "name": "helm-splitwell-splitwell-pg-exporter-postgres-splitwell-participant",
+    "name": "helm-splitwell-splitwell-pg-exporter-postgres-participant",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2177,7 +1877,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "splitwell-pg-exporter-postgres-validator-splitwell",
+      "name": "splitwell-pg-exporter-postgres-val-splitwell",
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
@@ -2235,7 +1935,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "validator_splitwell",
+          "database": "val_splitwell",
           "hostname": "postgres.splitwell.svc.cluster.local",
           "port": "5432"
         },
@@ -2252,7 +1952,7 @@
         }
       }
     },
-    "name": "helm-splitwell-splitwell-pg-exporter-postgres-validator-splitwell",
+    "name": "helm-splitwell-splitwell-pg-exporter-postgres-val-splitwell",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2359,10 +2059,10 @@
           }
         },
         "persistence": {
-          "databaseName": "validator_splitwell",
+          "databaseName": "val_splitwell",
           "host": "postgres.splitwell.svc.cluster.local",
           "port": 5432,
-          "schema": "validator_splitwell",
+          "schema": "val_splitwell",
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
@@ -2601,9 +2301,9 @@
           "release": "prometheus-grafana-monitoring"
         },
         "postgres": "postgres.sv-1.svc.cluster.local",
-        "postgresMediatorDb": "sv_1_global_domain_mediator",
+        "postgresMediatorDb": "global_domain_mediator",
         "postgresSecretName": "postgres-secrets",
-        "postgresSequencerDb": "sv_1_global_domain_sequencer",
+        "postgresSequencerDb": "global_domain_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -2782,8 +2482,8 @@
           }
         },
         "postgres": "postgres.sv-1.svc.cluster.local",
-        "postgresDb": "sv_1_participant",
-        "postgresSchema": "sv_1_participant",
+        "postgresDb": "participant",
+        "postgresSchema": "participant",
         "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
@@ -2984,6 +2684,261 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
+      "name": "sv-1-pg-exporter-postgres-global-domain-mediator",
+      "namespace": "sv-1",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": {
+          "database": "global_domain_mediator",
+          "hostname": "postgres.sv-1.svc.cluster.local",
+          "port": "5432"
+        },
+        "postgresSecretName": "postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "1Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "1Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-1-sv-1-pg-exporter-postgres-global-domain-mediator",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
+      "name": "sv-1-pg-exporter-postgres-global-domain-sequencer",
+      "namespace": "sv-1",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": {
+          "database": "global_domain_sequencer",
+          "hostname": "postgres.sv-1.svc.cluster.local",
+          "port": "5432"
+        },
+        "postgresSecretName": "postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "1Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "1Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-1-sv-1-pg-exporter-postgres-global-domain-sequencer",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
+      "name": "sv-1-pg-exporter-postgres-participant",
+      "namespace": "sv-1",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": {
+          "database": "participant",
+          "hostname": "postgres.sv-1.svc.cluster.local",
+          "port": "5432"
+        },
+        "postgresSecretName": "postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "1Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "1Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-1-sv-1-pg-exporter-postgres-participant",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
       "name": "sv-1-pg-exporter-postgres-scan-sv-1",
       "namespace": "sv-1",
       "timeout": 480,
@@ -3060,261 +3015,6 @@
       }
     },
     "name": "helm-sv-1-sv-1-pg-exporter-postgres-scan-sv-1",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-1-pg-exporter-postgres-sv-1-global-domain-mediator",
-      "namespace": "sv-1",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.41.138.150/32",
-              "54.228.250.8/32",
-              "34.31.226.101/32",
-              "34.27.176.33/32",
-              "34.173.27.241/32",
-              "35.76.230.119/32",
-              "3.133.222.39/32",
-              "3.14.21.185/32",
-              "3.18.254.138/32",
-              "52.3.116.188/32",
-              "34.41.138.150/32",
-              "34.41.138.150/32",
-              "20.250.62.34/32",
-              "52.220.114.41/32",
-              "20.250.62.103/32",
-              "20.250.60.187/32",
-              "20.250.127.247/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "35.224.32.176/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32"
-            ],
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_1_global_domain_mediator",
-          "hostname": "postgres.sv-1.svc.cluster.local",
-          "port": "5432"
-        },
-        "postgresSecretName": "postgres-secrets",
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "helm-sv-1-sv-1-pg-exporter-postgres-sv-1-global-domain-mediator",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-1-pg-exporter-postgres-sv-1-global-domain-sequencer",
-      "namespace": "sv-1",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.41.138.150/32",
-              "54.228.250.8/32",
-              "34.31.226.101/32",
-              "34.27.176.33/32",
-              "34.173.27.241/32",
-              "35.76.230.119/32",
-              "3.133.222.39/32",
-              "3.14.21.185/32",
-              "3.18.254.138/32",
-              "52.3.116.188/32",
-              "34.41.138.150/32",
-              "34.41.138.150/32",
-              "20.250.62.34/32",
-              "52.220.114.41/32",
-              "20.250.62.103/32",
-              "20.250.60.187/32",
-              "20.250.127.247/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "35.224.32.176/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32"
-            ],
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_1_global_domain_sequencer",
-          "hostname": "postgres.sv-1.svc.cluster.local",
-          "port": "5432"
-        },
-        "postgresSecretName": "postgres-secrets",
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "helm-sv-1-sv-1-pg-exporter-postgres-sv-1-global-domain-sequencer",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-1-pg-exporter-postgres-sv-1-participant",
-      "namespace": "sv-1",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.41.138.150/32",
-              "54.228.250.8/32",
-              "34.31.226.101/32",
-              "34.27.176.33/32",
-              "34.173.27.241/32",
-              "35.76.230.119/32",
-              "3.133.222.39/32",
-              "3.14.21.185/32",
-              "3.18.254.138/32",
-              "52.3.116.188/32",
-              "34.41.138.150/32",
-              "34.41.138.150/32",
-              "20.250.62.34/32",
-              "52.220.114.41/32",
-              "20.250.62.103/32",
-              "20.250.60.187/32",
-              "20.250.127.247/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "35.224.32.176/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32"
-            ],
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_1_participant",
-          "hostname": "postgres.sv-1.svc.cluster.local",
-          "port": "5432"
-        },
-        "postgresSecretName": "postgres-secrets",
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "helm-sv-1-sv-1-pg-exporter-postgres-sv-1-participant",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3993,9 +3693,9 @@
           "release": "prometheus-grafana-monitoring"
         },
         "postgres": "postgres.sv-2.svc.cluster.local",
-        "postgresMediatorDb": "sv_2_global_domain_mediator",
+        "postgresMediatorDb": "global_domain_mediator",
         "postgresSecretName": "postgres-secrets",
-        "postgresSequencerDb": "sv_2_global_domain_sequencer",
+        "postgresSequencerDb": "global_domain_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -4174,8 +3874,8 @@
           }
         },
         "postgres": "postgres.sv-2.svc.cluster.local",
-        "postgresDb": "sv_2_participant",
-        "postgresSchema": "sv_2_participant",
+        "postgresDb": "participant",
+        "postgresSchema": "participant",
         "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
@@ -4376,6 +4076,261 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
+      "name": "sv-2-pg-exporter-postgres-global-domain-mediator",
+      "namespace": "sv-2",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": {
+          "database": "global_domain_mediator",
+          "hostname": "postgres.sv-2.svc.cluster.local",
+          "port": "5432"
+        },
+        "postgresSecretName": "postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "1Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "1Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-2-sv-2-pg-exporter-postgres-global-domain-mediator",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
+      "name": "sv-2-pg-exporter-postgres-global-domain-sequencer",
+      "namespace": "sv-2",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": {
+          "database": "global_domain_sequencer",
+          "hostname": "postgres.sv-2.svc.cluster.local",
+          "port": "5432"
+        },
+        "postgresSecretName": "postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "1Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "1Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-2-sv-2-pg-exporter-postgres-global-domain-sequencer",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
+      "name": "sv-2-pg-exporter-postgres-participant",
+      "namespace": "sv-2",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": {
+          "database": "participant",
+          "hostname": "postgres.sv-2.svc.cluster.local",
+          "port": "5432"
+        },
+        "postgresSecretName": "postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "1Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "1Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-2-sv-2-pg-exporter-postgres-participant",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
       "name": "sv-2-pg-exporter-postgres-scan-sv-2",
       "namespace": "sv-2",
       "timeout": 480,
@@ -4452,261 +4407,6 @@
       }
     },
     "name": "helm-sv-2-sv-2-pg-exporter-postgres-scan-sv-2",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-2-pg-exporter-postgres-sv-2-global-domain-mediator",
-      "namespace": "sv-2",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.41.138.150/32",
-              "54.228.250.8/32",
-              "34.31.226.101/32",
-              "34.27.176.33/32",
-              "34.173.27.241/32",
-              "35.76.230.119/32",
-              "3.133.222.39/32",
-              "3.14.21.185/32",
-              "3.18.254.138/32",
-              "52.3.116.188/32",
-              "34.41.138.150/32",
-              "34.41.138.150/32",
-              "20.250.62.34/32",
-              "52.220.114.41/32",
-              "20.250.62.103/32",
-              "20.250.60.187/32",
-              "20.250.127.247/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "35.224.32.176/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32"
-            ],
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_2_global_domain_mediator",
-          "hostname": "postgres.sv-2.svc.cluster.local",
-          "port": "5432"
-        },
-        "postgresSecretName": "postgres-secrets",
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "helm-sv-2-sv-2-pg-exporter-postgres-sv-2-global-domain-mediator",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-2-pg-exporter-postgres-sv-2-global-domain-sequencer",
-      "namespace": "sv-2",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.41.138.150/32",
-              "54.228.250.8/32",
-              "34.31.226.101/32",
-              "34.27.176.33/32",
-              "34.173.27.241/32",
-              "35.76.230.119/32",
-              "3.133.222.39/32",
-              "3.14.21.185/32",
-              "3.18.254.138/32",
-              "52.3.116.188/32",
-              "34.41.138.150/32",
-              "34.41.138.150/32",
-              "20.250.62.34/32",
-              "52.220.114.41/32",
-              "20.250.62.103/32",
-              "20.250.60.187/32",
-              "20.250.127.247/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "35.224.32.176/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32"
-            ],
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_2_global_domain_sequencer",
-          "hostname": "postgres.sv-2.svc.cluster.local",
-          "port": "5432"
-        },
-        "postgresSecretName": "postgres-secrets",
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "helm-sv-2-sv-2-pg-exporter-postgres-sv-2-global-domain-sequencer",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-2-pg-exporter-postgres-sv-2-participant",
-      "namespace": "sv-2",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.41.138.150/32",
-              "54.228.250.8/32",
-              "34.31.226.101/32",
-              "34.27.176.33/32",
-              "34.173.27.241/32",
-              "35.76.230.119/32",
-              "3.133.222.39/32",
-              "3.14.21.185/32",
-              "3.18.254.138/32",
-              "52.3.116.188/32",
-              "34.41.138.150/32",
-              "34.41.138.150/32",
-              "20.250.62.34/32",
-              "52.220.114.41/32",
-              "20.250.62.103/32",
-              "20.250.60.187/32",
-              "20.250.127.247/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "35.224.32.176/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32"
-            ],
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_2_participant",
-          "hostname": "postgres.sv-2.svc.cluster.local",
-          "port": "5432"
-        },
-        "postgresSecretName": "postgres-secrets",
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "helm-sv-2-sv-2-pg-exporter-postgres-sv-2-participant",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5357,9 +5057,9 @@
           "release": "prometheus-grafana-monitoring"
         },
         "postgres": "postgres.sv-3.svc.cluster.local",
-        "postgresMediatorDb": "sv_3_global_domain_mediator",
+        "postgresMediatorDb": "global_domain_mediator",
         "postgresSecretName": "postgres-secrets",
-        "postgresSequencerDb": "sv_3_global_domain_sequencer",
+        "postgresSequencerDb": "global_domain_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -5538,8 +5238,8 @@
           }
         },
         "postgres": "postgres.sv-3.svc.cluster.local",
-        "postgresDb": "sv_3_participant",
-        "postgresSchema": "sv_3_participant",
+        "postgresDb": "participant",
+        "postgresSchema": "participant",
         "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
@@ -5740,6 +5440,261 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
+      "name": "sv-3-pg-exporter-postgres-global-domain-mediator",
+      "namespace": "sv-3",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": {
+          "database": "global_domain_mediator",
+          "hostname": "postgres.sv-3.svc.cluster.local",
+          "port": "5432"
+        },
+        "postgresSecretName": "postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "1Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "1Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-3-sv-3-pg-exporter-postgres-global-domain-mediator",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
+      "name": "sv-3-pg-exporter-postgres-global-domain-sequencer",
+      "namespace": "sv-3",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": {
+          "database": "global_domain_sequencer",
+          "hostname": "postgres.sv-3.svc.cluster.local",
+          "port": "5432"
+        },
+        "postgresSecretName": "postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "1Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "1Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-3-sv-3-pg-exporter-postgres-global-domain-sequencer",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
+      "name": "sv-3-pg-exporter-postgres-participant",
+      "namespace": "sv-3",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": {
+          "database": "participant",
+          "hostname": "postgres.sv-3.svc.cluster.local",
+          "port": "5432"
+        },
+        "postgresSecretName": "postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "1Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "1Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-3-sv-3-pg-exporter-postgres-participant",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
       "name": "sv-3-pg-exporter-postgres-scan-sv-3",
       "namespace": "sv-3",
       "timeout": 480,
@@ -5816,261 +5771,6 @@
       }
     },
     "name": "helm-sv-3-sv-3-pg-exporter-postgres-scan-sv-3",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-3-pg-exporter-postgres-sv-3-global-domain-mediator",
-      "namespace": "sv-3",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.41.138.150/32",
-              "54.228.250.8/32",
-              "34.31.226.101/32",
-              "34.27.176.33/32",
-              "34.173.27.241/32",
-              "35.76.230.119/32",
-              "3.133.222.39/32",
-              "3.14.21.185/32",
-              "3.18.254.138/32",
-              "52.3.116.188/32",
-              "34.41.138.150/32",
-              "34.41.138.150/32",
-              "20.250.62.34/32",
-              "52.220.114.41/32",
-              "20.250.62.103/32",
-              "20.250.60.187/32",
-              "20.250.127.247/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "35.224.32.176/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32"
-            ],
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_3_global_domain_mediator",
-          "hostname": "postgres.sv-3.svc.cluster.local",
-          "port": "5432"
-        },
-        "postgresSecretName": "postgres-secrets",
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "helm-sv-3-sv-3-pg-exporter-postgres-sv-3-global-domain-mediator",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-3-pg-exporter-postgres-sv-3-global-domain-sequencer",
-      "namespace": "sv-3",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.41.138.150/32",
-              "54.228.250.8/32",
-              "34.31.226.101/32",
-              "34.27.176.33/32",
-              "34.173.27.241/32",
-              "35.76.230.119/32",
-              "3.133.222.39/32",
-              "3.14.21.185/32",
-              "3.18.254.138/32",
-              "52.3.116.188/32",
-              "34.41.138.150/32",
-              "34.41.138.150/32",
-              "20.250.62.34/32",
-              "52.220.114.41/32",
-              "20.250.62.103/32",
-              "20.250.60.187/32",
-              "20.250.127.247/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "35.224.32.176/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32"
-            ],
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_3_global_domain_sequencer",
-          "hostname": "postgres.sv-3.svc.cluster.local",
-          "port": "5432"
-        },
-        "postgresSecretName": "postgres-secrets",
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "helm-sv-3-sv-3-pg-exporter-postgres-sv-3-global-domain-sequencer",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-3-pg-exporter-postgres-sv-3-participant",
-      "namespace": "sv-3",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.41.138.150/32",
-              "54.228.250.8/32",
-              "34.31.226.101/32",
-              "34.27.176.33/32",
-              "34.173.27.241/32",
-              "35.76.230.119/32",
-              "3.133.222.39/32",
-              "3.14.21.185/32",
-              "3.18.254.138/32",
-              "52.3.116.188/32",
-              "34.41.138.150/32",
-              "34.41.138.150/32",
-              "20.250.62.34/32",
-              "52.220.114.41/32",
-              "20.250.62.103/32",
-              "20.250.60.187/32",
-              "20.250.127.247/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "35.224.32.176/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32"
-            ],
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_3_participant",
-          "hostname": "postgres.sv-3.svc.cluster.local",
-          "port": "5432"
-        },
-        "postgresSecretName": "postgres-secrets",
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "helm-sv-3-sv-3-pg-exporter-postgres-sv-3-participant",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -6721,9 +6421,9 @@
           "release": "prometheus-grafana-monitoring"
         },
         "postgres": "postgres.sv-4.svc.cluster.local",
-        "postgresMediatorDb": "sv_4_global_domain_mediator",
+        "postgresMediatorDb": "global_domain_mediator",
         "postgresSecretName": "postgres-secrets",
-        "postgresSequencerDb": "sv_4_global_domain_sequencer",
+        "postgresSequencerDb": "global_domain_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -6902,8 +6602,8 @@
           }
         },
         "postgres": "postgres.sv-4.svc.cluster.local",
-        "postgresDb": "sv_4_participant",
-        "postgresSchema": "sv_4_participant",
+        "postgresDb": "participant",
+        "postgresSchema": "participant",
         "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
@@ -7104,6 +6804,261 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
+      "name": "sv-4-pg-exporter-postgres-global-domain-mediator",
+      "namespace": "sv-4",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": {
+          "database": "global_domain_mediator",
+          "hostname": "postgres.sv-4.svc.cluster.local",
+          "port": "5432"
+        },
+        "postgresSecretName": "postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "1Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "1Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-4-sv-4-pg-exporter-postgres-global-domain-mediator",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
+      "name": "sv-4-pg-exporter-postgres-global-domain-sequencer",
+      "namespace": "sv-4",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": {
+          "database": "global_domain_sequencer",
+          "hostname": "postgres.sv-4.svc.cluster.local",
+          "port": "5432"
+        },
+        "postgresSecretName": "postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "1Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "1Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-4-sv-4-pg-exporter-postgres-global-domain-sequencer",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
+      "name": "sv-4-pg-exporter-postgres-participant",
+      "namespace": "sv-4",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ipAddress": "127.0.0.2",
+          "name": "cn-mocknet",
+          "networkSettings": {
+            "domainCpu": 1,
+            "domainMemoryMib": 4096,
+            "externalIPRanges": [
+              "35.194.81.56/32",
+              "35.198.147.95/32",
+              "35.189.40.124/32",
+              "34.132.91.75/32",
+              "18.210.210.130/32",
+              "34.41.138.150/32",
+              "54.228.250.8/32",
+              "34.31.226.101/32",
+              "34.27.176.33/32",
+              "34.173.27.241/32",
+              "35.76.230.119/32",
+              "3.133.222.39/32",
+              "3.14.21.185/32",
+              "3.18.254.138/32",
+              "52.3.116.188/32",
+              "34.41.138.150/32",
+              "34.41.138.150/32",
+              "20.250.62.34/32",
+              "52.220.114.41/32",
+              "20.250.62.103/32",
+              "20.250.60.187/32",
+              "20.250.127.247/32",
+              "34.28.102.64/32",
+              "34.71.129.232/32",
+              "35.224.32.176/32",
+              "34.171.136.234/32",
+              "34.173.176.161/32"
+            ],
+            "ledgerDatabaseGib": 40,
+            "numberOfSvNodes": 4,
+            "participantCpu": 1,
+            "participantMemoryMib": 32768,
+            "postgresCpu": 2,
+            "postgresMemoryMib": 8192,
+            "tls": {
+              "issuerName": "letsencrypt-production",
+              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
+            }
+          }
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "postgres": {
+          "database": "participant",
+          "hostname": "postgres.sv-4.svc.cluster.local",
+          "port": "5432"
+        },
+        "postgresSecretName": "postgres-secrets",
+        "resources": {
+          "limits": {
+            "cpu": "2",
+            "memory": "1Gi"
+          },
+          "requests": {
+            "cpu": "2",
+            "memory": "1Gi"
+          }
+        }
+      }
+    },
+    "name": "helm-sv-4-sv-4-pg-exporter-postgres-participant",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
       "name": "sv-4-pg-exporter-postgres-scan-sv-4",
       "namespace": "sv-4",
       "timeout": 480,
@@ -7180,261 +7135,6 @@
       }
     },
     "name": "helm-sv-4-sv-4-pg-exporter-postgres-scan-sv-4",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-4-pg-exporter-postgres-sv-4-global-domain-mediator",
-      "namespace": "sv-4",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.41.138.150/32",
-              "54.228.250.8/32",
-              "34.31.226.101/32",
-              "34.27.176.33/32",
-              "34.173.27.241/32",
-              "35.76.230.119/32",
-              "3.133.222.39/32",
-              "3.14.21.185/32",
-              "3.18.254.138/32",
-              "52.3.116.188/32",
-              "34.41.138.150/32",
-              "34.41.138.150/32",
-              "20.250.62.34/32",
-              "52.220.114.41/32",
-              "20.250.62.103/32",
-              "20.250.60.187/32",
-              "20.250.127.247/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "35.224.32.176/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32"
-            ],
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_4_global_domain_mediator",
-          "hostname": "postgres.sv-4.svc.cluster.local",
-          "port": "5432"
-        },
-        "postgresSecretName": "postgres-secrets",
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "helm-sv-4-sv-4-pg-exporter-postgres-sv-4-global-domain-mediator",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-4-pg-exporter-postgres-sv-4-global-domain-sequencer",
-      "namespace": "sv-4",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.41.138.150/32",
-              "54.228.250.8/32",
-              "34.31.226.101/32",
-              "34.27.176.33/32",
-              "34.173.27.241/32",
-              "35.76.230.119/32",
-              "3.133.222.39/32",
-              "3.14.21.185/32",
-              "3.18.254.138/32",
-              "52.3.116.188/32",
-              "34.41.138.150/32",
-              "34.41.138.150/32",
-              "20.250.62.34/32",
-              "52.220.114.41/32",
-              "20.250.62.103/32",
-              "20.250.60.187/32",
-              "20.250.127.247/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "35.224.32.176/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32"
-            ],
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_4_global_domain_sequencer",
-          "hostname": "postgres.sv-4.svc.cluster.local",
-          "port": "5432"
-        },
-        "postgresSecretName": "postgres-secrets",
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "helm-sv-4-sv-4-pg-exporter-postgres-sv-4-global-domain-sequencer",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-4-pg-exporter-postgres-sv-4-participant",
-      "namespace": "sv-4",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "ipAddress": "127.0.0.2",
-          "name": "cn-mocknet",
-          "networkSettings": {
-            "domainCpu": 1,
-            "domainMemoryMib": 4096,
-            "externalIPRanges": [
-              "35.194.81.56/32",
-              "35.198.147.95/32",
-              "35.189.40.124/32",
-              "34.132.91.75/32",
-              "18.210.210.130/32",
-              "34.41.138.150/32",
-              "54.228.250.8/32",
-              "34.31.226.101/32",
-              "34.27.176.33/32",
-              "34.173.27.241/32",
-              "35.76.230.119/32",
-              "3.133.222.39/32",
-              "3.14.21.185/32",
-              "3.18.254.138/32",
-              "52.3.116.188/32",
-              "34.41.138.150/32",
-              "34.41.138.150/32",
-              "20.250.62.34/32",
-              "52.220.114.41/32",
-              "20.250.62.103/32",
-              "20.250.60.187/32",
-              "20.250.127.247/32",
-              "34.28.102.64/32",
-              "34.71.129.232/32",
-              "35.224.32.176/32",
-              "34.171.136.234/32",
-              "34.173.176.161/32"
-            ],
-            "ledgerDatabaseGib": 40,
-            "numberOfSvNodes": 4,
-            "participantCpu": 1,
-            "participantMemoryMib": 32768,
-            "postgresCpu": 2,
-            "postgresMemoryMib": 8192,
-            "tls": {
-              "issuerName": "letsencrypt-production",
-              "issuerServer": "https://acme-v02.api.letsencrypt.org/directory"
-            }
-          }
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_4_participant",
-          "hostname": "postgres.sv-4.svc.cluster.local",
-          "port": "5432"
-        },
-        "postgresSecretName": "postgres-secrets",
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "helm-sv-4-sv-4-pg-exporter-postgres-sv-4-participant",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -7962,7 +7662,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres/",
       "compat": "true",
-      "name": "participant-postgres",
+      "name": "participant-pg",
       "namespace": "validator1",
       "timeout": 480,
       "values": {
@@ -8023,7 +7723,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretName": "participant-postgres-secrets",
+        "postgresSecretName": "participant-pg-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -8036,7 +7736,7 @@
         }
       }
     },
-    "name": "helm-validator1-participant-postgres",
+    "name": "helm-validator1-participant-pg",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8123,10 +7823,10 @@
             "optional": false
           }
         },
-        "postgres": "participant-postgres.validator1.svc.cluster.local",
-        "postgresDb": "validator1_participant",
-        "postgresSchema": "validator1_participant",
-        "postgresSecretName": "participant-postgres-secrets",
+        "postgres": "participant-pg.validator1.svc.cluster.local",
+        "postgresDb": "participant",
+        "postgresSchema": "participant",
+        "postgresSecretName": "participant-pg-secrets",
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -8227,7 +7927,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres/",
       "compat": "true",
-      "name": "validator-postgres",
+      "name": "validator-pg",
       "namespace": "validator1",
       "timeout": 480,
       "values": {
@@ -8288,7 +7988,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretName": "validator-postgres-secrets",
+        "postgresSecretName": "validator-pg-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -8301,7 +8001,7 @@
         }
       }
     },
-    "name": "helm-validator1-validator-postgres",
+    "name": "helm-validator1-validator-pg",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8395,13 +8095,13 @@
         },
         "persistence": {
           "databaseName": "validator1",
-          "host": "validator-postgres.validator1.svc.cluster.local",
+          "host": "validator-pg.validator1.svc.cluster.local",
           "port": 5432,
           "schema": "validator1",
-          "secretName": "validator-postgres-secrets",
+          "secretName": "validator-pg-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "validator-postgres-secrets",
+        "postgresSecretName": "validator-pg-secrets",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -8433,7 +8133,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "validator1-pg-exporter-participant-postgres-validator1-participant",
+      "name": "validator1-pg-exporter-participant-pg-participant",
       "namespace": "validator1",
       "timeout": 480,
       "values": {
@@ -8491,11 +8191,11 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "validator1_participant",
-          "hostname": "participant-postgres.validator1.svc.cluster.local",
+          "database": "participant",
+          "hostname": "participant-pg.validator1.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretName": "participant-postgres-secrets",
+        "postgresSecretName": "participant-pg-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -8508,7 +8208,7 @@
         }
       }
     },
-    "name": "helm-validator1-validator1-pg-exporter-participant-postgres-validator1-participant",
+    "name": "helm-validator1-validator1-pg-exporter-participant-pg-participant",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8518,7 +8218,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "validator1-pg-exporter-validator-postgres-validator1",
+      "name": "validator1-pg-exporter-validator-pg-validator1",
       "namespace": "validator1",
       "timeout": 480,
       "values": {
@@ -8577,10 +8277,10 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
           "database": "validator1",
-          "hostname": "validator-postgres.validator1.svc.cluster.local",
+          "hostname": "validator-pg.validator1.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretName": "validator-postgres-secrets",
+        "postgresSecretName": "validator-pg-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -8593,7 +8293,7 @@
         }
       }
     },
-    "name": "helm-validator1-validator1-pg-exporter-validator-postgres-validator1",
+    "name": "helm-validator1-validator1-pg-exporter-validator-pg-validator1",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8606,6 +8306,46 @@
     "name": "organization/infra/infra.mock",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database domain_mediator\""
+    },
+    "name": "splitwell-createdb-postgres-domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database domain_sequencer\""
+    },
+    "name": "splitwell-createdb-postgres-domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database participant\""
+    },
+    "name": "splitwell-createdb-postgres-participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database val_splitwell\""
+    },
+    "name": "splitwell-createdb-postgres-val_splitwell",
+    "provider": "",
+    "type": "command:local:Command"
   },
   {
     "custom": true,
@@ -8631,6 +8371,46 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "splitwell-waitdb-postgres-domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "splitwell-waitdb-postgres-domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "splitwell-waitdb-postgres-participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "splitwell-waitdb-postgres-val_splitwell",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
@@ -8643,6 +8423,66 @@
     "name": "splitwell",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_mediator\""
+    },
+    "name": "sv-1-createdb-postgres-global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_sequencer\""
+    },
+    "name": "sv-1-createdb-postgres-global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database participant\""
+    },
+    "name": "sv-1-createdb-postgres-participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_1\""
+    },
+    "name": "sv-1-createdb-postgres-scan_sv_1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_1\""
+    },
+    "name": "sv-1-createdb-postgres-sv_1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_1\""
+    },
+    "name": "sv-1-createdb-postgres-validator_sv_1",
+    "provider": "",
+    "type": "command:local:Command"
   },
   {
     "custom": true,
@@ -8668,6 +8508,66 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-1-waitdb-postgres-global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-1-waitdb-postgres-global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-1-waitdb-postgres-participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-1-waitdb-postgres-scan_sv_1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-1-waitdb-postgres-sv_1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-1-waitdb-postgres-validator_sv_1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
@@ -8678,6 +8578,66 @@
     "name": "sv-1",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_mediator\""
+    },
+    "name": "sv-2-createdb-postgres-global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_sequencer\""
+    },
+    "name": "sv-2-createdb-postgres-global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database participant\""
+    },
+    "name": "sv-2-createdb-postgres-participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_2\""
+    },
+    "name": "sv-2-createdb-postgres-scan_sv_2",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_2\""
+    },
+    "name": "sv-2-createdb-postgres-sv_2",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_2\""
+    },
+    "name": "sv-2-createdb-postgres-validator_sv_2",
+    "provider": "",
+    "type": "command:local:Command"
   },
   {
     "custom": true,
@@ -8703,6 +8663,66 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-2-waitdb-postgres-global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-2-waitdb-postgres-global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-2-waitdb-postgres-participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-2-waitdb-postgres-scan_sv_2",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-2-waitdb-postgres-sv_2",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-2-waitdb-postgres-validator_sv_2",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
@@ -8713,6 +8733,66 @@
     "name": "sv-2",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_mediator\""
+    },
+    "name": "sv-3-createdb-postgres-global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_sequencer\""
+    },
+    "name": "sv-3-createdb-postgres-global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database participant\""
+    },
+    "name": "sv-3-createdb-postgres-participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_3\""
+    },
+    "name": "sv-3-createdb-postgres-scan_sv_3",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_3\""
+    },
+    "name": "sv-3-createdb-postgres-sv_3",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_3\""
+    },
+    "name": "sv-3-createdb-postgres-validator_sv_3",
+    "provider": "",
+    "type": "command:local:Command"
   },
   {
     "custom": true,
@@ -8738,6 +8818,66 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-3-waitdb-postgres-global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-3-waitdb-postgres-global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-3-waitdb-postgres-participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-3-waitdb-postgres-scan_sv_3",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-3-waitdb-postgres-sv_3",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-3-waitdb-postgres-validator_sv_3",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
@@ -8748,6 +8888,66 @@
     "name": "sv-3",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_mediator\""
+    },
+    "name": "sv-4-createdb-postgres-global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_sequencer\""
+    },
+    "name": "sv-4-createdb-postgres-global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database participant\""
+    },
+    "name": "sv-4-createdb-postgres-participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_4\""
+    },
+    "name": "sv-4-createdb-postgres-scan_sv_4",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_4\""
+    },
+    "name": "sv-4-createdb-postgres-sv_4",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_4\""
+    },
+    "name": "sv-4-createdb-postgres-validator_sv_4",
+    "provider": "",
+    "type": "command:local:Command"
   },
   {
     "custom": true,
@@ -8773,6 +8973,66 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-4-waitdb-postgres-global_domain_mediator",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-4-waitdb-postgres-global_domain_sequencer",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-4-waitdb-postgres-participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-4-waitdb-postgres-scan_sv_4",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-4-waitdb-postgres-sv_4",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "sv-4-waitdb-postgres-validator_sv_4",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
@@ -8788,11 +9048,31 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "create": "kubectl exec -n validator1 participant-pg-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database participant\""
+    },
+    "name": "validator1-createdb-participant-pg-participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n validator1 validator-pg-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator1\""
+    },
+    "name": "validator1-createdb-validator-pg-validator1",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "length": 16,
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "validator1-participant-postgres-passwd",
+    "name": "validator1-participant-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -8800,7 +9080,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "validator1-participant-postgres",
+    "name": "validator1-participant-pg",
     "provider": "",
     "type": "canton:network:postgres"
   },
@@ -8812,7 +9092,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "validator1-validator-postgres-passwd",
+    "name": "validator1-validator-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -8820,9 +9100,29 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "validator1-validator-postgres",
+    "name": "validator1-validator-pg",
     "provider": "",
     "type": "canton:network:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n validator1 participant-pg-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "validator1-waitdb-participant-pg-participant",
+    "provider": "",
+    "type": "command:local:Command"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "create": "kubectl exec -n validator1 validator-pg-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
+    },
+    "name": "validator1-waitdb-validator-pg-validator1",
+    "provider": "",
+    "type": "command:local:Command"
   },
   {
     "custom": true,
@@ -8840,305 +9140,5 @@
     "name": "validator1",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-scan_sv_1",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-scan_sv_2",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-scan_sv_3",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-scan_sv_4",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-splitwell_domain_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-splitwell_domain_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-splitwell_participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_1_global_domain_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_1_global_domain_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_1_participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_1",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_2_global_domain_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_2_global_domain_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_2_participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_2",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_3_global_domain_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_3_global_domain_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_3_participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_3",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_4_global_domain_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_4_global_domain_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_4_participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-sv_4",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n validator1 participant-postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-validator1_participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n validator1 validator-postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-validator1",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-validator_splitwell",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-validator_sv_1",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-validator_sv_2",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-validator_sv_3",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "waitdb-validator_sv_4",
-    "provider": "",
-    "type": "command:local:Command"
   }
 ]

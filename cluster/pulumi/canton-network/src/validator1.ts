@@ -29,7 +29,7 @@ export async function installValidator1(
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name, true);
 
-  const participantPostgres = postgres.installPostgres(xns, 'participant-postgres', true);
+  const participantPostgres = postgres.installPostgres(xns, 'participant-pg', true);
 
   const loopback = installCNHelmChart(
     xns,
@@ -58,7 +58,7 @@ export async function installValidator1(
     await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
   ]);
 
-  const validatorPostgres = postgres.installPostgres(xns, 'validator-postgres', true);
+  const validatorPostgres = postgres.installPostgres(xns, 'validator-pg', true);
 
   const validatorDbName = 'validator1';
   const validatorDb = validatorPostgres.createDatabase(validatorDbName);
