@@ -69,6 +69,7 @@ import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 
 import java.time.Instant
@@ -92,7 +93,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       for {
         store <- mkStore()
         _ <- dummyDomain.create(created)(store.multiDomainAcsStore)
-        _ <- Future.traverse(noise)(dummyDomain.create(_)(store.multiDomainAcsStore))
+        _ <- MonadUtil.sequentialTraverse(noise)(dummyDomain.create(_)(store.multiDomainAcsStore))
         result <- fetch(store)
       } yield result.map(_.contract) should be(Some(created))
     }
@@ -247,7 +248,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore()
           _ <- dummyDomain.create(svcRules())(store.multiDomainAcsStore)
           _ <- createMiningRoundsTriple(store, startRound = 3L) // oldest is round 3, newest is 5
-          _ <- Future.traverse(
+          _ <- MonadUtil.sequentialTraverse(
             Seq(expiresAtRound2, expiresAtRound3, expiresAtRound4, wontExpireAnyTimeSoon)
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
@@ -292,7 +293,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore()
           _ <- dummyDomain.create(svcRules())(store.multiDomainAcsStore)
           _ <- createMiningRoundsTriple(store, startRound = 3L) // oldest is round 3, newest is 5
-          _ <- Future.traverse(
+          _ <- MonadUtil.sequentialTraverse(
             Seq(expiresAtRound2, expiresAtRound3, expiresAtRound4, wontExpireAnyTimeSoon)
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
@@ -335,7 +336,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val notExpired = (4 to 6).map(n => voteRequest(requester = userParty(n)))
         for {
           store <- mkStore()
-          _ <- Future.traverse(expired ++ notExpired)(
+          _ <- MonadUtil.sequentialTraverse(expired ++ notExpired)(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listExpiredVoteRequests()(
@@ -361,7 +362,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val badConfirmation2 = confirmation(5, badActionDifferentType)
         for {
           store <- mkStore()
-          _ <- Future.traverse(goodConfirmations :+ badConfirmation1 :+ badConfirmation2)(
+          _ <- MonadUtil.sequentialTraverse(
+            goodConfirmations :+ badConfirmation1 :+ badConfirmation2
+          )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listConfirmations(goodAction)
@@ -380,10 +383,10 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val inRoundOtherDomain = (1 to 3).map(n => appRewardCoupon(round = 3, userParty(n)))
         for {
           store <- mkStore()
-          _ <- Future.traverse(inRound ++ outOfRound)(
+          _ <- MonadUtil.sequentialTraverse(inRound ++ outOfRound)(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          _ <- Future.traverse(inRoundOtherDomain)(
+          _ <- MonadUtil.sequentialTraverse(inRoundOtherDomain)(
             dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listAppRewardCouponsOnDomain(round = 3, dummyDomain, Limit.DefaultLimit)
@@ -402,10 +405,10 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val inRoundOtherDomain = (1 to 3).map(n => validatorRewardCoupon(round = 3, userParty(n)))
         for {
           store <- mkStore()
-          _ <- Future.traverse(inRound ++ outOfRound)(
+          _ <- MonadUtil.sequentialTraverse(inRound ++ outOfRound)(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          _ <- Future.traverse(inRoundOtherDomain)(
+          _ <- MonadUtil.sequentialTraverse(inRoundOtherDomain)(
             dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listValidatorRewardCouponsOnDomain(
@@ -431,12 +434,12 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val provider2OtherDomain = (1 to 3).map(_ => appRewardCoupon(round = 3, userParty(2)))
         for {
           store <- mkStore()
-          _ <- Future.traverse(
+          _ <- MonadUtil.sequentialTraverse(
             provider1InRound ++ provider2InRound ++ provider1OutOfRound ++ provider2OutOfRound
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          _ <- Future.traverse(
+          _ <- MonadUtil.sequentialTraverse(
             provider1OtherDomain ++ provider2OtherDomain
           )(
             dummy2Domain.create(_)(store.multiDomainAcsStore)
@@ -469,12 +472,12 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val provider2OtherDomain = (1 to 3).map(_ => validatorRewardCoupon(round = 3, userParty(2)))
         for {
           store <- mkStore()
-          _ <- Future.traverse(
+          _ <- MonadUtil.sequentialTraverse(
             provider1InRound ++ provider2InRound ++ provider1OutOfRound ++ provider2OutOfRound
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          _ <- Future.traverse(
+          _ <- MonadUtil.sequentialTraverse(
             provider1OtherDomain ++ provider2OtherDomain
           )(
             dummy2Domain.create(_)(store.multiDomainAcsStore)
@@ -506,7 +509,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         for {
           store <- mkStore()
           _ <- dummyDomain.create(svcRules())(store.multiDomainAcsStore)
-          _ <- Future.traverse(
+          _ <- MonadUtil.sequentialTraverse(
             goodClosed :+ hasValidatorCoupon :+ hasAppCoupon :+ hasConfirmation
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
@@ -579,7 +582,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
         for {
           store <- mkStore()
-          _ <- Future.traverse(
+          _ <- MonadUtil.sequentialTraverse(
             acceptedConfirmations ++ rejectedConfirmations ++ Seq(unrelatedConfirmation)
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
@@ -616,7 +619,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           (4 to 6).map(n => svOnboardingRequest(n.toString, userParty(n), n.toString))
         for {
           store <- mkStore()
-          _ <- Future.traverse(expired ++ notExpired)(
+          _ <- MonadUtil.sequentialTraverse(expired ++ notExpired)(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listExpiredSvOnboardingRequests(
@@ -646,7 +649,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val notExpired = (4 to 6).map(n => svOnboardingConfirmed(n.toString, userParty(n)))
         for {
           store <- mkStore()
-          _ <- Future.traverse(expired ++ notExpired)(
+          _ <- MonadUtil.sequentialTraverse(expired ++ notExpired)(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listExpiredSvOnboardingConfirmed(
@@ -683,7 +686,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
         for {
           store <- mkStore()
-          _ <- Future.traverse(
+          _ <- MonadUtil.sequentialTraverse(
             goodElectionRequests :+ electionRequestOtherMember :+ electionRequestOtherEpoch
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
@@ -705,7 +708,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
         for {
           store <- mkStore()
-          _ <- Future.traverse(electionRequests)(
+          _ <- MonadUtil.sequentialTraverse(electionRequests)(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listExpiredElectionRequests(epoch = 4)(traceContext)
@@ -760,7 +763,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         for {
           store <- mkStore()
           (_, _, newest) <- createMiningRoundsTriple(store, startRound = 500L)
-          _ <- Future.traverse(
+          _ <- MonadUtil.sequentialTraverse(
             receiverCoins ++ coinsOfOthers ++ receiverLicenses ++ validatorLicensesOfOthers
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
@@ -795,7 +798,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
               (contextContract, idleStateContract)
             }
-          _ <- Future.traverse(data) { case (contextContract, idleContract) =>
+          _ <- MonadUtil.sequentialTraverse(data) { case (contextContract, idleContract) =>
             for {
               _ <- dummyDomain.create(contextContract, createdEventSignatories = Seq(svcParty))(
                 store.multiDomainAcsStore
@@ -879,12 +882,12 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
         for {
           store <- mkStore()
-          _ <- Future.traverse(
+          _ <- MonadUtil.sequentialTraverse(
             Seq(goodCnsName, badCnsName)
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          _ <- Future.traverse(
+          _ <- MonadUtil.sequentialTraverse(
             goodConfirmations ++ badConfirmations ++ unrelatedConfirmations
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
@@ -908,7 +911,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val badContracts = (4 to 6).map(n => memberTraffic(badMember, n.toLong))
         for {
           store <- mkStore()
-          _ <- Future.traverse(
+          _ <- MonadUtil.sequentialTraverse(
             goodContracts ++ badContracts
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
@@ -932,7 +935,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummyDomain.create(voteRequestContract)(store.multiDomainAcsStore)
           votes = (1 to 4).map(n => vote(userParty(n), voteRequestContract.contractId)).toList
           result = mkExecuteDefiniteVoteResult(voteRequestContract)
-          _ <- Future.traverse(votes)(dummyDomain.create(_)(store.multiDomainAcsStore))
+          _ <- MonadUtil.sequentialTraverse(votes)(dummyDomain.create(_)(store.multiDomainAcsStore))
           definitiveVoteTx <- dummyDomain.exercise(
             contract = svcRules(),
             interfaceId = Some(SvcRules.TEMPLATE_ID),
@@ -1038,10 +1041,10 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         val badVotes = (1 to 3).map(n => vote(userParty(n), badVoteRequests(n - 1).contractId))
         for {
           store <- mkStore()
-          _ <- Future.traverse(goodVoteRequests ++ badVoteRequests)(
+          _ <- MonadUtil.sequentialTraverse(goodVoteRequests ++ badVoteRequests)(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          _ <- Future.traverse(goodVotes ++ badVotes)(
+          _ <- MonadUtil.sequentialTraverse(goodVotes ++ badVotes)(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listVotesByVoteRequests(goodVoteRequests.map(_.contractId))
@@ -1204,8 +1207,8 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     val middle = openMiningRound(svcParty, startRound + 1, 2.0)
     val newest = openMiningRound(svcParty, startRound + 2, 3.0)
     val all = Random.shuffle(Seq(oldest, middle, newest))
-    Future
-      .traverse(all)(dummyDomain.create(_)(store.multiDomainAcsStore))
+    MonadUtil
+      .sequentialTraverse(all)(dummyDomain.create(_)(store.multiDomainAcsStore))
       .map(_ => (oldest, middle, newest))
   }
 

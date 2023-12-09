@@ -50,6 +50,7 @@ import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.reflect.ClassTag
 import com.daml.network.scan.store.SortOrder
+import com.digitalasset.canton.util.MonadUtil
 
 abstract class ScanStoreTest extends StoreTest with HasExecutionContext with StoreErrors {
 
@@ -192,7 +193,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         )
         for {
           store <- mkStore()
-          _ <- Future.traverse(appRewards.zip(validatorRewards).zipWithIndex) {
+          _ <- MonadUtil.sequentialTraverse(appRewards.zip(validatorRewards).zipWithIndex) {
             case ((appAmount, validatorAmount), round) =>
               dummyDomain.exercise(
                 coinRules(),
@@ -233,7 +234,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         )
         for {
           store <- mkStore()
-          _ <- Future.traverse(appRewards.zipWithIndex) { case (amount, round) =>
+          _ <- MonadUtil.sequentialTraverse(appRewards.zipWithIndex) { case (amount, round) =>
             dummyDomain.exercise(
               coinRules(),
               Some(cc.coinrules.CoinRules.TEMPLATE_ID),
@@ -249,7 +250,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               ),
             )(store.multiDomainAcsStore)
           }
-          _ <- Future.traverse(validatorRewards.zipWithIndex) { case (amount, round) =>
+          _ <- MonadUtil.sequentialTraverse(validatorRewards.zipWithIndex) { case (amount, round) =>
             dummyDomain.exercise(
               coinRules(),
               Some(cc.coinrules.CoinRules.TEMPLATE_ID),
@@ -400,17 +401,18 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         store <- mkStore()
         openTx <- dummyDomain.create(open)(store.multiDomainAcsStore)
         closedTx <- dummyDomain.create(closed)(store.multiDomainAcsStore)
-        rewardTxs <- Future.traverse(providerRewardRounds) { case (provider, amount, round) =>
-          dummyDomain.exercise(
-            coinRules(),
-            Some(cc.coinrules.CoinRules.TEMPLATE_ID),
-            Transfer.choice.name,
-            mkCoinRulesTransfer(provider, amount),
-            mkTransferResultForTest(
-              amount,
-              round.toLong,
-            ),
-          )(store.multiDomainAcsStore)
+        rewardTxs <- MonadUtil.sequentialTraverse(providerRewardRounds) {
+          case (provider, amount, round) =>
+            dummyDomain.exercise(
+              coinRules(),
+              Some(cc.coinrules.CoinRules.TEMPLATE_ID),
+              Transfer.choice.name,
+              mkCoinRulesTransfer(provider, amount),
+              mkTransferResultForTest(
+                amount,
+                round.toLong,
+              ),
+            )(store.multiDomainAcsStore)
         }
       } yield {
         transactionTreeSource.addTree(openTx)
@@ -525,7 +527,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           store <- mkStore()
           openTx <- dummyDomain.create(open)(store.multiDomainAcsStore)
           closedTx <- dummyDomain.create(closed)(store.multiDomainAcsStore)
-          trafficPurchaseUpdates <- Future.traverse(trafficPurchaseTrees)(
+          trafficPurchaseUpdates <- MonadUtil.sequentialTraverse(trafficPurchaseTrees)(
             dummyDomain.ingest(_)(store.multiDomainAcsStore)
           )
         } yield {

@@ -34,6 +34,7 @@ import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import org.scalatest.{Assertion, Succeeded}
 
@@ -367,15 +368,16 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
       "return correct results" in {
         for {
-          Seq(store1, store2, storeP) <- Future.traverse(Seq(user1, user2, provider1)) {
-            endUserParty =>
-              for {
-                store <- mkStore(endUserParty)
-                _ <- dummyDomain.create(
-                  walletInstall(endUserParty),
-                  createdEventSignatories = Seq(endUserParty, svcParty),
-                )(store.multiDomainAcsStore)
-              } yield store
+          Seq(store1, store2, storeP) <- MonadUtil.sequentialTraverse(
+            Seq(user1, user2, provider1)
+          ) { endUserParty =>
+            for {
+              store <- mkStore(endUserParty)
+              _ <- dummyDomain.create(
+                walletInstall(endUserParty),
+                createdEventSignatories = Seq(endUserParty, svcParty),
+              )(store.multiDomainAcsStore)
+            } yield store
           }
           allAcsStores = Seq(
             store1.multiDomainAcsStore,
