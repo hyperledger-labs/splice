@@ -68,6 +68,9 @@ class UserWalletAutomationService(
   registerTrigger(
     new AcceptedTransferOfferTrigger(triggerContext, store, treasury, connection)
   )
+  registerTrigger(
+    new BuyTrafficRequestTrigger(triggerContext, store, treasury, connection)
+  )
   if (automationConfig.enableAutomaticRewardsCollectionAndCoinMerging) {
     registerTrigger(
       new CollectRewardsAndMergeCoinsTrigger(triggerContext, treasury)

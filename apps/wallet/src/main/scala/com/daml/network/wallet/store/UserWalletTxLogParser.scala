@@ -16,6 +16,7 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperation.{
   CO_AppPayment,
   CO_BuyMemberTraffic,
   CO_CompleteAcceptedTransfer,
+  CO_CompleteBuyTrafficRequest,
   CO_MergeTransferInputs,
   CO_SubscriptionAcceptAndMakeInitialPayment,
   CO_SubscriptionMakePayment,
@@ -238,7 +239,8 @@ class UserWalletTxLogParser(
                       )
                     // The errors below should not produce notifications
                     case _: CO_AppPayment | _: CO_SubscriptionAcceptAndMakeInitialPayment |
-                        _: CO_MergeTransferInputs | _: CO_BuyMemberTraffic | _: CO_Tap =>
+                        _: CO_MergeTransferInputs | _: CO_BuyMemberTraffic |
+                        _: CO_CompleteBuyTrafficRequest | _: CO_Tap =>
                       State.empty
                     case _ => throw new RuntimeException(s"Invalid operation $op")
                   }

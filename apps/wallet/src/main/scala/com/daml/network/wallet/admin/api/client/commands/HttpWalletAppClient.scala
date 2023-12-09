@@ -719,6 +719,30 @@ object HttpWalletAppClient {
     }
   }
 
+  case class GetTrafficRequestStatus(trackingId: String)
+      extends ExternalBaseCommand[
+        externalHttp.GetBuyTrafficRequestStatusResponse,
+        definitions.GetBuyTrafficRequestStatusResponse,
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], externalHttp.GetBuyTrafficRequestStatusResponse] =
+      client.getBuyTrafficRequestStatus(trackingId = trackingId, headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[externalHttp.GetBuyTrafficRequestStatusResponse, Either[
+      String,
+      definitions.GetBuyTrafficRequestStatusResponse,
+    ]] = { case externalHttp.GetBuyTrafficRequestStatusResponse.OK(ok) =>
+      Right(ok)
+    }
+  }
+
   case object ListAppRewardCoupons
       extends InternalBaseCommand[
         http.ListAppRewardCouponsResponse,

@@ -151,11 +151,14 @@ object GlobalDomainMigrationCoverageTest {
   private val knownNotHandled = {
     import codegen.java.cc.globaldomain
     import codegen.java.cn.wallet.topupstate as topUpCodegen
+    import codegen.java.cn.wallet.buytrafficrequest as trafficRequestCodegen
     Seq(
       globaldomain.MemberTraffic.COMPANION ->
         reason("tied to a specific domainId, never migrated", SvSvcStore),
       topUpCodegen.ValidatorTopUpState.COMPANION ->
         reason("tied to a specific domainId, never migrated", ValidatorStore),
+      trafficRequestCodegen.BuyTrafficRequest.COMPANION ->
+        reason("tied to a specific domainId, never migrated", UserWalletStore),
     ).view.map { case (c, reason) =>
       (QualifiedName(c.TEMPLATE_ID), reason)
     }.toMap

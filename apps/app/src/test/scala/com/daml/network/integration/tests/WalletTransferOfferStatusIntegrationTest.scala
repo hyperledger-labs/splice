@@ -9,6 +9,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
+import com.daml.network.wallet.automation.AcceptedTransferOfferTrigger
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
@@ -87,9 +88,13 @@ class WalletTransferOfferStatusIntegrationTest
 
       val offerCid = createTransferOffer(aliceUserParty, bobUserParty)
 
-      // Stop validator so it doesn't immediately move from Accepted to Completed
-      // TODO (#7609): replace with stopping and starting AcceptedTransferOfferTrigger
-      bracket(aliceValidatorBackend.stop(), aliceValidatorBackend.startSync()) {
+      def acceptedTransferOfferTrigger =
+        aliceValidatorBackend
+          .userWalletAutomation(aliceWalletClient.config.ledgerApiUser)
+          .trigger[AcceptedTransferOfferTrigger]
+
+      // Pause AcceptedTransferOfferTrigger so the offer doesn't immediately move from Accepted to Completed
+      bracket(acceptedTransferOfferTrigger.pause(), acceptedTransferOfferTrigger.resume()) {
         actAndCheck(
           "Bob accepts the transfer offer",
           bobWalletClient.acceptTransferOffer(offerCid),

@@ -73,12 +73,16 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
                 )
                 .map(_ =>
                   TaskSuccess(
-                    s"Updated extra traffic limit for member ${memberId} to ${newExtraTrafficLimit}"
+                    s"Updated extra traffic limit for member ${memberId} from ${currentExtraTrafficLimit} to ${newExtraTrafficLimit}"
                   )
                 )
             )
         } else {
-          Future(TaskSuccess("Skipping since traffic limit is already up to date"))
+          Future(
+            TaskSuccess(
+              s"Skipping since traffic limit is already up to date (previous limit = ${currentExtraTrafficLimit}, new limit = ${newExtraTrafficLimit})."
+            )
+          )
         }
     } yield taskOutcome
   }

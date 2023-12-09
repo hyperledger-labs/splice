@@ -192,4 +192,10 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
       .trafficState
   }
 
+  def getSequencerTrafficLimit(
+      validatorApp: ValidatorAppBackendReference,
+      domainId: DomainId,
+  ): Long = {
+    getTrafficState(validatorApp, domainId).extraTrafficLimit.fold(0L)(_.value)
+  }
 }

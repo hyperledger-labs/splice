@@ -3,13 +3,16 @@ package com.daml.network.console
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.{
+  buytrafficrequest as trafficRequestCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOfferCodegen,
-  buytrafficrequest as trafficRequestCodegen,
 }
 import com.daml.network.environment.CNNodeConsoleEnvironment
-import com.daml.network.http.v0.definitions.GetTransferOfferStatusResponse
+import com.daml.network.http.v0.definitions.{
+  GetBuyTrafficRequestStatusResponse,
+  GetTransferOfferStatusResponse,
+}
 import com.daml.network.util.Contract
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.{
@@ -349,6 +352,16 @@ abstract class WalletAppReference(
           )
       )
     }
+
+  @Help.Summary("Get traffic request status")
+  @Help.Description("Returns the status of a buy traffic request.")
+  def getTrafficRequestStatus(trackingId: String): GetBuyTrafficRequestStatusResponse = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.GetTrafficRequestStatus(trackingId)
+      )
+    }
+  }
 
   @Help.Summary("List app rewards")
   @Help.Description("List all open app rewards for the configured user")

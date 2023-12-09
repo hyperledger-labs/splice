@@ -11,6 +11,7 @@ import com.daml.network.http.v0.{external, definitions as d0}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.Codec
 import com.daml.network.wallet.UserWalletManager
+import com.digitalasset.canton.config.RequireTypes.PositiveLong
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry.RetryUtil.{
@@ -23,6 +24,7 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
+import cats.syntax.either.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -147,18 +149,39 @@ class HttpExternalWalletHandler(
       val userWalletStore = getUserWallet(user).store
       val domainId = Codec.tryDecode(Codec.DomainId)(request.domainId)
       val receivingValidator = Codec.tryDecode(Codec.Party)(request.receivingValidatorPartyId)
+      val trafficAmount = PositiveLong
+        .create(request.trafficAmount)
+        .valueOr(_ =>
+          throw io.grpc.Status.INVALID_ARGUMENT
+            .withDescription(s"trafficAmount must be positive")
+            .asRuntimeException()
+        )
       for {
         participantId <- participantAdminConnection
           .getPartyToParticipant(
             domainId,
             receivingValidator,
           )
-          .map(_.mapping.participantIds.toList)
+          .transform(
+            _.mapping.participantIds.toList,
+            // We translate NOT_FOUND raised by getPartyToParticipant to INVALID_ARGUMENT
+            // if no PartyToParticipantX state is found
+            {
+              case ex: io.grpc.StatusRuntimeException
+                  if ex.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+                throw io.grpc.Status.INVALID_ARGUMENT
+                  .withDescription(
+                    s"Could not find participant hosting ${receivingValidator} on domain ${domainId}"
+                  )
+                  .asRuntimeException()
+              case other => other
+            },
+          )
           .map {
             case Nil =>
-              throw io.grpc.Status.NOT_FOUND
+              throw io.grpc.Status.INVALID_ARGUMENT
                 .withDescription(
-                  s"Could not find participant hosting receivingValidator ${receivingValidator}"
+                  s"Could not find participant hosting ${receivingValidator} on domain ${domainId}"
                 )
                 .asRuntimeException()
             case only :: Nil => only
@@ -170,7 +193,7 @@ class HttpExternalWalletHandler(
               first
           }
         result <- userWalletStore
-          .getLatestTransferOfferEventByTrackingId(request.trackingId)
+          .getLatestBuyTrafficRequestEventByTrackingId(request.trackingId)
           .flatMap {
             case QueryResult(_, Some(_)) =>
               Future.failed(
@@ -193,7 +216,7 @@ class HttpExternalWalletHandler(
                         .exerciseWalletAppInstall_CreateBuyTrafficRequest(
                           participantId.toProtoPrimitive,
                           domainId.toProtoPrimitive,
-                          request.trafficAmount,
+                          trafficAmount.value,
                           expiresAt.toInstant,
                           request.trackingId,
                         )
@@ -234,7 +257,24 @@ class HttpExternalWalletHandler(
 
   override def getBuyTrafficRequestStatus(
       respond: r0.GetBuyTrafficRequestStatusResponse.type
-  )(trackingId: String)(tuser: TracedUser): Future[r0.GetBuyTrafficRequestStatusResponse] = ???
+  )(trackingId: String)(tuser: TracedUser): Future[r0.GetBuyTrafficRequestStatusResponse] = {
+
+    implicit val TracedUser(user, traceContext) = tuser
+    withSpan(s"$workflowId.getBuyTrafficRequestStatus") { _ => _ =>
+      for {
+        userStore <- getUserStore(user)
+        txLogEntry <- userStore.getLatestBuyTrafficRequestEventByTrackingId(trackingId)
+      } yield {
+        txLogEntry.value
+          .map(_.status)
+          .fold[r0.GetBuyTrafficRequestStatusResponse](
+            r0.GetBuyTrafficRequestStatusResponse(
+              d0.ErrorResponse(s"Couldn't find transfer offer with tracking id $trackingId")
+            )
+          )(status => r0.GetBuyTrafficRequestStatusResponse(status.toStatusResponse))
+      }
+    }
+  }
 }
 
 object HttpExternalWalletHandler {

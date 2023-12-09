@@ -15,6 +15,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
+  buytrafficrequest as trafficRequestCodegen,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{BaseLedgerConnection, RetryProvider}
@@ -619,6 +620,15 @@ object UserWalletStore {
         ),
         mkFilter(cnsCodegen.CnsEntryContext.COMPANION)(co => co.payload.user == endUser)(
           UserWalletAcsStoreRowData(_)
+        ),
+        // Buy traffic requests
+        mkFilter(trafficRequestCodegen.BuyTrafficRequest.COMPANION)(co =>
+          co.payload.svc == svc && co.payload.endUserParty == endUser
+        )(contract =>
+          UserWalletAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
         ),
       ),
     )

@@ -25,6 +25,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
+  buytrafficrequest as trafficRequestCodegen,
 }
 import com.daml.network.codegen.java.cn.wallet.install.{
   ExecuteBatchResult,
@@ -233,6 +234,13 @@ class TreasuryService(
       //  in order to do the staleness check here. BuyMemberTraffic txs are always placed into
       //  their own batch so a failure of this tx should not impact other coin txs.
       case _: coinoperation.CO_BuyMemberTraffic => Future.unit
+
+      case op: coinoperation.CO_CompleteBuyTrafficRequest =>
+        for {
+          _ <- userStore.multiDomainAcsStore.getContractById(
+            trafficRequestCodegen.BuyTrafficRequest.COMPANION
+          )(op.trafficRequestCid)
+        } yield ()
 
       case op => throw new NotImplementedError(show"Unexpected coin operation: $op")
     }
