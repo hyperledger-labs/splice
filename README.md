@@ -563,11 +563,7 @@ Current Canton commit: `0689e8649ccee69e0fb55908a8b0fbcfcc500749`
    In that repo, execute the following steps:
    1. Define the environment variable used in the commands below using `export PATH_TO_CANTON_OSS=<your-canton-oss-repo-path>`
    2. Checkout `main` and learn the Daml SDK version used by Canton from `head -n15 $PATH_TO_CANTON_OSS/project/project/DamlVersions.scala`.
-   3. Check that a release that includes this Daml SDK version is available on https://github.com/digital-asset/daml/releases. Take note of the Daml release version that does.
-      If not ask on #team-daml when it will land.
-      In case we have not bumped our Canton fork recently, consider upgrading to an
-      earlier Canton OSS version for which a Daml SDK release is available.
-   4. Checkout the **current Canton commit listed above**, so we can diff our current fork against this checkout.
+   3. Checkout the **current Canton commit listed above**, so we can diff our current fork against this checkout.
       NOTE: if you can't find the commit, then you are probably using the closed source https://github.com/DACH-NY/canton repo.
       That won't work. You need the Canton OSS repo linked above.
 2. Change to your checkout of the canton coin repo and execute the following steps:
@@ -585,7 +581,7 @@ Current Canton commit: `0689e8649ccee69e0fb55908a8b0fbcfcc500749`
    5. Bump the SDK/Canton versions in the following places:
       1. The current Canton commit in this `README.md`
       2. Set `version` in `CantonDependencies.scala` to the SDK version from Step 1.2
-      3. Set `sdk_version` and `daml_version` in `nix/canton-sources.json` to the SDK release version and the Daml versions from Steps 1.2 and 1.3, respectively.
+      3. Set `sdk_version` in `nix/canton-sources.json` to the SDK release version from Step 1.2.
       4. Bump the sdk version in our own `daml.yaml` and `*.nix` files via `./set-sdk.sh $sdkversion` to the same Daml SDK version.
       5. Change the hashes for both the linux and macos releases in `daml2js.nix`. To do so change a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `daml2js.nix`,
          and then call `direnv reload` to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.

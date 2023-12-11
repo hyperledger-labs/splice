@@ -48,7 +48,7 @@ extensions = [
     # interact the right way with how copy-buttons are placed.
 ]
 
-## -- Redirects -----------------------------------------------------------
+# -- Redirects -----------------------------------------------------------
 redirects = {
     "sv_operator/bootstrap": "sv_helm.html",
     "sv_operator/onboarding": "sv_helm.html"
@@ -99,7 +99,7 @@ html_js_files = ['script.js']
 with open("../../../../nix/canton-sources.json") as f:
     obj = json.load(f)
     canton_version = obj['version']
-    daml_sdk_version = obj['daml_version']
+    daml_sdk_version = obj['sdk_version']
 
 with open(os.path.join(os.getenv("CANTON"), "SUBDIR")) as f:
     canton_subdir = f.readline()

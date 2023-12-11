@@ -69,7 +69,7 @@ in pkgs.mkShell {
   ] ++ linuxOnly;
 
   CANTON = "${pkgs.canton}";
-  DAML_VERSION = "${sources.daml_version}";
+  DAML_VERSION = "${sources.sdk_version}";
   SDK_VERSION = "${sources.sdk_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
   COMETBFT_DRIVER = "${pkgs.cometbft_driver}";
