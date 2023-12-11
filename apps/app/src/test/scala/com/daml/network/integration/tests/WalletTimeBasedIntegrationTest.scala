@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
@@ -10,10 +9,8 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.sv.automation.leaderbased.CnsSubscriptionRenewalPaymentTrigger
-import com.daml.network.sv.config.InitialCnsConfig
 import com.daml.network.util.{SplitwellTestUtil, TimeTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.Duration
@@ -39,16 +36,6 @@ class WalletTimeBasedIntegrationTest
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
-      .addConfigTransform((_, config) =>
-        CNNodeConfigTransforms
-          .updateAllSvAppFoundCollectiveConfigs_(
-            _.copy(
-              initialCnsConfig = InitialCnsConfig(
-                renewalDuration = NonNegativeFiniteDuration.ofDays(1)
-              )
-            )
-          )(config)
-      )
 
   "A wallet" should {
 
@@ -194,10 +181,12 @@ class WalletTimeBasedIntegrationTest
         ) {
           actAndCheck(
             "Wait for a payment on the first subscription to become possible", {
-              // We time the advances so that automation doesn't trigger before
-              // payments can be made.
+              // Renewal duration is 30 days and entry lifetime is 90 days.
+              // To reach the renewal period of alice1 subscription, we need to advance (90 - 30 days) = 60 days
+              // We have already advanced by 30 days previously (10 days * 3)
+              // So we will have to advance  (90 - 30 - 30 days) = 30 days to make alice1 subscription expired
               // TODO (#7609): consider replacing with stopping and starting triggers
-              advanceTimeAndWaitForRoundAutomation(Duration.ofDays(59).minus(Duration.ofMinutes(9)))
+              advanceTimeAndWaitForRoundAutomation(Duration.ofDays(30))
               advanceTimeToRoundOpen
             },
           )(
