@@ -138,7 +138,7 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
                 </TableRow>
                 <TableRow>
                   <TableCell>
-                    <Typography variant="h6">Request Reason Summary</Typography>
+                    <Typography variant="h6">Proposal Summary</Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="h6" id="vote-request-modal-reason-body">
@@ -148,7 +148,7 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
                 </TableRow>
                 <TableRow>
                   <TableCell>
-                    <Typography variant="h6">Request Reason URL</Typography>
+                    <Typography variant="h6">Proposal URL</Typography>
                   </TableCell>
                   <TableCell>
                     <Link

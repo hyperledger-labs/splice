@@ -53,6 +53,13 @@ const AddFutureCoinConfigSchedule: React.FC<{
     return <p>undefined query data</p>;
   }
 
+  if (configuration == null) {
+    const originalConfig = CoinConfig(USD).encode(
+      svcInfosQuery.data?.coinRules.payload.configSchedule.initialValue!
+    ) as Record<string, JSONValue>;
+    setConfiguration(originalConfig);
+  }
+
   function addFutureCoinConfigScheduleAction(config: Record<string, JSONValue>) {
     setConfiguration(config);
   }
@@ -79,14 +86,7 @@ const AddFutureCoinConfigSchedule: React.FC<{
         <Typography variant="h6" mt={4}>
           Configuration
         </Typography>
-        <JsonEditor
-          data={
-            CoinConfig(USD).encode(
-              svcInfosQuery.data?.coinRules.payload.configSchedule.initialValue!
-            ) as Record<string, JSONValue>
-          }
-          onChange={addFutureCoinConfigScheduleAction}
-        />
+        <JsonEditor data={configuration!} onChange={addFutureCoinConfigScheduleAction} />
       </FormControl>
     </Stack>
   );

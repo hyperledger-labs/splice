@@ -91,9 +91,15 @@ const VoteRequest: React.FC = () => {
     { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
     { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
     { name: 'Set SvcRules Configuration', value: 'SRARC_SetConfig' },
-    { name: 'Add Coin Configuration Schedule', value: 'CRARC_AddFutureCoinConfigSchedule' },
-    { name: 'Remove Coin Configuration Schedule', value: 'CRARC_RemoveFutureCoinConfigSchedule' },
-    { name: 'Update Coin Configuration Schedule', value: 'CRARC_UpdateFutureCoinConfigSchedule' },
+    { name: 'Add SVC App Configuration Schedule', value: 'CRARC_AddFutureCoinConfigSchedule' },
+    {
+      name: 'Remove SVC App Configuration Schedule',
+      value: 'CRARC_RemoveFutureCoinConfigSchedule',
+    },
+    {
+      name: 'Update SVC App Configuration Schedule',
+      value: 'CRARC_UpdateFutureCoinConfigSchedule',
+    },
   ];
 
   const [action, setAction] = useState<ActionRequiringConfirmation | undefined>(undefined);
@@ -236,11 +242,12 @@ const VoteRequest: React.FC = () => {
           {actionName === 'CRARC_UpdateFutureCoinConfigSchedule' && (
             <UpdateFutureCoinConfigSchedule chooseAction={chooseAction} />
           )}
-          <Typography variant="h5">Reason</Typography>
+          <Typography variant="h5">Proposal</Typography>
 
           <Stack direction="column" mb={4} spacing={1}>
             <Typography variant="h6">Summary</Typography>
             <TextField
+              error={!summary}
               id="create-reason-summary"
               rows={2}
               multiline
@@ -250,7 +257,7 @@ const VoteRequest: React.FC = () => {
           </Stack>
 
           <Stack direction="column" mb={4} spacing={1}>
-            <Typography variant="h6">URL:</Typography>
+            <Typography variant="h6">URL</Typography>
             <Box display="flex">
               <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
                 <TextField
@@ -292,7 +299,7 @@ const VoteRequest: React.FC = () => {
             onClick={() => {
               createVoteRequestMutation.mutate();
             }}
-            disabled={createVoteRequestMutation.isLoading || action === undefined}
+            disabled={createVoteRequestMutation.isLoading || action === undefined || summary === ''}
           >
             Send request to collective
           </Button>

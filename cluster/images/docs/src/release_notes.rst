@@ -3,6 +3,12 @@
 Release Notes
 =============
 
+2023-12-18
+----------
+
+* Minor SV UI tweaks. Among other things, it is now mandatory to supply a textual proposal summary when submitting a vote request.
+
+
 2023-12-11
 ----------
 

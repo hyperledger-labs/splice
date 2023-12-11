@@ -352,6 +352,9 @@ class SvFrontendIntegrationTest
               inside(find(id("create-reason-url"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonUrl)
               }
+              clue("sv1 operator can't click submit before adding a summary") {
+                find(id("create-voterequest-submit-button")).value.isEnabled shouldBe false
+              }
               inside(find(id("create-reason-summary"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonBody)
               }
@@ -370,7 +373,7 @@ class SvFrontendIntegrationTest
                 }
               })
 
-              click on "create-voterequest-submit-button"
+              clickVoteRequestSubmitButtonOnceEnabled()
             },
           )(
             "sv1 can see the new vote request",
@@ -596,11 +599,14 @@ class SvFrontendIntegrationTest
               inside(find(id("create-reason-url"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonUrl)
               }
+              clue("sv1 operator can't click submit before adding a summary") {
+                find(id("create-voterequest-submit-button")).value.isEnabled shouldBe false
+              }
               inside(find(id("create-reason-summary"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonBody)
               }
 
-              click on "create-voterequest-submit-button"
+              clickVoteRequestSubmitButtonOnceEnabled()
             },
           )(
             "sv1 can see the new vote request",
@@ -653,11 +659,14 @@ class SvFrontendIntegrationTest
               inside(find(id("create-reason-url"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonUrl)
               }
+              clue("sv1 operator can't click submit before adding a summary") {
+                find(id("create-voterequest-submit-button")).value.isEnabled shouldBe false
+              }
               inside(find(id("create-reason-summary"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonBody)
               }
 
-              click on "create-voterequest-submit-button"
+              clickVoteRequestSubmitButtonOnceEnabled()
             },
           )(
             "sv1 can see the new vote request",
@@ -727,7 +736,7 @@ class SvFrontendIntegrationTest
 
               // TODO(#8767): remove this screenshot
               screenshot()
-              click on "create-voterequest-submit-button"
+              clickVoteRequestSubmitButtonOnceEnabled()
             },
           )(
             "sv1 can see the new vote request",
@@ -777,6 +786,76 @@ class SvFrontendIntegrationTest
             }
           }
 
+        }
+    }
+
+    "can create a CRARC_AddFutureCoinConfigSchedule vote request with only a proposal text and no change" in {
+      implicit env =>
+        val proposalSummary = "This is a request reason, and everything this is about."
+
+        withFrontEnd("sv1") { implicit webDriver =>
+          actAndCheck(
+            "sv1 operator can login and browse to the governance tab", {
+              go to s"http://localhost:$sv1UIPort/votes"
+              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
+            },
+          )(
+            "sv1 can see the create vote request button",
+            _ => {
+              find(id("create-voterequest-submit-button")) should not be empty
+            },
+          )
+
+          click on "tab-panel-in-progress"
+          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
+
+          actAndCheck(
+            "sv1 operator can create a request to add a new coin config schedule", {
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("CRARC_AddFutureCoinConfigSchedule")
+              val effectiveDateTimePicker =
+                webDriver.findElement(By.id("datetime-picker-coin-configuration"))
+
+              clue(s"sv1 selects an effective date") {
+                eventually() {
+                  effectiveDateTimePicker.clear()
+                  effectiveDateTimePicker.click()
+                  effectiveDateTimePicker.sendKeys("01/04/2032 08:00 AM")
+                  effectiveDateTimePicker.sendKeys(Keys.RETURN)
+                }
+              }
+              setExpirationDate("sv1", "01/04/2032 02:00 AM")
+
+              clue("sv1 operator can't click submit before adding a summary") {
+                find(id("create-voterequest-submit-button")).value.isEnabled shouldBe false
+              }
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(proposalSummary)
+              }
+
+              clue("sv1 creates the vote request") {
+                clickVoteRequestSubmitButtonOnceEnabled()
+              }
+            },
+          )(
+            "sv1 can see the new vote request",
+            _ => {
+              click on "tab-panel-in-progress"
+
+              val tbody = find(id("sv-voting-in-progress-table-body"))
+              val tb = tbody.value
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              rows.size shouldBe previousVoteRequestsInProgress + 1
+              rows.head.text shouldBe "CRARC_AddFutureCoinConfigSchedule"
+
+              val reviewButton = rows.head
+              reviewButton.underlying.click()
+
+              inside(find(id("vote-request-modal-reason-body"))) { case Some(tb) =>
+                tb.text shouldBe proposalSummary
+              }
+            },
+          )
         }
     }
 
@@ -844,7 +923,7 @@ class SvFrontendIntegrationTest
               setExpirationDate("sv1", "07/11/2032 12:12 AM")
 
               clue("sv1 creates the vote request") {
-                click on "create-voterequest-submit-button"
+                clickVoteRequestSubmitButtonOnceEnabled()
               }
             },
           )(
@@ -895,10 +974,14 @@ class SvFrontendIntegrationTest
                 }
               })
 
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
+
               setExpirationDate("sv1", "07/11/2032 12:12 AM")
 
               clue("sv1 creates the vote request") {
-                click on "create-voterequest-submit-button"
+                clickVoteRequestSubmitButtonOnceEnabled()
               }
             },
           )(
@@ -945,10 +1028,14 @@ class SvFrontendIntegrationTest
                 }
               })
 
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
+
               setExpirationDate("sv1", "07/12/2034 12:12 AM")
 
               clue("sv1 creates the vote request") {
-                click on "create-voterequest-submit-button"
+                clickVoteRequestSubmitButtonOnceEnabled()
               }
             },
           )(
@@ -1000,7 +1087,7 @@ class SvFrontendIntegrationTest
 
               setExpirationDate("sv1", "07/11/2030 12:12 AM")
 
-              click on "create-voterequest-submit-button"
+              clickVoteRequestSubmitButtonOnceEnabled()
             },
           )(
             "sv1 can see the new vote request",
@@ -1042,9 +1129,13 @@ class SvFrontendIntegrationTest
                   .sendKeys(requestNewTransferConfigFeeValue)
               }
 
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
+
               setExpirationDate("sv1", "07/11/2030 12:12 AM")
 
-              click on "create-voterequest-submit-button"
+              clickVoteRequestSubmitButtonOnceEnabled()
             },
           )(
             "sv1 can see the alerting message preventing him to continue",
@@ -1092,7 +1183,7 @@ class SvFrontendIntegrationTest
               setExpirationDate("sv1", "07/11/2030 12:12 AM")
 
               clue("sv1 creates the vote request") {
-                click on "create-voterequest-submit-button"
+                clickVoteRequestSubmitButtonOnceEnabled()
               }
             },
           )(
@@ -1129,10 +1220,14 @@ class SvFrontendIntegrationTest
                 new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
               dropDownCoinConfigDate.selectByIndex(1)
 
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
+
               setExpirationDate("sv1", "07/11/2030 12:12 AM")
 
               clue("sv1 creates the vote request") {
-                click on "create-voterequest-submit-button"
+                clickVoteRequestSubmitButtonOnceEnabled()
               }
             },
           )(
@@ -1324,7 +1419,7 @@ class SvFrontendIntegrationTest
           val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
           val (_, requestIdAdd1) = actAndCheck(
             "sv1 creates the vote request",
-            click on "create-voterequest-submit-button",
+            clickVoteRequestSubmitButtonOnceEnabled(),
           )(
             "sv1 can see the new vote request",
             _ => {
@@ -1354,7 +1449,7 @@ class SvFrontendIntegrationTest
           val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
           val (_, requestIdAdd2) = actAndCheck(
             "sv2 creates the vote request",
-            click on "create-voterequest-submit-button",
+            clickVoteRequestSubmitButtonOnceEnabled(),
           )(
             "sv2 can see the new vote request",
             _ => {
@@ -1426,6 +1521,15 @@ class SvFrontendIntegrationTest
     tbodyInProgress
       .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
       .getOrElse(0)
+  }
+
+  def clickVoteRequestSubmitButtonOnceEnabled()(implicit webDriver: WebDriverType) = {
+    clue("wait for the submit button to become clickable") {
+      eventually()(find(id("create-voterequest-submit-button")).value.isEnabled shouldBe true)
+    }
+    clue("click the submit button") {
+      click on "create-voterequest-submit-button"
+    }
   }
 
   private def svCoinPriceShouldMatch(
