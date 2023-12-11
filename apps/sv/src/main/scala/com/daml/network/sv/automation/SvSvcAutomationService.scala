@@ -13,6 +13,7 @@ import com.daml.network.environment.{
   ParticipantAdminConnection,
   RetryProvider,
 }
+import com.daml.network.sv.automation.SvSvcAutomationService.LocalSequencerClientConfig
 import com.daml.network.sv.automation.confirmation.{
   ArchiveClosedMiningRoundsTrigger,
   CnsSubscriptionInitialPaymentTrigger,
@@ -29,8 +30,10 @@ import com.daml.network.sv.automation.singlesv.onboarding.{
 }
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
+import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.util.QualifiedName
+import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.{Clock, WallClock}
 import io.opentelemetry.api.trace.Tracer
@@ -47,6 +50,7 @@ class SvSvcAutomationService(
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
+    localSequencerClientConfig: Option[LocalSequencerClientConfig],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -208,9 +212,26 @@ class SvSvcAutomationService(
       )
     )
   }
+
+  localSequencerClientConfig.foreach { sequencerCfg =>
+    registerTrigger(
+      new LocalSequencerConnectionsTrigger(
+        triggerContext,
+        participantAdminConnection,
+        sequencerCfg.globalDomainAlias,
+        svcStore,
+        sequencerCfg.sequencerInternalConfig,
+      )
+    )
+  }
 }
 
 object SvSvcAutomationService {
+  case class LocalSequencerClientConfig(
+      sequencerInternalConfig: ClientConfig,
+      globalDomainAlias: DomainAlias,
+  )
+
   private[automation] def extraPackageIdResolver(template: QualifiedName): Option[String] =
     template.moduleName match {
       // SvcBootstrap is how we create CoinRules in the first place so we cannot infer the package id for that from CoinRules.

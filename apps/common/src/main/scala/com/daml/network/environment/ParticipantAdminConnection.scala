@@ -218,19 +218,26 @@ class ParticipantAdminConnection(
   def modifyDomainConnectionConfig(
       domain: DomainAlias,
       f: DomainConnectionConfig => Option[DomainConnectionConfig],
-  )(implicit traceContext: TraceContext): Future[Boolean] =
+  )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       oldConfig <- getDomainConnectionConfig(domain)
       newConfig = f(oldConfig)
-      isModified <- newConfig match {
+      _ <- newConfig match {
         case None =>
           logger.trace("No update to domain connection config required")
-          Future.successful(false)
+          Future.unit
         case Some(config) =>
           logger.info(s"Updating to new domain connection config for domain $domain")
-          setDomainConnectionConfig(config).map(_ => true)
+          for {
+            _ <- setDomainConnectionConfig(config)
+            _ = logger.info(
+              s"reconnect to the domain $domain for new sequencer configuration to take effect"
+            )
+            //
+            _ <- reconnectDomain(config.domain)
+          } yield ()
       }
-    } yield isModified
+    } yield ()
 
   def uploadDarFiles(
       pkgs: Seq[UploadablePackage],

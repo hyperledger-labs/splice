@@ -73,6 +73,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
       .withAllocatedUsers()
       .withTrafficTopupsEnabled
       .withResettedUnionspace()
+      .withZeroSequencerAvailabilityDelay
       .withManualStart
 
   "can replay unionspace definition on new domain" in { implicit env =>

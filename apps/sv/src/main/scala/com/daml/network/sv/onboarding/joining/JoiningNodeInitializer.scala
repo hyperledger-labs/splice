@@ -9,6 +9,7 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.*
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.admin.api.client.SvConnection
+import com.daml.network.sv.automation.SvSvcAutomationService.LocalSequencerClientConfig
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.{
   CometBftClient,
@@ -24,6 +25,7 @@ import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
@@ -164,6 +166,7 @@ class JoiningNodeInitializer(
                 svcStore,
                 ledgerClient,
                 cometBftNode,
+                localDomainNode.map(_.sequencerInternalConfig),
               )
             _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- retryProvider.ensureThatB(
@@ -518,9 +521,7 @@ class JoiningNodeInitializer(
     }
 
     // TODO(#5364): inline these methods where they are used only once, or move them up.
-    private def newSvSvcAutomationService(
-        svcStore: SvSvcStore
-    ) =
+    private def newSvSvcAutomationService(svcStore: SvSvcStore) =
       new SvSvcAutomationService(
         clock,
         config,
@@ -530,6 +531,12 @@ class JoiningNodeInitializer(
         participantAdminConnection,
         retryProvider,
         cometBftNode,
+        localDomainNode.map(cfg =>
+          LocalSequencerClientConfig(
+            cfg.sequencerInternalConfig,
+            config.domains.global.alias,
+          )
+        ),
         loggerFactory,
       )
   }
@@ -575,6 +582,7 @@ class JoiningNodeInitializer(
       svcStore: SvSvcStore,
       ledgerClient: CNLedgerClient,
       cometBftNode: Option[CometBftNode],
+      sequencerInternalConfig: Option[ClientConfig],
   ) =
     new SvSvcAutomationService(
       clock,
@@ -585,6 +593,12 @@ class JoiningNodeInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
+      sequencerInternalConfig.map(sequencerInternalConfig =>
+        LocalSequencerClientConfig(
+          sequencerInternalConfig,
+          config.domains.global.alias,
+        )
+      ),
       loggerFactory,
     )
 

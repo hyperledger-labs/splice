@@ -50,15 +50,10 @@ class ReconcileSequencerConnectionsTrigger(
               logger,
               domainTime,
             )
-            isModified <- participantAdminConnection.modifyDomainConnectionConfig(
+            _ <- participantAdminConnection.modifyDomainConnectionConfig(
               globalDomainAlias, // TODO (#8450) how?
               modifySequencerConnections(sequencerConnections),
             )
-            _ <-
-              if (isModified) {
-                // reconnect to the domain for new sequencer configuration to take effect
-                participantAdminConnection.reconnectDomain(globalDomainAlias) // TODO (#8450) how?
-              } else Future.unit
           } yield ()
         case None =>
           logger.debug("time tracker from the domain is not yet available, skipping")

@@ -634,6 +634,7 @@ class FoundingNodeInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
+      None,
       loggerFactory,
     )
 

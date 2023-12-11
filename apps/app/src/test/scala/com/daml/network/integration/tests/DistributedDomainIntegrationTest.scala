@@ -26,6 +26,7 @@ class DistributedDomainIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
+      .withZeroSequencerAvailabilityDelay
       .withManualStart
 
   private val globalDomain = DomainAlias.tryCreate("global")
@@ -40,74 +41,64 @@ class DistributedDomainIntegrationTest
     }
 
     clue("SV participants are connected to their own sequencers") {
-      inside(
-        sv1Backend.participantClient.domains
-          .config(globalDomain)
-          .value
-          .sequencerConnections
-          .connections
-          .forgetNE
-      ) { case Seq(GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _)) =>
-        defaultSequencerEndpoint shouldBe NonEmpty
-          .mk(Seq, Endpoint("localhost", Port.tryCreate(5008)))
-          .toVector
-      }
-      inside(
-        sv2Backend.participantClient.domains
-          .config(globalDomain)
-          .value
-          .sequencerConnections
-          .connections
-          .forgetNE
-      ) {
-        case Seq(
-              GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _),
-              GrpcSequencerConnection(localSequencerEndpoint, _, _, _),
-            ) =>
+      eventually() {
+        inside(
+          sv1Backend.participantClient.domains
+            .config(globalDomain)
+            .value
+            .sequencerConnections
+            .connections
+            .forgetNE
+        ) { case Seq(GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _)) =>
           defaultSequencerEndpoint shouldBe NonEmpty
             .mk(Seq, Endpoint("localhost", Port.tryCreate(5008)))
             .toVector
-          localSequencerEndpoint shouldBe NonEmpty
-            .mk(Seq, Endpoint("localhost", Port.tryCreate(5608)))
-            .toVector
-      }
-      inside(
-        sv3Backend.participantClient.domains
-          .config(globalDomain)
-          .value
-          .sequencerConnections
-          .connections
-          .forgetNE
-      ) {
-        case Seq(
-              GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _),
-              GrpcSequencerConnection(localSequencerEndpoint, _, _, _),
-            ) =>
-          defaultSequencerEndpoint shouldBe NonEmpty
-            .mk(Seq, Endpoint("localhost", Port.tryCreate(5008)))
-            .toVector
-          localSequencerEndpoint shouldBe NonEmpty
-            .mk(Seq, Endpoint("localhost", Port.tryCreate(5708)))
-            .toVector
-      }
-      inside(
-        sv4Backend.participantClient.domains
-          .config(globalDomain)
-          .value
-          .sequencerConnections
-          .connections
-          .forgetNE
-      ) {
-        case Seq(
-              GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _),
-              GrpcSequencerConnection(localSequencerEndpoint, _, _, _),
-            ) =>
-          defaultSequencerEndpoint shouldBe NonEmpty
-            .mk(Seq, Endpoint("localhost", Port.tryCreate(5008)))
-            .toVector
-          localSequencerEndpoint shouldBe NonEmpty
-            .mk(Seq, Endpoint("localhost", Port.tryCreate(5808)))
-            .toVector
+        }
+        inside(
+          sv2Backend.participantClient.domains
+            .config(globalDomain)
+            .value
+            .sequencerConnections
+            .connections
+            .forgetNE
+        ) {
+          case Seq(
+                GrpcSequencerConnection(localSequencerEndpoint, _, _, _)
+              ) =>
+            localSequencerEndpoint shouldBe NonEmpty
+              .mk(Seq, Endpoint("localhost", Port.tryCreate(5608)))
+              .toVector
+        }
+        inside(
+          sv3Backend.participantClient.domains
+            .config(globalDomain)
+            .value
+            .sequencerConnections
+            .connections
+            .forgetNE
+        ) {
+          case Seq(
+                GrpcSequencerConnection(localSequencerEndpoint, _, _, _)
+              ) =>
+            localSequencerEndpoint shouldBe NonEmpty
+              .mk(Seq, Endpoint("localhost", Port.tryCreate(5708)))
+              .toVector
+        }
+        inside(
+          sv4Backend.participantClient.domains
+            .config(globalDomain)
+            .value
+            .sequencerConnections
+            .connections
+            .forgetNE
+        ) {
+          case Seq(
+                GrpcSequencerConnection(localSequencerEndpoint, _, _, _)
+              ) =>
+            localSequencerEndpoint shouldBe NonEmpty
+              .mk(Seq, Endpoint("localhost", Port.tryCreate(5808)))
+              .toVector
+        }
       }
     }
 

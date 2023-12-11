@@ -7,14 +7,12 @@ import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.Endpoint
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.protocol.StaticDomainParameters
-import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
+import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
   NamespaceDelegationX,
@@ -316,46 +314,10 @@ final class LocalDomainNode(
         logger,
       )
       _ = logger.info(
-        "Sequencer initialized, changing participant connection to point to new sequencer"
+        "Sequencer is initialized"
       )
-      _ <- participantAdminConnection.modifyDomainConnectionConfig(
-        domainAlias,
-        addLocalSequencerConnection(sequencerInternalConfig),
-      )
-      _ = logger.info("Participant is now connected to new sequencer")
     } yield ()
   }
-
-  private def addLocalSequencerConnection(
-      sequencerConfig: ClientConfig
-  )(implicit traceContext: TraceContext): DomainConnectionConfig => Option[DomainConnectionConfig] =
-    conf =>
-      conf.sequencerConnections.default match {
-        case defaultConnection: GrpcSequencerConnection =>
-          val localEndpoint = LocalDomainNode.toEndpoint(sequencerConfig)
-          val localSequencerConnection =
-            new GrpcSequencerConnection(
-              NonEmpty.mk(Seq, localEndpoint),
-              transportSecurity = sequencerConfig.tls.isDefined,
-              customTrustCertificates = None,
-              SequencerAlias.Local,
-            )
-          val newConnections = SequencerConnections.tryMany(
-            Seq(defaultConnection, localSequencerConnection),
-            PositiveInt.tryCreate(1),
-          )
-          if (conf.sequencerConnections == newConnections) {
-            logger.info("Sequencers already set.")
-            None
-          } else {
-            Some(
-              conf.copy(
-                sequencerConnections = newConnections
-              )
-            )
-          }
-        case _ => None
-      }
 
   override protected def onClosed(): Unit = {
     Lifecycle.close(sequencerAdminConnection, mediatorAdminConnection)(logger)
@@ -364,9 +326,10 @@ final class LocalDomainNode(
 }
 
 object LocalDomainNode {
+  def toEndpoint(config: ClientConfig): Endpoint = Endpoint(config.address, config.port)
+
   // TODO(#5107) Consider using something other than a ClientConfig in the config file
   // to simplify conversion to GrpcSequencerConnection.
   private def toEndpoints(config: ClientConfig): NonEmpty[Seq[Endpoint]] =
     NonEmpty.mk(Seq, toEndpoint(config))
-  private def toEndpoint(config: ClientConfig): Endpoint = Endpoint(config.address, config.port)
 }

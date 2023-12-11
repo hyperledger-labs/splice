@@ -265,6 +265,19 @@ case class CNNodeEnvironmentDefinition(
   def withCoinPrice(price: BigDecimal): CNNodeEnvironmentDefinition =
     addConfigTransforms((_, conf) => CNNodeConfigTransforms.setCoinPrice(price)(conf))
 
+  def withZeroSequencerAvailabilityDelay: CNNodeEnvironmentDefinition =
+    addConfigTransform((_, config) =>
+      CNNodeConfigTransforms.updateAllSvAppConfigs_(
+        _.focus(_.localDomainNode)
+          .modify(
+            _.map(d =>
+              d.focus(_.sequencer.sequencerAvailabilityDelay)
+                .replace(NonNegativeFiniteDuration.Zero)
+            )
+          )
+      )(config)
+    )
+
   def clearConfigTransforms(): CNNodeEnvironmentDefinition =
     copy(configTransformsWithContext = _ => Seq())
 
