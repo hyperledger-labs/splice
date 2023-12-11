@@ -393,7 +393,7 @@ workflows:
         context:
           - artifactory
           - datadog
-          - slack-context:wq
+          - slack-context
         cluster: "cidaily-testnet"
         use_published_artifacts: true
         requires:
