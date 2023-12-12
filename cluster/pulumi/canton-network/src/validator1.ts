@@ -21,7 +21,6 @@ export async function installValidator1(
   svc: pulumi.Resource,
   name: string,
   onboardingSecret: string,
-  isDevNet: boolean,
   validatorWalletUser: string,
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
@@ -50,7 +49,6 @@ export async function installValidator1(
     auth0UserNameEnvVarSource('validator'),
     // We disable auto-init if we have a dump to bootstrap from.
     !!participantBootstrapDump,
-    isDevNet,
     [loopback]
   );
 

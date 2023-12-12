@@ -21,13 +21,11 @@ import {
   validatorOnboardingSecretName,
   installValidatorOnboardingSecret,
   PersistenceConfig,
-  isDevNet,
 } from 'cn-pulumi-common';
 import type { Auth0Client, CnInput, SvIdKey } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
-import { installCometBftNode } from './cometbft';
 import { installGlobalDomain, installParticipant } from './ledger';
 import { installValidatorApp } from './validator';
 
@@ -85,7 +83,6 @@ export type SvConfig = {
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
   auth0ValidatorAppName: string;
-  sequencerDriver: 'cometbft' | 'postgres';
 };
 
 async function getAcsBootstrappingDump(xns: ExactNamespace, config: BootstrappingDumpConfig) {
@@ -151,30 +148,12 @@ export async function installSvNode(
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
-  const cometBftRpcService = installCometBftNode(
-    xns,
-    config.nodename,
-    config.onboardingName,
-    cometBftSyncSource
-  );
 
-  const sequencerDatabase =
-    config.onboarding.type === 'join-with-key' ? config.onboarding.sequencerDatabase : postgresDb;
-
-  const domain = installGlobalDomain(
-    xns,
-    'global-domain',
-    postgresDb,
-    config.sequencerDriver === 'cometbft'
-      ? {
-          driver: 'cometbft',
-          service: cometBftRpcService,
-        }
-      : {
-          driver: 'postgres',
-          postgres: sequencerDatabase,
-        }
-  );
+  const domain = installGlobalDomain(xns, 'global-domain', postgresDb, {
+    name: config.nodename,
+    onboardingName: config.onboardingName,
+    syncSource: cometBftSyncSource,
+  });
 
   const participant = installParticipant(
     xns,
@@ -182,8 +161,7 @@ export async function installSvNode(
     postgresDb,
     auth0UserNameEnvVarSource('sv'),
     // If we have a dump, we disable auto init.
-    !!config.bootstrappingDumpConfig,
-    isDevNet
+    !!config.bootstrappingDumpConfig
   );
 
   const svAppName = config.nodename.replace('-', '_');
@@ -242,7 +220,7 @@ export async function installSvNode(
     config.nodename + '-sv-app',
     'cn-sv-node',
     svValues,
-    dependsOn.concat([participant, cometBftRpcService, postgresDb, svDb, domain])
+    dependsOn.concat([participant, postgresDb, svDb, domain])
   );
 
   const scanDbName = `scan_${svAppName}`;

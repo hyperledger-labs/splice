@@ -19,7 +19,6 @@ export async function installSplitwell(
   svc: pulumi.Resource,
   providerWalletUser: string,
   onboardingSecret: string,
-  isDevNet: boolean,
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
   topupConfig?: ValidatorTopupConfig
@@ -49,7 +48,6 @@ export async function installSplitwell(
     auth0UserNameEnvVarSource('validator'),
     // We disable auto-init if we have a dump to bootstrap from.
     !!participantBootstrapDump,
-    isDevNet,
     [domain, loopback]
   );
 

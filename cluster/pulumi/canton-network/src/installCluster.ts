@@ -172,7 +172,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     bootstrappingDumpConfig,
     topupConfig,
     auth0ValidatorAppName: 'sv1_validator',
-    sequencerDriver: 'cometbft',
   });
 
   if (!singleSv) {
@@ -190,7 +189,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         auth0ValidatorAppName: 'sv2_validator',
         bootstrappingDumpConfig,
         topupConfig,
-        sequencerDriver: 'cometbft',
       },
       sv1
     );
@@ -208,7 +206,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         auth0ValidatorAppName: 'sv3_validator',
         bootstrappingDumpConfig,
         topupConfig,
-        sequencerDriver: 'cometbft',
       },
       sv1
     );
@@ -226,7 +223,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         auth0ValidatorAppName: 'sv4_validator',
         bootstrappingDumpConfig,
         topupConfig,
-        sequencerDriver: 'cometbft',
       },
       sv1
     );
@@ -237,7 +233,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     sv1,
     'validator1',
     validator1Onboarding.secret,
-    isDevNet,
     'auth0|63e3d75ff4114d87a2c1e4f5',
     backupConfig,
     bootstrappingDumpConfig,
@@ -249,7 +244,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     sv1,
     'auth0|63e12e0415ad881ffe914e61',
     splitwellOnboarding.secret,
-    isDevNet,
     backupConfig,
     bootstrappingDumpConfig,
     topupConfig

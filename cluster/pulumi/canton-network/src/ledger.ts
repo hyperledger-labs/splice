@@ -1,9 +1,10 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { Service } from '@pulumi/kubernetes/core/v1';
+import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 
 import { jmxOptions } from '../../common/src/jmx';
+import { installCometBftNode } from './cometbft';
 import { Postgres } from './postgres';
 
 export function installDomain(
@@ -37,7 +38,11 @@ export function installGlobalDomain(
   xns: ExactNamespace,
   name: string,
   postgres: Postgres,
-  sequencer: PostgresSequencer | CometBftSequencer
+  cometbft: {
+    name: string;
+    onboardingName: string;
+    syncSource?: Release;
+  }
 ): pulumi.Resource {
   const sanitizedName = name.replace('-', '_');
 
@@ -46,6 +51,12 @@ export function installGlobalDomain(
 
   const sequencerDbName = `${sanitizedName}_sequencer`;
   const sequencerDb = postgres.createDatabase(sequencerDbName);
+  const cometBftService = installCometBftNode(
+    xns,
+    cometbft.name,
+    cometbft.onboardingName,
+    cometbft.syncSource
+  );
 
   return installCNHelmChart(
     xns,
@@ -55,23 +66,17 @@ export function installGlobalDomain(
       postgres: postgres.address,
       postgresMediatorDb: mediatorDbName,
       postgresSequencerDb: sequencerDbName,
-      sequencerDriver:
-        sequencer.driver === 'cometbft'
-          ? {
-              type: sequencer.driver,
-              host: pulumi.interpolate`${sequencer.service.metadata.name}.${sequencer.service.metadata.namespace}.svc.cluster.local`,
-              port: 26657,
-            }
-          : {
-              type: sequencer.driver,
-              address: sequencer.postgres.address,
-            },
+      sequencerDriver: {
+        type: 'cometbft',
+        host: pulumi.interpolate`${cometBftService.metadata.name}.${cometBftService.metadata.namespace}.svc.cluster.local`,
+        port: 26657,
+      },
       metrics: {
         enable: true,
       },
       additionalJvmOptions: jmxOptions(),
     },
-    [mediatorDb, sequencerDb]
+    [mediatorDb, sequencerDb, cometBftService]
   );
 }
 
@@ -81,7 +86,6 @@ export function installParticipant(
   postgres: Postgres,
   participantAdminUserNameFrom: k8s.types.input.core.v1.EnvVarSource,
   disableAutoInit = false,
-  isDevNet: boolean,
   dependsOn: pulumi.Resource[] = []
 ): pulumi.Resource {
   const postgresDbName = 'participant';
@@ -106,13 +110,3 @@ export function installParticipant(
     dependsOn.concat([postgresDb])
   );
 }
-
-type PostgresSequencer = {
-  driver: 'postgres';
-  postgres: Postgres;
-};
-
-type CometBftSequencer = {
-  driver: 'cometbft';
-  service: Service;
-};
