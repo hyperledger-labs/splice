@@ -18,7 +18,6 @@ import com.daml.network.sv.config.InitialCnsConfig
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.util.FutureInstances.*
 import cats.syntax.parallel.*
-import com.daml.network.codegen.java.cn.cns.CnsEntry
 import com.daml.network.sv.automation.leaderbased.ExpiredCnsEntryTrigger
 import com.daml.network.wallet.automation.SubscriptionReadyForPaymentTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -120,7 +119,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
           sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
             .submitJava(
               actAs = Seq(svcParty),
-              commands = new CnsEntry(
+              commands = new codegen.CnsEntry(
                 svcParty.toProtoPrimitive,
                 svcParty.toProtoPrimitive,
                 testEntryName,

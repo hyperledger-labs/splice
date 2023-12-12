@@ -1,6 +1,18 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.coinrules.AppTransferContext
+import com.daml.network.codegen.java.cn.cns.{
+  CnsEntryContext,
+  CnsEntryContext_CollectInitialEntryPayment,
+}
+import com.daml.network.codegen.java.cn.svcrules.Confirmation
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CnsEntryContext
+import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment
+import com.daml.network.codegen.java.cn.wallet.subscriptions.{
+  SubscriptionInitialPayment,
+  SubscriptionRequest,
+}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
@@ -8,13 +20,23 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.sv.automation.confirmation.CnsSubscriptionInitialPaymentTrigger
 import com.daml.network.sv.automation.leaderbased.CnsSubscriptionRenewalPaymentTrigger
-import com.daml.network.util.{SplitwellTestUtil, TimeTestUtil, TriggerTestUtil, WalletTestUtil}
+import com.daml.network.util.{
+  Contract,
+  SplitwellTestUtil,
+  TimeTestUtil,
+  TriggerTestUtil,
+  WalletTestUtil,
+}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
+import org.slf4j.event.Level
 
 import java.time.Duration
 import java.util.UUID
+import scala.jdk.CollectionConverters.*
 
 class WalletTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
@@ -206,6 +228,110 @@ class WalletTimeBasedIntegrationTest
           )
         }
       }
+    }
+
+    "reject cns initial subscription payment due to expired round even if confirmed acceptance exists previously" in {
+      implicit env =>
+        def cnsSubscriptionInitialPaymentTrigger =
+          sv1Backend.svcAutomation.trigger[CnsSubscriptionInitialPaymentTrigger]
+
+        onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        clue("Alice gets some coins") {
+          aliceWalletClient.tap(50)
+        }
+        val entryName = "alice"
+        val (_, requestId) = actAndCheck(
+          "Request CNS entry", {
+            aliceDirectoryExternalClient
+              .createDirectoryEntry(perTestCaseName(entryName), testEntryUrl, testEntryDescription)
+          },
+        )(
+          "the corresponding subscription request is created",
+          { _ =>
+            inside(aliceWalletClient.listSubscriptionRequests()) { case Seq(r) =>
+              r.contractId
+            }
+          },
+        )
+
+        // pause cnsSubscriptionInitialPaymentTrigger so payment is not accepted
+        cnsSubscriptionInitialPaymentTrigger.pause().futureValue
+
+        val (_, initialPayment) = actAndCheck(
+          "Accept subscription request", {
+            aliceWalletClient.acceptSubscriptionRequest(requestId)
+          },
+        )(
+          "SubscriptionInitialPayment is created",
+          _ => {
+            aliceWalletClient.listSubscriptions() shouldBe empty
+            inside(aliceWalletClient.listSubscriptionInitialPayments()) {
+              case Seq(initialPayment) => initialPayment
+            }
+          },
+        )
+
+        val roundCid = sv1ScanBackend
+          .getOpenAndIssuingMiningRounds()
+          ._1
+          .find(_.payload.round == initialPayment.payload.round)
+          .value
+          .contractId
+
+        actAndCheck(
+          "Advance rounds to make the round specified in SubscriptionInitialPayment closed", {
+            (1 to 3).foreach(_ => advanceRoundsByOneTick)
+          },
+        )(
+          s"The round $roundCid is closed",
+          _ => {
+            val openRounds = sv1Backend.listOpenMiningRounds().map(_.payload.round).toSet
+            openRounds should not contain initialPayment.payload.round
+          },
+        )
+
+        val now = aliceValidatorBackend.participantClient.ledger_api.time.get()
+        val transferContext = sv1ScanBackend.getUnfeaturedAppTransferContext(now)
+        val transferContextWithClosedRound = new AppTransferContext(
+          transferContext.coinRules,
+          roundCid,
+          transferContext.featuredAppRight,
+        )
+        actAndCheck(
+          "Create a confirmation of accepting the cns initial payment with a closed round.", {
+            createCnsAcceptInitialPaymentConfirmation(
+              initialPayment,
+              transferContextWithClosedRound,
+            )
+          },
+        )(
+          "The confirmation is created",
+          _ => {
+            lookupCnsAcceptInitialPaymentConfirmation(
+              lookupCnsContextCid(initialPayment.payload.reference).value
+            )
+          },
+        )
+
+        loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
+          {
+            actAndCheck(
+              "Resume cnsSubscriptionInitialPaymentTrigger to check if it should accept payment", {
+                cnsSubscriptionInitialPaymentTrigger.resume()
+              },
+            )(
+              "The payment is rejected due to the round for collecting payment is no longer active",
+              _ => {
+                aliceWalletClient.listSubscriptionInitialPayments() shouldBe empty
+              },
+            )
+          },
+          lines => {
+            forExactly(1, lines) { line =>
+              line.message should include regex (s"confirmed to reject payment.+Round\\(.+\\) is no longer active")
+            }
+          },
+        )
     }
 
     "auto-expire payment requests" in { implicit env =>
@@ -630,6 +756,64 @@ class WalletTimeBasedIntegrationTest
           .featured shouldBe true
       })
     }
+  }
 
+  private def lookupCnsContextCid(
+      subscriptionRequestCid: SubscriptionRequest.ContractId
+  )(implicit env: CNNodeTestConsoleEnvironment): Option[CnsEntryContext.ContractId] =
+    aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+      .filterJava(CnsEntryContext.COMPANION)(svcParty)
+      .find(_.data.reference == subscriptionRequestCid)
+      .map(_.id)
+
+  private def lookupCnsAcceptInitialPaymentConfirmation(
+      cnsContextCid: CnsEntryContext.ContractId
+  )(implicit env: CNNodeTestConsoleEnvironment): Option[Confirmation.ContractId] = {
+    val svParty = sv1Backend.getSvcInfo().svParty
+    sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+      .filterJava(Confirmation.COMPANION)(svcParty)
+      .find(confirmation =>
+        confirmation.data.action match {
+          case cnsContextAction: ARC_CnsEntryContext =>
+            cnsContextAction.cnsEntryContextCid == cnsContextCid && confirmation.data.confirmer == svParty.toProtoPrimitive
+          case _ => false
+        }
+      )
+      .map(_.id)
+  }
+
+  private def createCnsAcceptInitialPaymentConfirmation(
+      initialPayment: Contract[SubscriptionInitialPayment.ContractId, SubscriptionInitialPayment],
+      transferContext: AppTransferContext,
+  )(implicit
+      env: CNNodeTestConsoleEnvironment
+  ) = {
+    val svParty = sv1Backend.getSvcInfo().svParty
+    val cnsRules = sv1ScanBackend.getCnsRules()
+    sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+      actAs = Seq(svParty),
+      readAs = Seq(svcParty),
+      optTimeout = None,
+      commands = sv1Backend
+        .getSvcInfo()
+        .svcRules
+        .contractId
+        .exerciseSvcRules_ConfirmAction(
+          svParty.toProtoPrimitive,
+          new ARC_CnsEntryContext(
+            lookupCnsContextCid(initialPayment.payload.reference).value,
+            new CNSRARC_CollectInitialEntryPayment(
+              new CnsEntryContext_CollectInitialEntryPayment(
+                initialPayment.contractId,
+                transferContext,
+                cnsRules.contractId,
+              )
+            ),
+          ),
+        )
+        .commands
+        .asScala
+        .toSeq,
+    )
   }
 }

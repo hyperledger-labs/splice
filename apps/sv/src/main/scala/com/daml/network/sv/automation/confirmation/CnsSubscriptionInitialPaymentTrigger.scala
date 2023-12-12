@@ -249,7 +249,7 @@ class CnsSubscriptionInitialPaymentTrigger(
       cnsContextCId,
     )
 
-    // look up the rejection confirmation for this payment created by this.
+    // look up the rejection confirmation for this payment
     queryResult <- svcStore.lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(
       svParty,
       paymentCid,
