@@ -51,8 +51,9 @@ A security-sensitive error has been received.*TransactionProcessingSteps:partici
 # TODO(#5706): investigate and remove once fixed
 MEDIATOR_INVALID_MESSAGE.*Received a mediator response.*with an unknown request id.*Discarding response
 
-# TODO(#8596) Might be expected and benign, but let's investigate to be sure
+# TODO(#8596): These two might be expected and benign, but let's investigate to be sure
 MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Superfluous root hash message
+MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a mediator response.*with an invalid root hash.*
 
 # TODO(#6106): Remove this when we can
 Failed to handle Mediator events
