@@ -704,34 +704,38 @@ class SvFrontendIntegrationTest
             },
           )
 
-          def setConfigRequest(expiresInNextMinute: Boolean) = actAndCheck(
+          def setConfigRequest(expiresInNextMinutes: Boolean) = actAndCheck(
             "sv1 operator can create a new vote request", {
-              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-              dropDownAction.selectByValue("SRARC_SetConfig")
+              // The `eventually` guards against `StaleElementReferenceException`s
+              eventually() {
+                val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+                dropDownAction.selectByValue("SRARC_SetConfig")
 
-              inside(find(id("numUnclaimedRewardsThreshold-value"))) { case Some(element) =>
-                element.underlying.sendKeys(requestNewNumUnclaimedRewardsThreshold)
-              }
-              inside(find(id("create-reason-url"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonUrl)
-              }
-              inside(find(id("create-reason-summary"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonBody)
-              }
+                inside(find(id("numUnclaimedRewardsThreshold-value"))) { case Some(element) =>
+                  element.underlying.sendKeys(requestNewNumUnclaimedRewardsThreshold)
+                }
+                inside(find(id("create-reason-url"))) { case Some(element) =>
+                  element.underlying.sendKeys(requestReasonUrl)
+                }
+                inside(find(id("create-reason-summary"))) { case Some(element) =>
+                  element.underlying.sendKeys(requestReasonBody)
+                }
 
-              // TODO(#8767): remove this screenshot
-              screenshot()
-              if (expiresInNextMinute) {
-                setExpirationDate(
-                  "sv1",
-                  DateTimeFormatter
-                    .ofPattern("dd/MM/yyyy HH:mm a")
-                    .format(
-                      LocalDateTime
-                        .ofInstant(CantonTimestamp.now().toInstant, ZoneOffset.UTC)
-                        .plusMinutes(1)
-                    ),
-                )
+                // TODO(#8767): remove this screenshot
+                screenshot()
+                if (expiresInNextMinutes) {
+                  setExpirationDate(
+                    "sv1",
+                    DateTimeFormatter
+                      .ofPattern("dd/MM/yyyy HH:mm a")
+                      .format(
+                        // TODO(#8767): consider reducing to 1 minute again after we remove the screenshot call
+                        LocalDateTime
+                          .ofInstant(CantonTimestamp.now().toInstant, ZoneOffset.UTC)
+                          .plusMinutes(2)
+                      ),
+                  )
+                }
               }
 
               // TODO(#8767): remove this screenshot
@@ -743,7 +747,7 @@ class SvFrontendIntegrationTest
             _ => {
               click on "tab-panel-in-progress"
 
-              if (!expiresInNextMinute) {
+              if (!expiresInNextMinutes) {
                 val tbody = find(id("sv-voting-in-progress-table-body"))
                 inside(tbody) { case Some(tb) =>
                   val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
@@ -762,8 +766,8 @@ class SvFrontendIntegrationTest
             },
           )
 
-          setConfigRequest(expiresInNextMinute = true)
-          val (_, requestId) = setConfigRequest(expiresInNextMinute = false)
+          setConfigRequest(expiresInNextMinutes = true)
+          val (_, requestId) = setConfigRequest(expiresInNextMinutes = false)
 
           vote(sv2Backend, requestId, false, "1", false)
           vote(sv3Backend, requestId, false, "1", false)
@@ -776,8 +780,9 @@ class SvFrontendIntegrationTest
             rows.size shouldBe previousVoteRequestsInProgress
           }
 
-          clue("the vote request is rejected") {
-            eventually(65.seconds) {
+          clue("the vote requests get rejected (one by vote, one by expiry)") {
+            // TODO(#8835): Consider pausing and resuming the expiry trigger instead of having to idle wait for safety
+            eventually(125.seconds) {
               click on "tab-panel-rejected"
               val tbody = find(id("sv-vote-results-rejected-table-body"))
               val tb = tbody.value
@@ -854,6 +859,7 @@ class SvFrontendIntegrationTest
               inside(find(id("vote-request-modal-reason-body"))) { case Some(tb) =>
                 tb.text shouldBe proposalSummary
               }
+              click on "vote-request-modal-close-button"
             },
           )
         }
@@ -945,7 +951,6 @@ class SvFrontendIntegrationTest
                   tb.text
                 }
               requestId
-
             },
           )
 
@@ -1108,7 +1113,6 @@ class SvFrontendIntegrationTest
                   tb.text
                 }
               requestId
-
             },
           )
 
@@ -1205,7 +1209,6 @@ class SvFrontendIntegrationTest
                   tb.text
                 }
               requestId
-
             },
           )
 

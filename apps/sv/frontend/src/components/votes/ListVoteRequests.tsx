@@ -280,8 +280,8 @@ const ListVoteRequests: React.FC = () => {
       <Modal
         open={isVoteRequestModalOpen}
         onClose={handleClose}
-        aria-labelledby="voterequest-modal-title"
-        aria-describedby="voterequest-modal-description"
+        aria-labelledby="vote-request-modal-title"
+        aria-describedby="vote-request-modal-description"
       >
         <Box sx={{ flex: 1, overflowY: 'scroll', maxHeight: '100%' }}>
           <ClickAwayListener onClickAway={handleClose}>
@@ -290,7 +290,7 @@ const ListVoteRequests: React.FC = () => {
                 <CardHeader
                   title="Vote Request"
                   action={
-                    <IconButton onClick={handleClose}>
+                    <IconButton id="vote-request-modal-close-button" onClick={handleClose}>
                       <CloseIcon />
                     </IconButton>
                   }
@@ -308,8 +308,8 @@ const ListVoteRequests: React.FC = () => {
       <Modal
         open={isVoteResultModalOpen}
         onClose={handleClose}
-        aria-labelledby="voteresult-modal-title"
-        aria-describedby="voteresult-modal-description"
+        aria-labelledby="vote-result-modal-title"
+        aria-describedby="vote-result-modal-description"
       >
         <Box sx={{ flex: 1, overflowY: 'scroll', maxHeight: '100%' }}>
           <ClickAwayListener onClickAway={handleClose}>
@@ -318,7 +318,7 @@ const ListVoteRequests: React.FC = () => {
                 <CardHeader
                   title="Vote Result"
                   action={
-                    <IconButton onClick={handleClose}>
+                    <IconButton id="vote-result-modal-close-button" onClick={handleClose}>
                       <CloseIcon />
                     </IconButton>
                   }
