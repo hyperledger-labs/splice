@@ -45,10 +45,20 @@ class CNThresholdsTest extends AnyWordSpecLike with BaseTest {
           mappingSpecificSize,
         ) shouldBe PositiveInt
           .tryCreate(threshold)
-        CNThresholds.partyToParticipantThresholdWithNewMember(
-          svcSize,
-          mappingSpecificSize,
-        ) shouldBe PositiveInt
+      }
+      forAll(
+        Table(
+          ("mapping specific size", "threshold"),
+          (1, 1),
+          (2, 1),
+          (3, 1),
+          (4, 2),
+          (5, 2),
+          (6, 2),
+          (7, 3),
+        )
+      ) { (mappingSpecificSize: Int, threshold: Int) =>
+        CNThresholds.partyToParticipantThreshold(mappingSpecificSize) shouldBe PositiveInt
           .tryCreate(threshold)
       }
     }

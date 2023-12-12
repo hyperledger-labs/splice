@@ -47,14 +47,12 @@ class SvcPartyMigration(
     logger.info(s"Sponsor SV authorizing SVC party to participant $participantId")
     for {
       svcRules <- EitherT.liftF(svcStore.getSvcRules())
-      svcMembersSize = svcRules.payload.members.size()
       ourParticipant <- EitherT.liftF(participantAdminConnection.getParticipantId())
       // this will wait until the PartyToParticipant state change completed
       authorizedAt <- partyHosting
         .authorizeSvcPartyToParticipant(
           svcRules.domain,
           participantId,
-          svcMembersSize,
           ourParticipant.uid.namespace.fingerprint,
         )
       _ = logger.info(

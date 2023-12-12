@@ -293,8 +293,12 @@ testSvOnboardingConfirmedExpiry = do
   passTime (hours 25)
 
   -- leader expires the confirmation
-  leaderSubmits app $ \cid -> exerciseCmd cid $
-    SvcRules_ExpireSvOnboardingConfirmed svOnboardingConfirmedCid
+  _ <- leaderSubmits app $ \cid -> exerciseCmd cid $
+    SvcRules_ExpireSvOnboardingConfirmed with
+        cid = svOnboardingConfirmedCid
+
+  [(_, svcRules)] <- query @SvcRules svc
+  Map.keys (svcRules.offboardedMembers) === [svX]
 
 
 testSvNameUniquenessNotInDevNet : Script ()

@@ -49,11 +49,10 @@ class JoiningNodeSvcPartyHosting(
                 svcInfo <- svConnection.getSvcInfo()
                 svcMembersSize = svcInfo.svcRules.payload.members.size()
                 partyToParticipantProposal <- participantAdminConnection
-                  .ensurePartyToParticipantProposal(
+                  .ensurePartyToParticipantAdditionProposal(
                     domainId,
                     svcParty,
                     participantId,
-                    svcMembersSize,
                     svParty.uid.namespace.fingerprint,
                   )
                 _ = logger.info("Disconnecting from all domains")

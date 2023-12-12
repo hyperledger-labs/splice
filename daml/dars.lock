@@ -7,8 +7,8 @@ daml/cn-util/.daml/dist/cn-util-0.1.0.dar 903fbe0f851785a01d6afee8cca98b955745a2
 daml/splitwell-upgrade/.daml/dist/splitwell-0.2.0.dar 3b9b638d1d0c5d72b7e40860f0694b0820bf222951cd1963027131ec266ede71
 daml/splitwell/.daml/dist/splitwell-0.1.0.dar f4cff781a98736129cbdee701587e4165f2579b0012bd822af1157d6d17e021a
 daml/sv-local/.daml/dist/sv-local-0.1.0.dar 97b5a7615e5737a85d6ecb7bf5458a9523c84d22bae29eaa227e646ebc7e04a2
-daml/svc-governance-upgrade/.daml/dist/svc-governance-0.2.0.dar 6b2a54cbd5223b794fa9b9841245a4cf9a7d702a003aef08527bdc8a966e0d47
-daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar 54156f1583ca031883e80bf0aae5538ad728dfd603f7450d07f711311223b8a5
+daml/svc-governance-upgrade/.daml/dist/svc-governance-0.2.0.dar 1a2e5fdff45e4a21eca1b910461d9fb46d1d89fcbd683049cf6a80f63aa5027d
+daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar f05bfa2132b3a9548f96ba46c0a24f4ab14d96564abae96fd41c4496eec3a1b2
 daml/validator-lifecycle/.daml/dist/validator-lifecycle-0.1.0.dar 582fef12caa94d4140cfbbc34d4d95fe33fdbdabba8a18354f3b42213ecb0f6c
 daml/wallet-payments-upgrade/.daml/dist/wallet-payments-0.2.0.dar c0a822cede753894f2b8d9f21741ca68ef423c2553bd4701ffc67b890a5ea833
 daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar aa57040910c829c9c7466493a0f23c7c37f6ff702b401a0fcb7a5ffe40ee9405

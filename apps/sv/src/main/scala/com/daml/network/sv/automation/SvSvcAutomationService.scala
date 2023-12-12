@@ -1,6 +1,5 @@
 package com.daml.network.sv.automation
 
-import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.{
   AssignTrigger,
   CNNodeAppAutomationService,
@@ -22,6 +21,7 @@ import com.daml.network.sv.automation.confirmation.{
   SvOnboardingRequestTrigger,
 }
 import com.daml.network.sv.automation.singlesv.*
+import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingPartyToParticipantProposalTrigger
 import com.daml.network.sv.automation.singlesv.onboarding.{
   SvOnboardingMediatorProposalTrigger,
   SvOnboardingNamespaceProposalTrigger,
@@ -38,6 +38,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.{Clock, WallClock}
 import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -180,6 +181,13 @@ class SvSvcAutomationService(
       .replace(
         new WallClock(triggerContext.timeouts, triggerContext.loggerFactory)
       )
+    registerTrigger(
+      new SvOffboardingPartyToParticipantProposalTrigger(
+        triggerContext,
+        svcStore,
+        participantAdminConnection,
+      )
+    )
     registerTrigger(
       new ReconcileSequencerLimitWithMemberTrafficTrigger(
         triggerContext,

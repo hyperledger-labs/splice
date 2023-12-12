@@ -28,15 +28,10 @@ object CNThresholds {
     FPlus1Threshold(minSize)
   }
 
-  // TODO(#7884): update function after proper sv off-boarding
-  def partyToParticipantThresholdWithNewMember(
-      currentSvcSize: Int,
-      currentParticipantSize: Int,
+  def partyToParticipantThreshold(
+      participantsHostingTheParty: Int
   ): PositiveInt = {
-    // take the minimum to avoid setting a threshold which is too high in concurrent onboarding setup.
-    // add 1 to include the new sv.
-    val minSize = List(currentSvcSize, currentParticipantSize).min + 1
-    FPlus1Threshold(minSize)
+    FPlus1Threshold(participantsHostingTheParty)
   }
 
   def sequencerConnectionsSizeThreshold(sequencersSize: Int): PositiveInt =

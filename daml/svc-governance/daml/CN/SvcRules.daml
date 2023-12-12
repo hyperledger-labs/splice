@@ -113,6 +113,11 @@ data MemberInfo = MemberInfo with
     -- https://github.com/DACH-NY/canton-network-node/pull/3896/files.
   deriving (Eq, Show)
 
+-- | Information about offboarded members
+data OffboardedMemberInfo = OffboardedMemberInfo with
+    name : Text -- ^ Human-readable name; must be unique.
+  deriving (Eq, Show)
+
 data CollectiveSummary = CollectiveSummary with
     leader : Party
     numMembers : Int
@@ -297,6 +302,7 @@ template SvcRules with
     svc : Party        -- ^ The collective party representing this collective
     epoch : Int        -- ^ The number of leaders that have already been elected.
     members : Map.Map Party MemberInfo
+    offboardedMembers : Map.Map Party OffboardedMemberInfo
     leader : Party
     config : SvcRulesConfig
     initialTrafficState: Map.Map Text TrafficState -- ^ Map from participant/mediator ID to its traffic state at the time of SVC founding. Used for testing, empty in prod.
@@ -326,6 +332,7 @@ template SvcRules with
       controller svc
       do
         require "Member party is new" (not $ newMemberParty `Map.member` members)
+        require "Member party has not already been offboarded" (not $ newMemberParty `Map.member` offboardedMembers)
         unless isDevNet $ do
           require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
         let info = MemberInfo with
@@ -348,6 +355,7 @@ template SvcRules with
           -- existing entry of member with same name as the new member will be overwritten by the new member info
           -- this should only happen if it is in devnet
           members = Map.insert newMemberParty info membersNotMatchingNewMemberName
+          offboardedMembers
           config
           initialTrafficState
           isDevNet
@@ -357,26 +365,30 @@ template SvcRules with
         member : Party
       controller svc
       do
-        require "Member exists" (member `Map.member` members)
         require "There is more than one member" (Map.size members > 1)
-        -- NOTE: this immediate deletion also slashes that member's share of the current round's issuance
-        -- and drops their CommetBFT config, which will in turn lead to the SV apps of the remaining members
-        -- revoking that member's rights in the CometBFT network.
-        let newMembers = Map.delete member members
-        -- We optimize for prompt removal of a member if the vote said so. We can thus not wait for a leader-election
-        -- and instead just choose the member with the lexicographically smallest name.
-        let (newLeader, newEpoch)
-              | member == leader = (head (Map.keys newMembers), epoch + 1)
-              | otherwise        = (leader, epoch)
-        -- create the new rules contract
-        create SvcRules with
-          svc
-          epoch = newEpoch
-          leader = newLeader
-          members = newMembers
-          config
-          initialTrafficState
-          isDevNet
+        case Map.lookup member members of
+          None -> fail "Not a member"
+          Some info -> do
+            -- NOTE: this immediate deletion also slashes that member's share of the current round's issuance
+            -- and drops their CommetBFT config, which will in turn lead to the SV apps of the remaining members
+            -- revoking that member's rights in the CometBFT network.
+            let newMembers = Map.delete member members
+            -- We optimize for prompt removal of a member if the vote said so. We can thus not wait for a leader-election
+            -- and instead just choose the member with the lexicographically smallest name.
+            let (newLeader, newEpoch)
+                  | member == leader = (head (Map.keys newMembers), epoch + 1)
+                  | otherwise        = (leader, epoch)
+            let offboardedMemberInfo = OffboardedMemberInfo with name = info.name
+            -- create the new rules contract
+            create SvcRules with
+              svc
+              epoch = newEpoch
+              leader = newLeader
+              members = newMembers
+              offboardedMembers = Map.insert member offboardedMemberInfo offboardedMembers
+              config
+              initialTrafficState
+              isDevNet
 
     -- Challenge an SV member that seems to be non-responsive.
     -- The challenge will need to be seconded by another member after the deadine timer has elapsed before being executed.
@@ -913,12 +925,26 @@ template SvcRules with
           svc
           expiresAt
 
-    nonconsuming choice SvcRules_ExpireSvOnboardingConfirmed : ()
+    choice SvcRules_ExpireSvOnboardingConfirmed : ContractId SvcRules
       with
         cid: ContractId SvOnboardingConfirmed
       controller leader
       do
+        -- add the expired onboarding Sv into the offboardedMembers to be sure it is offboarded from all canton data structures
+        svOnboardingConfirmed <- fetch cid
+        let party = svOnboardingConfirmed.svParty
+        let info = OffboardedMemberInfo with
+              name = svOnboardingConfirmed.svName
         exercise cid SvOnboardingConfirmed_Expire
+        create SvcRules with
+          svc
+          epoch
+          leader
+          members
+          offboardedMembers = Map.insert party info offboardedMembers
+          config
+          initialTrafficState
+          isDevNet
 
 
     -- Coin management driven directly by the leader

@@ -1146,6 +1146,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       svcParty.toProtoPrimitive,
       epoch,
       members,
+      Collections.emptyMap(),
       user1.toProtoPrimitive,
       new svcrulesCodegen.SvcRulesConfig(
         1,

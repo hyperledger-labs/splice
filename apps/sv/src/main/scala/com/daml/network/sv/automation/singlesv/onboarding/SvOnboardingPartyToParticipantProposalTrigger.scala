@@ -83,11 +83,10 @@ class SvOnboardingPartyToParticipantProposalTrigger(
   ): Future[TaskOutcome] = {
     for {
       svcRules <- svcStore.getSvcRules()
-      _ <- participantAdminConnection.ensurePartyToParticipantProposal(
+      _ <- participantAdminConnection.ensurePartyToParticipantAdditionProposal(
         svcRules.domain,
         svcParty,
         task,
-        svcRules.payload.members.size(),
         svParty.uid.namespace.fingerprint,
       )
     } yield {

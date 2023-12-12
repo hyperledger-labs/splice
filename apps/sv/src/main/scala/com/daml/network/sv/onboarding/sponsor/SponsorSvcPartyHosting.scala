@@ -38,7 +38,6 @@ class SponsorSvcPartyHosting(
   def authorizeSvcPartyToParticipant(
       domain: DomainId,
       participantId: ParticipantId,
-      svcSize: Int,
       signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): EitherT[Future, SvcPartyMigrationFailure, Instant] =
     for {
@@ -47,7 +46,6 @@ class SponsorSvcPartyHosting(
         svcParty,
         participantId,
         signedBy,
-        svcSize,
       )
       authorizedAt <- EitherT.liftF(
         svcPartyHosting.waitForSvcPartyToParticipantAuthorization(
@@ -67,11 +65,10 @@ class SponsorSvcPartyHosting(
       party: PartyId,
       newParticipant: ParticipantId,
       signedBy: Fingerprint,
-      svcRulesMembersSize: Int,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, SvcPartyMigrationFailure, TopologyResult[PartyToParticipantX]] = {
-    validateProposalForNewMember(domainId, newParticipant, svcRulesMembersSize).flatMap {
+    validateProposalForNewMember(domainId, newParticipant).flatMap {
       validProposalOrValidAuthorizedState =>
         EitherT(
           participantAdminConnection
@@ -99,20 +96,23 @@ class SponsorSvcPartyHosting(
                       }
                   )
               ),
-              previous =>
-                Right(
-                  // TODO(#7884): handle threshold update for sv off-boarding
-                  previous.copy(
-                    participants = HostingParticipant(
-                      newParticipant,
-                      ParticipantPermissionX.Submission,
-                    ) +: previous.participants,
-                    threshold = CNThresholds.partyToParticipantThresholdWithNewMember(
-                      svcRulesMembersSize,
-                      previous.participants.length,
-                    ),
+              previous => {
+                val newHostingParticipants = previous.participants.appended(
+                  HostingParticipant(
+                    newParticipant,
+                    ParticipantPermissionX.Submission,
                   )
-                ),
+                )
+                Right(
+                  previous.copy(
+                    participants = newHostingParticipants,
+                    threshold = CNThresholds
+                      .partyToParticipantThreshold(
+                        newHostingParticipants.length
+                      ),
+                  )
+                )
+              },
               RetryFor.ClientCalls,
               signedBy,
               isProposal = true,
@@ -120,6 +120,9 @@ class SponsorSvcPartyHosting(
             )
             .map(Right(_))
             .recover { case AuthorizedStateChanged(serial) =>
+              logger.debug(
+                s"Authorized state serial changed to $serial when adding participant $newParticipant"
+              )
               Left(RequiredProposalNotFound(serial))
             }
         )
@@ -129,7 +132,6 @@ class SponsorSvcPartyHosting(
   private def validateProposalForNewMember(
       domainId: DomainId,
       participantId: ParticipantId,
-      svcMembersSize: Int,
   )(implicit tc: TraceContext): EitherT[
     Future,
     SvcPartyMigrationFailure,
@@ -146,16 +148,10 @@ class SponsorSvcPartyHosting(
         )
         .flatMap { proposals =>
           partyToParticipantAcceptedState
-            .map(acceptedState =>
-              CNThresholds.partyToParticipantThresholdWithNewMember(
-                svcMembersSize,
-                acceptedState.mapping.participantIds.size,
-              )
-            )
-            .map { expectedThreshold =>
+            .map { _ =>
               proposals.find(proposal =>
                 proposal.mapping.participantIds
-                  .contains(participantId) && proposal.mapping.threshold == expectedThreshold
+                  .contains(participantId)
               )
             }
         }
@@ -167,6 +163,7 @@ class SponsorSvcPartyHosting(
       })
       .toRightF {
         partyToParticipantAcceptedState.map { partyToParticipant =>
+          logger.debug(s"Required proposal not found, found accepted state: $partyToParticipant")
           RequiredProposalNotFound(
             partyToParticipant.base.serial
           )

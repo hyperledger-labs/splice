@@ -80,6 +80,7 @@ template SvcBootstrap with
           svc
           epoch = 0
           members = Map.fromList [(founderParty, founderInfo)]
+          offboardedMembers = Map.empty
           leader = founderParty
           config
           initialTrafficState

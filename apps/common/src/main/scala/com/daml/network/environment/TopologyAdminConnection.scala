@@ -503,12 +503,45 @@ abstract class TopologyAdminConnection(
       isProposal = false,
     )
 
-  // TODO(#7884): handle threshold update for sv off-boarding
-  def ensurePartyToParticipantProposal(
+  def ensurePartyToParticipantRemovalProposal(
+      domainId: DomainId,
+      party: PartyId,
+      participantToRemove: ParticipantId,
+      signedBy: Fingerprint,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[TopologyResult[PartyToParticipantX]] = {
+    def removeParticipant(participants: Seq[HostingParticipant]): Seq[HostingParticipant] = {
+      participants.filterNot(_.participantId == participantToRemove)
+    }
+    ensurePartyToParticipantProposal(domainId, party, removeParticipant, signedBy)
+  }
+
+  def ensurePartyToParticipantAdditionProposal(
       domainId: DomainId,
       party: PartyId,
       newParticipant: ParticipantId,
-      svcRulesMembersSize: Int,
+      signedBy: Fingerprint,
+  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] = {
+    def addParticipant(participants: Seq[HostingParticipant]): Seq[HostingParticipant] = {
+      val newHostingParticipant =
+        HostingParticipant(newParticipant, ParticipantPermissionX.Submission)
+      if (participants.contains(newHostingParticipant)) {
+        participants
+      } else {
+        participants.appended(newHostingParticipant)
+      }
+    }
+    ensurePartyToParticipantProposal(domainId, party, addParticipant, signedBy)
+  }
+
+  // the participantChange participant sequence must be ordering, if not canton will consider topology proposals with different ordering as fully different proposals and will not aggregate signatures
+  private def ensurePartyToParticipantProposal(
+      domainId: DomainId,
+      party: PartyId,
+      participantChange: Seq[HostingParticipant] => Seq[
+        HostingParticipant
+      ], // participantChange must be idempotent
       signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] = {
     def findPartyToParticipant(topologyTransactionType: TopologyTransactionType) = EitherT {
@@ -521,53 +554,57 @@ abstract class TopologyAdminConnection(
             proposals = proposals,
           ).map { proposals =>
             proposals
-              .find(proposal =>
-                proposal.mapping.participantIds.contains(
-                  newParticipant
-                ) && proposal.mapping.threshold == CNThresholds
-                  .partyToParticipantThresholdWithNewMember(
-                    svcRulesMembersSize,
-                    proposal.mapping.participantIds.size - 1,
-                  )
-              )
+              .find(proposal => {
+                val newHostingParticipants = participantChange(
+                  proposal.mapping.participants
+                )
+                proposal.mapping.participantIds ==
+                  newHostingParticipants.map(_.participantId)
+                  && proposal.mapping.threshold == CNThresholds
+                    .partyToParticipantThreshold(
+                      newHostingParticipants.size
+                    )
+              })
               .getOrElse(
                 throw Status.NOT_FOUND
                   .withDescription(
-                    s"No party to participant proposal for party $party and participant $newParticipant on domain $domainId"
+                    s"No party to participant proposal for party $party on domain $domainId"
                   )
                   .asRuntimeException()
               )
               .asRight
           }
         case TopologyTransactionType.AuthorizedState =>
-          getPartyToParticipant(domainId, party).map(result =>
-            Either.cond(
+          getPartyToParticipant(domainId, party).map(result => {
+            val newHostingParticipants = participantChange(
               result.mapping.participants
-                .exists(hosting => hosting.participantId == newParticipant),
+            )
+            Either.cond(
+              result.mapping.participantIds ==
+                newHostingParticipants.map(_.participantId),
               result,
               result,
             )
-          )
+          })
       }
     }
 
     ensureTopologyProposal[PartyToParticipantX](
       TopologyStoreId.DomainStore(domainId),
-      show"Party $party is proposed on $newParticipant",
+      show"Party $party is proposed on ",
       queryType => findPartyToParticipant(queryType),
-      previous =>
+      previous => {
+        val newHostingParticipants = participantChange(previous.participants)
         Right(
           previous.copy(
-            participants = HostingParticipant(
-              newParticipant,
-              ParticipantPermissionX.Submission,
-            ) +: previous.participants,
-            threshold = CNThresholds.partyToParticipantThresholdWithNewMember(
-              svcRulesMembersSize,
-              previous.participants.length,
-            ),
+            participants = newHostingParticipants,
+            threshold = CNThresholds
+              .partyToParticipantThreshold(
+                newHostingParticipants.size
+              ),
           )
-        ),
+        )
+      },
       RetryFor.WaitingOnInitDependency,
       signedBy,
     )

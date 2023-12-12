@@ -1275,6 +1275,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       svcParty.toProtoPrimitive,
       epoch,
       members,
+      Collections.emptyMap(),
       storeSvParty.toProtoPrimitive,
       new SvcRulesConfig(
         1,

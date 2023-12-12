@@ -152,6 +152,7 @@ testRemoveMember = do
   -- check that the member was removed and the leader changed to sv2
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
   Map.keys (svcRules.members) === [sv2, sv3, sv4]
+  Map.keys (svcRules.offboardedMembers) === [sv1]
   svcRules.leader === sv2
 
   -- duplicate the CoinPriceVote for sv2 to test duplicate removal
