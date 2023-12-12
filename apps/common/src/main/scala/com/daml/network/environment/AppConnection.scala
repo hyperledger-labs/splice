@@ -34,7 +34,8 @@ abstract class BaseAppConnection(
 
   protected def toFuture[T](e: Either[String, T]): Future[T] =
     e.fold(
-      err => Future.failed(Status.INTERNAL.withDescription(err).asRuntimeException()),
+      // RetryProvider retries UNAVAILABLE by default
+      err => Future.failed(Status.UNAVAILABLE.withDescription(err).asRuntimeException()),
       Future.successful,
     )
 
