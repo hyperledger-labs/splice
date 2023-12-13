@@ -6,5 +6,5 @@ export function installDocs(): pulumi.Resource {
 
   const dependsOn = [xns.ns];
 
-  return installCNHelmChart(xns, 'docs', 'cn-docs', {}, dependsOn);
+  return installCNHelmChart(xns, 'docs', 'cn-docs', {}, { dependsOn });
 }

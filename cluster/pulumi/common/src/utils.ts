@@ -3,10 +3,10 @@ import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import * as _ from 'lodash';
 import { Release } from '@pulumi/kubernetes/helm/v3';
+import { CustomResourceOptions } from '@pulumi/pulumi';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
-import { CnInput } from './helm';
 import { InfrastructureOutputs } from './infra';
 
 export const config = new pulumi.Config();
@@ -211,7 +211,7 @@ export function installCNHelmChartByNamespaceName(
   name: string,
   chartName: string,
   values: ChartValues = {},
-  dependsOn: CnInput<pulumi.Resource>[] = []
+  opts?: CustomResourceOptions
 ): Release {
   return new k8s.helm.v3.Release(
     `helm-${prefix}-${name}`,
@@ -222,9 +222,7 @@ export function installCNHelmChartByNamespaceName(
       values: cnChartValues(chartName, values),
       timeout: HELM_CHART_TIMEOUT_SEC,
     },
-    {
-      dependsOn,
-    }
+    opts
   );
 }
 
@@ -233,7 +231,7 @@ export function installCNHelmChart(
   name: string,
   chartName: string,
   values: ChartValues = {},
-  dependsOn: CnInput<pulumi.Resource>[] = []
+  opts?: CustomResourceOptions
 ): Release {
   return installCNHelmChartByNamespaceName(
     xns.logicalName,
@@ -241,7 +239,7 @@ export function installCNHelmChart(
     name,
     chartName,
     values,
-    dependsOn.concat([xns.ns])
+    opts
   );
 }
 

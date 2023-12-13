@@ -129,6 +129,6 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       },
       postgresSecretName: config.persistenceConfig.secretName,
     },
-    dependsOn
+    { dependsOn }
   );
 }

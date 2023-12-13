@@ -38,7 +38,7 @@ export async function installSplitwell(
         basename: CLUSTER_BASENAME,
       },
     },
-    [xns.ns]
+    { dependsOn: [xns.ns] }
   );
 
   const participant = installParticipant(
@@ -61,7 +61,7 @@ export async function installSplitwell(
         enable: true,
       },
     },
-    [svc, participant]
+    { dependsOn: [svc, participant] }
   );
 
   const validatorDbName = 'val_splitwell';

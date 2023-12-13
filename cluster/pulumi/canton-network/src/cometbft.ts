@@ -1,11 +1,11 @@
 import * as pulumi from '@pulumi/pulumi';
 import { Service } from '@pulumi/kubernetes/core/v1';
 import { Release } from '@pulumi/kubernetes/helm/v3';
-import { Output } from '@pulumi/pulumi';
+import { CustomResourceOptions, Output } from '@pulumi/pulumi';
 import {
-  clusterLargeDisk,
-  CLUSTER_DNS_NAME,
   CLUSTER_BASENAME,
+  CLUSTER_DNS_NAME,
+  clusterLargeDisk,
   ExactNamespace,
   installCNHelmChart,
   isDevNet,
@@ -95,7 +95,8 @@ export function installCometBftNode(
   xns: ExactNamespace,
   nodename: string,
   onboardingName: string,
-  syncSource?: Release
+  syncSource?: Release,
+  opts?: CustomResourceOptions
 ): Service {
   const nodeConfig = nodeConfigs[nodename];
   let stateSyncConfig;
@@ -149,7 +150,10 @@ export function installCometBftNode(
         volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
       },
     },
-    syncSource ? [syncSource] : []
+    {
+      ...opts,
+      ...{ dependsOn: syncSource ? [syncSource] : [] },
+    }
   );
   return Service.get(
     `${nodeConfig.identifier}-cometbft-rpc`,

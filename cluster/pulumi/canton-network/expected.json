@@ -8485,6 +8485,14 @@
     "type": "command:local:Command"
   },
   {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-1-global-domain",
+    "provider": "",
+    "type": "canton:network:domain:global"
+  },
+  {
     "custom": true,
     "id": "",
     "inputs": {
@@ -8638,6 +8646,14 @@
     "name": "sv-2-createdb-postgres-validator_sv_2",
     "provider": "",
     "type": "command:local:Command"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-2-global-domain",
+    "provider": "",
+    "type": "canton:network:domain:global"
   },
   {
     "custom": true,
@@ -8795,6 +8811,14 @@
     "type": "command:local:Command"
   },
   {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-3-global-domain",
+    "provider": "",
+    "type": "canton:network:domain:global"
+  },
+  {
     "custom": true,
     "id": "",
     "inputs": {
@@ -8948,6 +8972,14 @@
     "name": "sv-4-createdb-postgres-validator_sv_4",
     "provider": "",
     "type": "command:local:Command"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-4-global-domain",
+    "provider": "",
+    "type": "canton:network:domain:global"
   },
   {
     "custom": true,

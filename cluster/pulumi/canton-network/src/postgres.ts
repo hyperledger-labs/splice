@@ -141,7 +141,7 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
         },
         postgresSecretName: this.secretName,
       },
-      [db]
+      { dependsOn: [db] }
     );
     return db;
   }
@@ -176,7 +176,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
         },
         postgresSecretName: this.secretName,
       },
-      [passwordSecret]
+      { dependsOn: [passwordSecret] }
     );
     this.pg = pg;
 
@@ -215,7 +215,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
         },
         postgresSecretName: this.secretName,
       },
-      [createCommand]
+      { dependsOn: [createCommand] }
     );
     return createCommand;
   }

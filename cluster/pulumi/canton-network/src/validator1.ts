@@ -39,7 +39,7 @@ export async function installValidator1(
         basename: CLUSTER_BASENAME,
       },
     },
-    [xns.ns]
+    { dependsOn: [xns.ns] }
   );
 
   const participant = installParticipant(
@@ -52,9 +52,15 @@ export async function installValidator1(
     [loopback]
   );
 
-  installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, [
-    await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell'),
-  ]);
+  installCNHelmChart(
+    xns,
+    'splitwell-web-ui',
+    'cn-splitwell-web-ui',
+    {},
+    {
+      dependsOn: [await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell')],
+    }
+  );
 
   const validatorPostgres = postgres.installPostgres(xns, 'validator-pg', true);
 

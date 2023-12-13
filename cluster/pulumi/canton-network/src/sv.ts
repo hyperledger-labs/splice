@@ -26,7 +26,8 @@ import type { Auth0Client, CnInput, SvIdKey } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
-import { installGlobalDomain, installParticipant } from './ledger';
+import { GlobalDomainNode } from './globalDomainNode';
+import { installParticipant } from './ledger';
 import { installValidatorApp } from './validator';
 
 export function installSvKeySecret(
@@ -149,7 +150,7 @@ export async function installSvNode(
 
   const postgresDb = postgres.installPostgres(xns, 'postgres');
 
-  const domain = installGlobalDomain(xns, 'global-domain', postgresDb, {
+  const globalDomain = new GlobalDomainNode(xns, 'global-domain', postgresDb, {
     name: config.nodename,
     onboardingName: config.onboardingName,
     syncSource: cometBftSyncSource,
@@ -215,13 +216,9 @@ export async function installSvNode(
     };
   }
 
-  const svApp = installCNHelmChart(
-    xns,
-    config.nodename + '-sv-app',
-    'cn-sv-node',
-    svValues,
-    dependsOn.concat([participant, postgresDb, svDb, domain])
-  );
+  const svApp = installCNHelmChart(xns, config.nodename + '-sv-app', 'cn-sv-node', svValues, {
+    dependsOn: dependsOn.concat([participant, postgresDb, svDb, globalDomain]),
+  });
 
   const scanDbName = `scan_${svAppName}`;
   const scanDb = postgresDb.createDatabase(scanDbName);
@@ -233,11 +230,9 @@ export async function installSvNode(
     persistence: persistenceConfig(postgresDb, scanDbName),
     additionalJvmOptions: jmxOptions(),
   };
-  installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, [
-    svApp,
-    postgresDb,
-    scanDb,
-  ]);
+  installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, {
+    dependsOn: [svApp, postgresDb, scanDb],
+  });
 
   const validatorDbName = `validator_${svAppName}`;
   const validatorDb = postgresDb.createDatabase(validatorDbName);
@@ -273,7 +268,7 @@ export async function installSvNode(
         svNamespace: xns.logicalName,
       },
     },
-    [xns.ns]
+    { dependsOn: [xns.ns] }
   );
 
   return { svApp, postgresDatabase: postgresDb };
