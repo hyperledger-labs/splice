@@ -6,7 +6,8 @@ import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, Reassignm
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
 
-private[store] case class IngestionSummary[TXE <: TxLogStore.Entry[?]](
+// TODO(#8943): Remove Product upper bound
+private[store] case class IngestionSummary[TXE <: Product with Serializable](
     txId: Option[String],
     offset: Option[String],
     newAcsSize: Int,
@@ -72,7 +73,7 @@ private[store] case class IngestionSummary[TXE <: TxLogStore.Entry[?]](
 }
 
 private[store] object IngestionSummary {
-  def empty[TXE <: TxLogStore.Entry[?]]: IngestionSummary[TXE] = IngestionSummary(
+  def empty[TXE <: Product with Serializable]: IngestionSummary[TXE] = IngestionSummary(
     txId = None,
     offset = None,
     newAcsSize = 0,

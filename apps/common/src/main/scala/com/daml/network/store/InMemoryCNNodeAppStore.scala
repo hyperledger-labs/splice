@@ -42,3 +42,32 @@ abstract class InMemoryCNNodeAppStoreWithoutHistory(implicit
       TxLogStore.IndexRecord,
       TxLogStore.Entry[TxLogStore.IndexRecord],
     ] {}
+
+abstract class InMemoryCNNodeAppStoreWithNewHistory[
+    TXE <: TxLogStoreNew.Entry
+](implicit protected val ec: ExecutionContext)
+    extends CNNodeAppStoreWithNewHistory[TXE] {
+
+  protected def retryProvider: RetryProvider
+  final protected def futureSupervisor: FutureSupervisor = retryProvider.futureSupervisor
+
+  override val multiDomainAcsStore: InMemoryMultiDomainAcsStoreNew[TXE] =
+    new InMemoryMultiDomainAcsStoreNew(
+      loggerFactory,
+      acsContractFilter,
+      txLogConfig,
+      retryProvider,
+    )
+
+  override lazy val domains: DomainStore =
+    new InMemoryDomainStore(
+      acsContractFilter.ingestionFilter.primaryParty,
+      loggerFactory,
+      retryProvider,
+    )
+
+  override def close(): Unit = ()
+
+  // The following members will be deleted
+  override def txLog = ???
+}

@@ -3,27 +3,211 @@ package com.daml.network.scan.store
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
 import com.daml.network.codegen.java.cc
 import com.daml.network.history.*
-import com.daml.network.scan.store.TxLogIndexRecord.*
-import com.daml.network.store.TxLogStore
+import com.daml.network.store.{StoreErrors, TxLogStoreNew}
 import com.daml.network.util.{Codec, ExerciseNode}
+
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
-import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
 import com.daml.network.http.v0.definitions as httpDef
-import com.digitalasset.canton.topology.DomainId
-import java.time.ZoneOffset
+import com.digitalasset.canton.config.CantonRequireTypes.String3
+import com.digitalasset.canton.topology.{DomainId, PartyId}
+import spray.json.{
+  DefaultJsonProtocol,
+  DeserializationException,
+  JsString,
+  JsValue,
+  JsonFormat,
+  RootJsonFormat,
+  deserializationError,
+}
 
-sealed trait TxLogEntry extends TxLogStore.Entry[TxLogIndexRecord] {}
+import java.time.ZoneOffset
+import scala.math.BigDecimal.RoundingMode
+
+sealed trait TxLogEntry extends TxLogStoreNew.Entry {
+  // Scan store uses the eventId for pagination
+  def eventId: String
+}
 
 object TxLogEntry {
 
-  final case class ErrorTxLogEntry(indexRecord: ErrorIndexRecord) extends TxLogEntry {}
+  def encode(entry: TxLogEntry): (String3, JsValue) = {
+    import spray.json.*
+    import JsonProtocol.*
+    entry match {
+      case e: ErrorLogEntry => (ErrorLogEntry.dbType, e.toJson)
+      case e: BalanceChangeLogEntry => (BalanceChangeLogEntry.dbType, e.toJson)
+      case e: ClosedMiningRoundLogEntry => (ClosedMiningRoundLogEntry.dbType, e.toJson)
+      case e: ExtraTrafficPurchaseLogEntry => (ExtraTrafficPurchaseLogEntry.dbType, e.toJson)
+      case e: OpenMiningRoundLogEntry => (OpenMiningRoundLogEntry.dbType, e.toJson)
+      case e: AppRewardLogEntry => (AppRewardLogEntry.dbType, e.toJson)
+      case e: MintLogEntry => (MintLogEntry.dbType, e.toJson)
+      case e: SvRewardCollectedLogEntry => (SvRewardCollectedLogEntry.dbType, e.toJson)
+      case e: TapLogEntry => (TapLogEntry.dbType, e.toJson)
+      case e: TransferLogEntry => (TransferLogEntry.dbType, e.toJson)
+      case e: ValidatorRewardLogEntry => (ValidatorRewardLogEntry.dbType, e.toJson)
 
-  final case class EmptyTxLogEntry(indexRecord: TxLogIndexRecord) extends TxLogEntry {}
+    }
+  }
+  def decode(dbType: String3, json: JsValue): TxLogEntry = {
+    import TxLogEntry.JsonProtocol.*
+    try {
+      dbType match {
+        case ErrorLogEntry.dbType => json.convertTo[ErrorLogEntry]
+        case BalanceChangeLogEntry.dbType => json.convertTo[BalanceChangeLogEntry]
+        case ClosedMiningRoundLogEntry.dbType => json.convertTo[ClosedMiningRoundLogEntry]
+        case ExtraTrafficPurchaseLogEntry.dbType => json.convertTo[ExtraTrafficPurchaseLogEntry]
+        case OpenMiningRoundLogEntry.dbType => json.convertTo[OpenMiningRoundLogEntry]
+        case AppRewardLogEntry.dbType => json.convertTo[AppRewardLogEntry]
+        case MintLogEntry.dbType => json.convertTo[MintLogEntry]
+        case SvRewardCollectedLogEntry.dbType => json.convertTo[SvRewardCollectedLogEntry]
+        case TapLogEntry.dbType => json.convertTo[TapLogEntry]
+        case TransferLogEntry.dbType => json.convertTo[TransferLogEntry]
+        case ValidatorRewardLogEntry.dbType => json.convertTo[ValidatorRewardLogEntry]
+        case _ => throw txDecodingFailed()
+      }
+    } catch {
+      case _: DeserializationException => throw txDecodingFailed()
+    }
+  }
+
+  object JsonProtocol extends DefaultJsonProtocol with StoreErrors {
+    import com.digitalasset.canton.http.json.JsonProtocol.*
+    implicit val domainIdFormat: JsonFormat[DomainId] =
+      new JsonFormat[DomainId] {
+        override def write(obj: DomainId) =
+          JsString(obj.uid.toProtoPrimitive)
+
+        override def read(json: JsValue) = json match {
+          case JsString(s) =>
+            DomainId.fromProtoPrimitive(s, "").fold(f => deserializationError(f.message), identity)
+          case _ => deserializationError("DomainId must be a string")
+        }
+      }
+    implicit val partyIdFormat: JsonFormat[PartyId] =
+      new JsonFormat[PartyId] {
+        override def write(obj: PartyId) =
+          JsString(obj.uid.toProtoPrimitive)
+
+        override def read(json: JsValue) = json match {
+          case JsString(s) =>
+            PartyId.fromProtoPrimitive(s, "").fold(f => deserializationError(f.message), identity)
+          case _ => deserializationError("PartyId must be a string")
+        }
+      }
+
+    implicit val errorEntryFormat: RootJsonFormat[ErrorLogEntry] = jsonFormat1(ErrorLogEntry.apply)
+    implicit val balanceChangeEntryFormat: RootJsonFormat[BalanceChangeLogEntry] = jsonFormat5(
+      BalanceChangeLogEntry.apply
+    )
+    implicit val closedMiningRoundEntryFormat: RootJsonFormat[ClosedMiningRoundLogEntry] =
+      jsonFormat4(
+        ClosedMiningRoundLogEntry.apply
+      )
+    implicit val extraTrafficPurchaseEntryFormat: RootJsonFormat[ExtraTrafficPurchaseLogEntry] =
+      jsonFormat6(
+        ExtraTrafficPurchaseLogEntry.apply
+      )
+    implicit val openMiningRoundEntryFormat: RootJsonFormat[OpenMiningRoundLogEntry] = jsonFormat8(
+      OpenMiningRoundLogEntry.apply
+    )
+    implicit val appRewardEntryFormat: RootJsonFormat[AppRewardLogEntry] = jsonFormat5(
+      AppRewardLogEntry.apply
+    )
+    implicit val mintEntryFormat: RootJsonFormat[MintLogEntry] = jsonFormat8(
+      MintLogEntry.apply
+    )
+    implicit val svRewardCollectedEntryFormat: RootJsonFormat[SvRewardCollectedLogEntry] =
+      jsonFormat8(
+        SvRewardCollectedLogEntry.apply
+      )
+    implicit val tapEntryFormat: RootJsonFormat[TapLogEntry] = jsonFormat8(
+      TapLogEntry.apply
+    )
+    implicit val senderAmountFormat: JsonFormat[SenderAmount] = jsonFormat8(SenderAmount.apply)
+    implicit val receiverAmountFormat: JsonFormat[ReceiverAmount] = jsonFormat3(
+      ReceiverAmount.apply
+    )
+    implicit val balanceChangeFormat: JsonFormat[BalanceChange] = jsonFormat3(BalanceChange.apply)
+    implicit val transferEntryFormat: RootJsonFormat[TransferLogEntry] = jsonFormat10(
+      TransferLogEntry.apply
+    )
+    implicit val validatorRewardEntryFormat: RootJsonFormat[ValidatorRewardLogEntry] = jsonFormat5(
+      ValidatorRewardLogEntry.apply
+    )
+
+  }
+
+  final case class ErrorLogEntry(
+      eventId: String
+  ) extends TxLogEntry
+
+  object ErrorLogEntry {
+    val dbType: String3 = String3.tryCreate("err")
+  }
+
+  final case class BalanceChangeLogEntry(
+      override val eventId: String,
+      domainId: DomainId,
+      round: Long,
+      changeToInitialAmountAsOfRoundZero: BigDecimal,
+      changeToHoldingFeesRate: BigDecimal,
+  ) extends TxLogEntry
+
+  object BalanceChangeLogEntry {
+    val dbType: String3 = String3.tryCreate("bac")
+  }
+
+  sealed trait RewardLogEntry extends TxLogEntry {
+    def party: PartyId
+
+    def amount: BigDecimal
+
+    def round: Long
+  }
+
+  final case class AppRewardLogEntry(
+      override val eventId: String,
+      domainId: DomainId,
+      round: Long,
+      party: PartyId,
+      amount: BigDecimal,
+  ) extends RewardLogEntry
+
+  object AppRewardLogEntry {
+    val dbType: String3 = String3.tryCreate("are")
+  }
+
+  final case class ValidatorRewardLogEntry(
+      override val eventId: String,
+      domainId: DomainId,
+      round: Long,
+      party: PartyId,
+      amount: BigDecimal,
+  ) extends RewardLogEntry
+
+  object ValidatorRewardLogEntry {
+    val dbType: String3 = String3.tryCreate("vre")
+  }
+
+  final case class ExtraTrafficPurchaseLogEntry(
+      override val eventId: String,
+      domainId: DomainId,
+      round: Long,
+      validator: PartyId,
+      trafficPurchased: Long,
+      ccSpent: BigDecimal,
+  ) extends TxLogEntry
+
+  object ExtraTrafficPurchaseLogEntry {
+    val dbType: String3 = String3.tryCreate("etp")
+  }
 
   final case class OpenMiningRoundLogEntry(
-      indexRecord: TxLogIndexRecord,
+      override val eventId: String,
+      domainId: DomainId,
+      round: Long,
       coinCreateFee: BigDecimal,
       holdingFee: BigDecimal,
       lockHolderFee: BigDecimal,
@@ -32,8 +216,20 @@ object TxLogEntry {
   ) extends TxLogEntry
 
   object OpenMiningRoundLogEntry {
-    val transaction_type = "open_mining_round"
+    val dbType: String3 = String3.tryCreate("omr")
   }
+
+  final case class ClosedMiningRoundLogEntry(
+      override val eventId: String,
+      domainId: DomainId,
+      round: Long,
+      effectiveAt: Instant,
+  ) extends TxLogEntry
+
+  object ClosedMiningRoundLogEntry {
+    val dbType: String3 = String3.tryCreate("cmr")
+  }
+
   sealed trait TransactionType {
     def toResponse: httpDef.TransactionHistoryResponseItem.TransactionType
   }
@@ -105,6 +301,8 @@ object TxLogEntry {
   }
 
   object TransferLogEntry {
+    val dbType: String3 = String3.tryCreate("tra")
+
     def apply(
         tx: TransactionTree,
         event: TreeEvent,
@@ -116,7 +314,9 @@ object TxLogEntry {
       val receivers = parseReceiverAmounts(node.argument.value, node.result.value)
 
       TransferLogEntry(
-        indexRecord = TransactionIndexRecord(tx, event, domainId),
+        offset = tx.getOffset,
+        eventId = event.getEventId,
+        domainId = domainId,
         date = tx.getEffectiveAt,
         provider = node.argument.value.transfer.provider,
         sender = sender,
@@ -131,28 +331,30 @@ object TxLogEntry {
           }
           .toSeq
           .sortBy(_.party),
-        round = node.result.value.round,
+        round = node.result.value.round.number,
         coinPrice = coinPrice,
       )
     }
   }
 
   final case class TransferLogEntry(
-      indexRecord: TransactionIndexRecord,
+      override val eventId: String,
+      offset: String,
+      domainId: DomainId,
       date: Instant,
       provider: String,
       sender: SenderAmount,
       receivers: Seq[ReceiverAmount],
       balanceChanges: Seq[BalanceChange],
-      round: cc.round.types.Round,
+      round: Long,
       coinPrice: BigDecimal,
   ) extends TransactionLogEntry {
-    val transactionType = TransactionType.Transfer
-    def toResponseItem = httpDef.TransactionHistoryResponseItem(
+    override def transactionType = TransactionType.Transfer
+    override def toResponseItem = httpDef.TransactionHistoryResponseItem(
       transactionType = transactionType.toResponse,
-      eventId = indexRecord.eventId,
-      offset = indexRecord.optOffset,
-      domainId = indexRecord.domainId.toProtoPrimitive,
+      eventId = eventId,
+      offset = Some(offset),
+      domainId = domainId.toProtoPrimitive,
       date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
       transfer = Some(
         httpDef.Transfer(
@@ -162,25 +364,27 @@ object TxLogEntry {
           balanceChanges = balanceChanges.map(_.toResponse).toVector,
         )
       ),
-      round = Codec.encode(round),
+      round = round,
       coinPrice = Codec.encode(coinPrice),
     )
   }
 
   final case class TapLogEntry(
-      indexRecord: TransactionIndexRecord,
+      override val eventId: String,
+      offset: String,
+      domainId: DomainId,
       date: Instant,
       coinOwner: String,
       coinAmount: BigDecimal,
-      round: cc.round.types.Round,
+      round: Long,
       coinPrice: BigDecimal,
   ) extends TransactionLogEntry {
-    val transactionType = TransactionType.Tap
-    def toResponseItem = httpDef.TransactionHistoryResponseItem(
+    override def transactionType = TransactionType.Tap
+    override def toResponseItem = httpDef.TransactionHistoryResponseItem(
       transactionType = transactionType.toResponse,
-      eventId = indexRecord.eventId,
-      offset = indexRecord.optOffset,
-      domainId = indexRecord.domainId.toProtoPrimitive,
+      eventId = eventId,
+      offset = Some(offset),
+      domainId = domainId.toProtoPrimitive,
       date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
       tap = Some(
         httpDef.CoinAmount(
@@ -188,25 +392,31 @@ object TxLogEntry {
           coinAmount = Codec.encode(coinAmount),
         )
       ),
-      round = Codec.encode(round),
+      round = round,
       coinPrice = Codec.encode(coinPrice),
     )
   }
 
+  object TapLogEntry {
+    val dbType: String3 = String3.tryCreate("tap")
+  }
+
   final case class MintLogEntry(
-      indexRecord: TransactionIndexRecord,
+      override val eventId: String,
+      offset: String,
+      domainId: DomainId,
       date: Instant,
       coinOwner: String,
       coinAmount: BigDecimal,
-      round: cc.round.types.Round,
+      round: Long,
       coinPrice: BigDecimal,
   ) extends TransactionLogEntry {
-    val transactionType = TransactionType.Mint
-    def toResponseItem = httpDef.TransactionHistoryResponseItem(
+    override def transactionType = TransactionType.Mint
+    override def toResponseItem = httpDef.TransactionHistoryResponseItem(
       transactionType = transactionType.toResponse,
-      eventId = indexRecord.eventId,
-      offset = indexRecord.optOffset,
-      domainId = indexRecord.domainId.toProtoPrimitive,
+      eventId = eventId,
+      offset = Some(offset),
+      domainId = domainId.toProtoPrimitive,
       date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
       mint = Some(
         httpDef.CoinAmount(
@@ -214,25 +424,31 @@ object TxLogEntry {
           coinAmount = Codec.encode(coinAmount),
         )
       ),
-      round = Codec.encode(round),
+      round = round,
       coinPrice = Codec.encode(coinPrice),
     )
   }
 
+  object MintLogEntry {
+    val dbType: String3 = String3.tryCreate("min")
+  }
+
   final case class SvRewardCollectedLogEntry(
-      indexRecord: TransactionIndexRecord,
+      override val eventId: String,
+      offset: String,
+      domainId: DomainId,
       date: Instant,
       coinOwner: String,
       coinAmount: BigDecimal,
-      round: cc.round.types.Round,
+      round: Long,
       coinPrice: BigDecimal,
   ) extends TransactionLogEntry {
-    val transactionType = TransactionType.SvRewardCollected
-    def toResponseItem = httpDef.TransactionHistoryResponseItem(
+    override def transactionType = TransactionType.SvRewardCollected
+    override def toResponseItem = httpDef.TransactionHistoryResponseItem(
       transactionType = transactionType.toResponse,
-      eventId = indexRecord.eventId,
-      offset = indexRecord.optOffset,
-      domainId = indexRecord.domainId.toProtoPrimitive,
+      eventId = eventId,
+      offset = Some(offset),
+      domainId = domainId.toProtoPrimitive,
       date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
       svRewardCollected = Some(
         httpDef.CoinAmount(
@@ -240,9 +456,13 @@ object TxLogEntry {
           coinAmount = Codec.encode(coinAmount),
         )
       ),
-      round = Codec.encode(round),
+      round = round,
       coinPrice = Codec.encode(coinPrice),
     )
+  }
+
+  object SvRewardCollectedLogEntry {
+    val dbType: String3 = String3.tryCreate("src")
   }
 
   private def parseSenderAmount(

@@ -15,4 +15,7 @@ trait StoreErrors {
     Status.INTERNAL.withDescription("Offset was expected to be present").asRuntimeException()
   }
 
+  def txDecodingFailed() = {
+    Status.INTERNAL.withDescription(s"Log entry could not be decoded").asRuntimeException
+  }
 }

@@ -22,13 +22,9 @@ import com.daml.network.history.{
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.TxLogEntry.*
-import com.daml.network.scan.store.TxLogIndexRecord.{
-  OpenMiningRoundIndexRecord,
-  TransactionIndexRecord,
-}
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{PageLimit, StoreErrors, StoreTest, TxLogStore}
+import com.daml.network.store.{PageLimit, StoreErrors, StoreTest}
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.util.{
   Contract,
@@ -282,17 +278,15 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         val unwanted = openMiningRound(svcParty, round = 3, coinPrice = 3.0)
         for {
           store <- mkStore()
-          wantedTx <- dummyDomain.create(wanted)(store.multiDomainAcsStore)
-          unwantedTx <- dummyDomain.create(unwanted)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(wanted)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(unwanted)(store.multiDomainAcsStore)
         } yield {
-          transactionTreeSource.addTree(wantedTx)
-          transactionTreeSource.addTree(unwantedTx)
           val logEntry = store.getCoinConfigForRound(round = 2).futureValue
-          logEntry.indexRecord match {
-            case OpenMiningRoundIndexRecord(_, _, _, round) =>
-              round should be(wanted.payload.round.number)
+          logEntry match {
+            case omr: OpenMiningRoundLogEntry =>
+              omr.round should be(wanted.payload.round.number)
             case x =>
-              fail(s"Index record was not an OpenMiningRoundIndexRecord but a $x")
+              fail(s"Entry was not an OpenMiningRoundLogEntry but a $x")
           }
           numeric(logEntry.coinCreateFee) should be(
             numeric(
@@ -312,24 +306,21 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         val unwantedOpen = openMiningRound(svcParty, round = 3, coinPrice = 3.0)
         for {
           store <- mkStore()
-          wantedOpenTx <- dummyDomain.create(
+          _ <- dummyDomain.create(
             wantedOpen,
             txEffectiveAt = Instant.ofEpochSecond(1000),
           )(
             store.multiDomainAcsStore
           )
-          unwantedOpenTx <- dummyDomain.create(
+          _ <- dummyDomain.create(
             unwantedOpen,
             txEffectiveAt = Instant.ofEpochSecond(2000),
           )(store.multiDomainAcsStore)
           closeTime = Instant.ofEpochSecond(1500)
-          closedTx <- dummyDomain.create(closed, txEffectiveAt = closeTime)(
+          _ <- dummyDomain.create(closed, txEffectiveAt = closeTime)(
             store.multiDomainAcsStore
           )
         } yield {
-          transactionTreeSource.addTree(wantedOpenTx)
-          transactionTreeSource.addTree(unwantedOpenTx)
-          transactionTreeSource.addTree(closedTx)
           val (round, effectiveAt) = store.getRoundOfLatestData().futureValue
           round should be(2)
           effectiveAt should be(closeTime)
@@ -340,9 +331,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         val open = openMiningRound(svcParty, round = 2, coinPrice = 2.0)
         for {
           store <- mkStore()
-          wantedOpenTx <- dummyDomain.create(open)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(open)(store.multiDomainAcsStore)
         } yield {
-          transactionTreeSource.addTree(wantedOpenTx)
           val failure = store.getRoundOfLatestData().failed.futureValue
           failure.getMessage should be(txLogNotFound().getMessage)
         }
@@ -358,12 +348,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             txEffectiveAt = Instant.ofEpochSecond(2000),
           )(store.multiDomainAcsStore)
           closeTime = Instant.ofEpochSecond(1500)
-          closedTx <- dummyDomain.create(closed, txEffectiveAt = closeTime)(
+          _ <- dummyDomain.create(closed, txEffectiveAt = closeTime)(
             store.multiDomainAcsStore
           )
         } yield {
-          transactionTreeSource.addTree(openAfterTx)
-          transactionTreeSource.addTree(closedTx)
           val failure = store.getRoundOfLatestData().failed.futureValue
           failure.getMessage should be(txLogNotFound().getMessage)
         }
@@ -399,25 +387,21 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       val closed = closedMiningRound(svcParty, round = asOfEndOfRound)
       for {
         store <- mkStore()
-        openTx <- dummyDomain.create(open)(store.multiDomainAcsStore)
-        closedTx <- dummyDomain.create(closed)(store.multiDomainAcsStore)
-        rewardTxs <- MonadUtil.sequentialTraverse(providerRewardRounds) {
-          case (provider, amount, round) =>
-            dummyDomain.exercise(
-              coinRules(),
-              Some(cc.coinrules.CoinRules.TEMPLATE_ID),
-              Transfer.choice.name,
-              mkCoinRulesTransfer(provider, amount),
-              mkTransferResultForTest(
-                amount,
-                round.toLong,
-              ),
-            )(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(open)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(closed)(store.multiDomainAcsStore)
+        _ <- MonadUtil.sequentialTraverse(providerRewardRounds) { case (provider, amount, round) =>
+          dummyDomain.exercise(
+            coinRules(),
+            Some(cc.coinrules.CoinRules.TEMPLATE_ID),
+            Transfer.choice.name,
+            mkCoinRulesTransfer(provider, amount),
+            mkTransferResultForTest(
+              amount,
+              round.toLong,
+            ),
+          )(store.multiDomainAcsStore)
         }
       } yield {
-        transactionTreeSource.addTree(openTx)
-        transactionTreeSource.addTree(closedTx)
-        rewardTxs.foreach(transactionTreeSource.addTree)
         getTopProviders(store, asOfEndOfRound, 2).futureValue shouldBe Seq(
           userParty(3) -> BigDecimal(4.0 * 3),
           userParty(1) -> BigDecimal(4.0 * 2),
@@ -525,15 +509,12 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         val closed = closedMiningRound(svcParty, round = asOfEndOfRound)
         for {
           store <- mkStore()
-          openTx <- dummyDomain.create(open)(store.multiDomainAcsStore)
-          closedTx <- dummyDomain.create(closed)(store.multiDomainAcsStore)
-          trafficPurchaseUpdates <- MonadUtil.sequentialTraverse(trafficPurchaseTrees)(
+          _ <- dummyDomain.create(open)(store.multiDomainAcsStore)
+          _ <- dummyDomain.create(closed)(store.multiDomainAcsStore)
+          _ <- MonadUtil.sequentialTraverse(trafficPurchaseTrees)(
             dummyDomain.ingest(_)(store.multiDomainAcsStore)
           )
         } yield {
-          transactionTreeSource.addTree(openTx)
-          transactionTreeSource.addTree(closedTx)
-          trafficPurchaseUpdates.foreach(transactionTreeSource.addTree)
           store
             .getTopValidatorsByPurchasedTraffic(asOfEndOfRound, limit = 2)
             .futureValue shouldBe Seq(
@@ -716,11 +697,9 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         val zero = BigDecimal(0)
         val txs: List[TransferLogEntry] = (1 to nrTransfers).map { i =>
           TransferLogEntry(
-            TransactionIndexRecord(
-              s"$i",
-              s"$i",
-              domainId = dummyDomain,
-            ),
+            offset = s"$i",
+            eventId = s"$i",
+            domainId = dummyDomain,
             date = now,
             provider = user1.toProtoPrimitive,
             sender = SenderAmount(
@@ -735,12 +714,11 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             ),
             balanceChanges = Seq(),
             receivers = Seq(ReceiverAmount(user2.toProtoPrimitive, BigDecimal(i), zero)),
-            round = new roundCodegen.types.Round(round),
+            round = round,
             coinPrice = BigDecimal(1.0),
           )
         }.toList
-        def stripEventId(tx: TransferLogEntry) =
-          tx.copy(indexRecord = tx.indexRecord.copy(eventId = ""))
+        def stripEventId(tx: TransferLogEntry) = tx.copy(eventId = "")
         val expectedFirstPage = txs.reverse.take(limit).toList
         val expectedSecondPage = txs.reverse.drop(limit).take(limit).toList
 
@@ -779,10 +757,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             )(
               store.multiDomainAcsStore
             )
-            .map { result =>
-              transactionTreeSource.addTree(result)
-              ()
-            }
+            .map(_ => ())
         }
 
         for {
@@ -794,7 +769,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
                 store,
                 coinRulesContract,
                 tx,
-                tx.indexRecord.offset,
+                tx.offset,
               )
             }
           }
@@ -811,7 +786,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           )
           val nextPageDescending = store
             .listByType[TransferLogEntry](
-              Some(firstPageDescending.last.indexRecord.eventId),
+              Some(firstPageDescending.last.eventId),
               SortOrder.Descending,
               limit,
             )
@@ -833,7 +808,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 
           val nextPageAscending = store
             .listByType[TransferLogEntry](
-              Some(firstPageAscending.last.indexRecord.eventId),
+              Some(firstPageAscending.last.eventId),
               SortOrder.Ascending,
               limit,
             )
@@ -850,8 +825,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       serviceUserPrimaryParty: PartyId = user1,
       svcParty: PartyId = svcParty,
   ): Future[ScanStore]
-
-  protected lazy val transactionTreeSource = TxLogStore.TransactionTreeSource.ForTesting()
 
   private lazy val user1 = userParty(1)
   private lazy val user2 = userParty(2)
@@ -1208,7 +1181,6 @@ class InMemoryScanStoreTest extends ScanStoreTest {
       serviceUserPrimaryParty = serviceUserPrimaryParty,
       svcParty = svcParty,
       loggerFactory,
-      transactionTreeSource,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )
     for {
@@ -1247,7 +1219,6 @@ class DbScanStoreTest
       svcParty = svcParty,
       storage,
       loggerFactory,
-      transactionTreeSource,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )(parallelExecutionContext, implicitly, implicitly)
     for {

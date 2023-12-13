@@ -1,12 +1,10 @@
 package com.daml.network.scan.store.db
 
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
-import com.daml.network.scan.store.TxLogIndexRecord
-import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue}
+import com.daml.network.scan.store.TxLogEntry
+import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.config.CantonRequireTypes.String3
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 
 object ScanTables extends AcsTables {
 
@@ -33,197 +31,97 @@ object ScanTables extends AcsTables {
   }
 
   case class ScanTxLogRowData(
-      eventId: String,
-      offset: Option[String],
-      domainId: DomainId,
-      acsContractId: Option[ContractId[?]],
-      indexRecordType: String3,
-      round: Option[Long],
-      rewardAmount: Option[BigDecimal],
-      rewardedParty: Option[PartyId],
-      balanceChangeToInitialAmountAsOfRoundZero: Option[BigDecimal],
-      balanceChangeChangeToHoldingFeesRate: Option[BigDecimal],
-      extraTrafficValidator: Option[PartyId],
-      extraTrafficPurchaseTrafficPurchase: Option[Long],
-      extraTrafficPurchaseCcSpent: Option[BigDecimal],
-  )
+      entry: TxLogEntry,
+      round: Option[Long] = None,
+      rewardAmount: Option[BigDecimal] = None,
+      rewardedParty: Option[PartyId] = None,
+      balanceChangeToInitialAmountAsOfRoundZero: Option[BigDecimal] = None,
+      balanceChangeChangeToHoldingFeesRate: Option[BigDecimal] = None,
+      extraTrafficValidator: Option[PartyId] = None,
+      extraTrafficPurchaseTrafficPurchase: Option[Long] = None,
+      extraTrafficPurchaseCcSpent: Option[BigDecimal] = None,
+  ) extends TxLogRowData {
+
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
+      "event_id" -> Some(lengthLimited(entry.eventId)),
+      "round" -> round,
+      "reward_amount" -> rewardAmount,
+      "rewarded_party" -> rewardedParty,
+      "balance_change_change_to_initial_amount_as_of_round_zero" -> balanceChangeToInitialAmountAsOfRoundZero,
+      "balance_change_change_to_holding_fees_rate" -> balanceChangeChangeToHoldingFeesRate,
+      "extra_traffic_validator" -> extraTrafficValidator,
+      "extra_traffic_purchase_traffic_purchased" -> extraTrafficPurchaseTrafficPurchase,
+      "extra_traffic_purchase_cc_spent" -> extraTrafficPurchaseCcSpent,
+    )
+  }
 
   object ScanTxLogRowData {
 
-    def fromTxLogIndexRecord(record: TxLogIndexRecord): ScanTxLogRowData = {
+    def fromTxLogEntry(record: TxLogEntry): ScanTxLogRowData = {
       record match {
-        case err @ TxLogIndexRecord.ErrorIndexRecord(offset, eventId, domainId) =>
+        case err: TxLogEntry.ErrorLogEntry =>
           ScanTxLogRowData(
-            eventId = eventId,
-            offset = Some(offset),
-            domainId = domainId,
-            acsContractId = None,
-            indexRecordType = err.companion.dbType,
-            round = None,
-            rewardAmount = None,
-            rewardedParty = None,
-            balanceChangeToInitialAmountAsOfRoundZero = None,
-            balanceChangeChangeToHoldingFeesRate = None,
-            extraTrafficValidator = None,
-            extraTrafficPurchaseTrafficPurchase = None,
-            extraTrafficPurchaseCcSpent = None,
+            entry = err
           )
-        case omr @ TxLogIndexRecord.OpenMiningRoundIndexRecord(
-              offset,
-              eventId,
-              domainId,
-              round,
-            ) =>
+        case omr: TxLogEntry.OpenMiningRoundLogEntry =>
           ScanTxLogRowData(
-            eventId = eventId,
-            indexRecordType = omr.companion.dbType,
-            domainId = domainId,
-            acsContractId = None,
-            offset = Some(offset),
-            round = Some(round),
-            rewardAmount = None,
-            rewardedParty = None,
-            balanceChangeToInitialAmountAsOfRoundZero = None,
-            balanceChangeChangeToHoldingFeesRate = None,
-            extraTrafficValidator = None,
-            extraTrafficPurchaseTrafficPurchase = None,
-            extraTrafficPurchaseCcSpent = None,
+            entry = omr,
+            round = Some(omr.round),
           )
-        case cmr @ TxLogIndexRecord.ClosedMiningRoundIndexRecord(
-              offset,
-              eventId,
-              domainId,
-              round,
-              _,
-            ) =>
+        case cmr: TxLogEntry.ClosedMiningRoundLogEntry =>
           ScanTxLogRowData(
-            eventId = eventId,
-            indexRecordType = cmr.companion.dbType,
-            offset = Some(offset),
-            domainId = domainId,
-            acsContractId = None,
-            round = Some(round),
-            rewardAmount = None,
-            rewardedParty = None,
-            balanceChangeToInitialAmountAsOfRoundZero = None,
-            balanceChangeChangeToHoldingFeesRate = None,
-            extraTrafficValidator = None,
-            extraTrafficPurchaseTrafficPurchase = None,
-            extraTrafficPurchaseCcSpent = None,
+            entry = cmr,
+            round = Some(cmr.round),
           )
-        case are @ TxLogIndexRecord.AppRewardIndexRecord(
-              offset,
-              eventId,
-              domainId,
-              round,
-              party,
-              amount,
-            ) =>
+        case are: TxLogEntry.AppRewardLogEntry =>
           ScanTxLogRowData(
-            eventId = eventId,
-            indexRecordType = are.companion.dbType,
-            domainId = domainId,
-            offset = Some(offset),
-            acsContractId = None,
-            round = Some(round),
-            rewardAmount = Some(amount),
-            rewardedParty = Some(party),
-            balanceChangeToInitialAmountAsOfRoundZero = None,
-            balanceChangeChangeToHoldingFeesRate = None,
-            extraTrafficValidator = None,
-            extraTrafficPurchaseTrafficPurchase = None,
-            extraTrafficPurchaseCcSpent = None,
+            entry = are,
+            round = Some(are.round),
+            rewardAmount = Some(are.amount),
+            rewardedParty = Some(are.party),
           )
-        case vre @ TxLogIndexRecord.ValidatorRewardIndexRecord(
-              offset,
-              eventId,
-              domainId,
-              round,
-              party,
-              amount,
-            ) =>
+        case vre: TxLogEntry.ValidatorRewardLogEntry =>
           ScanTxLogRowData(
-            eventId = eventId,
-            indexRecordType = vre.companion.dbType,
-            offset = Some(offset),
-            domainId = domainId,
-            acsContractId = None,
-            round = Some(round),
-            rewardAmount = Some(amount),
-            rewardedParty = Some(party),
-            balanceChangeToInitialAmountAsOfRoundZero = None,
-            balanceChangeChangeToHoldingFeesRate = None,
-            extraTrafficValidator = None,
-            extraTrafficPurchaseTrafficPurchase = None,
-            extraTrafficPurchaseCcSpent = None,
+            entry = vre,
+            round = Some(vre.round),
+            rewardAmount = Some(vre.amount),
+            rewardedParty = Some(vre.party),
           )
-        case etp @ TxLogIndexRecord.ExtraTrafficPurchaseIndexRecord(
-              offset,
-              eventId,
-              domainId,
-              round,
-              validator,
-              trafficPurchased,
-              ccSpent,
-            ) =>
+        case etp: TxLogEntry.ExtraTrafficPurchaseLogEntry =>
           ScanTxLogRowData(
-            eventId = eventId,
-            indexRecordType = etp.companion.dbType,
-            offset = Some(offset),
-            domainId = domainId,
-            acsContractId = None,
-            round = Some(round),
-            rewardAmount = None,
-            rewardedParty = None,
-            balanceChangeToInitialAmountAsOfRoundZero = None,
-            balanceChangeChangeToHoldingFeesRate = None,
-            extraTrafficValidator = Some(validator),
-            extraTrafficPurchaseTrafficPurchase = Some(trafficPurchased),
-            extraTrafficPurchaseCcSpent = Some(ccSpent),
+            entry = etp,
+            round = Some(etp.round),
+            extraTrafficValidator = Some(etp.validator),
+            extraTrafficPurchaseTrafficPurchase = Some(etp.trafficPurchased),
+            extraTrafficPurchaseCcSpent = Some(etp.ccSpent),
           )
-        case bac @ TxLogIndexRecord.BalanceChangeIndexRecord(
-              offset,
-              eventId,
-              domainId,
-              round,
-              changeToInitialAmountAsOfRoundZero,
-              changeToHoldingFeesRate,
-              acsContractId,
-            ) =>
+        case bac: TxLogEntry.BalanceChangeLogEntry =>
           ScanTxLogRowData(
-            eventId = eventId,
-            indexRecordType = bac.companion.dbType,
-            offset = offset,
-            domainId = domainId,
-            acsContractId = acsContractId,
-            round = Some(round),
-            rewardAmount = None,
-            rewardedParty = None,
-            balanceChangeToInitialAmountAsOfRoundZero = Some(changeToInitialAmountAsOfRoundZero),
-            balanceChangeChangeToHoldingFeesRate = Some(changeToHoldingFeesRate),
-            extraTrafficValidator = None,
-            extraTrafficPurchaseTrafficPurchase = None,
-            extraTrafficPurchaseCcSpent = None,
+            entry = bac,
+            round = Some(bac.round),
+            balanceChangeToInitialAmountAsOfRoundZero =
+              Some(bac.changeToInitialAmountAsOfRoundZero),
+            balanceChangeChangeToHoldingFeesRate = Some(bac.changeToHoldingFeesRate),
           )
-        case rar @ TxLogIndexRecord.TransactionIndexRecord(
-              offset,
-              eventId,
-              domainId,
-            ) =>
+        case rar: TxLogEntry.TransferLogEntry =>
           ScanTxLogRowData(
-            eventId = eventId,
-            indexRecordType = rar.companion.dbType,
-            offset = Some(offset),
-            domainId = domainId,
-            acsContractId = None,
-            round = None,
-            rewardAmount = None,
-            rewardedParty = None,
-            balanceChangeToInitialAmountAsOfRoundZero = None,
-            balanceChangeChangeToHoldingFeesRate = None,
-            extraTrafficValidator = None,
-            extraTrafficPurchaseTrafficPurchase = None,
-            extraTrafficPurchaseCcSpent = None,
+            entry = rar,
+            round = Some(rar.round),
+          )
+        case entry: TxLogEntry.TapLogEntry =>
+          ScanTxLogRowData(
+            entry = entry,
+            round = Some(entry.round),
+          )
+        case entry: TxLogEntry.MintLogEntry =>
+          ScanTxLogRowData(
+            entry = entry,
+            round = Some(entry.round),
+          )
+        case entry: TxLogEntry.SvRewardCollectedLogEntry =>
+          ScanTxLogRowData(
+            entry = entry,
+            round = Some(entry.round),
           )
       }
     }

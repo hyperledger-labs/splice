@@ -52,3 +52,14 @@ trait CNNodeAppStoreWithHistory[
       loggerFactory,
     )
 }
+
+trait CNNodeAppStoreWithNewHistory[
+    TXE <: TxLogStoreNew.Entry
+] extends CNNodeAppStore[TxLogStore.IndexRecord, TxLogStore.Entry[TxLogStore.IndexRecord]] {
+
+  protected def txLogConfig: TxLogStoreNew.Config[TXE]
+
+  // The following members will be deleted
+  override def txLogParser = ???
+  override def txLog = ???
+}

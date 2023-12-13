@@ -38,7 +38,7 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
-import scala.collection.immutable.{SortedMap, VectorMap}
+import scala.collection.immutable.{Seq, SortedMap, VectorMap}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -52,30 +52,29 @@ import com.google.protobuf.ByteString
 
 import scala.collection.mutable
 
-class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Entry[TXI]](
+class DbMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
     storage: DbStorage,
     acsTableName: String,
     txLogTableName: String,
     storeDescriptor: io.circe.Json,
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
-    override val txLogParser: TxLogStore.Parser[TXI, TXE],
+    txLogConfig: TxLogStoreNew.Config[TXE],
     retryProvider: RetryProvider,
-    ingestTxLogInsert: (TXI, TraceContext) => Either[String, DBIOAction[?, NoStream, Effect.Write]],
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
 ) extends MultiDomainAcsStore
-    with TxLogStore[TXI, TXE]
     with AcsTables
     with AcsQueries
+    with TxLogQueries[TXE]
     with StoreErrors
     with NamedLogging
     with LimitHelpers {
 
   import MultiDomainAcsStore.*
-  import DbMultiDomainAcsStore.*
+  import DbMultiDomainAcsStoreNew.*
   import profile.api.jdbcActionExtensionMethods
 
   private val state = new AtomicReference[State](State.empty())
@@ -565,7 +564,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         finishedAcsIngestion.isCompleted == false,
         s"ACS was already ingested for store $storeId",
       )
-      val txLogEntries = txLogParser.parseAcs(acs, incompleteOut, incompleteIn).map(_._2)
+      val txLogEntries = txLogConfig.parser.parseAcs(acs, incompleteOut, incompleteIn)
 
       // Filter out all contracts we are not interested in
       val todoAcs = acs
@@ -640,7 +639,9 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                         )
                       } yield ()
                     }
-                    ++ txLogEntries.map { txe => doIngestTxLogInsert(offset, txe, summaryState) }
+                    ++ txLogEntries.map { case (domain, contractId, txe) =>
+                      doIngestTxLogInsert(domain, offset, contractId, txe, summaryState)
+                    }
                 ),
             ),
             "ingestAcs",
@@ -866,7 +867,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
         )
         .toVector
         .map(_._2)
-      val txLogEntries = txLogParser.parse(tree, domainId, logger)
+      val txLogEntries = txLogConfig.parser.parse(tree, domainId, logger)
 
       for {
         _ <- storage
@@ -898,7 +899,9 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                     case Delete(exercisedEvent) =>
                       doDeleteContract(exercisedEvent, summary)
                   }
-                    ++ txLogEntries.map(txe => doIngestTxLogInsert(tree.getOffset, txe, summary))
+                    ++ txLogEntries.map(txe =>
+                      doIngestTxLogInsert(domainId, tree.getOffset, None, txe, summary)
+                    )
                 ),
             ),
             "ingestTransactionTree",
@@ -950,6 +953,21 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       reassignmentUnassignId = Some(String255.tryCreate(event.unassignId)),
     )
 
+    private def getIndexColumnValues(data: Seq[(String, IndexColumnValue[?])]): SQLActionBuilder =
+      data
+        .map(_._2)
+        .map(v => sql"$v")
+        .reduceOption { (acc, next) =>
+          (acc ++ sql"," ++ next).toActionBuilder
+        }
+        .map(s => (sql"," ++ s).toActionBuilder)
+        .getOrElse(sql"")
+
+    // Note: the column names are hardcoded so they're safe to interpolate raw
+    private def getIndexColumnNames(data: Seq[(String, IndexColumnValue[?])]): String =
+      if (data.isEmpty) ""
+      else data.map(_._1).mkString(",", ", ", "")
+
     private def doIngestAcsInsert(
         offset: String,
         createdEvent: CreatedEvent,
@@ -985,19 +1003,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
             reassignmentUnassignId,
           ) = stateData
 
-          // the column names are hardcoded so they're safe to interpolate raw
-          val indexColumnNames =
-            if (rowData.indexColumns.isEmpty) ""
-            else rowData.indexColumns.map(_._1).mkString(",", ", ", "")
-
-          val indexColumnNameValues = rowData.indexColumns
-            .map(_._2)
-            .map(v => sql"$v")
-            .reduceOption { (acc, next) =>
-              (acc ++ sql"," ++ next).toActionBuilder
-            }
-            .map(s => (sql"," ++ s).toActionBuilder)
-            .getOrElse(sql"")
+          val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
+          val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
 
           import storage.DbStorageConverters.setParameterByteArray
           (sql"""
@@ -1010,27 +1017,30 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                         $createArguments, $createdEventBlob, $createdAt, $contractExpiresAt,
                         $assignedDomain, $reassignmentCounter, $reassignmentTargetDomain,
                         $reassignmentSourceDomain, $reassignmentSubmitter, $reassignmentUnassignId
-              """ ++ indexColumnNameValues ++ sql") on conflict do nothing").toActionBuilder.asUpdate
+              """ ++ indexColumnNameValues ++ sql")").toActionBuilder.asUpdate
       }
     }
 
     private def doIngestTxLogInsert(
+        domainId: DomainId,
         offset: String,
+        acsContractId: Option[ContractId[?]],
         txe: TXE,
         summary: MutableIngestionSummary[TXE],
-    )(implicit
-        tc: TraceContext
     ) = {
-      ingestTxLogInsert(txe.indexRecord, tc) match {
-        case Left(err) =>
-          val errMsg =
-            s"Tx at offset $offset with event id ${txe.indexRecord.eventId} cannot be ingested: $err"
-          logger.error(errMsg)
-          throw new IllegalArgumentException(errMsg)
-        case Right(action) =>
-          summary.ingestedTxLogEntries.addOne(txe)
-          action
-      }
+      summary.ingestedTxLogEntries.addOne(txe)
+
+      val safeOffset = lengthLimited(offset)
+      val (entryType, entryData) = txLogConfig.encodeEntry(txe)
+      val rowData = txLogConfig.entryToRow(txe)
+      val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
+      val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
+      (sql"""
+      insert into #$txLogTableName(store_id, transaction_offset, domain_id, acs_contract_id,
+      entry_type, entry_data #$indexColumnNames)
+      values ($storeId, $safeOffset, $domainId, $acsContractId,
+              $entryType, $entryData""" ++ indexColumnNameValues ++ sql""")
+    """).toActionBuilder.asUpdate
     }
 
     private def doDeleteContract(event: ExercisedEvent, summary: MutableIngestionSummary[TXE]) = {
@@ -1257,7 +1267,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
 
 }
 
-object DbMultiDomainAcsStore {
+object DbMultiDomainAcsStoreNew {
 
   /** @param storeId The primary key of this stores entry in the store_descriptors table
     * @param offset The last ingested offset, if any
@@ -1351,7 +1361,7 @@ object DbMultiDomainAcsStore {
 
   /** Like [[IngestionSummary]], but with all fields mutable to simplify collecting the content from helper methods */
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  case class MutableIngestionSummary[TXE <: TxLogStore.Entry[?]](
+  case class MutableIngestionSummary[TXE <: TxLogStoreNew.Entry](
       ingestedCreatedEvents: mutable.ArrayBuffer[CreatedEvent],
       var numFilteredCreatedEvents: Int,
       ingestedArchivedEvents: mutable.ArrayBuffer[ExercisedEvent],
@@ -1393,7 +1403,7 @@ object DbMultiDomainAcsStore {
   }
 
   object MutableIngestionSummary {
-    def empty[TXE <: TxLogStore.Entry[?]]: MutableIngestionSummary[TXE] = MutableIngestionSummary(
+    def empty[TXE <: TxLogStoreNew.Entry]: MutableIngestionSummary[TXE] = MutableIngestionSummary(
       mutable.ArrayBuffer.empty,
       0,
       mutable.ArrayBuffer.empty,

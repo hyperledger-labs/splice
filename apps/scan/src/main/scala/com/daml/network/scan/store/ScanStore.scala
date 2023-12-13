@@ -1,30 +1,27 @@
 package com.daml.network.scan.store
 
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn
-import com.daml.network.environment.{BaseLedgerConnection, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{
-  CNNodeAppStoreWithHistory,
+  CNNodeAppStoreWithNewHistory,
   Limit,
   MultiDomainAcsStore,
   PageLimit,
-  TxLogStore,
+  TxLogStoreNew,
 }
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.scan.store.db.DbScanStore
+import com.daml.network.scan.store.db.{DbScanStore, ScanTables}
 import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
-import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.{CoinConfigSchedule, ContractWithState, TemplateJsonDecoder}
-import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -40,13 +37,10 @@ object SortOrder {
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
 trait ScanStore
-    extends CNNodeAppStoreWithHistory[
-      TxLogIndexRecord,
-      TxLogEntry,
+    extends CNNodeAppStoreWithNewHistory[
+      TxLogEntry
     ]
     with PackageIdResolver.HasCoinRulesPayload {
-
-  override protected def txLogParser = new ScanTxLogParser(loggerFactory)
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
@@ -55,6 +49,13 @@ trait ScanStore
 
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] =
     ScanStore.contractFilter(svcParty)
+
+  override lazy val txLogConfig = new TxLogStoreNew.Config[TxLogEntry] {
+    override val parser = new ScanTxLogParser(loggerFactory)
+    override def entryToRow = ScanTables.ScanTxLogRowData.fromTxLogEntry
+    override def encodeEntry = TxLogEntry.encode
+    override def decodeEntry = TxLogEntry.decode
+  }
 
   def lookupCoinRules()(implicit
       tc: TraceContext
@@ -173,39 +174,6 @@ trait ScanStore
   )(implicit
       tc: TraceContext
   ): Future[Seq[TxLogEntry.TransactionLogEntry]]
-
-  protected def loadTxLogEntry(
-      txLogReader: TxLogStore.Reader[TxLogIndexRecord, TxLogEntry],
-      eventId: String,
-      domainId: DomainId,
-      acsContractId: Option[ContractId[?]],
-      dbType: String3,
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[TxLogEntry] =
-    txLogReader.loadTxLogEntry(eventId, domainId, acsContractId, filterUnique(dbType))
-
-  protected def filterUnique(dbType: String3)(
-      entries: Seq[TxLogEntry],
-      eventId: String,
-  ): TxLogEntry = {
-    val res = entries.filter(e =>
-      e.indexRecord.eventId == eventId && e.indexRecord.companion.dbType == dbType
-    )
-    res match {
-      case entry +: Seq() =>
-        entry
-      case Seq() =>
-        throw new IllegalStateException(
-          s"ScanStore.filterUnique did not return any entry for event $eventId and dbType $dbType. "
-        )
-      case x =>
-        throw new IllegalStateException(
-          s"ScanStore.filterUnique returned ${x.size} entries for event $eventId and dbType $dbType."
-        )
-    }
-  }
 }
 
 object ScanStore {
@@ -214,21 +182,18 @@ object ScanStore {
       svcParty: PartyId,
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
-      connection: BaseLedgerConnection,
       retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       close: CloseContext,
   ): ScanStore = {
-    val treeSource = TransactionTreeSource.LedgerConnection(svcParty, connection)
     storage match {
       case _: MemoryStorage =>
         new InMemoryScanStore(
           serviceUserPrimaryParty = serviceUserPrimaryParty,
           svcParty = svcParty,
           loggerFactory,
-          treeSource,
           retryProvider,
         )
       case db: DbStorage =>
@@ -237,7 +202,6 @@ object ScanStore {
           svcParty = svcParty,
           db,
           loggerFactory,
-          treeSource,
           retryProvider,
         )
     }

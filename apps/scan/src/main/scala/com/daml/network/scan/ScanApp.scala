@@ -95,11 +95,6 @@ class ScanApp(
           svcParty = svcParty,
           storage,
           loggerFactory,
-          // ScanStore needs its own connection for enriching the tx history on-demand
-          ledgerClient.readOnlyConnection(
-            this.getClass.getSimpleName,
-            loggerFactory,
-          ),
           retryProvider,
         )
       )
