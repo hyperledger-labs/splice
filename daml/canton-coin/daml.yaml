@@ -3,7 +3,7 @@
 # classes. You should either use `daml build` or `sbt ~compile`, but NOT both
 # at the same time (see #179 for more context).
 
-sdk-version: 2.9.0-snapshot.20231127.12418.0.v59ebefde
+sdk-version: 2.9.0-snapshot.20231129.12441.0.v72cefd6f
 name: canton-coin
 source: daml
 version: 0.1.0

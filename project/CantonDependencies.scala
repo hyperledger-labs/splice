@@ -3,14 +3,14 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "2.9.0-snapshot.20231127.12418.0.v59ebefde"
+  val version: String = "2.9.0-snapshot.20231129.12441.0.v72cefd6f"
   val daml_language_versions = Seq("1.14", "1.15", "1.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
   val daml_libraries_version = version
   val daml_compiler_version = version
   // TODO(#8069) Revert this back to daml_libraries_version.
-  val daml_java_codegen_version = "2.9.0-snapshot.20231127.12418.0.v59ebefde"
+  val daml_java_codegen_version = "2.9.0-snapshot.20231129.12441.0.v72cefd6f"
   val use_custom_daml_version = false
 
   lazy val osClassifier: String =

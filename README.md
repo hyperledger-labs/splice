@@ -556,7 +556,7 @@ Update the version in the `nix/cometbft-driver-sources.json` file
 
 #### Bumping Our Canton fork
 
-Current Canton commit: `0689e8649ccee69e0fb55908a8b0fbcfcc500749`
+Current Canton commit: `d1500dec6c5b1fbb295c6651f40e073132ce7b6b`
 
 
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
@@ -589,6 +589,8 @@ Current Canton commit: `0689e8649ccee69e0fb55908a8b0fbcfcc500749`
       6. You might also want to bump ``ledgerApiVersion`` in ``Dependencies.scala``. However, in general this must be kept in sync with the ledger API version
          server by the Canton binary not the Canton fork.
    6. Create another commit, `git add -A && git reset '*.rej' && git commit -m"Bump Canton commit and Canton/SDK versions"`
+5. Check if the `protocolVersions` in our `BuildInfoKeys` in `BuildCommon.scala` needs to be bumped.
+   - One way to do this is to run `start-canton.sh -w` with an updated Canton binary, and check `ProtocolVersions.latest` in the console.
 5. Test whether things compile using `sbt Test/compile`.
    In case of problems, here are some tips that help:
    - Check whether there are related `*.rej` files for the parts of our changes that could not be applied.
