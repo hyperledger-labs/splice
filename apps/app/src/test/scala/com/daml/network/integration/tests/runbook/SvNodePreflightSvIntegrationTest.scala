@@ -6,6 +6,7 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{DirectoryFrontendTestUtil, FrontendLoginUtil, WalletFrontendTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.DomainId
 
 import scala.concurrent.duration.*
 import scala.util.Random
@@ -152,9 +153,8 @@ abstract class SvNodePreflightSvIntegrationTestBase
     }
   }
 
-  "Dumping participant identities works" in { implicit env =>
+  "Key API endpoints are reachable and functional" in { implicit env =>
     val auth0 = auth0UtilFromEnvVars("https://canton-network-sv-test.us.auth0.com", Some("sv"))
-
     val token = eventuallySucceeds() {
       getAuth0ClientCredential(
         "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn",
@@ -162,9 +162,28 @@ abstract class SvNodePreflightSvIntegrationTestBase
         auth0,
       )(noTracingLogger)
     }
-
     val svValidatorClient = vc("svTestValidator").copy(token = Some(token))
-    svValidatorClient.dumpParticipantIdentities()
+    val svScanClient = scancl("svTestScan")
+    val sv1ScanClient = scancl("sv1Scan")
+    val participantId = clue("Can dump participant identities from SV validator") {
+      svValidatorClient.dumpParticipantIdentities().id
+    }
+    val activeDomain = clue("Can get active domain from Scan") {
+      val svActiveDomain = DomainId.tryFromString(
+        svScanClient.getCoinConfigAsOf(env.environment.clock.now).globalDomain.activeDomain
+      )
+      val sv1ActiveDomain = DomainId.tryFromString(
+        sv1ScanClient.getCoinConfigAsOf(env.environment.clock.now).globalDomain.activeDomain
+      )
+      svActiveDomain shouldBe sv1ActiveDomain
+      svActiveDomain
+    }
+    clue("Can get member traffic status from Scan") {
+      val svTrafficStatus = svScanClient.getMemberTrafficStatus(activeDomain, participantId.member)
+      val sv1TrafficStatus =
+        sv1ScanClient.getMemberTrafficStatus(activeDomain, participantId.member)
+      svTrafficStatus shouldBe sv1TrafficStatus
+    }
   }
 }
 

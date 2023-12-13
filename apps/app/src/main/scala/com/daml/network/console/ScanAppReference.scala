@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.cc.round.{
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
+import com.daml.network.http.v0.definitions
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
@@ -20,7 +21,7 @@ import com.daml.network.util.{CNNodeUtil, CoinConfigSchedule, Contract, Contract
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 
 import java.time.Instant
 
@@ -227,6 +228,17 @@ abstract class ScanAppReference(
   ): Seq[HttpScanAppClient.ValidatorPurchasedTraffic] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetTopValidatorsByPurchasedTraffic(round, limit))
+    }
+
+  @Help.Summary(
+    "Get a member's (participant or mediator) traffic status as reported by the sequencer"
+  )
+  def getMemberTrafficStatus(
+      domainId: DomainId,
+      memberId: Member,
+  ): definitions.MemberTrafficStatus =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetMemberTrafficStatus(domainId, memberId))
     }
 
   @Help.Summary(

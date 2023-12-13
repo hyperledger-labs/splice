@@ -49,6 +49,8 @@ spec:
         {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         - name: CN_APP_SCAN_PARTICIPANT_ADDRESS
           value: {{ .Values.participantAddress | default "participant" | quote }}
+        - name: CN_APP_SCAN_SEQUENCER_ADDRESS
+          value: {{ .Values.sequencerAddress | default "global-domain-sequencer" | quote }}
         imagePullPolicy: Always
         ports:
         - containerPort: 5012

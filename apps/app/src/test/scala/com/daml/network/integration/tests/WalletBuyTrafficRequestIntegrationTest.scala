@@ -161,17 +161,26 @@ class WalletBuyTrafficRequestIntegrationTest
                 aliceValidatorBackend.participantClient.id,
                 activeDomainId,
               ) shouldBe (initialTrafficAmount + minTopupAmount)
+              // TODO(#8882) - Also test Scan traffic-status API
             }
           }
         }
         clue("Receiving validator's sequencer traffic limit is updated") {
           // Note that this check would fail if we do not sync the on-ledger and sequencer traffic states at the beginning of this test.
+          val expectedTrafficLimit = initialTrafficAmount + minTopupAmount
           eventually() {
-            // TODO(#8882) - Replace with call to Scan traffic-status API
             getSequencerTrafficLimit(
               aliceValidatorBackend,
               activeDomainId,
-            ) shouldBe (initialTrafficAmount + minTopupAmount)
+            ) shouldBe expectedTrafficLimit
+            // double-check that scan returns the same result
+            sv1ScanBackend
+              .getMemberTrafficStatus(
+                activeDomainId,
+                aliceValidatorBackend.participantClient.id,
+              )
+              .actual
+              .totalLimit shouldBe expectedTrafficLimit
           }
         }
       }
@@ -321,10 +330,4 @@ class WalletBuyTrafficRequestIntegrationTest
 
   private def minTopupAmount(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment) =
     sv1ScanBackend.getCoinConfigAsOf(env.environment.clock.now).globalDomain.fees.minTopupAmount
-
-  private def activeDomainId(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment) =
-    DomainId.tryFromString(
-      sv1ScanBackend.getCoinConfigAsOf(env.environment.clock.now).globalDomain.activeDomain
-    )
-
 }

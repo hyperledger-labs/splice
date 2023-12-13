@@ -198,4 +198,9 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
   ): Long = {
     getTrafficState(validatorApp, domainId).extraTrafficLimit.fold(0L)(_.value)
   }
+
+  def activeDomainId(implicit env: CNNodeTestConsoleEnvironment) =
+    DomainId.tryFromString(
+      sv1ScanBackend.getCoinConfigAsOf(env.environment.clock.now).globalDomain.activeDomain
+    )
 }

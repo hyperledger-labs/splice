@@ -20,7 +20,7 @@ import com.daml.network.http.v0.definitions.{GetCnsRulesRequest, GetCoinRulesReq
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.codegen.java.cc
 import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
-import com.digitalasset.canton.topology.{DomainId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{DomainId, PartyId, SequencerId, Member}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
@@ -524,10 +524,22 @@ object HttpScanAppClient {
     }
   }
 
-  final case class ValidatorTrafficBalance(
-      remainingBalance: Double,
-      totalPurchased: Double,
-  )
+  case class GetMemberTrafficStatus(domainId: DomainId, memberId: Member)
+      extends BaseCommand[http.GetMemberTrafficStatusResponse, definitions.MemberTrafficStatus] {
+
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetMemberTrafficStatusResponse] =
+      client.getMemberTrafficStatus(domainId.toProtoPrimitive, memberId.toProtoPrimitive, headers)
+
+    override protected def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetMemberTrafficStatusResponse.OK(response) => Right(response.trafficStatus)
+    }
+  }
 
   case class ListImportCrates(party: PartyId)
       extends BaseCommand[http.ListImportCratesResponse, Seq[

@@ -21,6 +21,7 @@ case class ScanAppBackendConfig(
     override val storage: CNDbConfig,
     svUser: String,
     override val participantClient: CNParticipantClientConfig,
+    sequencerAdminClient: ClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     ingestFromParticipantBegin: Boolean = false,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,

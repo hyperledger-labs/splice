@@ -8,7 +8,14 @@ import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
-import com.daml.network.environment.{CNLedgerClient, CNNode, CNNodeStatus, DarResources, RetryFor}
+import com.daml.network.environment.{
+  CNLedgerClient,
+  CNNode,
+  CNNodeStatus,
+  DarResources,
+  RetryFor,
+  SequencerAdminConnection,
+}
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.admin.http.HttpScanHandler
@@ -96,6 +103,12 @@ class ScanApp(
           retryProvider,
         )
       )
+      sequencerAdminConnection = new SequencerAdminConnection(
+        config.sequencerAdminClient,
+        loggerFactory,
+        retryProvider,
+        clock,
+      )
       automation = new ScanAutomationService(
         config.automation,
         clock,
@@ -122,6 +135,7 @@ class ScanApp(
 
       handler = new HttpScanHandler(
         store,
+        sequencerAdminConnection,
         config.miningRoundsCacheTimeToLiveOverride,
         loggerFactory,
       )
@@ -164,6 +178,7 @@ class ScanApp(
         )
     } yield {
       ScanApp.State(
+        sequencerAdminConnection,
         storage,
         store,
         automation,
@@ -181,6 +196,7 @@ class ScanApp(
 object ScanApp {
 
   case class State(
+      sequencerAdminConnection: SequencerAdminConnection,
       storage: Storage,
       store: ScanStore,
       automation: ScanAutomationService,
@@ -202,6 +218,7 @@ object ScanApp {
         automation,
         store,
         storage,
+        sequencerAdminConnection,
       )(logger)
   }
 }
