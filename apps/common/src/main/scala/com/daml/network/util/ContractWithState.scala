@@ -5,8 +5,9 @@ import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.topology.DomainId
-
+import com.daml.network.http.v0.definitions
 import Contract.Companion
+import com.digitalasset.canton.logging.ErrorLoggingContext
 
 final case class ContractWithState[TCid, T](
     contract: Contract[TCid, T],
@@ -17,6 +18,12 @@ final case class ContractWithState[TCid, T](
       case ContractState.Assigned(domain) => Some(AssignedContract(contract, domain))
       case ContractState.InFlight => None
     }
+
+  def toHttp(implicit elc: ErrorLoggingContext): definitions.ContractWithState =
+    definitions.ContractWithState(
+      contract.toHttp,
+      state.fold(domainId => Some(domainId.toProtoPrimitive), None),
+    )
 }
 
 object ContractWithState {

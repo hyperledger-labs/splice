@@ -21,6 +21,11 @@ export interface AssignedContract<T> {
   domainId: string;
 }
 
+export interface ContractWithState<T> {
+  contract: Contract<T>;
+  domainId?: string;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const Contract = {
   decodeOpenAPI: <T extends object, K, I extends string>(

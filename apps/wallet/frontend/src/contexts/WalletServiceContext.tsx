@@ -3,6 +3,7 @@ import BigNumber from 'bignumber.js';
 import {
   BaseApiMiddleware,
   Contract,
+  ContractWithState,
   OpenAPILoggingMiddleware,
   useUserState,
 } from 'common-frontend';
@@ -71,7 +72,7 @@ export interface WalletClient {
   rejectTransferOffer: (offerContractId: string) => Promise<void>;
   listAcceptedTransferOffers: () => Promise<ListAcceptedTransferOffersResponse>;
 
-  getAppPaymentRequest: (contractId: string) => Promise<Contract<AppPaymentRequest>>;
+  getAppPaymentRequest: (contractId: string) => Promise<ContractWithState<AppPaymentRequest>>;
   acceptAppPaymentRequest: (requestContractId: string) => Promise<void>;
   rejectAppPaymentRequest: (requestContractId: string) => Promise<void>;
 
@@ -231,7 +232,8 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       getAppPaymentRequest: async contractId => {
         const response = await walletClient.getAppPaymentRequest(contractId);
-        return Contract.decodeOpenAPI(response, payment.AppPaymentRequest);
+        const contract = Contract.decodeOpenAPI(response.contract, payment.AppPaymentRequest);
+        return { contract, domainId: response.domain_id };
       },
       acceptAppPaymentRequest: async requestContractId => {
         await walletClient.acceptAppPaymentRequest(requestContractId);

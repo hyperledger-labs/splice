@@ -138,7 +138,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+                $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":

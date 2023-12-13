@@ -10,7 +10,7 @@ const DevNetOnly: React.FC<{ children: React.ReactElement }> = props => {
     return null;
   }
 
-  const isDevNet = coinRules?.payload.isDevNet;
+  const isDevNet = coinRules?.contract.payload.isDevNet;
 
   if (!isDevNet) {
     return null;

@@ -50,8 +50,9 @@ const NetworkInfo: React.FC = () => {
               </Stack>
               <FeesTable
                 coinConfig={
-                  getCoinConfigurationAsOfNow(getCoinRulesQuery.data.payload.configSchedule)
-                    .initialValue
+                  getCoinConfigurationAsOfNow(
+                    getCoinRulesQuery.data.contract.payload.configSchedule
+                  ).initialValue
                 }
               />
               <NextConfigUpdate />
@@ -66,7 +67,8 @@ const NextConfigUpdate: React.FC = () => {
   const { data: coinRules } = useGetCoinRules();
 
   const futureValues =
-    coinRules && getCoinConfigurationAsOfNow(coinRules.payload.configSchedule).futureValues;
+    coinRules &&
+    getCoinConfigurationAsOfNow(coinRules.contract.payload.configSchedule).futureValues;
   const configurationUpdate =
     futureValues && futureValues.length > 0 && new Date(futureValues[0]._1);
 

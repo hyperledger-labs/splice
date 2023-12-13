@@ -113,13 +113,13 @@ trait UserWalletStore
   def getAppPaymentRequest(
       cid: walletCodegen.AppPaymentRequest.ContractId
   )(implicit tc: TraceContext): Future[
-    Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
+    ContractWithState[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
   ] =
     for {
       appPaymentRequest <- multiDomainAcsStore.getContractById(
         walletCodegen.AppPaymentRequest.COMPANION
       )(cid)
-    } yield appPaymentRequest.contract
+    } yield appPaymentRequest
 
   def listExpiredAppPaymentRequests: ListExpiredContracts[
     walletCodegen.AppPaymentRequest.ContractId,

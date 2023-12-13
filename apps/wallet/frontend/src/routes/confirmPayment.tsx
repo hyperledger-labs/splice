@@ -1,6 +1,6 @@
 import BigNumber from 'bignumber.js';
 import { AmountDisplay, CnsEntry, ErrorDisplay, Loading, RateDisplay } from 'common-frontend';
-import { useCoinPrice } from 'common-frontend/scan-api';
+import { useCoinPrice, useGetCoinRules } from 'common-frontend/scan-api';
 import React from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
@@ -39,7 +39,8 @@ export const ConfirmPayment: React.FC = () => {
     return <ErrorDisplay message={'Error while fetching payment requests and coin price'} />;
   }
 
-  const appPaymentRequest = appPaymentRequestQuery.data;
+  const appPaymentRequest = appPaymentRequestQuery.data.contract;
+  const appPaymentRequestDomain = appPaymentRequestQuery.data.domainId;
 
   const total = computeTotal(appPaymentRequest.payload.receiverAmounts, coinPriceQuery.data);
 
@@ -71,6 +72,7 @@ export const ConfirmPayment: React.FC = () => {
         <PaymentDescription description={appPaymentRequest.payload.description} />
         <TotalPaymentContainer
           contractId={appPaymentRequest.contractId}
+          domainId={appPaymentRequestDomain}
           total={total}
           coinPrice={coinPriceQuery.data}
         />
@@ -226,11 +228,13 @@ const PaymentDescription: React.FC<PaymentDescriptionProps> = ({ description }) 
 
 interface PaymentContainerProps {
   contractId: ContractId<payment.AppPaymentRequest>;
+  domainId?: string;
   total: Total;
   coinPrice: BigNumber;
 }
 const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
   contractId,
+  domainId,
   total,
   coinPrice,
 }) => {
@@ -259,19 +263,22 @@ const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
             </Typography>
             <Typography variant="body2">Fees will be added.</Typography>
           </Stack>
-          <ConfirmPaymentButton contractId={contractId} />
+          <ConfirmPaymentButton contractId={contractId} domainId={domainId} />
         </Stack>
       </Box>
     </Container>
   );
 };
 
-const ConfirmPaymentButton: React.FC<{ contractId: ContractId<payment.AppPaymentRequest> }> = ({
-  contractId,
-}) => {
+const ConfirmPaymentButton: React.FC<{
+  contractId: ContractId<payment.AppPaymentRequest>;
+  domainId?: string;
+}> = ({ contractId, domainId }) => {
   const { acceptAppPaymentRequest } = useWalletClient();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect');
+  const coinRules = useGetCoinRules();
+  const coinRulesDomain = coinRules.data && coinRules.data.domainId;
 
   const onAccept = async () => {
     await acceptAppPaymentRequest(contractId);
@@ -281,7 +288,13 @@ const ConfirmPaymentButton: React.FC<{ contractId: ContractId<payment.AppPayment
   };
 
   return (
-    <Button variant="pill" size="large" onClick={onAccept} className="payment-accept">
+    <Button
+      variant="pill"
+      size="large"
+      onClick={onAccept}
+      className="payment-accept"
+      disabled={!domainId || domainId !== coinRulesDomain}
+    >
       Send Payment
     </Button>
   );

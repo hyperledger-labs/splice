@@ -240,12 +240,9 @@ abstract class PreflightValidatorIntegrationTestBase
           )
 
           // Bob is redirected to wallet ..
-          val acceptButton = eventually() {
-            findAll(className("payment-accept")).toSeq.headOption
-              .valueOrFail("Failed to find accept payment button.")
+          clue("accept payment in wallet") {
+            eventuallyClickOn(className("payment-accept"))
           }
-
-          acceptButton.underlying.click()
 
           // And then back to splitwell, where he is already logged in.
           // Accepting the payment (which triggers the redirect) and seeing

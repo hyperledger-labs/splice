@@ -2,10 +2,10 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
 import { CoinRules } from '@daml.js/canton-coin/lib/CC/CoinRules/';
 
-import { Contract, PollingStrategy } from '../../utils';
+import { Contract, ContractWithState, PollingStrategy } from '../../utils';
 import { useScanClient } from './ScanClientContext';
 
-const useGetCoinRules = (): UseQueryResult<Contract<CoinRules>> => {
+const useGetCoinRules = (): UseQueryResult<ContractWithState<CoinRules>> => {
   const scanClient = useScanClient();
 
   return useQuery({
@@ -16,7 +16,8 @@ const useGetCoinRules = (): UseQueryResult<Contract<CoinRules>> => {
       if (!response.coin_rules_update.contract) {
         throw new Error(`There was no CoinRules contract in response: ${JSON.stringify(response)}`);
       }
-      return Contract.decodeOpenAPI(response.coin_rules_update.contract, CoinRules);
+      const contract = Contract.decodeOpenAPI(response.coin_rules_update.contract, CoinRules);
+      return { contract, domainId: response.coin_rules_update.domain_id };
     },
   });
 };

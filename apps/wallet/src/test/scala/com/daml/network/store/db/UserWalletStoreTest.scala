@@ -429,7 +429,11 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           actualP should be(empty)
 
           // Pointwise lookup - only user1 store should see request1
-          store1.getAppPaymentRequest(request1.contractId).map(resultCids).futureValue should be(
+          store1
+            .getAppPaymentRequest(request1.contractId)
+            .map(_.contract)
+            .map(resultCids)
+            .futureValue should be(
             request1.contractId.contractId
           )
           assertThrows[Throwable](store2.getAppPaymentRequest(request1.contractId).futureValue)
@@ -496,7 +500,11 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           actual should contain theSameElementsInOrderAs expected
 
           // Pointwise lookup - only request1 should be visible
-          store1.getAppPaymentRequest(request1.contractId).map(resultCids).futureValue should be(
+          store1
+            .getAppPaymentRequest(request1.contractId)
+            .map(_.contract)
+            .map(resultCids)
+            .futureValue should be(
             request1.contractId.contractId
           )
           assertThrows[Throwable](store1.getAppPaymentRequest(request2.contractId).futureValue)

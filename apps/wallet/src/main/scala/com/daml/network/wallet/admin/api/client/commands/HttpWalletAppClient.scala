@@ -281,7 +281,9 @@ object HttpWalletAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case GetAppPaymentRequestResponse.OK(response) =>
-      Contract.fromHttp(walletCodegen.AppPaymentRequest.COMPANION)(response).leftMap(_.toString)
+      Contract
+        .fromHttp(walletCodegen.AppPaymentRequest.COMPANION)(response.contract)
+        .leftMap(_.toString)
     }
   }
 
