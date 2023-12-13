@@ -175,12 +175,12 @@ If this is not true for your OIDC provider, pay extra attention when configuring
 For user-facing authentication - allowing users to access the various web UIs hosted on your SV node,
 your OIDC provider must support the `OAuth 2.0 Authorization Code Grant <https://datatracker.ietf.org/doc/html/rfc6749#section-4.1>`_ flow
 and allow you to obtain client identifiers for the web UIs your SV node will be hosting.
-Currently, these are the SV web UI, the Wallet web UI and the Directory web UI.
+Currently, these are the SV web UI, the Wallet web UI and the CNS web UI.
 You might be required to whitelist a range of URLs on your OIDC provider, such as "Allowed Callback URLs", "Allowed Logout URLs", "Allowed Web Origins", and "Allowed Origins (CORS)".
 If you are using the ingress configuration of this runbook, the correct URLs to configure here are
 ``https://sv.sv.svc.YOUR_HOSTNAME`` (for the SV web UI) ,
 ``https://wallet.sv.svc.YOUR_HOSTNAME`` (for the Wallet web UI) and
-``https://directory.sv.svc.YOUR_HOSTNAME`` (for the Directory web UI).
+``https://cns.sv.svc.YOUR_HOSTNAME`` (for the CNS web UI).
 An identifier that is unique to the user must be set via the `sub` field of the issued JWT.
 On some occasions, this identifier will be used as a user name for that user on your SV node's Canton participant.
 In :ref:`helm-sv-install`, you will be required to configure a user identifier as the ``validatorWalletUser`` -
@@ -205,7 +205,7 @@ SV_CLIENT_ID            The client id of the Auth0 app for the SV app backend
 SV_CLIENT_SECRET        The client secret of the Auth0 app for the SV app backend
 WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
 SV_UI_CLIENT_ID         The client id of the Auth0 app for the SV UI.
-DIRECTORY_UI_CLIENT_ID  The client id of the Auth0 app for the directory UI.
+CNS_UI_CLIENT_ID        The client id of the Auth0 app for the CNS UI.
 ======================= ===========================================================================
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-sv-auth-secrets-config` and :ref:`helm-sv-install`.
@@ -277,12 +277,12 @@ To configure `Auth0 <https://auth0.com>`_ as your SV's OIDC provider, perform th
    - In steps c and d, use the URL for your SV's *wallet* UI.
      If you're using the ingress configuration of this runbook, that would be ``https://wallet.sv.svc.YOUR_HOSTNAME``.
 
-7. Create an Auth0 Application for the directory web UI.
+7. Create an Auth0 Application for the CNS web UI.
    Repeat all steps described in step 5, with following modifications:
 
-   - In step b, use ``Directory web UI`` as the name of your application.
-   - In steps c and d, use the URL for your SV's *directory* UI.
-     If you're using the ingress configuration of this runbook, that would be ``https://directory.sv.svc.YOUR_HOSTNAME``.
+   - In step b, use ``CNS web UI`` as the name of your application.
+   - In steps c and d, use the URL for your SV's *CNS* UI.
+     If you're using the ingress configuration of this runbook, that would be ``https://cns.sv.svc.YOUR_HOSTNAME``.
 
 8. (Optional) Similarly to the ledger API above, the default audience is set to ``https://canton.network.global``.
     If you want to configure a different audience to your APIs, you can do so by creating new Auth0 APIs with an identifier set to the audience of your choice. For example,
@@ -310,7 +310,7 @@ SV_CLIENT_ID                       The client id of the Auth0 app for the SV app
 SV_CLIENT_SECRET                   The client secret of the Auth0 app for the SV app backend
 WALLET_UI_CLIENT_ID                The client id of the Auth0 app for the wallet UI.
 SV_UI_CLIENT_ID                    The client id of the Auth0 app for the SV UI.
-DIRECTORY_UI_CLIENT_ID             The client id of the Auth0 app for the directory UI.
+CNS_UI_CLIENT_ID                   The client id of the Auth0 app for the CNS UI.
 ================================== ===========================================================================
 
 The ``AUTH0_TENANT_NAME`` is the name of your Auth0 tenant as shown at the top left of your Auth0 project.
@@ -360,9 +360,9 @@ To setup the wallet and SV UI, create the following two secrets.
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${SV_UI_CLIENT_ID}"
 
-    kubectl create --namespace sv secret generic cn-app-directory-ui-auth \
+    kubectl create --namespace sv secret generic cn-app-cns-ui-auth \
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
-        "--from-literal=client-id=${DIRECTORY_UI_CLIENT_ID}"
+        "--from-literal=client-id=${CNS_UI_CLIENT_ID}"
 
 Configuring your CometBft node
 ------------------------------
@@ -622,8 +622,8 @@ Each SV member is required to configure their cluster ingress to allow traffic f
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan`` should be routed to ``/api/scan`` at port 5012 in service ``scan-app`` in the ``sv`` namespace.
 * ``cometbft.sv.svc.<YOUR_HOSTNAME>:26656`` should be routed to port 26656 of service ``cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol.
   Please note that cometBFT traffic is purely TCP. TLS is not supported so SNI host routing for these traffic is not possible.
-* ``https://directory.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``directory-web-ui`` in the ``sv`` namespace.
-* ``https://directory.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
+* ``https://cns.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``cns-web-ui`` in the ``sv`` namespace.
+* ``https://cns.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
 * ``https://sequencer.sv.svc.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-sequencer`` in the ``sv`` namespace.
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
@@ -781,20 +781,20 @@ Once logged in one should see the transactions page.
   :width: 600
   :alt: After logged in into the wallet UI
 
-.. _helm-directory-web-ui:
+.. _helm-cns-web-ui:
 
-Logging into the directory UI
+Logging into the CNS UI
 -----------------------------
 
 You can open your browser at
-https://directory.sv.svc.YOUR_HOSTNAME and login using the
+https://cns.sv.svc.YOUR_HOSTNAME and login using the
 credentials for the user that you configured as
 ``validatorWalletUser`` earlier. You will be able to register a name on the
 Canton Name Service.
 
-.. image:: images/directory_home.png
+.. image:: images/cns_home.png
   :width: 600
-  :alt: After logged in into the Directory UI
+  :alt: After logged in into the CNS UI
 
 .. _local-sv-web-ui:
 
@@ -891,7 +891,7 @@ Please modify the command as follows:
 
 .. code-block:: bash
 
-    curl --location 'https://directory.sv.svc.<your_hostname>/api/json-api/v1/parties/allocate' \
+    curl --location 'https://cns.sv.svc.<your_hostname>/api/json-api/v1/parties/allocate' \
     --header 'Authorization: Bearer <access_token>' \
     --header 'Content-Type: application/json' \
     --data '{
@@ -927,7 +927,7 @@ Please modify the command as follows:
 
 .. code-block:: bash
 
-    curl --location 'https://directory.sv.svc.<your_hostname>/api/json-api/v1/user/create' \
+    curl --location 'https://cns.sv.svc.<your_hostname>/api/json-api/v1/user/create' \
     --header 'Authorization: Bearer <access_token>' \
     --header 'Content-Type: application/json' \
     --data '{

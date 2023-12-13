@@ -844,7 +844,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       }
     }
 
-    "listDirectoryEntries" should {
+    "listCnsEntries" should {
       "return correct results" in {
         val payData = subscriptionPayData()
         for {
@@ -856,12 +856,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             time(1),
           )
           subscriptionRequest1 = subscription1.payload.reference
-          directoryEntryContext1 = directoryEntryContext(
+          cnsEntryContext1 = cnsEntryContext(
             user1,
             "user1",
             subscriptionRequest1,
           )
-          directoryEntry1 = directoryEntry(
+          cnsEntry1 = cnsEntry(
             user1,
             "user1",
             provider1,
@@ -873,21 +873,21 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             store1.multiDomainAcsStore
           )
           _ <- dummyDomain.create(
-            directoryEntryContext1,
+            cnsEntryContext1,
             createdEventSignatories = Seq(user1, provider1),
           )(
             store1.multiDomainAcsStore
           )
-          _ <- dummyDomain.create(directoryEntry1, createdEventSignatories = Seq(user1, provider1))(
+          _ <- dummyDomain.create(cnsEntry1, createdEventSignatories = Seq(user1, provider1))(
             store1.multiDomainAcsStore
           )
         } yield {
-          val actual = store1.listDirectoryEntries().futureValue
+          val actual = store1.listCnsEntries().futureValue
           val expected = Seq(
-            UserWalletStore.DirectoryEntryWithPayData(
-              contractId = directoryEntry1.contractId,
-              expiresAt = directoryEntry1.payload.expiresAt,
-              entryName = directoryEntry1.payload.name,
+            UserWalletStore.CnsEntryWithPayData(
+              contractId = cnsEntry1.contractId,
+              expiresAt = cnsEntry1.payload.expiresAt,
+              entryName = cnsEntry1.payload.name,
               amount = state1.payload.payData.paymentAmount.amount,
               currency = state1.payload.payData.paymentAmount.currency,
               paymentInterval = state1.payload.payData.paymentInterval,
@@ -1170,7 +1170,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  protected def directoryEntry(
+  protected def cnsEntry(
       user: PartyId,
       name: String,
       provider: PartyId = providerParty(0),
@@ -1193,7 +1193,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  protected def directoryEntryContext(
+  protected def cnsEntryContext(
       user: PartyId,
       name: String,
       subscriptionRequest: subsCodegen.SubscriptionRequest.ContractId,

@@ -276,11 +276,11 @@ trait UserWalletStore
       limit: PageLimit,
   )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TransactionHistoryTxLogEntry]]
 
-  def listDirectoryEntries(limit: Limit = Limit.DefaultLimit)(implicit tc: TraceContext): Future[
-    Seq[UserWalletStore.DirectoryEntryWithPayData]
+  def listCnsEntries(limit: Limit = Limit.DefaultLimit)(implicit tc: TraceContext): Future[
+    Seq[UserWalletStore.CnsEntryWithPayData]
   ] = {
     import UserWalletStore.{
-      DirectoryEntryWithPayData,
+      CnsEntryWithPayData,
       EntryWithSubscriptionContext,
       SubscriptionIdleState,
       SubscriptionPayData,
@@ -332,7 +332,7 @@ trait UserWalletStore
         subRefToPayData
           .get(es.subscriptionReference)
           .map(subPayData =>
-            DirectoryEntryWithPayData(
+            CnsEntryWithPayData(
               contractId = es.entry.contractId,
               expiresAt = es.entry.payload.expiresAt,
               entryName = es.entry.payload.name,
@@ -430,7 +430,7 @@ object UserWalletStore {
       subscriptionReference: subsCodegen.SubscriptionRequest.ContractId,
       payData: subsCodegen.SubscriptionPayData,
   )
-  final case class DirectoryEntryWithPayData(
+  final case class CnsEntryWithPayData(
       contractId: cnsCodegen.CnsEntry.ContractId,
       expiresAt: Instant,
       entryName: String,
@@ -614,7 +614,7 @@ object UserWalletStore {
         mkFilter(coinCodegen.FeaturedAppRight.COMPANION)(co =>
           co.payload.svc == svc && co.payload.provider == endUser
         )(UserWalletAcsStoreRowData(_)),
-        // Cns entry
+        // CNS entry
         mkFilter(cnsCodegen.CnsEntry.COMPANION)(co => co.payload.user == endUser)(
           UserWalletAcsStoreRowData(_)
         ),

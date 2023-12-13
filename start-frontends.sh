@@ -76,7 +76,7 @@ function usage() {
   echo "  -h        display this help message"
   echo "  -d        start in detached mode"
   echo "  -a        run all frontends with canton-network-test auth0 tenant and no test auth"
-  echo "  -p        run the frontends needed for the preflight self-hosted directory UI test"
+  echo "  -p        run the frontends needed for the preflight self-hosted CNS UI test"
   echo "  -v        run frontends with a shared validator for all users"
   echo "  -s        run frontends with two super validators for Sv*IntegrationTest in CI"
   echo "  -l        run frontends with four super validators for local testing"
@@ -179,8 +179,8 @@ function start_local_frontends() {
   start_frontend   wallet    3001 bob     $validator_for_bob   $enable_test_auth
   start_frontend   wallet    3011 sv1     "sv1"                $enable_test_auth
 
-  # Directory
-  start_frontend   directory 3100 alice   "alice"              $enable_test_auth
+  # CNS
+  start_frontend   cns       3100 alice   "alice"              $enable_test_auth
 
   # SV
   start_frontend   sv        3211 sv1     "sv1"                $enable_test_auth
@@ -215,17 +215,17 @@ function start_local_frontends() {
 
 }
 
-# The set of frontends we want to start for the preflight self-hosted directory UI test
+# The set of frontends we want to start for the preflight self-hosted CNS UI test
 function start_preflight_frontends() {
   # start_frontend <app> <ui-http-port> <user-name> <validator-name> <enable-test-auth> <algorithm> <cluster-protocol> <cluster-address>
   start_frontend   wallet    3000 alice   "preflight" $enable_test_auth "rs-256" "https" "${NETWORK_APPS_ADDRESS}"
-  start_frontend   directory 3004 alice   "preflight" $enable_test_auth "rs-256" "https" "${NETWORK_APPS_ADDRESS}"
+  start_frontend   cns       3004 alice   "preflight" $enable_test_auth "rs-256" "https" "${NETWORK_APPS_ADDRESS}"
 }
 
 # The set of tests we want to start for local unit testing
 function start_local_tests() {
   start_test app-manager
-  start_test directory
+  start_test cns
   start_test scan
   start_test splitwell
   start_test sv

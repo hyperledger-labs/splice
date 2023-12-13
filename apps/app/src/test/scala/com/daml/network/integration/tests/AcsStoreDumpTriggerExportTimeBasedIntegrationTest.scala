@@ -13,7 +13,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.{
   Contract,
-  DirectoryTestUtil,
+  CnsEntryTestUtil,
   GcpBucket,
   ResourceTemplateDecoder,
   TemplateJsonDecoder,
@@ -31,7 +31,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
     extends CNNodeIntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with TimeTestUtil
-    with DirectoryTestUtil {
+    with CnsEntryTestUtil {
 
   private val packageSignatures = {
     // Note: the canton-name-service.dar suffices as it transitively references canton-coin.dar as well.
@@ -75,10 +75,10 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
     }
     val (_, aliceCnsEntryContractIds) = actAndCheck(
       "Setup a cns entry for alice",
-      initialiseDirectoryApp(
+      initialiseCnsEntry(
         "alice.unverified.cns",
         aliceUserParty,
-        aliceDirectoryExternalClient,
+        aliceCnsExternalClient,
         aliceWalletClient,
       ),
     )(
@@ -210,7 +210,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
       }
       val lockedCoinContractIds = checkContracts(cc.coin.LockedCoin.COMPANION)
       val importCrateContractIds = checkContracts(cc.coinimport.ImportCrate.COMPANION)
-      val directoryEntryContractIds = checkContracts(cn.cns.CnsEntry.COMPANION)
+      val cnsEntryContractIds = checkContracts(cn.cns.CnsEntry.COMPANION)
 
       clue("check that all expected contract-ids are present") {
         val actualContractIds =
@@ -218,7 +218,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
             .map(co => co.contractId.contractId)
             .appendedAll(lockedCoinContractIds)
             .appendedAll(importCrateContractIds)
-            .appendedAll(directoryEntryContractIds)
+            .appendedAll(cnsEntryContractIds)
             .toSet
         expectedContractIds.diff(actualContractIds) shouldBe empty
       }

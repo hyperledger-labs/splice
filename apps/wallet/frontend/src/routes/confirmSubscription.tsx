@@ -1,7 +1,7 @@
 import BigNumber from 'bignumber.js';
 import {
   AmountDisplay,
-  DirectoryEntry,
+  CnsEntry,
   Loading,
   ErrorDisplay,
   IntervalDisplay,
@@ -43,14 +43,14 @@ export const ConfirmSubscription: React.FC = () => {
             <Stack alignItems="center" spacing={1}>
               <Stack alignItems="center" direction="row" spacing={1}>
                 <Typography variant="h6">Confirm Subscription to </Typography>
-                <DirectoryEntry
+                <CnsEntry
                   partyId={subscriptionRequestQuery.data.payload.subscriptionData.receiver}
                   variant="h5"
                 />
               </Stack>
               <Stack alignItems="center" direction="row" spacing={1}>
                 <Typography variant="body2">via </Typography>
-                <DirectoryEntry
+                <CnsEntry
                   partyId={subscriptionRequestQuery.data.payload.subscriptionData.provider}
                   variant="body2"
                 />

@@ -14,10 +14,10 @@ Payments and integration with CC Wallet
 * Never work against CC directly, instead go through Wallet APIs
 * Each CC write (transfer, locking) must require confirmation through wallet
 
-Integration with Directory App
+Integration with CNS App
 ------------------------------
 
-* No resolution within Daml, resolve names off-ledger via APIs of directory service
+* No resolution within Daml, resolve names off-ledger via APIs of CNS service
 * Design Daml models to work with parties not human readable names + resolution
 * If needed, check that resolution is still accurate in transaction by
   passing in cid of entry & fetch it

@@ -551,7 +551,7 @@
       "payload": {
         "name": "alice.unverified.cns",
         "url": "https://cns-dir-url.com",
-        "description": "Sample CNS Directory Entry Description",
+        "description": "Sample CNS Entry Description",
         "expiresAt": "1970-04-01T00:02:40Z",
         "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
         "user": "alice__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250"
@@ -566,7 +566,7 @@
         "reference": "004f2bdfe3bb511a7a8c11b2342c24e4060e4bd4b0e2b66a92d8373f8d801aaa08ca02122057b846862c91e0a489a1974a0f29ce292ed1a27584c6c862eb0c21ecdba0348c",
         "name": "alice.unverified.cns",
         "url": "https://cns-dir-url.com",
-        "description": "Sample CNS Directory Entry Description",
+        "description": "Sample CNS Entry Description",
         "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
         "user": "alice__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250"
       },
@@ -727,7 +727,7 @@
         "nextPaymentDueAt": "1970-04-01T00:02:40Z",
         "subscriptionData": {
           "provider": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
-          "description": "Cns entry: \"alice.unverified.cns\"",
+          "description": "CNS entry: \"alice.unverified.cns\"",
           "receiver": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
           "sender": "alice__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250",
           "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b"

@@ -48,13 +48,13 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       val charlieEntryName = perTestCaseName("charlie")
-      createDirectoryEntry(
-        charlieDirectoryExternalClient,
+      createCnsEntry(
+        charlieCnsExternalClient,
         charlieEntryName,
         charlieWalletClient,
       )
 
-      val directoryExpectedCns = createDirectoryEntryForDirectoryItself
+      val entryForCns = createCnsEntryForItself
 
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
@@ -72,8 +72,8 @@ class WalletTransactionHistoryFrontendIntegrationTest
         val (_, txs) = actAndCheck(
           "Transactions are done", {
             // alice's directory - also taps 5 CC
-            createDirectoryEntry(
-              aliceDirectoryExternalClient,
+            createCnsEntry(
+              aliceCnsExternalClient,
               aliceEntryName,
               aliceWalletClient,
             )
@@ -110,7 +110,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         )
 
         inside(txs) {
-          case otp +: sent +: received +: directoryCreation +: lockForDirectory +: balanceChange +: Nil =>
+          case otp +: sent +: received +: cnsCreation +: lockForCns +: balanceChange +: Nil =>
             matchTransaction(otp)(
               coinPrice = 2,
               expectedAction = "Sent",
@@ -138,14 +138,14 @@ class WalletTransactionHistoryFrontendIntegrationTest
             )
             // Note: this transfer has no effect on the balance of the sender:
             // the input for the app payment is a locked coin that was unlocked in the same transaction.
-            matchTransaction(directoryCreation)(
+            matchTransaction(cnsCreation)(
               coinPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "CNS Entry Initial Payment Collected",
-              expectedPartyDescription = Some(s"$directoryExpectedCns $directoryExpectedCns"),
+              expectedPartyDescription = Some(s"$entryForCns $entryForCns"),
               expectedAmountCC = BigDecimal(0), // 0 USD
             )
-            matchTransaction(lockForDirectory)(
+            matchTransaction(lockForCns)(
               coinPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "Subscription Initial Payment Accepted",
@@ -184,7 +184,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 expectedAction = "Sent",
                 expectedSubtype = "Extra Traffic Purchase",
                 expectedPartyDescription =
-                  Some(s"${expectedCns(svcParty, "directory.cns")} ${sv1ValidatorParty}"),
+                  Some(s"${expectedCns(svcParty, "cns.cns")} ${sv1ValidatorParty}"),
                 expectedAmountCC = -trafficCostCc,
               )
             }
@@ -217,12 +217,12 @@ class WalletTransactionHistoryFrontendIntegrationTest
           },
         )
 
-        createDirectoryEntry(
-          aliceDirectoryExternalClient,
+        createCnsEntry(
+          aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
         )
-        createDirectoryEntry(bobDirectoryExternalClient, bobEntryName, bobWalletClient)
+        createCnsEntry(bobCnsExternalClient, bobEntryName, bobWalletClient)
 
         aliceWalletClient.tap(500)
 

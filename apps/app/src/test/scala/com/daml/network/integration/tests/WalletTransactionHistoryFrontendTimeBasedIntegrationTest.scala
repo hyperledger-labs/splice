@@ -33,11 +33,11 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice")
 
-      val directoryExpectedCns = createDirectoryEntryForDirectoryItself
+      val entryForCns = createCnsEntryForItself
 
       withFrontEnd("alice") { implicit webDriver =>
-        createDirectoryEntry(
-          aliceDirectoryExternalClient,
+        createCnsEntry(
+          aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
         )
@@ -55,7 +55,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           },
         )
 
-        matchInitialTransactions(txsBefore, directoryExpectedCns)
+        matchInitialTransactions(txsBefore, entryForCns)
 
         val (_, txsAfter) = actAndCheck(
           "time passes for the next payment to happen", {
@@ -75,8 +75,8 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           },
         )
 
-        matchLockUnlockDirectoryPayment(txsAfter.take(2), directoryExpectedCns, isInitial = false)
-        matchInitialTransactions(txsAfter.drop(2), directoryExpectedCns)
+        matchLockUnlockCnsPayment(txsAfter.take(2), entryForCns, isInitial = false)
+        matchInitialTransactions(txsAfter.drop(2), entryForCns)
       }
     }
 
@@ -109,11 +109,11 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
       }
     }
 
-    def matchInitialTransactions(txs: Seq[Element], directoryExpectedCns: String)(implicit
+    def matchInitialTransactions(txs: Seq[Element], entryForCns: String)(implicit
         env: CNNodeTestConsoleEnvironment
     ) = {
       inside(txs) { case rest :+ balanceChange =>
-        matchLockUnlockDirectoryPayment(rest, directoryExpectedCns, isInitial = true)
+        matchLockUnlockCnsPayment(rest, entryForCns, isInitial = true)
         matchTransaction(balanceChange)(
           coinPrice = 2,
           expectedAction = "Balance Change",
@@ -124,27 +124,27 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
       }
     }
 
-    def matchLockUnlockDirectoryPayment(
+    def matchLockUnlockCnsPayment(
         txs: Seq[Element],
-        directoryExpectedCns: String,
+        entryForCns: String,
         isInitial: Boolean,
     )(implicit
         env: CNNodeTestConsoleEnvironment
     ) = {
-      inside(txs) { case directoryCreation +: lockForDirectory +: Nil =>
+      inside(txs) { case cnsCreation +: lockForCns +: Nil =>
         // Note: this transfer has no effect on the balance of the sender:
         // the input for the app payment is a locked coin that was unlocked in the same transaction.
-        matchTransaction(directoryCreation)(
+        matchTransaction(cnsCreation)(
           coinPrice = 2,
           expectedAction = "Sent",
           expectedSubtype =
             if (isInitial)
               "CNS Entry Initial Payment Collected"
             else "CNS Entry Renewal Payment Collected",
-          expectedPartyDescription = Some(s"$directoryExpectedCns $directoryExpectedCns"),
+          expectedPartyDescription = Some(s"$entryForCns $entryForCns"),
           expectedAmountCC = BigDecimal(0), // 0 USD
         )
-        matchTransaction(lockForDirectory)(
+        matchTransaction(lockForCns)(
           coinPrice = 2,
           expectedAction = "Sent",
           expectedSubtype =

@@ -9,7 +9,7 @@ spec:
   - "wallet.splitwell.{{ (.Values.cluster).basename }}.network.canton.global"
   - "splitwell.{{ (.Values.cluster).basename }}.network.canton.global"
   - "wallet.splitwell.{{ (.Values.cluster).basename }}.network.canton.global"
-  - "directory.validator1.{{ (.Values.cluster).basename }}.network.canton.global"
+  - "cns.validator1.{{ (.Values.cluster).basename }}.network.canton.global"
   - "splitwell.validator1.{{ (.Values.cluster).basename }}.network.canton.global"
   - "wallet.validator1.{{ (.Values.cluster).basename }}.network.canton.global"
   gateways:

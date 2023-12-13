@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: cns-web-ui
+  name: cns-web-ui
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cns-web-ui
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: cns-web-ui
+    spec:
+      containers:
+      - name: cns-web-ui
+        image: "{{ .Values.imageRepo }}/cns-web-ui:{{ (.Values.cluster).imageTag }}"
+        imagePullPolicy: Always
+        env:
+        - name: CN_APP_CNS_UI_AUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              key: client-id
+              name: cn-app-cns-ui-auth
+              optional: false
+        - name: CN_APP_CNS_UI_AUTH_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: cn-app-cns-ui-auth
+              optional: false
+        - name: CN_APP_CNS_UI_AUTH_AUDIENCE
+          value: {{ (.Values.auth).audience | default "https://canton.network.global" | quote }}
+        - name: CN_APP_CNS_UI_CLUSTER
+          value: {{ .Values.clusterUrl | quote }}
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        resources:
+          limits:
+            memory: 1536Mi
+          requests:
+            cpu: 500m
+            memory: 1536Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cns-web-ui
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: cns-web-ui
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP

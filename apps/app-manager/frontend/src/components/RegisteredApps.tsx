@@ -1,5 +1,5 @@
 import * as openapi from 'validator-openapi';
-import { DirectoryEntry, ErrorDisplay, Loading } from 'common-frontend';
+import { CnsEntry, ErrorDisplay, Loading } from 'common-frontend';
 import { MuiFileInput } from 'mui-file-input';
 import React, { useState } from 'react';
 
@@ -50,7 +50,7 @@ const RegisteredApp: React.FC<{ app: openapi.RegisteredApp }> = ({ app }) => {
         <Stack direction="column" alignItems="flex-start" spacing={2}>
           <Stack direction="row" alignItems="center" spacing={2}>
             <Typography color="text.secondary">App Provider</Typography>
-            <DirectoryEntry partyId={app.provider} />
+            <CnsEntry partyId={app.provider} />
           </Stack>
           <Stack direction="row" spacing={2}>
             {/* Setting the id does not seem to be possible here so we go for a classname. */}

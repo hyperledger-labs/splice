@@ -4,7 +4,7 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{DirectoryFrontendTestUtil, FrontendLoginUtil, WalletFrontendTestUtil}
+import com.daml.network.util.{CnsFrontendTestUtil, FrontendLoginUtil, WalletFrontendTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.DomainId
 
@@ -17,7 +17,7 @@ abstract class SvNodePreflightSvIntegrationTestBase
     with SvUiIntegrationTestUtil
     with FrontendLoginUtil
     with WalletFrontendTestUtil
-    with DirectoryFrontendTestUtil {
+    with CnsFrontendTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -109,17 +109,17 @@ abstract class SvNodePreflightSvIntegrationTestBase
     }
   }
 
-  "The Directory UI is working" in { _ =>
-    val directoryUrl = s"https://directory.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
+  "The CNS UI is working" in { _ =>
+    val cnsUrl = s"https://cns.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
     val cnsName = s"da-test-${Random.alphanumeric.take(10).mkString.toLowerCase}.unverified.cns"
 
     withFrontEnd("sv") { implicit webDriver =>
       def login(): Unit = {
         actAndCheck(
-          s"Logging in to directory at $directoryUrl", {
+          s"Logging in to CNS at $cnsUrl", {
             completeAuth0LoginWithAuthorization(
-              directoryUrl,
+              cnsUrl,
               svUsername,
               svPassword,
               () => find(id("logout-button")) should not be empty,
@@ -134,18 +134,18 @@ abstract class SvNodePreflightSvIntegrationTestBase
 
       }
       if (isDevNet) { // SV missing CC in NonDevNet
-        reserveDirectoryNameFor(
+        reserveCnsNameFor(
           () => login(),
           cnsName,
           "1.0000000000",
           "USD",
           "90 days",
         )
-        clue(s"Reserved directory name is shown in scan ui at ${scanUrl}") {
+        clue(s"Reserved CNS name is shown in scan ui at ${scanUrl}") {
           go to scanUrl
           eventually(3.minutes) {
             val cnsEntryNames =
-              findAll(className("directory-entry")).map(elm => seleniumText(elm)).toList.distinct
+              findAll(className("cns-entry")).map(elm => seleniumText(elm)).toList.distinct
             cnsEntryNames.exists(_.startsWith(cnsName)) should be(true)
           }
         }

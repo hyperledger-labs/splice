@@ -35,7 +35,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
 
   private val testEntryName = "mycoolentry.unverified.cns"
   private val testEntryUrl = "https://cns-dir-url.com"
-  private val testEntryDescription = "Sample CNS Directory Entry Description"
+  private val testEntryDescription = "Sample CNS Entry Description"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -193,7 +193,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       val aliceRefs = setupUser(aliceStaticRefs)
 
       clue("invalid entries(bad descriptions) are rejected") {
-        val invalidDescriptions = Seq("Sample CNS Directory Entry Description -" * 50)
+        val invalidDescriptions = Seq("Sample CNS Entry Description -" * 50)
         invalidDescriptions.foreach { desc =>
           loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
             {
@@ -213,7 +213,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       val aliceStaticRefs = StaticUserRefs(aliceValidatorBackend, aliceWalletClient)
       val aliceRefs = setupUser(aliceStaticRefs)
       val (subscriptionRequest, _) = actAndCheck(
-        "request directory entry",
+        "request CNS entry",
         requestEntry(aliceRefs, testEntryName),
       )(
         "alice sees subscription request",
@@ -227,7 +227,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
         "alice rejects subscription request",
         aliceWalletClient.rejectSubscriptionRequest(subscriptionRequest),
       )(
-        "DirectoryEntryContext gets archived",
+        "CnsEntryContext gets archived",
         _ =>
           aliceRefs.validator.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(codegen.CnsEntryContext.COMPANION)(

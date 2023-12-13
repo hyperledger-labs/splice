@@ -1,7 +1,7 @@
 import {
   Contract,
-  DirectoryEntry as DirectoryEntryComponent,
-  DirectoryField,
+  CnsEntry as CnsEntryComponent,
+  CnsField,
   ErrorDisplay,
   Loading,
   TransferButton,
@@ -97,7 +97,7 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, r
             {Array.from(balances.data).map(([party, balance]) => (
               <TableRow key={party} className="balances-table-row">
                 <TableCell>
-                  <DirectoryEntryComponent className="balances-table-receiver" partyId={party} />
+                  <CnsEntryComponent className="balances-table-receiver" partyId={party} />
                 </TableCell>
                 <TableCell className="balances-table-amount">{balance}</TableCell>
               </TableRow>
@@ -158,7 +158,7 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
               >
                 Add
               </Button>
-              <DirectoryEntryComponent partyId={invite.payload.invitee} noCopy />
+              <CnsEntryComponent partyId={invite.payload.invitee} noCopy />
             </ListItem>
           ))}
         </List>
@@ -238,7 +238,7 @@ const Entry: React.FC<EntryProps> = ({ group, party, provider, domainId, rules }
             value={transferAmount}
             onChange={event => setTransferAmount(event.target.value)}
           ></TextField>
-          <DirectoryField
+          <CnsField
             className="transfer-receiver-field"
             onPartyChanged={party => setTransferReceiver(party)}
           />
@@ -267,7 +267,7 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
       const value = update.payload.update.value;
       return (
         <ListItem className="balance-updates-list-item">
-          <DirectoryEntryComponent className="sender" partyId={value.payer} />
+          <CnsEntryComponent className="sender" partyId={value.payer} />
           <span className="description">
             paid {value.amount} {'CC for '} {value.description}
           </span>
@@ -277,11 +277,11 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
       const value = update.payload.update.value;
       return (
         <ListItem className="balance-updates-list-item">
-          <DirectoryEntryComponent className="sender" partyId={value.sender} />
+          <CnsEntryComponent className="sender" partyId={value.sender} />
           <span className="description">
             sent {value.amount} {'CC to '}
           </span>
-          <DirectoryEntryComponent className="receiver" partyId={value.receiver} />
+          <CnsEntryComponent className="receiver" partyId={value.receiver} />
         </ListItem>
       );
     } else {
@@ -344,7 +344,7 @@ const Group: React.FC<GroupProps> = ({ group, party, provider, domainId, rules }
           </Button>
         )}
         <Typography variant="button">
-          owned by <DirectoryEntryComponent partyId={group.payload.owner} />
+          owned by <CnsEntryComponent partyId={group.payload.owner} />
         </Typography>
       </Stack>
       <Divider />

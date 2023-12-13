@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-apps=("common" "wallet" "validator" "sv" "splitwell" "scan" "directory" "app-manager")
+apps=("common" "wallet" "validator" "sv" "splitwell" "scan" "cns" "app-manager")
 mkdir -p /tmp/artifacts
 mkdir -p /tmp/openapi
 cp "apps/common/src/main/openapi/README.md" /tmp/openapi;

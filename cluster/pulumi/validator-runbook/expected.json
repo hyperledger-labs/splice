@@ -31,7 +31,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-directory-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "validator"
       },
       "stringData": {
@@ -42,7 +42,7 @@
         }
       }
     },
-    "name": "auth0-ui-secret-validator-directory",
+    "name": "auth0-ui-secret-validator-cns",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },

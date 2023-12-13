@@ -1,0 +1,142 @@
+openapi: 3.0.0
+info:
+  title: CNS API
+  version: 0.0.1
+tags:
+  - name: cns
+servers:
+  - url: https://example.com/api/validator
+paths:
+  /v0/entry/create:
+    post:
+      tags: [cns]
+      x-jvm-package: external.cns
+      operationId: "createCnsEntry"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateCnsEntryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CreateCnsEntryResponse"
+        "400":
+          description: |
+            Invalid request, check the error response for details.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/entry/all:
+    get:
+      tags: [ cns ]
+      x-jvm-package: external.cns
+      operationId: "listCnsEntries"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCnsEntriesResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+components:
+  schemas:
+    CreateCnsEntryRequest:
+      type: object
+      required:
+        - name
+        - url
+        - description
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        description:
+          type: string
+    CreateCnsEntryResponse:
+      type: object
+      required:
+        - name
+        - url
+        - description
+        - entryContextCid
+        - subscriptionRequestCid
+      properties:
+        entryContextCid:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        subscriptionRequestCid:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        name:
+          type: string
+        url:
+          type: string
+        description:
+          type: string
+    ListCnsEntriesResponse:
+      type: object
+      required:
+        - entries
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/CnsEntryResponse"
+    CnsEntryResponse:
+      type: object
+      required:
+        - contractId
+        - name
+        - amount
+        - currency
+        - expiresAt
+        - paymentInterval
+        - paymentDuration
+      properties:
+        contractId:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        name:
+          type: string
+        amount:
+          type: string
+        currency:
+          type: string
+        expiresAt:
+          type: string
+        paymentInterval:
+          type: string
+        paymentDuration:
+          type: string
+    CreateCnsInstallResponse:
+      type: object
+      required:
+        - contractId
+      properties:
+        contractId:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+    FetchCnsInstallResponse:
+      type: object
+      required:
+        - contractId
+        - entryFee
+        - entryLifetime
+      properties:
+        contractId:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
+        entryFee:
+          type: string
+        entryLifetime:
+          type: string
+

@@ -30,7 +30,7 @@ trait SplitwellFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
       field.underlying.click()
       reactTextInput(field).value = quantity.toString
     }
-    setDirectoryField(
+    setCnsField(
       reactTextInput(find(className("transfer-receiver-field")).value),
       receiver,
       receiverPartyId.toProtoPrimitive,

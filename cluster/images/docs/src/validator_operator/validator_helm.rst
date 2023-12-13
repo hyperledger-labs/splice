@@ -3,7 +3,7 @@
 Kubernetes-Based Deployment of a Validator node
 ===============================================
 
-This section describes how to deploy a standalone validator node in Kubernetes using Helm charts. The Helm charts deploy a validator node along with associated wallet and directory UIs, and connect it to a target cluster.
+This section describes how to deploy a standalone validator node in Kubernetes using Helm charts. The Helm charts deploy a validator node along with associated wallet and CNS UIs, and connect it to a target cluster.
 
 Digital Asset currently operates two Canton Network clusters: `TestNet` and `DevNet`. Both upgrade weekly. `DevNet` is usually on the latest release. `TestNet` follows it on a one-week delay, and has some `DevNet`-only features disabled. Please use `DevNet` unless you have a specific reason not to.
 
@@ -144,11 +144,11 @@ If this is not true for your OIDC provider, pay extra attention when configuring
 For user-facing authentication - allowing users to access the various web UIs hosted on your Validator node,
 your OIDC provider must support the `OAuth 2.0 Authorization Code Grant <https://datatracker.ietf.org/doc/html/rfc6749#section-4.1>`_ flow
 and allow you to obtain client identifiers for the web UIs your Validator node will be hosting.
-Currently, these are the Wallet web UI and the Directory web UI.
+Currently, these are the Wallet web UI and the CNS web UI.
 You might be required to whitelist a range of URLs on your OIDC provider, such as "Allowed Callback URLs", "Allowed Logout URLs", "Allowed Web Origins", and "Allowed Origins (CORS)".
 If you are using the ingress configuration of this runbook, the correct URLs to configure here are
 ``https://wallet.validator.YOUR_HOSTNAME`` (for the Wallet web UI) and
-``https://directory.validator.YOUR_HOSTNAME`` (for the Directory web UI).
+``https://cns.validator.YOUR_HOSTNAME`` (for the CNS web UI).
 An identifier that is unique to the user must be set via the `sub` field of the issued JWT.
 On some occasions, this identifier will be used as a user name for that user on your Validator node's Canton participant.
 In :ref:`helm-validator-install`, you will be required to configure a user identifier as the ``validatorWalletUser`` -
@@ -170,7 +170,7 @@ OIDC_AUTHORITY_URL      The URL of your OIDC provider for obtaining the ``openid
 VALIDATOR_CLIENT_ID     The client id of the Auth0 app for the validator app backend
 VALIDATOR_CLIENT_SECRET The client secret of the Auth0 app for the validator app backend
 WALLET_UI_CLIENT_ID     The client id of the Auth0 app for the wallet UI.
-DIRECTORY_UI_CLIENT_ID  The client id of the Auth0 app for the directory UI.
+CNS_UI_CLIENT_ID        The client id of the Auth0 app for the CNS UI.
 ======================= ===========================================================================
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-validator-auth-secrets-config` and :ref:`helm-validator-install`.
@@ -191,7 +191,7 @@ OIDC_AUTHORITY_VALIDATOR_AUDIENCE    The audience for the validator backend API.
 In case you are facing trouble with setting up your (non-Auth0) OIDC provider,
 it can be beneficial to skim the instructions in :ref:`helm-validator-auth0` as well, to check for functionality or configuration details that your OIDC provider setup might be missing.
 
-.. [#reach] The URL must be reachable from the Canton participant and validator app running in your cluster, as well as from all web browsers that should be able to interact with the wallet and directory UIs.
+.. [#reach] The URL must be reachable from the Canton participant and validator app running in your cluster, as well as from all web browsers that should be able to interact with the wallet and CNS UIs.
 
     .. TODO(#2052) use a unique audience for each app
 
@@ -236,12 +236,12 @@ To configure `Auth0 <https://auth0.com>`_ as your validator's OIDC provider, per
        - "Allowed Origins (CORS)"
     e. Save your application settings.
 
-6. Create an Auth0 Application for the directory web UI.
+6. Create an Auth0 Application for the CNS web UI.
    Repeat all steps described in step 5, with following modifications:
 
-   - In step b, use ``Directory web UI`` as the name of your application.
-   - In steps c and d, use the URL for your validator's *directory* UI.
-     If you're using the ingress configuration of this runbook, that would be ``https://directory.validator.YOUR_HOSTNAME``.
+   - In step b, use ``CNS web UI`` as the name of your application.
+   - In steps c and d, use the URL for your validator's *CNS* UI.
+     If you're using the ingress configuration of this runbook, that would be ``https://cns.validator.YOUR_HOSTNAME``.
 
 Please refer to Auth0's `own documentation on user management <https://auth0.com/docs/manage-users>`_ for pointers on how to set up end-user accounts for the two web UI applications you created.
 Note that you will need to create at least one such user account for completing the steps in :ref:`helm-validator-install` - for being able to log in as your Validator node's administrator.
@@ -258,7 +258,7 @@ OIDC_AUTHORITY_LEDGER_API_AUDIENCE The optional audience of your choice for Ledg
 VALIDATOR_CLIENT_ID                The client id of the Auth0 app for the validator app backend
 VALIDATOR_CLIENT_SECRET            The client secret of the Auth0 app for the validator app backend
 WALLET_UI_CLIENT_ID                The client id of the Auth0 app for the wallet UI.
-DIRECTORY_UI_CLIENT_ID             The client id of the Auth0 app for the directory UI.
+CNS_UI_CLIENT_ID                   The client id of the Auth0 app for the CNS UI.
 ================================== ===========================================================================
 
 The ``AUTH0_TENANT_NAME`` is the name of your Auth0 tenant as shown at the top left of your Auth0 project.
@@ -284,7 +284,7 @@ The validator app backend requires the following secret.
         # Optional. uncomment it if you want to set audience for ledger API
         # "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
 
-To setup the wallet and directory UI, create the following two secrets.
+To setup the wallet and CNS UI, create the following two secrets.
 
 .. code-block:: bash
 
@@ -292,9 +292,9 @@ To setup the wallet and directory UI, create the following two secrets.
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
         "--from-literal=client-id=${WALLET_UI_CLIENT_ID}"
 
-    kubectl create --namespace validator secret generic cn-app-directory-ui-auth \
+    kubectl create --namespace validator secret generic cn-app-cns-ui-auth \
         "--from-literal=url=${OIDC_AUTHORITY_URL}" \
-        "--from-literal=client-id=${DIRECTORY_UI_CLIENT_ID}"
+        "--from-literal=client-id=${CNS_UI_CLIENT_ID}"
 
 .. _helm-validator-install:
 
@@ -376,7 +376,7 @@ namespace. A typical query might look as follows:
 
     $ kubectl get pods -n validator
     NAMESPACE         NAME                                  READY   STATUS             RESTARTS        AGE
-    validator         directory-web-ui-5bf489db78-bdn2j     1/1     Running            0               24m
+    validator         cns-web-ui-5bf489db78-bdn2j           1/1     Running            0               24m
     validator         participant-8988dfb54-m9655           1/1     Running            0               26m
     validator         postgres-0                            1/1     Running            0               37m
     validator         validator-app-f8c74d5dd-zf9j4         1/1     Running            0               24m
@@ -401,14 +401,14 @@ Services               Port         Routes
 ---------------------- ------------ ---------------------------------------------------------------------------
 ``wallet-web-ui``                   ``https://wallet.validator.<YOUR_HOSTNAME>``
 ``validator-app``      5003         ``https://wallet.validator.<YOUR_HOSTNAME>/api/validator``
-``directory-web-ui``                ``https://directory.validator.<YOUR_HOSTNAME>``
-``validator-app``      5003         ``https://directory.validator.<YOUR_HOSTNAME>/api/validator``
+``cns-web-ui``                      ``https://cns.validator.<YOUR_HOSTNAME>``
+``validator-app``      5003         ``https://cns.validator.<YOUR_HOSTNAME>/api/validator``
 ====================== ============ ===========================================================================
 
 * ``https://wallet.validator.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``validator`` namespace
 * ``https://wallet.validator.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``validator`` namespace
-* ``https://directory.validator.<YOUR_HOSTNAME>`` should be routed to service ``directory-web-ui`` in the ``validator`` namespace
-* ``https://directory.validator.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``validator`` namespace
+* ``https://cns.validator.<YOUR_HOSTNAME>`` should be routed to service ``cns-web-ui`` in the ``validator`` namespace
+* ``https://cns.validator.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``validator`` namespace
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of a Validator node ingress, we have
@@ -539,20 +539,20 @@ the top right of the UI (e.g. ``validator_validator_service_user::12204f9f94b736
 
 An SV (say your sponsor) will need to transfer coin to this party. They can do this through their wallet UI.
 
-.. _helm-validator-directory-web-ui:
+.. _helm-validator-cns-web-ui:
 
-Logging into the directory UI
+Logging into the CNS UI
 -----------------------------
 
 You can open your browser at
-https://directory.validator.YOUR_HOSTNAME and login using the
+https://cns.validator.YOUR_HOSTNAME and login using the
 credentials for the user that you configured as
 ``validatorWalletUser`` earlier. You will be able to register a name on the
 Canton Name Service.
 
-.. image:: images/directory_home.png
+.. image:: images/cns_home.png
   :width: 600
-  :alt: After logged in into the Directory UI
+  :alt: After logged in into the CNS UI
 
 .. _validator-continuity:
 

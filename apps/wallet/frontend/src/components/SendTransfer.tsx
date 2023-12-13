@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
-import { DirectoryField } from 'common-frontend';
+import { CnsField } from 'common-frontend';
 import { useCoinPrice } from 'common-frontend/scan-api';
 import addHours from 'date-fns/addHours';
 import React, { useMemo, useState } from 'react';
@@ -87,11 +87,7 @@ const SendTransfer: React.FC = () => {
         <CardContent sx={{ paddingX: '64px' }}>
           <Stack direction="column" mb={4} spacing={1}>
             <Typography variant="h6">Recipient</Typography>
-            <DirectoryField
-              id="create-offer-receiver"
-              label="Receiver"
-              onPartyChanged={setReceiver}
-            />
+            <CnsField id="create-offer-receiver" label="Receiver" onPartyChanged={setReceiver} />
           </Stack>
 
           <Stack direction="column" mb={4} spacing={1}>

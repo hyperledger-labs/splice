@@ -3,7 +3,7 @@ import BigNumber from 'bignumber.js';
 import {
   AmountDisplay,
   Contract,
-  DirectoryEntry,
+  CnsEntry,
   DateDisplay,
   ErrorDisplay,
   Loading,
@@ -111,11 +111,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
         <ArrowCircleLeftOutlined fontSize="large" />
         <Stack direction="row" alignItems="center">
           <Stack direction="column">
-            <DirectoryEntry
-              partyId={offer.senderId}
-              variant="h5"
-              className={'transfer-offer-sender'}
-            />
+            <CnsEntry partyId={offer.senderId} variant="h5" className={'transfer-offer-sender'} />
           </Stack>
         </Stack>
         <Stack direction="column" alignItems="flex-end">

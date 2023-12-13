@@ -1,12 +1,6 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import {
-  AmountDisplay,
-  DirectoryEntry,
-  ErrorDisplay,
-  IntervalDisplay,
-  Loading,
-} from 'common-frontend';
+import { AmountDisplay, CnsEntry, ErrorDisplay, IntervalDisplay, Loading } from 'common-frontend';
 import { useCoinPrice } from 'common-frontend/scan-api';
 import differenceInMilliseconds from 'date-fns/differenceInMilliseconds';
 import intlFormat from 'date-fns/intlFormat';
@@ -100,7 +94,7 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
   return (
     <TableRow className="subscription-row">
       <TableCell variant="party">
-        <DirectoryEntry
+        <CnsEntry
           className="sub-receiver"
           partyId={subscription.subscription.payload.subscriptionData.receiver}
         />
@@ -138,7 +132,7 @@ const Service: React.FC<{ provider: Party; description: string }> = ({ provider,
       <Typography variant="h6" className="sub-description">
         {description}
       </Typography>
-      <DirectoryEntry partyId={provider} variant="caption" className="sub-provider" />
+      <CnsEntry partyId={provider} variant="caption" className="sub-provider" />
     </Stack>
   );
 };

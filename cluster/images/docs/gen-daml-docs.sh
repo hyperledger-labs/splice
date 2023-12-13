@@ -32,7 +32,7 @@ ensure_damlc_exists() {
 
 # skip calling sbt when `SKIP_DAML_BUILD` is defined
 if [[ ! -v SKIP_DAML_BUILD ]]; then
-  (cd "$PROJ_ROOT"; sbt --batch canton-coin-daml/damlBuild wallet-payments-daml/damlBuild directory-daml/damlBuild)
+  (cd "$PROJ_ROOT"; sbt --batch canton-coin-daml/damlBuild wallet-payments-daml/damlBuild canton-name-service-daml/damlBuild)
 fi
 
 ensure_damlc_exists

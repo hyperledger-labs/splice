@@ -162,7 +162,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
   val bobWalletUIPort = 3001
   val charlieWalletUIPort = 3002
 
-  val aliceDirectoryUIPort = 3100
+  val aliceCnsUIPort = 3100
 
   val sv1UIPort = 3211
   val sv2UIPort = 3212
@@ -645,13 +645,13 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     }
   }
 
-  protected def setDirectoryField(textField: TextField, input: String, expectedPartyId: String) = {
+  protected def setCnsField(textField: TextField, input: String, expectedPartyId: String) = {
     textField.underlying.sendKeys(input)
-    // We need to wait for the query against the directory service to finish.
-    waitForDirectoryField(textField, expectedPartyId)
+    // We need to wait for the query against the cns service to finish.
+    waitForCnsField(textField, expectedPartyId)
   }
 
-  protected def waitForDirectoryField(textField: TextField, expectedPartyId: String) = {
+  protected def waitForCnsField(textField: TextField, expectedPartyId: String) = {
     eventually() {
       textField.attribute("data-resolved-party-id") shouldBe Some(expectedPartyId)
     }

@@ -29,9 +29,9 @@ class WalletSubscriptionsFrontendIntegrationTest
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val alicePartyId = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice")
-      val directoryParty = createDirectoryEntryForDirectoryItself
-      createDirectoryEntry(aliceDirectoryExternalClient, aliceEntryName, aliceWalletClient)
-      val directoryPaymentDue = LocalDate.now().plusDays(90)
+      val cnsParty = createCnsEntryForItself
+      createCnsEntry(aliceCnsExternalClient, aliceEntryName, aliceWalletClient)
+      val cnsPaymentDue = LocalDate.now().plusDays(90)
       val aDate = LocalDate.now().plusDays(1)
       val selfSubscriptionDescription = "A recurring thing"
       createSelfSubscription(
@@ -65,14 +65,14 @@ class WalletSubscriptionsFrontendIntegrationTest
             val subscriptionRows = findAll(className("subscription-row")).toSeq
             subscriptionRows should have size 2
             matchSubscription(subscriptionRows.head)(
-              expectedReceiver = directoryParty,
-              expectedProvider = directoryParty,
+              expectedReceiver = cnsParty,
+              expectedProvider = cnsParty,
               expectedPrice = "1 USD per 90 days",
               expectedCoinPrice = "0.5 CC @ 2USD/CC",
               expectedPaymentDate =
-                s"${directoryPaymentDue.getMonthValue}/${directoryPaymentDue.getDayOfMonth}/${directoryPaymentDue.getYear}",
+                s"${cnsPaymentDue.getMonthValue}/${cnsPaymentDue.getDayOfMonth}/${cnsPaymentDue.getYear}",
               expectedButtonEnabled = true,
-              expectedDescription = s"Cns entry: \"$aliceEntryName\"",
+              expectedDescription = s"CNS entry: \"$aliceEntryName\"",
             )
             matchSecondSubscription(subscriptionRows(1))
             subscriptionRows
@@ -127,13 +127,13 @@ class WalletSubscriptionsFrontendIntegrationTest
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName1 = perTestCaseName("alice")
-      createDirectoryEntry(aliceDirectoryExternalClient, aliceEntryName1, aliceWalletClient)
+      createCnsEntry(aliceCnsExternalClient, aliceEntryName1, aliceWalletClient)
 
-      val directoryParty = createDirectoryEntryForDirectoryItself
-      val directoryPaymentDue = LocalDate.now().plusDays(90)
+      val cnsParty = createCnsEntryForItself
+      val cnsPaymentDue = LocalDate.now().plusDays(90)
       val newlyPurchasedName = perTestCaseName("new")
       val respond =
-        requestDirectoryEntry(aliceDirectoryExternalClient, newlyPurchasedName)
+        requestCnsEntry(aliceCnsExternalClient, newlyPurchasedName)
 
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
@@ -150,12 +150,12 @@ class WalletSubscriptionsFrontendIntegrationTest
 
             find(className("available-balance"))
               .valueOrFail("Balance is not shown")
-              // from the original `createDirectoryEntry`
+              // from the original `createCnsEntry`
               .text should matchText("Total Available Balance: 4.4475 CC / 8.895 USD")
 
             find(className("sub-request-description"))
               .valueOrFail("Description is not shown")
-              .text should matchText(s"Cns entry: \"$newlyPurchasedName\"")
+              .text should matchText(s"CNS entry: \"$newlyPurchasedName\"")
 
             find(className("sub-request-price"))
               .valueOrFail("Price is not shown")
@@ -180,16 +180,16 @@ class WalletSubscriptionsFrontendIntegrationTest
           "Alice sees the new subscription in the list",
           _ => {
             val subscriptionRows = findAll(className("subscription-row")).toSeq
-            subscriptionRows should have size 2 // from createDirectoryEntry and just-accepted requestDirectoryEntry
+            subscriptionRows should have size 2 // from createCnsEntry and just-accepted requestCnsEntry
             matchSubscription(subscriptionRows.last)(
-              expectedReceiver = directoryParty,
-              expectedProvider = directoryParty,
+              expectedReceiver = cnsParty,
+              expectedProvider = cnsParty,
               expectedPrice = "1 USD per 90 days",
               expectedCoinPrice = "0.5 CC @ 2USD/CC",
               expectedPaymentDate =
-                s"${directoryPaymentDue.getMonthValue}/${directoryPaymentDue.getDayOfMonth}/${directoryPaymentDue.getYear}",
+                s"${cnsPaymentDue.getMonthValue}/${cnsPaymentDue.getDayOfMonth}/${cnsPaymentDue.getYear}",
               expectedButtonEnabled = true,
-              expectedDescription = s"Cns entry: \"$newlyPurchasedName\"",
+              expectedDescription = s"CNS entry: \"$newlyPurchasedName\"",
             )
           },
         )

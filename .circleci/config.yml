@@ -297,8 +297,8 @@ commands:
           key: &frontend_builds_key frontend-builds-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} daml:{{ checksum "daml/dars.lock" }} openapi:{{ checksum "openapi-cache-key.txt" }} package-lock:{{ checksum "apps/package-lock.json" }} rev:{{ .Revision }}
           paths:
             - ./apps/common/frontend/target
-            - ./apps/directory/frontend/build
-            - ./apps/directory/frontend/target
+            - ./apps/cns/frontend/build
+            - ./apps/cns/frontend/target
             - ./apps/scan/frontend/build
             - ./apps/scan/frontend/target
             - ./apps/sv/frontend/build

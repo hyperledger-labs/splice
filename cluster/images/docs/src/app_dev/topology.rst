@@ -100,10 +100,10 @@ Default Application Topology
        the app user UI. Users should be authenticated using app access-tokens
        issued by their validator node.
 
-  * the app provider uses the directory service to allocate a human-readable
+  * the app provider uses the CNS service to allocate a human-readable
     name to its on-ledger identity
 
-  * the app user UI relies on the user having wallet, directory, and app
+  * the app user UI relies on the user having wallet, CNS, and app
     installations available on its validator node. We'd expect that many app
     UIs use
 
@@ -112,7 +112,7 @@ Default Application Topology
       flow of e-commerce sites that transfer control to a payment provider
       like PayPal
 
-    * the directory app installation for looking up human-readable names for parties
+    * the CNS app installation for looking up human-readable names for parties
 
     * the app's installation itself, which allows the UI to read the app specific
       Daml contract and act on them

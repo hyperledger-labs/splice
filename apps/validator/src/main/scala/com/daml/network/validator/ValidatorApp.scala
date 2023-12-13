@@ -63,8 +63,8 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import com.daml.network.validator.admin.http.HttpExternalDirectoryHandler
-import com.daml.network.http.v0.external.directory.DirectoryResource
+import com.daml.network.validator.admin.http.HttpExternalCnsHandler
+import com.daml.network.http.v0.external.cns.CnsResource
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequencer
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
@@ -605,7 +605,7 @@ class ValidatorApp(
         participantAdminConnection,
       )
 
-      directoryExternalHandler = new HttpExternalDirectoryHandler(
+      cnsExternalHandler = new HttpExternalCnsHandler(
         walletManager,
         scanConnection,
         loggerFactory,
@@ -705,9 +705,9 @@ class ValidatorApp(
                     walletExternalHandler,
                     AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
                   ),
-                  DirectoryResource.routes(
-                    directoryExternalHandler,
-                    AuthExtractor(verifier, loggerFactory, "canton network directory realm"),
+                  CnsResource.routes(
+                    cnsExternalHandler,
+                    AuthExtractor(verifier, loggerFactory, "canton network cns realm"),
                   ),
                   ValidatorAdminResource.routes(
                     adminHandler,

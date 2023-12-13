@@ -1,5 +1,5 @@
 import * as openapi from 'validator-openapi';
-import { DateDisplay, DirectoryEntry, ErrorDisplay, Loading, appLaunchUrl } from 'common-frontend';
+import { DateDisplay, CnsEntry, ErrorDisplay, Loading, appLaunchUrl } from 'common-frontend';
 import React, { useState } from 'react';
 
 import {
@@ -120,7 +120,7 @@ const InstalledApp: React.FC<{ app: openapi.InstalledApp }> = ({ app }) => {
     <Card className="installed-app" variant="outlined">
       <CardContent>
         <Typography className="installed-app-name">{app.latest_configuration.name}</Typography>
-        <DirectoryEntry partyId={app.provider} />
+        <CnsEntry partyId={app.provider} />
         <Typography variant="h5">Unapproved Release Configurations</Typography>
         {app.unapproved_release_configurations.map((config, i) => (
           <UnapprovedReleaseConfiguration

@@ -74,8 +74,8 @@ class WalletFrontendTimeBasedIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val entryName = perTestCaseName("alice")
 
-      createDirectoryEntry(
-        aliceDirectoryExternalClient,
+      createCnsEntry(
+        aliceCnsExternalClient,
         entryName,
         aliceWalletClient,
       )

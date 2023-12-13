@@ -26,10 +26,6 @@ window.canton_network_config = {
       // URL of the JSON API for the participant
       url: "https://" + window.location.hostname + "/api/json-api/",
     },
-    directory: {
-      // URL of the directory backend. Note that this is not (yet) exposed over TLS.
-      url: `https://directory.sv-1.svc.${cluster}/api/v0/directory`,
-    },
     scan: {
       // URL of the scan app's HTTP API
       url: `https://scan.sv-1.svc.${cluster}/api/scan`,

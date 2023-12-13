@@ -68,7 +68,7 @@ Glossary
         entry which is used to provide a human readable name to their party
         (similar to reverse DNS)
       * provides APIs for resolution in both directions that can be used by
-        other apps (e.g., the wallet) to display and accept directory names instead of party ids
+        other apps (e.g., the wallet) to display and accept CNS names instead of party ids
 
 
     Splitwell

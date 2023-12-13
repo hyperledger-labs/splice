@@ -256,7 +256,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     }
   }
 
-  "create and list directory entries" in { implicit env =>
+  "create and list CNS entries" in { implicit env =>
     initSvcWithSv1Only()
     aliceValidatorBackend.startSync()
     aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
@@ -266,7 +266,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     val url = "https://alice-url.com"
     val description = "A test CNS entry for alice"
 
-    val createResponse = aliceDirectoryExternalClient.createDirectoryEntry(name, url, description)
+    val createResponse = aliceCnsExternalClient.createCnsEntry(name, url, description)
     createResponse.name shouldBe name
     createResponse.name shouldBe name
     createResponse.url shouldBe url
@@ -275,7 +275,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     aliceWalletClient.acceptSubscriptionRequest(createResponse.subscriptionRequestCid)
 
     eventually() {
-      val entriesResponse = aliceDirectoryExternalClient.listDirectoryEntries()
+      val entriesResponse = aliceCnsExternalClient.listCnsEntries()
       entriesResponse.entries should have size 1
     }
   }

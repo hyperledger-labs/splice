@@ -5,7 +5,7 @@ import cats.syntax.either.*
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.http.v0.definitions.{AppConfiguration, ReleaseConfiguration, Timespan}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.util.{FrontendLoginUtil, DirectoryFrontendTestUtil, WalletTestUtil}
+import com.daml.network.util.{FrontendLoginUtil, CnsFrontendTestUtil, WalletTestUtil}
 
 import java.io.File
 import scala.util.Try
@@ -13,7 +13,7 @@ import scala.util.Try
 class AppManagerFrontendIntegrationTest
     extends FrontendIntegrationTest("splitwell", "alice")
     with WalletTestUtil
-    with DirectoryFrontendTestUtil
+    with CnsFrontendTestUtil
     with FrontendLoginUtil {
 
   private val splitwellBundle = new File(

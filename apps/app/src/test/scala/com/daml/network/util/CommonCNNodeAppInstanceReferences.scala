@@ -14,7 +14,7 @@ import com.daml.network.console.{
 }
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.daml.network.console.DirectoryExternalAppClientReference
+import com.daml.network.console.CnsExternalAppClientReference
 import com.digitalasset.canton.DomainAlias
 
 // TODO(#736): these should eventually be defined analogue to Canton's `participant1` references etc
@@ -164,22 +164,22 @@ trait CommonCNNodeAppInstanceReferences {
       "splitwellProviderWallet"
     )
 
-  def aliceDirectoryExternalClient(implicit
+  def aliceCnsExternalClient(implicit
       env: CNNodeTestConsoleEnvironment
-  ): DirectoryExternalAppClientReference = rdpe(
-    "aliceDirectory"
+  ): CnsExternalAppClientReference = rdpe(
+    "aliceCns"
   )
 
-  def bobDirectoryExternalClient(implicit
+  def bobCnsExternalClient(implicit
       env: CNNodeTestConsoleEnvironment
-  ): DirectoryExternalAppClientReference = rdpe(
-    "bobDirectory"
+  ): CnsExternalAppClientReference = rdpe(
+    "bobCns"
   )
 
-  def charlieDirectoryExternalClient(implicit
+  def charlieCnsExternalClient(implicit
       env: CNNodeTestConsoleEnvironment
-  ): DirectoryExternalAppClientReference = rdpe(
-    "charlieDirectory"
+  ): CnsExternalAppClientReference = rdpe(
+    "charlieCns"
   )
 
   def aliceSplitwellClient(implicit
@@ -244,10 +244,10 @@ trait CommonCNNodeAppInstanceReferences {
 
   def rdpe(
       name: String
-  )(implicit env: CNNodeTestConsoleEnvironment): DirectoryExternalAppClientReference =
-    env.externalDirectories
+  )(implicit env: CNNodeTestConsoleEnvironment): CnsExternalAppClientReference =
+    env.externalCns
       .find(_.name == name)
-      .getOrElse(sys.error(s"remote external directory [$name] not configured"))
+      .getOrElse(sys.error(s"remote external CNS [$name] not configured"))
 
   def sw(
       name: String

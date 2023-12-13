@@ -82,7 +82,7 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
     config.participant,
     await installAuth0Secret(config.auth0Client, config.xns, 'validator', config.auth0AppName),
     await installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
-    await installAuth0UISecret(config.auth0Client, config.xns, 'directory', 'directory'),
+    await installAuth0UISecret(config.auth0Client, config.xns, 'cns', 'cns'),
   ]
     .concat(
       config.onboardingSecret

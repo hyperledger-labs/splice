@@ -8,7 +8,7 @@ import {
   exactNamespace,
   ExactNamespace,
   REPO_ROOT,
-  directoryUiSecret,
+  cnsUiSecret,
   fixedTokens,
   setupBootstrapping,
   imagePullSecretByNamespaceName,
@@ -27,7 +27,7 @@ import {
 } from 'cn-pulumi-common';
 
 import { auth0Cfg } from './auth0cfg';
-import { walletUIClientId, directoryClientId } from './secrets';
+import { walletUIClientId, cnsClientId } from './secrets';
 import {
   CLUSTER_BASENAME,
   VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
@@ -240,7 +240,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
   const dependsOn = imagePullDeps
     .concat([participant])
     .concat([validatorAppSecret, validatorUISecret])
-    .concat([directoryUiSecret(xns, auth0Client, directoryClientId)])
+    .concat([cnsUiSecret(xns, auth0Client, cnsClientId)])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(
       onboardingSecret ? [installValidatorOnboardingSecret(xns, 'validator', onboardingSecret)] : []

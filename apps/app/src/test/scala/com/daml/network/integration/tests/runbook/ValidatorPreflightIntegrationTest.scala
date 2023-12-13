@@ -17,7 +17,7 @@ abstract class PreflightValidatorIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("alice-validator", "bob-validator")
     with FrontendLoginUtil
     with PreflightIntegrationTestUtil
-    with DirectoryFrontendTestUtil
+    with CnsFrontendTestUtil
     with WalletFrontendTestUtil
     with SplitwellFrontendTestUtil {
 
@@ -35,8 +35,8 @@ abstract class PreflightValidatorIntegrationTestBase
 
   private lazy val walletUiUrl =
     s"https://wallet.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
-  private lazy val directoryUiUrl =
-    s"https://directory.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
+  private lazy val cnsUiUrl =
+    s"https://cns.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
   private lazy val splitwellUiUrl =
     s"https://splitwell.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
 
@@ -284,7 +284,7 @@ abstract class PreflightValidatorIntegrationTestBase
     }
   }
 
-  "test the directory ui of a validator" in { _ =>
+  "test the CNS ui of a validator" in { _ =>
     val aliceUser = auth0Users.get("alice-validator").value
 
     withFrontEnd("alice-validator") { implicit webDriver =>
@@ -298,11 +298,11 @@ abstract class PreflightValidatorIntegrationTestBase
         val cnsName = s"alice_${entryId}.unverified.cns"
 
         tapCoins(100)
-        reserveDirectoryNameFor(
+        reserveCnsNameFor(
           () =>
             auth0Login(
               aliceUser,
-              directoryUiUrl,
+              cnsUiUrl,
               () => {
                 waitForQuery(id("entry-name-field"))
                 find(id("entry-name-field")) should not be empty
@@ -317,7 +317,7 @@ abstract class PreflightValidatorIntegrationTestBase
         // On non-DevNet clusters, we only test logging in to the directory UI
         auth0Login(
           aliceUser,
-          directoryUiUrl,
+          cnsUiUrl,
           () => {
             waitForQuery(id("entry-name-field"))
             find(id("entry-name-field")) should not be empty

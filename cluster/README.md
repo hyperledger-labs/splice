@@ -119,7 +119,7 @@ Across all our Canton Network clusters, we use the same set of Auth0 application
 This tenant is used by components of the `canton-network` Pulumi stack to deploy:
 * four supervalidator nodes `SV1-4` along with their wallet, directory and SV UIs
 * a Splitwell instance backed by its own validator
-* a standalone validator `Validator1` along with wallet, directory and splitwell UIs
+* a standalone validator `Validator1` along with wallet, CNS and splitwell UIs
 
 (In the table below i goes from 1 to 4)
 
@@ -131,14 +131,14 @@ This tenant is used by components of the `canton-network` Pulumi stack to deploy
 | Splitwell backend            | Machine to Machine      | Auth for splitwell backend                                   |
 | Splitwell validator backend  | Machine to Machine      | Auth for splitwell validator backend                         |
 | Validator1 backend           | Machine to Machine      | Auth for Validator1 backend                                  |
-| SVi Frontends                | Single Page Application | Auth for Wallet, Directory and SV UIs for SV1-4              |
+| SVi Frontends                | Single Page Application | Auth for Wallet, CNS and SV UIs for SV1-4              |
 | Splitwell UI                 | Single Page Application | Auth for Splitwell UI                                        |
-| Validator1 UI                | Single Page Application | Auth for Wallet, Directory and Splitwell UIs for Validator1  |
+| Validator1 UI                | Single Page Application | Auth for Wallet, CNS and Splitwell UIs for Validator1  |
 
 ### `canton-network-sv-test` Tenant
 
 This tenant is used by components of the `sv-runbook` Pulumi stack to deploy:
-* a supervalidator `SV` along with associated wallet, directory and SV UIs
+* a supervalidator `SV` along with associated wallet, CNS and SV UIs
 
 | Application Name             | Type                    | Purpose                                                      |
 |------------------------------|-------------------------|--------------------------------------------------------------|
@@ -146,20 +146,20 @@ This tenant is used by components of the `sv-runbook` Pulumi stack to deploy:
 | SV backend                   | Machine to Machine      | Auth for SV backend                                          |
 | Validator backend            | Machine to Machine      | Auth for SV validator backend                                |
 | Wallet UI                    | Single Page Application | Auth for SV Wallet UI                                        |
-| Directory UI                 | Single Page Application | Auth for SV Directory UI                                     |
+| CNS UI                 | Single Page Application | Auth for SV CNS UI                                     |
 | SV UI                        | Single Page Application | Auth for SV UI                                               |
 
 ### `canton-network-validator-test` Tenant
 
 This tenant is used by components of the `validator-runbook` Pulumi stack to deploy:
-* a standalone validator `Validator` along with associated wallet and directory UIs
+* a standalone validator `Validator` along with associated wallet and CNS UIs
 
 | Application Name             | Type                    | Purpose                                                      |
 |------------------------------|-------------------------|--------------------------------------------------------------|
 | API Explorer Application     | Machine to Machine      | Managing users for tests                                     |
 | Validator app backend        | Machine to Machine      | Auth for Validator backend                                   |
 | Wallet UI                    | Single Page Application | Auth for Validator Wallet UI                                 |
-| Directory UI                 | Single Page Application | Auth for Validator Directory UI                              |
+| CNS UI                 | Single Page Application | Auth for Validator CNS UI                              |
 
 ## Connecting to a Cluster
 

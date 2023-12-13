@@ -92,10 +92,10 @@ object CNNodeTests {
         env: CNNodeTestConsoleEnvironment
     ): AppManagerAppClientReference = extendLedgerApiUserWithCaseId(super.uamc(name))
 
-    // make `aliceDirectory` etc. use updated usernames
+    // make `aliceCns` etc. use updated usernames
     override def rdpe(name: String)(implicit
         env: CNNodeTestConsoleEnvironment
-    ): DirectoryExternalAppClientReference =
+    ): CnsExternalAppClientReference =
       extendLedgerApiUserWithCaseId(super.rdpe(name))
 
     // make `aliceSplitwell` etc. use updated usernames
@@ -129,10 +129,10 @@ object CNNodeTests {
     }
 
     private def extendLedgerApiUserWithCaseId(
-        ref: DirectoryExternalAppClientReference
-    ): DirectoryExternalAppClientReference = {
+        ref: CnsExternalAppClientReference
+    ): CnsExternalAppClientReference = {
       val newLedgerApiUser = perTestCaseNameWithoutUnverified(ref.config.ledgerApiUser)
-      new DirectoryExternalAppClientReference(
+      new CnsExternalAppClientReference(
         ref.cnNodeConsoleEnvironment,
         ref.name,
         config = ref.config.copy(ledgerApiUser = newLedgerApiUser),

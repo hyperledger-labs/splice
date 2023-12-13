@@ -65,7 +65,7 @@ case class CNNodeConfig(
     scanAppClients: Map[InstanceName, ScanAppClientConfig] = Map.empty,
     walletAppClients: Map[InstanceName, WalletAppClientConfig] = Map.empty,
     appManagerAppClients: Map[InstanceName, AppManagerAppClientConfig] = Map.empty,
-    directoryAppExternalClients: Map[InstanceName, DirectoryAppExternalClientConfig] = Map.empty,
+    cnsAppExternalClients: Map[InstanceName, CnsAppExternalClientConfig] = Map.empty,
     splitwellApps: Map[InstanceName, SplitwellAppBackendConfig] = Map.empty,
     splitwellAppClients: Map[InstanceName, SplitwellAppClientConfig] = Map.empty,
     // TODO(#736): we want to remove all of the configurations options below:
@@ -493,9 +493,8 @@ object CNNodeConfig {
       deriveReader[WalletAppClientConfig]
     implicit val AppManagerAppClientConfigReader: ConfigReader[AppManagerAppClientConfig] =
       deriveReader[AppManagerAppClientConfig]
-    implicit val directoryExternalClientConfigReader
-        : ConfigReader[DirectoryAppExternalClientConfig] =
-      deriveReader[DirectoryAppExternalClientConfig]
+    implicit val cnsExternalClientConfigReader: ConfigReader[CnsAppExternalClientConfig] =
+      deriveReader[CnsAppExternalClientConfig]
     implicit val splitwellDomainsReader: ConfigReader[SplitwellDomains] =
       deriveReader[SplitwellDomains]
     implicit val splitwellDomainConfigReader: ConfigReader[SplitwellDomainConfig] =
@@ -691,9 +690,8 @@ object CNNodeConfig {
       deriveWriter[WalletAppClientConfig]
     implicit val AppManagerAppClientConfigWriter: ConfigWriter[AppManagerAppClientConfig] =
       deriveWriter[AppManagerAppClientConfig]
-    implicit val directoryExternalClientConfigWriter
-        : ConfigWriter[DirectoryAppExternalClientConfig] =
-      deriveWriter[DirectoryAppExternalClientConfig]
+    implicit val cnsExternalClientConfigWriter: ConfigWriter[CnsAppExternalClientConfig] =
+      deriveWriter[CnsAppExternalClientConfig]
     implicit val splitwellDomains: ConfigWriter[SplitwellDomains] =
       deriveWriter[SplitwellDomains]
     implicit val splitwellDomainConfigWriter: ConfigWriter[SplitwellDomainConfig] =

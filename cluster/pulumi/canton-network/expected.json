@@ -270,7 +270,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-directory-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "splitwell"
       },
       "stringData": {
@@ -281,7 +281,7 @@
         }
       }
     },
-    "name": "auth0-ui-secret-splitwell-directory",
+    "name": "auth0-ui-secret-splitwell-cns",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -314,7 +314,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-directory-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "sv-1"
       },
       "stringData": {
@@ -325,7 +325,7 @@
         }
       }
     },
-    "name": "auth0-ui-secret-sv-1-directory",
+    "name": "auth0-ui-secret-sv-1-cns",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -380,7 +380,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-directory-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "sv-2"
       },
       "stringData": {
@@ -391,7 +391,7 @@
         }
       }
     },
-    "name": "auth0-ui-secret-sv-2-directory",
+    "name": "auth0-ui-secret-sv-2-cns",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -446,7 +446,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-directory-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "sv-3"
       },
       "stringData": {
@@ -457,7 +457,7 @@
         }
       }
     },
-    "name": "auth0-ui-secret-sv-3-directory",
+    "name": "auth0-ui-secret-sv-3-cns",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -512,7 +512,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-directory-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "sv-4"
       },
       "stringData": {
@@ -523,7 +523,7 @@
         }
       }
     },
-    "name": "auth0-ui-secret-sv-4-directory",
+    "name": "auth0-ui-secret-sv-4-cns",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -578,7 +578,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-directory-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "validator1"
       },
       "stringData": {
@@ -589,7 +589,7 @@
         }
       }
     },
-    "name": "auth0-ui-secret-validator1-directory",
+    "name": "auth0-ui-secret-validator1-cns",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },

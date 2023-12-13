@@ -55,7 +55,7 @@ class DbMultiDomainAcsStoreTest
             mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured)(BobbyTablesRowData(_))
           ),
         ),
-        acsTableName = "directory_acs_store", // to have extra columns
+        acsTableName = "scan_acs_store", // to have extra columns
       )
       val coupon = c(1)
       for {
@@ -113,7 +113,7 @@ class DbMultiDomainAcsStoreTest
     override def contractExpiresAt: Option[Timestamp] = None
 
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq(
-      "directory_entry_name" -> lengthLimited("'); DROP TABLE bobby_tables; --")
+      "cns_entry_name" -> lengthLimited("'); DROP TABLE bobby_tables; --")
     )
   }
 }

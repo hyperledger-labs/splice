@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DirectoryEntry, ErrorDisplay, Loading, RateDisplay } from 'common-frontend';
+import { AmountDisplay, CnsEntry, ErrorDisplay, Loading, RateDisplay } from 'common-frontend';
 import { useCoinPrice } from 'common-frontend/scan-api';
 import React from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
@@ -145,15 +145,10 @@ const SingleRecipientInfo: React.FC<SingleRecipientInfoProps> = ({
       <Typography variant="h5" className="payment-amount">
         Send <AmountDisplay amount={BigNumber(amount.amount)} currency={amount.currency} /> to{' '}
       </Typography>
-      <DirectoryEntry
-        partyId={receiver}
-        variant="h5"
-        fontWeight="bold"
-        className="payment-receiver"
-      />
+      <CnsEntry partyId={receiver} variant="h5" fontWeight="bold" className="payment-receiver" />
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="body2">via</Typography>{' '}
-        <DirectoryEntry partyId={provider} variant="body2" className="payment-provider" />
+        <CnsEntry partyId={provider} variant="body2" className="payment-provider" />
       </Stack>
     </Stack>
   );
@@ -180,7 +175,7 @@ const MultiRecipientsInfo: React.FC<MultipleRecipientsInfoProps> = ({
       </Typography>
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="body2">via</Typography>{' '}
-        <DirectoryEntry partyId={provider} variant="body2" className="payment-provider" />
+        <CnsEntry partyId={provider} variant="body2" className="payment-provider" />
       </Stack>
       <Table>
         <TableBody>
@@ -189,7 +184,7 @@ const MultiRecipientsInfo: React.FC<MultipleRecipientsInfoProps> = ({
             return (
               <TableRow key={receiver} id={`${receiver}-payment-row`}>
                 <TableCell variant="party">
-                  <DirectoryEntry partyId={receiver} variant="h6" className="receiver-entry" />
+                  <CnsEntry partyId={receiver} variant="h6" className="receiver-entry" />
                 </TableCell>
                 <TableCell>
                   <Typography variant="h6" className="receiver-amount">

@@ -1,6 +1,6 @@
 import com.daml.lf.value.Value.ContractId
 import com.daml.network.codegen.java.cn.{splitwell => splitwellCodegen}
-import com.daml.network.console.{DirectoryExternalAppClientReference, WalletAppClientReference}
+import com.daml.network.console.{CnsExternalAppClientReference, WalletAppClientReference}
 import com.daml.network.console.LedgerApiExtensions._
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
@@ -29,13 +29,13 @@ val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser
 val bobUserParty = bobValidator.onboardUser(bobWallet.config.ledgerApiUser)
 val charlieUserParty = charlieValidator.onboardUser(charlieWallet.config.ledgerApiUser)
 
-println("Ensuring that directory entries are allocated correctly...")
-def ensureDirectoryEntry(
+println("Ensuring that CNS entries are allocated correctly...")
+def ensureCnsEntry(
     user: PartyId,
     name: String,
     url: String,
     description: String,
-    directory: DirectoryExternalAppClientReference,
+    cns: CnsExternalAppClientReference,
     wallet: WalletAppClientReference,
 ) {
   try {
@@ -48,7 +48,7 @@ def ensureDirectoryEntry(
   } catch {
     case e: CommandFailure => {
       println(s"Requesting CNS name \"$name\" for user \"$user\".")
-      directory.createDirectoryEntry(name, url, description)
+      cns.createCnsEntry(name, url, description)
       println("Waiting for wallet initialization to complete")
       wallet.waitForInitialization()
       println("Wallet initialization complete, tapping coin")
@@ -69,28 +69,28 @@ def ensureDirectoryEntry(
     }
   }
 }
-ensureDirectoryEntry(
+ensureCnsEntry(
   aliceUserParty,
   "alice.unverified.cns",
   "https://alice-url.cns.com",
   "",
-  aliceDirectory,
+  aliceCns,
   aliceWallet,
 )
-ensureDirectoryEntry(
+ensureCnsEntry(
   bobUserParty,
   "bob.unverified.cns",
   "https://bob-url.cns.com",
   "",
-  bobDirectory,
+  bobCns,
   bobWallet,
 )
-ensureDirectoryEntry(
+ensureCnsEntry(
   charlieUserParty,
   "charlie.unverified.cns",
   "https://charlie-url.cns.com",
   "",
-  charlieDirectory,
+  charlieCns,
   charlieWallet,
 )
 

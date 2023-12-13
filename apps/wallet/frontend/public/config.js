@@ -19,11 +19,6 @@ window.canton_network_config = {
       url: 'http://localhost:5003/api/validator',
     },
     // BEGIN_WALLET_CLUSTER_BACKEND_CONFIG
-    directory: {
-      // URL of the directory backend.
-      // Edit this to the cluster you're trying to connect on.
-      url: 'https://directory.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/v0/directory',
-    },
     scan: {
       // URL of scan backend.
       // Edit this to the cluster you're trying to connect on.

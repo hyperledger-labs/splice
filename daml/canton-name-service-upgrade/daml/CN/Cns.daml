@@ -34,7 +34,7 @@ template CnsRules
               receiver = svc
               provider = svc
               svc
-              description = "Cns entry: " <> show name
+              description = "CNS entry: " <> show name
             payData = SubscriptionPayData with
               paymentAmount = PaymentAmount config.entryFee USD
               paymentInterval = config.entryLifetime

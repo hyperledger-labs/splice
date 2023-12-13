@@ -56,7 +56,7 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-directory-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "sv"
       },
       "stringData": {
@@ -67,7 +67,7 @@
         }
       }
     },
-    "name": "auth0-ui-secret-sv-directory",
+    "name": "auth0-ui-secret-sv-cns",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },

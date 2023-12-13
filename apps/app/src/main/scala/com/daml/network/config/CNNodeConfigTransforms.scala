@@ -13,7 +13,7 @@ import com.daml.network.validator.config.{
   AppManagerConfig,
   AppManagerAppClientConfig,
   ValidatorAppBackendConfig,
-  DirectoryAppExternalClientConfig,
+  CnsAppExternalClientConfig,
 }
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.DomainAlias
@@ -102,7 +102,7 @@ object CNNodeConfigTransforms {
       updateAllRemoteSplitwellAppConfigs_(c =>
         c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
       ),
-      updateAllDirectoryAppExternalClientConfigs_(c =>
+      updateAllCnsAppExternalClientConfigs_(c =>
         c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
       ),
     )
@@ -163,7 +163,7 @@ object CNNodeConfigTransforms {
   }
 
   type CnAppConfigTransform[A] = A => A
-  type DirectoryExternalClientConfigReader = CnAppConfigTransform[DirectoryAppExternalClientConfig]
+  type CnsExternalClientConfigReader = CnAppConfigTransform[CnsAppExternalClientConfig]
   type ValidatorAppTransform = CnAppConfigTransform[ValidatorAppBackendConfig]
   type WalletAppClientTransform = CnAppConfigTransform[WalletAppClientConfig]
   type AppManagerAppClientTransform = CnAppConfigTransform[AppManagerAppClientConfig]
@@ -186,10 +186,10 @@ object CNNodeConfigTransforms {
       (name, update(config))
     })
 
-  def updateAllDirectoryAppExternalClientConfigs_(
-      update: DirectoryExternalClientConfigReader
+  def updateAllCnsAppExternalClientConfigs_(
+      update: CnsExternalClientConfigReader
   ): CNNodeConfigTransform =
-    _.focus(_.directoryAppExternalClients).modify(_.map { case (name, config) =>
+    _.focus(_.cnsAppExternalClients).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 

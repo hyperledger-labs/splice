@@ -7,7 +7,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTest
 import com.daml.network.util.{
-  DirectoryFrontendTestUtil,
+  CnsFrontendTestUtil,
   FrontendLoginUtil,
   ProcessTestUtil,
   WalletFrontendTestUtil,
@@ -24,7 +24,7 @@ class SelfHostedPreflightIntegrationTest
     with FrontendLoginUtil
     with WalletFrontendTestUtil
     with PreflightIntegrationTestUtil
-    with DirectoryFrontendTestUtil {
+    with CnsFrontendTestUtil {
 
   // We need to delay this until we started the validator. Otherwise we might
   // end up with port collisions.
@@ -72,7 +72,7 @@ class SelfHostedPreflightIntegrationTest
       runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
 
       val walletUiPort = 3000
-      val directoryUiPort = 3004
+      val cnsUiPort = 3004
 
       // Generate new random CNS names to avoid conflicts between multiple preflight check runs
       val id = (new scala.util.Random).nextInt().toHexString
@@ -83,8 +83,8 @@ class SelfHostedPreflightIntegrationTest
       withFrontEnd("alice-selfhosted") { implicit webDriver =>
         login(walletUiPort, "alice")
         tapCoins(100)
-        reserveDirectoryNameFor(
-          () => login(directoryUiPort, "alice"),
+        reserveCnsNameFor(
+          () => login(cnsUiPort, "alice"),
           cnsName,
           "1.0000000000",
           "USD",

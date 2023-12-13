@@ -5,7 +5,7 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{
-  DirectoryTestUtil,
+  CnsEntryTestUtil,
   FrontendLoginUtil,
   SplitwellFrontendTestUtil,
   WalletTestUtil,
@@ -21,7 +21,7 @@ class SplitwellFrontendIntegrationTest
       "bobSplitwell",
       "charlieSplitwell",
     )
-    with DirectoryTestUtil
+    with CnsEntryTestUtil
     with WalletTestUtil
     with SplitwellFrontendTestUtil
     with FrontendLoginUtil {
@@ -188,16 +188,16 @@ class SplitwellFrontendIntegrationTest
 
       val aliceEntryName = perTestCaseName("alice")
       val bobEntryName = perTestCaseName("bob")
-      initialiseDirectoryApp(
+      initialiseCnsEntry(
         aliceEntryName,
         aliceUserParty,
-        aliceDirectoryExternalClient,
+        aliceCnsExternalClient,
         aliceWalletClient,
       )
-      initialiseDirectoryApp(
+      initialiseCnsEntry(
         bobEntryName,
         bobUserParty,
-        bobDirectoryExternalClient,
+        bobCnsExternalClient,
         bobWalletClient,
       )
       val aliceCns = expectedCns(aliceUserParty, aliceEntryName)
@@ -231,14 +231,14 @@ class SplitwellFrontendIntegrationTest
         eventually(scaled(5 seconds)) {
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
             matchRow(
-              Seq("directory-entry", "balances-table-amount"),
+              Seq("cns-entry", "balances-table-amount"),
               Seq(aliceCns, "0.0000000000"),
             )(row)
           }
           inside(findAll(className("balance-updates-list-item")).toSeq.sortBy(_.text)) {
             case Seq(row1, row2) =>
               matchRow(
-                Seq("directory-entry", "description"),
+                Seq("cns-entry", "description"),
                 Seq(aliceCns, "paid 1000.0 CC for Team lunch"),
               )(row1)
 

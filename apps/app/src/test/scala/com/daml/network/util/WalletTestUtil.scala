@@ -399,40 +399,40 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     )
   }
 
-  protected def createDirectoryEntryForDirectoryItself(implicit
+  protected def createCnsEntryForItself(implicit
       env: CNNodeTestConsoleEnvironment
   ): String = {
-    val dirEntryName = "directory.cns"
+    val cnsEntryName = "cns.cns"
     val entryUrl = "https://cns-dir-url.com"
-    val entryDescription = "Sample CNS Directory Entry Description"
+    val entryDescription = "Sample CNS Entry Description"
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
       actAs = Seq(svcParty),
       commands = new cnsCodegen.CnsEntry(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
-        dirEntryName,
+        cnsEntryName,
         entryUrl,
         entryDescription,
         Instant.now().plus(90, ChronoUnit.DAYS),
       ).create.commands.asScala.toSeq,
       optTimeout = None,
     )
-    waitForDirectoryEntry(dirEntryName)
-    expectedCns(svcParty, dirEntryName)
+    waitForCnsEntry(cnsEntryName)
+    expectedCns(svcParty, cnsEntryName)
   }
 
-  protected def createDirectoryEntry(
-      directoryExternalApp: DirectoryExternalAppReference,
+  protected def createCnsEntry(
+      cnsExternalApp: CnsExternalAppReference,
       entryName: String,
       wallet: WalletAppClientReference,
       tapAmount: BigDecimal = 5.0,
       entryUrl: String = "https://cns-dir-url.com",
-      entryDescription: String = "Sample CNS Directory Entry Description",
+      entryDescription: String = "Sample CNS Entry Description",
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
-    requestDirectoryEntry(
-      directoryExternalApp,
+    requestCnsEntry(
+      cnsExternalApp,
       entryName,
       entryUrl,
       entryDescription,
@@ -444,10 +444,10 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     wallet.acceptSubscriptionRequest(
       wallet.listSubscriptionRequests().head.contractId
     )
-    waitForDirectoryEntry(entryName)
+    waitForCnsEntry(entryName)
   }
 
-  private def waitForDirectoryEntry(name: String)(implicit
+  private def waitForCnsEntry(name: String)(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
     eventuallySucceeds(40.seconds) {
@@ -455,15 +455,15 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     }
   }
 
-  protected def requestDirectoryEntry(
-      directoryExternalApp: DirectoryExternalAppReference,
+  protected def requestCnsEntry(
+      cnsExternalApp: CnsExternalAppReference,
       entryName: String,
       entryUrl: String = "https://cns-dir-url.com",
-      entryDescription: String = "Sample CNS Directory Entry Description",
+      entryDescription: String = "Sample CNS Entry Description",
   ) = {
     // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
     retryCommandSubmission(
-      directoryExternalApp.createDirectoryEntry(entryName, entryUrl, entryDescription)
+      cnsExternalApp.createCnsEntry(entryName, entryUrl, entryDescription)
     )
   }
 

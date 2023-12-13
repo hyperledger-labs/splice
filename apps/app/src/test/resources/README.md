@@ -6,7 +6,6 @@ Name Allocation
 Our deployment topologies require many servers representing nodes and apps to be deployed simultaneously.
 We use the following prefixes for their names:
 - svc: for the servers operated by the svc
-- directory: for the servers operated by the directory provider
 - alice: for servers operated by alice acting as a self-hosted validator operator
 - bob: for servers operated by bob acting as a self-hosted validator operator
 
@@ -74,8 +73,7 @@ all network indices must be odd numbers.
 - `07`: Mediator, Admin API
 - `08`: Domain, Public API
 - `09`: Domain, Admin API
-- `10`: Directory provider, Admin API
-- `11`: Directory user, Admin API
+- `11`: CNS user, Admin API
 - `12`: Scan, Admin API
 - `13`: Splitwell, Admin API
 - `14`: SV, Public API + Admin API

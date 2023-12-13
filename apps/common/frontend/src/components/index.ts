@@ -1,11 +1,11 @@
 import AmountDisplay from './AmountDisplay';
 import AuthProvider from './AuthProvider';
+import CnsEntry from './CnsEntry';
+import CnsField from './CnsField';
 import CopyableTypography from './CopyableTypography';
 import Copyright from './Copyright';
 import DateDisplay from './DateDisplay';
 import DevNetOnly from './DevNetOnly';
-import DirectoryEntry from './DirectoryEntry';
-import DirectoryField from './DirectoryField';
 import ErrorBoundary from './ErrorBoundary';
 import ErrorDisplay from './ErrorDisplay';
 import IntervalDisplay from './IntervalDisplay';
@@ -20,14 +20,14 @@ import { TransferButton, SubscriptionButton } from './WalletButtons';
 export {
   AuthProvider,
   CopyableTypography,
-  DirectoryEntry,
+  CnsEntry,
   ErrorBoundary,
   Login,
   DateDisplay,
   DevNetOnly,
   Copyright,
   PartyId,
-  DirectoryField,
+  CnsField,
   AmountDisplay,
   RateDisplay,
   TitledTable,

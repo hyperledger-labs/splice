@@ -89,11 +89,11 @@ spec:
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: directory-sv-{{ (.Values.cluster).svNamespace }}
+  name: cns-sv-{{ (.Values.cluster).svNamespace }}
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "directory.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+    - "cns.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:
@@ -112,7 +112,7 @@ spec:
         - destination:
             port:
               number: 80
-            host: directory-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: cns-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
 {{- if .Values.withSvIngress }}
 apiVersion: networking.istio.io/v1alpha3

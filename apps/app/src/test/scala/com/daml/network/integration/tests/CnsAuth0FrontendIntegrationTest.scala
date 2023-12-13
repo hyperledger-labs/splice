@@ -1,0 +1,52 @@
+package com.daml.network.integration.tests
+
+import com.daml.network.LocalAuth0Test
+import com.daml.network.auth.AuthConfig.Rs256
+import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
+import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.util.{FrontendLoginUtil, CnsFrontendTestUtil, WalletTestUtil}
+import monocle.macros.syntax.lens.*
+
+import java.net.URL
+
+class CnsAuth0FrontendIntegrationTest
+    extends FrontendIntegrationTest("alice")
+    with WalletTestUtil
+    with CnsFrontendTestUtil
+    with FrontendLoginUtil {
+
+  override def environmentDefinition =
+    CNNodeEnvironmentDefinition
+      .simpleTopology1Sv(this.getClass.getSimpleName)
+      .addConfigTransform((_, cnNodeConfig) =>
+        updateAllValidatorConfigs_(conf =>
+          conf
+            .focus(_.auth)
+            .replace(
+              Rs256(
+                "https://canton.network.global",
+                new URL("https://canton-network-test.us.auth0.com/.well-known/jwks.json"),
+              )
+            )
+        )(cnNodeConfig)
+      )
+
+  "A CNS UI" should {
+    "allow login via auth0" taggedAs LocalAuth0Test in { implicit env =>
+      // onboard the user through the wallet UI since the console command refs are not set up to get tokens from the auth0 test tenant -- then log in to the directory UI
+      withAuth0LoginCheck("alice", aliceWalletUIPort, onboardThroughWalletUI = true) {
+        (user, _, wd) =>
+          implicit val webDriver: WebDriverType = wd
+
+          clue("The user logs in with OAauth2 and completes all Auth0 login prompts") {
+            completeAuth0LoginWithAuthorization(
+              s"http://localhost:$aliceCnsUIPort",
+              user.email,
+              user.password,
+              () => seleniumText(find(id("logged-in-user"))) should not be empty,
+            )
+          }
+      }
+    }
+  }
+}

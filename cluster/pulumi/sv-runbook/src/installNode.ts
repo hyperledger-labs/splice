@@ -5,7 +5,7 @@ import {
   Auth0Client,
   BackupConfig,
   ChartValues,
-  directoryUiSecret,
+  cnsUiSecret,
   envFlag,
   exactNamespace,
   ExactNamespace,
@@ -36,7 +36,7 @@ import {
 import { auth0Cfg } from './auth0cfg';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installGlobalDomainNode } from './globalDomain';
-import { walletUIClientId, directoryClientId, svUIClientId } from './secrets';
+import { walletUIClientId, cnsClientId, svUIClientId } from './secrets';
 import { CLUSTER_BASENAME, localCharts, TARGET_CLUSTER, version } from './utils';
 
 if (!isDevNet) {
@@ -364,7 +364,7 @@ async function installSvAndValidator(config: SvConfig) {
     imagePullDeps
       .concat([sv, participant])
       .concat([svValidatorAppSecret, svValidatorUISecret])
-      .concat([directoryUiSecret(xns, auth0Client, directoryClientId)])
+      .concat([cnsUiSecret(xns, auth0Client, cnsClientId)])
       .concat(backupConfigSecret ? [backupConfigSecret] : [])
   );
 

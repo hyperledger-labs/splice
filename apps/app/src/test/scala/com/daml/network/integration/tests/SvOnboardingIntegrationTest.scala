@@ -194,21 +194,21 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
   "SVs expect onboardings when asked to" in { implicit env =>
     initSvc()
     clue("SV1 has created as many ValidatorOnboarding contracts as it's configured to.") {
-      sv1Backend.listOngoingValidatorOnboardings() should have length 4
+      sv1Backend.listOngoingValidatorOnboardings() should have length 3
     }
     clue("SV1 doesn't recreate ValidatorOnboarding contracts on restart...") {
       sv1Backend.stop()
       sv1Backend.startSync()
-      sv1Backend.listOngoingValidatorOnboardings() should have length 4
+      sv1Backend.listOngoingValidatorOnboardings() should have length 3
     }
     clue("...even if an onboarding was completed in the meantime...") {
       bobValidatorBackend.startSync()
       eventually() {
-        sv1Backend.listOngoingValidatorOnboardings() should have length 3
+        sv1Backend.listOngoingValidatorOnboardings() should have length 2
       }
       sv1Backend.stop()
       sv1Backend.startSync()
-      sv1Backend.listOngoingValidatorOnboardings() should have length 3
+      sv1Backend.listOngoingValidatorOnboardings() should have length 2
     }
   }
 

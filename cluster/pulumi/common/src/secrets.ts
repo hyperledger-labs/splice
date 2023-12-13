@@ -97,12 +97,12 @@ export async function validatorSecrets(
   };
 }
 
-export function directoryUiSecret(
+export function cnsUiSecret(
   ns: ExactNamespace,
   auth0Client: Auth0Client,
   clientId: string
 ): k8s.core.v1.Secret {
-  return uiSecret(auth0Client, ns, 'directory', clientId);
+  return uiSecret(auth0Client, ns, 'cns', clientId);
 }
 
 export async function svAppSecrets(

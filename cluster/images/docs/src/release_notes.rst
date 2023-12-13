@@ -8,6 +8,10 @@ Release Notes
 
 * Minor SV UI tweaks. Among other things, it is now mandatory to supply a textual proposal summary when submitting a vote request.
 
+* Renamed ``directory`` to ``CNS`` across the system
+
+  * Renamed ingress rule from ``https://directory.sv.svc.<YOUR_HOSTNAME>*`` to ``https://cns.sv.svc.<YOUR_HOSTNAME>*``.  Please note that this is now a requirement for this UI to continue working properly.
+
 
 2023-12-11
 ----------

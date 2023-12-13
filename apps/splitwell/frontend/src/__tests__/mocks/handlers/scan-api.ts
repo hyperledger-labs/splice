@@ -50,7 +50,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
           ctx.json<LookupEntryByPartyResponse>({
             entry: {
               template_id:
-                '5c14f1a1caa3f7916ccb572ea7b8685dce90b90c5307dd6aeefd7b711013a7ea:CN.Directory:DirectoryEntry',
+                '5c14f1a1caa3f7916ccb572ea7b8685dce90b90c5307dd6aeefd7b711013a7ea:CN.Cns:CnsEntry',
               contract_id:
                 '00c8e178f8b0b2c2955103b3fa59ccdc5f34861c4bcf659844c2959ba9febf3f61ca0212207e6c7b0db1b456c2f3f23c3b0c75b02dfc0c470cd1ea3fb603a01527e414c922',
               payload: CnsEntry.encode({

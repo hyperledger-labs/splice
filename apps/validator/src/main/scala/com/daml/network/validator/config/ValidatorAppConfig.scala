@@ -177,7 +177,7 @@ case class AppManagerAppClientConfig(
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }
 
-case class DirectoryAppExternalClientConfig(
+case class CnsAppExternalClientConfig(
     adminApi: NetworkAppClientConfig,
     ledgerApiUser: String,
 ) extends HttpCNNodeClientConfig {

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, DirectoryEntry, ErrorDisplay, RateDisplay, Loading } from 'common-frontend';
+import { AmountDisplay, CnsEntry, ErrorDisplay, RateDisplay, Loading } from 'common-frontend';
 import { useCoinPrice } from 'common-frontend/scan-api';
 import formatISO from 'date-fns/formatISO';
 
@@ -317,15 +317,11 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
     );
   } else if (transaction.senderId !== primaryPartyId) {
     senderOrReceiver = (
-      <DirectoryEntry
-        className="sender-or-receiver"
-        partyId={transaction.senderId}
-        variant="body1"
-      />
+      <CnsEntry className="sender-or-receiver" partyId={transaction.senderId} variant="body1" />
     );
   } else if (transaction.receivers.length === 1) {
     senderOrReceiver = (
-      <DirectoryEntry
+      <CnsEntry
         className="sender-or-receiver"
         partyId={transaction.receivers[0].party}
         variant="body1"
@@ -348,11 +344,7 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
       {senderOrReceiver}
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="caption">via </Typography>
-        <DirectoryEntry
-          className="provider-id"
-          partyId={transaction.providerId}
-          variant="caption"
-        />
+        <CnsEntry className="provider-id" partyId={transaction.providerId} variant="caption" />
       </Stack>
     </Stack>
   );

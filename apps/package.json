@@ -3,7 +3,7 @@
     "common/frontend-test-utils",
     "common/frontend-typeface-termina",
     "common/frontend",
-    "directory/frontend",
+    "cns/frontend",
     "scan/frontend",
     "scan/openapi-ts-client",
     "splitwell/frontend",
