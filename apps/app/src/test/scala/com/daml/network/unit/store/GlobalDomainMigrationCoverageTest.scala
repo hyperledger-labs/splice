@@ -154,7 +154,7 @@ object GlobalDomainMigrationCoverageTest {
     import codegen.java.cn.wallet.buytrafficrequest as trafficRequestCodegen
     Seq(
       globaldomain.MemberTraffic.COMPANION ->
-        reason("tied to a specific domainId, never migrated", SvSvcStore),
+        reason("tied to a specific domainId, never migrated", ScanStore, SvSvcStore),
       topUpCodegen.ValidatorTopUpState.COMPANION ->
         reason("tied to a specific domainId, never migrated", ValidatorStore),
       trafficRequestCodegen.BuyTrafficRequest.COMPANION ->

@@ -6,6 +6,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
+import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
@@ -20,7 +21,7 @@ import com.daml.network.store.{
 }
 import com.daml.network.util.{Contract, ContractWithState}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -356,6 +357,18 @@ class InMemoryScanStore(
         .sortWith(_.totalTrafficPurchased > _.totalTrafficPurchased)
         .take(limit)
     }
+  }
+
+  override def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Long] = {
+    multiDomainAcsStore
+      .listContractsOnDomain(MemberTraffic.COMPANION, domainId)
+      .map(
+        _.filter(_.payload.memberId == memberId.toProtoPrimitive)
+          .map(_.payload.totalPurchased.toLong)
+          .sum
+      )
   }
 
   def listImportCrates(receiverParty: PartyId, limit: Limit = Limit.DefaultLimit)(implicit

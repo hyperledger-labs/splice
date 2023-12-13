@@ -17,8 +17,9 @@ import com.daml.network.environment.{
   SequencerAdminConnection,
 }
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
-import com.daml.network.http.v0.scan.ScanResource
-import com.daml.network.scan.admin.http.HttpScanHandler
+import com.daml.network.http.v0.external.scan.ScanResource as ExternalScanResource
+import com.daml.network.http.v0.scan.ScanResource as InternalScanResource
+import com.daml.network.scan.admin.http.{HttpScanHandler, HttpExternalScanHandler}
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
@@ -128,10 +129,15 @@ class ScanApp(
         logger,
       )
 
-      handler = new HttpScanHandler(
+      internalHandler = new HttpScanHandler(
+        store,
+        config.miningRoundsCacheTimeToLiveOverride,
+        loggerFactory,
+      )
+
+      externalHandler = new HttpExternalScanHandler(
         store,
         sequencerAdminConnection,
-        config.miningRoundsCacheTimeToLiveOverride,
         loggerFactory,
       )
 
@@ -151,7 +157,8 @@ class ScanApp(
             requestLogger(traceContext) {
               HttpErrorHandler(loggerFactory)(traceContext) {
                 concat(
-                  ScanResource.routes(handler, _ => provide(traceContext)),
+                  InternalScanResource.routes(internalHandler, _ => provide(traceContext)),
+                  ExternalScanResource.routes(externalHandler, _ => provide(traceContext)),
                   pathPrefix("api" / "scan")(
                     CommonAdminResource.routes(adminHandler, _ => provide(traceContext))
                   ),

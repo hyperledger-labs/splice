@@ -4,7 +4,7 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.scan.store.TxLogEntry
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{Member, PartyId}
 
 object ScanTables extends AcsTables {
 
@@ -18,6 +18,8 @@ object ScanTables extends AcsTables {
       featuredAppRightProvider: Option[PartyId] = None,
       cnsEntryName: Option[String] = None,
       cnsEntryOwner: Option[PartyId] = None,
+      memberTrafficMember: Option[Member] = None,
+      totalTrafficPurchased: Option[Long] = None,
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "round" -> round,
@@ -27,6 +29,8 @@ object ScanTables extends AcsTables {
       "featured_app_right_provider" -> featuredAppRightProvider,
       "cns_entry_name" -> cnsEntryName.map(lengthLimited),
       "cns_entry_owner" -> cnsEntryOwner,
+      "member_traffic_member" -> memberTrafficMember,
+      "total_traffic_purchased" -> totalTrafficPurchased,
     )
   }
 

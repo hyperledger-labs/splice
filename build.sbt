@@ -505,23 +505,30 @@ lazy val `apps-scan` =
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
+        npmName = "scan-external-openapi",
+        openApiSpec = "scan-external.yaml",
+        directory = "external-openapi-ts-client",
+      ),
+      BuildCommon.TS.openApiSettings(
         npmName = "scan-openapi",
         openApiSpec = "scan-internal.yaml",
       ),
       Compile / guardrailTasks :=
-        List(
-          ScalaServer(
-            new File("apps/scan/src/main/openapi/scan-internal.yaml"),
-            pkg = "com.daml.network.http.v0",
-            framework = "pekko-http",
-            customExtraction = true,
+        List("external", "internal").flatMap { scope =>
+          List(
+            ScalaServer(
+              new File(s"apps/scan/src/main/openapi/scan-$scope.yaml"),
+              pkg = "com.daml.network.http.v0",
+              framework = "pekko-http",
+              customExtraction = true,
+            ),
+            ScalaClient(
+              new File(s"apps/scan/src/main/openapi/scan-$scope.yaml"),
+              pkg = "com.daml.network.http.v0",
+              framework = "pekko-http",
+            ),
           ),
-          ScalaClient(
-            new File("apps/scan/src/main/openapi/scan-internal.yaml"),
-            pkg = "com.daml.network.http.v0",
-            framework = "pekko-http",
-          ),
-        ),
+        },
     )
 
 lazy val `apps-common-frontend` = {

@@ -21,7 +21,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -142,6 +142,10 @@ trait ScanStore
         .fees
         .baseRateTrafficLimits
     )
+
+  def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Long]
 
   def listImportCrates(receiverParty: PartyId, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
@@ -281,6 +285,15 @@ object ScanStore {
             contract = contract,
             cnsEntryName = Some(contract.payload.name),
             cnsEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+          )
+        },
+        mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt => vt.payload.svc == svc) { contract =>
+          ScanAcsStoreRowData(
+            contract,
+            memberTrafficMember = Member
+              .fromProtoPrimitive_(contract.payload.memberId)
+              .fold(e => throw new IllegalArgumentException(e), Some(_)),
+            totalTrafficPurchased = Some(contract.payload.totalPurchased),
           )
         },
       ),

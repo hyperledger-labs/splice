@@ -157,11 +157,21 @@ class WalletBuyTrafficRequestIntegrationTest
               status shouldBe d0.GetBuyTrafficRequestStatusResponse.Status.Completed
             }
             clue("Receiving validator's on-ledger traffic is updated") {
+              val expectedTotalPurchasedTraffic = (initialTrafficAmount + minTopupAmount)
               getTotalPurchasedTraffic(
                 aliceValidatorBackend.participantClient.id,
                 activeDomainId,
-              ) shouldBe (initialTrafficAmount + minTopupAmount)
-              // TODO(#8882) - Also test Scan traffic-status API
+              ) shouldBe expectedTotalPurchasedTraffic
+              // double-check that scan returns the same result
+              eventually()(
+                sv1ScanBackend
+                  .getMemberTrafficStatus(
+                    activeDomainId,
+                    aliceValidatorBackend.participantClient.id,
+                  )
+                  .target
+                  .totalPurchased shouldBe expectedTotalPurchasedTraffic
+              )
             }
           }
         }
@@ -236,8 +246,20 @@ class WalletBuyTrafficRequestIntegrationTest
       // on-ledger state of traffic for member on domain - sum of MemberTraffic contracts
       def purchasedTraffic =
         getTotalPurchasedTraffic(validatorApp.participantClient.id, activeDomainId)
+      // double-check that scan returns the same result
+      eventually()(
+        sv1ScanBackend
+          .getMemberTrafficStatus(activeDomainId, validatorApp.participantClient.id)
+          .target
+          .totalPurchased shouldBe purchasedTraffic
+      )
       // topology state of traffic for member on domain
       def sequencerTrafficLimit = getSequencerTrafficLimit(validatorApp, activeDomainId)
+      // double-check that scan returns the same result
+      sv1ScanBackend
+        .getMemberTrafficStatus(activeDomainId, validatorApp.participantClient.id)
+        .actual
+        .totalLimit shouldBe sequencerTrafficLimit
 
       actAndCheck(
         "Create new MemberTraffic if needed", {

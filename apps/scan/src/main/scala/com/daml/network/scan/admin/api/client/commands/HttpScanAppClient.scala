@@ -16,6 +16,7 @@ import com.daml.network.codegen.java.cc.round.{
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.http.v0.{definitions, scan as http}
+import com.daml.network.http.v0.external.scan as externalHttp
 import com.daml.network.http.v0.definitions.{GetCnsRulesRequest, GetCoinRulesRequest}
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.codegen.java.cc
@@ -29,7 +30,7 @@ import scala.jdk.OptionConverters.*
 
 object HttpScanAppClient {
 
-  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+  abstract class InternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
     override type Client = http.ScanClient
 
     def createClient(host: String)(implicit
@@ -41,8 +42,20 @@ object HttpScanAppClient {
       http.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
+  abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = externalHttp.ScanClient
+
+    def createClient(host: String)(implicit
+        httpClient: HttpRequest => Future[HttpResponse],
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client =
+      externalHttp.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
+  }
+
   case class GetSvcPartyId(headers: List[HttpHeader])
-      extends BaseCommand[http.GetSvcPartyIdResponse, PartyId] {
+      extends InternalBaseCommand[http.GetSvcPartyIdResponse, PartyId] {
 
     override def submitRequest(
         client: Client,
@@ -85,7 +98,7 @@ object HttpScanAppClient {
   case class GetSortedOpenAndIssuingMiningRounds(
       cachedOpenRounds: Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
       cachedIssuingRounds: Seq[ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]],
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.GetOpenAndIssuingMiningRoundsResponse,
         (
             Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
@@ -141,7 +154,7 @@ object HttpScanAppClient {
 
   case class GetCoinRules(
       cachedCoinRules: Option[ContractWithState[CoinRules.ContractId, CoinRules]]
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.GetCoinRulesResponse,
         ContractWithState[CoinRules.ContractId, CoinRules],
       ] {
@@ -176,7 +189,7 @@ object HttpScanAppClient {
 
   case class GetCnsRules(
       cachedCnsRules: Option[ContractWithState[CnsRules.ContractId, CnsRules]]
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.GetCnsRulesResponse,
         ContractWithState[CnsRules.ContractId, CnsRules],
       ] {
@@ -210,7 +223,7 @@ object HttpScanAppClient {
   }
 
   case object GetClosedRounds
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.GetClosedRoundsResponse,
         Seq[Contract[ClosedMiningRound.ContractId, ClosedMiningRound]],
       ] {
@@ -231,7 +244,7 @@ object HttpScanAppClient {
   }
 
   case object ListFeaturedAppRight
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.ListFeaturedAppRightsResponse,
         Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]],
       ] {
@@ -252,7 +265,7 @@ object HttpScanAppClient {
   }
 
   case class LookupFeaturedAppRight(providerPartyId: PartyId)
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.LookupFeaturedAppRightResponse,
         Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]],
       ] {
@@ -275,7 +288,7 @@ object HttpScanAppClient {
   case class ListCnsEntries(
       namePrefix: String,
       pageSize: Int,
-  ) extends BaseCommand[http.ListCnsEntriesResponse, Seq[
+  ) extends InternalBaseCommand[http.ListCnsEntriesResponse, Seq[
         Contract[CnsEntry.ContractId, CnsEntry]
       ]] {
 
@@ -293,7 +306,7 @@ object HttpScanAppClient {
 
   case class LookupCnsEntryByParty(
       party: PartyId
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.LookupCnsEntryByPartyResponse,
         Contract[CnsEntry.ContractId, CnsEntry],
       ] {
@@ -316,7 +329,7 @@ object HttpScanAppClient {
 
   case class LookupCnsEntryByName(
       name: String
-  ) extends BaseCommand[
+  ) extends InternalBaseCommand[
         http.LookupCnsEntryByNameResponse,
         Contract[CnsEntry.ContractId, CnsEntry],
       ] {
@@ -338,7 +351,7 @@ object HttpScanAppClient {
   }
 
   case class GetTotalCoinBalance(asOfEndOfRound: Long)
-      extends BaseCommand[http.GetTotalCoinBalanceResponse, BigDecimal] {
+      extends InternalBaseCommand[http.GetTotalCoinBalanceResponse, BigDecimal] {
 
     override def submitRequest(
         client: Client,
@@ -367,7 +380,7 @@ object HttpScanAppClient {
       transferFee: SteppedRate,
   )
   case class GetCoinConfigForRound(round: Long)
-      extends BaseCommand[http.GetCoinConfigForRoundResponse, CoinConfig] {
+      extends InternalBaseCommand[http.GetCoinConfigForRoundResponse, CoinConfig] {
 
     override def submitRequest(
         client: Client,
@@ -410,7 +423,7 @@ object HttpScanAppClient {
   }
 
   case class GetRoundOfLatestData()
-      extends BaseCommand[http.GetRoundOfLatestDataResponse, (Long, Instant)] {
+      extends InternalBaseCommand[http.GetRoundOfLatestDataResponse, (Long, Instant)] {
 
     override def submitRequest(
         client: http.ScanClient,
@@ -425,7 +438,7 @@ object HttpScanAppClient {
   }
 
   case class GetRewardsCollected(round: Option[Long])
-      extends BaseCommand[http.GetRewardsCollectedResponse, BigDecimal] {
+      extends InternalBaseCommand[http.GetRewardsCollectedResponse, BigDecimal] {
 
     override def submitRequest(
         client: http.ScanClient,
@@ -453,7 +466,9 @@ object HttpScanAppClient {
     )
 
   case class getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)
-      extends BaseCommand[http.GetTopProvidersByAppRewardsResponse, Seq[(PartyId, BigDecimal)]] {
+      extends InternalBaseCommand[http.GetTopProvidersByAppRewardsResponse, Seq[
+        (PartyId, BigDecimal)
+      ]] {
     override def submitRequest(
         client: http.ScanClient,
         headers: List[HttpHeader],
@@ -468,7 +483,7 @@ object HttpScanAppClient {
   }
 
   case class getTopValidatorsByValidatorRewards(asOfEndOfRound: Long, limit: Int)
-      extends BaseCommand[http.GetTopValidatorsByValidatorRewardsResponse, Seq[
+      extends InternalBaseCommand[http.GetTopValidatorsByValidatorRewardsResponse, Seq[
         (PartyId, BigDecimal)
       ]] {
     override def submitRequest(
@@ -496,7 +511,7 @@ object HttpScanAppClient {
   )
 
   case class GetTopValidatorsByPurchasedTraffic(asOfEndOfRound: Long, limit: Int)
-      extends BaseCommand[http.GetTopValidatorsByPurchasedTrafficResponse, Seq[
+      extends InternalBaseCommand[http.GetTopValidatorsByPurchasedTrafficResponse, Seq[
         ValidatorPurchasedTraffic
       ]] {
     override def submitRequest(
@@ -525,24 +540,27 @@ object HttpScanAppClient {
   }
 
   case class GetMemberTrafficStatus(domainId: DomainId, memberId: Member)
-      extends BaseCommand[http.GetMemberTrafficStatusResponse, definitions.MemberTrafficStatus] {
+      extends ExternalBaseCommand[
+        externalHttp.GetMemberTrafficStatusResponse,
+        definitions.MemberTrafficStatus,
+      ] {
 
     override def submitRequest(
-        client: http.ScanClient,
+        client: externalHttp.ScanClient,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.GetMemberTrafficStatusResponse] =
+    ], externalHttp.GetMemberTrafficStatusResponse] =
       client.getMemberTrafficStatus(domainId.toProtoPrimitive, memberId.toProtoPrimitive, headers)
 
     override protected def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.GetMemberTrafficStatusResponse.OK(response) => Right(response.trafficStatus)
+      case externalHttp.GetMemberTrafficStatusResponse.OK(response) => Right(response.trafficStatus)
     }
   }
 
   case class ListImportCrates(party: PartyId)
-      extends BaseCommand[http.ListImportCratesResponse, Seq[
+      extends InternalBaseCommand[http.ListImportCratesResponse, Seq[
         ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]
       ]] {
     override def submitRequest(
@@ -563,7 +581,7 @@ object HttpScanAppClient {
     }
   }
   case class ListSvcSequencers()
-      extends BaseCommand[
+      extends InternalBaseCommand[
         http.ListSvcSequencersResponse,
         Seq[DomainSequencers],
       ] {
@@ -608,7 +626,7 @@ object HttpScanAppClient {
       pageEndEventId: Option[String],
       sortOrder: definitions.TransactionHistoryRequest.SortOrder,
       pageSize: Int,
-  ) extends BaseCommand[http.ListTransactionHistoryResponse, Seq[
+  ) extends InternalBaseCommand[http.ListTransactionHistoryResponse, Seq[
         definitions.TransactionHistoryResponseItem
       ]] {
     override def submitRequest(

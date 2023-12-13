@@ -5,6 +5,7 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
+import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -23,7 +24,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -450,6 +451,25 @@ class DbScanStore(
         "getTopValidatorsByPurchasedTraffic",
       )
     } yield rows.map((HttpScanAppClient.ValidatorPurchasedTraffic.apply _).tupled)
+  }
+
+  override def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Long] = waitUntilAcsIngested {
+    for {
+      sum <- storage
+        .querySingle(
+          sql"""
+               select sum(total_traffic_purchased)
+               from #${ScanTables.acsTableName}
+               where store_id = $storeId
+                and template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID)}
+                and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
+             """.as[Long].headOption,
+          "getTotalPurchasedMemberTraffic",
+        )
+        .value
+    } yield sum.getOrElse(0L)
   }
 
   override def listImportCrates(receiverParty: PartyId, limit: Limit = Limit.DefaultLimit)(implicit

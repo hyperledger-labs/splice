@@ -904,9 +904,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     "listMemberTrafficContracts" should {
 
       "list all MemberTraffic contracts of a member" in {
-        val namespace = Namespace(Fingerprint.tryCreate(s"participant-identity"))
+        val namespace = Namespace(Fingerprint.tryCreate(s"dummy"))
         val goodMember = ParticipantId(Identifier.tryCreate("good"), namespace)
-        val badMember = SequencerId(dummyDomain)
+        val badMember = MediatorId(Identifier.tryCreate("bad"), namespace)
         val goodContracts = (1 to 3).map(n => memberTraffic(goodMember, n.toLong))
         val badContracts = (4 to 6).map(n => memberTraffic(badMember, n.toLong))
         for {
@@ -922,6 +922,30 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             PageLimit.tryCreate(100),
           )
         } yield result should contain theSameElementsAs goodContracts
+      }
+
+    }
+
+    "getTotalPurchasedMemberTraffic" should {
+
+      "return the sum over all traffic contracts for the member" in {
+        val namespace = Namespace(Fingerprint.tryCreate(s"dummy"))
+        val goodMember = ParticipantId(Identifier.tryCreate("good"), namespace)
+        val badMember = MediatorId(Identifier.tryCreate("bad"), namespace)
+        val goodContracts = (1 to 3).map(n => memberTraffic(goodMember, n.toLong))
+        val badContracts = (4 to 6).map(n => memberTraffic(badMember, n.toLong))
+        for {
+          store <- mkStore()
+          _ <- MonadUtil.sequentialTraverse(
+            goodContracts ++ badContracts
+          )(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          result <- store.getTotalPurchasedMemberTraffic(
+            goodMember,
+            dummyDomain,
+          )
+        } yield result shouldBe (1 to 3).sum.toLong
       }
 
     }

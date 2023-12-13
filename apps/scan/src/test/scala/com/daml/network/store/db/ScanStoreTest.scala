@@ -33,10 +33,11 @@ import com.daml.network.util.{
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{Member, PartyId}
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 
 import java.time.Instant
@@ -534,6 +535,30 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             ),
           )
         }
+      }
+
+    }
+
+    "getTotalPurchasedMemberTraffic" should {
+
+      "return the sum over all traffic contracts for the member" in {
+        val namespace = Namespace(Fingerprint.tryCreate(s"dummy"))
+        val goodMember = ParticipantId(Identifier.tryCreate("good"), namespace)
+        val badMember = MediatorId(Identifier.tryCreate("bad"), namespace)
+        val goodContracts = (1 to 3).map(n => memberTraffic(goodMember, n.toLong))
+        val badContracts = (4 to 6).map(n => memberTraffic(badMember, n.toLong))
+        for {
+          store <- mkStore()
+          _ <- MonadUtil.sequentialTraverse(
+            goodContracts ++ badContracts
+          )(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          result <- store.getTotalPurchasedMemberTraffic(
+            goodMember,
+            dummyDomain,
+          )
+        } yield result shouldBe (1 to 3).sum.toLong
       }
 
     }
@@ -1164,6 +1189,24 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     contract(
       CnsEntry.TEMPLATE_ID,
       new CnsEntry.ContractId(nextCid()),
+      template,
+    )
+  }
+
+  private def memberTraffic(member: Member, totalPurchased: Long) = {
+    val template = new MemberTraffic(
+      svcParty.toProtoPrimitive,
+      member.toProtoPrimitive,
+      dummyDomain.toProtoPrimitive,
+      totalPurchased,
+      1,
+      numeric(1.0),
+      numeric(1.0),
+    )
+
+    contract(
+      MemberTraffic.TEMPLATE_ID,
+      new MemberTraffic.ContractId(nextCid()),
       template,
     )
   }

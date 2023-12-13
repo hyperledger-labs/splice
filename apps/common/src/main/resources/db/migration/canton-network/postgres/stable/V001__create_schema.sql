@@ -305,7 +305,13 @@ create table scan_acs_store
     cns_entry_name              text,
 
     -- party-id of the directory user that owns a cns entry contract
-    cns_entry_owner             text
+    cns_entry_owner             text,
+
+    -- the member id in a MemberTraffic
+    member_traffic_member         text,
+
+    -- the traffic purchased in a MemberTraffic
+    total_traffic_purchased       bigint
 );
 
 -- lookup validator traffic
@@ -332,6 +338,11 @@ create index scan_acs_store_sid_den_tpo
 create index scan_acs_store_sid_deo_den
     on scan_acs_store (store_id, cns_entry_owner, cns_entry_name)
     where cns_entry_owner is not null and cns_entry_name is not null;
+
+-- retrieve total traffic purchased per member
+create index scan_acs_store_sid_tid_mtm
+    on scan_acs_store (store_id, template_id_qualified_name, member_traffic_member)
+    where member_traffic_member is not null;
 
 create table scan_txlog_store
 (
@@ -462,10 +473,10 @@ create table svc_acs_store
     sv_candidate_party            text,
     sv_candidate_name             text,
 
-    -- the validator party in a ValidatorLicense or ValidatorTraffic
+    -- the validator party in a ValidatorLicense or MemberTraffic
     validator                     text,
 
-    -- the traffic purchased in a ValidatorTraffic
+    -- the traffic purchased in a MemberTraffic
     total_traffic_purchased       bigint,
 
     -- the SV in a CoinPriceVote contract, or the voter in a Vote contract

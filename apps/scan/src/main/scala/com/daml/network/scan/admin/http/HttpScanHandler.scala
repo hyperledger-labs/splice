@@ -10,7 +10,6 @@ import com.daml.network.codegen.java.cc.round.{
   OpenMiningRound,
   SummarizingMiningRound,
 }
-import com.daml.network.environment.SequencerAdminConnection
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
@@ -20,7 +19,7 @@ import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{Codec, Contract, ContractWithState}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{Member, PartyId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -41,7 +40,6 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 class HttpScanHandler(
     store: ScanStore,
-    sequencerAdminConnection: SequencerAdminConnection,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -606,51 +604,4 @@ class HttpScanHandler(
         }
     }
   }
-
-  override def getMemberTrafficStatus(
-      respond: ScanResource.GetMemberTrafficStatusResponse.type
-  )(domainId: String, memberId: String)(
-      extracted: TraceContext
-  ): Future[ScanResource.GetMemberTrafficStatusResponse] = {
-    implicit val tc = extracted
-    withSpan(s"$workflowId.getMemberTrafficStatus") { _ => _ =>
-      for {
-        member <- Member.fromProtoPrimitive_(memberId) match {
-          case Right(member) => Future.successful(member)
-          case Left(error) =>
-            Future.failed(
-              HttpErrorHandler.badRequest(s"Could not decode member ID: $error")
-            )
-        }
-        response <- sequencerAdminConnection.getSequencerTrafficStatus(Seq(member))
-        _ <-
-          if (response.members.length == 0) {
-            Future.failed(
-              HttpErrorHandler.notFound(
-                s"No traffic status found for member: $memberId"
-              )
-            )
-          } else if (response.members.length == 1) {
-            Future.unit
-          } else {
-            Future.failed(
-              HttpErrorHandler.internalServerError(
-                s"Received more than one traffic status responses for member: $memberId."
-              )
-            )
-          }
-        actual = response.members(0).trafficState
-        actualConsumed = actual.extraTrafficConsumed.value
-        actualLimit = actual.extraTrafficLimit.fold(0L)(_.value)
-      } yield {
-        definitions.GetMemberTrafficStatusResponse(
-          definitions.MemberTrafficStatus(
-            definitions.ActualMemberTrafficState(actualConsumed, actualLimit),
-            definitions.TargetMemberTrafficState(0), // TODO(#8882) Implement me
-          )
-        )
-      }
-    }
-  }
-
 }
