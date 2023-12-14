@@ -321,7 +321,7 @@ create index scan_acs_store_sid_tid_val
 
 -- list ImportCrates
 create index scan_acs_store_sid_tid_icrn
-    on scan_acs_store (store_id, template_id_qualified_name, import_crate_receiver)
+    on scan_acs_store (store_id, template_id_qualified_name, import_crate_receiver, event_number)
     where import_crate_receiver is not null;
 
 -- lookup FeaturedAppRight

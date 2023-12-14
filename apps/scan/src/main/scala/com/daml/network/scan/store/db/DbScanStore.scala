@@ -485,7 +485,7 @@ class DbScanStore(
               where = sql"""template_id_qualified_name = ${QualifiedName(
                   ImportCrate.TEMPLATE_ID
                 )} and acs.import_crate_receiver = $receiverParty""",
-              orderLimit = sql"""limit ${sqlLimit(limit)}""",
+              orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
             ),
             "listImportCrates",
           )

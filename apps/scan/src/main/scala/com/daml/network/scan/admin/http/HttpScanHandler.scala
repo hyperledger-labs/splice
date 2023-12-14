@@ -473,9 +473,12 @@ class HttpScanHandler(
           OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
         )
         sequencersByDomain = sequencers.groupBy(_._1).view.mapValues(_.map(_._2))
-        domainSequencers = sequencersByDomain.map { case (domainId, svcSequencers) =>
-          definitions.DomainSequencers(domainId, svcSequencers.toVector)
-        }.toVector
+        domainSequencers = sequencersByDomain
+          .map { case (domainId, svcSequencers) =>
+            definitions.DomainSequencers(domainId, svcSequencers.toVector)
+          }
+          .toVector
+          .sortBy(_.domainId)
       } yield definitions.ListSvcSequencersResponse(domainSequencers)
     }
   }
