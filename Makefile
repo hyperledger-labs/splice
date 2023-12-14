@@ -18,7 +18,7 @@ $(app-bundle): $(canton-coin-dar) $(wallet-payments-dar)
 	sbt --batch bundle
 
 $(canton-coin-dar) $(wallet-payments-dar) &:
-	sbt --batch 'canton-coin-daml'/damlBuild 'wallet-payments-daml'/damlBuild 'directory-daml'/damlBuild
+	sbt --batch 'canton-coin-daml'/damlBuild 'wallet-payments-daml'/damlBuild
 
 .PHONY: clean
 clean: cluster/clean
