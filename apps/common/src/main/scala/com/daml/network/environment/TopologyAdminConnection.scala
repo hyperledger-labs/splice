@@ -30,6 +30,7 @@ import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.time.{Clock, RemoteClock, WallClock}
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransactionX,
@@ -189,28 +190,30 @@ abstract class TopologyAdminConnection(
     txs.map { tx => TopologyResult(tx.context, tx.item) }
   }
 
-  def getUnionspaceDefinition(
+  def getDecentralizedNamespaceDefinition(
       domainId: DomainId,
-      unionspace: Namespace,
+      decentralizedNamespace: Namespace,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[UnionspaceDefinitionX]] =
-    listUnionspaceDefinition(domainId, unionspace).map { txs =>
+  ): Future[TopologyResult[DecentralizedNamespaceDefinitionX]] =
+    listDecentralizedNamespaceDefinition(domainId, decentralizedNamespace).map { txs =>
       txs.headOption
         .getOrElse(
           throw Status.NOT_FOUND
-            .withDescription(show"No unionspace definition for $unionspace on domain $domainId")
+            .withDescription(
+              show"No decentralized namespace definition for $decentralizedNamespace on domain $domainId"
+            )
             .asRuntimeException()
         )
     }
 
-  private def listUnionspaceDefinition(
+  private def listDecentralizedNamespaceDefinition(
       domainId: DomainId,
-      unionspace: Namespace,
+      decentralizedNamespace: Namespace,
       proposals: TopologyTransactionType = AuthorizedState,
   )(implicit tc: TraceContext) = {
     runCmd(
-      TopologyAdminCommandsX.Read.ListUnionspaceDefinition(
+      TopologyAdminCommandsX.Read.ListDecentralizedNamespaceDefinition(
         BaseQueryX(
           filterStore = domainId.filterString,
           proposals = proposals.proposals,
@@ -219,7 +222,7 @@ abstract class TopologyAdminConnection(
           filterSigningKey = proposals.signingKey.getOrElse(""),
           protocolVersion = None,
         ),
-        filterNamespace = unionspace.toProtoPrimitive,
+        filterNamespace = decentralizedNamespace.toProtoPrimitive,
       )
     ).map {
       _.map(result => TopologyResult(result.context, result.item))
@@ -729,17 +732,17 @@ abstract class TopologyAdminConnection(
       signedBy,
     )
 
-  def proposeInitialUnionspaceDefinition(
+  def proposeInitialDecentralizedNamespaceDefinition(
       namespace: Namespace,
       owners: NonEmpty[Set[Namespace]],
       threshold: PositiveInt,
       signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
-  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, UnionspaceDefinitionX]] =
+  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, DecentralizedNamespaceDefinitionX]] =
     proposeMapping(
       TopologyStoreId.AuthorizedStore,
-      UnionspaceDefinitionX.create(
+      DecentralizedNamespaceDefinitionX.create(
         namespace,
         threshold,
         owners,
@@ -749,44 +752,44 @@ abstract class TopologyAdminConnection(
       isProposal = false,
     )
 
-  def ensureUnionspaceDefinitionProposalAccepted(
+  def ensureDecentralizedNamespaceDefinitionProposalAccepted(
       domainId: DomainId,
-      unionspace: Namespace,
+      decentralizedNamespace: Namespace,
       newOwner: Namespace,
       signedBy: Fingerprint,
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[UnionspaceDefinitionX]] =
-    ensureUnionspaceDefinitionOwnerChangeProposalAccepted(
-      show"Namespace $newOwner is in owners of UnionspaceDefinition",
+  ): Future[TopologyResult[DecentralizedNamespaceDefinitionX]] =
+    ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
+      show"Namespace $newOwner is in owners of DecentralizedNamespaceDefinition",
       domainId,
-      unionspace,
+      decentralizedNamespace,
       _.incl(newOwner),
       signedBy,
       retryFor,
     )
 
-  def ensureUnionspaceDefinitionOwnerChangeProposalAccepted(
+  def ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
       description: String,
       domainId: DomainId,
-      unionspace: Namespace,
+      decentralizedNamespace: Namespace,
       ownerChange: NonEmpty[Set[Namespace]] => NonEmpty[Set[Namespace]],
       signedBy: Fingerprint,
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[UnionspaceDefinitionX]] =
-    ensureTopologyMapping[UnionspaceDefinitionX](
+  ): Future[TopologyResult[DecentralizedNamespaceDefinitionX]] =
+    ensureTopologyMapping[DecentralizedNamespaceDefinitionX](
       TopologyStoreId.DomainStore(domainId),
       description,
-      unionspaceDefinitionForNamespace(domainId, unionspace, ownerChange),
+      decentralizedNamespaceDefinitionForNamespace(domainId, decentralizedNamespace, ownerChange),
       previous => {
         // constructor is not exposed so no copy
         val newOwners = ownerChange(previous.owners)
-        UnionspaceDefinitionX.create(
-          previous.unionspace,
-          CNThresholds.unionspaceThreshold(
+        DecentralizedNamespaceDefinitionX.create(
+          previous.namespace,
+          CNThresholds.decentralizedNamespaceThreshold(
             newOwners.size
           ),
           newOwners,
@@ -797,13 +800,13 @@ abstract class TopologyAdminConnection(
       isProposal = true,
     )
 
-  private def unionspaceDefinitionForNamespace(
+  private def decentralizedNamespaceDefinitionForNamespace(
       domainId: DomainId,
-      unionspace: Namespace,
+      decentralizedNamespace: Namespace,
       ownerChange: NonEmpty[Set[Namespace]] => NonEmpty[Set[Namespace]],
   )(implicit tc: TraceContext) = {
     EitherT(
-      getUnionspaceDefinition(domainId, unionspace).map(result =>
+      getDecentralizedNamespaceDefinition(domainId, decentralizedNamespace).map(result =>
         Either.cond(result.mapping.owners == ownerChange(result.mapping.owners), result, result)
       )
     )
@@ -1052,10 +1055,12 @@ object TopologyAdminConnection {
     )
   }
 
+  implicit val prettyStore: Pretty[grpc.TopologyStore] = prettyOfObject[grpc.TopologyStore]
+
   implicit val prettyBaseResult: Pretty[BaseResult] =
     prettyNode(
       "BaseResult",
-      param("domain", _.domain.unquoted),
+      param("store", _.store),
       param("validFrom", _.validFrom),
       param("validUntil", _.validUntil),
       param("operation", _.operation),

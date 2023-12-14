@@ -164,7 +164,7 @@ In order to use their time effectively, create an GitHub issue for your problem 
 - [ ] The context in which the error happened; e.g.:
   - Which nodes (participants, sequencer nodes, mediator nodes) are involved?
   - Any exotic features that we are using that might be relevant here
-    (unionspace for the SVC party, party migrations, distributed domain...)?
+    (decentralizedNamespace for the SVC party, party migrations, distributed domain...)?
   - What our app code was trying to do when the error happened
      - in Canton terms; ledger API submissions, topology transactions, ...
      - pay attention to concurrent operations that might trigger the bug

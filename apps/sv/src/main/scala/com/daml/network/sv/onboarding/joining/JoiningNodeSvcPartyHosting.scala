@@ -38,7 +38,7 @@ class JoiningNodeSvcPartyHosting(
         for {
           response <- retryProvider.retry(
             RetryFor.WaitingOnInitDependency,
-            "Onboard to SVC party hosting and unionspace membership",
+            "Onboard to SVC party hosting and decentralized namespace membership",
             SvConnection(
               sponsorSvConfig.adminApi,
               retryProvider,

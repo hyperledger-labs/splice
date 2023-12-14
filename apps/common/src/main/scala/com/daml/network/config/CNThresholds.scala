@@ -39,8 +39,8 @@ object CNThresholds {
       sequencersSize
     )
 
-  def unionspaceThreshold(unionspaceSize: Int): PositiveInt = {
-    svcRulesThreshold(unionspaceSize)
+  def decentralizedNamespaceThreshold(decentralizedNamespaceSize: Int): PositiveInt = {
+    svcRulesThreshold(decentralizedNamespaceSize)
   }
 
   def requiredNumVotes(

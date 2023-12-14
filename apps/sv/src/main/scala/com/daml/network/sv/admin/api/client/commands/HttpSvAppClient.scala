@@ -348,7 +348,7 @@ object HttpSvAppClient {
               )
             )
           sequencerSnapshot <- CantonSequencerSnapshot
-            .fromByteArray(Base64.getDecoder().decode(snapshot.sequencerSnapshot))
+            .fromByteArrayUnsafe(Base64.getDecoder().decode(snapshot.sequencerSnapshot))
         } yield SequencerSnapshot(topologySnapshot, sequencerSnapshot)).left.map(_.message)
     }
   }

@@ -10,9 +10,10 @@ class CNThresholdsTest extends AnyWordSpecLike with BaseTest {
     "return expected SVC consortium thresholds" in {
       forAll(Table(("consortium members", "threshold"), (1, 1), (2, 2), (3, 2), (4, 3))) {
         (consortiumMembers: Int, threshold: Int) =>
-          CNThresholds.unionspaceThreshold(consortiumMembers) shouldBe PositiveInt.tryCreate(
-            threshold
-          )
+          CNThresholds.decentralizedNamespaceThreshold(consortiumMembers) shouldBe PositiveInt
+            .tryCreate(
+              threshold
+            )
       }
     }
 

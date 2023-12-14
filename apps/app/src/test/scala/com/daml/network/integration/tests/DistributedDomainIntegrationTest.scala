@@ -109,17 +109,22 @@ class DistributedDomainIntegrationTest
       sv4Backend.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
     }
 
-    clue("SVC party is bootstrapped as a unionspace with SVs as owners") {
+    clue("SVC party is bootstrapped as a decentralized namespace with SVs as owners") {
       val svcParty = sv1Backend.getSvcInfo().svcParty
       val domainId =
         sv1Backend.participantClient.domains.id_of(globalDomain)
-      val unionspaces = sv1Backend.participantClient.topology.unionspaces
+      val decentralizedNamespaces = sv1Backend.participantClient.topology.decentralized_namespaces
         .list(
           filterStore = domainId.filterString,
           filterNamespace = svcParty.uid.namespace.toProtoPrimitive,
         )
-      inside(unionspaces) { case Seq(unionspace) =>
-        unionspace.item.owners shouldBe Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+      inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>
+        decentralizedNamespace.item.owners shouldBe Seq(
+          sv1Backend,
+          sv2Backend,
+          sv3Backend,
+          sv4Backend,
+        )
           .map(_.participantClient.id.uid.namespace)
           .toSet
       }

@@ -18,10 +18,10 @@ import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 /** Trigger that reacts to the assignment of SvcRules
   * It checks the members of the SVC as defined by the SvcRules members property,
-  * with the members of the svc unionspace as defined by the UnionspaceDefinitionX,
-  * and adds to the unionspace any members that are missing.
+  * with the members of the svc decentralized namespace as defined by the DecentralizedNamespaceDefinitionX,
+  * and adds to the decentralized namespace any members that are missing.
   *
-  * Adding the sv to the unionspace only after it's already part of the svc guarantees that party migration has finished
+  * Adding the sv to the decentralized namespace only after it's already part of the svc guarantees that party migration has finished
   */
 class SvOnboardingNamespaceProposalTrigger(
     override protected val context: TriggerContext,
@@ -46,8 +46,8 @@ class SvOnboardingNamespaceProposalTrigger(
       task: AssignedContract[SvcRules.ContractId, SvcRules]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     participantAdminConnection
-      .getUnionspaceDefinition(task.domain, svcParty.uid.namespace)
-      .flatMap { unionspace =>
+      .getDecentralizedNamespaceDefinition(task.domain, svcParty.uid.namespace)
+      .flatMap { decentralizedNamespace =>
         val svcRulesPayload = task.contract.payload
         svcRulesPayload.members
           .keySet()
@@ -55,15 +55,15 @@ class SvOnboardingNamespaceProposalTrigger(
           .map(PartyId.tryFromProtoPrimitive)
           .toSeq
           .filter(svcMemberParty =>
-            !unionspace.mapping.owners.contains(svcMemberParty.uid.namespace)
+            !decentralizedNamespace.mapping.owners.contains(svcMemberParty.uid.namespace)
           )
           // parallel to ensure that if one proposal is never accepted the rest of them are eventually accepted
           // this increases contention but the call will always redo the proposal when a new state is accepted
           .parTraverse { svcMemberParty =>
             logger.info(
-              s"Proposing $svcMemberParty as member of the unionspace, will wait for it to take effect."
+              s"Proposing $svcMemberParty as member of the decentralized namespace, will wait for it to take effect."
             )
-            participantAdminConnection.ensureUnionspaceDefinitionProposalAccepted(
+            participantAdminConnection.ensureDecentralizedNamespaceDefinitionProposalAccepted(
               task.domain,
               svcParty.uid.namespace,
               svcMemberParty.uid.namespace,

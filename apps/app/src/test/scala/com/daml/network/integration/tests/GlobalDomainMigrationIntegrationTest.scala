@@ -72,11 +72,11 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
       .fromResources(Seq("global-upgrade-topology.conf"), this.getClass.getSimpleName)
       .withAllocatedUsers()
       .withTrafficTopupsEnabled
-      .withResettedUnionspace()
+      .withResettedDecentralizedNamespace()
       .withZeroSequencerAvailabilityDelay
       .withManualStart
 
-  "can replay unionspace definition on new domain" in { implicit env =>
+  "can replay decentralized namespace definition on new domain" in { implicit env =>
     import env.{actorSystem, executionContext}
     import env.environment.scheduler
     val retryProvider = new RetryProvider(
@@ -123,10 +123,11 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
         val allUpgradeNodes =
           Seq(upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4)
 
-        val svcPartyUnionspace = sv2Backend.appState.svcStore.key.svcParty.uid.namespace
-        val globalDomainUnionspaceDefinition = sv1Backend.appState.participantAdminConnection
-          .getUnionspaceDefinition(globalDomainId, svcPartyUnionspace)
-          .futureValue
+        val svcPartyDecentralizedNamespace = sv2Backend.appState.svcStore.key.svcParty.uid.namespace
+        val globalDomainDecentralizedNamespaceDefinition =
+          sv1Backend.appState.participantAdminConnection
+            .getDecentralizedNamespaceDefinition(globalDomainId, svcPartyDecentralizedNamespace)
+            .futureValue
 
         val domainDynamicParams =
           sv1Backend.participantClientWithAdminToken.topology.domain_parameters
@@ -155,15 +156,15 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
               "Register new domain, connect to sync topology, disconnect and import acs snapshot, reconnect"
             ) {
               allUpgradeNodes.parTraverse(_.registerAndConnectToDomain()).futureValue.discard
-              withClue("unionspace is replicated on the new global domain") {
+              withClue("decentralized namespace is replicated on the new global domain") {
                 eventuallySucceeds(timeUntilSuccess = 1.minute) {
                   upgradeDomainNode1.newParticipantConnection
-                    .getUnionspaceDefinition(
+                    .getDecentralizedNamespaceDefinition(
                       globalDomainId,
-                      svcPartyUnionspace,
+                      svcPartyDecentralizedNamespace,
                     )
                     .futureValue
-                    .mapping shouldBe globalDomainUnionspaceDefinition.mapping
+                    .mapping shouldBe globalDomainDecentralizedNamespaceDefinition.mapping
                 }
               }
             }
@@ -195,16 +196,16 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
         }
 
         val sv2Party = sv2Backend.appState.svStore.key.svParty
-        withClue("unionspace can be modified on the new domain") {
+        withClue("decentralized namespace can be modified on the new domain") {
           allUpgradeNodes
             .parTraverse { upgradeNode =>
               val connection = upgradeNode.newParticipantConnection
               for {
                 id <- connection.getId()
-                _ <- connection.ensureUnionspaceDefinitionOwnerChangeProposalAccepted(
+                _ <- connection.ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
                   "keep just sv2",
                   globalDomainId,
-                  svcPartyUnionspace,
+                  svcPartyDecentralizedNamespace,
                   _ => NonEmpty(Set, sv2Party.uid.namespace),
                   id.namespace.fingerprint,
                   RetryFor.WaitingOnInitDependency,
@@ -215,9 +216,9 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
             .discard
           eventuallySucceeds() {
             upgradeDomainNode1.newParticipantConnection
-              .getUnionspaceDefinition(
+              .getDecentralizedNamespaceDefinition(
                 globalDomainId,
-                svcPartyUnionspace,
+                svcPartyDecentralizedNamespace,
               )
               .futureValue
               .mapping

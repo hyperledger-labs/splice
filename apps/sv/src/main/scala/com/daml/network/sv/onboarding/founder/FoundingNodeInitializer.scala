@@ -49,7 +49,7 @@ import com.digitalasset.canton.topology.transaction.{
   SignedTopologyTransactionX,
   TopologyChangeOpX,
   TopologyMappingX,
-  UnionspaceDefinitionX,
+  DecentralizedNamespaceDefinitionX,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -229,7 +229,8 @@ class FoundingNodeInitializer(
       domainNode.mediatorAdminConnection.getMediatorId,
       domainNode.sequencerAdminConnection.getSequencerId,
     ).flatMapN { case (participantId, mediatorId, sequencerId) =>
-      val namespace = UnionspaceDefinitionX.computeNamespace(Set(participantId.uid.namespace))
+      val namespace =
+        DecentralizedNamespaceDefinitionX.computeNamespace(Set(participantId.uid.namespace))
       val domainId = DomainId(
         UniqueIdentifier(
           Identifier.tryCreate("global-domain"),
@@ -250,7 +251,7 @@ class FoundingNodeInitializer(
           for {
             (
               identityTransactions,
-              unionspace,
+              decentralizedNamespace,
               domainParametersState,
               sequencerState,
               mediatorState,
@@ -264,7 +265,7 @@ class FoundingNodeInitializer(
               }.map(_.flatten),
               // Proposing the same state is idempotent so we don't bother wrapping all of these in a check if the transaction has already
               // been proposed.
-              participantAdminConnection.proposeInitialUnionspaceDefinition(
+              participantAdminConnection.proposeInitialDecentralizedNamespaceDefinition(
                 namespace,
                 NonEmpty.mk(Set, participantId.uid.namespace),
                 threshold = PositiveInt.one,
@@ -299,7 +300,7 @@ class FoundingNodeInitializer(
             ).tupled
             bootstrapTransactions =
               (Seq(
-                unionspace,
+                decentralizedNamespace,
                 domainParametersState,
                 sequencerState,
                 mediatorState,
@@ -661,7 +662,7 @@ object FoundingNodeInitializer {
         t.transaction.mapping.code match {
           case Code.NamespaceDelegationX => 1
           case Code.OwnerToKeyMappingX => 2
-          case Code.UnionspaceDefinitionX => 3
+          case Code.DecentralizedNamespaceDefinitionX => 3
           case _ => 4
         }
       }

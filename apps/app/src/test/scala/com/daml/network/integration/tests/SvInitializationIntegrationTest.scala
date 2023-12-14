@@ -87,19 +87,19 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
 
     startSv(2, sv2Backend, sv2ValidatorBackend, Some(sv2ScanBackend))
     startSv(3, sv3Backend, sv3ValidatorBackend)
-    // Increase the unionspace threshold to 3 to require more than the candidate and sponsor to authorize the party to participant mapping. This ensures that the party to participant reconciliation loops work as expected.
-    // do this by falsely adding the sequencer namespace to the unionspace
+    // Increase the decentralized namespace threshold to 3 to require more than the candidate and sponsor to authorize the party to participant mapping. This ensures that the party to participant reconciliation loops work as expected.
+    // do this by falsely adding the sequencer namespace to the decentralized namespace
     val sv1SequencerAdminConnection =
       sv1Backend.appState.localDomainNode.value.sequencerAdminConnection
     val sv1SequencerId = sv1SequencerAdminConnection.getSequencerId.futureValue
-    val newUnionspace = Seq(
+    val newDecentralizedNamespace = Seq(
       sv1SequencerAdminConnection,
       sv1Backend.appState.participantAdminConnection,
       sv2Backend.appState.participantAdminConnection,
     ).parTraverse { connection =>
       val id = connection.getId().futureValue
       connection
-        .ensureUnionspaceDefinitionProposalAccepted(
+        .ensureDecentralizedNamespaceDefinitionProposalAccepted(
           globalDomainId,
           svcParty.uid.namespace,
           sv1SequencerId.uid.namespace,
@@ -109,7 +109,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     }.futureValue
       .headOption
       .value
-    newUnionspace.mapping.threshold shouldBe PositiveInt.tryCreate(3)
+    newDecentralizedNamespace.mapping.threshold shouldBe PositiveInt.tryCreate(3)
     startSv(4, sv4Backend, sv4ValidatorBackend)
     withClue("validate party to participant threshold") {
       // validate here as well when onboarding is sequential
@@ -150,7 +150,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       eventually() {
         val participantAdminConnection = sv1Backend.appState.participantAdminConnection
         participantAdminConnection
-          .getUnionspaceDefinition(
+          .getDecentralizedNamespaceDefinition(
             globalDomainId,
             svcParty.uid.namespace,
           )

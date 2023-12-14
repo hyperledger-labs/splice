@@ -13,7 +13,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/svc-governance/daml.yaml ../d
 --- ../daml/svc-governance/daml.yaml
 +++ ../daml/svc-governance-upgrade/daml.yaml
 @@ -1,16 +1,16 @@
- sdk-version: 2.9.0-snapshot.20231129.12441.0.v72cefd6f
+ sdk-version: 2.9.0-snapshot.20231211.12491.0.vbb56339f
  name: svc-governance
  source: daml
 -version: 0.1.0

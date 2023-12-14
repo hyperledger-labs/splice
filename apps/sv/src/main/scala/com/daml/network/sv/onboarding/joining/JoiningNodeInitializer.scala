@@ -395,9 +395,9 @@ class JoiningNodeInitializer(
             } yield svcRules,
             logger,
           )
-          _ = logger.info("Adding member to the unionspace.")
+          _ = logger.info("Adding member to the decentralized namespace.")
           _ <- participantAdminConnection
-            .ensureUnionspaceDefinitionProposalAccepted(
+            .ensureDecentralizedNamespaceDefinitionProposalAccepted(
               domainId,
               svcParty.uid.namespace,
               svParty.uid.namespace,

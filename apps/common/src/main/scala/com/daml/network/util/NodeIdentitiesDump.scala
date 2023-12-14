@@ -43,7 +43,7 @@ object NodeIdentitiesDump {
         keys = response.keys.toSeq.map(k => NodeKey(Base64.getDecoder.decode(k.keyPair), k.name)),
         bootstrapTxs = response.bootstrapTxs.toSeq.map(t =>
           SignedTopologyTransactionX
-            .fromByteArray(Base64.getDecoder.decode(t))
+            .fromByteArrayUnsafe(Base64.getDecoder.decode(t))
             .fold(err => throw new IllegalArgumentException(err.message), identity)
         ),
         version = response.version,

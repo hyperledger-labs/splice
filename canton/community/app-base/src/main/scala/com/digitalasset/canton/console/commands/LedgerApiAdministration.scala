@@ -1547,7 +1547,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
             timeout = timeout,
           )
       ) match {
-        case Success(values) if values.size == 1 => values(0)
+        case Success(values) if values.sizeIs == 1 => values(0)
         case Success(values) =>
           throw new IllegalStateException(
             s"$logPrefix Exactely one update expected, but received #${values.size}"

@@ -21,7 +21,7 @@ class SvOnboardingConfigIntegrationTest extends CNNodeIntegrationTest with SvTes
         Seq("simple-topology.conf", "include/svs/sv2-onboarded.conf"),
         this.getClass.getSimpleName,
       )
-      .withResettedUnionspace()
+      .withResettedDecentralizedNamespace()
       .withAllocatedUsers()
       .withManualStart
 

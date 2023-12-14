@@ -3,7 +3,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "2.9.0-snapshot.20231129.12441.0.v72cefd6f"
+  val version: String = "2.9.0-snapshot.20231211.12491.0.vbb56339f"
   val daml_language_versions = Seq("1.14", "1.15", "1.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"

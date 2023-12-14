@@ -9,6 +9,7 @@ import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{Codec, ContractWithState}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStore
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 
@@ -242,12 +243,10 @@ class HttpSplitwellHandler(
         )
       } yield definitions.GetConnectedDomainsResponse(
         mappings
-          .map(_.base.domain)
-          .filter(storeId =>
-            // While the field is called `domain` this is really a store id not a domain id.
-            // We only want domain stores so we filter to store ids that are domain ids.
-            Codec.decode(Codec.DomainId)(storeId).isRight
-          )
+          .map(_.base.store)
+          .collect { case TopologyStore.Domain(domainId) =>
+            domainId.filterString
+          }
           .toVector
       )
     }
