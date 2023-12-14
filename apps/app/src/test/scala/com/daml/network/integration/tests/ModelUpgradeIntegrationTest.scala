@@ -26,6 +26,7 @@ class ModelUpgradeIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
+      .withSequencerConnectionsFromScanDisabled()
 
   "daml model upgrade" should {
     "support switching to new svc-governance version" in { implicit env =>
