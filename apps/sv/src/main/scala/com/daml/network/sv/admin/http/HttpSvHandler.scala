@@ -469,13 +469,13 @@ class HttpSvHandler(
     for {
       globalDomain <- svcStore.getSvcRules().map(_.domain)
       _ <- retryProvider.waitUntil(
-        RetryFor.ClientCalls,
+        RetryFor.WaitingOnInitDependency, // the trigger runs every 30s, so this should be enough to observe the new sequencer
         "New sequencer is observed in SequencerDomainState through existing sequencer",
         sequencerAdminConnection
           .getSequencerDomainState(globalDomain)
           .map(result =>
             if (!result.mapping.active.contains(sequencerId)) {
-              throw Status.FAILED_PRECONDITION
+              throw Status.NOT_FOUND
                 .withDescription(
                   s"Sequencer $sequencerId is not in active sequencers ${result.mapping.active}"
                 )
