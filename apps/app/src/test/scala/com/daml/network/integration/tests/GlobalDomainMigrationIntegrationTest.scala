@@ -1,10 +1,19 @@
 package com.daml.network.integration.tests
 
 import cats.implicits.catsSyntaxParallelTraverse1
+import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.auth.{AuthToken, AuthUtil}
+import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
+import com.daml.network.codegen.java.cn.svcrules.SvcRules_AddMember
 import com.daml.network.console.SvAppBackendReference
 import com.daml.network.environment.{
+  BaseLedgerConnection,
+  CNLedgerClient,
   CNNodeEnvironmentImpl,
   MediatorAdminConnection,
+  PackageIdResolver,
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
@@ -16,6 +25,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.UpgradeDomainNode
 import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.setup.NodeInitializer
 import com.daml.network.sv.LocalDomainNode
@@ -25,12 +35,14 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
+  ApiLoggingConfig,
   ClientConfig,
   CommunityCryptoConfig,
   NonNegativeDuration,
   ProcessingTimeout,
 }
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -40,31 +52,39 @@ import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.processing.SequencedTime
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransactionsX,
-  TimeQueryX,
+  StoredTopologyTransactionX,
   TopologyStoreId,
 }
-import com.digitalasset.canton.topology.transaction.DomainTrustCertificateX
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.topology.store.StoredTopologyTransactionX.GenericStoredTopologyTransactionX
+import com.digitalasset.canton.topology.transaction.{TopologyChangeOpX, TopologyMappingX}
+import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code
+import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext}
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.scalatest.OptionValues
-import org.scalatest.time.{Minute, Span}
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
+import org.scalatest.time.{Minute, Minutes, Span}
 
 import java.nio.file.Files
 import java.time.Duration as JavaDuration
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.concurrent.duration.*
+import scala.concurrent.duration.DurationInt
+import scala.math.Ordered.orderingToOrdered
 import scala.util.Using
 
 class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with ProcessTestUtil {
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
+  // if not the newly started apps will use the old state
+  registerPlugin(new UseInMemoryStores(loggerFactory))
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -76,8 +96,8 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
       .withZeroSequencerAvailabilityDelay
       .withManualStart
 
-  "can replay decentralized namespace definition on new domain" in { implicit env =>
-    import env.{actorSystem, executionContext}
+  "migrate global domain to new nodes" in { implicit env =>
+    import env.{actorSystem, executionContext, executionSequencerFactory}
     import env.environment.scheduler
     val retryProvider = new RetryProvider(
       loggerFactory,
@@ -91,8 +111,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
     )
     val staticParams =
       DomainParametersConfig(
-        protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
-        devVersionSupport = true,
+        protocolVersion = DomainProtocolVersion(ProtocolVersion.dev)
       ).toStaticDomainParameters(CommunityCryptoConfig())
         .valueOrFail("static")
     startAllSync(
@@ -120,10 +139,10 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
         createUpgradeNode(3, sv3Backend, retryProvider, wallClock, staticParams),
         createUpgradeNode(4, sv4Backend, retryProvider, wallClock, staticParams),
       ) { case (upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4) =>
-        val allUpgradeNodes =
+        val allNodes =
           Seq(upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4)
 
-        val svcPartyDecentralizedNamespace = sv2Backend.appState.svcStore.key.svcParty.uid.namespace
+        val svcPartyDecentralizedNamespace = sv1Backend.appState.svcStore.key.svcParty.uid.namespace
         val globalDomainDecentralizedNamespaceDefinition =
           sv1Backend.appState.participantAdminConnection
             .getDecentralizedNamespaceDefinition(globalDomainId, svcPartyDecentralizedNamespace)
@@ -137,121 +156,237 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
             .headOption
             .value
             .item
+        val majorityUpgradeNodes = Seq(upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4)
+        // sv1 is the founder so specifically join it later to validate our replay
+        val lateRejoiningUpgradeNodes = Seq(upgradeDomainNode1)
+        val sv1Party = sv1Backend.appState.svStore.key.svParty
+        def withCLueAndLog[T](clueMessage: String)(fun: => T) = withClue(clueMessage) {
+          clue(clueMessage)(fun)
+        }
         bracket(
-          withClue("Freeze the existing domain") {
+          withCLueAndLog("Freeze the existing domain") {
             val zeroRate = NonNegativeInt.zero
-            changeDomainRatePerParticipant(allUpgradeNodes, zeroRate)
+            changeDomainRatePerParticipant(
+              allNodes.map(_.backend.appState.participantAdminConnection),
+              zeroRate,
+            )
           },
           // reset to not crash other tests
           changeDomainRatePerParticipant(
-            allUpgradeNodes,
+            allNodes.map(_.backend.appState.participantAdminConnection),
             domainDynamicParams.maxRatePerParticipant,
           ),
         ) {
-          withClue("Switch domain nodes") {
-            withClue("Init new nodes with the same identity") {
-              allUpgradeNodes.parTraverse(_.initNewDomainNodes()).futureValue
-            }
-            withClue(
-              "Register new domain, connect to sync topology, disconnect and import acs snapshot, reconnect"
-            ) {
-              allUpgradeNodes.parTraverse(_.registerAndConnectToDomain()).futureValue.discard
-              withClue("decentralized namespace is replicated on the new global domain") {
-                eventuallySucceeds(timeUntilSuccess = 1.minute) {
-                  upgradeDomainNode1.newParticipantConnection
-                    .getDecentralizedNamespaceDefinition(
-                      globalDomainId,
-                      svcPartyDecentralizedNamespace,
+          def migrateDomainOnNodes(
+              nodes: Seq[UpgradeDomainNode],
+              firstRun: Boolean = false,
+          ): Unit = {
+            withCLueAndLog(s"Switch domain nodes ${nodes.map(_.id)}") {
+              withCLueAndLog("Init new nodes with the same identity") {
+                nodes
+                  .parTraverse(_.migrateDomainToNewNodes())
+                  .futureValue(
+                    Timeout(
+                      Span(
+                        3,
+                        Minutes,
+                      )
                     )
-                    .futureValue
-                    .mapping shouldBe globalDomainDecentralizedNamespaceDefinition.mapping
+                  )
+              }
+              withCLueAndLog(
+                "Register new domain, connect to it in order to sync topology, disconnect and import acs snapshot, reconnect"
+              ) {
+                nodes.parTraverse(_.registerAndConnectToDomain()).futureValue.discard
+
+                withCLueAndLog("party hosting is replicated on the new global domain") {
+                  nodes.foreach { node =>
+                    eventuallySucceeds(timeUntilSuccess = 1.minute) {
+                      node.newParticipantConnection
+                        .getPartyToParticipant(
+                          globalDomainId,
+                          svcParty,
+                        )
+                        .futureValue
+                        .mapping
+                        .participantIds
+                        .size shouldBe 4
+                    }
+                  }
+                }
+                if (firstRun) {
+                  withCLueAndLog("all topology is synced") {
+                    nodes.foreach { node =>
+                      val topologyTransactionsInOldStore =
+                        node.backend.appState.participantAdminConnection
+                          .listAllTransactions(
+                            Some(TopologyStoreId.DomainStore(globalDomainId))
+                          )
+                          .futureValue
+                      eventuallySucceeds(timeUntilSuccess = 1.minute) {
+                        node.newParticipantConnection
+                          .listAllTransactions(
+                            Some(TopologyStoreId.DomainStore(globalDomainId))
+                          )
+                          .futureValue
+                          .size == topologyTransactionsInOldStore.size
+                      }
+                    }
+                  }
+
+                  withCLueAndLog("new domain is frozen") {
+                    nodes.foreach { node =>
+                      eventuallySucceeds(timeUntilSuccess = 1.minute) {
+                        node.newParticipantConnection
+                          .getDomainParametersState(
+                            globalDomainId
+                          )
+                          .futureValue
+                          .mapping
+                          .parameters
+                          .maxRatePerParticipant shouldBe NonNegativeInt.zero
+                      }
+                    }
+                  }
+                  withCLueAndLog("decentralized namespace is replicated on the new global domain") {
+                    eventuallySucceeds(timeUntilSuccess = 1.minute) {
+                      nodes.foreach { node =>
+                        node.newParticipantConnection
+                          .getDecentralizedNamespaceDefinition(
+                            globalDomainId,
+                            svcPartyDecentralizedNamespace,
+                          )
+                          .futureValue
+                          .mapping shouldBe globalDomainDecentralizedNamespaceDefinition.mapping
+                      }
+                    }
+                  }
                 }
               }
+              changeDomainRatePerParticipant(
+                nodes.map(_.newParticipantConnection),
+                domainDynamicParams.maxRatePerParticipant,
+              )
+
+              withCLueAndLog("Domain nodes modified, migrating all dars to the new participant.") {
+                nodes.parTraverse(_.migrateAllDars()).futureValue
+              }
+              nodes
+                .parTraverse(_.newParticipantConnection.disconnectDomain(globalDomainAlias))
+                .futureValue
+                .discard
+              logger.info("Downloading ACS snapshot.")
+              // TODO(#8761) wait until it's safe, based on params described in the design
+              // also consider(from Martin): If a node was offline and joins the (old) domain a bit later, how will it know that it has caught up to the final ACS state so it's safe to take the snapshot?
+              val acsSnapshots = withCLueAndLog("take acs snapshots") {
+                nodes.parTraverse(_.takeAcsSnapshot()).futureValue
+              }
+
+              withCLueAndLog("restore acs snapshot") {
+                nodes
+                  .zip(acsSnapshots)
+                  .parTraverse { case (node, snapshot) =>
+                    node.restoreAcsSnapshot(snapshot)
+                  }
+                  .futureValue
+              }
+              withCLueAndLog("Reconnecting domain.") {
+                nodes
+                  .parTraverse(_.newParticipantConnection.reconnectDomain(globalDomainAlias))
+                  .futureValue
+                  .discard
+              }
             }
-            logger.info("Domain nodes modified, migrating all dars to the new participant.")
-            allUpgradeNodes.parTraverse(_.migrateAllDars()).futureValue
-            allUpgradeNodes
-              .parTraverse(_.newParticipantConnection.disconnectDomain(globalDomainAlias))
-              .futureValue
-              .discard
-            logger.info("Downloading ACS snapshot.")
-            // TODO(#8761) wait until it's safe, based on params described in the design
-            // also consider(from Martin): If a node was offline and joins the (old) domain a bit later, how will it know that it has caught up to the final ACS state so it's safe to take the snapshot?
-            val acsSnapshots = withClue("take acs snapshots") {
-              allUpgradeNodes.parTraverse(_.takeAcsSnapshot()).futureValue
-            }
-            logger.info("Restoring ACS snapshot.")
-            allUpgradeNodes
-              .zip(acsSnapshots)
-              .parTraverse { case (node, snapshot) =>
-                node.restoreAcsSnapshot(snapshot)
+          }
+
+          migrateDomainOnNodes(majorityUpgradeNodes, firstRun = true)
+
+          withCLueAndLog("decentralized namespace can be modified on the new domain") {
+            majorityUpgradeNodes
+              .parTraverse { upgradeNode =>
+                val connection = upgradeNode.newParticipantConnection
+                for {
+                  id <- connection.getId()
+                  _ <- connection.ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
+                    "keep just sv1",
+                    globalDomainId,
+                    svcPartyDecentralizedNamespace,
+                    _ => NonEmpty(Set, sv1Party.uid.namespace),
+                    id.namespace.fingerprint,
+                    RetryFor.WaitingOnInitDependency,
+                  )
+                } yield {}
               }
               .futureValue
-            logger.info("Reconnecting domain.")
-            allUpgradeNodes
-              .parTraverse(_.newParticipantConnection.reconnectDomain(globalDomainAlias))
-              .futureValue
               .discard
           }
-        }
 
-        val sv2Party = sv2Backend.appState.svStore.key.svParty
-        withClue("decentralized namespace can be modified on the new domain") {
-          allUpgradeNodes
-            .parTraverse { upgradeNode =>
-              val connection = upgradeNode.newParticipantConnection
-              for {
-                id <- connection.getId()
-                _ <- connection.ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
-                  "keep just sv2",
-                  globalDomainId,
-                  svcPartyDecentralizedNamespace,
-                  _ => NonEmpty(Set, sv2Party.uid.namespace),
-                  id.namespace.fingerprint,
-                  RetryFor.WaitingOnInitDependency,
-                )
-              } yield {}
+          withCLueAndLog("migrate domain and prepare sv1") {
+            migrateDomainOnNodes(lateRejoiningUpgradeNodes)
+            allNodes.foreach { node =>
+              eventuallySucceeds() {
+                node.newParticipantConnection
+                  .getDecentralizedNamespaceDefinition(
+                    globalDomainId,
+                    svcPartyDecentralizedNamespace,
+                  )
+                  .futureValue
+                  .mapping
+                  .owners shouldBe Set(sv1Party.uid.namespace)
+              }
             }
-            .futureValue
-            .discard
-          eventuallySucceeds() {
-            upgradeDomainNode1.newParticipantConnection
-              .getDecentralizedNamespaceDefinition(
-                globalDomainId,
-                svcPartyDecentralizedNamespace,
-              )
-              .futureValue
-              .mapping
-              .owners shouldBe Set(sv2Party.uid.namespace)
+            upgradeDomainNode1.migrateUserAnnotation().futureValue
           }
+          sv1LocalBackend.startSync()
+          sv1LocalBackend.getSvcInfo().svcRules.payload.members.size() shouldBe 4
+          actAndCheck(
+            "validate domain with create VoteRequest",
+            sv1LocalBackend.createVoteRequest(
+              sv1Party.toProtoPrimitive,
+              new ARC_SvcRules(
+                new SRARC_AddMember(
+                  new SvcRules_AddMember(
+                    "alice",
+                    "Alice",
+                    "alice-participant-id",
+                    new Round(42),
+                    globalDomainId.toProtoPrimitive,
+                  )
+                )
+              ),
+              "url",
+              "description",
+              sv1LocalBackend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+            ),
+          )(
+            "VoteRequest and Vote should be there",
+            _ =>
+              inside(sv1LocalBackend.listVoteRequests()) { case Seq(onlyReq) =>
+                sv1LocalBackend.listVotes(Vector(onlyReq.contractId.contractId)) should have size 1
+              },
+          )
         }
-      // TODO(#8791) start new sv app and validate
-//      sv1LocalBackend.startSync()
-//      sv1LocalBackend.getSvcInfo().svcRules.payload.members.size() shouldBe 4
       }
     }
   }
 
   private def changeDomainRatePerParticipant(
-      allUpgradeNodes: Seq[UpgradeDomainNode],
-      zeroRate: NonNegativeInt,
+      nodes: Seq[ParticipantAdminConnection],
+      rate: NonNegativeInt,
   )(implicit
       env: CNNodeTestConsoleEnvironment,
       ec: ExecutionContextExecutor,
   ): Unit = {
-    allUpgradeNodes
-      .parTraverse(node =>
-        node.backend.appState.participantAdminConnection
+    nodes
+      .parTraverse { node =>
+        val id = node.getId().futureValue
+        node
           .ensureDomainParameters(
             globalDomainId,
-            params => {
-              params.copy(maxRatePerParticipant = zeroRate)(
-                params.representativeProtocolVersion
-              )
-            },
-            node.backend.appState.svStore.key.svParty.uid.namespace.fingerprint,
+            _.tryUpdate(maxRatePerParticipant = rate),
+            signedBy = id.namespace.fingerprint,
           )
-      )
+      }
       .futureValue
       .discard
   }
@@ -262,24 +397,30 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
       retryProvider: RetryProvider,
       wallClock: WallClock,
       staticParams: StaticDomainParameters,
-  )(implicit ec: ExecutionContextExecutor, sys: ActorSystem, env: CNNodeTestConsoleEnvironment) = {
+  )(implicit
+      ec: ExecutionContextExecutor,
+      sys: ActorSystem,
+      env: CNNodeTestConsoleEnvironment,
+      esf: ExecutionSequencerFactory,
+  ) = {
     implicit val httpClient: HttpRequest => Future[HttpResponse] = backend.appState.httpClient
     implicit val decoder: TemplateJsonDecoder = backend.appState.decoder
     val svOffset = sv * 100
+    val loggerFactoryWithKey = loggerFactory.append("updateNode", sv.toString)
     UpgradeDomainNode(
       sv.toString,
       globalDomainAlias,
       globalDomainId,
       new LocalDomainNode(
         new SequencerAdminConnection(
-          ClientConfig(port = Port.tryCreate(27009 + svOffset)),
-          loggerFactory,
+          ClientConfig(address = "localhost", port = Port.tryCreate(27009 + svOffset)),
+          loggerFactoryWithKey,
           retryProvider,
           wallClock,
         ),
         new MediatorAdminConnection(
           ClientConfig(port = Port.tryCreate(27007 + svOffset)),
-          loggerFactory,
+          loggerFactoryWithKey,
           retryProvider,
           wallClock,
         ),
@@ -287,21 +428,39 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
         ClientConfig(port = Port.tryCreate(27008 + svOffset)),
         "",
         JavaDuration.ZERO,
-        loggerFactory,
+        loggerFactoryWithKey,
         retryProvider,
       ),
       new ParticipantAdminConnection(
         ClientConfig(port = Port.tryCreate(27002 + svOffset)),
-        loggerFactory,
+        loggerFactoryWithKey,
         retryProvider,
         wallClock,
       ),
       backend,
       wallClock,
-      loggerFactory,
+      loggerFactoryWithKey,
       retryProvider,
       staticParams,
       svcParty,
+      new CNLedgerClient(
+        ClientConfig(
+          port = Port.tryCreate(27001 + svOffset)
+        ),
+        globalDomainId.filterString,
+        () =>
+          Future.successful(
+            Some(
+              AuthToken(
+                AuthUtil.LedgerApi.testToken(user = backend.config.ledgerApiUser, secret = "test")
+              )
+            )
+          ),
+        ApiLoggingConfig(),
+        loggerFactory,
+        NoReportingTracerProvider,
+        retryProvider,
+      ),
     )
   }
 }
@@ -340,6 +499,55 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
     )
 
   }
+
+  case class DomainTopologyTransactions(
+      transactions: Seq[StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]]
+  ) {
+
+    private val sortedTransactions = transactions.sorted
+
+    private val sequencerInitTransactions = Seq(
+      // TODO(#8761) reduce the number of identity we import just to the nodes we actually need (sequencer most likely)
+      TopologyMappingX.Code.NamespaceDelegationX,
+      TopologyMappingX.Code.OwnerToKeyMappingX,
+      TopologyMappingX.Code.IdentifierDelegationX,
+      // start with all the sequencers authorized
+      TopologyMappingX.Code.SequencerDomainStateX,
+      // TODO(#8761) fix issue where replaying this fails with not authorized
+      TopologyMappingX.Code.TrafficControlStateX,
+    )
+
+    val (sequencerInitTopologyTransactions, topologyTransactionsToSubmit) =
+      sortedTransactions
+        .map { transaction =>
+          if (sequencerInitTransactions.contains(transaction.mapping.code)) {
+            // reset sequenced time to ensure it's included in all the init calls
+            // use same value as for the founding bootstrap
+            transaction.copy(
+              sequenced = SequencedTime(CantonTimestamp.MinValue.immediateSuccessor)
+            )
+          } else {
+            if (
+              isFoundingTopologyTransaction(transaction) && !sequencerInitTransactions.contains(
+                transaction.mapping.code
+              )
+            ) {
+              // ensure transaction is valid to be able to replay
+              transaction.copy(validUntil = None)
+            } else {
+              transaction
+            }
+          }
+        }
+        .partition(transaction => isFoundingTopologyTransaction(transaction))
+
+    private def isFoundingTopologyTransaction(
+        transaction: StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]
+    ) = {
+      transaction.sequenced.value == CantonTimestamp.MinValue || transaction.sequenced.value == CantonTimestamp.MinValue.immediateSuccessor
+    }
+  }
+
   case class UpgradeDomainNode(
       id: String,
       globalDomainAlias: DomainAlias,
@@ -352,10 +560,10 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
       retryProvider: RetryProvider,
       staticParams: StaticDomainParameters,
       svcPartyId: PartyId,
+      newLedgerClient: CNLedgerClient,
   )(implicit ec: ExecutionContextExecutor) {
 
-    private lazy val loggerFactoryWithKey = loggerFactory.append("updateNode", id)
-    private val logger = loggerFactoryWithKey.getLogger(getClass)
+    private val logger = loggerFactory.getLogger(getClass)
 
     val existingParticipantIdentities = new NodeIdentitiesStore(
       backend.appState.participantAdminConnection,
@@ -379,17 +587,6 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
       retryProvider,
     )
 
-    // queries during init to avoid including the freeze domain transaction
-    private val sequencerTopologySnapshot =
-      backend.appState.localDomainNode.value.sequencerAdminConnection
-        .listALlTransactions(
-          Some(TopologyStoreId.DomainStore(globalDomainId)),
-          timeQuery = TimeQueryX.Range(
-            None,
-            None,
-          ),
-        )(TraceContext.empty)
-
     def migrateAllDars()(implicit tc: TraceContext): Future[Unit] = {
       val dars = backend.participantClientWithAdminToken.dars.list()
       val directoryToStoreDars = Files.createTempDirectory("dar_migration")
@@ -407,30 +604,39 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
         .map(_.discard)
     }
 
-    def initNewDomainNodes()(implicit tc: TraceContext): Future[Unit] = {
+    def migrateUserAnnotation(): Future[Unit] = {
+      newLedgerClient
+        .connection(
+          "migration",
+          loggerFactory,
+          PackageIdResolver.staticTesting,
+        )
+        .ensureUserMetadataAnnotation(
+          backend.config.ledgerApiUser,
+          BaseLedgerConnection.SVC_PARTY_USER_METADATA_KEY,
+          svcPartyId.toProtoPrimitive,
+          RetryFor.WaitingOnInitDependency,
+        )
+    }
+
+    def migrateDomainToNewNodes()(implicit tc: TraceContext): Future[Unit] = {
       for {
+        domainTopologyTransactions <-
+          backend.appState.localDomainNode.value.sequencerAdminConnection
+            .getTopologySnapshot(globalDomainId)
+            .map(snapshot => DomainTopologyTransactions(snapshot.result))
+        _ = logger.info(s"Init new domain nodes from snapshot $domainTopologyTransactions")
         participantDump <- existingParticipantIdentities.getNodeIdentitiesDump()
         _ <- newParticipantInitializer.initializeAndWait(participantDump)
         sequencerDump <- existingDomainNodeIdentites.sequencerIdentityStore.getNodeIdentitiesDump()
         _ <- newDomainNodeIdentities.sequencerInitializer.initializeFromDump(sequencerDump)
-        _ = logger.info(s"Restored sequencer from dump identity $sequencerDump")
-        // remove domain trust certificates so that the participants init with all the topology state
-        // can we somehow not do this? doing it basically re-registers the participant up to the current point and
-        // breaks party allocations on the ledger api, and maybe other things that count on streaming updates
-        domainTopologyTransactions <- sequencerTopologySnapshot.map(
-          _.filterNot(transaction =>
-            transaction.mapping
-              .select[DomainTrustCertificateX]
-              .isDefined
-          )
-        )
         _ = logger.info(
-          s"Restoring sequencer topology with sequencer transactions $domainTopologyTransactions"
+          s"Restoring sequencer topology with sequencer transactions ${domainTopologyTransactions.sequencerInitTopologyTransactions}"
         )
         _ <- newLocalDomainNode.sequencerAdminConnection
           .initialize(
             StoredTopologyTransactionsX(
-              domainTopologyTransactions
+              domainTopologyTransactions.sequencerInitTopologyTransactions
             ),
             staticParams,
             None,
@@ -459,7 +665,17 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
           },
           loggerFactory.getTracedLogger(getClass),
         )
-        _ = logger.info("Sequencer is initialized")
+        _ = logger.info(
+          s"Adding topology transactions after sequencer initialization ${domainTopologyTransactions.topologyTransactionsToSubmit}"
+        )
+        _ <- MonadUtil.sequentialTraverse_(domainTopologyTransactions.topologyTransactionsToSubmit)(
+          transactions =>
+            newLocalDomainNode.sequencerAdminConnection
+              .addTopologyTransactionsAndEnsurePersisted(
+                Some(globalDomainId),
+                Seq(transactions.transaction),
+              )
+        )
         mediatorDump <- existingDomainNodeIdentites.mediatorIdentityStore.getNodeIdentitiesDump()
         _ <-
           newDomainNodeIdentities.mediatorInitializer.initializeFromDump(mediatorDump)
@@ -479,9 +695,23 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
                 .asRuntimeException()
             }
           },
-          loggerFactoryWithKey.getTracedLogger(getClass),
+          loggerFactory.getTracedLogger(getClass),
         )
-        _ = logger.info(s"Mediator is initialized from dump $mediatorDump")
+        _ <- retryProvider.waitUntil(
+          RetryFor.ClientCalls,
+          "mediator synced topology",
+          for {
+            sequencerTopology <- newLocalDomainNode.sequencerAdminConnection.listAllTransactions(
+              Some(TopologyStoreId.DomainStore(globalDomainId))
+            )
+            mediatorTopology <- newLocalDomainNode.mediatorAdminConnection.listAllTransactions(
+              Some(TopologyStoreId.DomainStore(globalDomainId))
+            )
+          } yield {
+            sequencerTopology.size == mediatorTopology.size
+          },
+          loggerFactory.getTracedLogger(getClass),
+        )
       } yield {}
     }
 
@@ -490,13 +720,34 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
         DomainConnectionConfig(
           globalDomainAlias,
           domainId = Some(globalDomainId),
-          sequencerConnections = SequencerConnections.single(newLocalDomainNode.sequencerConnection),
+          sequencerConnections =
+            SequencerConnections.single(newLocalDomainNode.sequencerConnection),
+          initializeFromTrustedDomain = true,
         )
       )
     }
 
     def takeAcsSnapshot()(implicit tc: TraceContext): Future[ByteString] = {
-      backend.appState.participantAdminConnection.downloadAcsSnapshot(
+      val connection = backend.appState.participantAdminConnection
+      acsSnapshotForConnection(connection)
+    }
+
+    def restoreAcsSnapshot(snapshot: ByteString)(implicit tc: TraceContext): Future[Unit] = {
+      newParticipantConnection
+        .uploadAcsSnapshot(
+          snapshot
+        )
+        .flatMap { _ =>
+          acsSnapshotForConnection(newParticipantConnection).map(newSnapshot =>
+            require(snapshot == newSnapshot, "Snapshots must be identical after restore")
+          )
+        }
+    }
+
+    private def acsSnapshotForConnection(
+        connection: ParticipantAdminConnection
+    )(implicit tc: TraceContext) = {
+      connection.downloadAcsSnapshot(
         Set(
           backend.appState.svcStore.key.svcParty,
           backend.appState.svcStore.key.svParty,
@@ -507,18 +758,35 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
       )
     }
 
-    def restoreAcsSnapshot(snapshot: ByteString)(implicit tc: TraceContext): Future[Unit] = {
-      newParticipantConnection.uploadAcsSnapshot(
-        snapshot
-      )
-    }
-
   }
 
   implicit val upgradeDomainNodeReleasable: Using.Releasable[UpgradeDomainNode] =
     (resource: UpgradeDomainNode) => {
-      resource.newLocalDomainNode.close()
       resource.newParticipantConnection.close()
+      resource.newLocalDomainNode.close()
+      resource.newLedgerClient.close()
     }
+
+  implicit val storedTopologyTransactionOrdering: Ordering[GenericStoredTopologyTransactionX] = {
+    // it seems some topology transactions can have the same sequenced time for the same transaction type
+    // so to be able to successfully replay we need to sort by serial
+    (x: GenericStoredTopologyTransactionX, y: GenericStoredTopologyTransactionX) =>
+      {
+        val sequencerTimeCompared = x.sequenced.compare(y.sequenced)
+        if (sequencerTimeCompared == 0) {
+          val xCode = x.transaction.transaction.mapping.code
+          val yCode = y.transaction.transaction.mapping.code
+          if (xCode == yCode)
+            x.transaction.transaction.serial.compare(y.transaction.transaction.serial)
+          else if (xCode == Code.DecentralizedNamespaceDefinitionX) {
+            // as the decentralized namespace controls the domain authorization is safer to just apply it afterwards
+            -1
+          } else 1
+
+        } else {
+          sequencerTimeCompared
+        }
+      }
+  }
 
 }

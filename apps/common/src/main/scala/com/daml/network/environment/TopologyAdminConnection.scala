@@ -239,7 +239,7 @@ abstract class TopologyAdminConnection(
       domainId,
     )
 
-  def listALlTransactions(
+  def listAllTransactions(
       store: Option[TopologyStoreId],
       timeQuery: TimeQueryX = TimeQueryX.HeadState,
       proposals: Boolean = false,
@@ -266,7 +266,7 @@ abstract class TopologyAdminConnection(
       domainId: Option[DomainId],
       proposals: Boolean = false,
   )(implicit traceContext: TraceContext): Future[Seq[GenericSignedTopologyTransactionX]] =
-    listALlTransactions(domainId.map(TopologyStoreId.DomainStore(_)), proposals = proposals)
+    listAllTransactions(domainId.map(TopologyStoreId.DomainStore(_)), proposals = proposals)
       .map(_.map(_.transaction))
       .map { transactions =>
         transactions
@@ -472,15 +472,17 @@ abstract class TopologyAdminConnection(
     )
 
   def proposeInitialPartyToParticipant(
+      store: TopologyStoreId,
       partyId: PartyId,
       participantId: ParticipantId,
       signedBy: Fingerprint,
   )(implicit
       traceContext: TraceContext
   ): Future[SignedTopologyTransactionX[TopologyChangeOpX, PartyToParticipantX]] = {
-    proposeInitialPartyToParticipant(partyId, Seq(participantId), signedBy)
+    proposeInitialPartyToParticipant(store, partyId, Seq(participantId), signedBy)
   }
   def proposeInitialPartyToParticipant(
+      store: TopologyStoreId,
       partyId: PartyId,
       participants: Seq[ParticipantId],
       signedBy: Fingerprint,
@@ -488,7 +490,7 @@ abstract class TopologyAdminConnection(
       traceContext: TraceContext
   ): Future[SignedTopologyTransactionX[TopologyChangeOpX, PartyToParticipantX]] =
     proposeMapping(
-      TopologyStoreId.AuthorizedStore,
+      store,
       PartyToParticipantX(
         partyId,
         None,
@@ -611,6 +613,41 @@ abstract class TopologyAdminConnection(
       RetryFor.WaitingOnInitDependency,
       signedBy,
     )
+  }
+
+  def addTopologyTransactionsAndEnsurePersisted(
+      domainId: Option[DomainId],
+      txs: Seq[GenericSignedTopologyTransactionX],
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    logger.info(
+      s"Adding topology transactions $txs"
+    )
+    retryProvider
+      .ensureThat[Seq[GenericSignedTopologyTransactionX], Seq[GenericSignedTopologyTransactionX]](
+        RetryFor.ClientCalls,
+        "Topology transaction are added",
+        listAllTransactions(
+          domainId.map(TopologyStoreId.DomainStore(_)),
+          TimeQueryX.Range(None, None),
+        ).map { stored =>
+          val signedStoredTransactions = stored.map(_.transaction.transaction)
+          // filter just based on the transaction, ignoring signature differences
+          val missingTxs =
+            txs.filterNot(transaction => signedStoredTransactions.contains(transaction.transaction))
+          if (missingTxs.nonEmpty) {
+            logger.debug(s"Found missing transactions $missingTxs")
+          }
+          Either.cond(missingTxs.isEmpty, txs, missingTxs)
+        },
+        missingTx => {
+          logger.debug(s"Submitting missing transactions $missingTx")
+          addTopologyTransactions(domainId, missingTx)
+        },
+        logger,
+      )
+      .map(_.discard)
   }
 
   def addTopologyTransactions(
@@ -883,7 +920,7 @@ abstract class TopologyAdminConnection(
       retryFor = RetryFor.ClientCalls,
     )
 
-  private def getDomainParametersState(
+  def getDomainParametersState(
       domainId: DomainId
   )(implicit tc: TraceContext): Future[TopologyResult[DomainParametersStateX]] = {
     runCmd(

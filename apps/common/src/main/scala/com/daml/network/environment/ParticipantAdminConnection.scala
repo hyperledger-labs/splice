@@ -344,6 +344,7 @@ class ParticipantAdminConnection(
   }
 
   def ensureInitialPartyToParticipant(
+      store: TopologyStoreId,
       partyId: PartyId,
       participantId: ParticipantId,
       signedBy: Fingerprint,
@@ -353,31 +354,35 @@ class ParticipantAdminConnection(
         RetryFor.WaitingOnInitDependency,
         show"Party $partyId is allocated on $participantId",
         listPartyToParticipant(
-          TopologyStoreId.AuthorizedStore.filterName,
+          store.filterName,
           filterParty = partyId.filterString,
         ).map(_.nonEmpty),
         proposeInitialPartyToParticipant(
+          store,
           partyId,
           participantId,
           signedBy,
         ).map(_ => ()),
         logger,
       )
-      _ <- retryProvider.waitUntil(
-        RetryFor.WaitingOnInitDependency,
-        show"Party allocation of $partyId is visible on all connected domains",
-        for {
-          domains <- listConnectedDomains()
-          _ = if (domains.isEmpty)
-            throw Status.FAILED_PRECONDITION
-              .withDescription("No domain connected")
-              .asRuntimeException()
-          else ()
-          // TODO(tech-debt) we could also replace this with a single call to the API and filter by domains ourselves
-          _ <- domains.traverse_(domain => getPartyToParticipant(domain.domainId, partyId))
-        } yield (),
-        logger,
-      )
+      _ <-
+        if (store == TopologyStoreId.AuthorizedStore)
+          retryProvider.waitUntil(
+            RetryFor.WaitingOnInitDependency,
+            show"Party allocation of $partyId is visible on all connected domains",
+            for {
+              domains <- listConnectedDomains()
+              _ = if (domains.isEmpty)
+                throw Status.FAILED_PRECONDITION
+                  .withDescription("No domain connected")
+                  .asRuntimeException()
+              else ()
+              // TODO(tech-debt) we could also replace this with a single call to the API and filter by domains ourselves
+              _ <- domains.traverse_(domain => getPartyToParticipant(domain.domainId, partyId))
+            } yield (),
+            logger,
+          )
+        else Future.unit
     } yield ()
 
   def getDomainTime(domainAlias: DomainAlias, timeout: NonNegativeDuration)(implicit

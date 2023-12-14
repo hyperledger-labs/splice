@@ -21,6 +21,7 @@ import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
 import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.logging.pretty.PrettyInstances.prettyPrettyPrinting
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import io.grpc.Status
 
@@ -290,7 +291,9 @@ final class LocalDomainNode(
         logger,
       )
       _ = logger.info(s"Onboarded sequencer $sequencerId")
-      _ = logger.info(s"Initializing sequencer $sequencerId")
+      _ = logger.info(
+        s"Initializing sequencer $sequencerId with snapshot ${snapshot.sequencerSnapshot} and topology ${snapshot.topologySnapshot.show}."
+      )
       _ <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
         "Initializing sequencer",

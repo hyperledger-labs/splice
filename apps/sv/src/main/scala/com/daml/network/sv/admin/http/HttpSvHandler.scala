@@ -23,7 +23,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.onboarding.SvcPartyHosting
 import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
 import com.daml.network.sv.util.SvOnboardingToken
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.{LocalDomainNode, SvApp}
@@ -32,6 +32,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
@@ -488,11 +489,13 @@ class HttpSvHandler(
   }
 
   private def dummyTopologyTransaction(
-      sequencerAdminConnection: SequencerAdminConnection
+      globalDomainId: DomainId,
+      sequencerAdminConnection: SequencerAdminConnection,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     val dummyHint = s"dummy-${UUID.randomUUID}"
     for {
       party <- svcStoreWithIngestion.connection.ensurePartyAllocated(
+        TopologyStoreId.DomainStore(globalDomainId),
         dummyHint,
         None,
         participantAdminConnection,
@@ -529,9 +532,9 @@ class HttpSvHandler(
       // Note that for now we do the dummy transaction here independent of whether the sequencer has already been onboarded
       // in the topology state or not. We could crash after the topology update but before this and there doesn't seem to be a good way
       // to test for this.
-      _ <- dummyTopologyTransaction(sequencerAdminConnection)
-      _ = logger.info(s"Downloading topology and sequencer snapshot")
       globalDomain <- svcStore.getSvcRules().map(_.domain)
+      _ <- dummyTopologyTransaction(globalDomain, sequencerAdminConnection)
+      _ = logger.info(s"Downloading topology and sequencer snapshot")
       // TODO(#5339) Check if we need to be careful at which offset we query our snapshot.
       topologySnapshot <- sequencerAdminConnection.getTopologySnapshot(globalDomain)
       sequencerSnapshot <- sequencerAdminConnection.getSequencerSnapshot(

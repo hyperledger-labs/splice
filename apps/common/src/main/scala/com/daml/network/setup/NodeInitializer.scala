@@ -20,6 +20,7 @@ class NodeInitializer(
       dump: NodeIdentitiesDump,
       domainId: Option[DomainId] = None,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
+    logger.info(s"Initializing node from dump: $dump")
     for {
       _ <- retryProvider.ensureThatB(
         RetryFor.WaitingOnInitDependency,

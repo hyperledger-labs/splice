@@ -43,6 +43,8 @@ import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset.Value
 import com.digitalasset.canton.topology.{DomainId, Identifier, Namespace, PartyId, UniqueIdentifier}
+import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{PekkoUtil, LoggerUtil}
 import com.digitalasset.canton.util.ShowUtil.*
@@ -174,7 +176,7 @@ class BaseLedgerConnection(
       s"User $userId has primary party",
       check = getOptionalPrimaryParty(userId),
       establish = for {
-        party <- ensurePartyAllocated(hint, None, participantAdminConnection)
+        party <- ensurePartyAllocated(AuthorizedStore, hint, None, participantAdminConnection)
         _ <- setUserPrimaryParty(userId, party)
         _ <- grantUserRights(userId, actAsParties = Seq(party), readAsParties = Seq.empty)
       } yield (),
@@ -182,6 +184,7 @@ class BaseLedgerConnection(
     )
 
   def ensurePartyAllocated(
+      store: TopologyStoreId,
       hint: String,
       namespaceO: Option[Namespace],
       participantAdminConnection: ParticipantAdminConnection,
@@ -197,6 +200,7 @@ class BaseLedgerConnection(
       )
       _ <- participantAdminConnection
         .ensureInitialPartyToParticipant(
+          store,
           partyId,
           participantId,
           participantId.uid.namespace.fingerprint,
@@ -240,6 +244,7 @@ class BaseLedgerConnection(
   )(implicit traceContext: TraceContext): Future[PartyId] =
     for {
       party <- ensurePartyAllocated(
+        AuthorizedStore,
         sanitizeUserIdToPartyString(user),
         None,
         participantAdminConnection,

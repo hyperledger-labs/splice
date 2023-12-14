@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.javaapi.data.{Identifier as JIdentifier, Template}
+import com.daml.ledger.javaapi.data.{Template, Identifier as JIdentifier}
 import com.daml.ledger.javaapi.data.codegen.{
   ContractId,
   Update,
@@ -10,8 +10,8 @@ import com.daml.ledger.javaapi.data.codegen.{
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.{
   cns,
-  svcrules as svcr,
   svlocal,
+  svcrules as svcr,
   svonboarding as so,
   validatoronboarding as vo,
   wallet as cnw,
@@ -25,15 +25,16 @@ import com.daml.network.config.CNNodeConfigTransforms.{
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.util.{
   AssignedContract,
-  Contract,
   CoinConfigSchedule,
   ConfigScheduleUtil,
+  Contract,
   ContractWithState,
 }
 import com.daml.network.validator.config.AppManagerConfig
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import org.scalatest.prop.TableDrivenPropertyChecks.forEvery as tForEvery
 
 import java.time.Instant
@@ -96,6 +97,19 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       globalUpgradeDomain
     ) withClue "find the global-upgrade domain ID"
 
+    val sv1Party = sv1Backend.getSvcInfo().svParty
+
+    // host the svc party as it's stored in the domain stores only
+    sv1Backend.appState.participantAdminConnection
+      .ensureInitialPartyToParticipant(
+        TopologyStoreId.DomainStore(globalUpgradeId),
+        svcParty,
+        sv1Backend.participantClientWithAdminToken.id,
+        sv1Party.uid.namespace.fingerprint,
+      )
+      .futureValue
+      .discard
+
     val (previousGlobalId, coinRulesCid) = clue("change coinconfig to migrate domains") {
       inside(sv1ScanBackend.getCoinRules()) {
         case ContractWithState(firstCoinRules, Assigned(global1)) =>
@@ -149,8 +163,6 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       sv1Backend.participantClient.ledger_api_extensions.acs
         .filterJava(companion)(svcParty)
         .nonEmpty
-
-    val sv1Party = sv1Backend.getSvcInfo().svParty
 
     def exerciseSvc[T](update: Update[T]) =
       sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands

@@ -20,7 +20,7 @@ import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, Sv
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
 import com.daml.network.sv.onboarding.{DomainNodeReconciler, SetupUtil, SvcPartyHosting}
-import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
 import com.daml.network.util.{AssignedContract, GcpBucket, TemplateJsonDecoder, UploadablePackage}
@@ -41,8 +41,9 @@ import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionX,
   StoredTopologyTransactionsX,
+  StoredTopologyTransactionX,
+  TopologyStoreId,
 }
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code
 import com.digitalasset.canton.topology.transaction.{
@@ -57,7 +58,7 @@ import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
+import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -101,7 +102,7 @@ class FoundingNodeInitializer(
     )
 
     for {
-      namespace <- bootstrapDomain(localDomainNode)
+      (namespace, domainId) <- bootstrapDomain(localDomainNode)
       _ = logger.info("Domain is bootstrapped, connecting founding participant to domain")
       _ <- participantAdminConnection.ensureDomainRegistered(
         DomainConnectionConfig(
@@ -115,7 +116,7 @@ class FoundingNodeInitializer(
         RetryFor.WaitingOnInitDependency,
       )
       _ = logger.info("Participant connected to domain")
-      svcParty <- setupSvcParty(initConnection, namespace)
+      svcParty <- setupSvcParty(domainId, initConnection, namespace)
       // founder does not need to lock here
       svParty <- SetupUtil.setupSvParty(initConnection, config, participantAdminConnection)
       _ <- participantAdminConnection.uploadDarFiles(
@@ -193,11 +194,13 @@ class FoundingNodeInitializer(
   }
 
   private def setupSvcParty(
+      domain: DomainId,
       connection: BaseLedgerConnection,
       namespace: Namespace,
   ): Future[PartyId] =
     for {
       svc <- connection.ensurePartyAllocated(
+        TopologyStoreId.DomainStore(domain),
         foundingConfig.svcPartyHint,
         Some(namespace),
         participantAdminConnection,
@@ -221,7 +224,7 @@ class FoundingNodeInitializer(
     )
   }
 
-  private def bootstrapDomain(domainNode: LocalDomainNode): Future[Namespace] = {
+  private def bootstrapDomain(domainNode: LocalDomainNode): Future[(Namespace, DomainId)] = {
     logger.info("Bootstrapping the domain as the founding node")
 
     (
@@ -333,7 +336,7 @@ class FoundingNodeInitializer(
           ),
           logger,
         )
-      } yield namespace
+      } yield (namespace, domainId)
     }
   }
 
