@@ -153,7 +153,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     infraStack.requireOutput(InfrastructureOutputs.INGRESS_NAMESPACE) as pulumi.Output<string>
   );
 
-  const { svApp: sv1, postgresDatabase: postgresDB1 } = await installSvNode({
+  const { svApp: sv1, sequencerPostgres: postgresDB1 } = await installSvNode({
     auth0Client,
     nodename: 'sv-1',
     onboardingName: isDevNet ? 'Canton-Foundation-1' : 'Canton-Foundation',
@@ -172,6 +172,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     bootstrappingDumpConfig,
     topupConfig,
     auth0ValidatorAppName: 'sv1_validator',
+    splitPostgresInstances: false,
   });
 
   if (!singleSv) {
@@ -189,6 +190,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         auth0ValidatorAppName: 'sv2_validator',
         bootstrappingDumpConfig,
         topupConfig,
+        splitPostgresInstances: false,
       },
       sv1
     );
@@ -206,6 +208,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         auth0ValidatorAppName: 'sv3_validator',
         bootstrappingDumpConfig,
         topupConfig,
+        splitPostgresInstances: false,
       },
       sv1
     );
@@ -223,6 +226,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         auth0ValidatorAppName: 'sv4_validator',
         bootstrappingDumpConfig,
         topupConfig,
+        splitPostgresInstances: true,
       },
       sv1
     );

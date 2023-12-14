@@ -18,7 +18,8 @@ export class GlobalDomainNode extends ComponentResource {
   constructor(
     xns: ExactNamespace,
     name: string,
-    postgres: Postgres,
+    sequencerPostgres: Postgres,
+    mediatorPostgres: Postgres,
     cometbft: {
       name: string;
       onboardingName: string;
@@ -33,10 +34,10 @@ export class GlobalDomainNode extends ComponentResource {
     const sanitizedName = name.replace('-', '_');
 
     const mediatorDbName = `${sanitizedName}_mediator`;
-    const mediatorDb = postgres.createDatabase(mediatorDbName);
+    const mediatorDb = mediatorPostgres.createDatabase(mediatorDbName);
 
     const sequencerDbName = `${sanitizedName}_sequencer`;
-    const sequencerDb = postgres.createDatabase(sequencerDbName);
+    const sequencerDb = sequencerPostgres.createDatabase(sequencerDbName);
     const cometBftService = installCometBftNode(
       xns,
       cometbft.name,
@@ -49,7 +50,10 @@ export class GlobalDomainNode extends ComponentResource {
       name,
       'cn-global-domain',
       {
-        postgres: postgres.address,
+        sequencerPostgres: sequencerPostgres.address,
+        sequencerPostgresSecretName: sequencerPostgres.secretName,
+        mediatorPostgres: mediatorPostgres.address,
+        mediatorPostgresSecretName: mediatorPostgres.secretName,
         postgresMediatorDb: mediatorDbName,
         postgresSequencerDb: sequencerDbName,
         sequencerDriver: {

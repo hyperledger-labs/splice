@@ -24,11 +24,11 @@ spec:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
         - name: CANTON_DOMAIN_POSTGRES_SERVER
-          value: {{ .Values.postgres }}
+          value: {{ .Values.mediatorPostgres }}
         - name: CANTON_DOMAIN_POSTGRES_PASSWORD
           valueFrom:
            secretKeyRef:
-              name: {{ .Values.postgresSecretName }}
+              name: {{ .Values.mediatorPostgresSecretName }}
               key: postgresPassword
         {{- if .Values.postgresMediatorDb }}
         - name: CANTON_MEDIATOR_POSTGRES_DB

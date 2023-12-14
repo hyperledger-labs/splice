@@ -3,6 +3,15 @@
 Release Notes
 =============
 
+2024-01-08
+----------
+
+* Deployment:
+
+  * The global domain helm chart now supports separate Postgres instances for the sequencer and mediator. They can be configured in the `sequencerPostgres` and `mediatorPostgres` values.
+    The single `postgres` value has been deprecated and is no longer supported.
+    (It is still possible to use a shared postgres instance, by configuring it under both `sequencerPostgres` and `mediatorPostgres`.)
+
 2023-12-18
 ----------
 
@@ -11,7 +20,6 @@ Release Notes
 * Renamed ``directory`` to ``CNS`` across the system
 
   * Renamed ingress rule from ``https://directory.sv.svc.<YOUR_HOSTNAME>*`` to ``https://cns.sv.svc.<YOUR_HOSTNAME>*``.  Please note that this is now a requirement for this UI to continue working properly.
-
 
 2023-12-11
 ----------

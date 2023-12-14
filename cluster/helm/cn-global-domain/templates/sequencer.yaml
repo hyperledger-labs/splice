@@ -28,11 +28,11 @@ spec:
             - name: JAVA_TOOL_OPTIONS
               value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
             - name: CANTON_DOMAIN_POSTGRES_SERVER
-              value: {{ .Values.postgres }}
+              value: {{ .Values.sequencerPostgres }}
             - name: CANTON_DOMAIN_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.postgresSecretName }}
+                  name: {{ .Values.sequencerPostgresSecretName }}
                   key: postgresPassword
         {{- if .Values.postgresSequencerDb }}
             - name: CANTON_SEQUENCER_POSTGRES_DB

@@ -41,7 +41,7 @@ spec:
       # If postgres is not yet ready, postgres-exporter fails when initializing the collector
       # but never retries nor indicates non-readiness, so we unfortunatly need to wait for it
       # to be ready before spinning up postgres-exporter.
-      - name: {{ .Release.Name }}-init-postgres
+      - name: {{ .Release.Name }}-init
         image: postgres:14
         command: ['sh', '-c', "until pg_isready -h {{ .Values.postgres.hostname }} -p {{ .Values.postgres.port }}; do echo waiting for postgres at hostname {{ .Values.postgres.hostname }}, port {{ .Values.postgres.port }}; sleep 2; done"]
 ---

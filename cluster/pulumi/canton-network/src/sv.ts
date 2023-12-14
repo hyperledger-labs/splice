@@ -84,6 +84,7 @@ export type SvConfig = {
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
   auth0ValidatorAppName: string;
+  splitPostgresInstances: boolean;
 };
 
 async function getAcsBootstrappingDump(xns: ExactNamespace, config: BootstrappingDumpConfig) {
@@ -99,7 +100,7 @@ export async function installSvNode(
   cometBftSyncSource?: k8s.helm.v3.Release
 ): Promise<{
   svApp: k8s.helm.v3.Release;
-  postgresDatabase: postgres.Postgres;
+  sequencerPostgres: postgres.Postgres;
 }> {
   const xns = exactNamespace(config.nodename);
 
@@ -148,25 +149,49 @@ export async function installSvNode(
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
-  const postgresDb = postgres.installPostgres(xns, 'postgres');
+  const sequencerPostgres = postgres.installPostgres(
+    xns,
+    config.splitPostgresInstances ? 'sequencer-pg' : 'postgres',
+    config.splitPostgresInstances
+  );
+  const mediatorPostgres = config.splitPostgresInstances
+    ? postgres.installPostgres(
+        xns,
+        config.splitPostgresInstances ? 'mediator-pg' : 'postgres',
+        true
+      )
+    : sequencerPostgres;
 
-  const globalDomain = new GlobalDomainNode(xns, 'global-domain', postgresDb, {
-    name: config.nodename,
-    onboardingName: config.onboardingName,
-    syncSource: cometBftSyncSource,
-  });
+  const globalDomain = new GlobalDomainNode(
+    xns,
+    'global-domain',
+    sequencerPostgres,
+    mediatorPostgres,
+    {
+      name: config.nodename,
+      onboardingName: config.onboardingName,
+      syncSource: cometBftSyncSource,
+    }
+  );
+
+  const participantPostgres = config.splitPostgresInstances
+    ? postgres.installPostgres(xns, 'participant-pg', true)
+    : sequencerPostgres;
 
   const participant = installParticipant(
     xns,
     'participant',
-    postgresDb,
+    participantPostgres,
     auth0UserNameEnvVarSource('sv'),
     // If we have a dump, we disable auto init.
     !!config.bootstrappingDumpConfig
   );
 
+  const svAppPostgres = config.splitPostgresInstances
+    ? postgres.installPostgres(xns, 'sv-pg', true)
+    : sequencerPostgres;
   const svAppName = config.nodename.replace('-', '_');
-  const svDb = postgresDb.createDatabase(svAppName);
+  const svDb = svAppPostgres.createDatabase(svAppName);
 
   const svValues = {
     onboardingType: config.onboarding.type,
@@ -195,7 +220,8 @@ export async function installSvNode(
     })),
     isDevNet: config.isDevNet,
     approvedSvIdentities: config.approvedSvIdentities,
-    persistence: persistenceConfig(postgresDb, svAppName),
+    persistence: persistenceConfig(svAppPostgres, svAppName),
+    postgresSecretName: svAppPostgres.secretName,
     acsDumpPeriodicExport: backupConfig,
     acsDumpImport:
       config.bootstrappingDumpConfig && config.onboarding.type === 'found-collective'
@@ -217,25 +243,32 @@ export async function installSvNode(
   }
 
   const svApp = installCNHelmChart(xns, config.nodename + '-sv-app', 'cn-sv-node', svValues, {
-    dependsOn: dependsOn.concat([participant, postgresDb, svDb, globalDomain]),
+    dependsOn: dependsOn.concat([participant, svAppPostgres, svDb, globalDomain]),
   });
 
+  const scanAppPostgres = config.splitPostgresInstances
+    ? postgres.installPostgres(xns, 'scan-pg', true)
+    : sequencerPostgres;
   const scanDbName = `scan_${svAppName}`;
-  const scanDb = postgresDb.createDatabase(scanDbName);
+  const scanDb = scanAppPostgres.createDatabase(scanDbName);
   const scanValues = {
     clusterUrl: `${CLUSTER_BASENAME}.network.canton.global`,
     metrics: {
       enable: true,
     },
-    persistence: persistenceConfig(postgresDb, scanDbName),
+    persistence: persistenceConfig(scanAppPostgres, scanDbName),
+    postgresSecretName: scanAppPostgres.secretName,
     additionalJvmOptions: jmxOptions(),
   };
   installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, {
-    dependsOn: [svApp, postgresDb, scanDb],
+    dependsOn: [svApp, scanAppPostgres, scanDb],
   });
 
+  const validatorPostgres = config.splitPostgresInstances
+    ? postgres.installPostgres(xns, 'validator-pg', true)
+    : sequencerPostgres;
   const validatorDbName = `validator_${svAppName}`;
-  const validatorDb = postgresDb.createDatabase(validatorDbName);
+  const validatorDb = validatorPostgres.createDatabase(validatorDbName);
 
   await installValidatorApp({
     auth0Client: config.auth0Client,
@@ -252,8 +285,8 @@ export async function installSvNode(
             secret: backupConfigSecret,
           }
         : undefined,
-    persistenceConfig: persistenceConfig(postgresDb, validatorDbName),
-    extraDependsOn: [svApp, postgresDb, validatorDb],
+    persistenceConfig: persistenceConfig(validatorPostgres, validatorDbName),
+    extraDependsOn: [svApp, validatorPostgres, validatorDb],
     svValidator: true,
   });
 
@@ -271,7 +304,7 @@ export async function installSvNode(
     { dependsOn: [xns.ns] }
   );
 
-  return { svApp, postgresDatabase: postgresDb };
+  return { svApp, sequencerPostgres: sequencerPostgres };
 }
 
 function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): PersistenceConfig {

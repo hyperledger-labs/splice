@@ -253,12 +253,13 @@
       "timeout": 480,
       "values": {
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": "postgres",
+        "mediatorPostgres": "postgres",
         "sequencerDriver": {
           "host": "cometbft-cometbft-rpc",
           "port": 26657,
           "type": "cometbft"
-        }
+        },
+        "sequencerPostgres": "postgres"
       }
     },
     "name": "global-domain",
