@@ -8,17 +8,22 @@ current_dir = $(shell dirname $(lastword $(MAKEFILE_LIST)))
 
 app-bundle := ${REPO_ROOT}/apps/app/target/release/cn-node-0.1.0-SNAPSHOT.tar.gz
 
+load-tester := ${REPO_ROOT}/load-tester/dist
+
 canton-coin-dar := ${REPO_ROOT}/daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar
 wallet-payments-dar := ${REPO_ROOT}/daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar
 
 .PHONY: build
-build: $(app-bundle) cluster/build ## Build the Canton Coin app bundle and ensure cluster scripts are ready to run.
+build: $(app-bundle) $(load-tester) cluster/build ## Build the Canton Coin app bundle and ensure cluster scripts are ready to run.
 
 $(app-bundle): $(canton-coin-dar) $(wallet-payments-dar)
 	sbt --batch bundle
 
 $(canton-coin-dar) $(wallet-payments-dar) &:
 	sbt --batch 'canton-coin-daml'/damlBuild 'wallet-payments-daml'/damlBuild
+
+$(load-tester):
+	cd "${REPO_ROOT}/load-tester" && npm ci && npm run build
 
 .PHONY: clean
 clean: cluster/clean

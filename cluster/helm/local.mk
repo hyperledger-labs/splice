@@ -8,6 +8,7 @@ app_charts := \
 	cn-global-domain \
 	cn-istio-fwd \
 	cn-istio-gateway \
+	cn-load-tester \
 	cn-participant \
 	cn-postgres \
 	cn-postgres-metrics \

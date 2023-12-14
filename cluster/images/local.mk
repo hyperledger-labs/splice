@@ -23,6 +23,7 @@ images := \
 	docs \
 	external-proxy-full \
 	gcs-proxy \
+	load-tester \
 
 canton-image := cluster/images/canton
 cn-image := cluster/images/cn-app

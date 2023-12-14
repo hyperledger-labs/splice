@@ -743,20 +743,6 @@ workflows:
           requires:
             - wait_for_previous_pipeline
             - cancel_if_previous_pipeline
-      - load_test:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - deployment/cidaily
-          cluster: "cidaily"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - datadog
-            - slack-context
-          requires:
-            - preflight_check
 
   cidaily_testnet_health_check:
     when:

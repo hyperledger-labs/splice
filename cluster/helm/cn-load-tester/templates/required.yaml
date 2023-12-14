@@ -1,0 +1,8 @@
+{{ $_ := required ".Release.Namespace is required." .Release.Namespace }}
+
+{{ $_ := required ".Values.cluster.imageTag is required." (.Values.cluster).imageTag }}
+{{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
+
+{{ $_ := required ".Values.schedule is required." .Values.schedule }}
+{{ $_ := required ".Values.config is required." .Values.config }}
+{{ $_ := required ".Values.prometheusRw is required." .Values.prometheusRw }}

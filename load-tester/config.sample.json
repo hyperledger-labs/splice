@@ -1,0 +1,9 @@
+{
+  "testDuration": "$K6_TEST_DURATION",
+  "walletBaseUrl": "$K6_WALLET_BASE_URL",
+  "auth": {
+    "oauthDomain": "$K6_OAUTH_DOMAIN",
+    "oauthClientId": "$K6_OAUTH_CLIENT_ID",
+    "userCredentials": "$K6_USER_CREDENTIALS"
+  }
+}

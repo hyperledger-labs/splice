@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: load-tester
+spec:
+  schedule: "{{ .Values.schedule }}"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: load-tester
+              image: "{{ .Values.imageRepo }}/load-tester:{{ (.Values.cluster).imageTag }}"
+              imagePullPolicy: Always
+              env:
+                - name: EXTERNAL_CONFIG
+                  value: {{ .Values.config | quote }}
+                - name: K6_PROMETHEUS_RW_SERVER_URL
+                  value: "{{ .Values.prometheusRw }}"
