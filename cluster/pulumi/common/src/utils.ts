@@ -25,7 +25,8 @@ export function requireEnv(name: string, msg = ''): string {
 
   if (!value) {
     console.error(
-      `Environment variable ${name} is undefined.` + (msg != '' ? `(should define: ${msg})` : '')
+      `FATAL: Environment variable ${name} is undefined. Shutting down.` +
+        (msg != '' ? `(should define: ${msg})` : '')
     );
     process.exit(1);
   } else {
@@ -46,7 +47,9 @@ export function envFlag(flagName: string, defaultFlag = false): boolean {
     } else if (val === 'f' || val === 'false' || val === 'n' || val === 'no' || val === '0') {
       flag = false;
     } else {
-      console.error(`Flag environment variable ${flagName} has unexpected value: ${varVal}.`);
+      console.error(
+        `FATAL: Flag environment variable ${flagName} has unexpected value: ${varVal}.`
+      );
       process.exit(1);
     }
   }
