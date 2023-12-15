@@ -75,7 +75,7 @@ import org.scalatest.time.{Minute, Minutes, Span}
 
 import java.nio.file.Files
 import java.time.Duration as JavaDuration
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
 import scala.concurrent.duration.DurationInt
 import scala.math.Ordered.orderingToOrdered
 import scala.util.Using
@@ -592,16 +592,27 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
       val directoryToStoreDars = Files.createTempDirectory("dar_migration")
       dars
         .parTraverse { dar =>
-          backend.participantClientWithAdminToken.dars.download(
-            dar.hash,
-            directoryToStoreDars.toFile.getAbsolutePath,
-          )
-          newParticipantConnection.uploadDarFile(
-            directoryToStoreDars.resolve(s"${dar.name}.dar"),
-            RetryFor.ClientCalls,
-          )
+          Future {
+            blocking {
+              backend.participantClientWithAdminToken.dars.download(
+                dar.hash,
+                directoryToStoreDars.toFile.getAbsolutePath,
+              )
+            }
+          }
         }
-        .map(_.discard)
+        .flatMap { _ =>
+          // Sequential uploads to avoid #8987
+          // TODO(#5141) move back to parallel uploads
+          MonadUtil
+            .sequentialTraverse(dars) { dar =>
+              newParticipantConnection.uploadDarFile(
+                directoryToStoreDars.resolve(s"${dar.name}.dar"),
+                RetryFor.ClientCalls,
+              )
+            }
+            .map(_.discard)
+        }
     }
 
     def migrateUserAnnotation(): Future[Unit] = {
