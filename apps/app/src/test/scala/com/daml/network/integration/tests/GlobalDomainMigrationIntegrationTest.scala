@@ -166,11 +166,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
         }
         bracket(
           withCLueAndLog("Freeze the existing domain") {
-            val zeroRate = NonNegativeInt.zero
-            changeDomainRatePerParticipant(
-              allNodes.map(_.backend.appState.participantAdminConnection),
-              zeroRate,
-            )
+            allNodes.parTraverse(n => Future(n.backend.pauseGlobalDomain())).futureValue.discard
           },
           // reset to not crash other tests
           changeDomainRatePerParticipant(

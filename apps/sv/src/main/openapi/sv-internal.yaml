@@ -542,6 +542,14 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
         "501":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
+  /v0/sv/globald-domain/pause:
+    get:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "pauseGlobalDomain"
+      responses:
+        "200":
+          description: ok
   /v0/svc:
     get:
       tags: [sv]

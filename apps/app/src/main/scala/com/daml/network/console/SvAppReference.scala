@@ -67,6 +67,12 @@ abstract class SvAppReference(
       httpCommand(HttpSvAppClient.DevNetOnboardValidatorPrepare())
     }
 
+  @Help.Summary("Set DomainRatePerParticipant to zero")
+  def pauseGlobalDomain(): Unit =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAppClient.PauseGlobalDomain())
+    }
+
   def getSvcInfo(): HttpSvAppClient.SvcInfo =
     consoleEnvironment.run {
       httpCommand(HttpSvAppClient.GetSvcInfo)

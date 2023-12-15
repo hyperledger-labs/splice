@@ -23,12 +23,13 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.onboarding.SvcPartyHosting
 import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
-import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
+import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvOnboardingToken
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
@@ -238,6 +239,18 @@ class HttpSvHandler(
           )
         )
       }
+    }
+  }
+
+  def pauseGlobalDomain(respond: v0.SvResource.PauseGlobalDomainResponse.type)()(
+      extracted: TraceContext
+  ): scala.concurrent.Future[v0.SvResource.PauseGlobalDomainResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.pauseGlobalDomain") { _ => _ =>
+      for {
+        globalDomain <- svcStore.getSvcRules().map(_.domain)
+        _ <- changeDomainRatePerParticipant(globalDomain, NonNegativeInt.zero)
+      } yield v0.SvResource.PauseGlobalDomainResponseOK
     }
   }
 
@@ -763,4 +776,16 @@ class HttpSvHandler(
       } yield outcome
     }
   }
+
+  private def changeDomainRatePerParticipant(globalDomainId: DomainId, rate: NonNegativeInt)(
+      implicit tc: TraceContext
+  ) = for {
+    id <- participantAdminConnection.getId()
+    result <- participantAdminConnection
+      .ensureDomainParameters(
+        globalDomainId,
+        _.tryUpdate(maxRatePerParticipant = rate),
+        signedBy = id.namespace.fingerprint,
+      )
+  } yield result
 }
