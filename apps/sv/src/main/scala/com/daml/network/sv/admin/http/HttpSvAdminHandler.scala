@@ -9,6 +9,7 @@ import com.daml.network.config.BackupDumpConfig
 import com.daml.network.environment.{
   CNNodeStatus,
   MediatorAdminConnection,
+  ParticipantAdminConnection,
   SequencerAdminConnection,
 }
 import com.daml.network.http.v0.definitions.{
@@ -34,8 +35,10 @@ import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -51,6 +54,7 @@ class HttpSvAdminHandler(
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     cometBftClient: Option[CometBftClient],
     localDomainNode: Option[LocalDomainNode],
+    participantAdminConnection: ParticipantAdminConnection,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -530,6 +534,18 @@ class HttpSvAdminHandler(
     }
   }
 
+  override def pauseGlobalDomain(respond: SvAdminResource.PauseGlobalDomainResponse.type)()(
+      tuser: TracedUser
+  ): Future[SvAdminResource.PauseGlobalDomainResponse] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.pauseGlobalDomain") { _ => _ =>
+      for {
+        globalDomain <- svcStore.getSvcRules().map(_.domain)
+        _ <- changeDomainRatePerParticipant(globalDomain, NonNegativeInt.zero)
+      } yield SvAdminResource.PauseGlobalDomainResponseOK
+    }
+  }
+
   private def withClientOrNotFound[T](
       notFound: ErrorResponse => T
   )(call: CometBftClient => Future[T]) = cometBftClient
@@ -556,4 +572,15 @@ class HttpSvAdminHandler(
         .pure[Future]
     } { call }
 
+  private def changeDomainRatePerParticipant(globalDomainId: DomainId, rate: NonNegativeInt)(
+      implicit tc: TraceContext
+  ) = for {
+    id <- participantAdminConnection.getId()
+    result <- participantAdminConnection
+      .ensureDomainParameters(
+        globalDomainId,
+        _.tryUpdate(maxRatePerParticipant = rate),
+        signedBy = id.namespace.fingerprint,
+      )
+  } yield result
 }

@@ -340,6 +340,7 @@ class SvApp(
         svcAutomation,
         cometBftClient,
         localDomainNode,
+        participantAdminConnection,
         clock,
         loggerFactory,
       )

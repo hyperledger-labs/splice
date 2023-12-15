@@ -449,6 +449,24 @@ object HttpSvAdminAppClient {
     }
   }
 
+  case class PauseGlobalDomain() extends BaseCommand[http.PauseGlobalDomainResponse, Unit] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.PauseGlobalDomainResponse] =
+      client.pauseGlobalDomain(headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.PauseGlobalDomainResponse.OK =>
+      Right(())
+    }
+  }
+
   case class TriggerAcsDump()
       extends BaseCommand[
         http.TriggerAcsDumpResponse,

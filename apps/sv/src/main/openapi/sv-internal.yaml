@@ -156,6 +156,14 @@ paths:
             application/json:
               schema:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+  /v0/admin/domain/pause:
+    get:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "pauseGlobalDomain"
+      responses:
+        "200":
+          description: ok
   /v0/admin/sv/identity/approve:
     post:
       tags: [sv]
@@ -542,14 +550,6 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
         "501":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
-  /v0/sv/globald-domain/pause:
-    get:
-      tags: [sv]
-      x-jvm-package: sv
-      operationId: "pauseGlobalDomain"
-      responses:
-        "200":
-          description: ok
   /v0/svc:
     get:
       tags: [sv]
