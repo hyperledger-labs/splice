@@ -27,7 +27,7 @@ export class Auth0Manager {
     this.auth0Tenant = auth0Tenant;
     this.clientId = clientId;
     this.walletUri = walletUri;
-    this.httpClient = new HttpClient(auth0Tenant);
+    this.httpClient = new HttpClient(auth0Tenant, true);
   }
 
   // Step through the /authorize endpoint
@@ -59,7 +59,7 @@ export class Auth0Manager {
       'Sec-Fetch-User': '?1',
     };
 
-    return this.httpClient.getRedirect(url, headers, (_, location) => {
+    return this.httpClient.get.redirect(url, headers, (_, location) => {
       const state = location.split('state=')[1];
       return { location, state };
     });
@@ -84,7 +84,7 @@ export class Auth0Manager {
       'Sec-Fetch-User': '?1',
     };
 
-    return this.httpClient.postRedirect(
+    return this.httpClient.post.redirect(
       `${this.auth0Tenant}${location}`,
       data,
       headers,
@@ -110,16 +110,20 @@ export class Auth0Manager {
       'Sec-Fetch-User': '?1',
     };
 
-    return this.httpClient.getRedirect(`${this.auth0Tenant}${location}`, headers, (_, location) => {
-      const querystr = location.split('/?')[1];
-      const { state, code } = parse(querystr);
+    return this.httpClient.get.redirect(
+      `${this.auth0Tenant}${location}`,
+      headers,
+      (_, location) => {
+        const querystr = location.split('/?')[1];
+        const { state, code } = parse(querystr);
 
-      if (!state || !code || Array.isArray(code) || Array.isArray(state)) {
-        throw new Error('expected single string state and code params');
-      }
+        if (!state || !code || Array.isArray(code) || Array.isArray(state)) {
+          throw new Error('expected single string state and code params');
+        }
 
-      return { location, state, code };
-    });
+        return { location, state, code };
+      },
+    );
   };
 
   // Step through the /oauth/token endpoint
@@ -137,7 +141,7 @@ export class Auth0Manager {
       'Sec-Fetch-Site': 'cross-site',
     };
 
-    return this.httpClient.postSuccess(`${this.auth0Tenant}/oauth/token`, data, headers, resp => {
+    return this.httpClient.post.success(`${this.auth0Tenant}/oauth/token`, data, headers, resp => {
       const json = JSON.parse(resp.body || '{}');
 
       if (json && typeof json.access_token === 'string') {

@@ -1,8 +1,4 @@
-/* @ts-expect-error typings unavailable */
-import { randomIntBetween } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
-import { sleep } from 'k6';
-import http from 'k6/http';
-
+import { ValidatorClient } from '../client/validator';
 import settings from '../settings';
 import { Auth0Manager } from '../utils/auth';
 
@@ -19,31 +15,17 @@ export function setup(): Data {
     settings.walletBaseUrl,
   );
 
-  // all VUs sharing one user token for now
   const token = oauth.authorizationCodeGrant(settings.auth.userCredentials);
-
-  http.post(`${settings.walletBaseUrl}/api/validator/v0/register`, null, {
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
   return { token };
 }
 
 export default function (data: Data): void {
-  http.post(
-    `${settings.walletBaseUrl}/api/validator/v0/wallet/tap`,
-    JSON.stringify({ amount: '10.0' }),
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${data.token}`,
-      },
-    },
-  );
+  const validator = new ValidatorClient(settings.walletBaseUrl, data.token);
 
-  // target a rate of roughly ~1 tap/sec, based on VU size (10 VUs)
-  sleep(randomIntBetween(8, 12));
+  const userStatus = validator.v0.wallet.userStatus();
+  if (userStatus?.user_onboarded && userStatus?.user_wallet_installed) {
+    validator.v0.wallet.tap('10.0');
+  } else {
+    validator.v0.register();
+  }
 }

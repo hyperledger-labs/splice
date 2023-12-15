@@ -960,11 +960,6 @@ subcommand_whitelist[load_test]='Run the k6 load test against the cluster'
 function subcmd_load_test() {
     _log "Starting k6 load test"
 
-    if [ "${K6_ENABLE_LOAD_GENERATOR:-}" != "true" ];
-    then
-        _error "k6 load tests are disabled in this cluster. Set K6_ENABLE_LOAD_GENERATOR=true in its .envrc.vars if you wish to enable it."
-    fi
-
     cd "$REPO_ROOT/load-tester" && npm ci && npm run build
 
     hostname="$GCP_CLUSTER_BASENAME.network.canton.global"
@@ -972,13 +967,10 @@ function subcmd_load_test() {
     export K6_WALLET_BASE_URL="https://wallet.validator1.$hostname"
     prometheus_rw="https://prometheus.$hostname/api/v1/write"
 
-    mkdir -p "$REPO_ROOT/log"
-
     K6_PROMETHEUS_RW_SERVER_URL="$prometheus_rw" k6 \
         --verbose \
         --out experimental-prometheus-rw \
         --env EXTERNAL_CONFIG="$(envsubst < "$REPO_ROOT/load-tester/config.sample.json")" \
-        --log-output file="$REPO_ROOT/log/k6-load-test.log" \
         run "$REPO_ROOT/load-tester/dist/generate-load.js"
 }
 

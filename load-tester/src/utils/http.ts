@@ -1,9 +1,11 @@
 import { sleep } from 'k6';
 import http, { RefinedResponse } from 'k6/http';
 
+// HTTP client built off of k6/http, that automatically handles retries
 export class HttpClient {
   private retryCount: number = 5;
   private retryWait: number = 1; // in seconds
+  private errorsAreFatal: boolean = false;
 
   // we're _definitely_ a browser ;)
   private headers: Record<string, string> = {
@@ -16,8 +18,19 @@ export class HttpClient {
 
   private tag: string | undefined;
 
-  constructor(tag: string) {
+  constructor(tag: string, errorsAreFatal?: boolean) {
     this.tag = tag;
+    this.errorsAreFatal = !!errorsAreFatal;
+  }
+
+  private handleError(
+    errorMessage: string,
+    debugInfo: object | string | number | boolean | null | undefined,
+  ): void {
+    console.error(`${errorMessage}. Debug: ${JSON.stringify(debugInfo)}}`);
+    if (this.errorsAreFatal) {
+      throw new Error(errorMessage);
+    }
   }
 
   // base HTTP request with simple error handling
@@ -26,7 +39,7 @@ export class HttpClient {
     method: 'GET' | 'POST',
     body: string | Buffer | undefined,
     expectedStatus: 200 | 302,
-    additionalHeaders: Record<string, string>,
+    additionalHeaders: Record<string, string> | undefined,
     retries: number,
     handleResponse: (resp: RefinedResponse<'text'>) => R,
   ): R {
@@ -63,9 +76,9 @@ export class HttpClient {
           handleResponse,
         );
       } else {
-        console.error(resp.headers, resp.body);
-        throw new Error(
+        this.handleError(
           `Expected status code ${expectedStatus} but received ${resp.status} for ${method} ${url}`,
+          resp.body,
         );
       }
     }
@@ -78,7 +91,7 @@ export class HttpClient {
     url: string,
     method: 'GET' | 'POST',
     body: string | Buffer | undefined,
-    additionalHeaders: Record<string, string>,
+    additionalHeaders: Record<string, string> | undefined,
     handleResponse: (resp: RefinedResponse<'text'>, location: string) => R,
   ): R {
     return this._request(url, method, body, 302, additionalHeaders, this.retryCount, resp => {
@@ -87,43 +100,65 @@ export class HttpClient {
       if (typeof location === 'string') {
         return handleResponse(resp, location);
       } else {
-        console.error(resp.headers);
-        throw new Error(`Found a 302 but did not find a redirect location for ${url}.`);
+        this.handleError(`Found a 302 but did not find a redirect location for ${url}.`, {
+          headers: resp.headers,
+          body: resp.body,
+        });
+        return handleResponse(resp, '');
       }
     });
   }
 
-  public getRedirect<R>(
-    url: string,
-    additionalHeaders: Record<string, string>,
-    handleResponse: (resp: RefinedResponse<'text'>, location: string) => R,
-  ): R {
-    return this._redirect(url, 'GET', undefined, additionalHeaders, handleResponse);
-  }
+  public get = {
+    redirect: <R>(
+      url: string,
+      additionalHeaders: Record<string, string>,
+      handleResponse: (resp: RefinedResponse<'text'>, location: string) => R,
+    ): R => {
+      return this._redirect(url, 'GET', undefined, additionalHeaders, handleResponse);
+    },
+    success: <R>(
+      url: string,
+      body: string | Buffer | undefined,
+      additionalHeaders: Record<string, string>,
+      handleResponse: (resp: RefinedResponse<'text'>) => R,
+    ): R => {
+      return this._request(
+        url,
+        'GET',
+        body,
+        200,
+        additionalHeaders,
+        this.retryCount,
+        handleResponse,
+      );
+    },
+  };
 
-  public postRedirect<R>(
-    url: string,
-    body: string | Buffer | undefined,
-    additionalHeaders: Record<string, string>,
-    handleResponse: (resp: RefinedResponse<'text'>, location: string) => R,
-  ): R {
-    return this._redirect(url, 'POST', body, additionalHeaders, handleResponse);
-  }
-
-  public postSuccess<R>(
-    url: string,
-    body: string | Buffer | undefined,
-    additionalHeaders: Record<string, string>,
-    handleResponse: (resp: RefinedResponse<'text'>) => R,
-  ): R {
-    return this._request(
-      url,
-      'POST',
-      body,
-      200,
-      additionalHeaders,
-      this.retryCount,
-      handleResponse,
-    );
-  }
+  public post = {
+    redirect: <R>(
+      url: string,
+      body: string | Buffer | undefined,
+      additionalHeaders: Record<string, string>,
+      handleResponse: (resp: RefinedResponse<'text'>, location: string) => R,
+    ): R => {
+      return this._redirect(url, 'POST', body, additionalHeaders, handleResponse);
+    },
+    success: <R>(
+      url: string,
+      body: string | Buffer | undefined,
+      additionalHeaders: Record<string, string>,
+      handleResponse: (resp: RefinedResponse<'text'>) => R,
+    ): R => {
+      return this._request(
+        url,
+        'POST',
+        body,
+        200,
+        additionalHeaders,
+        this.retryCount,
+        handleResponse,
+      );
+    },
+  };
 }
