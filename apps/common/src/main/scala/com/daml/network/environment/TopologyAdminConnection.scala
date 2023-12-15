@@ -463,6 +463,9 @@ abstract class TopologyAdminConnection(
             }
             .recover {
               case ex: AuthorizedStateChanged if recreateOnAuthorizedStateChange =>
+                logger.info(
+                  s"check $description failed and the base state has changed, re-establishing condition"
+                )
                 throw Status.FAILED_PRECONDITION.withDescription(ex.getMessage).asRuntimeException()
             }
         },
@@ -519,7 +522,13 @@ abstract class TopologyAdminConnection(
     def removeParticipant(participants: Seq[HostingParticipant]): Seq[HostingParticipant] = {
       participants.filterNot(_.participantId == participantToRemove)
     }
-    ensurePartyToParticipantProposal(domainId, party, removeParticipant, signedBy)
+    ensurePartyToParticipantProposal(
+      s"Party $party is proposed to be removed from $participantToRemove",
+      domainId,
+      party,
+      removeParticipant,
+      signedBy,
+    )
   }
 
   def ensurePartyToParticipantAdditionProposal(
@@ -537,11 +546,18 @@ abstract class TopologyAdminConnection(
         participants.appended(newHostingParticipant)
       }
     }
-    ensurePartyToParticipantProposal(domainId, party, addParticipant, signedBy)
+    ensurePartyToParticipantProposal(
+      s"Party $party is proposed to be added on $newParticipant",
+      domainId,
+      party,
+      addParticipant,
+      signedBy,
+    )
   }
 
   // the participantChange participant sequence must be ordering, if not canton will consider topology proposals with different ordering as fully different proposals and will not aggregate signatures
   private def ensurePartyToParticipantProposal(
+      description: String,
       domainId: DomainId,
       party: PartyId,
       participantChange: Seq[HostingParticipant] => Seq[
@@ -596,7 +612,7 @@ abstract class TopologyAdminConnection(
 
     ensureTopologyProposal[PartyToParticipantX](
       TopologyStoreId.DomainStore(domainId),
-      show"Party $party is proposed on ",
+      description,
       queryType => findPartyToParticipant(queryType),
       previous => {
         val newHostingParticipants = participantChange(previous.participants)
