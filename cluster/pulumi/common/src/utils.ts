@@ -217,7 +217,7 @@ export function installCNHelmChartByNamespaceName(
   opts?: CustomResourceOptions
 ): Release {
   return new k8s.helm.v3.Release(
-    `helm-${prefix}-${name}`,
+    `${prefix}-${name}`,
     {
       name,
       namespace: nsName,
