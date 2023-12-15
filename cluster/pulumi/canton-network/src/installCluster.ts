@@ -15,6 +15,7 @@ import {
   svKeyFromSecret,
   SvIdKey,
   CnInput,
+  sequencerPruningConfig,
 } from 'cn-pulumi-common';
 
 import { installDocs } from './docs';
@@ -173,6 +174,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     topupConfig,
     auth0ValidatorAppName: 'sv1_validator',
     splitPostgresInstances: false,
+    sequencerPruningConfig,
   });
 
   if (!singleSv) {
@@ -191,6 +193,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         bootstrappingDumpConfig,
         topupConfig,
         splitPostgresInstances: false,
+        sequencerPruningConfig,
       },
       sv1
     );
@@ -209,6 +212,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         bootstrappingDumpConfig,
         topupConfig,
         splitPostgresInstances: false,
+        sequencerPruningConfig,
       },
       sv1
     );
@@ -227,6 +231,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         bootstrappingDumpConfig,
         topupConfig,
         splitPostgresInstances: true,
+        sequencerPruningConfig,
       },
       sv1
     );

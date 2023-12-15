@@ -14,13 +14,19 @@ import com.daml.network.http.v0.definitions as http
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion, PageLimit}
 import com.daml.network.sv.LocalDomainNode
+import com.daml.network.sv.automation.SvSvcAutomationService.LocalSequencerClientContext
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
-import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.{
+  SequencerPruningConfig,
+  SvAppBackendConfig,
+  SvBootstrapDumpConfig,
+  SvOnboardingConfig,
+}
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
 import com.daml.network.sv.onboarding.{DomainNodeReconciler, SetupUtil, SvcPartyHosting}
-import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
+import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
 import com.daml.network.util.{AssignedContract, GcpBucket, TemplateJsonDecoder, UploadablePackage}
@@ -41,16 +47,16 @@ import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionsX,
   StoredTopologyTransactionX,
+  StoredTopologyTransactionsX,
   TopologyStoreId,
 }
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code
 import com.digitalasset.canton.topology.transaction.{
+  DecentralizedNamespaceDefinitionX,
   SignedTopologyTransactionX,
   TopologyChangeOpX,
   TopologyMappingX,
-  DecentralizedNamespaceDefinitionX,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -58,7 +64,7 @@ import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -638,7 +644,22 @@ class FoundingNodeInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
-      None,
+      Some(
+        LocalSequencerClientContext(
+          localDomainNode.sequencerAdminConnection,
+          // Founding SV should have already connected to its sequencer.
+          // We put None here to indicate automation service not to create LocalSequencerConnectionsTrigger
+          // which is responsible for reconnecting to its own sequencer
+          internalClientConfig = None,
+          localDomainNode.sequencerPruningConfig.map(pruningConfig =>
+            SequencerPruningConfig(
+              pruningConfig.pruningInterval,
+              pruningConfig.retentionPeriod,
+              pruningConfig.unauthenticatedMembersRetentionPeriod,
+            )
+          ),
+        )
+      ),
       loggerFactory,
     )
 

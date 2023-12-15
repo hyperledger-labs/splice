@@ -414,6 +414,9 @@
         },
         "domain": {
           "sequencerAvailabilityDelay": "60 seconds",
+          "sequencerPruningConfig": {
+            "enabled": false
+          },
           "sequencerPublicUrl": "https://sequencer.sv.svc.svrun.network.canton.global"
         },
         "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",

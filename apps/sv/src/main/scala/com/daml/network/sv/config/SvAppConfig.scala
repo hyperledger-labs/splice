@@ -173,6 +173,18 @@ case class CometBftConfig(
     connectionUri: String = "",
 )
 
+// Removes unnecessary data from the Sequencer that is earlier than the configured retention period
+final case class SequencerPruningConfig(
+    // this defines how frequent the prune command is being called to the sequencer
+    pruningInterval: NonNegativeFiniteDuration,
+    // data within the retention period preceding the current time will not be removed during the pruning process
+    retentionPeriod: NonNegativeFiniteDuration,
+    // retention period for unauthenticated Members before they are disabled
+    // the default value of 1 hour is copied from canton `RetentionPeriodDefaults`
+    unauthenticatedMembersRetentionPeriod: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofHours(1),
+)
+
 final case class SvSequencerConfig(
     adminApi: ClientConfig,
     internalApi: ClientConfig,
@@ -180,6 +192,7 @@ final case class SvSequencerConfig(
     // The default value of 60 seconds is based on https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
     // TODO (#8282): consider reading config value from participant instead of configuring here
     sequencerAvailabilityDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(60),
+    pruning: Option[SequencerPruningConfig] = None,
 )
 
 final case class SvMediatorConfig(

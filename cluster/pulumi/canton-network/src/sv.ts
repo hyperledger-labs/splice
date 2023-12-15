@@ -71,6 +71,12 @@ export type SvOnboarding =
 
 export type ApprovedSvIdentity = { name: string; publicKey: string };
 
+export type SequencerPruningConfig = {
+  enabled: boolean;
+  pruningInterval?: string;
+  retentionPeriod?: string;
+};
+
 export type SvConfig = {
   auth0Client: Auth0Client;
   nodename: string;
@@ -83,6 +89,7 @@ export type SvConfig = {
   backupConfig?: BackupConfig;
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
+  sequencerPruningConfig: SequencerPruningConfig;
   auth0ValidatorAppName: string;
   splitPostgresInstances: boolean;
 };
@@ -207,6 +214,7 @@ export async function installSvNode(
       // because helm does not distinguish between an empty object and unset.
       {
         sequencerPublicUrl: `https://sequencer.${config.nodename}.svc.${CLUSTER_BASENAME}.network.canton.global`,
+        sequencerPruningConfig: config.sequencerPruningConfig,
       },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
       expiresIn: onboarding.expiresIn,

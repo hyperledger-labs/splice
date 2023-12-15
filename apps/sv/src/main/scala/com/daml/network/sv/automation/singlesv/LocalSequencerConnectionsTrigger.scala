@@ -2,24 +2,19 @@ package com.daml.network.sv.automation.singlesv
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.codegen.java.cn.svc.globaldomain.SequencerConfig
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.AssignedContract
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
-import com.digitalasset.canton.time.FetchTimeResponse
-import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import java.time.Instant
-import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -38,10 +33,11 @@ class LocalSequencerConnectionsTrigger(
     for {
       svcRules <- store.getSvcRules()
       domainTime <- participantAdminConnection.getDomainTime(globalDomainAlias, timeouts.default)
-      globalDomainId <- coinRulesDomain()
-      svcRulesActiveSequencerConfig = sequencerConfigFromSvcRules(
+      globalDomainId <- store.getCoinRulesDomain()(traceContext)
+      svcRulesActiveSequencerConfig = getAvailableSequencerConfigFromSvcRules(
+        svParty,
         svcRules,
-        domainTime,
+        domainTime.timestamp.toInstant,
         globalDomainId,
       )
       _ <- svcRulesActiveSequencerConfig.fold {
@@ -61,19 +57,6 @@ class LocalSequencerConnectionsTrigger(
       }
     } yield false
   }
-
-  private def sequencerConfigFromSvcRules(
-      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
-      domainTime: FetchTimeResponse,
-      globalDomainId: DomainId,
-  ) = for {
-    memberInfo <- svcRules.payload.members.asScala.get(svParty.toProtoPrimitive)
-    domainNodeConfig <- memberInfo.domainNodes.asScala.get(globalDomainId.toProtoPrimitive)
-    sequencerConfig <- domainNodeConfig.sequencer.toScala
-    if sequencerConfig.url.nonEmpty && sequencerConfig.availableAfter.toScala.exists(
-      availableAfter => domainTime.timestamp.toInstant.isAfter(availableAfter)
-    )
-  } yield sequencerConfig
 
   private def setLocalSequencerConnection(
       publishedSequencerInfo: SequencerConfig,
@@ -117,8 +100,4 @@ class LocalSequencerConnectionsTrigger(
           }
         case _ => None
       }
-
-  private def coinRulesDomain()(implicit tc: TraceContext): Future[DomainId] =
-    store.getCoinRulesDomain()(tc)
-
 }

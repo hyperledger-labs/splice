@@ -62,6 +62,15 @@ export function envFlag(flagName: string, defaultFlag = false): boolean {
 export const isDevNet = envFlag('IS_DEVNET', true);
 export const clusterLargeDisk = envFlag('CLUSTER_LARGE_DISK', false);
 
+const enableSequencerPruning = envFlag('ENABLE_SEQUENCER_PRUNING', false);
+export const sequencerPruningConfig = enableSequencerPruning
+  ? {
+      enabled: true,
+      pruningInterval: requireEnv('SEQUENCER_PRUNING_INTERVAL', ''),
+      retentionPeriod: requireEnv('SEQUENCER_RETENTION_PERIOD', ''),
+    }
+  : { enabled: false };
+
 // Refrence to upstream infrastructure stack.
 export const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);
 

@@ -145,6 +145,7 @@ class SvApp(
           config.sequencer.internalApi,
           config.sequencer.externalPublicApiUrl,
           config.sequencer.sequencerAvailabilityDelay.asJava,
+          config.sequencer.pruning,
           loggerFactory,
           retryProvider,
         )

@@ -14,3 +14,8 @@
 {{ $_ := required ".Values.globalDomainUrl is required." .Values.globalDomainUrl }}
 {{ $_ := required ".Values.domain.sequencerPublicUrl is required." .Values.domain.sequencerPublicUrl }}
 {{ $_ := required ".Values.postgresSecretName is required" .Values.postgresSecretName }}
+
+{{- if ((.Values.domain).sequencerPruningConfig).enabled }}
+{{ $_ := required ".Values.domain.sequencerPruningConfig.pruningInterval is required if sequencerPruningConfig is enabled." ((.Values.domain).sequencerPruningConfig).pruningInterval }}
+{{ $_ := required ".Values.domain.sequencerPruningConfig.retentionPeriod is required if sequencerPruningConfig is enabled." ((.Values.domain).sequencerPruningConfig).retentionPeriod }}
+{{- end }}

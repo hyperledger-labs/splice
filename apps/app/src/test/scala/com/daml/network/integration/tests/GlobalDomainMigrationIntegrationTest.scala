@@ -440,6 +440,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
         ClientConfig(port = Port.tryCreate(27008 + svOffset)),
         "",
         JavaDuration.ZERO,
+        None,
         loggerFactoryWithKey,
         retryProvider,
       ),

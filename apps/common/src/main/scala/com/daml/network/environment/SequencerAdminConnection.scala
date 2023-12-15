@@ -8,7 +8,10 @@ import com.digitalasset.canton.admin.api.client.commands.{
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.admin.grpc.InitializeSequencerResponseX
-import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot
+import com.digitalasset.canton.domain.sequencing.sequencer.{
+  SequencerPruningStatus,
+  SequencerSnapshot,
+}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SequencerNodeStatus}
 import com.digitalasset.canton.protocol.StaticDomainParameters
@@ -76,6 +79,26 @@ class SequencerAdminConnection(
     runCmd(
       SequencerAdminCommands.GetTrafficControlState(filterMembers)
     )
+
+  def getSequencerPruningStatus()(implicit
+      traceContext: TraceContext
+  ): Future[SequencerPruningStatus] =
+    runCmd(
+      SequencerAdminCommands.GetPruningStatus
+    )
+
+  def prune(ts: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): Future[String] =
+    runCmd(
+      EnterpriseSequencerAdminCommands.Prune(ts)
+    )
+
+  def disableMember(member: Member)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = runCmd(
+    EnterpriseSequencerAdminCommands.DisableMember(member)
+  )
 
   override def identity()(implicit traceContext: TraceContext): Future[NodeIdentity] =
     getSequencerId

@@ -11,8 +11,9 @@ import com.daml.network.environment.{
   PackageIdResolver,
   ParticipantAdminConnection,
   RetryProvider,
+  SequencerAdminConnection,
 }
-import com.daml.network.sv.automation.SvSvcAutomationService.LocalSequencerClientConfig
+import com.daml.network.sv.automation.SvSvcAutomationService.LocalSequencerClientContext
 import com.daml.network.sv.automation.confirmation.{
   ArchiveClosedMiningRoundsTrigger,
   CnsSubscriptionInitialPaymentTrigger,
@@ -29,7 +30,7 @@ import com.daml.network.sv.automation.singlesv.onboarding.{
   SvOnboardingSequencerProposalTrigger,
 }
 import com.daml.network.sv.cometbft.CometBftNode
-import com.daml.network.sv.config.SvAppBackendConfig
+import com.daml.network.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.DomainAlias
@@ -51,7 +52,7 @@ class SvSvcAutomationService(
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
-    localSequencerClientConfig: Option[LocalSequencerClientConfig],
+    localSequencerClientContext: Option[LocalSequencerClientContext],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -221,20 +222,46 @@ class SvSvcAutomationService(
     )
   }
 
-  localSequencerClientConfig.foreach { sequencerCfg =>
+  localSequencerClientContext.flatMap(_.internalClientConfig).foreach { internalClientConfig =>
     registerTrigger(
       new LocalSequencerConnectionsTrigger(
         triggerContext,
         participantAdminConnection,
-        sequencerCfg.globalDomainAlias,
+        internalClientConfig.globalDomainAlias,
         svcStore,
-        sequencerCfg.sequencerInternalConfig,
+        internalClientConfig.sequencerInternalConfig,
       )
     )
+  }
+
+  localSequencerClientContext.foreach { sequencerContext =>
+    sequencerContext.pruningConfig.foreach { pruningConfig =>
+      val contextWithSpecificPolling = triggerContext.copy(
+        config = triggerContext.config.copy(
+          pollingInterval = pruningConfig.pruningInterval
+        )
+      )
+      registerTrigger(
+        new SequencerPruningTrigger(
+          contextWithSpecificPolling,
+          svcStore,
+          sequencerContext.sequencerAdminConnection,
+          clock,
+          pruningConfig.retentionPeriod,
+          pruningConfig.unauthenticatedMembersRetentionPeriod,
+        )
+      )
+    }
   }
 }
 
 object SvSvcAutomationService {
+  case class LocalSequencerClientContext(
+      sequencerAdminConnection: SequencerAdminConnection,
+      internalClientConfig: Option[LocalSequencerClientConfig],
+      pruningConfig: Option[SequencerPruningConfig] = None,
+  )
+
   case class LocalSequencerClientConfig(
       sequencerInternalConfig: ClientConfig,
       globalDomainAlias: DomainAlias,

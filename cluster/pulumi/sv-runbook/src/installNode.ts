@@ -31,6 +31,7 @@ import {
   imagePullSecret,
   CnInput,
   installPostgresPasswordSecret,
+  sequencerPruningConfig,
 } from 'cn-pulumi-common';
 
 import { auth0Cfg } from './auth0cfg';
@@ -249,13 +250,18 @@ async function installSvAndValidator(config: SvConfig) {
     ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv234NameSet.has(id.name))
     : allApprovedSvIdentities;
 
-  const svValues: ChartValues = {
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`, {
+  const valuesFromYamlFile = loadYamlFromFile(
+    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
+    {
       TARGET_CLUSTER: TARGET_CLUSTER,
       YOUR_SV_NAME: onboardingName,
       OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
       YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
-    }),
+    }
+  );
+
+  const svValues: ChartValues = {
+    ...valuesFromYamlFile,
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
@@ -263,6 +269,10 @@ async function installSvAndValidator(config: SvConfig) {
     cometBFT: {
       enabled: true,
       connectionUri: cometBftConnectionUri,
+    },
+    domain: {
+      ...(valuesFromYamlFile.domain || {}),
+      sequencerPruningConfig,
     },
   };
 

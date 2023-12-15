@@ -9,7 +9,10 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.*
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.sv.automation.SvSvcAutomationService.LocalSequencerClientConfig
+import com.daml.network.sv.automation.SvSvcAutomationService.{
+  LocalSequencerClientConfig,
+  LocalSequencerClientContext,
+}
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.{
   CometBftClient,
@@ -17,7 +20,7 @@ import com.daml.network.sv.cometbft.{
   CometBftHttpRpcClient,
   CometBftNode,
 }
-import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.{SequencerPruningConfig, SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState.{Onboarded, Onboarding}
 import com.daml.network.sv.onboarding.{DomainNodeReconciler, SetupUtil, SvcPartyHosting}
@@ -25,7 +28,6 @@ import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
-import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
@@ -166,7 +168,7 @@ class JoiningNodeInitializer(
                 svcStore,
                 ledgerClient,
                 cometBftNode,
-                localDomainNode.map(_.sequencerInternalConfig),
+                localDomainNode,
               )
             _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- retryProvider.ensureThatB(
@@ -532,9 +534,21 @@ class JoiningNodeInitializer(
         retryProvider,
         cometBftNode,
         localDomainNode.map(cfg =>
-          LocalSequencerClientConfig(
-            cfg.sequencerInternalConfig,
-            config.domains.global.alias,
+          LocalSequencerClientContext(
+            cfg.sequencerAdminConnection,
+            Some(
+              LocalSequencerClientConfig(
+                cfg.sequencerInternalConfig,
+                config.domains.global.alias,
+              )
+            ),
+            cfg.sequencerPruningConfig.map(pruningConfig =>
+              SequencerPruningConfig(
+                pruningConfig.pruningInterval,
+                pruningConfig.retentionPeriod,
+                pruningConfig.unauthenticatedMembersRetentionPeriod,
+              )
+            ),
           )
         ),
         loggerFactory,
@@ -582,7 +596,7 @@ class JoiningNodeInitializer(
       svcStore: SvSvcStore,
       ledgerClient: CNLedgerClient,
       cometBftNode: Option[CometBftNode],
-      sequencerInternalConfig: Option[ClientConfig],
+      localDomainNode: Option[LocalDomainNode],
   ) =
     new SvSvcAutomationService(
       clock,
@@ -593,10 +607,22 @@ class JoiningNodeInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
-      sequencerInternalConfig.map(sequencerInternalConfig =>
-        LocalSequencerClientConfig(
-          sequencerInternalConfig,
-          config.domains.global.alias,
+      localDomainNode.map(cfg =>
+        LocalSequencerClientContext(
+          cfg.sequencerAdminConnection,
+          Some(
+            LocalSequencerClientConfig(
+              cfg.sequencerInternalConfig,
+              config.domains.global.alias,
+            )
+          ),
+          cfg.sequencerPruningConfig.map(pruningConfig =>
+            SequencerPruningConfig(
+              pruningConfig.pruningInterval,
+              pruningConfig.retentionPeriod,
+              pruningConfig.unauthenticatedMembersRetentionPeriod,
+            )
+          ),
         )
       ),
       loggerFactory,

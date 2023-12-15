@@ -127,6 +127,12 @@ spec:
                       port = 5008
                     }
                     external-public-api-url = {{ .sequencerPublicUrl | quote }}
+                    {{- if .sequencerPruningConfig.enabled }}
+                    pruning {
+                      pruning-interval = {{ .sequencerPruningConfig.pruningInterval | quote }}
+                      retention-period = {{ .sequencerPruningConfig.retentionPeriod | quote }}
+                    }
+                    {{- end }}
                   }
                   mediator {
                     admin-api {

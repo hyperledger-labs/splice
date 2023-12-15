@@ -4,6 +4,7 @@ import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 import com.daml.network.environment.*
 import com.daml.network.sv.admin.api.client.SvConnection
+import com.daml.network.sv.config.SequencerPruningConfig
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ClientConfig
@@ -39,6 +40,7 @@ final class LocalDomainNode(
     val sequencerInternalConfig: ClientConfig,
     val sequencerExternalPublicUrl: String,
     val sequencerAvailabilityDelay: Duration,
+    val sequencerPruningConfig: Option[SequencerPruningConfig],
     override val loggerFactory: NamedLoggerFactory,
     override protected[this] val retryProvider: RetryProvider,
 )(implicit
