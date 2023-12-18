@@ -2,6 +2,7 @@ import { clusterBasename } from './config';
 import { configureIstio } from './istio';
 import { configureNetwork } from './network';
 import { configureObservability } from './observability';
+import { configureStorage } from './storage';
 
 const network = configureNetwork(clusterBasename);
 
@@ -14,3 +15,5 @@ configureIstio(network.ingressNs, ingressIp);
 // Ensures that images required from Quay for observability can be pulled
 const observabilityDependsOn = [network];
 configureObservability(observabilityDependsOn);
+
+configureStorage();
