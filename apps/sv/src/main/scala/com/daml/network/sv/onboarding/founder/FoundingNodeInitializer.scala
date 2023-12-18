@@ -253,7 +253,7 @@ class FoundingNodeInitializer(
         trafficControlParameters = Some(initialTrafficControlParameters),
       )(initialValues.representativeProtocolVersion)
       for {
-        domainId <- retryProvider.ensureThatO(
+        _ <- retryProvider.ensureThatO(
           RetryFor.WaitingOnInitDependency,
           "sequencer is initialized",
           domainNode.sequencerAdminConnection.getStatus.map(_.successOption.map(_.domainId)),

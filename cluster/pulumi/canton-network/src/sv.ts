@@ -169,17 +169,11 @@ export async function installSvNode(
       )
     : sequencerPostgres;
 
-  const globalDomain = new GlobalDomainNode(
-    xns,
-    'global-domain',
-    sequencerPostgres,
-    mediatorPostgres,
-    {
-      name: config.nodename,
-      onboardingName: config.onboardingName,
-      syncSource: cometBftSyncSource,
-    }
-  );
+  const globalDomain = new GlobalDomainNode('default', xns, sequencerPostgres, mediatorPostgres, {
+    name: config.nodename,
+    onboardingName: config.onboardingName,
+    syncSource: cometBftSyncSource,
+  });
 
   const participantPostgres = config.splitPostgresInstances
     ? postgres.installPostgres(xns, 'participant-pg', true)
@@ -197,8 +191,9 @@ export async function installSvNode(
   const svAppPostgres = config.splitPostgresInstances
     ? postgres.installPostgres(xns, 'sv-pg', true)
     : sequencerPostgres;
-  const svAppName = config.nodename.replace('-', '_');
+  const svAppName = config.nodename.replaceAll('-', '_');
   const svDb = svAppPostgres.createDatabase(svAppName);
+  const sequencerAddress = `${globalDomain.name}-sequencer`;
 
   const svValues = {
     onboardingType: config.onboarding.type,
@@ -207,12 +202,14 @@ export async function installSvNode(
       enabled: true,
       connectionUri: `http://cometbft-${config.nodename}-cometbft-rpc:26657`,
     },
-    globalDomainUrl: 'http://global-domain-sequencer.sv-1:5008',
+    globalDomainUrl: `http://${sequencerAddress}.sv-1:5008`,
     domain:
       // defaults for ports and address are fine,
       // we need to include a dummy value though
       // because helm does not distinguish between an empty object and unset.
       {
+        sequencerAddress: sequencerAddress,
+        mediatorAddress: `${globalDomain.name}-mediator`,
         sequencerPublicUrl: `https://sequencer.${config.nodename}.svc.${CLUSTER_BASENAME}.network.canton.global`,
         sequencerPruningConfig: config.sequencerPruningConfig,
       },
@@ -250,7 +247,7 @@ export async function installSvNode(
     };
   }
 
-  const svApp = installCNHelmChart(xns, config.nodename + '-sv-app', 'cn-sv-node', svValues, {
+  const svApp = installCNHelmChart(xns, 'sv-app', 'cn-sv-node', svValues, {
     dependsOn: dependsOn.concat([participant, svAppPostgres, svDb, globalDomain]),
   });
 
@@ -267,9 +264,10 @@ export async function installSvNode(
     persistence: persistenceConfig(scanAppPostgres, scanDbName),
     postgresSecretName: scanAppPostgres.secretName,
     additionalJvmOptions: jmxOptions(),
+    sequencerAddress: sequencerAddress,
   };
-  installCNHelmChart(xns, 'scan-' + xns.logicalName, 'cn-scan', scanValues, {
-    dependsOn: [svApp, scanAppPostgres, scanDb],
+  installCNHelmChart(xns, 'scan', 'cn-scan', scanValues, {
+    dependsOn: [svApp, scanAppPostgres, scanDb, globalDomain],
   });
 
   const validatorPostgres = config.splitPostgresInstances
@@ -300,10 +298,15 @@ export async function installSvNode(
 
   installCNHelmChart(
     xns,
-    'ingress-sv-' + xns.logicalName,
+    'ingress-sv',
     'cn-cluster-ingress-runbook',
     {
       withSvIngress: true,
+      ingress: {
+        sequencer: {
+          activeGlobalDomain: globalDomain.id,
+        },
+      },
       cluster: {
         hostname: `${CLUSTER_BASENAME}.network.canton.global`,
         svNamespace: xns.logicalName,

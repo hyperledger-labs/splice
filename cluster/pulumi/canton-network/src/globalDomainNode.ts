@@ -1,13 +1,14 @@
 import * as pulumi from '@pulumi/pulumi';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ComponentResource } from '@pulumi/pulumi';
-import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
+import { CLUSTER_BASENAME, ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import { installCometBftNode } from './cometbft';
 import { Postgres } from './postgres';
 
 export class GlobalDomainNode extends ComponentResource {
+  id: string;
   name: string;
   cometbft: {
     name: string;
@@ -16,8 +17,8 @@ export class GlobalDomainNode extends ComponentResource {
   };
 
   constructor(
+    domainId: string,
     xns: ExactNamespace,
-    name: string,
     sequencerPostgres: Postgres,
     mediatorPostgres: Postgres,
     cometbft: {
@@ -26,12 +27,12 @@ export class GlobalDomainNode extends ComponentResource {
       syncSource?: Release;
     }
   ) {
-    const logicalName = xns.logicalName + '-' + name;
-    super('canton:network:domain:global', logicalName);
-    this.name = name;
+    super('canton:network:domain:global', `${xns.logicalName}-global-domain-${domainId}`);
+    this.id = domainId;
     this.cometbft = cometbft;
+    this.name = 'global-domain-' + domainId;
 
-    const sanitizedName = name.replace('-', '_');
+    const sanitizedName = this.name.replaceAll('-', '_');
 
     const mediatorDbName = `${sanitizedName}_mediator`;
     const mediatorDb = mediatorPostgres.createDatabase(mediatorDbName);
@@ -42,12 +43,13 @@ export class GlobalDomainNode extends ComponentResource {
       xns,
       cometbft.name,
       cometbft.onboardingName,
+      this.name,
       cometbft.syncSource,
       { parent: this }
     );
     installCNHelmChart(
       xns,
-      name,
+      this.name,
       'cn-global-domain',
       {
         sequencerPostgres: sequencerPostgres.address,
@@ -67,6 +69,28 @@ export class GlobalDomainNode extends ComponentResource {
         additionalJvmOptions: jmxOptions(),
       },
       { dependsOn: [mediatorDb, sequencerDb, cometBftService], parent: this }
+    );
+    installCNHelmChart(
+      xns,
+      'ingress-sequencer-' + this.name,
+      'cn-cluster-ingress-runbook',
+      {
+        withSvIngress: true,
+        ingress: {
+          wallet: false,
+          sv: false,
+          cns: false,
+          scan: false,
+          sequencer: {
+            globalDomain: domainId,
+          },
+        },
+        cluster: {
+          hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+          svNamespace: xns.logicalName,
+        },
+      },
+      { dependsOn: [xns.ns], parent: this }
     );
   }
 }

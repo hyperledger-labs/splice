@@ -95,6 +95,7 @@ export function installCometBftNode(
   xns: ExactNamespace,
   nodename: string,
   onboardingName: string,
+  domain: string,
   syncSource?: Release,
   opts?: CustomResourceOptions
 ): Service {
@@ -111,7 +112,7 @@ export function installCometBftNode(
   }
   const cometbftRelease = installCNHelmChart(
     xns,
-    'cometbft',
+    `cometbft-${domain}`,
     'cn-cometbft',
     {
       nodeName: onboardingName,

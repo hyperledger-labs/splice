@@ -4,3 +4,11 @@ cluster:
   hostPrefix: "svc."
 withSvIngress: true
 defaultJvmOptions: -Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4
+ingress:
+  wallet: true
+  sv: true
+  cns: true
+  scan: true
+  sequencer:
+    globalDomain: ""
+    activeGlobalDomain: ""

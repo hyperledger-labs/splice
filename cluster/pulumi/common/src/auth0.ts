@@ -148,7 +148,6 @@ export class Auth0Fetch implements Auth0Client {
   }
 
   public async getSecrets(): Promise<Auth0SecretMap> {
-    await pulumi.log.info('getSecrets()');
     if (this.secrets === undefined) {
       await pulumi.log.info('Calling Auth0 API for getSecrets()');
       this.secrets = await this.loadSecrets();

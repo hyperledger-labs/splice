@@ -10,7 +10,7 @@ export function installDomain(
   name: string,
   postgres: Postgres
 ): pulumi.Resource {
-  const sanitizedName = name.replace('-', '_');
+  const sanitizedName = name.replaceAll('-', '_');
 
   const mediatorDbName = `${sanitizedName}_mediator`;
   const mediatorDb = postgres.createDatabase(mediatorDbName);
