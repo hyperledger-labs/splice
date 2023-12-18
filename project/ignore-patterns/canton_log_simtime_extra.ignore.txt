@@ -16,4 +16,7 @@ The payload to event time bound.*has been been exceeded by payload time
 # advancing time can result in the sequencer subscriptions being expired (See #7980)
 SEQUENCER_SUBSCRIPTION_LOST.*: Lost subscription to domain .* Will try to recover automatically.
 
+# TODO(#8955): investigate and remove once fixed
+INVALID_ACKNOWLEDGEMENT_TIMESTAMP.*Member.*has acknowledged the timestamp.*when only events with timestamps at most.*have been delivered
+
 # Make sure to have a trailing newline
