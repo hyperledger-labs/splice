@@ -132,7 +132,9 @@ class SvOffboardingIntegrationTest extends SvIntegrationTestBase {
     )
 
     clue("SV2 votes on removing sv4") {
-      sv2Backend.castVote(voteRequestCid4, true, "url", "description")
+      eventually() {
+        sv2Backend.castVote(voteRequestCid4, true, "url", "description")
+      }
     }
 
     actAndCheck(
