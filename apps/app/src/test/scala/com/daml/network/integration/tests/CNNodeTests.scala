@@ -306,15 +306,10 @@ object CNNodeTests {
     def eventuallySucceeds[T](
         timeUntilSuccess: FiniteDuration = 20.seconds,
         maxPollInterval: FiniteDuration = 5.seconds,
-        suppressErrors: Boolean = true,
     )(testCode: => T): T = {
       eventually(timeUntilSuccess, maxPollInterval) {
         try {
-          if (suppressErrors) {
-            loggerFactory.suppressErrors(testCode)
-          } else {
-            testCode
-          }
+          loggerFactory.suppressErrors(testCode)
         } catch {
           case NonFatal(e) => fail(e)
         }

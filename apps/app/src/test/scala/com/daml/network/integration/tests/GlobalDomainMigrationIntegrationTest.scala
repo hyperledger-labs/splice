@@ -45,7 +45,7 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.logging.{NamedLoggerFactory, SuppressionRule}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.protocol.StaticDomainParameters
@@ -54,8 +54,8 @@ import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.topology.processing.SequencedTime
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionX,
   StoredTopologyTransactionsX,
+  StoredTopologyTransactionX,
   TopologyStoreId,
 }
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionX.GenericStoredTopologyTransactionX
@@ -72,7 +72,6 @@ import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.{Minute, Minutes, Span}
-import org.slf4j.event.Level
 
 import java.nio.file.Files
 import java.time.Duration as JavaDuration
@@ -198,7 +197,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
 
                 withCLueAndLog("party hosting is replicated on the new global domain") {
                   nodes.foreach { node =>
-                    eventuallySucceeds(timeUntilSuccess = 1.minute, suppressErrors = false) {
+                    eventuallySucceeds(timeUntilSuccess = 1.minute) {
                       node.newParticipantConnection
                         .getPartyToParticipant(
                           globalDomainId,
@@ -220,7 +219,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
                             Some(TopologyStoreId.DomainStore(globalDomainId))
                           )
                           .futureValue
-                      eventuallySucceeds(timeUntilSuccess = 1.minute, suppressErrors = false) {
+                      eventuallySucceeds(timeUntilSuccess = 1.minute) {
                         node.newParticipantConnection
                           .listAllTransactions(
                             Some(TopologyStoreId.DomainStore(globalDomainId))
@@ -233,7 +232,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
 
                   withCLueAndLog("new domain is frozen") {
                     nodes.foreach { node =>
-                      eventuallySucceeds(timeUntilSuccess = 1.minute, suppressErrors = false) {
+                      eventuallySucceeds(timeUntilSuccess = 1.minute) {
                         node.newParticipantConnection
                           .getDomainParametersState(
                             globalDomainId
@@ -246,7 +245,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
                     }
                   }
                   withCLueAndLog("decentralized namespace is replicated on the new global domain") {
-                    eventuallySucceeds(timeUntilSuccess = 1.minute, suppressErrors = false) {
+                    eventuallySucceeds(timeUntilSuccess = 1.minute) {
                       nodes.foreach { node =>
                         node.newParticipantConnection
                           .getDecentralizedNamespaceDefinition(
@@ -296,86 +295,71 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
             }
           }
 
-          def migrateMajorityAndValidate() = {
-            migrateDomainOnNodes(majorityUpgradeNodes, firstRun = true)
+          migrateDomainOnNodes(majorityUpgradeNodes, firstRun = true)
 
-            withCLueAndLog("decentralized namespace can be modified on the new domain") {
-              majorityUpgradeNodes
-                .parTraverse { upgradeNode =>
-                  val connection = upgradeNode.newParticipantConnection
-                  for {
-                    id <- connection.getId()
-                    _ <- connection
-                      .ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
-                        "keep just sv1",
-                        globalDomainId,
-                        svcPartyDecentralizedNamespace,
-                        _ => NonEmpty(Set, sv1Party.uid.namespace),
-                        id.namespace.fingerprint,
-                        RetryFor.WaitingOnInitDependency,
-                      )
-                  } yield {}
-                }
-                .futureValue
-                .discard
-            }
-          }
-
-          def migrateDomainAndValidate() = {
-            withCLueAndLog("migrate domain and prepare sv1") {
-              migrateDomainOnNodes(lateRejoiningUpgradeNodes)
-              allNodes.foreach { node =>
-                eventuallySucceeds(suppressErrors = false) {
-                  node.newParticipantConnection
-                    .getDecentralizedNamespaceDefinition(
-                      globalDomainId,
-                      svcPartyDecentralizedNamespace,
-                    )
-                    .futureValue
-                    .mapping
-                    .owners shouldBe Set(sv1Party.uid.namespace)
-                }
-              }
-              upgradeDomainNode1.migrateUserAnnotation().futureValue
-            }
-            sv1LocalBackend.startSync()
-            sv1LocalBackend.getSvcInfo().svcRules.payload.members.size() shouldBe 4
-            actAndCheck(
-              "validate domain with create VoteRequest",
-              sv1LocalBackend.createVoteRequest(
-                sv1Party.toProtoPrimitive,
-                new ARC_SvcRules(
-                  new SRARC_AddMember(
-                    new SvcRules_AddMember(
-                      "alice",
-                      "Alice",
-                      "alice-participant-id",
-                      new Round(42),
-                      globalDomainId.toProtoPrimitive,
-                    )
+          withCLueAndLog("decentralized namespace can be modified on the new domain") {
+            majorityUpgradeNodes
+              .parTraverse { upgradeNode =>
+                val connection = upgradeNode.newParticipantConnection
+                for {
+                  id <- connection.getId()
+                  _ <- connection.ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
+                    "keep just sv1",
+                    globalDomainId,
+                    svcPartyDecentralizedNamespace,
+                    _ => NonEmpty(Set, sv1Party.uid.namespace),
+                    id.namespace.fingerprint,
+                    RetryFor.WaitingOnInitDependency,
                   )
-                ),
-                "url",
-                "description",
-                sv1LocalBackend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
-              ),
-            )(
-              "VoteRequest and Vote should be there",
-              _ =>
-                inside(sv1LocalBackend.listVoteRequests()) { case Seq(onlyReq) =>
-                  sv1LocalBackend.listVotes(
-                    Vector(onlyReq.contractId.contractId)
-                  ) should have size 1
-                },
-            )
+                } yield {}
+              }
+              .futureValue
+              .discard
           }
 
-          loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
-            {
-              migrateMajorityAndValidate()
-              migrateDomainAndValidate()
-            },
-            warns => forAll(warns)(_.message should include("Noticed an SvcRules epoch change")),
+          withCLueAndLog("migrate domain and prepare sv1") {
+            migrateDomainOnNodes(lateRejoiningUpgradeNodes)
+            allNodes.foreach { node =>
+              eventuallySucceeds() {
+                node.newParticipantConnection
+                  .getDecentralizedNamespaceDefinition(
+                    globalDomainId,
+                    svcPartyDecentralizedNamespace,
+                  )
+                  .futureValue
+                  .mapping
+                  .owners shouldBe Set(sv1Party.uid.namespace)
+              }
+            }
+            upgradeDomainNode1.migrateUserAnnotation().futureValue
+          }
+          sv1LocalBackend.startSync()
+          sv1LocalBackend.getSvcInfo().svcRules.payload.members.size() shouldBe 4
+          actAndCheck(
+            "validate domain with create VoteRequest",
+            sv1LocalBackend.createVoteRequest(
+              sv1Party.toProtoPrimitive,
+              new ARC_SvcRules(
+                new SRARC_AddMember(
+                  new SvcRules_AddMember(
+                    "alice",
+                    "Alice",
+                    "alice-participant-id",
+                    new Round(42),
+                    globalDomainId.toProtoPrimitive,
+                  )
+                )
+              ),
+              "url",
+              "description",
+              sv1LocalBackend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+            ),
+          )(
+            "VoteRequest and Vote should be there",
+            _ =>
+              inside(sv1LocalBackend.listVoteRequests()) { case Seq(onlyReq) =>
+                sv1LocalBackend.listVotes(Vector(onlyReq.contractId.contractId)) should have size 1
+              },
           )
         }
       }

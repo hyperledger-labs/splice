@@ -63,4 +63,7 @@ Trying to re-register template.*
 # TODO(#8565): investigate and remove once fixed
 failed with UNKNOWN/channel closed.*SvAppLedgerApiConnectivityIntegrationTest
 
+# This might be logged between the test finishing and shutdown of the nodes (see #8991)
+Noticed an SvcRules epoch change.*GlobalDomainMigrationIntegrationTest
+
 # Make sure to have a trailing newline
