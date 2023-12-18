@@ -1,6 +1,0 @@
-cn-node-0.1.0-SNAPSHOT/
-.env
-gke_gcloud_auth_plugin_cache
-*.clog
-.environment
-validator_runbook.sh
