@@ -51,7 +51,7 @@ function wait_for_pvc_backup() {
 
   local backupName="${pvc_name}-$RUN_ID"
 
-  i=0
+  local -i i=0
 
   _info "Waiting for $description PVC backup to complete..."
   while true; do
@@ -60,10 +60,7 @@ function wait_for_pvc_backup() {
       _info "Backup of $description PVC ready!"
       break
     else
-      (( i++ ))
-      if [[ $i -eq 300 ]]; then
-        _error "Timed out waiting for backup of $description PVC"
-      fi
+      (( i++ )) && (( i > 300 )) && _error "Timed out waiting for backup of $description PVC"
       sleep 5
       _info "still waiting..."
     fi
@@ -107,7 +104,7 @@ function wait_for_cloudsql_backup() {
 
   db_id=$(get_cloudsql_id "$instance")
 
-  i=0
+  local -i i=0
 
   _info "Waiting for $description db backup to complete..."
   while true; do
@@ -119,10 +116,7 @@ function wait_for_cloudsql_backup() {
       _info "Backup of $description ready! Backup ID: $id "
       break
     else
-      (( i++ ))
-      if [[ $i -eq 300 ]]; then
-        _error "Timed out waiting for backup of $description db"
-      fi
+      (( i++ ))&& (( i > 300 )) &&_error "Timed out waiting for backup of $description db"
       sleep 5
       _info "still waiting..."
     fi
