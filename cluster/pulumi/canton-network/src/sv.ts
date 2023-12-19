@@ -247,6 +247,25 @@ export async function installSvNode(
     };
   }
 
+  installCNHelmChart(
+    xns,
+    'ingress-sv',
+    'cn-cluster-ingress-runbook',
+    {
+      withSvIngress: true,
+      ingress: {
+        sequencer: {
+          activeGlobalDomain: globalDomain.id,
+        },
+      },
+      cluster: {
+        hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+        svNamespace: xns.logicalName,
+      },
+    },
+    { dependsOn: [xns.ns] }
+  );
+
   const svApp = installCNHelmChart(xns, 'sv-app', 'cn-sv-node', svValues, {
     dependsOn: dependsOn.concat([participant, svAppPostgres, svDb, globalDomain]),
   });
@@ -295,25 +314,6 @@ export async function installSvNode(
     extraDependsOn: [svApp, validatorPostgres, validatorDb],
     svValidator: true,
   });
-
-  installCNHelmChart(
-    xns,
-    'ingress-sv',
-    'cn-cluster-ingress-runbook',
-    {
-      withSvIngress: true,
-      ingress: {
-        sequencer: {
-          activeGlobalDomain: globalDomain.id,
-        },
-      },
-      cluster: {
-        hostname: `${CLUSTER_BASENAME}.network.canton.global`,
-        svNamespace: xns.logicalName,
-      },
-    },
-    { dependsOn: [xns.ns] }
-  );
 
   return { svApp, sequencerPostgres: sequencerPostgres };
 }
