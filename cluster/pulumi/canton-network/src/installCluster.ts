@@ -211,7 +211,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         auth0ValidatorAppName: 'sv3_validator',
         bootstrappingDumpConfig,
         topupConfig,
-        splitPostgresInstances: false,
+        splitPostgresInstances: true,
         sequencerPruningConfig,
       },
       sv1
@@ -230,7 +230,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         auth0ValidatorAppName: 'sv4_validator',
         bootstrappingDumpConfig,
         topupConfig,
-        splitPostgresInstances: true,
+        splitPostgresInstances: false,
         sequencerPruningConfig,
       },
       sv1
