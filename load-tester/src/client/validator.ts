@@ -1,28 +1,22 @@
-// import http, { RefinedResponse } from 'k6/http';
-import { z } from 'zod';
+/* @ts-expect-error typings unavailable */
+import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 
 import { HttpClient } from '../utils/http';
-
-const userStatusResponse = z.object({
-  party_id: z.string(),
-  user_onboarded: z.boolean(),
-  user_wallet_installed: z.boolean(),
-  has_featured_app_right: z.boolean(),
-});
-
-type UserStatusResponse = z.infer<typeof userStatusResponse>;
-
-const parseJsonBody = <Z extends z.ZodTypeAny = z.ZodNever>(
-  schema: Z,
-  body: string,
-): z.infer<Z> | undefined => {
-  const result = schema.safeParse(JSON.parse(body));
-  if (result.success) {
-    return result.data;
-  } else {
-    return undefined;
-  }
-};
+import { getTomorrowMs, jsonStringDecoder } from '../utils/utils';
+import {
+  AcceptTransferOfferResponse,
+  CreateTransferOfferResponse,
+  GetBalanceResponse,
+  ListTransactionsResponse,
+  ListTransferOffersResponse,
+  UserStatusResponse,
+  acceptTransferOfferResponse,
+  createTransferOfferResponse,
+  getBalanceResponse,
+  listTransactionsResponse,
+  listTransferOffersResponse,
+  userStatusResponse,
+} from './models';
 
 export class ValidatorClient {
   private http: HttpClient;
@@ -40,7 +34,7 @@ export class ValidatorClient {
     this.validatorBaseUrl = validatorBaseUrl;
     this.token = token;
 
-    this.http = new HttpClient(validatorBaseUrl);
+    this.http = new HttpClient();
   }
 
   public partyId = (): string | undefined => {
@@ -67,6 +61,55 @@ export class ValidatorClient {
 
     // -*--- WALLET APIS ----------------------------------------------------------*-
     wallet: {
+      acceptTransferOffer: (transferOfferCid: string): AcceptTransferOfferResponse | undefined => {
+        return this.http.post.success(
+          `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers/${transferOfferCid}/accept`,
+          undefined,
+          this.headers(),
+          resp => jsonStringDecoder(acceptTransferOfferResponse, resp.body),
+        );
+      },
+      getBalance: (): GetBalanceResponse | undefined => {
+        return this.http.get.success(
+          `${this.validatorBaseUrl}/api/validator/v0/wallet/balance`,
+          undefined,
+          this.headers(),
+          resp => jsonStringDecoder(getBalanceResponse, resp.body),
+        );
+      },
+      createTransferOffer: (
+        amount: string,
+        receiver_party_id: string,
+      ): CreateTransferOfferResponse | undefined => {
+        return this.http.post.success(
+          `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers`,
+          JSON.stringify({
+            amount,
+            receiver_party_id,
+            description: 'createTransfer from load tester',
+            expires_at: getTomorrowMs(),
+            tracking_id: uuidv4(),
+          }),
+          this.headers(),
+          resp => jsonStringDecoder(createTransferOfferResponse, resp.body),
+        );
+      },
+      listTransactions: (): ListTransactionsResponse | undefined => {
+        return this.http.post.success(
+          `${this.validatorBaseUrl}/api/validator/v0/wallet/transactions`,
+          JSON.stringify({ pageSize: 10 }),
+          this.headers(),
+          resp => jsonStringDecoder(listTransactionsResponse, resp.body),
+        );
+      },
+      listTransferOffers: (): ListTransferOffersResponse | undefined => {
+        return this.http.get.success(
+          `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers`,
+          undefined,
+          this.headers(),
+          resp => jsonStringDecoder(listTransferOffersResponse, resp.body),
+        );
+      },
       tap: (amount: string): void => {
         this.http.post.success(
           `${this.validatorBaseUrl}/api/validator/v0/wallet/tap`,
@@ -80,7 +123,7 @@ export class ValidatorClient {
           `${this.validatorBaseUrl}/api/validator/v0/wallet/user-status`,
           undefined,
           this.headers(),
-          resp => parseJsonBody(userStatusResponse, resp.body),
+          resp => jsonStringDecoder(userStatusResponse, resp.body),
         );
       },
     },

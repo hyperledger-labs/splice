@@ -982,7 +982,7 @@ subcommand_whitelist[load_test]='Run the k6 load test against the cluster'
 function subcmd_load_test() {
     _log "Starting k6 load test"
 
-    cd "$REPO_ROOT/load-tester" && npm ci && npm run build
+    cd "$REPO_ROOT" && sbt load-tester/npmBuild
 
     hostname="$GCP_CLUSTER_BASENAME.network.canton.global"
 

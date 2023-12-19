@@ -952,6 +952,16 @@ lazy val `load-tester` =
         }
         cache(Set(npmRootDir.value / "package.json")).toSeq
       },
+      npmBuild := {
+        val log = streams.value.log
+        npmLint.value
+        runCommand(
+          Seq("npm", "run", "build"),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
     )
 
 lazy val patchTemplate = taskKey[File]("patch an openapi codegen template")

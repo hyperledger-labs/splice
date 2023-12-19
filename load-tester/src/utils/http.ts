@@ -18,7 +18,7 @@ export class HttpClient {
 
   private tag: string | undefined;
 
-  constructor(tag: string, errorsAreFatal?: boolean) {
+  constructor(tag?: string, errorsAreFatal?: boolean) {
     this.tag = tag;
     this.errorsAreFatal = !!errorsAreFatal;
   }
