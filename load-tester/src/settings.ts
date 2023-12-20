@@ -25,7 +25,7 @@ export default {
         duration: config.testDuration,
 
         // How many iterations per timeUnit
-        rate: 45,
+        rate: 60,
         timeUnit: '1m',
 
         // Pre-allocate VUs

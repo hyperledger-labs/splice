@@ -245,7 +245,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     'auth0|63e3d75ff4114d87a2c1e4f5',
     backupConfig,
     bootstrappingDumpConfig,
-    topupConfig
+    // x10 validator1's traffic targetThroughput for load tester -- see #9064
+    { ...topupConfig, targetThroughput: topupConfig.targetThroughput * 10 }
   );
 
   const splitwell = await installSplitwell(
