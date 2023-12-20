@@ -249,7 +249,7 @@ There are a few extensions that improve the VS Code experience when working on v
 
 - Install the Daml open source SDK by running
    ```
-   ./install-daml-sdk.sh
+   ./build-tools/install-daml-sdk.sh
    ```
    or by following the instructions at https://docs.daml.com/getting-started/installation.html,
    while making sure that you install the version of the SDK referenced in `nix/canton-sources.json`.
