@@ -1,5 +1,6 @@
 package com.daml.network.validator.config
 
+import cats.data.NonEmptyList
 import org.apache.pekko.http.scaladsl.model.Uri
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.*
@@ -129,6 +130,21 @@ case class ValidatorDomainConfig(
     extra: Seq[ValidatorExtraDomainConfig] = Seq(),
 )
 
+sealed trait ScanClientValidatorConfig
+object ScanClientValidatorConfig {
+  case class TrustSingle(
+      url: Uri,
+      coinRulesCacheTimeToLive: NonNegativeFiniteDuration =
+        ScanAppClientConfig.DefaultCoinRulesCacheTimeToLive,
+  ) extends ScanClientValidatorConfig
+  case class Bft(
+      seedUrls: NonEmptyList[Uri],
+      coinRulesCacheTimeToLive: NonNegativeFiniteDuration =
+        ScanAppClientConfig.DefaultCoinRulesCacheTimeToLive,
+  ) extends ScanClientValidatorConfig
+
+}
+
 case class ValidatorAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CNDbConfig,
@@ -145,7 +161,7 @@ case class ValidatorAppBackendConfig(
     auth: AuthConfig,
     appInstances: Map[String, AppInstance],
     participantClient: CNParticipantClientConfig,
-    scanClient: ScanAppClientConfig,
+    scanClient: ScanClientValidatorConfig,
     override val automation: AutomationConfig = AutomationConfig(),
     domains: ValidatorDomainConfig,
     onboarding: Option[ValidatorOnboardingConfig],

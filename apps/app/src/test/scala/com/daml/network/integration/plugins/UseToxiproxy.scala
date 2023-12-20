@@ -3,11 +3,12 @@ package com.daml.network.integration.plugins.toxiproxy
 import com.daml.network.config.{CNNodeConfig, CNParticipantClientConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.scan.config.ScanAppClientConfig
+import com.daml.network.validator.config.ScanClientValidatorConfig
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import eu.rekawek.toxiproxy.{Proxy, ToxiproxyClient}
 import monocle.macros.syntax.lens.*
+import org.apache.pekko.http.scaladsl.model.Uri
 
 import scala.collection.mutable.Map
 
@@ -51,12 +52,12 @@ case class UseToxiproxy(
 
     def addScanAppHttpProxy(
         instanceName: String,
-        remoteScanApp: ScanAppClientConfig,
+        remoteScanApp: Uri,
         extraPortBump: Int,
-    ): ScanAppClientConfig = {
+    ): Uri = {
       val bump = portBump + extraPortBump
 
-      val originalPort = remoteScanApp.adminApi.url.effectivePort
+      val originalPort = remoteScanApp.effectivePort
 
       val listenPort = originalPort + bump
       val listen = s"localhost:$listenPort"
@@ -65,7 +66,7 @@ case class UseToxiproxy(
       val upstream = s"localhost:$originalPort"
 
       addProxy(s"${instanceName}-scan-api", listen, upstream)
-      remoteScanApp.focus(_.adminApi.url).modify(_.withPort(listenPort))
+      remoteScanApp.withPort(listenPort)
     }
 
     val svLedgerApiConf =
@@ -91,8 +92,28 @@ case class UseToxiproxy(
             _.toSeq
               .sortBy(_._1.unwrap)
               .zipWithIndex // for adapting the port bump
-              .map { case ((n, c), i) =>
-                (n, c.copy(scanClient = addScanAppHttpProxy(n.unwrap, c.scanClient, i)))
+              .map { case ((n, config), i) =>
+                val basePortBump = i * 100
+                config.scanClient match {
+                  case ScanClientValidatorConfig.TrustSingle(url, coinRulesCacheTimeToLive) =>
+                    val newUrl = addScanAppHttpProxy(n.unwrap, url, basePortBump)
+                    (
+                      n,
+                      config.copy(scanClient =
+                        ScanClientValidatorConfig.TrustSingle(newUrl, coinRulesCacheTimeToLive)
+                      ),
+                    )
+                  case ScanClientValidatorConfig.Bft(seedUrls, coinRulesCacheTimeToLive) =>
+                    val newSeedUrls = seedUrls.zipWithIndex.map { case (seedUrl, ii) =>
+                      addScanAppHttpProxy(n.unwrap, seedUrl, basePortBump + ii)
+                    }
+                    (
+                      n,
+                      config.copy(scanClient =
+                        ScanClientValidatorConfig.Bft(newSeedUrls, coinRulesCacheTimeToLive)
+                      ),
+                    )
+                }
               }
               .toMap
           )

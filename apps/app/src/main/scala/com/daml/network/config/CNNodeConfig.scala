@@ -45,6 +45,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.generic.FieldCoproductHint
 import pureconfig.{ConfigReader, ConfigWriter}
 import pureconfig.error.FailureReason
+import pureconfig.module.cats.{nonEmptyListReader, nonEmptyListWriter}
 
 import scala.concurrent.duration.*
 import java.io.File
@@ -353,6 +354,15 @@ object CNNodeConfig {
       deriveReader[CNParticipantClientConfig]
     implicit val appInstanceReader: ConfigReader[AppInstance] =
       deriveReader[AppInstance]
+    implicit val scanClientConfigConfigHint =
+      new FieldCoproductHint[ScanClientValidatorConfig]("type")
+    implicit val scanClientConfigTrustSingleConfigReader
+        : ConfigReader[ScanClientValidatorConfig.TrustSingle] =
+      deriveReader[ScanClientValidatorConfig.TrustSingle]
+    implicit val scanClientConfigSeedsConfigReader: ConfigReader[ScanClientValidatorConfig.Bft] =
+      deriveReader[ScanClientValidatorConfig.Bft]
+    implicit val scanClientConfigConfigReader: ConfigReader[ScanClientValidatorConfig] =
+      deriveReader[ScanClientValidatorConfig]
     implicit val scanClientConfigReader: ConfigReader[ScanAppClientConfig] =
       deriveReader[ScanAppClientConfig]
     implicit val domainConfigReader: ConfigReader[DomainConfig] =
@@ -575,6 +585,15 @@ object CNNodeConfig {
       deriveWriter[CNParticipantClientConfig]
     implicit val appInstanceWriter: ConfigWriter[AppInstance] =
       deriveWriter[AppInstance]
+    implicit val scanClientConfigConfigHint =
+      new FieldCoproductHint[ScanClientValidatorConfig]("type")
+    implicit val scanClientConfigTrustSingleConfigWriter
+        : ConfigWriter[ScanClientValidatorConfig.TrustSingle] =
+      deriveWriter[ScanClientValidatorConfig.TrustSingle]
+    implicit val scanClientConfigSeedsConfigWriter: ConfigWriter[ScanClientValidatorConfig.Bft] =
+      deriveWriter[ScanClientValidatorConfig.Bft]
+    implicit val scanClientConfigConfigWriter: ConfigWriter[ScanClientValidatorConfig] =
+      deriveWriter[ScanClientValidatorConfig]
     implicit val scanClientConfigWriter: ConfigWriter[ScanAppClientConfig] =
       deriveWriter[ScanAppClientConfig]
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =

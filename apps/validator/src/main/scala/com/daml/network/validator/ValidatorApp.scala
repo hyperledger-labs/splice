@@ -37,6 +37,7 @@ import com.daml.network.validator.admin.http.*
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{
   AppInstance,
+  ScanClientValidatorConfig,
   ValidatorAppBackendConfig,
   ValidatorOnboardingConfig,
 }
@@ -127,13 +128,7 @@ class ValidatorApp(
       _ <-
         withParticipantAdminConnection { participantAdminConnection =>
           for {
-            scanConnection <- ScanConnection(
-              ledgerClient,
-              config.scanClient,
-              clock,
-              retryProvider,
-              loggerFactory,
-            )
+            scanConnection <- getScanConnection(ledgerClient)
             _ <- ensureGlobalDomainRegistered(participantAdminConnection, scanConnection)
             _ <- ensureExtraDomainsRegistered(participantAdminConnection)
             // Note that for the validator of an SV app, the user will be created by the SV app with a
@@ -149,6 +144,29 @@ class ValidatorApp(
           } yield ()
         }
     } yield ()
+
+  // TODO: (#8951): Replace with BftScanConnection
+  private def getScanConnection(ledgerClient: CNLedgerClient): Future[ScanConnection] = {
+    config.scanClient match {
+      case ScanClientValidatorConfig.TrustSingle(url, coinRulesCacheTimeToLive) =>
+        ScanConnection(
+          ledgerClient,
+          ScanAppClientConfig(NetworkAppClientConfig(url), coinRulesCacheTimeToLive),
+          clock,
+          retryProvider,
+          loggerFactory,
+        )
+      case ScanClientValidatorConfig.Bft(seedUrls, coinRulesCacheTimeToLive) =>
+        ScanConnection(
+          ledgerClient,
+          // TODO: (#8951): seedUrls.head is obviously not what we want
+          ScanAppClientConfig(NetworkAppClientConfig(seedUrls.head), coinRulesCacheTimeToLive),
+          clock,
+          retryProvider,
+          loggerFactory,
+        )
+    }
+  }
 
   private def setupWalletDars(
       participantAdminConnection: ParticipantAdminConnection
@@ -277,20 +295,28 @@ class ValidatorApp(
     )
   }
 
-  private def ensureVersionMatch(scanClient: ScanAppClientConfig): Future[Unit] =
+  private def ensureVersionMatch(scanClientConfig: ScanClientValidatorConfig): Future[Unit] =
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
       "version checked via scan",
       // we checkVersionCompatibility on every CN app connection
-      withMinimalScanConnection(scanClient)(_.checkActive()),
+      scanClientConfig match {
+        case ScanClientValidatorConfig.TrustSingle(url, _) =>
+          val config = ScanAppClientConfig(NetworkAppClientConfig(url))
+          MinimalScanConnection(config, retryProvider, loggerFactory).flatMap(con =>
+            con.checkActive().andThen(_ => con.close())
+          )
+        case ScanClientValidatorConfig.Bft(seedUrls, _) =>
+          seedUrls
+            .traverse { url =>
+              val config = ScanAppClientConfig(NetworkAppClientConfig(url))
+              MinimalScanConnection(config, retryProvider, loggerFactory).flatMap(con =>
+                con.checkActive().andThen(_ => con.close())
+              )
+            }
+            .map(_ => ())
+      },
       logger,
-    )
-
-  private def withMinimalScanConnection[T](
-      config: ScanAppClientConfig
-  )(f: MinimalScanConnection => Future[T]): Future[T] =
-    MinimalScanConnection(config, retryProvider, loggerFactory).flatMap(con =>
-      f(con).andThen(_ => con.close())
     )
 
   private def withSvConnection[T](
@@ -456,13 +482,7 @@ class ValidatorApp(
         clock,
         loggerFactory,
       )
-      scanConnection <- ScanConnection(
-        ledgerClient,
-        config.scanClient,
-        clock,
-        retryProvider,
-        loggerFactory,
-      )
+      scanConnection <- getScanConnection(ledgerClient)
 
       // Register the traffic balance service
       trafficBalanceService = newTrafficBalanceService(participantAdminConnection, scanConnection)

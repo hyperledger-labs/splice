@@ -10,6 +10,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.sv.config.ExpectedValidatorOnboardingConfig
 import com.daml.network.util.ProcessTestUtil
+import com.daml.network.validator.config.ScanClientValidatorConfig
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import com.typesafe.config.ConfigFactory
@@ -156,7 +157,10 @@ class LocalRunbookIntegrationTest
 
   private def localScanUrl(conf: CNNodeConfig): CNNodeConfig = {
     CNNodeConfigTransforms.updateAllValidatorConfigs_(vc =>
-      vc.focus(_.scanClient.adminApi.url).replace("http://localhost:5012")
+      vc.focus(_.scanClient)
+        .replace(
+          ScanClientValidatorConfig.TrustSingle("http://localhost:5012")
+        )
     )(conf)
   }
 }

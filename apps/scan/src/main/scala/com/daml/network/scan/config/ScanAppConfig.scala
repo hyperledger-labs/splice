@@ -48,3 +48,8 @@ case class ScanAppClientConfig(
     with BaseScanAppConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }
+
+object ScanAppClientConfig {
+  val DefaultCoinRulesCacheTimeToLive: NonNegativeFiniteDuration =
+    NonNegativeFiniteDuration.ofMinutes(10)
+}
