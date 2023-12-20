@@ -821,6 +821,8 @@ jobs:
           cluster: "scratchnetc"
       - cluster_lock_reaper:
           cluster: "scratchnetd"
+      - cluster_lock_reaper:
+          cluster: "scratchnete"
 
   mark_for_testnet:
     docker:

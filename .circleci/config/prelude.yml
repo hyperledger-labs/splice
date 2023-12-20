@@ -25,11 +25,26 @@ parameters:
     default: "25"
   run-job:
     type: enum
-    enum: [build, deploy-cidaily, deploy-cilr, deploy-devnet, deploy-testnet,
-           healthcheck-cidaily, healthcheck-cidaily-testnet, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet,
-           redeploy-sv-runbook-cidaily, redeploy-sv-runbook-cilr, redeploy-sv-runbook-devnet,
-           publish-public-artifacts, auth0-user-cleanup,
-           cluster-lock-reaper, mark-for-testnet]
+    enum:
+      [
+        build,
+        deploy-cidaily,
+        deploy-cilr,
+        deploy-devnet,
+        deploy-testnet,
+        healthcheck-cidaily,
+        healthcheck-cidaily-testnet,
+        healthcheck-cilr,
+        healthcheck-devnet,
+        healthcheck-testnet,
+        redeploy-sv-runbook-cidaily,
+        redeploy-sv-runbook-cilr,
+        redeploy-sv-runbook-devnet,
+        publish-public-artifacts,
+        auth0-user-cleanup,
+        cluster-lock-reaper,
+        mark-for-testnet,
+      ]
     default: build
   # Tag the current commit for the next DevNet release, overwriting the existing tag if it exists.
   mark-for-devnet:
@@ -73,4 +88,20 @@ notify-fail: &notify-fail
 cluster-parameter: &cluster-parameter
   cluster:
     type: enum
-    enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "cimain", "cidaily", "cidaily-testnet", "cilr", "devnet", "testnet", "testnet-preview", "observability"]
+    enum:
+      [
+        "scratchneta",
+        "scratchnetb",
+        "scratchnetc",
+        "scratchnetd",
+        "scratchnete",
+        "cimain",
+        "cidaily",
+        "cidaily-testnet",
+        "cilr",
+        "devnet",
+        "testnet",
+        "testnet-preview",
+        "observability",
+        "none",
+      ]

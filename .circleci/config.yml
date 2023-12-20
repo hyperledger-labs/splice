@@ -31,11 +31,26 @@ parameters:
     default: "25"
   run-job:
     type: enum
-    enum: [build, deploy-cidaily, deploy-cilr, deploy-devnet, deploy-testnet,
-           healthcheck-cidaily, healthcheck-cidaily-testnet, healthcheck-cilr, healthcheck-devnet, healthcheck-testnet,
-           redeploy-sv-runbook-cidaily, redeploy-sv-runbook-cilr, redeploy-sv-runbook-devnet,
-           publish-public-artifacts, auth0-user-cleanup,
-           cluster-lock-reaper, mark-for-testnet]
+    enum:
+      [
+        build,
+        deploy-cidaily,
+        deploy-cilr,
+        deploy-devnet,
+        deploy-testnet,
+        healthcheck-cidaily,
+        healthcheck-cidaily-testnet,
+        healthcheck-cilr,
+        healthcheck-devnet,
+        healthcheck-testnet,
+        redeploy-sv-runbook-cidaily,
+        redeploy-sv-runbook-cilr,
+        redeploy-sv-runbook-devnet,
+        publish-public-artifacts,
+        auth0-user-cleanup,
+        cluster-lock-reaper,
+        mark-for-testnet,
+      ]
     default: build
   # Tag the current commit for the next DevNet release, overwriting the existing tag if it exists.
   mark-for-devnet:
@@ -79,7 +94,23 @@ notify-fail: &notify-fail
 cluster-parameter: &cluster-parameter
   cluster:
     type: enum
-    enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "cimain", "cidaily", "cidaily-testnet", "cilr", "devnet", "testnet", "testnet-preview", "observability"]
+    enum:
+      [
+        "scratchneta",
+        "scratchnetb",
+        "scratchnetc",
+        "scratchnetd",
+        "scratchnete",
+        "cimain",
+        "cidaily",
+        "cidaily-testnet",
+        "cilr",
+        "devnet",
+        "testnet",
+        "testnet-preview",
+        "observability",
+        "none",
+      ]
 
 commands:
   setup_nix:
@@ -492,9 +523,10 @@ commands:
       additional_nix_args:
         type: string
         default: ""
+      <<: *cluster-parameter
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "cimain", "cidaily", "cidaily-testnet", "cilr", "devnet", "testnet", "testnet-preview", "none", "observability"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "cimain", "cidaily", "cidaily-testnet", "cilr", "devnet", "testnet", "testnet-preview", "none", "observability"]
         default: "none"
     steps:
       - run_bash_command_in_nix:
@@ -619,7 +651,7 @@ commands:
         default: false
       cluster:
         type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "cimain", "cidaily", "cidaily-testnet", "cilr", "devnet", "testnet", "testnet-preview", "none", "observability"]
+        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "cimain", "cidaily", "cidaily-testnet", "cilr", "devnet", "testnet", "testnet-preview", "none", "observability"]
         default: "none"
       additional_nix_args:
         type: string
@@ -1996,6 +2028,8 @@ jobs:
           cluster: "scratchnetc"
       - cluster_lock_reaper:
           cluster: "scratchnetd"
+      - cluster_lock_reaper:
+          cluster: "scratchnete"
 
   mark_for_testnet:
     docker:
