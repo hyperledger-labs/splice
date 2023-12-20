@@ -707,6 +707,7 @@ class SvFrontendIntegrationTest
           def setConfigRequest(expiresInNextMinutes: Boolean) = actAndCheck(
             "sv1 operator can create a new vote request", {
               // The `eventually` guards against `StaleElementReferenceException`s
+              // eventually() must contain clickVoteRequestSubmitButtonOnceEnabled() to retry the whole process
               eventually() {
                 val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
                 dropDownAction.selectByValue("SRARC_SetConfig")
@@ -714,33 +715,29 @@ class SvFrontendIntegrationTest
                 inside(find(id("numUnclaimedRewardsThreshold-value"))) { case Some(element) =>
                   element.underlying.sendKeys(requestNewNumUnclaimedRewardsThreshold)
                 }
-                inside(find(id("create-reason-url"))) { case Some(element) =>
-                  element.underlying.sendKeys(requestReasonUrl)
-                }
                 inside(find(id("create-reason-summary"))) { case Some(element) =>
                   element.underlying.sendKeys(requestReasonBody)
                 }
+                inside(find(id("create-reason-url"))) { case Some(element) =>
+                  element.underlying.sendKeys(requestReasonUrl)
+                }
 
-                // TODO(#8767): remove this screenshot
-                screenshot()
                 if (expiresInNextMinutes) {
                   setExpirationDate(
                     "sv1",
                     DateTimeFormatter
                       .ofPattern("dd/MM/yyyy HH:mm a")
                       .format(
-                        // TODO(#8767): consider reducing to 1 minute again after we remove the screenshot call
+                        // TODO(#8835): consider reducing to 1 minute again after we remove the screenshot call
                         LocalDateTime
                           .ofInstant(CantonTimestamp.now().toInstant, ZoneOffset.UTC)
                           .plusMinutes(2)
                       ),
                   )
                 }
-              }
 
-              // TODO(#8767): remove this screenshot
-              screenshot()
-              clickVoteRequestSubmitButtonOnceEnabled()
+                clickVoteRequestSubmitButtonOnceEnabled()
+              }
             },
           )(
             "sv1 can see the new vote request",
@@ -1528,7 +1525,9 @@ class SvFrontendIntegrationTest
 
   def clickVoteRequestSubmitButtonOnceEnabled()(implicit webDriver: WebDriverType) = {
     clue("wait for the submit button to become clickable") {
-      eventually()(find(id("create-voterequest-submit-button")).value.isEnabled shouldBe true)
+      eventually(5.seconds)(
+        find(id("create-voterequest-submit-button")).value.isEnabled shouldBe true
+      )
     }
     clue("click the submit button") {
       click on "create-voterequest-submit-button"
