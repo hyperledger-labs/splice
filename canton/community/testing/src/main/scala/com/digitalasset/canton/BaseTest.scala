@@ -130,14 +130,14 @@ trait BaseTest
   ): FutureConcept[B] =
     eitherTFuture.valueOr(err => fail(s"Unexpected left value $err"))
 
-  def clue[T](message: String)(expr: => T): T = {
-    logger.debug(s"Running clue: $message")
+  def clue[T](message: String)(expr: => T): T = TraceContext.withNewTraceContext { tc =>
+    logger.debug(s"Running clue: $message")(tc)
     Try(expr) match {
       case Success(value) =>
-        logger.debug(s"Finished clue: $message")
+        logger.debug(s"Finished clue: $message")(tc)
         value
       case Failure(ex) =>
-        logger.error(s"Failed clue: $message", ex)
+        logger.error(s"Failed clue: $message", ex)(tc)
         throw ex
     }
   }
