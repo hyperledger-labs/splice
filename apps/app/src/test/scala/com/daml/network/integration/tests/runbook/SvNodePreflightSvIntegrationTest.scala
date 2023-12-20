@@ -109,7 +109,7 @@ abstract class SvNodePreflightSvIntegrationTestBase
     }
   }
 
-  "The CNS UI is working" in { _ =>
+  "The CNS UI is working" in { implicit env =>
     val cnsUrl = s"https://cns.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
     val cnsName = s"da-test-${Random.alphanumeric.take(10).mkString.toLowerCase}.unverified.cns"
@@ -141,12 +141,10 @@ abstract class SvNodePreflightSvIntegrationTestBase
           "USD",
           "90 days",
         )
-        clue(s"Reserved CNS name is shown in scan ui at ${scanUrl}") {
-          go to scanUrl
-          eventually(3.minutes) {
-            val cnsEntryNames =
-              findAll(className("cns-entry")).map(elm => seleniumText(elm)).toList.distinct
-            cnsEntryNames.exists(_.startsWith(cnsName)) should be(true)
+        clue(s"Reserved CNS name can be looked up via scan") {
+          val svScanClient = scancl("svTestScan")
+          eventuallySucceeds(3.minutes) {
+            svScanClient.lookupEntryByName(cnsName)
           }
         }
       }
