@@ -1,0 +1,502 @@
+jobs:
+
+  # Inspired by Canton, we put the lint-like checks into their own CI job
+  static_tests:
+    docker:
+      - image: cimg/base:2021.04
+    resource_class: "xlarge"
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - run:
+          name: Verify config.yml is up to date with source.
+          command: |
+            source .envrc.vars
+            .circleci/build-config.sh --check
+      - setup_sbt_test_job
+      - execute_sbt_command:
+          cmd: "Test/compile lint"
+          cmd_retry_count: 3
+      - run_todo_script
+      - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
+
+  # We put our Daml tests in their own job for more parallelization
+  daml_test:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_sbt_test_job
+      - execute_sbt_command:
+          cmd: "damlTest"
+          timeout: "10m"
+          extra_env_vars: DAML_DEBUG=1
+      - collect_test_timings_and_send_to_datadog
+
+  # Run UI unit tests
+  ui_test:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_sbt_test_job
+      - execute_sbt_command:
+          cmd: "apps-common-frontend/npmTest"
+          fail_on_error_in_output: false # TODO(#7579) -- turn this back on when we figure out what to ignore/what not to
+      - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
+
+  # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
+  # work on anything but the Scala tests is duplicated across all parallel runs of this job
+  scala_test:
+    machine:
+      image: ubuntu-2004:2023.04.2
+    parameters:
+      test_names_file:
+        type: string
+      start_canton_options:
+        type: string
+      extra_pre_sbt_cmd:
+        type: string
+        default: ""
+      extra_post_sbt_cmd:
+        type: string
+        default: ""
+      parallelism:
+        type: integer
+      resource_class:
+        type: string
+      cmd_retry_count:
+        description: Number of times to retry the command
+        type: integer
+        default: 0
+    resource_class: << parameters.resource_class >>
+    environment:
+      <<: *env
+      POSTGRES_HOST: localhost
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parallelism: << parameters.parallelism >>
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_sbt_test_job
+      # Used to pull docker images for cometbft
+      - docker_login_artifactory
+      - docker_pull_test_images
+      # Start canton before compiling, as it takes a long time to start
+      # Note that we start canton before connecting VPN, so some initial
+      # metrics from Canton will be lost. Currently, they're Canton metrics
+      # before our actual tests start are not of interest for us,
+      # so we accept that.
+      - start_canton_in_background:
+          start_canton_options: << parameters.start_canton_options >>
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: "observability"
+      - split_tests_for_parallel_run:
+          test_names_file: << parameters.test_names_file >>
+      - run_splitted_scala_tests:
+          extra_pre_sbt_cmd: << parameters.extra_pre_sbt_cmd >>
+          extra_post_sbt_cmd: << parameters.extra_post_sbt_cmd >>
+          cmd_retry_count: << parameters.cmd_retry_count >>
+          start_canton_options: << parameters.start_canton_options >>
+      - cleanup_sbt_test_job
+      - collect_failing_test_data_and_send_to_datadog
+      - collect_test_timings_and_send_to_datadog
+
+  bundle:
+    docker:
+      - image: cimg/base:2021.04
+    resource_class: xlarge
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_sbt_test_job
+      - execute_sbt_command:
+          # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
+          cmd: "Test/compile bundle"
+          cmd_retry_count: 3
+      - run:
+          name: Copy bundle
+          command: |
+            set -eou pipefail
+            mkdir -p /tmp/artifacts
+            cp apps/app/target/release/*.tar.gz /tmp/artifacts
+      - run:
+          name: Copy OpenAPI specs
+          command: |
+            set -eou pipefail
+            .circleci/copy-openapi.sh
+      - store_artifacts:
+          path: /tmp/artifacts
+          destination: release-artifacts
+      - run_bash_command_in_nix:
+         cmd_name: Publish release bundles
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY"
+         cmd: |
+           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
+           export GOOGLE_CLOUD_PROJECT=da-cn-images
+           VERSION=$(get-snapshot-version)
+           (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
+           # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
+           # which would lead to an error due to a misisng `delete` permission
+           gsutil cp -n /tmp/artifacts/*.tar.gz gs://release-bundles
+         # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
+      - cleanup_sbt_test_job:
+          upload_caches: true
+      - collect_test_timings_and_send_to_datadog
+
+  deployment_test:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_nix
+      - run_bash_command_in_nix:
+         cmd_name: Deployment Test
+         cmd_retry_count: 5 # Retry in case of dependency download errors
+         cmd: make cluster/pulumi/test
+      - run_bash_command_in_nix:
+         cmd_name: Check Pulumi deployment
+         cmd: make --keep-going cluster/pulumi/test
+      - collect_test_timings_and_send_to_datadog
+
+  auth0_user_cleanup:
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      # TODO(#6630): look into these caches
+      - restore_precompiled_classes
+      - restore_sbt_cache
+      - execute_sbt_command:
+          cmd: "\"tools/run\""
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID \
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET
+            --keep ARTIFACTORY_USER
+            --keep ARTIFACTORY_PASSWORD"
+          timeout: "10m"
+      - save_sbt_cache
+      - save_compiled_classes
+
+  cluster_lock_reaper:
+    circleci_ip_ranges: true
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - cluster_lock_reaper:
+          cluster: "scratchneta"
+      - cluster_lock_reaper:
+          cluster: "scratchnetb"
+      - cluster_lock_reaper:
+          cluster: "scratchnetc"
+      - cluster_lock_reaper:
+          cluster: "scratchnetd"
+      - cluster_lock_reaper:
+          cluster: "scratchnete"
+
+  mark_for_testnet:
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Mark latest snapshot in branch for next TestNet release
+          additional_nix_args: "--keep GITHUB_TOKEN"
+          cmd: |
+            git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            LATEST_SNAPSHOT=`git describe --tags --match '*-snapshot.*' --abbrev=0 HEAD`
+            git tag --force testnet-next $LATEST_SNAPSHOT
+            git push --force origin testnet-next
+
+  update_pipeline_schedule:
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - run_bash_command_in_nix:
+         cmd_name: Update CircleCI pipeline configuration (incl. schedule triggers)
+         additional_nix_args: --keep CIRCLECI_TOKEN
+         cmd: |
+           set -euo pipefail
+
+           . .envrc.vars
+           .circleci/setup-pipeline.sh
+
+  docker_images_push:
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+    parameters:
+      skip_if_exists:
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - record_job_start_time
+      - restore_frontend_builds
+      - setup_sbt_test_job
+      - docker_login_artifactory
+      - run_bash_command_in_nix:
+         cmd_name: GCloud authorization
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+           --keep DOCKER_CERT_PATH \
+           --keep DOCKER_HOST \
+           --keep DOCKER_MACHINE_NAME \
+           --keep DOCKER_TLS_VERIFY \
+           --keep NO_PROXY"
+         cmd: |
+           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
+           (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
+      - when:
+          condition: << parameters.skip_if_exists >>
+          steps:
+          - run_bash_command_in_nix:
+             cmd_name: Check if images already exist
+             cmd: |
+               if make docker-check; then
+                  echo "Docker images already exist"
+                  # Running a circleci-agent command from within run_bash_command_in_nix does not work, so we create a file
+                  # that represents the need to halt, and call `circleci-agent step halt` in a separate `run` step
+                  touch .halt-build-step
+               fi
+          - run:
+              name: Halt build step if images already exist
+              command: |
+                if [ -f ".halt-build-step" ]; then
+                  echo "skipping rebuilding and pushing"
+                  circleci-agent step halt
+                fi
+      - run_bash_command_in_nix:
+         cmd_name: Build app
+         cmd: make build -j
+         cmd_retry_count: 5 # Retry in case of dependency download errors
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD"
+      - docker_build
+      - run_bash_command_in_nix:
+         cmd_name: Push Docker images
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+           --keep DOCKER_CERT_PATH \
+           --keep DOCKER_HOST \
+           --keep DOCKER_MACHINE_NAME \
+           --keep DOCKER_TLS_VERIFY \
+           --keep NO_PROXY"
+         cmd: make docker-push -j
+         cmd_retry_count: 5
+      - save_frontend_builds
+      - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
+
+  publish_public_release:
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_sbt_test_job
+      - docker_login_artifactory
+      - run_bash_command_in_nix:
+         cmd_name: Promote images to Artifactory
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+           --keep DOCKER_CERT_PATH \
+           --keep DOCKER_HOST \
+           --keep DOCKER_MACHINE_NAME \
+           --keep DOCKER_TLS_VERIFY \
+           --keep NO_PROXY"
+         cmd: |
+           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
+           (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
+
+           make docker-promote
+         cmd_retry_count: 5 # Retry in case of connectivity issues
+      - run_bash_command_in_nix:
+         cmd_name: Push Helm charts and tag git accordingly
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD \
+           --keep GITHUB_TOKEN"
+         cmd: |
+           publish () {
+             source=$1
+             full_path=$2
+             echo "Publishing ${source} to ${full_path}"
+             curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
+           }
+
+           make cluster/helm/build -j
+
+           for chart in cluster/helm/target/*.tgz; do
+             artifactory_url="https://digitalasset.jfrog.io/artifactory"
+             publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
+           done
+
+           git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+           RELEASE_TAG=$(get-snapshot-version)
+           git fetch origin
+           if [ $(git tag -l "${RELEASE_TAG}") ]; then
+             echo "tag ${RELEASE_TAG} already exists. not tagging"
+           else
+             git tag "${RELEASE_TAG}"
+             git push origin "${RELEASE_TAG}"
+           fi
+           if [[ << pipeline.parameters.mark-for-devnet >> == true ]]; then
+             # This is a mutating tag pointing to the most recent
+             # valid build for DevNet, and therefore the next build
+             # to go to DevNet.
+             git tag --force devnet-next
+             git push --force origin devnet-next
+           elif [[ << pipeline.parameters.mark-for-devnet-if-unmarked >> == true ]] &&
+             ! [ $(git tag -l devnet-next) ]
+           then
+             git tag devnet-next
+             git push origin devnet-next
+           fi
+      - collect_test_timings_and_send_to_datadog
+
+  docker_images_build:
+    machine:
+      image: ubuntu-2004:2023.04.2
+    resource_class: xlarge
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - restore_frontend_builds
+      - setup_sbt_test_job
+      - run_bash_command_in_nix:
+         cmd_name: Build app
+         cmd: make build -j
+         cmd_retry_count: 5 # Retry in case of dependency download errors
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD"
+      - docker_login_artifactory
+      - docker_build
+      - save_frontend_builds
+      - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
+
+  wait_for_previous_pipeline:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    parameters:
+      # space separated strings of workflow names to wait for.
+      workflow_names:
+        type: string
+      branch_filter:
+        type: string
+        default: "^main|deployment/.*$"
+      branch_filter_is_regex:
+        type: boolean
+        default: true
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 28800  # limit search to pipelines that are 8 hours old
+    steps:
+      - checkout
+      - run:
+          name: "Wait for previous pipeline"
+          command: |
+            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
+              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
+              << parameters.max_pipeline_age_secs >> wait
+
+  cancel_if_previous_pipeline:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    parameters:
+      # space separated strings of workflow names to check if they exist and cancel current workflow if so.
+      workflow_names:
+        type: string
+      branch_filter:
+        type: string
+        default: "^main|deployment/.*$"
+      branch_filter_is_regex:
+        type: boolean
+        default: true
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 28800  # limit search to pipelines that are 8 hours old
+    steps:
+      - checkout
+      - run:
+          name: "Cancel if previous pipeline"
+          command: |
+            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
+              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
+              << parameters.max_pipeline_age_secs >> cancel_self
+
+  cancel_previous_pipelines:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    parameters:
+      # space separated strings of workflow names to cancel if they exist.
+      workflow_names:
+        type: string
+      branch_filter:
+        type: string
+        default: ""
+      branch_filter_is_regex:
+        type: boolean
+        default: false
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 28800  # limit search to pipelines that are 8 hours old
+    steps:
+      - checkout
+      - run:
+          name: "Cancel previous pipelines"
+          command: |
+            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
+              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
+              << parameters.max_pipeline_age_secs >> cancel_pipeline

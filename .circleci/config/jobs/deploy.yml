@@ -1,0 +1,262 @@
+jobs:
+  deploy_sv_runbook:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      use_published_artifacts:
+        type: boolean
+        default: false
+      deploy_version:
+        type: string
+        default: ""
+      restore_cluster:
+        type: boolean
+        default: false
+      send_deployment_notification:
+        type: boolean
+        default: true
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_nix
+      - when:
+          condition: << parameters.deploy_version >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Checkout commit << parameters.deploy_version >>
+                cmd: git checkout << parameters.deploy_version >>
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+      - run_bash_command_in_nix:
+          cmd_name: Apply SV-runbook Kubernetes manifest to cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          gce_authenticate: true
+          cmd: |
+            if [[ << parameters.restore_cluster >> == true ]]; then
+              export RESTORE_CLUSTER=1
+            fi
+            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
+              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
+                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+                exit 1
+              fi
+            fi
+            cncluster activate
+            cncluster ci_pdown_sv
+            VERSION=""
+            if [[ << parameters.use_published_artifacts >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+            fi
+            cncluster ci_apply_sv $VERSION
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_deployment_notification >>
+          steps:
+            - notify-cluster-deployment:
+                cluster: << parameters.cluster >>
+      - collect_test_timings_and_send_to_datadog
+
+  deploy_validator_runbook:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      use_published_artifacts:
+        type: boolean
+        default: false
+      deploy_version:
+        type: string
+        default: ""
+      restore_cluster:
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_nix
+      - when:
+          condition: << parameters.deploy_version >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Checkout commit << parameters.deploy_version >>
+                cmd: git checkout << parameters.deploy_version >>
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+      - run_bash_command_in_nix:
+          cmd_name: Apply Validator runbook Kubernetes manifest to cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          gce_authenticate: true
+          cmd: |
+            if [[ << parameters.restore_cluster >> == true ]]; then
+              export RESTORE_CLUSTER=1
+            fi
+            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
+              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
+                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+                exit 1
+              fi
+            fi
+            cncluster activate
+            VERSION=""
+            if [[ << parameters.use_published_artifacts >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+            fi
+            cncluster ci_apply_validator $VERSION
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+      - collect_test_timings_and_send_to_datadog
+
+  deploy_cluster:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      restore_cluster:
+        type: boolean
+        default: false
+      deploy_version:
+        type: string
+        default: ""
+      use_published_artifacts:
+        type: boolean
+        default: false
+      update_deployment_branch:
+        type: boolean
+        default: true
+      send_deployment_notification:
+        type: boolean
+        default: true
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_nix
+      - when:
+          condition: << parameters.deploy_version >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Checkout commit << parameters.deploy_version >>
+                cmd: git checkout << parameters.deploy_version >>
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Apply Pulumi configuration to cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: >
+            --keep GITHUB_TOKEN
+            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep CIRCLECI_TOKEN
+            --keep CIRCLE_WORKFLOW_ID
+            --keep K6_USER_CREDENTIALS
+            --keep SLACK_ACCESS_TOKEN
+          gce_authenticate: true
+          cmd: |
+            if [[ << parameters.restore_cluster >> == true ]]; then
+              export RESTORE_CLUSTER=1
+            fi
+            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
+              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
+                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+                exit 1
+              fi
+            fi
+            cncluster activate
+            VERSION=""
+            if [[ << parameters.use_published_artifacts >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+            fi
+            if [[ << pipeline.parameters.reset-before-deploy >> == true ]]; then
+              cncluster ci_apply
+            else
+              cncluster ci_apply --skip-reset
+            fi
+      - when:
+          condition: << parameters.update_deployment_branch >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Update deployment branch for cluster
+                cluster: << parameters.cluster >>
+                additional_nix_args: "--keep GITHUB_TOKEN"
+                cmd: |
+                  # deployment/scratch* branches break our deployment, so we guard against accidentally creating those here
+                  # This is a safeguard against people manually running e.g. deploy_devnet on a scratchnet.
+                  if [[ << parameters.cluster >> != scratch* ]]; then
+                    scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
+                  else
+                    echo "NOTE: skipping deployment branch update for scratchnet cluster << parameters.cluster >>"
+                  fi
+                cmd_retry_count: 5
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_deployment_notification >>
+          steps:
+            - notify-cluster-deployment:
+                cluster: << parameters.cluster >>
+      - collect_test_timings_and_send_to_datadog
+
+  reset_cluster:
+    parameters:
+      <<: *cluster-parameter
+      channel_notify:
+        type: string
+        # #team-canton-network-internal-ci
+        default: C05DT77QF5M
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_vpn
+      # Needs to occur before setup_vpn_routes
+      - setup_nix
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Reset Cluster and Free Lock (if on scratch*)
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            cncluster ci_reset_unlock
+      - collect_test_timings_and_send_to_datadog

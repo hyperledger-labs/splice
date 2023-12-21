@@ -30,9 +30,12 @@ fi
     cat "${REPO_ROOT}/.circleci/config/prelude.yml"
     echo
     cat "${REPO_ROOT}/.circleci/config/commands.yml"
-    echo
-    cat "${REPO_ROOT}/.circleci/config/jobs.yml"
-    echo
+    echo "jobs:"
+    # sed 1d for all the files in the jobs directory
+    for file in "${REPO_ROOT}"/.circleci/config/jobs/*.yml; do
+        sed '1d' "${file}"
+        echo
+    done
     cat "${REPO_ROOT}/.circleci/config/workflows.yml"
 } > "${OUTPUT_CONF}"
 

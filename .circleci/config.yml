@@ -1204,8 +1204,269 @@ commands:
             docker pull ${COMETBFT_DOCKER_IMAGE}
             docker pull ${TESTCONTAINERS_SSHD_CONTAINER_IMAGE}
             docker pull ${OTEL_COLLECTOR_IMAGE}
-
 jobs:
+  deploy_sv_runbook:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      use_published_artifacts:
+        type: boolean
+        default: false
+      deploy_version:
+        type: string
+        default: ""
+      restore_cluster:
+        type: boolean
+        default: false
+      send_deployment_notification:
+        type: boolean
+        default: true
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_nix
+      - when:
+          condition: << parameters.deploy_version >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Checkout commit << parameters.deploy_version >>
+                cmd: git checkout << parameters.deploy_version >>
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+      - run_bash_command_in_nix:
+          cmd_name: Apply SV-runbook Kubernetes manifest to cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          gce_authenticate: true
+          cmd: |
+            if [[ << parameters.restore_cluster >> == true ]]; then
+              export RESTORE_CLUSTER=1
+            fi
+            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
+              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
+                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+                exit 1
+              fi
+            fi
+            cncluster activate
+            cncluster ci_pdown_sv
+            VERSION=""
+            if [[ << parameters.use_published_artifacts >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+            fi
+            cncluster ci_apply_sv $VERSION
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_deployment_notification >>
+          steps:
+            - notify-cluster-deployment:
+                cluster: << parameters.cluster >>
+      - collect_test_timings_and_send_to_datadog
+
+  deploy_validator_runbook:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      use_published_artifacts:
+        type: boolean
+        default: false
+      deploy_version:
+        type: string
+        default: ""
+      restore_cluster:
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_nix
+      - when:
+          condition: << parameters.deploy_version >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Checkout commit << parameters.deploy_version >>
+                cmd: git checkout << parameters.deploy_version >>
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+      - run_bash_command_in_nix:
+          cmd_name: Apply Validator runbook Kubernetes manifest to cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          gce_authenticate: true
+          cmd: |
+            if [[ << parameters.restore_cluster >> == true ]]; then
+              export RESTORE_CLUSTER=1
+            fi
+            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
+              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
+                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+                exit 1
+              fi
+            fi
+            cncluster activate
+            VERSION=""
+            if [[ << parameters.use_published_artifacts >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+            fi
+            cncluster ci_apply_validator $VERSION
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+      - collect_test_timings_and_send_to_datadog
+
+  deploy_cluster:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      restore_cluster:
+        type: boolean
+        default: false
+      deploy_version:
+        type: string
+        default: ""
+      use_published_artifacts:
+        type: boolean
+        default: false
+      update_deployment_branch:
+        type: boolean
+        default: true
+      send_deployment_notification:
+        type: boolean
+        default: true
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_nix
+      - when:
+          condition: << parameters.deploy_version >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Checkout commit << parameters.deploy_version >>
+                cmd: git checkout << parameters.deploy_version >>
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Apply Pulumi configuration to cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: >
+            --keep GITHUB_TOKEN
+            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep CIRCLECI_TOKEN
+            --keep CIRCLE_WORKFLOW_ID
+            --keep K6_USER_CREDENTIALS
+            --keep SLACK_ACCESS_TOKEN
+          gce_authenticate: true
+          cmd: |
+            if [[ << parameters.restore_cluster >> == true ]]; then
+              export RESTORE_CLUSTER=1
+            fi
+            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
+              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
+                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+                exit 1
+              fi
+            fi
+            cncluster activate
+            VERSION=""
+            if [[ << parameters.use_published_artifacts >> == true ]]; then
+              VERSION=$(get-snapshot-version)
+            fi
+            if [[ << pipeline.parameters.reset-before-deploy >> == true ]]; then
+              cncluster ci_apply
+            else
+              cncluster ci_apply --skip-reset
+            fi
+      - when:
+          condition: << parameters.update_deployment_branch >>
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Update deployment branch for cluster
+                cluster: << parameters.cluster >>
+                additional_nix_args: "--keep GITHUB_TOKEN"
+                cmd: |
+                  # deployment/scratch* branches break our deployment, so we guard against accidentally creating those here
+                  # This is a safeguard against people manually running e.g. deploy_devnet on a scratchnet.
+                  if [[ << parameters.cluster >> != scratch* ]]; then
+                    scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
+                  else
+                    echo "NOTE: skipping deployment branch update for scratchnet cluster << parameters.cluster >>"
+                  fi
+                cmd_retry_count: 5
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_deployment_notification >>
+          steps:
+            - notify-cluster-deployment:
+                cluster: << parameters.cluster >>
+      - collect_test_timings_and_send_to_datadog
+
+  reset_cluster:
+    parameters:
+      <<: *cluster-parameter
+      channel_notify:
+        type: string
+        # #team-canton-network-internal-ci
+        default: C05DT77QF5M
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_vpn
+      # Needs to occur before setup_vpn_routes
+      - setup_nix
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Reset Cluster and Free Lock (if on scratch*)
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            cncluster ci_reset_unlock
+      - collect_test_timings_and_send_to_datadog
+
 
   # Inspired by Canton, we put the lint-like checks into their own CI job
   static_tests:
@@ -1385,236 +1646,328 @@ jobs:
          cmd: make --keep-going cluster/pulumi/test
       - collect_test_timings_and_send_to_datadog
 
-  deploy_sv_runbook:
-    circleci_ip_ranges: true
+  auth0_user_cleanup:
     docker:
-      - image: cimg/base:2021.04
+    - image: cimg/base:2021.04
     environment:
       <<: *env
-      CIRCLE_TAG: git-<< pipeline.git.revision >>
-    parameters:
-      <<: *cluster-parameter
-      use_published_artifacts:
-        type: boolean
-        default: false
-      deploy_version:
-        type: string
-        default: ""
-      restore_cluster:
-        type: boolean
-        default: false
-      send_deployment_notification:
-        type: boolean
-        default: true
     steps:
       - checkout
-      - record_job_start_time
       - setup_nix
-      - when:
-          condition: << parameters.deploy_version >>
-          steps:
-          - run_bash_command_in_nix:
-              cmd_name: Checkout commit << parameters.deploy_version >>
-              cmd: git checkout << parameters.deploy_version >>
-      - run_bash_command_in_nix:
-          cmd_name: Build Helm & Pulumi artifacts
-          cluster: << parameters.cluster >>
-          cmd: |
-            make cluster/build
-      - run_bash_command_in_nix:
-          cmd_name: Apply SV-runbook Kubernetes manifest to cluster
-          cluster: << parameters.cluster >>
-          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
-          gce_authenticate: true
-          cmd: |
-            if [[ << parameters.restore_cluster >> == true ]]; then
-              export RESTORE_CLUSTER=1
-            fi
-            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
-              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
-              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
-                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
-                exit 1
-              fi
-            fi
-            cncluster activate
-            cncluster ci_pdown_sv
-            VERSION=""
-            if [[ << parameters.use_published_artifacts >> == true ]]; then
-              VERSION=$(get-snapshot-version)
-            fi
-            cncluster ci_apply_sv $VERSION
-      - notify-cluster-fail:
-          cluster: << parameters.cluster >>
-      - when:
-          condition: << parameters.send_deployment_notification >>
-          steps:
-            - notify-cluster-deployment:
-                cluster: << parameters.cluster >>
-      - collect_test_timings_and_send_to_datadog
-
-  deploy_validator_runbook:
-    circleci_ip_ranges: true
-    docker:
-      - image: cimg/base:2021.04
-    environment:
-      <<: *env
-      CIRCLE_TAG: git-<< pipeline.git.revision >>
-    parameters:
-      <<: *cluster-parameter
-      use_published_artifacts:
-        type: boolean
-        default: false
-      deploy_version:
-        type: string
-        default: ""
-      restore_cluster:
-        type: boolean
-        default: false
-    steps:
-      - checkout
-      - record_job_start_time
-      - setup_nix
-      - when:
-          condition: << parameters.deploy_version >>
-          steps:
-          - run_bash_command_in_nix:
-              cmd_name: Checkout commit << parameters.deploy_version >>
-              cmd: git checkout << parameters.deploy_version >>
-      - run_bash_command_in_nix:
-          cmd_name: Build Helm & Pulumi artifacts
-          cluster: << parameters.cluster >>
-          cmd: |
-            make cluster/build
-      - run_bash_command_in_nix:
-          cmd_name: Apply Validator runbook Kubernetes manifest to cluster
-          cluster: << parameters.cluster >>
-          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
-          gce_authenticate: true
-          cmd: |
-            if [[ << parameters.restore_cluster >> == true ]]; then
-              export RESTORE_CLUSTER=1
-            fi
-            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
-              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
-              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
-                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
-                exit 1
-              fi
-            fi
-            cncluster activate
-            VERSION=""
-            if [[ << parameters.use_published_artifacts >> == true ]]; then
-              VERSION=$(get-snapshot-version)
-            fi
-            cncluster ci_apply_validator $VERSION
-      - notify-cluster-fail:
-          cluster: << parameters.cluster >>
-      - collect_test_timings_and_send_to_datadog
-
-  deploy_cluster:
-    circleci_ip_ranges: true
-    docker:
-      - image: cimg/base:2021.04
-    environment:
-      <<: *env
-      CIRCLE_TAG: git-<< pipeline.git.revision >>
-    parameters:
-      <<: *cluster-parameter
-      restore_cluster:
-        type: boolean
-        default: false
-      deploy_version:
-        type: string
-        default: ""
-      use_published_artifacts:
-        type: boolean
-        default: false
-      update_deployment_branch:
-        type: boolean
-        default: true
-      send_deployment_notification:
-        type: boolean
-        default: true
-    steps:
-      - checkout
-      - record_job_start_time
-      - setup_nix
-      - when:
-          condition: << parameters.deploy_version >>
-          steps:
-          - run_bash_command_in_nix:
-              cmd_name: Checkout commit << parameters.deploy_version >>
-              cmd: git checkout << parameters.deploy_version >>
-      - run_bash_command_in_nix:
-          cmd_name: Build Helm & Pulumi artifacts
-          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
-          no_output_timeout: "20m"
-          cluster: << parameters.cluster >>
-          cmd: |
-            make cluster/build
-          cmd_retry_count: 2
-      - run_bash_command_in_nix:
-          cmd_name: Apply Pulumi configuration to cluster
-          cluster: << parameters.cluster >>
-          additional_nix_args: >
-            --keep GITHUB_TOKEN
-            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
+      # TODO(#6630): look into these caches
+      - restore_precompiled_classes
+      - restore_sbt_cache
+      - execute_sbt_command:
+          cmd: "\"tools/run\""
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID \
             --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
-            --keep CIRCLECI_TOKEN
-            --keep CIRCLE_WORKFLOW_ID
-            --keep K6_USER_CREDENTIALS
-            --keep SLACK_ACCESS_TOKEN
-          gce_authenticate: true
+            --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET
+            --keep ARTIFACTORY_USER
+            --keep ARTIFACTORY_PASSWORD"
+          timeout: "10m"
+      - save_sbt_cache
+      - save_compiled_classes
+
+  cluster_lock_reaper:
+    circleci_ip_ranges: true
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - cluster_lock_reaper:
+          cluster: "scratchneta"
+      - cluster_lock_reaper:
+          cluster: "scratchnetb"
+      - cluster_lock_reaper:
+          cluster: "scratchnetc"
+      - cluster_lock_reaper:
+          cluster: "scratchnetd"
+      - cluster_lock_reaper:
+          cluster: "scratchnete"
+
+  mark_for_testnet:
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Mark latest snapshot in branch for next TestNet release
+          additional_nix_args: "--keep GITHUB_TOKEN"
           cmd: |
-            if [[ << parameters.restore_cluster >> == true ]]; then
-              export RESTORE_CLUSTER=1
-            fi
-            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
-              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
-              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
-                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
-                exit 1
-              fi
-            fi
-            cncluster activate
-            VERSION=""
-            if [[ << parameters.use_published_artifacts >> == true ]]; then
-              VERSION=$(get-snapshot-version)
-            fi
-            if [[ << pipeline.parameters.reset-before-deploy >> == true ]]; then
-              cncluster ci_apply
-            else
-              cncluster ci_apply --skip-reset
-            fi
+            git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+            LATEST_SNAPSHOT=`git describe --tags --match '*-snapshot.*' --abbrev=0 HEAD`
+            git tag --force testnet-next $LATEST_SNAPSHOT
+            git push --force origin testnet-next
+
+  update_pipeline_schedule:
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - run_bash_command_in_nix:
+         cmd_name: Update CircleCI pipeline configuration (incl. schedule triggers)
+         additional_nix_args: --keep CIRCLECI_TOKEN
+         cmd: |
+           set -euo pipefail
+
+           . .envrc.vars
+           .circleci/setup-pipeline.sh
+
+  docker_images_push:
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+    parameters:
+      skip_if_exists:
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - record_job_start_time
+      - restore_frontend_builds
+      - setup_sbt_test_job
+      - docker_login_artifactory
+      - run_bash_command_in_nix:
+         cmd_name: GCloud authorization
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+           --keep DOCKER_CERT_PATH \
+           --keep DOCKER_HOST \
+           --keep DOCKER_MACHINE_NAME \
+           --keep DOCKER_TLS_VERIFY \
+           --keep NO_PROXY"
+         cmd: |
+           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
+           (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
       - when:
-          condition: << parameters.update_deployment_branch >>
+          condition: << parameters.skip_if_exists >>
           steps:
-            - run_bash_command_in_nix:
-                cmd_name: Update deployment branch for cluster
-                cluster: << parameters.cluster >>
-                additional_nix_args: "--keep GITHUB_TOKEN"
-                cmd: |
-                  # deployment/scratch* branches break our deployment, so we guard against accidentally creating those here
-                  # This is a safeguard against people manually running e.g. deploy_devnet on a scratchnet.
-                  if [[ << parameters.cluster >> != scratch* ]]; then
-                    scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
-                  else
-                    echo "NOTE: skipping deployment branch update for scratchnet cluster << parameters.cluster >>"
-                  fi
-                cmd_retry_count: 5
-      - notify-cluster-fail:
-          cluster: << parameters.cluster >>
-      - when:
-          condition: << parameters.send_deployment_notification >>
-          steps:
-            - notify-cluster-deployment:
-                cluster: << parameters.cluster >>
+          - run_bash_command_in_nix:
+             cmd_name: Check if images already exist
+             cmd: |
+               if make docker-check; then
+                  echo "Docker images already exist"
+                  # Running a circleci-agent command from within run_bash_command_in_nix does not work, so we create a file
+                  # that represents the need to halt, and call `circleci-agent step halt` in a separate `run` step
+                  touch .halt-build-step
+               fi
+          - run:
+              name: Halt build step if images already exist
+              command: |
+                if [ -f ".halt-build-step" ]; then
+                  echo "skipping rebuilding and pushing"
+                  circleci-agent step halt
+                fi
+      - run_bash_command_in_nix:
+         cmd_name: Build app
+         cmd: make build -j
+         cmd_retry_count: 5 # Retry in case of dependency download errors
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD"
+      - docker_build
+      - run_bash_command_in_nix:
+         cmd_name: Push Docker images
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+           --keep DOCKER_CERT_PATH \
+           --keep DOCKER_HOST \
+           --keep DOCKER_MACHINE_NAME \
+           --keep DOCKER_TLS_VERIFY \
+           --keep NO_PROXY"
+         cmd: make docker-push -j
+         cmd_retry_count: 5
+      - save_frontend_builds
+      - cleanup_sbt_test_job
       - collect_test_timings_and_send_to_datadog
+
+  publish_public_release:
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - setup_sbt_test_job
+      - docker_login_artifactory
+      - run_bash_command_in_nix:
+         cmd_name: Promote images to Artifactory
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+           --keep DOCKER_CERT_PATH \
+           --keep DOCKER_HOST \
+           --keep DOCKER_MACHINE_NAME \
+           --keep DOCKER_TLS_VERIFY \
+           --keep NO_PROXY"
+         cmd: |
+           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
+           (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
+
+           make docker-promote
+         cmd_retry_count: 5 # Retry in case of connectivity issues
+      - run_bash_command_in_nix:
+         cmd_name: Push Helm charts and tag git accordingly
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD \
+           --keep GITHUB_TOKEN"
+         cmd: |
+           publish () {
+             source=$1
+             full_path=$2
+             echo "Publishing ${source} to ${full_path}"
+             curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
+           }
+
+           make cluster/helm/build -j
+
+           for chart in cluster/helm/target/*.tgz; do
+             artifactory_url="https://digitalasset.jfrog.io/artifactory"
+             publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
+           done
+
+           git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
+           RELEASE_TAG=$(get-snapshot-version)
+           git fetch origin
+           if [ $(git tag -l "${RELEASE_TAG}") ]; then
+             echo "tag ${RELEASE_TAG} already exists. not tagging"
+           else
+             git tag "${RELEASE_TAG}"
+             git push origin "${RELEASE_TAG}"
+           fi
+           if [[ << pipeline.parameters.mark-for-devnet >> == true ]]; then
+             # This is a mutating tag pointing to the most recent
+             # valid build for DevNet, and therefore the next build
+             # to go to DevNet.
+             git tag --force devnet-next
+             git push --force origin devnet-next
+           elif [[ << pipeline.parameters.mark-for-devnet-if-unmarked >> == true ]] &&
+             ! [ $(git tag -l devnet-next) ]
+           then
+             git tag devnet-next
+             git push origin devnet-next
+           fi
+      - collect_test_timings_and_send_to_datadog
+
+  docker_images_build:
+    machine:
+      image: ubuntu-2004:2023.04.2
+    resource_class: xlarge
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - record_job_start_time
+      - restore_frontend_builds
+      - setup_sbt_test_job
+      - run_bash_command_in_nix:
+         cmd_name: Build app
+         cmd: make build -j
+         cmd_retry_count: 5 # Retry in case of dependency download errors
+         additional_nix_args: "--keep ARTIFACTORY_USER \
+           --keep ARTIFACTORY_PASSWORD"
+      - docker_login_artifactory
+      - docker_build
+      - save_frontend_builds
+      - cleanup_sbt_test_job
+      - collect_test_timings_and_send_to_datadog
+
+  wait_for_previous_pipeline:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    parameters:
+      # space separated strings of workflow names to wait for.
+      workflow_names:
+        type: string
+      branch_filter:
+        type: string
+        default: "^main|deployment/.*$"
+      branch_filter_is_regex:
+        type: boolean
+        default: true
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 28800  # limit search to pipelines that are 8 hours old
+    steps:
+      - checkout
+      - run:
+          name: "Wait for previous pipeline"
+          command: |
+            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
+              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
+              << parameters.max_pipeline_age_secs >> wait
+
+  cancel_if_previous_pipeline:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    parameters:
+      # space separated strings of workflow names to check if they exist and cancel current workflow if so.
+      workflow_names:
+        type: string
+      branch_filter:
+        type: string
+        default: "^main|deployment/.*$"
+      branch_filter_is_regex:
+        type: boolean
+        default: true
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 28800  # limit search to pipelines that are 8 hours old
+    steps:
+      - checkout
+      - run:
+          name: "Cancel if previous pipeline"
+          command: |
+            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
+              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
+              << parameters.max_pipeline_age_secs >> cancel_self
+
+  cancel_previous_pipelines:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    parameters:
+      # space separated strings of workflow names to cancel if they exist.
+      workflow_names:
+        type: string
+      branch_filter:
+        type: string
+        default: ""
+      branch_filter_is_regex:
+        type: boolean
+        default: false
+      branch_ignores:
+        type: string
+        default: "^$"
+      max_pipeline_age_secs:
+        type: integer
+        default: 28800  # limit search to pipelines that are 8 hours old
+    steps:
+      - checkout
+      - run:
+          name: "Cancel previous pipelines"
+          command: |
+            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
+              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
+              << parameters.max_pipeline_age_secs >> cancel_pipeline
 
   preflight_check:
     parameters:
@@ -1956,360 +2309,6 @@ jobs:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
       - collect_test_timings_and_send_to_datadog
-
-  reset_cluster:
-    parameters:
-      <<: *cluster-parameter
-      channel_notify:
-        type: string
-        # #team-canton-network-internal-ci
-        default: C05DT77QF5M
-    machine:
-      image: ubuntu-2004:2023.04.2
-    environment:
-      <<: *env
-      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
-      VPN_HOST_IP: 34.132.91.75
-    steps:
-      - checkout
-      - record_job_start_time
-      - setup_vpn
-      # Needs to occur before setup_vpn_routes
-      - setup_nix
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
-      - run_bash_command_in_nix:
-          cmd_name: Reset Cluster and Free Lock (if on scratch*)
-          cluster: << parameters.cluster >>
-          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
-          gce_authenticate: true
-          cmd: |
-            cncluster activate
-            cncluster ci_reset_unlock
-      - collect_test_timings_and_send_to_datadog
-
-  auth0_user_cleanup:
-    docker:
-    - image: cimg/base:2021.04
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - setup_nix
-      # TODO(#6630): look into these caches
-      - restore_precompiled_classes
-      - restore_sbt_cache
-      - execute_sbt_command:
-          cmd: "\"tools/run\""
-          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID \
-            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
-            --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID
-            --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET
-            --keep ARTIFACTORY_USER
-            --keep ARTIFACTORY_PASSWORD"
-          timeout: "10m"
-      - save_sbt_cache
-      - save_compiled_classes
-
-  cluster_lock_reaper:
-    circleci_ip_ranges: true
-    docker:
-    - image: cimg/base:2021.04
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - setup_nix
-      - cluster_lock_reaper:
-          cluster: "scratchneta"
-      - cluster_lock_reaper:
-          cluster: "scratchnetb"
-      - cluster_lock_reaper:
-          cluster: "scratchnetc"
-      - cluster_lock_reaper:
-          cluster: "scratchnetd"
-      - cluster_lock_reaper:
-          cluster: "scratchnete"
-
-  mark_for_testnet:
-    docker:
-    - image: cimg/base:2021.04
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - setup_nix
-      - run_bash_command_in_nix:
-          cmd_name: Mark latest snapshot in branch for next TestNet release
-          additional_nix_args: "--keep GITHUB_TOKEN"
-          cmd: |
-            git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-            LATEST_SNAPSHOT=`git describe --tags --match '*-snapshot.*' --abbrev=0 HEAD`
-            git tag --force testnet-next $LATEST_SNAPSHOT
-            git push --force origin testnet-next
-
-  update_pipeline_schedule:
-    docker:
-    - image: cimg/base:2021.04
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - setup_nix
-      - run_bash_command_in_nix:
-         cmd_name: Update CircleCI pipeline configuration (incl. schedule triggers)
-         additional_nix_args: --keep CIRCLECI_TOKEN
-         cmd: |
-           set -euo pipefail
-
-           . .envrc.vars
-           .circleci/setup-pipeline.sh
-
-  docker_images_push:
-    machine:
-      image: ubuntu-2004:2023.04.2
-    environment:
-      <<: *env
-    parameters:
-      skip_if_exists:
-        type: boolean
-        default: false
-    steps:
-      - checkout
-      - record_job_start_time
-      - restore_frontend_builds
-      - setup_sbt_test_job
-      - docker_login_artifactory
-      - run_bash_command_in_nix:
-         cmd_name: GCloud authorization
-         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
-           --keep DOCKER_CERT_PATH \
-           --keep DOCKER_HOST \
-           --keep DOCKER_MACHINE_NAME \
-           --keep DOCKER_TLS_VERIFY \
-           --keep NO_PROXY"
-         cmd: |
-           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
-           (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
-      - when:
-          condition: << parameters.skip_if_exists >>
-          steps:
-          - run_bash_command_in_nix:
-             cmd_name: Check if images already exist
-             cmd: |
-               if make docker-check; then
-                  echo "Docker images already exist"
-                  # Running a circleci-agent command from within run_bash_command_in_nix does not work, so we create a file
-                  # that represents the need to halt, and call `circleci-agent step halt` in a separate `run` step
-                  touch .halt-build-step
-               fi
-          - run:
-              name: Halt build step if images already exist
-              command: |
-                if [ -f ".halt-build-step" ]; then
-                  echo "skipping rebuilding and pushing"
-                  circleci-agent step halt
-                fi
-      - run_bash_command_in_nix:
-         cmd_name: Build app
-         cmd: make build -j
-         cmd_retry_count: 5 # Retry in case of dependency download errors
-         additional_nix_args: "--keep ARTIFACTORY_USER \
-           --keep ARTIFACTORY_PASSWORD"
-      - docker_build
-      - run_bash_command_in_nix:
-         cmd_name: Push Docker images
-         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
-           --keep DOCKER_CERT_PATH \
-           --keep DOCKER_HOST \
-           --keep DOCKER_MACHINE_NAME \
-           --keep DOCKER_TLS_VERIFY \
-           --keep NO_PROXY"
-         cmd: make docker-push -j
-         cmd_retry_count: 5
-      - save_frontend_builds
-      - cleanup_sbt_test_job
-      - collect_test_timings_and_send_to_datadog
-
-  publish_public_release:
-    machine:
-      image: ubuntu-2004:2023.04.2
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - record_job_start_time
-      - setup_sbt_test_job
-      - docker_login_artifactory
-      - run_bash_command_in_nix:
-         cmd_name: Promote images to Artifactory
-         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
-           --keep DOCKER_CERT_PATH \
-           --keep DOCKER_HOST \
-           --keep DOCKER_MACHINE_NAME \
-           --keep DOCKER_TLS_VERIFY \
-           --keep NO_PROXY"
-         cmd: |
-           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
-           (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
-
-           make docker-promote
-         cmd_retry_count: 5 # Retry in case of connectivity issues
-      - run_bash_command_in_nix:
-         cmd_name: Push Helm charts and tag git accordingly
-         additional_nix_args: "--keep ARTIFACTORY_USER \
-           --keep ARTIFACTORY_PASSWORD \
-           --keep GITHUB_TOKEN"
-         cmd: |
-           publish () {
-             source=$1
-             full_path=$2
-             echo "Publishing ${source} to ${full_path}"
-             curl -u "${ARTIFACTORY_USER}:${ARTIFACTORY_PASSWORD}" -sSf -X PUT --upload-file "${source}" "${full_path}"
-           }
-
-           make cluster/helm/build -j
-
-           for chart in cluster/helm/target/*.tgz; do
-             artifactory_url="https://digitalasset.jfrog.io/artifactory"
-             publish "${chart}" "${artifactory_url}/canton-network-helm/digitalasset/$(basename ${chart})"
-           done
-
-           git remote set-url origin https://githubuser-da:${GITHUB_TOKEN}@github.com/DACH-NY/canton-network-node.git
-           RELEASE_TAG=$(get-snapshot-version)
-           git fetch origin
-           if [ $(git tag -l "${RELEASE_TAG}") ]; then
-             echo "tag ${RELEASE_TAG} already exists. not tagging"
-           else
-             git tag "${RELEASE_TAG}"
-             git push origin "${RELEASE_TAG}"
-           fi
-           if [[ << pipeline.parameters.mark-for-devnet >> == true ]]; then
-             # This is a mutating tag pointing to the most recent
-             # valid build for DevNet, and therefore the next build
-             # to go to DevNet.
-             git tag --force devnet-next
-             git push --force origin devnet-next
-           elif [[ << pipeline.parameters.mark-for-devnet-if-unmarked >> == true ]] &&
-             ! [ $(git tag -l devnet-next) ]
-           then
-             git tag devnet-next
-             git push origin devnet-next
-           fi
-      - collect_test_timings_and_send_to_datadog
-
-  docker_images_build:
-    machine:
-      image: ubuntu-2004:2023.04.2
-    resource_class: xlarge
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - record_job_start_time
-      - restore_frontend_builds
-      - setup_sbt_test_job
-      - run_bash_command_in_nix:
-         cmd_name: Build app
-         cmd: make build -j
-         cmd_retry_count: 5 # Retry in case of dependency download errors
-         additional_nix_args: "--keep ARTIFACTORY_USER \
-           --keep ARTIFACTORY_PASSWORD"
-      - docker_login_artifactory
-      - docker_build
-      - save_frontend_builds
-      - cleanup_sbt_test_job
-      - collect_test_timings_and_send_to_datadog
-
-  wait_for_previous_pipeline:
-    docker:
-      - image: cimg/base:2021.04
-    environment:
-      <<: *env
-    parameters:
-      # space separated strings of workflow names to wait for.
-      workflow_names:
-        type: string
-      branch_filter:
-        type: string
-        default: "^main|deployment/.*$"
-      branch_filter_is_regex:
-        type: boolean
-        default: true
-      branch_ignores:
-        type: string
-        default: "^$"
-      max_pipeline_age_secs:
-        type: integer
-        default: 28800  # limit search to pipelines that are 8 hours old
-    steps:
-      - checkout
-      - run:
-          name: "Wait for previous pipeline"
-          command: |
-            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
-              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
-              << parameters.max_pipeline_age_secs >> wait
-
-  cancel_if_previous_pipeline:
-    docker:
-      - image: cimg/base:2021.04
-    environment:
-      <<: *env
-    parameters:
-      # space separated strings of workflow names to check if they exist and cancel current workflow if so.
-      workflow_names:
-        type: string
-      branch_filter:
-        type: string
-        default: "^main|deployment/.*$"
-      branch_filter_is_regex:
-        type: boolean
-        default: true
-      branch_ignores:
-        type: string
-        default: "^$"
-      max_pipeline_age_secs:
-        type: integer
-        default: 28800  # limit search to pipelines that are 8 hours old
-    steps:
-      - checkout
-      - run:
-          name: "Cancel if previous pipeline"
-          command: |
-            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
-              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
-              << parameters.max_pipeline_age_secs >> cancel_self
-
-  cancel_previous_pipelines:
-    docker:
-      - image: cimg/base:2021.04
-    environment:
-      <<: *env
-    parameters:
-      # space separated strings of workflow names to cancel if they exist.
-      workflow_names:
-        type: string
-      branch_filter:
-        type: string
-        default: ""
-      branch_filter_is_regex:
-        type: boolean
-        default: false
-      branch_ignores:
-        type: string
-        default: "^$"
-      max_pipeline_age_secs:
-        type: integer
-        default: 28800  # limit search to pipelines that are 8 hours old
-    steps:
-      - checkout
-      - run:
-          name: "Cancel previous pipelines"
-          command: |
-            .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
-              "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
-              << parameters.max_pipeline_age_secs >> cancel_pipeline
 
 main-branch-only: &main-branch-only
   filters:
