@@ -9,7 +9,7 @@ import {
 import { auth0Cfg } from './auth0cfg';
 
 export function scheduleLoadGenerator(): void {
-  if (envFlag('K6_ENABLE_LOAD_GENERATOR', false)) {
+  if (envFlag('K6_ENABLE_LOAD_GENERATOR')) {
     const xns = exactNamespace('load-tester', true);
 
     const clusterHostname = `${CLUSTER_BASENAME}.network.canton.global`;
@@ -29,10 +29,12 @@ export function scheduleLoadGenerator(): void {
 
     // give pulumi + cluster time to stabilize before the first load test run starts.
     const minute = (new Date().getMinutes() + 10) % 60;
+    // trigger the job once every hour, starting 10 mins from now
+    const schedule = `${minute} * * * *`;
 
     const oauthDomain = `https://${auth0Cfg.auth0Domain}`;
     const oauthClientId = auth0Cfg.namespaceToUiClientId.validator1;
-    const userCredentials = requireEnv('K6_USER_CREDENTIALS');
+    const usersPassword = requireEnv('K6_USERS_PASSWORD');
 
     // use internal cluster hostnames for the prometheus endpoint
     const prometheusRw =
@@ -43,13 +45,29 @@ export function scheduleLoadGenerator(): void {
       'load-tester',
       'cn-load-tester',
       {
-        schedule: `${minute} * * * *`, // trigger the job once every hour, starting 10 mins from now
-        config: JSON.stringify({
-          testDuration: '58m',
-          walletBaseUrl: `https://wallet.validator1.${clusterHostname}`,
-          auth: { oauthDomain, oauthClientId, userCredentials },
-        }),
+        schedule,
         prometheusRw,
+        config: JSON.stringify({
+          usersPerValidator: 10,
+          validators: [
+            {
+              walletBaseUrl: `https://wallet.validator1.${clusterHostname}`,
+              auth: {
+                oauthDomain,
+                oauthClientId,
+                usersPassword,
+                managementApi: {
+                  clientId: requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID'),
+                  clientSecret: requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET'),
+                },
+              },
+            },
+          ],
+          test: {
+            duration: '58m',
+            iterationsPerMinute: 60,
+          },
+        }),
       },
       { dependsOn: [loopback] }
     );

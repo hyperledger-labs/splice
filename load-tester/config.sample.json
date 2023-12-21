@@ -1,9 +1,21 @@
 {
-  "testDuration": "$K6_TEST_DURATION",
-  "walletBaseUrl": "$K6_WALLET_BASE_URL",
-  "auth": {
-    "oauthDomain": "$K6_OAUTH_DOMAIN",
-    "oauthClientId": "$K6_OAUTH_CLIENT_ID",
-    "userCredentials": "$K6_USER_CREDENTIALS"
+  "usersPerValidator": 10,
+  "validators": [
+    {
+      "walletBaseUrl": "$K6_WALLET_BASE_URL",
+      "auth": {
+        "oauthDomain": "$K6_OAUTH_DOMAIN",
+        "oauthClientId": "$K6_OAUTH_CLIENT_ID",
+        "usersPassword": "$K6_USERS_PASSWORD",
+        "managementApi": {
+          "clientId": "$AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
+          "clientSecret": "$AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET"
+        }
+      }
+    }
+  ],
+  "test": {
+    "duration": "$K6_TEST_DURATION",
+    "iterationsPerMinute": 60
   }
 }

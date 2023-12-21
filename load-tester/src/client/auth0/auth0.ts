@@ -1,4 +1,6 @@
-import { HttpClient } from './http';
+import { jsonStringDecoder } from '../../utils';
+import { HttpClient } from '../http';
+import { listUsersResponse } from './models';
 
 function parse(querystr: string): Record<string, string> {
   return querystr.split('&').reduce((prev, current) => {
@@ -9,12 +11,35 @@ function parse(querystr: string): Record<string, string> {
   }, {});
 }
 
+interface ClientCredentials {
+  clientId: string;
+  clientSecret: string;
+}
+
+type TokenRequest =
+  | {
+      grantType: 'authorization_code';
+      clientId: string;
+      code: string;
+      codeVerifier: string;
+      redirectUri: string;
+    }
+  | {
+      grantType: 'client_credentials';
+      clientId: string;
+      clientSecret: string;
+      audience: string;
+    };
+
 // While most of this follows a standard oauth2 authorization code grant,
 //  parts of it make specific auth0 assumptions
 export class Auth0Manager {
   private auth0Tenant: string;
-  private clientId: string;
+  private managementApiToken: string;
 
+  private connection: string = 'Username-Password-Authentication';
+
+  private clientId: string;
   private walletUri: string;
   private cnAudience: string = 'https://canton.network.global';
 
@@ -22,12 +47,30 @@ export class Auth0Manager {
     'acodeverifieracodeverifieracodeverifieracodeverifieracodeverifier';
 
   private httpClient: HttpClient;
+  // we're _definitely_ a browser ;)
+  private headers: Record<string, string> = {
+    'User-Agent':
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/119.0',
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+    Connection: 'keep-alive',
+  };
 
-  constructor(auth0Tenant: string, clientId: string, walletUri: string) {
+  constructor(
+    auth0Tenant: string,
+    clientId: string,
+    walletUri: string,
+    managementApi: ClientCredentials,
+  ) {
+    this.httpClient = new HttpClient(auth0Tenant, true);
     this.auth0Tenant = auth0Tenant;
     this.clientId = clientId;
     this.walletUri = walletUri;
-    this.httpClient = new HttpClient(auth0Tenant, true);
+    this.managementApiToken = this.clientCredentialsGrant(
+      managementApi.clientId,
+      managementApi.clientSecret,
+      `${this.auth0Tenant}/api/v2/`,
+    );
   }
 
   // Step through the /authorize endpoint
@@ -51,6 +94,7 @@ export class Auth0Manager {
     );
 
     const headers = {
+      ...this.headers,
       Referer: this.walletUri,
       'Upgrade-Insecure-Requests': '1',
       'Sec-Fetch-Dest': 'document',
@@ -69,11 +113,9 @@ export class Auth0Manager {
   private _login = (location: string, state: string, username: string, password: string) => {
     console.log('Calling login...');
 
-    const data = encodeURI(
-      `state=${state}&username=${username}&password=${password}&action=default`,
-    );
-
+    const data = `state=${state}&username=${username}&password=${password}&action=default`;
     const headers = {
+      ...this.headers,
       'Content-Type': 'application/x-www-form-urlencoded',
       Origin: this.auth0Tenant,
       Referer: location,
@@ -100,6 +142,7 @@ export class Auth0Manager {
     console.log('Calling resume...');
 
     const headers = {
+      ...this.headers,
       'Content-Type': 'application/x-www-form-urlencoded',
       Origin: this.auth0Tenant,
       Referer: location,
@@ -127,19 +170,26 @@ export class Auth0Manager {
   };
 
   // Step through the /oauth/token endpoint
-  private _token = (code: string): string => {
-    const data = encodeURI(
-      `grant_type=authorization_code&redirect_uri=${this.walletUri}&code=${code}&code_verifier=${this.codeVerifier}&client_id=${this.clientId}`,
-    );
-
-    const headers = {
+  private _token = (req: TokenRequest): string => {
+    let data = `grant_type=${req.grantType}&client_id=${req.clientId}`;
+    let headers: Record<string, string> = {
       'Content-Type': 'application/x-www-form-urlencoded',
-      Origin: this.walletUri,
-      Referer: this.walletUri,
-      'Sec-Fetch-Dest': 'empty',
-      'Sec-Fetch-Mode': 'cors',
-      'Sec-Fetch-Site': 'cross-site',
     };
+
+    if (req.grantType === 'authorization_code') {
+      data += `&redirect_uri=${req.redirectUri}&code=${req.code}&code_verifier=${this.codeVerifier}`;
+      headers = {
+        ...this.headers,
+        ...headers,
+        Origin: req.redirectUri,
+        Referer: req.redirectUri,
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'cross-site',
+      };
+    } else if (req.grantType === 'client_credentials') {
+      data += `&client_secret=${req.clientSecret}&audience=${req.audience}`;
+    }
 
     return this.httpClient.post.success(`${this.auth0Tenant}/oauth/token`, data, headers, resp => {
       const json = JSON.parse(resp.body || '{}');
@@ -152,27 +202,59 @@ export class Auth0Manager {
     });
   };
 
-  private _parse_credentials = (credentials: string): { username: string; password: string } => {
-    const pair = credentials.split(':');
-    if (pair.length !== 2) {
-      throw new Error(`Failed to parse credentials: ${credentials}`);
-    }
-
-    return { username: pair[0], password: pair[1] };
-  };
-
   /**
    *
    * @param credentials : A string "username:password"
    * @returns
    */
-  public authorizationCodeGrant = (credentials: string): string => {
-    const { username, password } = this._parse_credentials(credentials);
-
+  public authorizationCodeGrant = (username: string, password: string): string => {
     const a = this._authorize();
     const l = this._login(a.location, a.state, username, password);
     const r = this._resume(l.location);
 
-    return this._token(r.code);
+    return this._token({
+      grantType: 'authorization_code',
+      clientId: this.clientId,
+      code: r.code,
+      codeVerifier: this.codeVerifier,
+      redirectUri: this.walletUri,
+    });
+  };
+
+  public clientCredentialsGrant = (
+    clientId: string,
+    clientSecret: string,
+    audience: string,
+  ): string => {
+    return this._token({ grantType: 'client_credentials', clientId, clientSecret, audience });
+  };
+
+  public userExists = (email: string): boolean => {
+    const query = `&search_engine=v3&q=${encodeURIComponent(`email:${email}`)}`;
+
+    const response = this.httpClient.get.success(
+      `${this.auth0Tenant}/api/v2/users?${query}`,
+      undefined,
+      {
+        Accept: 'application/json',
+        Authorization: `Bearer ${this.managementApiToken}`,
+      },
+      resp => jsonStringDecoder(listUsersResponse, resp.body),
+    );
+
+    return !!response?.find(u => u.email === email);
+  };
+
+  public createUser = (email: string, password: string): void => {
+    this.httpClient.post.s201(
+      `${this.auth0Tenant}/api/v2/users`,
+      JSON.stringify({ email, password, connection: this.connection }),
+      {
+        Accept: 'application/json',
+        Authorization: `Bearer ${this.managementApiToken}`,
+        'Content-Type': 'application/json',
+      },
+      resp => resp,
+    );
   };
 }

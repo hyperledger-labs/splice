@@ -1,12 +1,24 @@
 import { z } from 'zod';
 
-export const configSchema = z.object({
-  testDuration: z.string().min(1),
+const validatorSchema = z.object({
   walletBaseUrl: z.string().min(1),
   auth: z.object({
     oauthDomain: z.string().min(1),
     oauthClientId: z.string().min(1),
-    userCredentials: z.string().min(1),
+    managementApi: z.object({
+      clientId: z.string().min(1),
+      clientSecret: z.string().min(1),
+    }),
+    usersPassword: z.string().min(1),
+  }),
+});
+
+export const configSchema = z.object({
+  usersPerValidator: z.number().min(1),
+  validators: z.array(validatorSchema).min(1),
+  test: z.object({
+    duration: z.string().min(1),
+    iterationsPerMinute: z.number().min(1),
   }),
 });
 
@@ -22,10 +34,10 @@ export default {
         executor: 'constant-arrival-rate',
 
         // How long the test lasts
-        duration: config.testDuration,
+        duration: config.test.duration,
 
         // How many iterations per timeUnit
-        rate: 60,
+        rate: config.test.iterationsPerMinute,
         timeUnit: '1m',
 
         // Pre-allocate VUs

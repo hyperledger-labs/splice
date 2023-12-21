@@ -7,15 +7,6 @@ export class HttpClient {
   private retryWait: number = 1; // in seconds
   private errorsAreFatal: boolean = false;
 
-  // we're _definitely_ a browser ;)
-  private headers: Record<string, string> = {
-    'User-Agent':
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/119.0',
-    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.5',
-    Connection: 'keep-alive',
-  };
-
   private tag: string | undefined;
 
   constructor(tag?: string, errorsAreFatal?: boolean) {
@@ -38,7 +29,7 @@ export class HttpClient {
     url: string,
     method: 'GET' | 'POST',
     body: string | Buffer | undefined,
-    expectedStatus: 200 | 302,
+    expectedStatus: 200 | 201 | 302,
     additionalHeaders: Record<string, string> | undefined,
     retries: number,
     handleResponse: (resp: RefinedResponse<'text'>) => R,
@@ -46,7 +37,6 @@ export class HttpClient {
     console.debug(`Calling ${method} on endpoint: ${url}`);
 
     const headers = {
-      ...this.headers,
       ...additionalHeaders,
     };
 
@@ -155,6 +145,22 @@ export class HttpClient {
         'POST',
         body,
         200,
+        additionalHeaders,
+        this.retryCount,
+        handleResponse,
+      );
+    },
+    s201: <R>(
+      url: string,
+      body: string | Buffer | undefined,
+      additionalHeaders: Record<string, string>,
+      handleResponse: (resp: RefinedResponse<'text'>) => R,
+    ): R => {
+      return this._request(
+        url,
+        'POST',
+        body,
+        201,
         additionalHeaders,
         this.retryCount,
         handleResponse,

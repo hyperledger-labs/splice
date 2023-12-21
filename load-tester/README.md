@@ -15,7 +15,7 @@ To run this test from your machine:
 1. Add the following to your `.envrc.private` variables:
     - `export K6_OAUTH_DOMAIN="https://canton-network-dev.us.auth0.com"`
     - `export K6_OAUTH_CLIENT_ID="5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK"`
-    - `export K6_USER_CREDENTIALS=user@cn-load-tester.com:<PASSWORD>` where `<PASSWORD>` is the actual password found in the passwords gdoc
+    - `export K6_USERS_PASSWORD=<PASSWORD>` where `<PASSWORD>` is the actual password found in the passwords gdoc
     - `export K6_TEST_DURATION="5m"` (or a different duration if you wish)
 2. Create & deploy a scratchnet cluster
 3. Run `cncluster load_test` from the cluster's deployment directory

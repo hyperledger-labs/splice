@@ -1,8 +1,8 @@
 /* @ts-expect-error typings unavailable */
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 
-import { HttpClient } from '../utils/http';
-import { getTomorrowMs, jsonStringDecoder } from '../utils/utils';
+import { getTomorrowMs, jsonStringDecoder } from '../../utils';
+import { HttpClient } from '../http';
 import {
   AcceptTransferOfferResponse,
   CreateTransferOfferResponse,
