@@ -3,7 +3,7 @@ package com.daml.network.validator.automation
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.config.BackupDumpConfig
 import com.daml.network.environment.RetryFor
-import com.daml.network.validator.store.NodeIdentitiesStore
+import com.daml.network.identities.NodeIdentitiesStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 

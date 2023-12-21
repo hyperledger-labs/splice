@@ -5,7 +5,7 @@ package com.daml.network.setup
 
 import com.daml.network.config.{CNParticipantClientConfig, ParticipantBootstrapDumpConfig}
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
-import com.daml.network.util.NodeIdentitiesDump
+import com.daml.network.identities.NodeIdentitiesDump
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.ParticipantId

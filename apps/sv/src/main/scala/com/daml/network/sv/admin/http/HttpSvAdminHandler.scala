@@ -1,6 +1,7 @@
 package com.daml.network.sv.admin.http
 
 import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
+import cats.syntax.traverse.*
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn
@@ -11,6 +12,7 @@ import com.daml.network.environment.{
   MediatorAdminConnection,
   ParticipantAdminConnection,
   SequencerAdminConnection,
+  TopologyAdminConnection,
 }
 import com.daml.network.http.v0.definitions.{
   BatchListVotesByVoteRequestsRequest,
@@ -22,9 +24,10 @@ import com.daml.network.http.v0.definitions.{
   ListVoteResultsRequest,
   UpdateVoteRequest,
 }
-import com.daml.network.util.JsonUtil
+import com.daml.network.util.{Codec, JsonUtil, TemplateJsonDecoder}
 import com.daml.network.http.v0.sv_admin.SvAdminResource
 import com.daml.network.http.v0.{definitions, sv_admin as v0}
+import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, PageLimit}
 import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.sv.cometbft.CometBftClient
@@ -33,7 +36,6 @@ import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.{LocalDomainNode, SvApp}
-import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
@@ -543,6 +545,42 @@ class HttpSvAdminHandler(
         globalDomain <- svcStore.getSvcRules().map(_.domain)
         _ <- changeDomainRatePerParticipant(globalDomain, NonNegativeInt.zero)
       } yield SvAdminResource.PauseGlobalDomainResponseOK
+    }
+  }
+
+  override def getDomainMigrationDump(
+      respond: SvAdminResource.GetDomainMigrationDumpResponse.type
+  )()(
+      tuser: TracedUser
+  ): Future[SvAdminResource.GetDomainMigrationDumpResponse] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.pauseGlobalDomain") { _ => _ =>
+      def newNodeIdentitiesStore(adminConnection: TopologyAdminConnection) =
+        new NodeIdentitiesStore(
+          adminConnection,
+          None,
+          clock,
+          loggerFactory,
+        )
+      for {
+        participantDump <- newNodeIdentitiesStore(participantAdminConnection)
+          .getNodeIdentitiesDump()
+        sequencerDump <- localDomainNode.traverse(domainNode =>
+          newNodeIdentitiesStore(domainNode.sequencerAdminConnection).getNodeIdentitiesDump()
+        )
+        mediatorDump <- localDomainNode.traverse(domainNode =>
+          newNodeIdentitiesStore(domainNode.mediatorAdminConnection)
+            .getNodeIdentitiesDump()
+        )
+      } yield SvAdminResource.GetDomainMigrationDumpResponse.OK(
+        definitions.GetDomainMigrationDumpResponse(
+          definitions.DomainMigrationIdentities(
+            participantDump.toHttp,
+            sequencerDump.map(_.toHttp),
+            mediatorDump.map(_.toHttp),
+          )
+        )
+      )
     }
   }
 

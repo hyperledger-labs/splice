@@ -1,9 +1,9 @@
-package com.daml.network.validator.store
+package com.daml.network.identities
 
 import cats.syntax.traverse.*
 import com.daml.network.config.BackupDumpConfig
 import com.daml.network.environment.{BuildInfo, TopologyAdminConnection}
-import com.daml.network.util.{BackupDump, NodeIdentitiesDump}
+import com.daml.network.util.BackupDump
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext

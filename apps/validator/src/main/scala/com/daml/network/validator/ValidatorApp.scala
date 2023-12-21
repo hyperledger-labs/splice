@@ -42,7 +42,7 @@ import com.daml.network.validator.config.{
   ValidatorOnboardingConfig,
 }
 import com.daml.network.validator.metrics.ValidatorAppMetrics
-import com.daml.network.validator.store.{NodeIdentitiesStore, ValidatorStore}
+import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.{OAuth2Manager, ValidatorUtil}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
@@ -66,6 +66,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.daml.network.validator.admin.http.HttpExternalCnsHandler
 import com.daml.network.http.v0.external.cns.CnsResource
+import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequencer
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp

@@ -30,7 +30,6 @@ import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.setup.NodeInitializer
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.util.{ProcessTestUtil, TemplateJsonDecoder}
-import com.daml.network.validator.store.NodeIdentitiesStore
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -469,20 +468,7 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
       clock: Clock,
       logger: NamedLoggerFactory,
       retryProvider: RetryProvider,
-  )(implicit ec: ExecutionContextExecutor) {
-    val sequencerIdentityStore = new NodeIdentitiesStore(
-      domainNode.sequencerAdminConnection,
-      None,
-      clock,
-      logger,
-    )
-    val mediatorIdentityStore = new NodeIdentitiesStore(
-      domainNode.mediatorAdminConnection,
-      None,
-      clock,
-      logger,
-    )
-
+  ) {
     val sequencerInitializer = new NodeInitializer(
       domainNode.sequencerAdminConnection,
       retryProvider,
@@ -562,12 +548,6 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
 
     private val logger = loggerFactory.getLogger(getClass)
 
-    val existingParticipantIdentities = new NodeIdentitiesStore(
-      backend.appState.participantAdminConnection,
-      None,
-      clock,
-      loggerFactory,
-    )
     val newParticipantInitializer =
       new NodeInitializer(newParticipantConnection, retryProvider, loggerFactory)
     val newDomainNodeIdentities: DomainNodeIdentities = DomainNodeIdentities(
@@ -634,9 +614,10 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
             .getTopologySnapshot(globalDomainId)
             .map(snapshot => DomainTopologyTransactions(snapshot.result))
         _ = logger.info(s"Init new domain nodes from snapshot $domainTopologyTransactions")
-        participantDump <- existingParticipantIdentities.getNodeIdentitiesDump()
+        domainMigrationDump = backend.getDomainMigrationDump().nodeIdentities
+        participantDump = domainMigrationDump.participant
         _ <- newParticipantInitializer.initializeAndWait(participantDump)
-        sequencerDump <- existingDomainNodeIdentites.sequencerIdentityStore.getNodeIdentitiesDump()
+        sequencerDump = domainMigrationDump.sequencer.value
         _ <- newDomainNodeIdentities.sequencerInitializer.initializeFromDump(sequencerDump)
         _ = logger.info(
           s"Restoring sequencer topology with sequencer transactions ${domainTopologyTransactions.sequencerInitTopologyTransactions}"
@@ -684,7 +665,7 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
                 Seq(transactions.transaction),
               )
         )
-        mediatorDump <- existingDomainNodeIdentites.mediatorIdentityStore.getNodeIdentitiesDump()
+        mediatorDump = domainMigrationDump.mediator.value
         _ <-
           newDomainNodeIdentities.mediatorInitializer.initializeFromDump(mediatorDump)
         _ <- newLocalDomainNode.mediatorAdminConnection

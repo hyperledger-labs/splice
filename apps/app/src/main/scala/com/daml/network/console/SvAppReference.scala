@@ -15,7 +15,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
 import com.daml.network.http.v0.definitions
-import com.daml.network.sv.SvApp
+import com.daml.network.sv.{DomainMigrationDump, SvApp}
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
 import com.daml.network.sv.automation.{LeaderBasedAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.automation.singlesv.RestartLeaderBasedAutomationTrigger
@@ -358,6 +358,12 @@ class SvAppBackendReference(
   def pauseGlobalDomain(): Unit =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.PauseGlobalDomain())
+    }
+
+  @Help.Summary("Get data dump for domain migrartion")
+  def getDomainMigrationDump(): DomainMigrationDump =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAdminAppClient.GetDomainMigrationDump())
     }
 
   /** Remote participant this sv app is configured to interact with. */

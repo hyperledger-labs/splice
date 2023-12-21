@@ -6,7 +6,7 @@ import com.daml.network.auth.AuthUtil
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.http.v0.definitions
-import com.daml.network.util.NodeIdentitiesDump
+import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.validator.ValidatorApp
 import com.daml.network.validator.admin.api.client.commands.{
   HttpAppManagerAdminAppClient,

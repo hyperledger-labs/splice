@@ -21,6 +21,7 @@ import com.daml.network.environment.CNNodeStatus
 import com.daml.network.http.v0.definitions.CometBftNodeDumpResponse
 import com.daml.network.http.v0.sv_admin.GetCometBftNodeDebugDumpResponse
 import com.daml.network.http.v0.{definitions, sv_admin as http}
+import com.daml.network.sv.DomainMigrationDump
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -464,6 +465,28 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.PauseGlobalDomainResponse.OK =>
       Right(())
+    }
+  }
+
+  case class GetDomainMigrationDump()
+      extends BaseCommand[
+        http.GetDomainMigrationDumpResponse,
+        DomainMigrationDump,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetDomainMigrationDumpResponse] =
+      client.getDomainMigrationDump(headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetDomainMigrationDumpResponse.OK(response) =>
+      DomainMigrationDump.fromHttp(response)
     }
   }
 

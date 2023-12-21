@@ -6,7 +6,8 @@ import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.http.v0.validator_admin as http
 import com.daml.network.http.v0.definitions.OnboardUserRequest
-import com.daml.network.util.{Codec, NodeIdentitiesDump, TemplateJsonDecoder}
+import com.daml.network.identities.NodeIdentitiesDump
+import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 

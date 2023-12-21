@@ -2,7 +2,7 @@ package com.daml.network.setup
 
 import cats.implicits.toFoldableOps
 import com.daml.network.environment.{RetryFor, RetryProvider, TopologyAdminConnection}
-import com.daml.network.util.NodeIdentitiesDump
+import com.daml.network.identities.NodeIdentitiesDump
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext

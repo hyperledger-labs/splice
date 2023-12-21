@@ -16,10 +16,11 @@ import com.daml.network.environment.{
   ParticipantAdminConnection,
   RetryProvider,
 }
+import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.QualifiedName
 import com.daml.network.validator.config.{AppManagerConfig, BuyExtraTrafficConfig}
-import com.daml.network.validator.store.{AppManagerStore, NodeIdentitiesStore, ValidatorStore}
+import com.daml.network.validator.store.{AppManagerStore, ValidatorStore}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.automation.{OffboardUsersTrigger, WalletAppInstallTrigger}
 import com.digitalasset.canton.DomainAlias

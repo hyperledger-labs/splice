@@ -1,10 +1,10 @@
-package com.daml.network.util
+package com.daml.network.identities
 
 import better.files.File
+import com.daml.network.http.v0.definitions as http
 import com.digitalasset.canton.topology.NodeIdentity
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
-import com.daml.network.http.v0.definitions as http
 import io.circe.Json
 import io.circe.syntax.*
 

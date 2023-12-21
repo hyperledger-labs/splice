@@ -164,6 +164,18 @@ paths:
       responses:
         "200":
           description: ok
+  /v0/admin/domain/migration-dump:
+    get:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "getDomainMigrationDump"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetDomainMigrationDumpResponse"
   /v0/admin/sv/identity/approve:
     post:
       tags: [sv]
@@ -1047,3 +1059,23 @@ components:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    DomainMigrationIdentities:
+      type: object
+      required:
+        - participant
+      properties:
+        participant:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
+        sequencer:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
+        mediator:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
+
+    GetDomainMigrationDumpResponse:
+      type: object
+      required:
+        - identities
+      properties:
+        identities:
+          $ref: "#/components/schemas/DomainMigrationIdentities"

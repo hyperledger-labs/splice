@@ -2,9 +2,9 @@ package com.daml.network.util
 
 import com.daml.network.config.GcpBucketConfig
 import com.daml.network.http.v0.definitions as http
+import com.daml.network.identities.{NodeIdentitiesDump, NodeIdentitiesStore}
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.validator.store.NodeIdentitiesStore
 import com.digitalasset.canton.topology.ParticipantId
 
 import java.nio.file.{Path, Paths}
