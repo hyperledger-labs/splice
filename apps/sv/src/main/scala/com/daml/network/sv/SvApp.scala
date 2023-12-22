@@ -105,17 +105,23 @@ class SvApp(
 
   override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
-    _ <- tryEnsureVersionMatch(config.onboarding)
-    _ <- ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
-      config.participantClient,
-      config.participantBootstrappingDump,
-      loggerFactory,
-      retryProvider,
-      clock,
-    )
+    _ <- appInitStep("Ensure version match") {
+      tryEnsureVersionMatch(config.onboarding)
+    }
+    _ <- appInitStep("Ensure participant initialized with expected id") {
+      ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+        config.participantClient,
+        config.participantBootstrappingDump,
+        loggerFactory,
+        retryProvider,
+        clock,
+      )
+    }
   } yield ()
 
-  override def initializeNode(ledgerClient: CNLedgerClient): Future[SvApp.State] = {
+  override def initializeNode(
+      ledgerClient: CNLedgerClient
+  ): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
       loggerFactory,
@@ -172,18 +178,22 @@ class SvApp(
     for {
       // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
       // reconnect all domains at the beginning of SV initialization just in case.
-      _ <- retryProvider.retry(
-        RetryFor.WaitingOnInitDependency,
-        "Reconnect all domains",
-        participantAdminConnection.reconnectAllDomains(),
-        logger,
-      )
-      participantId <- retryProvider.getValueWithRetries(
-        RetryFor.WaitingOnInitDependency,
-        "Participant ID",
-        participantAdminConnection.getParticipantId(),
-        logger,
-      )
+      _ <- appInitStep("Reconnect all domains") {
+        retryProvider.retry(
+          RetryFor.WaitingOnInitDependency,
+          "Reconnect all domains",
+          participantAdminConnection.reconnectAllDomains(),
+          logger,
+        )
+      }
+      participantId <- appInitStep("Get participant ID") {
+        retryProvider.getValueWithRetries(
+          RetryFor.WaitingOnInitDependency,
+          "Participant ID",
+          participantAdminConnection.getParticipantId(),
+          logger,
+        )
+      }
       cometBftClient = newCometBftClient
       cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
         new CometBftNode(client, config, loggerFactory)
@@ -207,11 +217,33 @@ class SvApp(
       // a fresh collective is fundamentally different from joining an existing collective
       config.onboarding match {
         case Some(foundingConfig: SvOnboardingConfig.FoundCollective) =>
-          // TODO(#5419): make the whole SvApp init tracing instead of just this local piece of code
-          TraceContext.withNewTraceContext(implicit traceContext => {
-            val initializer = new FoundingNodeInitializer(
+          appInitStep("FoundingNodeInitializer founding collective") {
+            // TODO(#5419): make the whole SvApp init tracing instead of just this local piece of code
+            TraceContext.withNewTraceContext(implicit traceContext => {
+              val initializer = new FoundingNodeInitializer(
+                config,
+                foundingConfig,
+                cometBftNode,
+                darFilesToUploadDuringInit,
+                loggerFactory,
+                retryProvider,
+                ledgerClient,
+                participantAdminConnection,
+                participantId,
+                clock,
+                storage,
+                localDomainNode.getOrElse(
+                  sys.error("Founding node must always specify a domain config")
+                ),
+              )
+              initializer.bootstrapCollective().map((_, Some(foundingConfig)))
+            })
+          }
+        case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
+          appInitStep("JoiningNodeInitializer joining collective with key") {
+            val initializer = new JoiningNodeInitializer(
               config,
-              foundingConfig,
+              Some(joiningConfig),
               cometBftNode,
               darFilesToUploadDuringInit,
               loggerFactory,
@@ -221,44 +253,28 @@ class SvApp(
               participantId,
               clock,
               storage,
-              localDomainNode.getOrElse(
-                sys.error("Founding node must always specify a domain config")
-              ),
+              localDomainNode,
             )
-            initializer.bootstrapCollective().map((_, Some(foundingConfig)))
-          })
-        case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
-          val initializer = new JoiningNodeInitializer(
-            config,
-            Some(joiningConfig),
-            cometBftNode,
-            darFilesToUploadDuringInit,
-            loggerFactory,
-            retryProvider,
-            ledgerClient,
-            participantAdminConnection,
-            participantId,
-            clock,
-            storage,
-            localDomainNode,
-          )
-          initializer.joinCollectiveAndOnboardNodes().map((_, None))
+            initializer.joinCollectiveAndOnboardNodes().map((_, None))
+          }
         case None =>
-          val initializer = new JoiningNodeInitializer(
-            config,
-            None,
-            cometBftNode,
-            darFilesToUploadDuringInit,
-            loggerFactory,
-            retryProvider,
-            ledgerClient,
-            participantAdminConnection,
-            participantId,
-            clock,
-            storage,
-            localDomainNode,
-          )
-          initializer.joinCollectiveAndOnboardNodes().map((_, None))
+          appInitStep("JoiningNodeInitializer joining collective") {
+            val initializer = new JoiningNodeInitializer(
+              config,
+              None,
+              cometBftNode,
+              darFilesToUploadDuringInit,
+              loggerFactory,
+              retryProvider,
+              ledgerClient,
+              participantAdminConnection,
+              participantId,
+              clock,
+              storage,
+              localDomainNode,
+            )
+            initializer.joinCollectiveAndOnboardNodes().map((_, None))
+          }
       }
 
       // TODO(#5141) Remove the comment about DAR uploads.
@@ -268,37 +284,49 @@ class SvApp(
       //    but could also be imported through the stream of the SV party. By only creating the validator user here
       //    we ensure that the party migration has been completed before the contract is created.
       // 2. Concurrent DAR uploads currently break Canton's topology state management.
-      _ <- SvApp.initializeValidator(svcAutomation, config, retryProvider, logger)
+      _ <- appInitStep("Initialize validator") {
+        SvApp.initializeValidator(svcAutomation, config, retryProvider, logger)
+      }
 
       // Ensure Daml-level invariants for the SV
       // ----------------------------------------
 
       // At this point the complex setup of SVC party, sequencer, and mediators is done
       // What remains is setting up some SV-level Daml state.
-      _ <- expectConfiguredValidatorOnboardings(
-        svAutomation,
-        globalDomain,
-        clock,
-      )
-      _ <- approveConfiguredSvIdentities(svAutomation, globalDomain)
-      isDevNet <- retryProvider.getValueWithRetriesNoPretty(
-        RetryFor.WaitingOnInitDependency,
-        "get CoinRules to determine if we are in a DevNet",
-        svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
-        logger,
-      )
-
-      _ <- config.initialCoinPriceVote
-        .map(
-          ensureCoinPriceVoteHasCoinPrice(
-            _,
-            svcAutomation,
-            logger,
-          )
+      _ <- appInitStep("Expect configured validator onboardings") {
+        expectConfiguredValidatorOnboardings(
+          svAutomation,
+          globalDomain,
+          clock,
         )
-        .getOrElse(Future.unit)
+      }
+      _ <- appInitStep("Approve configured SV identities") {
+        approveConfiguredSvIdentities(svAutomation, globalDomain)
+      }
+      isDevNet <- appInitStep("Get CoinRules to determine if we are in a DevNet") {
+        retryProvider.getValueWithRetriesNoPretty(
+          RetryFor.WaitingOnInitDependency,
+          "get CoinRules to determine if we are in a DevNet",
+          svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
+          logger,
+        )
+      }
 
-      _ <- waitUntilConfiguredOnboardingContractsHaveBeenCreated(svStore)
+      _ <- appInitStep("Ensure coin price has a vote") {
+        config.initialCoinPriceVote
+          .map(
+            ensureCoinPriceVoteHasCoinPrice(
+              _,
+              svcAutomation,
+              logger,
+            )
+          )
+          .getOrElse(Future.unit)
+      }
+
+      _ <- appInitStep("Wait until configured onboarding contracts have been created") {
+        waitUntilConfiguredOnboardingContractsHaveBeenCreated(svStore)
+      }
 
       // We're registering the trafficBalanceService on the LedgerClient after all the SV onboarding steps
       // because we do not want the onboarding to be throttled by the balance check.
@@ -393,16 +421,16 @@ class SvApp(
         }
 
       }
-      _ = logger.info(s"Starting http server on ${config.adminApi.clientConfig}")
-      binding <- Http()
-        .newServerAt(
-          config.adminApi.clientConfig.address,
-          config.adminApi.clientConfig.port.unwrap,
-        )
-        .bind(
-          routes
-        )
-      _ = logger.info(s"SV App is initialized")
+      binding <- appInitStep(s"Start http server on ${config.adminApi.clientConfig}") {
+        Http()
+          .newServerAt(
+            config.adminApi.clientConfig.address,
+            config.adminApi.clientConfig.port.unwrap,
+          )
+          .bind(
+            routes
+          )
+      }
     } yield {
       SvApp.State(
         participantAdminConnection,
@@ -454,7 +482,9 @@ class SvApp(
       )
   }
 
-  private def tryEnsureVersionMatch(onboardingO: Option[SvOnboardingConfig]): Future[Unit] =
+  private def tryEnsureVersionMatch(
+      onboardingO: Option[SvOnboardingConfig]
+  )(implicit traceContext: TraceContext): Future[Unit] =
     onboardingO match {
       case Some(onboarding) =>
         onboarding match {

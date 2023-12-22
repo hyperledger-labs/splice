@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.SSLContext
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
 /** A running instance of a canton node. See CNNode for the subclass that provides the default initialization for most apps. */
@@ -223,7 +223,6 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
               logger,
             )
       }
-
     new CNLedgerClient(
       participantClient.ledgerApi.clientConfig,
       // Note: When ledger API auth is enabled, application ID must be equal to user ID
@@ -255,15 +254,62 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
       ledgerClient: CNLedgerClient
   ): Future[State]
 
-  logger.info(s"Starting initialization")
+  private lazy val appInitMessage = s"$name app initialization"
+
+  protected def appInitStep[T](
+      description: String
+  )(f: => Future[T]): Future[T] =
+    TraceContext.withNewTraceContext(implicit tc => {
+      logger.debug(s"$appInitMessage: $description started")(tc)
+      // TODO(#5419): here we could pass on the trace context to inner function to make sure all log lines
+      // produced by this initialization step are tagged with the same trace id.
+      // However, some of our helper methods hold onto the trace context and use it for all future
+      // operations. This would mean that the trace context would be used for operations that are
+      // not part of the initialization step.
+      Try(f) match {
+        case Success(asyncValue) =>
+          asyncValue.transform {
+            case result @ Success(_) =>
+              logger.info(s"$appInitMessage: $description finished")(tc)
+              result
+            case Failure(ex) =>
+              logger.info(s"$appInitMessage: $description failed", ex)(tc)
+              Failure(new RuntimeException(s"$appInitMessage: $description failed", ex))
+          }
+        case Failure(ex) =>
+          logger.info(s"$appInitMessage: $description failed", ex)(tc)
+          throw new RuntimeException(s"$appInitMessage: $description failed", ex)
+      }
+    })
+
+  protected def appInitStepSync[T](
+      description: String
+  )(f: => T): T = TraceContext.withNewTraceContext(implicit tc => {
+    logger.info(s"$appInitMessage: $description started")(tc)
+    // See note about trace context in appInitStep
+    Try(f) match {
+      case Success(value) =>
+        logger.info(s"$appInitMessage: $description finished")(tc)
+        value
+      case Failure(ex) =>
+        logger.info(s"$appInitMessage: $description failed", ex)(tc)
+        throw new RuntimeException(s"$appInitMessage: $description failed", ex)
+    }
+  })
+
+  logger.info(s"$appInitMessage: Starting initialization")
   private val preInitialize1F = preInitializeBeforeLedgerConnection()
-  private val ledgerClientF = preInitialize1F.flatMap { _ => createLedgerClient() }
+  private val ledgerClientF = preInitialize1F.flatMap { _ =>
+    appInitStep("Create ledger client") { createLedgerClient() }
+  }
   private val initializeF = ledgerClientF.flatMap { client =>
     val initConnection = client.readOnlyConnection(
       this.getClass.getSimpleName,
       loggerFactory,
     )
-    waitForUser(initConnection).flatMap(_ => initializeNode(client))
+    appInitStep("Wait for user") { waitForUser(initConnection) }.flatMap(_ =>
+      initializeNode(client)
+    )
   }
   private[network] def getState = initializeF.value match {
     case Some(Success(state)) => Some(state)
@@ -271,7 +317,9 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
   }
 
   initializeF.foreach { _ =>
-    logger.info(s"Initialization complete, running on version ${BuildInfo.compiledVersion}")
+    logger.info(
+      s"$appInitMessage: Initialization complete, running on version ${BuildInfo.compiledVersion}"
+    )
     isInitializedVar.set(true)
   }
 
@@ -282,12 +330,13 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
   val initUnlessClosing = initializeF.andThen {
     case Failure(err) if this.isClosing =>
       logger.info(
-        s"Ignoring initialization failure, we are actually shutting down. Message was: ${err.getMessage()}"
+        s"$appInitMessage: Ignoring initialization failure, we are actually shutting down. Message was: ${err.getMessage()}"
       )
     case Failure(err) =>
-      val msg = s"Initialization of $name failed"
+      val msg = s"$appInitMessage: Initialization failed"
       logger.error(msg, err)
       System.err.println(s"$msg, so exiting; check the application logs for details")
+      err.printStackTrace()
       sys.exit(1)
   }
 

@@ -171,7 +171,7 @@ class ValidatorApp(
 
   private def setupWalletDars(
       participantAdminConnection: ParticipantAdminConnection
-  ): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info(s"Attempting to setup wallet...")
     val darFiles = Seq(
       UploadablePackage.fromResource(DarResources.wallet.bootstrap),
@@ -231,7 +231,7 @@ class ValidatorApp(
       store: ValidatorStore,
       validatorParty: PartyId,
       onboardingConfig: Option[ValidatorOnboardingConfig],
-  ): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     store.lookupValidatorLicenseWithOffset().flatMap {
       case QueryResult(_, Some(_)) =>
         logger.info("ValidatorLicense found => already onboarded.")
@@ -467,15 +467,19 @@ class ValidatorApp(
         retryProvider,
         clock,
       )
-      _ <- setupWalletDars(participantAdminConnection)
+      _ <- appInitStep("Setup wallet dars") {
+        setupWalletDars(participantAdminConnection)
+      }
       // Upload the DAR bfeore starting automation. Otherwise ingestion will fail
       // due to an unknown template.
-      _ <- config.appManager.traverse_ { _ =>
-        val dar = UploadablePackage.fromResource(DarResources.appManager.bootstrap)
-        participantAdminConnection.uploadDarFiles(
-          Seq(dar),
-          RetryFor.WaitingOnInitDependency,
-        )
+      _ <- appInitStep("Setup app manager dars") {
+        config.appManager.traverse_ { _ =>
+          val dar = UploadablePackage.fromResource(DarResources.appManager.bootstrap)
+          participantAdminConnection.uploadDarFiles(
+            Seq(dar),
+            RetryFor.WaitingOnInitDependency,
+          )
+        }
       }
       participantIdentitiesStore = new NodeIdentitiesStore(
         participantAdminConnection,
@@ -483,7 +487,9 @@ class ValidatorApp(
         clock,
         loggerFactory,
       )
-      scanConnection <- getScanConnection(ledgerClient)
+      scanConnection <- appInitStep("Get scan connection") {
+        getScanConnection(ledgerClient)
+      }
 
       // Register the traffic balance service
       trafficBalanceService = newTrafficBalanceService(participantAdminConnection, scanConnection)
@@ -493,7 +499,9 @@ class ValidatorApp(
       // must have their priority set as CommandPriority.High to ensure that they are not blocked by
       // the traffic balance service while the first top-up for the validator is yet to go through.
 
-      svcParty <- scanConnection.getSvcPartyIdWithRetries()
+      svcParty <- appInitStep("Get SVC party id") {
+        scanConnection.getSvcPartyIdWithRetries()
+      }
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
         svcParty = svcParty,
@@ -537,46 +545,53 @@ class ValidatorApp(
         retryProvider,
         loggerFactory,
       )
-      _ = logger.info(
-        s"Waiting for domain connection on ${config.domains.global.alias} before setting up app instances"
-      )
-      domainId <- store.domains.waitForDomainConnection(config.domains.global.alias)
+      domainId <- appInitStep(s"Wait for domain connection on ${config.domains.global.alias}") {
+        store.domains.waitForDomainConnection(config.domains.global.alias)
+      }
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
-        setupAppInstance(
-          name,
-          instance,
-          validatorParty,
-          automation,
-          participantAdminConnection,
-          domainId,
-        )
+        appInitStep(s"Set up app instance $name") {
+          setupAppInstance(
+            name,
+            instance,
+            validatorParty,
+            automation,
+            participantAdminConnection,
+            domainId,
+          )
+        }
       })
       // Receive the import crates for the validator party here, so that we can skip onboarding if there is a crate
       // containing a validator license. This MAY contend in a benign fashion with the crate receipt in the
       // 'UserWalletService' in case the validator app is restarted within its initialization sequence.
-      _ <- AcsStoreDump.receiveCratesFor(
-        validatorParty,
-        (party: PartyId, tc0: TraceContext) => scanConnection.getImportShipment(party)(tc0),
-        // Use the ValidatorStore's associated connection, so the later check whether a ValidatorLicense exists runs
-        // against the store updated with the results of the crate import.
-        automation.connection,
-        retryProvider,
-        logger,
-        CommandPriority.High,
-      )
-      _ <- ValidatorUtil.onboard(
-        endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
-        knownParty = Some(validatorParty),
-        automation,
-        validatorUserName = config.ledgerApiUser,
-        // we're initializing so CoinRules is guaranteed to be on domainId
-        getCoinRulesDomain = () => _ => Future successful domainId,
-        participantAdminConnection,
-        retryProvider,
-        logger,
-        CommandPriority.High,
-      )
-      _ <- ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
+      _ <- appInitStep(s"Receive import crates") {
+        AcsStoreDump.receiveCratesFor(
+          validatorParty,
+          (party: PartyId, tc0: TraceContext) => scanConnection.getImportShipment(party)(tc0),
+          // Use the ValidatorStore's associated connection, so the later check whether a ValidatorLicense exists runs
+          // against the store updated with the results of the crate import.
+          automation.connection,
+          retryProvider,
+          logger,
+          CommandPriority.High,
+        )
+      }
+      _ <- appInitStep(s"Onboard validator") {
+        ValidatorUtil.onboard(
+          endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),
+          knownParty = Some(validatorParty),
+          automation,
+          validatorUserName = config.ledgerApiUser,
+          // we're initializing so CoinRules is guaranteed to be on domainId
+          getCoinRulesDomain = () => _ => Future successful domainId,
+          participantAdminConnection,
+          retryProvider,
+          logger,
+          CommandPriority.High,
+        )
+      }
+      _ <- appInitStep(s"Ensure validator is onboarded") {
+        ensureValidatorIsOnboarded(store, validatorParty, config.onboarding)
+      }
 
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
@@ -649,13 +664,15 @@ class ValidatorApp(
 
           for {
             _ <- config.initialRegisteredApps.values.toList.traverse { app =>
-              service.registerApp(
-                app.providerUserId,
-                app.config,
-                new java.io.File(app.releaseFile),
-                RetryFor.WaitingOnInitDependency,
-                CommandPriority.High,
-              )
+              appInitStep(s"Register app ${app.config.name}") {
+                service.registerApp(
+                  app.providerUserId,
+                  app.config,
+                  new java.io.File(app.releaseFile),
+                  RetryFor.WaitingOnInitDependency,
+                  CommandPriority.High,
+                )
+              }
             }
             // TODO (#7458): use the endpoint implemented in #7516
 //            _ <- config.initialInstalledApps.values.toList.traverse { app =>
@@ -785,15 +802,16 @@ class ValidatorApp(
         }
       }
 
-      _ = logger.info(s"Starting http server on ${config.adminApi.clientConfig}")
-      binding <- Http()
-        .newServerAt(
-          config.adminApi.clientConfig.address,
-          config.adminApi.clientConfig.port.unwrap,
-        )
-        .bind(
-          routes
-        )
+      binding <- appInitStep(s"Start http server on ${config.adminApi.clientConfig}") {
+        Http()
+          .newServerAt(
+            config.adminApi.clientConfig.address,
+            config.adminApi.clientConfig.port.unwrap,
+          )
+          .bind(
+            routes
+          )
+      }
 
     } yield {
       ValidatorApp.State(

@@ -62,13 +62,14 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
       ledgerClient: CNLedgerClient
   ): Future[State] = for {
     _ <- preInitializeBeforeLedgerConnection()
-    _ = logger.info(s"Acquiring ledger connection")
-    initConnection = ledgerClient.readOnlyConnection(
-      this.getClass.getSimpleName,
-      loggerFactory,
-    )
+    initConnection = appInitStepSync("Acquire ledger connection") {
+      ledgerClient.readOnlyConnection(
+        this.getClass.getSimpleName,
+        loggerFactory,
+      )
+    }
     _ <- preInitializeAfterLedgerConnection(initConnection, ledgerClient)
-    serviceParty <-
+    serviceParty <- appInitStep("Get primary party") {
       retryProvider.getValueWithRetries[PartyId](
         RetryFor.WaitingOnInitDependency,
         s"primary party of service user $serviceUser",
@@ -80,9 +81,11 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
         // Since this is the first ledger API call in the app, we additionally retry on auth errors here.
         additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
       )
-    _ = logger.info(s"Waiting for packages to be uploaded: ${requiredPackageIds}")
-    _ <- initConnection.waitForPackages(requiredPackageIds)
-    _ = logger.info(s"Packages available, running app-specific init")
+    }
+    _ <- appInitStep("Wait for packages to be uploaded") {
+      logger.info(s"Required packages: ${requiredPackageIds}")
+      initConnection.waitForPackages(requiredPackageIds)
+    }
     state <- initialize(ledgerClient, serviceParty)
   } yield state
 }

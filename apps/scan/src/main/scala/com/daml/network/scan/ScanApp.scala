@@ -84,20 +84,20 @@ class ScanApp(
       serviceUserPrimaryParty: PartyId,
   ): Future[ScanApp.State] = {
     for {
-      svcParty <- ledgerClient
-        .readOnlyConnection(
-          this.getClass.getSimpleName,
-          loggerFactory,
-        )
-        .getSvcPartyFromUserMetadata(config.svUser)
-      store <- Future.successful(
-        ScanStore(
-          serviceUserPrimaryParty = serviceUserPrimaryParty,
-          svcParty = svcParty,
-          storage,
-          loggerFactory,
-          retryProvider,
-        )
+      svcParty <- appInitStep("Get SVC party from user metadata") {
+        ledgerClient
+          .readOnlyConnection(
+            this.getClass.getSimpleName,
+            loggerFactory,
+          )
+          .getSvcPartyFromUserMetadata(config.svUser)
+      }
+      store = ScanStore(
+        serviceUserPrimaryParty = serviceUserPrimaryParty,
+        svcParty = svcParty,
+        storage,
+        loggerFactory,
+        retryProvider,
       )
       sequencerAdminConnection = new SequencerAdminConnection(
         config.sequencerAdminClient,
@@ -114,20 +114,22 @@ class ScanApp(
         store,
         config.ingestFromParticipantBegin,
       )
-      _ <- retryProvider.waitUntil(
-        RetryFor.WaitingOnInitDependency,
-        "there is an OpenMiningRound contract",
-        store.multiDomainAcsStore
-          .listContracts(roundCodegen.OpenMiningRound.COMPANION, limit = PageLimit.tryCreate(1))
-          .map { cs =>
-            if (cs.isEmpty) {
-              throw Status.NOT_FOUND
-                .withDescription("OpenMiningRound contract")
-                .asRuntimeException()
-            }
-          },
-        logger,
-      )
+      _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
+        retryProvider.waitUntil(
+          RetryFor.WaitingOnInitDependency,
+          "there is an OpenMiningRound contract",
+          store.multiDomainAcsStore
+            .listContracts(roundCodegen.OpenMiningRound.COMPANION, limit = PageLimit.tryCreate(1))
+            .map { cs =>
+              if (cs.isEmpty) {
+                throw Status.NOT_FOUND
+                  .withDescription("OpenMiningRound contract")
+                  .asRuntimeException()
+              }
+            },
+          logger,
+        )
+      }
 
       internalHandler = new HttpScanHandler(
         store,
@@ -169,15 +171,16 @@ class ScanApp(
         }
       }
 
-      _ = logger.info(s"Starting http server on ${config.adminApi.clientConfig}")
-      binding <- Http()
-        .newServerAt(
-          config.adminApi.clientConfig.address,
-          config.adminApi.clientConfig.port.unwrap,
-        )
-        .bind(
-          routes
-        )
+      binding <- appInitStep(s"Start http server on ${config.adminApi.clientConfig}") {
+        Http()
+          .newServerAt(
+            config.adminApi.clientConfig.address,
+            config.adminApi.clientConfig.port.unwrap,
+          )
+          .bind(
+            routes
+          )
+      }
     } yield {
       ScanApp.State(
         sequencerAdminConnection,

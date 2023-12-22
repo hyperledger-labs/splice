@@ -83,7 +83,7 @@ class SplitwellApp(
     store <- Future.successful(
       SplitwellStore(party, storage, config.domains, loggerFactory, retryProvider)
     )
-    scanConnection <-
+    scanConnection <- appInitStep(s"Get scan connection") {
       ScanConnection(
         ledgerClient,
         config.scanClient,
@@ -91,6 +91,7 @@ class SplitwellApp(
         retryProvider,
         loggerFactory,
       )
+    }
     participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
       loggerFactory,
@@ -106,15 +107,20 @@ class SplitwellApp(
       retryProvider,
       loggerFactory,
     )
-    preferred <- store.domains.waitForDomainConnection(config.domains.splitwell.preferred.alias)
-    others <- config.domains.splitwell.others
-      .map(_.alias)
-      .toList
-      .traverse(store.domains.waitForDomainConnection(_))
-
+    preferred <- appInitStep(s"Wait for preferred domain connection") {
+      store.domains.waitForDomainConnection(config.domains.splitwell.preferred.alias)
+    }
+    others <- appInitStep(s"Wait for other domain connections") {
+      config.domains.splitwell.others
+        .map(_.alias)
+        .toList
+        .traverse(store.domains.waitForDomainConnection(_))
+    }
     splitwellDomains = SplitwellDomains(preferred, others)
 
-    _ <- createSplitwellRules(splitwellDomains, automation)
+    _ <- appInitStep(s"Create splitwell rules") {
+      createSplitwellRules(splitwellDomains, automation)
+    }
 
     handler = new HttpSplitwellHandler(
       participantAdminConnection,
@@ -143,15 +149,16 @@ class SplitwellApp(
         }
       }
     }
-    _ = logger.info(s"Starting http server on ${config.adminApi.clientConfig}")
-    binding <- Http()
-      .newServerAt(
-        config.adminApi.clientConfig.address,
-        config.adminApi.clientConfig.port.unwrap,
-      )
-      .bind(
-        routes
-      )
+    binding <- appInitStep(s"Start http server on ${config.adminApi.clientConfig}") {
+      Http()
+        .newServerAt(
+          config.adminApi.clientConfig.address,
+          config.adminApi.clientConfig.port.unwrap,
+        )
+        .bind(
+          routes
+        )
+    }
   } yield {
     SplitwellApp.State(
       automation,
