@@ -127,14 +127,16 @@ class SvOffboardingIntegrationTest extends SvIntegrationTestBase {
     )(
       "The vote request has been created",
       _ => {
-        sv1Backend.listVoteRequests().head.contractId
+        val voteRequestCid = sv1Backend.listVoteRequests().head.contractId
+        svs.foreach { sv =>
+          sv.listVoteRequests().head.contractId shouldBe voteRequestCid
+        }
+        voteRequestCid
       },
     )
 
     clue("SV2 votes on removing sv4") {
-      eventually() {
-        sv2Backend.castVote(voteRequestCid4, true, "url", "description")
-      }
+      sv2Backend.castVote(voteRequestCid4, true, "url", "description")
     }
 
     actAndCheck(
