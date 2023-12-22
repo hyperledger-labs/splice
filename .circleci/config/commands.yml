@@ -953,6 +953,12 @@ commands:
           path: todo-out/todos
           destination: todos
 
+  run_trailing_whitespace_check:
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: Check for trailing whitespace
+          cmd: ./scripts/check-trailing-whitespace.sh
+
   set-failed-parallel-run-url:
     steps:
       - run:

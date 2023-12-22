@@ -1067,6 +1067,12 @@ commands:
           path: todo-out/todos
           destination: todos
 
+  run_trailing_whitespace_check:
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: Check for trailing whitespace
+          cmd: ./scripts/check-trailing-whitespace.sh
+
   set-failed-parallel-run-url:
     steps:
       - run:
@@ -1484,10 +1490,12 @@ jobs:
             source .envrc.vars
             .circleci/build-config.sh --check
       - setup_sbt_test_job
+      # Run the cheap checks before the sbt based ones to provide fast feedback
+      - run_trailing_whitespace_check
+      - run_todo_script
       - execute_sbt_command:
           cmd: "Test/compile lint"
           cmd_retry_count: 3
-      - run_todo_script
       - cleanup_sbt_test_job
       - collect_test_timings_and_send_to_datadog
 

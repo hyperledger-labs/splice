@@ -64,3 +64,8 @@ repos:
         language: system
         entry: "./scripts/check-upgrade-model-diff.sh"
         pass_filenames: false
+      - id: check-trailing-whitespace
+        name: Check for trailing whitespace
+        language: system
+        entry: "./scripts/check-trailing-whitespace.sh"
+        pass_filenames: false
