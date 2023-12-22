@@ -692,6 +692,50 @@ class SvFrontendIntegrationTest
         withFrontEnd("sv1") { implicit webDriver =>
           val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
 
+          def submitSetConfigRequest(expiresInNextMinutes: Boolean) = {
+            // The `eventually` guards against `StaleElementReferenceException`s
+            // eventually() must contain clickVoteRequestSubmitButtonOnceEnabled() to retry the whole process
+            eventually() {
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("SRARC_SetConfig")
+
+              inside(find(id("numUnclaimedRewardsThreshold-value"))) { case Some(element) =>
+                element.underlying.sendKeys(requestNewNumUnclaimedRewardsThreshold)
+              }
+              inside(find(id("create-reason-summary"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonBody)
+              }
+              inside(find(id("create-reason-url"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonUrl)
+              }
+              if (expiresInNextMinutes) {
+                setExpirationDate(
+                  "sv1",
+                  DateTimeFormatter
+                    .ofPattern("dd/MM/yyyy HH:mm a")
+                    .format(
+                      // TODO(#8835): consider reducing to 1 minute again after we remove the screenshot call
+                      LocalDateTime
+                        .ofInstant(CantonTimestamp.now().toInstant, ZoneOffset.UTC)
+                        .plusMinutes(2)
+                    ),
+                )
+              }
+              clickVoteRequestSubmitButtonOnceEnabled()
+            }
+          }
+
+          def checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress: Int) = {
+            click on "tab-panel-in-progress"
+            val tbody = find(id("sv-voting-in-progress-table-body"))
+            val reviewButton = inside(tbody) { case Some(tb) =>
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              rows.size should be > previousVoteRequestsInProgress
+              rows.head
+            }
+            reviewButton
+          }
+
           actAndCheck(
             "sv1 operator can login and browse to the governance tab", {
               go to s"http://localhost:$sv1UIPort/votes"
@@ -704,67 +748,31 @@ class SvFrontendIntegrationTest
             },
           )
 
-          def setConfigRequest(expiresInNextMinutes: Boolean) = actAndCheck(
-            "sv1 operator can create a new vote request", {
-              // The `eventually` guards against `StaleElementReferenceException`s
-              // eventually() must contain clickVoteRequestSubmitButtonOnceEnabled() to retry the whole process
-              eventually() {
-                val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-                dropDownAction.selectByValue("SRARC_SetConfig")
-
-                inside(find(id("numUnclaimedRewardsThreshold-value"))) { case Some(element) =>
-                  element.underlying.sendKeys(requestNewNumUnclaimedRewardsThreshold)
-                }
-                inside(find(id("create-reason-summary"))) { case Some(element) =>
-                  element.underlying.sendKeys(requestReasonBody)
-                }
-                inside(find(id("create-reason-url"))) { case Some(element) =>
-                  element.underlying.sendKeys(requestReasonUrl)
-                }
-
-                if (expiresInNextMinutes) {
-                  setExpirationDate(
-                    "sv1",
-                    DateTimeFormatter
-                      .ofPattern("dd/MM/yyyy HH:mm a")
-                      .format(
-                        // TODO(#8835): consider reducing to 1 minute again after we remove the screenshot call
-                        LocalDateTime
-                          .ofInstant(CantonTimestamp.now().toInstant, ZoneOffset.UTC)
-                          .plusMinutes(2)
-                      ),
-                  )
-                }
-
-                clickVoteRequestSubmitButtonOnceEnabled()
-              }
+          actAndCheck(
+            "sv1 operator creates a new vote request with a short expiration time", {
+              submitSetConfigRequest(expiresInNextMinutes = true)
             },
           )(
-            "sv1 can see the new vote request",
-            _ => {
-              click on "tab-panel-in-progress"
-
-              if (!expiresInNextMinutes) {
-                val tbody = find(id("sv-voting-in-progress-table-body"))
-                inside(tbody) { case Some(tb) =>
-                  val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-                  rows.size should be > previousVoteRequestsInProgress
-                  val reviewButton = rows.head
-                  reviewButton.underlying.click()
-                }
-                val requestId =
-                  inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
-                    tb.text
-                  }
-                requestId
-              } else {
-                ""
-              }
-            },
+            "sv1 can see the new vote request in the progress tab",
+            _ => checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress),
           )
 
-          setConfigRequest(expiresInNextMinutes = true)
-          val (_, requestId) = setConfigRequest(expiresInNextMinutes = false)
+          val (_, requestId) = actAndCheck(
+            "sv1 operator creates a new vote request with a long expiration time", {
+              submitSetConfigRequest(expiresInNextMinutes = false)
+            },
+          )(
+            "sv1 can see the new vote request in the progress tab",
+            _ => {
+              val reviewButton = checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress)
+              reviewButton.underlying.click()
+              val requestId =
+                inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                  tb.text
+                }
+              requestId
+            },
+          )
 
           vote(sv2Backend, requestId, false, "1", false)
           vote(sv3Backend, requestId, false, "1", false)
