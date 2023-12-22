@@ -88,7 +88,7 @@ testUsageFees = do
         - config.createFee.fee - expectedLockFee1 - expectedSenderTransferFee
         - expectedSenderLockFee3
 
-  let ignoreBalanceChanges = transferResult.summary with balanceChanges = Map.empty 
+  let ignoreBalanceChanges = transferResult.summary with balanceChanges = Map.empty
 
   ignoreBalanceChanges === TransferSummary with
     inputAppRewardAmount = 0.0
@@ -100,9 +100,9 @@ testUsageFees = do
     senderChangeFee
     senderChangeAmount = 0.0
     coinPrice = 1.0
-  
+
   let totalBalanceChange = sum $ Map.values transferResult.summary.balanceChanges
-  
+
   totalBalanceChange.changeToHoldingFeesRate  === outputCoinHoldingFees - inputCoinHoldingFees
   assertMsg "Partial sender change fee"
     (0.0 < senderChangeFee && senderChangeFee < config.createFee.fee)
@@ -240,7 +240,7 @@ testSenderChangeAndOutput = do
   let outputAmount2 = 30.0
   let outputAmount3 = 25.0
   coin1 <- tap app alice coin1Amount
-  
+
   runNextIssuance app
   context <- getPaymentTransferContext app alice
   runNextIssuance app
@@ -270,7 +270,7 @@ testSenderChangeAndOutput = do
                     lock = None
                 ]
     context = context.context
-  assertMsg "senderChangeAmount > 0" 
+  assertMsg "senderChangeAmount > 0"
     (transferResult.summary.senderChangeAmount > 0.0)
   aliceNormalizedBalanceAfter <- getNormalizedBalance alice.primaryParty
 
@@ -290,7 +290,7 @@ testSenderNoChange = do
   let outputAmount2 = 30.0
   let outputAmount3 = 20.0
   coin1 <- tap app alice coin1Amount
-  
+
   runNextIssuance app
   context <- getPaymentTransferContext app alice
   runNextIssuance app
@@ -319,9 +319,9 @@ testSenderNoChange = do
                     lock = None
                 ]
     context = context.context
-  assertMsg "senderChangeAmount == 0" 
+  assertMsg "senderChangeAmount == 0"
     (transferResult.summary.senderChangeAmount == 0.0)
-  
+
   let Some(balanceChange) = Map.lookup alice.primaryParty transferResult.summary.balanceChanges
   balanceChange.changeToHoldingFeesRate === holdingFee
   return ()
@@ -336,7 +336,7 @@ testSenderNoChangeNoSenderOutput = do
   let outputAmount1 = 58.97
   let outputAmount2 = 39.98
   coin1 <- tap app alice coin1Amount
-  
+
   runNextIssuance app
   context <- getPaymentTransferContext app alice
   runNextIssuance app
@@ -346,7 +346,7 @@ testSenderNoChangeNoSenderOutput = do
       sender = alice.primaryParty
       provider = alice.primaryParty
       inputs = map (\c -> InputCoin c)[coin1]
-      outputs = [ 
+      outputs = [
                   TransferOutput with
                     receiver = bob.primaryParty
                     receiverFeeRatio = 0.0
@@ -360,12 +360,12 @@ testSenderNoChangeNoSenderOutput = do
 
                 ]
     context = context.context
-  assertMsg "senderChangeAmount == 0" 
+  assertMsg "senderChangeAmount == 0"
     (transferResult.summary.senderChangeAmount == 0.0)
-  
+
   let Some(bobBalanceChange) = Map.lookup bob.primaryParty transferResult.summary.balanceChanges
   bobBalanceChange.changeToHoldingFeesRate === 2.0 * holdingFee
-  
+
   let Some(aliceBalanceChange) = Map.lookup alice.primaryParty transferResult.summary.balanceChanges
   aliceBalanceChange.changeToHoldingFeesRate === negate holdingFee
 

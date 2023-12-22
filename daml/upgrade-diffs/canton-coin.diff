@@ -130,7 +130,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/T
                  ]
 +      upgrade = Some ()
      context = context.context
-   assertMsg "senderChangeAmount > 0" 
+   assertMsg "senderChangeAmount > 0"
      (transferResult.summary.senderChangeAmount > 0.0)
 @@ -318,6 +322,7 @@
                      amount = outputAmount3
@@ -138,7 +138,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/T
                  ]
 +      upgrade = Some ()
      context = context.context
-   assertMsg "senderChangeAmount == 0" 
+   assertMsg "senderChangeAmount == 0"
      (transferResult.summary.senderChangeAmount == 0.0)
 @@ -359,6 +364,7 @@
                      lock = None
@@ -146,7 +146,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/T
                  ]
 +      upgrade = Some ()
      context = context.context
-   assertMsg "senderChangeAmount == 0" 
+   assertMsg "senderChangeAmount == 0"
      (transferResult.summary.senderChangeAmount == 0.0)
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Scripts/TestCoinRulesTransferLimits.daml ../daml/canton-coin-upgrade/daml/CC/Scripts/TestCoinRulesTransferLimits.daml
 --- ../daml/canton-coin/daml/CC/Scripts/TestCoinRulesTransferLimits.daml

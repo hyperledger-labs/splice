@@ -528,13 +528,13 @@ getNormalizedBalance party = do
   let sum = normalizedCoinBalance + normalizedLockedCoinBalance
   return sum
 
-getBalanceChangesFromAcs: DefaultAppWithUsers -> Script(Map.Map Party BalanceChange) 
-getBalanceChangesFromAcs DefaultAppWithUsers{..} = do 
+getBalanceChangesFromAcs: DefaultAppWithUsers -> Script(Map.Map Party BalanceChange)
+getBalanceChangesFromAcs DefaultAppWithUsers{..} = do
   coins <- query @Coin app.svc
   lockedCoins <- query @LockedCoin app.svc
-  let allCoins = (map (._2) coins) ++ map (._2.coin) lockedCoins 
-  
-  let balanceChangeFromCoin coin = BalanceChange with 
+  let allCoins = (map (._2) coins) ++ map (._2.coin) lockedCoins
+
+  let balanceChangeFromCoin coin = BalanceChange with
         changeToInitialAmountAsOfRoundZero = getValueAsOfRound0 coin.amount
         changeToHoldingFeesRate = coin.amount.ratePerRound.rate
 

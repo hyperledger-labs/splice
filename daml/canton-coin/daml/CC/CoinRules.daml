@@ -706,8 +706,8 @@ summarizeTransfer sender openRound transferConfigCC inp preprocessedOutputs = do
     trace summary $ trace preprocessedOutputs $ trace inp $ pure summary
   where
     coinAsOfRoundZeroAdjustment = intToDecimal openRound.round.number * transferConfigCC.holdingFee.rate
-    outputBalanceChange preprocessedOutput = 
-      let balanceChange = BalanceChange with 
+    outputBalanceChange preprocessedOutput =
+      let balanceChange = BalanceChange with
             changeToInitialAmountAsOfRoundZero = preprocessedOutput.amount + coinAsOfRoundZeroAdjustment
             changeToHoldingFeesRate = transferConfigCC.holdingFee.rate
       in (preprocessedOutput.owner, balanceChange)
@@ -719,13 +719,13 @@ summarizeTransfer sender openRound transferConfigCC inp preprocessedOutputs = do
       - inp.totalHoldingFees - totalOutputAmount - sum outputFees
     senderChangeFee = min transferConfigCC.createFee.fee leftOverAmount
     senderChangeAmount = leftOverAmount - senderChangeFee
-    
-    senderBalanceChange = if senderChangeAmount > 0.0 then 
-      BalanceChange with 
+
+    senderBalanceChange = if senderChangeAmount > 0.0 then
+      BalanceChange with
         changeToInitialAmountAsOfRoundZero = senderChangeAmount + coinAsOfRoundZeroAdjustment - inp.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = transferConfigCC.holdingFee.rate + inp.changeToHoldingFeesRate
-    else 
-      BalanceChange with 
+    else
+      BalanceChange with
         changeToInitialAmountAsOfRoundZero = negate inp.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = inp.changeToHoldingFeesRate
 
@@ -741,7 +741,7 @@ summarizeTransfer sender openRound transferConfigCC inp preprocessedOutputs = do
       senderChangeFee
       senderChangeAmount
       coinPrice = openRound.coinPrice
-          
+
 issueRewards : TransferContextSummary -> Party -> Party -> TransferSummary -> Update ()
 issueRewards csum sender provider summary
   | usageFees <= 0.0 = pure ()
@@ -953,10 +953,10 @@ data BalanceChange = BalanceChange with
   deriving (Show, Eq)
 
 instance Additive BalanceChange where
-  (+) l r = BalanceChange with 
+  (+) l r = BalanceChange with
      changeToInitialAmountAsOfRoundZero = l.changeToInitialAmountAsOfRoundZero + r.changeToInitialAmountAsOfRoundZero
      changeToHoldingFeesRate = l.changeToHoldingFeesRate + r.changeToHoldingFeesRate
   aunit = BalanceChange with changeToInitialAmountAsOfRoundZero = 0.0; changeToHoldingFeesRate = 0.0
-  (-) l r = BalanceChange with 
+  (-) l r = BalanceChange with
      changeToInitialAmountAsOfRoundZero = l.changeToInitialAmountAsOfRoundZero - r.changeToInitialAmountAsOfRoundZero
      changeToHoldingFeesRate = l.changeToHoldingFeesRate - r.changeToHoldingFeesRate

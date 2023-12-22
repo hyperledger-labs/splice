@@ -44,7 +44,7 @@ testCoinBurn = do
   -- uncomment the following line to see how 'Validator1' can gather his rewards
   -- after having being declared as validator
   runCoinDepositBots app
-  
+
   -- run some more issuances and transfer
   advanceToIssuanceWithPrice app 1.3
   runCoinDepositBots app

@@ -155,7 +155,7 @@ test = do
         - transferConfig.createFee.fee -- fee for returning change
         -- no subtraction of transferredCoinFee as that fee is paid by the receiver
 
-  let ignoreBalanceChanges = result.summary with balanceChanges = Map.empty 
+  let ignoreBalanceChanges = result.summary with balanceChanges = Map.empty
   ignoreBalanceChanges === TransferSummary with
     inputAppRewardAmount = 0.0
     inputValidatorRewardAmount = 0.0
@@ -168,7 +168,7 @@ test = do
     coinPrice = 1.0
 
   let totalBalanceChange = sum $ Map.values result.summary.balanceChanges
-  
+
   totalBalanceChange.changeToHoldingFeesRate  === outputCoinHoldingFees - inputCoinHoldingFees
   totalBalanceChange.changeToInitialAmountAsOfRoundZero  === normalizedBalanceAfterTransfer - normalizedBalanceBeforeTransfer
 
