@@ -54,7 +54,7 @@ class SvOffboardingIntegrationTest extends SvIntegrationTestBase {
         svs.foreach { sv =>
           sv.listVoteRequests() should not be empty
         }
-        val head = sv1Backend.listVoteRequests().head.contractId
+        val head = sv1Backend.listVoteRequests().headOption.value.contractId
         sv1Backend.listVotes(Vector(head.contractId)) should have size 1
         head
       },
@@ -127,9 +127,9 @@ class SvOffboardingIntegrationTest extends SvIntegrationTestBase {
     )(
       "The vote request has been created",
       _ => {
-        val voteRequestCid = sv1Backend.listVoteRequests().head.contractId
+        val voteRequestCid = sv1Backend.listVoteRequests().headOption.value.contractId
         svs.foreach { sv =>
-          sv.listVoteRequests().head.contractId shouldBe voteRequestCid
+          sv.listVoteRequests().headOption.value.contractId shouldBe voteRequestCid
         }
         voteRequestCid
       },
