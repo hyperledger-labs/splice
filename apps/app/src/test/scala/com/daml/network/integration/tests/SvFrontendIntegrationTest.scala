@@ -3,6 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.sv.automation.leaderbased.ExpireVoteRequestTrigger
 import com.daml.network.util.{FrontendLoginUtil, SvTestUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -412,7 +413,7 @@ class SvFrontendIntegrationTest
               val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
               rows.size shouldBe previousVoteRequestsActionNeeded + 1
 
-              rows.head.text should matchText(
+              rows.last.text should matchText(
                 createdVoteRequestAction
               )
               tb.findAllChildElements(className("vote-row-requester"))
@@ -421,8 +422,7 @@ class SvFrontendIntegrationTest
                 .text should matchText(
                 createdVoteRequestRequester
               )
-              val reviewButton = rows.head
-              reviewButton.underlying
+              rows.last.underlying
             }
           },
         )
@@ -683,16 +683,20 @@ class SvFrontendIntegrationTest
         }
     }
 
-    "SV1 can create a valid SRARC_SetConfig (new SvcRules Configuration) vote request and the other SVs reject it" in {
+    "SV1 can create valid SRARC_SetConfig (new SvcRules Configuration) vote requests that can expire and get rejected by other SVs" in {
       implicit env =>
-        val requestNewNumUnclaimedRewardsThreshold = "40"
         val requestReasonUrl = "This is a request reason url."
         val requestReasonBody = "This is a request reason."
 
         withFrontEnd("sv1") { implicit webDriver =>
           val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
 
-          def submitSetConfigRequest(expiresInNextMinutes: Boolean) = {
+          // If we try to create two vote requests for identical configs,
+          // the second request will be rejected with "This vote request has already been created."
+          def submitSetConfigRequest(
+              requestNewNumUnclaimedRewardsThreshold: String,
+              expiresSoon: Boolean,
+          ) = {
             // The `eventually` guards against `StaleElementReferenceException`s
             // eventually() must contain clickVoteRequestSubmitButtonOnceEnabled() to retry the whole process
             eventually() {
@@ -708,16 +712,16 @@ class SvFrontendIntegrationTest
               inside(find(id("create-reason-url"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonUrl)
               }
-              if (expiresInNextMinutes) {
+              if (expiresSoon) {
+                // TODO(#8835) This actually results in some expiration date in the past, at least when run locally.
                 setExpirationDate(
                   "sv1",
                   DateTimeFormatter
-                    .ofPattern("dd/MM/yyyy HH:mm a")
+                    .ofPattern("MM/dd/yyyy HH:mm a")
                     .format(
-                      // TODO(#8835): consider reducing to 1 minute again after we remove the screenshot call
                       LocalDateTime
                         .ofInstant(CantonTimestamp.now().toInstant, ZoneOffset.UTC)
-                        .plusMinutes(2)
+                        .plusMinutes(1)
                     ),
                 )
               }
@@ -730,7 +734,7 @@ class SvFrontendIntegrationTest
             val tbody = find(id("sv-voting-in-progress-table-body"))
             val reviewButton = inside(tbody) { case Some(tb) =>
               val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-              rows.size should be > previousVoteRequestsInProgress
+              rows.size shouldBe previousVoteRequestsInProgress + 1
               rows.head
             }
             reviewButton
@@ -748,9 +752,13 @@ class SvFrontendIntegrationTest
             },
           )
 
+          clue("Deactivating vote request expiration automation") {
+            sv1Backend.leaderBasedAutomation.trigger[ExpireVoteRequestTrigger].pause().futureValue
+          }
+
           actAndCheck(
             "sv1 operator creates a new vote request with a short expiration time", {
-              submitSetConfigRequest(expiresInNextMinutes = true)
+              submitSetConfigRequest("41", expiresSoon = true)
             },
           )(
             "sv1 can see the new vote request in the progress tab",
@@ -759,12 +767,13 @@ class SvFrontendIntegrationTest
 
           val (_, requestId) = actAndCheck(
             "sv1 operator creates a new vote request with a long expiration time", {
-              submitSetConfigRequest(expiresInNextMinutes = false)
+              submitSetConfigRequest("42", expiresSoon = false)
             },
           )(
             "sv1 can see the new vote request in the progress tab",
             _ => {
-              val reviewButton = checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress)
+              val reviewButton =
+                checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress + 1)
               reviewButton.underlying.click()
               val requestId =
                 inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
@@ -774,28 +783,31 @@ class SvFrontendIntegrationTest
             },
           )
 
-          vote(sv2Backend, requestId, false, "1", false)
-          vote(sv3Backend, requestId, false, "1", false)
-          vote(sv4Backend, requestId, false, "1", true)
+          clue("Reactivating vote request expiration automation") {
+            sv1Backend.leaderBasedAutomation.trigger[ExpireVoteRequestTrigger].resume()
+          }
 
-          eventually() {
-            val tbody = find(id("sv-voting-in-progress-table-body"))
-            val tb = tbody.value
-            val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-            rows.size shouldBe previousVoteRequestsInProgress
+          clue("Voting to reject the other vote request") {
+            vote(sv2Backend, requestId, false, "1", false)
+            vote(sv3Backend, requestId, false, "1", false)
+            vote(sv4Backend, requestId, false, "1", true)
           }
 
           clue("the vote requests get rejected (one by vote, one by expiry)") {
-            // TODO(#8835): Consider pausing and resuming the expiry trigger instead of having to idle wait for safety
-            eventually(125.seconds) {
-              click on "tab-panel-rejected"
+            eventually() {
+              val tbody = find(id("sv-voting-in-progress-table-body"))
+              val tb = tbody.value
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              rows.size shouldBe previousVoteRequestsInProgress
+            }
+            click on "tab-panel-rejected"
+            eventually() {
               val tbody = find(id("sv-vote-results-rejected-table-body"))
               val tb = tbody.value
               val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
               rows.size shouldBe 2
             }
           }
-
         }
     }
 
