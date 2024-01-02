@@ -1393,7 +1393,7 @@ jobs:
             --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
             --keep CIRCLECI_TOKEN
             --keep CIRCLE_WORKFLOW_ID
-            --keep K6_USER_CREDENTIALS
+            --keep K6_USERS_PASSWORD
             --keep SLACK_ACCESS_TOKEN
           gce_authenticate: true
           cmd: |
