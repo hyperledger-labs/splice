@@ -1,7 +1,6 @@
 package com.daml.network.sv.admin.http
 
 import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
-import cats.syntax.traverse.*
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn
@@ -47,6 +46,7 @@ import io.opentelemetry.api.trace.Tracer
 import slick.jdbc.PostgresProfile
 
 import java.time.Instant
+import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -555,32 +555,48 @@ class HttpSvAdminHandler(
   ): Future[SvAdminResource.GetDomainMigrationDumpResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.pauseGlobalDomain") { _ => _ =>
-      def newNodeIdentitiesStore(adminConnection: TopologyAdminConnection) =
-        new NodeIdentitiesStore(
-          adminConnection,
-          None,
-          clock,
-          loggerFactory,
-        )
-      for {
-        participantDump <- newNodeIdentitiesStore(participantAdminConnection)
-          .getNodeIdentitiesDump()
-        sequencerDump <- localDomainNode.traverse(domainNode =>
-          newNodeIdentitiesStore(domainNode.sequencerAdminConnection).getNodeIdentitiesDump()
-        )
-        mediatorDump <- localDomainNode.traverse(domainNode =>
-          newNodeIdentitiesStore(domainNode.mediatorAdminConnection)
-            .getNodeIdentitiesDump()
-        )
-      } yield SvAdminResource.GetDomainMigrationDumpResponse.OK(
-        definitions.GetDomainMigrationDumpResponse(
-          definitions.DomainMigrationIdentities(
-            participantDump.toHttp,
-            sequencerDump.map(_.toHttp),
-            mediatorDump.map(_.toHttp),
+      localDomainNode match {
+        case Some(domainNode) =>
+          def newNodeIdentitiesStore(adminConnection: TopologyAdminConnection) =
+            new NodeIdentitiesStore(
+              adminConnection,
+              None,
+              clock,
+              loggerFactory,
+            )
+          for {
+            participantIdentities <- newNodeIdentitiesStore(participantAdminConnection)
+              .getNodeIdentitiesDump()
+            sequencerIdentities <- newNodeIdentitiesStore(domainNode.sequencerAdminConnection)
+              .getNodeIdentitiesDump()
+            mediatorIdentities <- newNodeIdentitiesStore(domainNode.mediatorAdminConnection)
+              .getNodeIdentitiesDump()
+            globalDomain <- svcStore.getSvcRules().map(_.domain)
+            topologySnapshot <- domainNode.sequencerAdminConnection.getTopologySnapshot(
+              globalDomain
+            )
+            acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
+              Set(svcStore.key.svParty, svcStore.key.svcParty)
+            )
+          } yield SvAdminResource.GetDomainMigrationDumpResponse.OK(
+            definitions.GetDomainMigrationDumpResponse(
+              identities = definitions.DomainMigrationIdentities(
+                participantIdentities.toHttp,
+                sequencerIdentities.toHttp,
+                mediatorIdentities.toHttp,
+              ),
+              topologySnapshot =
+                Base64.getEncoder.encodeToString(topologySnapshot.toProtoV0.toByteArray),
+              acsSnapshot = Base64.getEncoder.encodeToString(acsSnapshot.toByteArray),
+            )
           )
-        )
-      )
+        case None =>
+          Future.failed(
+            HttpErrorHandler.internalServerError(
+              s"Could not prepare DomainMigrationDump because domain node is not configured"
+            )
+          )
+      }
     }
   }
 

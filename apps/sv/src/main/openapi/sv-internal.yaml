@@ -176,6 +176,8 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetDomainMigrationDumpResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/admin/sv/identity/approve:
     post:
       tags: [sv]
@@ -1064,6 +1066,8 @@ components:
       type: object
       required:
         - participant
+        - sequencer
+        - mediator
       properties:
         participant:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
@@ -1076,6 +1080,16 @@ components:
       type: object
       required:
         - identities
+        - topology_snapshot
+        - acs_snapshot
       properties:
         identities:
           $ref: "#/components/schemas/DomainMigrationIdentities"
+        topology_snapshot:
+          description: |
+            base64 encoded string of topology snapshot
+          type: string
+        acs_snapshot:
+          description: |
+            base64 encoded string of acs snapshot
+          type: string

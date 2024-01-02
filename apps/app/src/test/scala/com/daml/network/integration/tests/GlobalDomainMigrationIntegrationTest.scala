@@ -28,7 +28,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.setup.NodeInitializer
-import com.daml.network.sv.LocalDomainNode
+import com.daml.network.sv.{DomainMigrationDump, LocalDomainNode}
 import com.daml.network.util.{ProcessTestUtil, TemplateJsonDecoder}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
@@ -53,8 +53,8 @@ import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.topology.processing.SequencedTime
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionsX,
   StoredTopologyTransactionX,
+  StoredTopologyTransactionsX,
   TopologyStoreId,
 }
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionX.GenericStoredTopologyTransactionX
@@ -74,7 +74,7 @@ import org.scalatest.time.{Minute, Minutes, Span}
 
 import java.nio.file.Files
 import java.time.Duration as JavaDuration
-import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 import scala.concurrent.duration.DurationInt
 import scala.math.Ordered.orderingToOrdered
 import scala.util.Using
@@ -176,10 +176,14 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
               nodes: Seq[UpgradeDomainNode],
               firstRun: Boolean = false,
           ): Unit = {
+            val nodesWithMigrationDumps =
+              nodes.map(node => node -> node.backend.getDomainMigrationDump())
             withCLueAndLog(s"Switch domain nodes ${nodes.map(_.id)}") {
               withCLueAndLog("Init new nodes with the same identity") {
-                nodes
-                  .parTraverse(_.migrateDomainToNewNodes())
+                nodesWithMigrationDumps
+                  .parTraverse { case (node, domainMigrationDump) =>
+                    node.migrateDomainToNewNodes(domainMigrationDump)
+                  }
                   .futureValue(
                     Timeout(
                       Span(
@@ -270,20 +274,11 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
                 .parTraverse(_.newParticipantConnection.disconnectDomain(globalDomainAlias))
                 .futureValue
                 .discard
-              logger.info("Downloading ACS snapshot.")
-              // TODO(#8761) wait until it's safe, based on params described in the design
-              // also consider(from Martin): If a node was offline and joins the (old) domain a bit later, how will it know that it has caught up to the final ACS state so it's safe to take the snapshot?
-              val acsSnapshots = withCLueAndLog("take acs snapshots") {
-                nodes.parTraverse(_.takeAcsSnapshot()).futureValue
-              }
 
               withCLueAndLog("restore acs snapshot") {
-                nodes
-                  .zip(acsSnapshots)
-                  .parTraverse { case (node, snapshot) =>
-                    node.restoreAcsSnapshot(snapshot)
-                  }
-                  .futureValue
+                nodesWithMigrationDumps.parTraverse { case (node, domainMigrationDump) =>
+                  node.restoreAcsSnapshot(domainMigrationDump.acsSnapshot)
+                }.futureValue
               }
               withCLueAndLog("Reconnecting domain.") {
                 nodes
@@ -607,18 +602,19 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
         )
     }
 
-    def migrateDomainToNewNodes()(implicit tc: TraceContext): Future[Unit] = {
+    def migrateDomainToNewNodes(
+        domainMigrationDump: DomainMigrationDump
+    )(implicit tc: TraceContext): Future[Unit] = {
+      val domainTopologyTransactions = DomainTopologyTransactions(
+        domainMigrationDump.topologySnapshot.result
+      )
+      logger.info(s"Init new domain nodes from snapshot $domainTopologyTransactions")
+      val nodeIdentities = backend.getDomainMigrationDump().nodeIdentities
+      val participantIdentities = nodeIdentities.participant
       for {
-        domainTopologyTransactions <-
-          backend.appState.localDomainNode.value.sequencerAdminConnection
-            .getTopologySnapshot(globalDomainId)
-            .map(snapshot => DomainTopologyTransactions(snapshot.result))
-        _ = logger.info(s"Init new domain nodes from snapshot $domainTopologyTransactions")
-        domainMigrationDump = backend.getDomainMigrationDump().nodeIdentities
-        participantDump = domainMigrationDump.participant
-        _ <- newParticipantInitializer.initializeAndWait(participantDump)
-        sequencerDump = domainMigrationDump.sequencer.value
-        _ <- newDomainNodeIdentities.sequencerInitializer.initializeFromDump(sequencerDump)
+        _ <- newParticipantInitializer.initializeAndWait(participantIdentities)
+        sequencerIdentities = nodeIdentities.sequencer
+        _ <- newDomainNodeIdentities.sequencerInitializer.initializeFromDump(sequencerIdentities)
         _ = logger.info(
           s"Restoring sequencer topology with sequencer transactions ${domainTopologyTransactions.sequencerInitTopologyTransactions}"
         )
@@ -646,7 +642,7 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
           RetryFor.ClientCalls,
           "sequencer is initialized with restored id",
           newLocalDomainNode.sequencerAdminConnection.getSequencerId.map { id =>
-            if (id != sequencerDump.id) {
+            if (id != sequencerIdentities.id) {
               throw Status.INTERNAL
                 .withDescription("Sequencer is not initialized with dump id")
                 .asRuntimeException()
@@ -665,9 +661,9 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
                 Seq(transactions.transaction),
               )
         )
-        mediatorDump = domainMigrationDump.mediator.value
+        mediatorIdentities = nodeIdentities.mediator
         _ <-
-          newDomainNodeIdentities.mediatorInitializer.initializeFromDump(mediatorDump)
+          newDomainNodeIdentities.mediatorInitializer.initializeFromDump(mediatorIdentities)
         _ <- newLocalDomainNode.mediatorAdminConnection
           .initialize(
             globalDomainId,
@@ -678,7 +674,7 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
           RetryFor.ClientCalls,
           "mediator is initialized as expected",
           newLocalDomainNode.mediatorAdminConnection.getMediatorId.map { id =>
-            if (id != mediatorDump.id) {
+            if (id != mediatorIdentities.id) {
               throw Status.INTERNAL
                 .withDescription("Mediator is not initialized with dump id")
                 .asRuntimeException()
@@ -714,11 +710,6 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
           initializeFromTrustedDomain = true,
         )
       )
-    }
-
-    def takeAcsSnapshot()(implicit tc: TraceContext): Future[ByteString] = {
-      val connection = backend.appState.participantAdminConnection
-      acsSnapshotForConnection(connection)
     }
 
     def restoreAcsSnapshot(snapshot: ByteString)(implicit tc: TraceContext): Future[Unit] = {
