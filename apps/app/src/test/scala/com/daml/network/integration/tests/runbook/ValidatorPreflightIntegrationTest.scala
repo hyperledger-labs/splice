@@ -13,7 +13,7 @@ import scala.concurrent.duration.*
 
 /** Base for preflight tests running against a deployed validator
   */
-abstract class PreflightValidatorIntegrationTestBase
+abstract class ValidatorPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("alice-validator", "bob-validator")
     with FrontendLoginUtil
     with PreflightIntegrationTestUtil
@@ -396,7 +396,7 @@ abstract class PreflightValidatorIntegrationTestBase
   }
 }
 
-class PreflightValidatorIntegrationTest extends PreflightValidatorIntegrationTestBase {
+class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegrationTestBase {
 
   override protected val isDevNet = true
   override protected val auth0 =
@@ -412,7 +412,7 @@ class PreflightValidatorIntegrationTest extends PreflightValidatorIntegrationTes
     "auth0|6526fab5214c99a9a8e1e3cc"
 }
 
-class Validator1PreflightIntegrationTest extends PreflightValidatorIntegrationTestBase {
+class Validator1PreflightIntegrationTest extends ValidatorPreflightIntegrationTestBase {
 
   override protected val isDevNet = true
   override protected val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com")

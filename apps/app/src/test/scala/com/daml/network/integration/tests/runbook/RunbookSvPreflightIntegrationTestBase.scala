@@ -11,7 +11,7 @@ import com.digitalasset.canton.topology.DomainId
 import scala.concurrent.duration.*
 import scala.util.Random
 
-abstract class SvNodePreflightSvIntegrationTestBase
+abstract class RunbookSvPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
     with PreflightIntegrationTestUtil
     with SvUiIntegrationTestUtil
@@ -188,12 +188,13 @@ abstract class SvNodePreflightSvIntegrationTestBase
   }
 }
 
-final class SvNodePreflightSvIntegrationTest extends SvNodePreflightSvIntegrationTestBase {
+final class RunbookSvPreflightIntegrationTest extends RunbookSvPreflightIntegrationTestBase {
   override protected def svUsername = s"admin@sv-dev.com";
   override protected def isDevNet = true
 }
 
-final class SvNodePreflightSvNonDevNetIntegrationTest extends SvNodePreflightSvIntegrationTestBase {
+final class RunbookSvNonDevNetPreflightIntegrationTest
+    extends RunbookSvPreflightIntegrationTestBase {
   override protected def svUsername = s"admin@sv.com";
   override protected def isDevNet = false
 

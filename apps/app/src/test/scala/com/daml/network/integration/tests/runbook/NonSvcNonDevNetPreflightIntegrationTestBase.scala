@@ -9,8 +9,8 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.util.DataExportTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-// Integration test for everything that is not part of an SV node.
-final class NonSvNonDevNetPreflightIntegrationTestBase
+// Integration test for everything from a core deployment that is not part of an SV node
+final class NonSvcNonDevNetPreflightIntegrationTestBase
     extends CNNodeIntegrationTestWithSharedEnvironment
     with DataExportTestUtil {
 

@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests.runbook
 
-final class NonDevNetPreflightValidatorIntegrationTest extends PreflightValidatorIntegrationTest {
+final class RunbookValidatorNonDevNetPreflightIntegrationTest
+    extends RunbookValidatorPreflightIntegrationTest {
   override protected val isDevNet = false
 }
 

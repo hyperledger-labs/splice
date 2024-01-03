@@ -12,7 +12,7 @@ import java.net.Socket
 
 /** Preflight test that makes sure that the cometBFT node of the node deployed through sv-runbook has initialized fine.
   */
-class CometBftPreflightSvIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironment {
+class RunbookSvCometBftPreflightIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironment {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

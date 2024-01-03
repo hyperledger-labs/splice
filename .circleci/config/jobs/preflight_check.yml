@@ -8,7 +8,7 @@ jobs:
         default: C05DT77QF5M
       test_names_file:
         type: string
-        default: "test-full-class-names-preflight.log"
+        default: "test-full-class-names-core-preflight.log"
       parallelism:
         type: integer
         default: 3

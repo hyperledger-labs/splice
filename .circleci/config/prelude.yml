@@ -15,7 +15,7 @@ env: &env
 
 non_devnet_preflight_params: &non_devnet_preflight_params
   parallelism: 1
-  test_names_file: "test-full-class-names-preflight-non-devnet.log"
+  test_names_file: "test-full-class-names-core-preflight-non-devnet.log"
 
 parameters:
   # Bump this when you change the definition of what is being cached to make sure

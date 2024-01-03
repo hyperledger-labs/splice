@@ -1226,18 +1226,16 @@ printTests := {
   def isTimeBasedTest(name: String): Boolean = name.contains("TimeBased")
   def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
   def isNonDevNetTest(name: String): Boolean = name.contains("NonDevNet")
-  def isPreflightIntegrationTest(name: String): Boolean =
-    name.contains("PreflightIntegrationTest") && !isNonDevNetTest(name)
-  def isNonDevNetPreflightIntegrationTest(name: String): Boolean =
-    name.contains("PreflightIntegrationTest") && isNonDevNetTest(name)
-  def isNonDevNetPreflightSvIntegrationTest(name: String): Boolean =
-    name.contains("PreflightSvNonDevNetIntegrationTest") && isNonDevNetTest(name)
-  def isPreflightSvIntegrationTest(name: String): Boolean =
-    name.contains("PreflightSvIntegrationTest") && !isNonDevNetTest(name)
-  def isPreflightValidatorIntegrationTest(name: String): Boolean =
-    name.contains("PreflightValidatorIntegrationTest") && !isNonDevNetTest(name)
-  def isNonDevNetPreflightValidatorIntegrationTest(name: String): Boolean =
-    name.contains("PreflightValidatorIntegrationTest") && isNonDevNetTest(name)
+  def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
+
+  def isCoreDeploymentPreflightIntegrationTest(name: String): Boolean = isPreflightIntegrationTest(
+    name
+  ) && !name.contains("RunbookSv") && !name.contains("RunbookValidator")
+  def isRunbookSvPreflightIntegrationTest(name: String): Boolean =
+    isPreflightIntegrationTest(name) && name.contains("RunbookSv")
+  def isRunbookValidatorPreflightIntegrationTest(name: String): Boolean =
+    isPreflightIntegrationTest(name) && name.contains("RunbookValidator")
+
   def isGlobalUpgradeTest(name: String): Boolean = name contains "GlobalDomainUpgrade"
   def isAppManagerTest(name: String): Boolean = name contains "AppManager"
 
@@ -1251,37 +1249,34 @@ printTests := {
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
     (
-      "Preflight tests",
-      "test-full-class-names-preflight.log",
-      (t: String) => isPreflightIntegrationTest(t),
+      "Preflight tests against core nodes",
+      "test-full-class-names-core-preflight.log",
+      (t: String) => isCoreDeploymentPreflightIntegrationTest(t) && !isNonDevNetTest(t),
     ),
     (
-      "Non DevNet Preflight tests",
-      "test-full-class-names-preflight-non-devnet.log",
-      (t: String) => isNonDevNetPreflightIntegrationTest(t),
-    ),
-    // This file is only used in sbt printTests for checking the pattern matching, but not used in ci
-    (
-      "Non DevNet Preflight SV tests",
-      "test-full-class-names-preflight-sv-non-devnet.log",
-      (t: String) => isNonDevNetPreflightSvIntegrationTest(t),
+      "Non-DevNet Preflight tests against core nodes",
+      "test-full-class-names-core-preflight-non-devnet.log",
+      (t: String) => isCoreDeploymentPreflightIntegrationTest(t) && isNonDevNetTest(t),
     ),
     (
-      "Non DevNet Preflight Validator tests",
-      "test-full-class-names-preflight-validator-non-devnet.log",
-      (t: String) => isNonDevNetPreflightValidatorIntegrationTest(t),
+      "Preflight tests against runbook SV",
+      "test-full-class-names-sv-preflight.log",
+      (t: String) => isRunbookSvPreflightIntegrationTest(t) && !isNonDevNetTest(t),
     ),
-    // This file is only used in sbt printTests for checking the pattern matching, but not used in ci
     (
-      "Preflight SV tests",
-      "test-full-class-names-preflight-sv.log",
-      (t: String) => isPreflightSvIntegrationTest(t),
+      "Non-DevNet Preflight tests against runbook SV",
+      "test-full-class-names-sv-preflight-non-devnet.log",
+      (t: String) => isRunbookSvPreflightIntegrationTest(t) && isNonDevNetTest(t),
     ),
-    // This file is only used in sbt printTests for checking the pattern matching, but not used in ci
     (
-      "Preflight Validator tests",
-      "test-full-class-names-preflight-validator.log",
-      (t: String) => isPreflightValidatorIntegrationTest(t),
+      "Preflight tests against runbook validator",
+      "test-full-class-names-validator-preflight.log",
+      (t: String) => isRunbookValidatorPreflightIntegrationTest(t) && !isNonDevNetTest(t),
+    ),
+    (
+      "Non-DevNet Preflight tests against runbook validator",
+      "test-full-class-names-validator-preflight-non-devnet.log",
+      (t: String) => isRunbookValidatorPreflightIntegrationTest(t) && isNonDevNetTest(t),
     ),
     (
       "global domain upgrade test",

@@ -13,7 +13,8 @@ import scala.jdk.OptionConverters.*
 
 /** Preflight test that makes sure that the sequencer url is published to svcRules
   */
-class SequencerInfoPreflightSvIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironment {
+class RunbookSvSequencerInfoPreflightIntegrationTest
+    extends CNNodeIntegrationTestWithSharedEnvironment {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

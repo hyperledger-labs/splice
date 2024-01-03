@@ -1015,19 +1015,11 @@ function subcmd_preflight() {
     subcmd_start_frontends
 
     set +e
-    subcmd_sbt_for_preflight printTests
 
-    if [ "${IS_DEVNET-}" != false ]; then
-      _log "Starting DevNet preflight checks"
-      tests_filename="test-full-class-names-preflight.log"
-    else
-      _log "Starting non-DevNet preflight checks"
-      tests_filename="test-full-class-names-preflight-non-devnet.log"
-    fi
-
-    preflight_tests=$(awk '{print $1}' "$REPO_ROOT"/$tests_filename | paste -s -d' ' -)
-
+    preflight_tests=$(_get_preflight_test_names "core")
+    _log "Starting preflight tests: $preflight_tests"
     subcmd_sbt_for_preflight "apps-app/testOnly $preflight_tests"
+
     local test_result=$?
     set -e
 
@@ -1054,38 +1046,26 @@ function subcmd_sbt_for_preflight() {
 
 ###
 
-subcommand_whitelist[preflight_sv]='Run the SV runbook preflight test against the cluster'
+subcommand_whitelist[preflight_sv]='Run the SV runbook preflight tests against the cluster'
 
 function subcmd_preflight_sv() {
-  if [ "${IS_DEVNET-}" != false ]; then
-    _log "Starting SV preflight"
+    preflight_tests=$(_get_preflight_test_names "sv")
+    _log "Starting runbook SV preflight tests: $preflight_tests"
     cd "${REPO_ROOT}" && \
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
-            sbt "apps-app/testOnly *PreflightSvIntegrationTest"
-  else
-    _log "Starting SV preflight on non-DevNet"
-    cd "${REPO_ROOT}" && \
-                NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
-                sbt "apps-app/testOnly *PreflightSvNonDevNetIntegrationTest"
-  fi
+            sbt "apps-app/testOnly $preflight_tests"
 }
 
 ###
 
-subcommand_whitelist[preflight_validator]='Run the validator runbook preflight test against the cluster'
+subcommand_whitelist[preflight_validator]='Run the validator runbook preflight tests against the cluster'
 
 function subcmd_preflight_validator() {
-  if [ "${IS_DEVNET-}" != false ]; then
-    _log "Starting Validator preflight"
+    preflight_tests=$(_get_preflight_test_names "validator")
+    _log "Starting runbook validator preflight tests: $preflight_tests"
     cd "${REPO_ROOT}" && \
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
-            sbt "apps-app/testOnly *PreflightValidatorIntegrationTest"
-  else
-    _log "Starting Validator preflight on non-DevNet"
-    cd "${REPO_ROOT}" && \
-            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
-            sbt "apps-app/testOnly *NonDevNetPreflightValidatorIntegrationTest"
-  fi
+            sbt "apps-app/testOnly $preflight_tests"
 }
 
 ###
@@ -1895,6 +1875,20 @@ function _get_ledger_api_auth_token_from_auth0() {
       --data "{\"client_id\":\"$LEDGER_API_AUTH_CLIENT_ID\",\"client_secret\":\"$LEDGER_API_AUTH_CLIENT_SECRET\",\"audience\":\"$LEDGER_API_AUTH_AUDIENCE\",\"grant_type\":\"client_credentials\"}" \
       | jq '.access_token' \
       | sed s/\"//g
+}
+
+function _get_preflight_test_names() {
+  hint="${1-}"
+
+  cd "${REPO_ROOT}" && sbt printTests 1>&2
+
+  if [ "${IS_DEVNET-}" != false ]; then
+    tests_filename="test-full-class-names-$hint-preflight.log"
+  else
+    tests_filename="test-full-class-names-$hint-preflight-non-devnet.log"
+  fi
+
+  awk '{print $1}' "$REPO_ROOT"/"$tests_filename" | paste -s -d' ' -
 }
 
 ################################
