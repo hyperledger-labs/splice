@@ -43,6 +43,7 @@ import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import com.digitalasset.canton.util.ShowUtil.showPretty
 import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, ReassignmentId}
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableWithStateResult
 import com.daml.network.store.db.AcsTables.ContractStateRowData

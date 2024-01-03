@@ -64,6 +64,14 @@ object TxLogStore {
     def indexRecord: ALI
   }
 
+  object Entry {
+
+    import com.digitalasset.canton.logging.pretty.Pretty
+
+    implicit val entryPretty: Pretty[Entry[?]] =
+      Pretty.adHocPrettyInstance
+  }
+
   /** Stores information needed to efficiently query for historical events.
     * Instances of EntryIndexRecord are persisted, make sure they do not contain unnecessary data.
     */

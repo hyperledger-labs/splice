@@ -3,11 +3,9 @@ package com.daml.network.store
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
 import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, ReassignmentId}
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.logging.pretty.Pretty
 
-// TODO(#8943): Remove Product upper bound
-private[store] case class IngestionSummary[TXE <: Product with Serializable](
+private[store] final case class IngestionSummary[+TXE](
     txId: Option[String],
     offset: Option[String],
     newAcsSize: Int,
@@ -24,26 +22,34 @@ private[store] case class IngestionSummary[TXE <: Product with Serializable](
     removedUnassignEvents: Vector[(ContractId[?], ReassignmentId)],
     prunedContracts: Vector[ContractId[_]],
     ingestedTxLogEntries: Seq[TXE],
-) extends PrettyPrinting {
+)
 
-  import com.daml.network.util.PrettyInstances
+private[store] object IngestionSummary {
+  def empty[TXE]: IngestionSummary[TXE] = Empty
+
+  private val Empty: IngestionSummary[Nothing] = IngestionSummary(
+    txId = None,
+    offset = None,
+    newAcsSize = 0,
+    ingestedCreatedEvents = Vector.empty,
+    updatedContractStates = Vector.empty,
+    numFilteredCreatedEvents = 0,
+    ingestedArchivedEvents = Vector.empty,
+    numFilteredArchivedEvents = 0,
+    addedAssignEvents = Vector.empty,
+    numFilteredAssignEvents = 0,
+    removedAssignEvents = Vector.empty,
+    addedUnassignEvents = Vector.empty,
+    numFilteredUnassignEvents = 0,
+    removedUnassignEvents = Vector.empty,
+    prunedContracts = Vector.empty,
+    ingestedTxLogEntries = Seq.empty,
+  )
+
+  import Pretty.{prettyString as _, *}
   import com.daml.network.util.PrettyInstances.*
 
-  @SuppressWarnings(Array("org.wartremover.warts.Product"))
-  implicit val txLogPretty: Pretty[TXE] = adHocPrettyInstance
-
-  implicit def prettyContractLocation: Pretty[ContractLocation] =
-    prettyNode("ContractLocation", param("cid", _.contractId), param("domain", _.domain))
-
-  implicit def prettyReassignmentId: Pretty[ReassignmentId] =
-    prettyNode(
-      "ReassignmentId",
-      param("source", _.source),
-      param[ReassignmentId, String]("id", _.id)(PrettyInstances.prettyString),
-    )
-
-  override def pretty: Pretty[this.type] = {
-
+  implicit def pretty[TXE: Pretty]: Pretty[IngestionSummary[TXE]] = {
     def paramIfNonZero[T](name: String, getValue: T => Int) =
       param(name, getValue(_), (x: T) => getValue(x) != 0)
 
@@ -70,30 +76,11 @@ private[store] case class IngestionSummary[TXE <: Product with Serializable](
       ),
     )
   }
-}
 
-private[store] object IngestionSummary {
-  def empty[TXE <: Product with Serializable]: IngestionSummary[TXE] = IngestionSummary(
-    txId = None,
-    offset = None,
-    newAcsSize = 0,
-    ingestedCreatedEvents = Vector.empty,
-    updatedContractStates = Vector.empty,
-    numFilteredCreatedEvents = 0,
-    ingestedArchivedEvents = Vector.empty,
-    numFilteredArchivedEvents = 0,
-    addedAssignEvents = Vector.empty,
-    numFilteredAssignEvents = 0,
-    removedAssignEvents = Vector.empty,
-    addedUnassignEvents = Vector.empty,
-    numFilteredUnassignEvents = 0,
-    removedUnassignEvents = Vector.empty,
-    prunedContracts = Vector.empty,
-    ingestedTxLogEntries = Seq.empty,
-  )
+  private[this] implicit def prettyReassignmentId: Pretty[ReassignmentId] =
+    prettyNode(
+      "ReassignmentId",
+      param("source", _.source),
+      param[ReassignmentId, String]("id", _.id)(prettyString),
+    )
 }
-
-private[store] case class ContractLocation(
-    contractId: ContractId[?],
-    domain: DomainId,
-)

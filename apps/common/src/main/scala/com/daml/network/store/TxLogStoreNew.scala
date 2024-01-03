@@ -52,6 +52,13 @@ object TxLogStoreNew {
   /** Stores all information about a historical event */
   trait Entry extends Product with Serializable {}
 
+  object Entry {
+    import com.digitalasset.canton.logging.pretty.Pretty
+
+    implicit val txLogPretty: Pretty[Entry] =
+      Pretty.adHocPrettyInstance
+  }
+
   /** Extracts tx log entries from transaction tree events */
   trait Parser[+TXE] {
 
