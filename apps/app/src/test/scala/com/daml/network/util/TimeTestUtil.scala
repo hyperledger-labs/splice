@@ -1,6 +1,5 @@
 package com.daml.network.util
 
-import com.daml.ledger.javaapi.data.{Command, DamlRecord, ExerciseCommand}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.SvcReward
 import com.daml.network.codegen.java.cc.coinrules.TransferOutput
@@ -151,27 +150,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
     )
   }
 
-  // TODO(#8424) Remove the hacky workarounds for downgrading the choice arg.
-  private def downgradeCoinRulesTransfer(command: Command): Command =
-    command match {
-      case ex: ExerciseCommand =>
-        val oldTransfer = ex.getChoiceArgument.asRecord.get.getFields.get(0).getValue
-        val newTransfer = new DamlRecord(
-          oldTransfer.asRecord.get.getFields.subList(0, 4)
-        )
-        val arg = new DamlRecord(
-          new DamlRecord.Field(newTransfer),
-          ex.getChoiceArgument.asRecord.get.getFields.get(1),
-        )
-        new ExerciseCommand(
-          ex.getTemplateId,
-          ex.getContractId,
-          ex.getChoice,
-          arg,
-        )
-      case _ => throw new IllegalArgumentException(s"Unsupported command $command")
-    }
-
   def lockCoins(
       userValidator: ValidatorAppBackendReference,
       userParty: PartyId,
@@ -221,7 +199,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
           )
           .commands
           .asScala
-          .map(downgradeCoinRulesTransfer(_))
           .toSeq,
         disclosedContracts = DisclosedContracts(coinRules, openRound).toLedgerApiDisclosedContracts,
       )
@@ -275,7 +252,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
         )
         .commands
         .asScala
-        .map(downgradeCoinRulesTransfer(_))
         .toSeq,
       workflowId = CNLedgerConnection.domainIdToWorkflowId(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
