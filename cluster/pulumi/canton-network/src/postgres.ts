@@ -1,4 +1,3 @@
-import * as command from '@pulumi/command';
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
@@ -13,6 +12,14 @@ import {
 } from 'cn-pulumi-common';
 
 const enableCloudSql = envFlag('ENABLE_CLOUD_SQL', false);
+export function initDatabase(): string | undefined {
+  if (enableCloudSql) {
+    return undefined;
+  } else {
+    return process.env['POSTGRES_DB'] || 'cantonnet';
+  }
+}
+
 const cluster = process.env['GCP_CLUSTER_BASENAME'] || 'GCP_CLUSTER_BASENAME not set';
 
 const project = gcp.organizations.getProjectOutput({});
@@ -42,7 +49,7 @@ export interface Postgres extends pulumi.Resource {
   readonly address: pulumi.Output<string>;
   readonly secretName: string;
 
-  createDatabase: (name: string) => pulumi.Resource;
+  createDatabaseAndInstallMetrics: (name: string) => pulumi.Resource;
 }
 
 class CloudPostgres extends pulumi.ComponentResource implements Postgres {
@@ -93,7 +100,7 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
 
     this.address = this.pgSvc.privateIpAddress;
 
-    const pgDB = this.createDatabase('cantonnet');
+    const pgDB = this.createDatabaseAndInstallMetrics('cantonnet');
 
     const password = generatePassword(`${logicalName}-passwd`, { parent: this }).result;
     const passwordSecret = installPostgresPasswordSecret(xns, password, this.secretName);
@@ -118,7 +125,7 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
     });
   }
 
-  createDatabase(name: string): pulumi.Resource {
+  createDatabaseAndInstallMetrics(name: string): pulumi.Resource {
     const db = new gcp.sql.Database(
       `${this.namespace.logicalName}-db-${this.name}-${name}`,
       {
@@ -186,27 +193,11 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
     });
   }
 
-  createDatabase(name: string): pulumi.Resource {
-    // the DB is not immediately available even if you can connect to the pod, so psql might fail a few times at the beginning.
-    const waitForPostgresToBeUp = new command.local.Command(
-      `${this.namespace.logicalName}-waitdb-${this.name}-${name}`,
-      {
-        create:
-          `kubectl exec -n ${this.namespace.logicalName} ${this.name}-0 -- ` +
-          `bash -c "let RETRIES=60; until psql --username=cnadmin --dbname=\${POSTGRES_DB:-cantonnet} -c \\"select 1\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done"`,
-      },
-      { dependsOn: this.pg }
-    );
-    const createCommand = new command.local.Command(
-      `${this.namespace.logicalName}-createdb-${this.name}-${name}`,
-      {
-        create: `kubectl exec -n ${this.namespace.logicalName} ${this.name}-0 -- psql --username=cnadmin --dbname=\${POSTGRES_DB:-cantonnet} -c "create database ${name}"`,
-      },
-      { dependsOn: waitForPostgresToBeUp }
-    );
+  createDatabaseAndInstallMetrics(name: string): pulumi.Resource {
+    // when using CNPostgres, apps are expected to create their own database in init containers
     installCNHelmChart(
       this.namespace,
-      `${this.name}-${sanitizedForHelm(name)}`,
+      `${this.name}-${sanitizedForHelm(name)}-e`,
       'cn-postgres-metrics',
       {
         postgres: {
@@ -215,9 +206,9 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
         },
         postgresSecretName: this.secretName,
       },
-      { dependsOn: [createCommand] }
+      { dependsOn: [this] }
     );
-    return createCommand;
+    return this; // don't return the metrics, because that's a circular dependency
   }
 }
 

@@ -28,6 +28,7 @@ import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import * as postgres from './postgres';
 import { GlobalDomainNode } from './globalDomainNode';
 import { installParticipant } from './ledger';
+import { initDatabase } from './postgres';
 import { installValidatorApp } from './validator';
 
 export function installSvKeySecret(
@@ -192,8 +193,10 @@ export async function installSvNode(
     ? postgres.installPostgres(xns, 'sv-pg', true)
     : sequencerPostgres;
   const svAppName = config.nodename.replaceAll('-', '_');
-  const svDb = svAppPostgres.createDatabase(svAppName);
+  const svDb = svAppPostgres.createDatabaseAndInstallMetrics(svAppName);
   const sequencerAddress = `${globalDomain.name}-sequencer`;
+
+  const initDb = initDatabase();
 
   const svValues = {
     onboardingType: config.onboarding.type,
@@ -239,6 +242,7 @@ export async function installSvNode(
       enable: true,
     },
     additionalJvmOptions: jmxOptions(),
+    init: initDb && { initDb },
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -274,7 +278,7 @@ export async function installSvNode(
     ? postgres.installPostgres(xns, 'scan-pg', true)
     : sequencerPostgres;
   const scanDbName = `scan_${svAppName}`;
-  const scanDb = scanAppPostgres.createDatabase(scanDbName);
+  const scanDb = scanAppPostgres.createDatabaseAndInstallMetrics(scanDbName);
   const scanValues = {
     clusterUrl: `${CLUSTER_BASENAME}.network.canton.global`,
     metrics: {
@@ -284,6 +288,7 @@ export async function installSvNode(
     postgresSecretName: scanAppPostgres.secretName,
     additionalJvmOptions: jmxOptions(),
     sequencerAddress: sequencerAddress,
+    init: initDb && { initDb },
   };
   installCNHelmChart(xns, 'scan', 'cn-scan', scanValues, {
     dependsOn: [svApp, scanAppPostgres, scanDb, globalDomain],
@@ -293,7 +298,7 @@ export async function installSvNode(
     ? postgres.installPostgres(xns, 'validator-pg', true)
     : sequencerPostgres;
   const validatorDbName = `validator_${svAppName}`;
-  const validatorDb = validatorPostgres.createDatabase(validatorDbName);
+  const validatorDb = validatorPostgres.createDatabaseAndInstallMetrics(validatorDbName);
 
   await installValidatorApp({
     auth0Client: config.auth0Client,

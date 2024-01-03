@@ -65,7 +65,7 @@ export async function installSplitwell(
   );
 
   const validatorDbName = 'val_splitwell';
-  const validatorDb = postgresDb.createDatabase(validatorDbName);
+  const validatorDb = postgresDb.createDatabaseAndInstallMetrics(validatorDbName);
 
   const extraDependsOn = [
     svc,

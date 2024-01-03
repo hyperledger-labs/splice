@@ -229,6 +229,30 @@ spec:
           {{- with .Values.resources }}
           resources: {{- toYaml . | nindent 12 }}
           {{- end }}
+      {{- if .Values.init }}
+      initContainers:
+        - name: {{ .Release.Name }}-init
+          image: postgres:14
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgresPassword
+                  name: {{ .Values.postgresSecretName }}
+          command:
+            - 'sh'
+            - '-c'
+            - |
+              until errmsg=$(psql -h {{ .Values.persistence.host }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.persistence.databaseName }}' 2>&1); do
+                if [[ $errmsg == *"already exists"* ]]; then
+                  echo "Database {{ .Values.persistence.databaseName }} already exists. Done."
+                  break
+                fi
+
+                echo "trying to create postgres database {{ .Values.persistence.databaseName }}, last error: $errmsg";
+                sleep 2;
+              done
+      {{- end }}
       {{- with .Values.participantIdentitiesDumpImport }}
       volumes:
         - name: participant-bootstrapping-dump-volume

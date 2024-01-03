@@ -39,11 +39,24 @@ spec:
             readOnly: true
       initContainers:
       # If postgres is not yet ready, postgres-exporter fails when initializing the collector
-      # but never retries nor indicates non-readiness, so we unfortunatly need to wait for it
+      # but never retries nor indicates non-readiness, so we unfortunately need to wait for it
       # to be ready before spinning up postgres-exporter.
       - name: {{ .Release.Name }}-init
         image: postgres:14
-        command: ['sh', '-c', "until pg_isready -h {{ .Values.postgres.hostname }} -p {{ .Values.postgres.port }}; do echo waiting for postgres at hostname {{ .Values.postgres.hostname }}, port {{ .Values.postgres.port }}; sleep 2; done"]
+        env:
+          - name: PGPASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: postgresPassword
+                name: {{ .Values.postgresSecretName }}
+        command:
+          - 'sh'
+          - '-c'
+          - |
+            until errmsg=$(psql -h {{ .Values.postgres.hostname }} --username=cnadmin --dbname={{ .Values.postgres.database }} -p {{ .Values.postgres.port }} -c 'select 1' 2>&1); do
+                echo "Waiting for database {{ .Values.postgres.database }}, at hostname {{ .Values.postgres.hostname }}, port {{ .Values.postgres.port }} to be accessible. Last error: $errmsg"
+                sleep 2;
+            done
 ---
 apiVersion: v1
 kind: Service

@@ -1308,46 +1308,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database domain_mediator\""
-    },
-    "name": "splitwell-createdb-postgres-domain_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database domain_sequencer\""
-    },
-    "name": "splitwell-createdb-postgres-domain_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database participant\""
-    },
-    "name": "splitwell-createdb-postgres-participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database val_splitwell\""
-    },
-    "name": "splitwell-createdb-postgres-val_splitwell",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "/cluster/helm/cn-domain/",
       "compat": "true",
       "name": "domain",
@@ -1410,6 +1370,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "postgres": "postgres.splitwell.svc.cluster.local",
         "postgresMediatorDb": "domain_mediator",
         "postgresSecretName": "postgres-secrets",
@@ -1580,6 +1543,9 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -1617,7 +1583,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-domain-mediator",
+      "name": "postgres-domain-mediator-e",
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
@@ -1693,7 +1659,7 @@
         }
       }
     },
-    "name": "splitwell-postgres-domain-mediator",
+    "name": "splitwell-postgres-domain-mediator-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1703,7 +1669,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-domain-sequencer",
+      "name": "postgres-domain-sequencer-e",
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
@@ -1779,7 +1745,7 @@
         }
       }
     },
-    "name": "splitwell-postgres-domain-sequencer",
+    "name": "splitwell-postgres-domain-sequencer-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1789,7 +1755,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-participant",
+      "name": "postgres-participant-e",
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
@@ -1865,7 +1831,7 @@
         }
       }
     },
-    "name": "splitwell-postgres-participant",
+    "name": "splitwell-postgres-participant-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1887,7 +1853,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-val-splitwell",
+      "name": "postgres-val-splitwell-e",
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
@@ -1963,7 +1929,7 @@
         }
       }
     },
-    "name": "splitwell-postgres-val-splitwell",
+    "name": "splitwell-postgres-val-splitwell-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2238,6 +2204,9 @@
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -2281,46 +2250,6 @@
     "name": "splitwell-validator-splitwell",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "splitwell-waitdb-postgres-domain_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "splitwell-waitdb-postgres-domain_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "splitwell-waitdb-postgres-participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n splitwell postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "splitwell-waitdb-postgres-val_splitwell",
-    "provider": "",
-    "type": "command:local:Command"
   },
   {
     "custom": true,
@@ -2481,66 +2410,6 @@
     "type": "kubernetes:helm.sh/v3:Release"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_default_mediator\""
-    },
-    "name": "sv-1-createdb-postgres-global_domain_default_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_default_sequencer\""
-    },
-    "name": "sv-1-createdb-postgres-global_domain_default_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database participant\""
-    },
-    "name": "sv-1-createdb-postgres-participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_1\""
-    },
-    "name": "sv-1-createdb-postgres-scan_sv_1",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_1\""
-    },
-    "name": "sv-1-createdb-postgres-sv_1",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_1\""
-    },
-    "name": "sv-1-createdb-postgres-validator_sv_1",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
     "custom": false,
     "id": "",
     "inputs": {},
@@ -2614,6 +2483,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "mediatorPostgres": "postgres.sv-1.svc.cluster.local",
         "mediatorPostgresSecretName": "postgres-secrets",
         "metrics": {
@@ -2887,6 +2759,9 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -2924,7 +2799,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-global-domain-default-mediator",
+      "name": "postgres-global-domain-default-mediator-e",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -3000,7 +2875,7 @@
         }
       }
     },
-    "name": "sv-1-postgres-global-domain-default-mediator",
+    "name": "sv-1-postgres-global-domain-default-mediator-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3010,7 +2885,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-global-domain-default-sequencer",
+      "name": "postgres-global-domain-default-sequencer-e",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -3086,7 +2961,7 @@
         }
       }
     },
-    "name": "sv-1-postgres-global-domain-default-sequencer",
+    "name": "sv-1-postgres-global-domain-default-sequencer-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3096,7 +2971,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-participant",
+      "name": "postgres-participant-e",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -3172,7 +3047,7 @@
         }
       }
     },
-    "name": "sv-1-postgres-participant",
+    "name": "sv-1-postgres-participant-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3194,7 +3069,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-scan-sv-1",
+      "name": "postgres-scan-sv-1-e",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -3270,7 +3145,7 @@
         }
       }
     },
-    "name": "sv-1-postgres-scan-sv-1",
+    "name": "sv-1-postgres-scan-sv-1-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3280,7 +3155,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-sv-1",
+      "name": "postgres-sv-1-e",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -3356,7 +3231,7 @@
         }
       }
     },
-    "name": "sv-1-postgres-sv-1",
+    "name": "sv-1-postgres-sv-1-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3366,7 +3241,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-validator-sv-1",
+      "name": "postgres-validator-sv-1-e",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -3442,7 +3317,7 @@
         }
       }
     },
-    "name": "sv-1-postgres-validator-sv-1",
+    "name": "sv-1-postgres-validator-sv-1-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3605,6 +3480,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -3801,6 +3679,9 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-default-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "isDevNet": true,
         "metrics": {
           "enable": true,
@@ -3903,6 +3784,9 @@
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -3939,66 +3823,6 @@
     "name": "sv-1-validator-sv-1",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-1-waitdb-postgres-global_domain_default_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-1-waitdb-postgres-global_domain_default_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-1-waitdb-postgres-participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-1-waitdb-postgres-scan_sv_1",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-1-waitdb-postgres-sv_1",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-1 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-1-waitdb-postgres-validator_sv_1",
-    "provider": "",
-    "type": "command:local:Command"
   },
   {
     "custom": true,
@@ -4153,66 +3977,6 @@
     "type": "kubernetes:helm.sh/v3:Release"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_default_mediator\""
-    },
-    "name": "sv-2-createdb-postgres-global_domain_default_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_default_sequencer\""
-    },
-    "name": "sv-2-createdb-postgres-global_domain_default_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database participant\""
-    },
-    "name": "sv-2-createdb-postgres-participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_2\""
-    },
-    "name": "sv-2-createdb-postgres-scan_sv_2",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_2\""
-    },
-    "name": "sv-2-createdb-postgres-sv_2",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_2\""
-    },
-    "name": "sv-2-createdb-postgres-validator_sv_2",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
     "custom": false,
     "id": "",
     "inputs": {},
@@ -4286,6 +4050,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "mediatorPostgres": "postgres.sv-2.svc.cluster.local",
         "mediatorPostgresSecretName": "postgres-secrets",
         "metrics": {
@@ -4559,6 +4326,9 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -4596,7 +4366,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-global-domain-default-mediator",
+      "name": "postgres-global-domain-default-mediator-e",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -4672,7 +4442,7 @@
         }
       }
     },
-    "name": "sv-2-postgres-global-domain-default-mediator",
+    "name": "sv-2-postgres-global-domain-default-mediator-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4682,7 +4452,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-global-domain-default-sequencer",
+      "name": "postgres-global-domain-default-sequencer-e",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -4758,7 +4528,7 @@
         }
       }
     },
-    "name": "sv-2-postgres-global-domain-default-sequencer",
+    "name": "sv-2-postgres-global-domain-default-sequencer-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4768,7 +4538,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-participant",
+      "name": "postgres-participant-e",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -4844,7 +4614,7 @@
         }
       }
     },
-    "name": "sv-2-postgres-participant",
+    "name": "sv-2-postgres-participant-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4866,7 +4636,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-scan-sv-2",
+      "name": "postgres-scan-sv-2-e",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -4942,7 +4712,7 @@
         }
       }
     },
-    "name": "sv-2-postgres-scan-sv-2",
+    "name": "sv-2-postgres-scan-sv-2-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4952,7 +4722,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-sv-2",
+      "name": "postgres-sv-2-e",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -5028,7 +4798,7 @@
         }
       }
     },
-    "name": "sv-2-postgres-sv-2",
+    "name": "sv-2-postgres-sv-2-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5038,7 +4808,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-validator-sv-2",
+      "name": "postgres-validator-sv-2-e",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -5114,7 +4884,7 @@
         }
       }
     },
-    "name": "sv-2-postgres-validator-sv-2",
+    "name": "sv-2-postgres-validator-sv-2-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5277,6 +5047,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -5442,6 +5215,9 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-default-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -5547,6 +5323,9 @@
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -5583,66 +5362,6 @@
     "name": "sv-2-validator-sv-2",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-2-waitdb-postgres-global_domain_default_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-2-waitdb-postgres-global_domain_default_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-2-waitdb-postgres-participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-2-waitdb-postgres-scan_sv_2",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-2-waitdb-postgres-sv_2",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-2 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-2-waitdb-postgres-validator_sv_2",
-    "provider": "",
-    "type": "command:local:Command"
   },
   {
     "custom": true,
@@ -5797,66 +5516,6 @@
     "type": "kubernetes:helm.sh/v3:Release"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 mediator-pg-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_default_mediator\""
-    },
-    "name": "sv-3-createdb-mediator-pg-global_domain_default_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 participant-pg-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database participant\""
-    },
-    "name": "sv-3-createdb-participant-pg-participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 scan-pg-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_3\""
-    },
-    "name": "sv-3-createdb-scan-pg-scan_sv_3",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 sequencer-pg-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_default_sequencer\""
-    },
-    "name": "sv-3-createdb-sequencer-pg-global_domain_default_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 sv-pg-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_3\""
-    },
-    "name": "sv-3-createdb-sv-pg-sv_3",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 validator-pg-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_3\""
-    },
-    "name": "sv-3-createdb-validator-pg-validator_sv_3",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
     "custom": false,
     "id": "",
     "inputs": {},
@@ -5930,6 +5589,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "mediatorPostgres": "mediator-pg.sv-3.svc.cluster.local",
         "mediatorPostgresSecretName": "mediator-pg-secrets",
         "metrics": {
@@ -6137,7 +5799,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "mediator-pg-global-domain-default-mediator",
+      "name": "mediator-pg-global-domain-default-mediator-e",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -6213,7 +5875,7 @@
         }
       }
     },
-    "name": "sv-3-mediator-pg-global-domain-default-mediator",
+    "name": "sv-3-mediator-pg-global-domain-default-mediator-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -6328,7 +5990,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "participant-pg-participant",
+      "name": "participant-pg-participant-e",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -6404,7 +6066,7 @@
         }
       }
     },
-    "name": "sv-3-participant-pg-participant",
+    "name": "sv-3-participant-pg-participant-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -6585,6 +6247,9 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -6634,7 +6299,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "scan-pg-scan-sv-3",
+      "name": "scan-pg-scan-sv-3-e",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -6710,7 +6375,7 @@
         }
       }
     },
-    "name": "sv-3-scan-pg-scan-sv-3",
+    "name": "sv-3-scan-pg-scan-sv-3-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -6873,6 +6538,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -6909,7 +6577,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "sequencer-pg-global-domain-default-sequencer",
+      "name": "sequencer-pg-global-domain-default-sequencer-e",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -6985,7 +6653,7 @@
         }
       }
     },
-    "name": "sv-3-sequencer-pg-global-domain-default-sequencer",
+    "name": "sv-3-sequencer-pg-global-domain-default-sequencer-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -7229,6 +6897,9 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-default-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -7282,7 +6953,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "sv-pg-sv-3",
+      "name": "sv-pg-sv-3-e",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -7358,7 +7029,7 @@
         }
       }
     },
-    "name": "sv-3-sv-pg-sv-3",
+    "name": "sv-3-sv-pg-sv-3-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -7473,7 +7144,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "validator-pg-validator-sv-3",
+      "name": "validator-pg-validator-sv-3-e",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -7549,7 +7220,7 @@
         }
       }
     },
-    "name": "sv-3-validator-pg-validator-sv-3",
+    "name": "sv-3-validator-pg-validator-sv-3-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -7716,6 +7387,9 @@
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -7752,66 +7426,6 @@
     "name": "sv-3-validator-sv-3",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 mediator-pg-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-3-waitdb-mediator-pg-global_domain_default_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 participant-pg-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-3-waitdb-participant-pg-participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 scan-pg-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-3-waitdb-scan-pg-scan_sv_3",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 sequencer-pg-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-3-waitdb-sequencer-pg-global_domain_default_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 sv-pg-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-3-waitdb-sv-pg-sv_3",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-3 validator-pg-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-3-waitdb-validator-pg-validator_sv_3",
-    "provider": "",
-    "type": "command:local:Command"
   },
   {
     "custom": true,
@@ -7966,66 +7580,6 @@
     "type": "kubernetes:helm.sh/v3:Release"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_default_mediator\""
-    },
-    "name": "sv-4-createdb-postgres-global_domain_default_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database global_domain_default_sequencer\""
-    },
-    "name": "sv-4-createdb-postgres-global_domain_default_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database participant\""
-    },
-    "name": "sv-4-createdb-postgres-participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database scan_sv_4\""
-    },
-    "name": "sv-4-createdb-postgres-scan_sv_4",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database sv_4\""
-    },
-    "name": "sv-4-createdb-postgres-sv_4",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator_sv_4\""
-    },
-    "name": "sv-4-createdb-postgres-validator_sv_4",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
     "custom": false,
     "id": "",
     "inputs": {},
@@ -8099,6 +7653,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "mediatorPostgres": "postgres.sv-4.svc.cluster.local",
         "mediatorPostgresSecretName": "postgres-secrets",
         "metrics": {
@@ -8372,6 +7929,9 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -8409,7 +7969,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-global-domain-default-mediator",
+      "name": "postgres-global-domain-default-mediator-e",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -8485,7 +8045,7 @@
         }
       }
     },
-    "name": "sv-4-postgres-global-domain-default-mediator",
+    "name": "sv-4-postgres-global-domain-default-mediator-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8495,7 +8055,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-global-domain-default-sequencer",
+      "name": "postgres-global-domain-default-sequencer-e",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -8571,7 +8131,7 @@
         }
       }
     },
-    "name": "sv-4-postgres-global-domain-default-sequencer",
+    "name": "sv-4-postgres-global-domain-default-sequencer-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8581,7 +8141,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-participant",
+      "name": "postgres-participant-e",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -8657,7 +8217,7 @@
         }
       }
     },
-    "name": "sv-4-postgres-participant",
+    "name": "sv-4-postgres-participant-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8679,7 +8239,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-scan-sv-4",
+      "name": "postgres-scan-sv-4-e",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -8755,7 +8315,7 @@
         }
       }
     },
-    "name": "sv-4-postgres-scan-sv-4",
+    "name": "sv-4-postgres-scan-sv-4-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8765,7 +8325,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-sv-4",
+      "name": "postgres-sv-4-e",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -8841,7 +8401,7 @@
         }
       }
     },
-    "name": "sv-4-postgres-sv-4",
+    "name": "sv-4-postgres-sv-4-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8851,7 +8411,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-validator-sv-4",
+      "name": "postgres-validator-sv-4-e",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -8927,7 +8487,7 @@
         }
       }
     },
-    "name": "sv-4-postgres-validator-sv-4",
+    "name": "sv-4-postgres-validator-sv-4-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -9090,6 +8650,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -9255,6 +8818,9 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-default-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
@@ -9360,6 +8926,9 @@
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -9401,66 +8970,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-4-waitdb-postgres-global_domain_default_mediator",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-4-waitdb-postgres-global_domain_default_sequencer",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-4-waitdb-postgres-participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-4-waitdb-postgres-scan_sv_4",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-4-waitdb-postgres-sv_4",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n sv-4 postgres-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "sv-4-waitdb-postgres-validator_sv_4",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
@@ -9471,26 +8980,6 @@
     "name": "sv-4",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n validator1 participant-pg-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database participant\""
-    },
-    "name": "validator1-createdb-participant-pg-participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n validator1 validator-pg-0 -- psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \"create database validator1\""
-    },
-    "name": "validator1-createdb-validator-pg-validator1",
-    "provider": "",
-    "type": "command:local:Command"
   },
   {
     "custom": true,
@@ -9577,7 +9066,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "participant-pg-participant",
+      "name": "participant-pg-participant-e",
       "namespace": "validator1",
       "timeout": 480,
       "values": {
@@ -9653,7 +9142,7 @@
         }
       }
     },
-    "name": "validator1-participant-pg-participant",
+    "name": "validator1-participant-pg-participant-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -9834,6 +9323,9 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -9963,7 +9455,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "validator-pg-validator1",
+      "name": "validator-pg-validator1-e",
       "namespace": "validator1",
       "timeout": 480,
       "values": {
@@ -10039,7 +9531,7 @@
         }
       }
     },
-    "name": "validator1-validator-pg-validator1",
+    "name": "validator1-validator-pg-validator1-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -10213,6 +9705,9 @@
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "init": {
+          "initDb": "cantonnet"
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -10258,26 +9753,6 @@
     "name": "validator1-validator-validator1",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n validator1 participant-pg-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "validator1-waitdb-participant-pg-participant",
-    "provider": "",
-    "type": "command:local:Command"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "create": "kubectl exec -n validator1 validator-pg-0 -- bash -c \"let RETRIES=60; until psql --username=cnadmin --dbname=${POSTGRES_DB:-cantonnet} -c \\\"select 1\\\" > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do let RETRIES=RETRIES-1; sleep 1; done\""
-    },
-    "name": "validator1-waitdb-validator-pg-validator1",
-    "provider": "",
-    "type": "command:local:Command"
   },
   {
     "custom": true,

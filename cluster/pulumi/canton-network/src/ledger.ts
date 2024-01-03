@@ -3,7 +3,7 @@ import * as pulumi from '@pulumi/pulumi';
 import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 
 import { jmxOptions } from '../../common/src/jmx';
-import { Postgres } from './postgres';
+import { initDatabase, Postgres } from './postgres';
 
 export function installDomain(
   xns: ExactNamespace,
@@ -13,10 +13,12 @@ export function installDomain(
   const sanitizedName = name.replaceAll('-', '_');
 
   const mediatorDbName = `${sanitizedName}_mediator`;
-  const mediatorDb = postgres.createDatabase(mediatorDbName);
+  const mediatorDb = postgres.createDatabaseAndInstallMetrics(mediatorDbName);
 
   const sequencerDbName = `${sanitizedName}_sequencer`;
-  const sequencerDb = postgres.createDatabase(sequencerDbName);
+  const sequencerDb = postgres.createDatabaseAndInstallMetrics(sequencerDbName);
+
+  const initDb = initDatabase();
 
   return installCNHelmChart(
     xns,
@@ -27,6 +29,7 @@ export function installDomain(
       postgresMediatorDb: mediatorDbName,
       postgresSequencerDb: sequencerDbName,
       additionalJvmOptions: jmxOptions(),
+      init: initDb && { initDb },
     },
     {
       dependsOn: [mediatorDb, sequencerDb],
@@ -44,7 +47,10 @@ export function installParticipant(
 ): pulumi.Resource {
   const postgresDbName = 'participant';
 
-  const postgresDb = postgres.createDatabase(postgresDbName);
+  const postgresDb = postgres.createDatabaseAndInstallMetrics(postgresDbName);
+
+  const initDb = initDatabase();
+
   return installCNHelmChart(
     xns,
     name,
@@ -60,6 +66,7 @@ export function installParticipant(
         enable: true,
       },
       additionalJvmOptions: jmxOptions(),
+      init: initDb && { initDb },
     },
     {
       dependsOn: dependsOn.concat([postgresDb]),

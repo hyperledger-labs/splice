@@ -85,6 +85,30 @@ spec:
               port: cs-pub-api
             timeoutSeconds: 1
       restartPolicy: Always
+      {{- if .Values.init }}
+      initContainers:
+        - name: {{ .Release.Name }}-init
+          image: postgres:14
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgresPassword
+                  name: {{ .Values.sequencerPostgresSecretName }}
+          command:
+            - 'sh'
+            - '-c'
+            - |
+              until errmsg=$(psql -h {{ .Values.sequencerPostgres }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.postgresSequencerDb }}' 2>&1); do
+                if [[ $errmsg == *"already exists"* ]]; then
+                  echo "Database {{ .Values.postgresSequencerDb }} already exists. Done."
+                  break
+                fi
+
+                echo "trying to create postgres database {{ .Values.postgresSequencerDb }}, last error: $errmsg";
+                sleep 2;
+              done
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

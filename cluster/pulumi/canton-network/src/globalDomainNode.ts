@@ -5,7 +5,7 @@ import { CLUSTER_BASENAME, ExactNamespace, installCNHelmChart } from 'cn-pulumi-
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import { installCometBftNode } from './cometbft';
-import { Postgres } from './postgres';
+import { initDatabase, Postgres } from './postgres';
 
 export class GlobalDomainNode extends ComponentResource {
   id: string;
@@ -35,10 +35,10 @@ export class GlobalDomainNode extends ComponentResource {
     const sanitizedName = this.name.replaceAll('-', '_');
 
     const mediatorDbName = `${sanitizedName}_mediator`;
-    const mediatorDb = mediatorPostgres.createDatabase(mediatorDbName);
+    const mediatorDb = mediatorPostgres.createDatabaseAndInstallMetrics(mediatorDbName);
 
     const sequencerDbName = `${sanitizedName}_sequencer`;
-    const sequencerDb = sequencerPostgres.createDatabase(sequencerDbName);
+    const sequencerDb = sequencerPostgres.createDatabaseAndInstallMetrics(sequencerDbName);
     const cometBftService = installCometBftNode(
       xns,
       cometbft.name,
@@ -47,6 +47,9 @@ export class GlobalDomainNode extends ComponentResource {
       cometbft.syncSource,
       { parent: this }
     );
+
+    const initDb = initDatabase();
+
     installCNHelmChart(
       xns,
       this.name,
@@ -67,6 +70,7 @@ export class GlobalDomainNode extends ComponentResource {
           enable: true,
         },
         additionalJvmOptions: jmxOptions(),
+        init: initDb && { initDb },
       },
       { dependsOn: [mediatorDb, sequencerDb, cometBftService], parent: this }
     );

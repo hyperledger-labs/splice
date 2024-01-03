@@ -46,6 +46,30 @@ spec:
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
       restartPolicy: Always
+      {{- if .Values.init }}
+      initContainers:
+        - name: {{ .Release.Name }}-init
+          image: postgres:14
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgresPassword
+                  name: {{ .Values.mediatorPostgresSecretName }}
+          command:
+            - 'sh'
+            - '-c'
+            - |
+              until errmsg=$(psql -h {{ .Values.mediatorPostgres }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.postgresMediatorDb }}' 2>&1); do
+                if [[ $errmsg == *"already exists"* ]]; then
+                  echo "Database {{ .Values.postgresMediatorDb }} already exists. Done."
+                  break
+                fi
+
+                echo "trying to create postgres database {{ .Values.postgresMediatorDb }}, last error: $errmsg";
+                sleep 2;
+              done
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

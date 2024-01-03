@@ -65,7 +65,7 @@ export async function installValidator1(
   const validatorPostgres = postgres.installPostgres(xns, 'validator-pg', true);
 
   const validatorDbName = 'validator1';
-  const validatorDb = validatorPostgres.createDatabase(validatorDbName);
+  const validatorDb = validatorPostgres.createDatabaseAndInstallMetrics(validatorDbName);
 
   const extraDependsOn: pulumi.Resource[] = [
     svc,

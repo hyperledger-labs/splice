@@ -74,6 +74,51 @@ spec:
             port: cd-pub-api
           timeoutSeconds: 1
       restartPolicy: Always
+      {{- if .Values.init }}
+      initContainers:
+        - name: {{ .Release.Name }}-init-sequencer
+          image: postgres:14
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgresPassword
+                  name: {{ .Values.postgresSecretName }}
+          command:
+            - 'sh'
+            - '-c'
+            - |
+              until errmsg=$(psql -h {{ .Values.postgres }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.postgresSequencerDb }}' 2>&1); do
+                if [[ $errmsg == *"already exists"* ]]; then
+                  echo "Database {{ .Values.postgresSequencerDb }} already exists. Done."
+                  break
+                fi
+
+                echo "trying to create postgres database {{ .Values.postgresSequencerDb }}, last error: $errmsg";
+                sleep 2;
+              done
+        - name: {{ .Release.Name }}-init-mediator
+          image: postgres:14
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: postgresPassword
+                  name: {{ .Values.postgresSecretName }}
+          command:
+            - 'sh'
+            - '-c'
+            - |
+              until errmsg=$(psql -h {{ .Values.postgres }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.postgresMediatorDb }}' 2>&1); do
+                if [[ $errmsg == *"already exists"* ]]; then
+                  echo "Database {{ .Values.postgresMediatorDb }} already exists. Done."
+                  break
+                fi
+
+                echo "trying to create postgres database {{ .Values.postgresMediatorDb }}, last error: $errmsg";
+                sleep 2;
+              done
+      {{- end}}
 ---
 apiVersion: v1
 kind: Service
