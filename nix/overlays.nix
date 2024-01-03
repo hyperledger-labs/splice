@@ -19,6 +19,20 @@
         sphinx-reredirects = pySelf.callPackage ./sphinx-reredirects.nix { };
     };
   };
+  geckodriver = super.geckodriver.overrideAttrs (old: rec {
+    version = "0.34.0";
+    src = super.fetchFromGitHub {
+      owner = "mozilla";
+      repo = "geckodriver";
+      rev = "refs/tags/v${version}";
+      sha256 = "sha256-jrF55j3/WKpGl7sJzRmPyaNMbxPqAoXWiuQJsxfIYgc=";
+    };
+    cargoDeps = old.cargoDeps.overrideAttrs {
+      inherit version;
+      inherit src;
+      outputHash = "sha256-WFqeOKNlkKcVb/Pj2NqVE4pllALYDTx4GbiaaoPjV10=";
+    };
+  });
   jsonnet = super.callPackage ./jsonnet.nix {};
   pulumi-bin = super.pulumi-bin.overrideAttrs (_: previousAttrs:
     let
