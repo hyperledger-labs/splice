@@ -177,10 +177,13 @@ abstract class SvNodePreflightSvIntegrationTestBase
       svActiveDomain
     }
     clue("Can get member traffic status from Scan") {
-      val svTrafficStatus = svScanClient.getMemberTrafficStatus(activeDomain, participantId.member)
-      val sv1TrafficStatus =
-        sv1ScanClient.getMemberTrafficStatus(activeDomain, participantId.member)
-      svTrafficStatus shouldBe sv1TrafficStatus
+      eventually() {
+        val svTrafficStatus =
+          svScanClient.getMemberTrafficStatus(activeDomain, participantId.member)
+        val sv1TrafficStatus =
+          sv1ScanClient.getMemberTrafficStatus(activeDomain, participantId.member)
+        svTrafficStatus shouldBe sv1TrafficStatus
+      }
     }
   }
 }
