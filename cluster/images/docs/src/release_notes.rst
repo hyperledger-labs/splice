@@ -12,6 +12,12 @@ Release Notes
     The single `postgres` value has been deprecated and is no longer supported.
     (It is still possible to use a shared postgres instance, by configuring it under both `sequencerPostgres` and `mediatorPostgres`.)
 
+* Bugfixes:
+
+  * CometBFT state sync has been fixed after the recent issues and can once again be used for fast CometBFT node bootstrapping.
+    (It should not be necessary anymore to override `stateSync.enable` to `false` in `cometbft-values.yaml`.)
+
+
 2023-12-18
 ----------
 
