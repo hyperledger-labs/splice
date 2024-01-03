@@ -12,7 +12,6 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionIdleSta
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion, QualifiedName}
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.google.protobuf.ByteString
 
 import java.util.Optional
 import scala.jdk.OptionConverters.*
@@ -254,7 +253,7 @@ object CoinCreate {
   def unapply(
       event: CreatedEvent
   ): Option[ContractType] = {
-    Contract.fromCreatedEvent(companion)(event, ByteString.EMPTY)
+    Contract.fromCreatedEvent(companion)(event)
   }
 }
 
@@ -267,7 +266,7 @@ object ImportCrate {
   def unapply(
       event: CreatedEvent
   ): Option[ContractType] = {
-    Contract.fromCreatedEvent(companion)(event, ByteString.EMPTY)
+    Contract.fromCreatedEvent(companion)(event)
   }
 }
 
@@ -295,7 +294,7 @@ object LockedCoinCreate {
   def unapply(
       event: CreatedEvent
   ): Option[ContractType] = {
-    Contract.fromCreatedEvent(companion)(event, ByteString.EMPTY)
+    Contract.fromCreatedEvent(companion)(event)
   }
 }
 
@@ -324,7 +323,7 @@ object OpenMiningRoundCreate {
   def unapply(
       event: CreatedEvent
   ): Option[ContractType] = {
-    Contract.fromCreatedEvent(companion)(event, ByteString.EMPTY)
+    Contract.fromCreatedEvent(companion)(event)
   }
 }
 
@@ -337,6 +336,6 @@ object ClosedMiningRoundCreate {
   def unapply(
       event: CreatedEvent
   ): Option[ContractType] = {
-    Contract.fromCreatedEvent(companion)(event, ByteString.EMPTY)
+    Contract.fromCreatedEvent(companion)(event)
   }
 }

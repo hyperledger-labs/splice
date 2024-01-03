@@ -13,7 +13,6 @@ import scala.util.Try
 import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
 import com.digitalasset.canton.topology.DomainId
 import scala.collection.SeqView
-import com.google.protobuf.ByteString
 
 /** Stores historical information that can be used to construct application-specific historical events,
   * such as a user notification or an item from a bank statement.
@@ -265,7 +264,6 @@ object TxLogStore {
       val activeContract = ActiveContract(
         domainId = domainId,
         createdEvent = createdEvent,
-        createdEventBlob = ByteString.EMPTY,
         reassignmentCounter = 0L,
       )
 

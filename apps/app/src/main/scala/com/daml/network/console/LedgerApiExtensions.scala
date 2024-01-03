@@ -24,7 +24,6 @@ import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.ledger.api.DeduplicationPeriod
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.google.protobuf.ByteString
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
@@ -158,7 +157,7 @@ trait LedgerApiExtensions {
               )
             )
           Contract
-            .fromCreatedEvent(companion)(createdEvent, ByteString.EMPTY)
+            .fromCreatedEvent(companion)(createdEvent)
             .getOrElse(
               throw new IllegalArgumentException("Failed to convert created event to contract")
             )

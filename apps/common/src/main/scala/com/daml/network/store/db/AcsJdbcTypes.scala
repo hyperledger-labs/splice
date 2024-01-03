@@ -234,12 +234,11 @@ trait AcsJdbcTypes {
   protected def tryToDecode[TCid <: ContractId[?], T <: DamlRecord[?], D](
       companion: Companion.Template[TCid, T],
       createdEvent: CreatedEvent,
-      createdEventBlob: ByteString,
   )(
       toData: Contract[TCid, T] => D
   ): Either[String, D] = {
     Contract
-      .fromCreatedEvent(companion)(createdEvent, createdEventBlob)
+      .fromCreatedEvent(companion)(createdEvent)
       .map(toData)
       .toRight(
         s"Failed to decode ${companion.TEMPLATE_ID} from CreatedEvent of contract id ${createdEvent.getContractId}."

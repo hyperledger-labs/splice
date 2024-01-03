@@ -327,7 +327,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       failedInterfaceViews = Map.empty.asJava,
       templateId = contract.identifier,
       arguments = contract.payload.toValue,
-      createdEventBlob = ByteString.empty(),
+      createdEventBlob = contract.createdEventBlob,
       witnessParties = Seq.empty.asJava,
       signatories = signatories.map(_.toProtoPrimitive).asJava,
       observers = Seq.empty.asJava,
@@ -363,7 +363,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     ActiveContract(
       domain,
       toCreatedEvent(contract, Seq(svcParty)),
-      contract.createdEventBlob,
       counter,
     )
 
@@ -464,7 +463,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       counter,
     ),
     toCreatedEvent(contract, Seq(svcParty)),
-    contract.createdEventBlob,
   )
 
   protected def toIncompleteAssign(
@@ -511,7 +509,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     source = source,
     target = target,
     createdEvent = toCreatedEvent(contract, Seq(svcParty)),
-    createdEventBlob = contract.createdEventBlob,
     counter = counter,
   )
 
@@ -549,7 +546,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         ActiveContract(
           domain,
           toCreatedEvent(contract, Seq(svcParty)),
-          contract.createdEventBlob,
           counter,
         )
       },
@@ -593,7 +589,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       store.ingestionSink
         .ingestUpdate(
           domain,
-          TransactionTreeUpdate(tx, tx.toProto),
+          TransactionTreeUpdate(tx),
         )
         .map(_ => tx)
     }
@@ -610,7 +606,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         txEffectiveAt,
         createdEventSignatories,
       )
-      val txUpdate = TransactionTreeUpdate(tx, tx.toProto)
+      val txUpdate = TransactionTreeUpdate(tx)
       // Note: runs the futures sequentially in order to get deterministic tests
       stores
         .foldLeft(Future.unit) { (acc, store) =>
@@ -631,8 +627,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         .ingestUpdate(
           domain,
           TransactionTreeUpdate(
-            tx,
-            tx.toProto,
+            tx
           ),
         )
         .map(_ => tx)
@@ -646,8 +641,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         .ingestUpdate(
           domain,
           TransactionTreeUpdate(
-            tx,
-            tx.toProto,
+            tx
           ),
         )
         .map(_ => tx)
@@ -657,7 +651,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         makeTx: String => TransactionTree
     )(implicit stores: Seq[MultiDomainAcsStore]): Future[TransactionTree] = {
       val tx = makeTx(nextOffset)
-      val txUpdate = TransactionTreeUpdate(tx, tx.toProto)
+      val txUpdate = TransactionTreeUpdate(tx)
       // Note: runs the futures sequentially in order to get deterministic tests
       stores
         .foldLeft(Future.unit) { (acc, store) =>
@@ -734,7 +728,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       store.ingestionSink
         .ingestUpdate(
           domain,
-          TransactionTreeUpdate(tx, tx.toProto),
+          TransactionTreeUpdate(tx),
         )
         .map(_ => tx)
     }

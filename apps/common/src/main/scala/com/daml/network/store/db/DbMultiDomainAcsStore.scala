@@ -4,7 +4,6 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import cats.data.OptionT
 import cats.implicits.*
-import com.daml.ledger.api.v1.TransactionOuterClass
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
@@ -48,7 +47,6 @@ import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, Reassignm
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableWithStateResult
 import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.nonempty.NonEmpty
-import com.google.protobuf.ByteString
 
 import scala.collection.mutable
 
@@ -598,7 +596,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                       _ <- doIngestAcsInsert(
                         offset,
                         ac.createdEvent,
-                        ac.createdEventBlob,
                         stateRowDataFromActiveContract(ac.domainId, ac.reassignmentCounter),
                         summaryState,
                       )
@@ -609,7 +606,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                         _ <- doIngestAcsInsert(
                           offset,
                           evt.createdEvent,
-                          evt.createdEventBlob,
                           stateRowDataFromUnassign(evt.reassignmentEvent),
                           summaryState,
                         )
@@ -627,7 +623,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                         _ <- doIngestAcsInsert(
                           offset,
                           evt.reassignmentEvent.createdEvent,
-                          evt.reassignmentEvent.createdEventBlob,
                           stateRowDataFromAssign(evt.reassignmentEvent),
                           summaryState,
                         )
@@ -689,8 +684,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
               )
             logger.debug(show"Ingested reassignment $summary")
           }
-        case TransactionTreeUpdate(tree, treeProto) =>
-          ingestTransactionTree(domain, tree, treeProto).map { summaryState =>
+        case TransactionTreeUpdate(tree) =>
+          ingestTransactionTree(domain, tree).map { summaryState =>
             state
               .getAndUpdate(s =>
                 s.withUpdate(
@@ -767,7 +762,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                               doIngestAcsInsert(
                                 reassignment.offset.getOffset,
                                 assign.createdEvent,
-                                assign.createdEventBlob,
                                 stateRowDataFromAssign(assign),
                                 summary,
                               ),
@@ -830,7 +824,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     private def ingestTransactionTree(
         domainId: DomainId,
         tree: TransactionTree,
-        treeProto: TransactionOuterClass.TransactionTree,
     )(implicit tc: TraceContext): Future[MutableIngestionSummary[TXE]] = {
       val summary = MutableIngestionSummary.empty[TXE]
 
@@ -843,8 +836,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
             if (contractFilter.contains(ev)) {
               contractFilter.ensureStakeholderOf(ev)
               st + (ev.getContractId -> Insert(
-                ev,
-                treeProto.getEventsByIdOrThrow(ev.getEventId).getCreated.getCreatedEventBlob,
+                ev
               ))
             } else {
               summary.numFilteredCreatedEvents += 1
@@ -877,7 +869,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                 .sequence(
                   // TODO (#5643): batch inserts
                   workTodo.map {
-                    case Insert(createdEvent, createdEventBlob) =>
+                    case Insert(createdEvent) =>
                       for {
                         alreadyArchived <- hasIncompleteReassignments(createdEvent.getContractId)
                         _ <-
@@ -888,7 +880,6 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                               doIngestAcsInsert(
                                 tree.getOffset,
                                 createdEvent,
-                                createdEventBlob,
                                 stateRowDataFromActiveContract(domainId, 0L),
                                 summary,
                               )
@@ -953,13 +944,12 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     private def doIngestAcsInsert(
         offset: String,
         createdEvent: CreatedEvent,
-        createdEventBlob: ByteString,
         stateData: ContractStateRowData,
         summary: MutableIngestionSummary[TXE],
     )(implicit
         tc: TraceContext
     ) = {
-      contractFilter.matchingContractToRow(createdEvent, createdEventBlob) match {
+      contractFilter.matchingContractToRow(createdEvent) match {
         case None =>
           val errMsg =
             s"Item at offset $offset with contract id ${createdEvent.getContractId} cannot be ingested."
@@ -1007,7 +997,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                                            reassignment_source_domain, reassignment_submitter, reassignment_unassign_id
                                            #$indexColumnNames)
                 values ($storeId, $contractId, $templateIdPackageId, $templateIdQualifiedName,
-                        $createArguments, $createdEventBlob, $createdAt, $contractExpiresAt,
+                        $createArguments, ${contract.createdEventBlob}, $createdAt, $contractExpiresAt,
                         $assignedDomain, $reassignmentCounter, $reassignmentTargetDomain,
                         $reassignmentSourceDomain, $reassignmentSubmitter, $reassignmentUnassignId
               """ ++ indexColumnNameValues ++ sql") on conflict do nothing").toActionBuilder.asUpdate
@@ -1163,7 +1153,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
     }
 
     sealed trait OperationToDo
-    case class Insert(evt: CreatedEvent, createdEventBlob: ByteString) extends OperationToDo
+    case class Insert(evt: CreatedEvent) extends OperationToDo
     case class Delete(evt: ExercisedEvent) extends OperationToDo
   }
 

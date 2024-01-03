@@ -2,7 +2,6 @@ package com.daml.network.store
 
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
-import com.daml.ledger.api.v1.TransactionOuterClass
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
@@ -15,7 +14,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Traced
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.google.protobuf.ByteString
 import io.grpc.Status
 
 import java.time.Instant
@@ -114,9 +112,9 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
         update: TreeUpdate,
     )(implicit traceContext: TraceContext): Future[Unit] =
       update match {
-        case TransactionTreeUpdate(tree, treeProto) =>
+        case TransactionTreeUpdate(tree) =>
           updateState(
-            _.ingestTransaction(domain, tree, treeProto, contractFilter, txLogConfig.parser, logger)
+            _.ingestTransaction(domain, tree, contractFilter, txLogConfig.parser, logger)
           ).map { case (summary, offsetChanged, offsetIngestionsToSignal) =>
             logger.debug(show"Ingested transaction $summary")
             offsetIngestionsToSignal.foreach(_.success(()))
@@ -166,9 +164,9 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
       applyLimit(
         limit,
         st.createEvents.values
-          .collect(Function.unlift { case (ev, bs) =>
+          .collect(Function.unlift { ev =>
             for {
-              parsedEv <- companionClass.fromCreatedEvent(companion)(contractFilter, ev, bs)
+              parsedEv <- companionClass.fromCreatedEvent(companion)(contractFilter, ev)
               state <- st.getContractState(new ContractId(ev.getContractId)).toActiveState
             } yield (parsedEv, state)
           })
@@ -265,14 +263,14 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
         )
 
   private def lookupContractById[T](
-      fromCreatedEvent: (CreatedEvent, ByteString) => Option[T]
+      fromCreatedEvent: CreatedEvent => Option[T]
   )(id: ContractId[_]): Future[Option[(T, ContractState)]] = {
     offsetAndStateAfterIngestingAcs().map { case (_, st) =>
       st.createEventsById.get(id).flatMap { evRev =>
         for {
           ev <- st.createEvents.get(evRev)
-          parsedEv <- fromCreatedEvent(ev._1, ev._2)
-          state <- st.getContractState(new ContractId(ev._1.getContractId)).toActiveState
+          parsedEv <- fromCreatedEvent(ev)
+          state <- st.getContractState(new ContractId(ev.getContractId)).toActiveState
         } yield (parsedEv, state)
       }
     }
@@ -285,7 +283,7 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
       traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]] = {
     requireInScope(companion)
-    lookupContractById(companionClass.fromCreatedEvent(companion)(contractFilter, _, _))(id)
+    lookupContractById(companionClass.fromCreatedEvent(companion)(contractFilter, _))(id)
       .map(_.map { case (contract, state) =>
         ContractWithState(contract, state)
       })
@@ -319,7 +317,7 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
       val optEntry = st.createEvents.values.collectFirst(
         Function.unlift(ev =>
           for {
-            contract <- companionClass.fromCreatedEvent(companion)(contractFilter, ev._1, ev._2)
+            contract <- companionClass.fromCreatedEvent(companion)(contractFilter, ev)
             if p(contract)
             state <- st.getContractState(contract.contractId).toActiveState
           } yield ContractWithState(contract, state)
@@ -365,7 +363,7 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
       val optEntry = st.createEvents.values.collectFirst(
         Function.unlift(ev =>
           for {
-            contract <- companionClass.fromCreatedEvent(companion)(contractFilter, ev._1, ev._2)
+            contract <- companionClass.fromCreatedEvent(companion)(contractFilter, ev)
             if p(contract)
             state = st.getContractState(contract.contractId)
             if state == StoreContractState.Assigned(domain)
@@ -433,7 +431,7 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
     }
 
   private def nextAssignedContract[T](
-      fromCreated: (CreatedEvent, ByteString) => Option[T],
+      fromCreated: CreatedEvent => Option[T],
       startingFromIncl: Long,
   ): Future[(Long, (T, DomainId))] = {
     val st = stateVar
@@ -444,7 +442,7 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
           domain <- state.toAssigned
           evNum <- st.createEventsById.get(state.contractId)
           ev <- st.createEvents.get(evNum)
-          t <- fromCreated(ev._1, ev._2)
+          t <- fromCreated(ev)
         } yield (num, (t, domain))
       })
     optEntry match {
@@ -457,7 +455,7 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
   }
 
   private def streamAssignedContracts[T](
-      fromCreatedEvent: (CreatedEvent, ByteString) => Option[T]
+      fromCreatedEvent: CreatedEvent => Option[T]
   ): Source[(T, DomainId), NotUsed] = {
     Source.unfoldAsync(0: Long)(eventNumber =>
       nextAssignedContract(fromCreatedEvent, eventNumber).map(Some(_))
@@ -471,7 +469,7 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
       traceContext: TraceContext,
   ): Source[AssignedContract[TCid, T], NotUsed] = {
     requireInScope(companion)
-    streamAssignedContracts(companionClass.fromCreatedEvent(companion)(contractFilter, _, _)).map {
+    streamAssignedContracts(companionClass.fromCreatedEvent(companion)(contractFilter, _)).map {
       case (contract, domain) => AssignedContract(contract, domain)
     }
   }
@@ -586,11 +584,11 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
             offset,
             state.createEvents.values
               .collect(
-                Function.unlift({ case (ev, createdEventBlob) =>
+                Function.unlift({ ev =>
                   if (ignoredContracts.contains(QualifiedName(ev.getTemplateId)))
                     None
                   else
-                    contractFilter.decodeMatchingContract(ev, createdEventBlob)
+                    contractFilter.decodeMatchingContract(ev)
                 })
               )
               .toSeq,
@@ -627,7 +625,7 @@ object InMemoryMultiDomainAcsStoreNew {
       // All active contracts across all domains that match our contract filter. Contracts are inserted
       // when we see the first create or assign and removed on archive.
       // Event number stays stable across reassignments.
-      createEvents: SortedMap[Long, (CreatedEvent, ByteString)],
+      createEvents: SortedMap[Long, CreatedEvent],
       createEventsById: Map[ContractId[_], Long],
       nextContractStateEventNumber: Long,
       // States of all active contracts.
@@ -717,7 +715,6 @@ object InMemoryMultiDomainAcsStoreNew {
     def ingestTransaction(
         domain: DomainId,
         tx: TransactionTree,
-        txProto: TransactionOuterClass.TransactionTree,
         contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
         txLogParser: TxLogStoreNew.Parser[TXE],
         logger: TracedLogger,
@@ -733,7 +730,6 @@ object InMemoryMultiDomainAcsStoreNew {
               contractFilter.ensureStakeholderOf(ev)
               st.ingestCreatedEvent(
                 ev,
-                txProto.getEventsByIdOrThrow(ev.getEventId).getCreated.getCreatedEventBlob,
                 domain,
                 0,
                 summary,
@@ -895,7 +891,6 @@ object InMemoryMultiDomainAcsStoreNew {
           contractFilter.ensureStakeholderOf(ev)
           st.ingestCreatedEvent(
             ev,
-            contract.createdEventBlob,
             contract.domainId,
             contract.reassignmentCounter,
             summary,
@@ -917,7 +912,6 @@ object InMemoryMultiDomainAcsStoreNew {
           if (p(ev.createdEvent)) {
             val (newStCreate, createSummary) = ingestCreatedEvent(
               ev.createdEvent,
-              ev.createdEventBlob,
               ev.reassignmentEvent.source,
               // counter - 1 so that the unassign event below overwrites the state produced by this.
               ev.reassignmentEvent.counter - 1,
@@ -953,7 +947,6 @@ object InMemoryMultiDomainAcsStoreNew {
 
     private def ingestCreatedEvent(
         ev: CreatedEvent,
-        createdEventBlob: ByteString,
         domain: DomainId,
         counter: Long,
         summary: IngestionSummary[TXE],
@@ -964,7 +957,7 @@ object InMemoryMultiDomainAcsStoreNew {
           (
             copy[TXE](
               nextCreateEventNumber = nextCreateEventNumber + 1,
-              createEvents = createEvents + (nextCreateEventNumber -> (ev, createdEventBlob)),
+              createEvents = createEvents + (nextCreateEventNumber -> ev),
               createEventsById = createEventsById + (cid -> nextCreateEventNumber),
             ),
             summary.copy(
@@ -1037,7 +1030,6 @@ object InMemoryMultiDomainAcsStoreNew {
       // First update create events and contract locations by only looking at the create event.
       val (createSt, createSummary) = ingestCreatedEvent(
         assign.createdEvent,
-        assign.createdEventBlob,
         assign.target,
         assign.counter,
         summary,

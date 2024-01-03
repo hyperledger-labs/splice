@@ -581,8 +581,7 @@ object LedgerClient {
           val treeV1 = tree.into[com.daml.ledger.api.v1.transaction.TransactionTree].transform
           val treeProto = scalapbToJava(treeV1)(_.companion)
           val update = TransactionTreeUpdate(
-            TransactionTree.fromProto(treeProto),
-            treeProto,
+            TransactionTree.fromProto(treeProto)
           )
           GetTreeUpdatesResponse(update, DomainId.tryFromString(tree.domainId))
 

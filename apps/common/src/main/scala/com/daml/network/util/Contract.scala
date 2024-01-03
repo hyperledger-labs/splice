@@ -233,24 +233,21 @@ object Contract {
   private def fromCodegenContract[TCid <: ContractId[?], T <: DamlRecord[?]](
       contract: CodegenContract[TCid, T],
       ev: CreatedEvent,
-      // TODO(#8392) Remove this and read it from CreatedEvent
-      createdEventBlob: ByteString,
   ): Contract[TCid, T] = {
     Contract(
       identifier = ev.getTemplateId,
       contractId = contract.id,
       payload = contract.data,
-      createdEventBlob = createdEventBlob,
+      createdEventBlob = ev.getCreatedEventBlob(),
       createdAt = ev.createdAt,
     )
   }
 
   def fromCreatedEvent[TCid <: ContractId[?], T <: DamlRecord[?]](
       companion: Companion.Template[TCid, T]
-      // TODO(#8392) Remove the blob and read it from CreatedEvent
-  )(ev: CreatedEvent, createdEventBlob: ByteString): Option[Contract[TCid, T]] = {
+  )(ev: CreatedEvent): Option[Contract[TCid, T]] = {
     JavaDecodeUtil
       .decodeCreated(companion)(ev)
-      .map(fromCodegenContract(_, ev, createdEventBlob))
+      .map(fromCodegenContract(_, ev))
   }
 }
