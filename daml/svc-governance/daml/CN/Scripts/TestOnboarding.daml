@@ -336,6 +336,19 @@ testSvMemberOverwriteInDevNet = do
   -- overwriting existing member successfuly
   submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" "sv2-participant-id" (Round 3) domainId
 
+  [(_, svcRules)] <- query @SvcRules app.svc
+  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'")]
+
+  svX2 <- allocateParty "svX2"
+
+  [(svcRulesCid, _)] <- query @SvcRules app.svc
+
+  -- overwriting existing member again
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX2 "sv2" "sv2-participant-id" (Round 3) domainId
+
+  [(_, svcRules)] <- query @SvcRules app.svc
+  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'"), (svX, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX2'")]
+
   pure ()
 
 testTapAfterRestoringOpenRounds : Script ()

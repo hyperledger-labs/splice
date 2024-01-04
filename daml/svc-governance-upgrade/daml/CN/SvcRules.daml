@@ -333,8 +333,17 @@ template SvcRules with
       do
         require "Member party is new" (not $ newMemberParty `Map.member` members)
         require "Member party has not already been offboarded" (not $ newMemberParty `Map.member` offboardedMembers)
-        unless isDevNet $ do
-          require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
+        newOffboardedMembers <-
+          if isDevNet
+            then
+              -- Check if there is an existing member with the same name
+              pure $ case find (\(_, info) -> info.name == newMemberName) (Map.toList members) of
+                None -> offboardedMembers
+                Some (prev, _) ->
+                  Map.insert prev (OffboardedMemberInfo $ "SV " <> show newMemberName <> " reonboarded as " <> show newMemberParty) offboardedMembers
+            else do
+              require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
+              pure offboardedMembers
         let info = MemberInfo with
               name = newMemberName
               joinedAsOfRound = joinedAsOfRound
@@ -355,7 +364,7 @@ template SvcRules with
           -- existing entry of member with same name as the new member will be overwritten by the new member info
           -- this should only happen if it is in devnet
           members = Map.insert newMemberParty info membersNotMatchingNewMemberName
-          offboardedMembers
+          offboardedMembers = newOffboardedMembers
           config
           initialTrafficState
           isDevNet
