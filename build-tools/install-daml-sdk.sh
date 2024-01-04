@@ -15,7 +15,7 @@ else
 fi
 
 # Get the Daml version is present in the JSON file
-json_file="nix/canton-sources.json"
+json_file="$REPO_ROOT/nix/canton-sources.json"
 daml_version=$(jq -re '.sdk_version // empty' "$json_file")
 if [ -z "$daml_version" ]; then
     echo "Error: Daml version not found in $json_file."
