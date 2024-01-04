@@ -361,9 +361,13 @@ object CNNodeUtil {
       coin: Coin,
       currentRound: Long,
   ): java.math.BigDecimal = {
-    java.math.BigDecimal
-      .valueOf(currentRound - coin.amount.createdAt.number)
-      .multiply(coin.amount.ratePerRound.rate)
+    coin.amount.initialAmount.min(
+      java.math.BigDecimal
+        .valueOf(currentRound - coin.amount.createdAt.number)
+        .setScale(10)
+        .multiply(coin.amount.ratePerRound.rate)
+        .setScale(10, RoundingMode.HALF_EVEN)
+    )
   }
 
   def currentAmount(

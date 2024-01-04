@@ -419,8 +419,8 @@ class WalletTimeBasedIntegrationTest
         // The coin is expired but not yet archived.
         // They will be archived when no coins can be used as transfer input.
         // ie, in 2 round
-        assertInRange(aliceWalletClient.list().coins.head.accruedHoldingFee, (0.000009, 0.00001))
-        assertInRange(aliceWalletClient.list().coins.head.effectiveAmount, (-0.000005, -0.000004))
+        aliceWalletClient.list().coins.head.accruedHoldingFee shouldBe 0.000005
+        aliceWalletClient.list().coins.head.effectiveAmount shouldBe 0
       }
 
       // advance 2 more rounds.
@@ -481,14 +481,8 @@ class WalletTimeBasedIntegrationTest
         // It will be archived when no coins can be used as transfer input.
         // ie, in 2 rounds
         aliceWalletClient.list().lockedCoins.head.round shouldBe startRound + 2
-        assertInRange(
-          aliceWalletClient.list().lockedCoins.head.accruedHoldingFee,
-          (0.000009, 0.00001),
-        )
-        assertInRange(
-          aliceWalletClient.list().lockedCoins.head.effectiveAmount,
-          (-0.000005, -0.000004),
-        )
+        aliceWalletClient.list().lockedCoins.head.accruedHoldingFee shouldBe 0.000005
+        aliceWalletClient.list().lockedCoins.head.effectiveAmount shouldBe 0
       }
 
       // advance 2 more rounds.
