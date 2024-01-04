@@ -1,27 +1,26 @@
 ---
-{{- $fullName := "cometbft" }}
 {{- with .Values.node }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $fullName }}
+  name: {{ $.Values.node.identifier }}
   namespace: {{ $.Release.Namespace }}
   labels:
-    app: {{ $fullName }}
+    app: {{ $.Values.node.identifier }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ $fullName }}
+      app: {{ $.Values.node.identifier }}
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: {{ $fullName }}
+        app: {{ $.Values.node.identifier }}
     spec:
       containers:
-        - name: {{ $fullName }}
+        - name: "cometbft"
           image: "{{ $.Values.imageRepo }}/{{ $.Values.imageName }}:{{ $.Values.cluster.imageTag }}"
           imagePullPolicy: Always
           ports:
@@ -85,7 +84,7 @@ spec:
                   name: {{ include "prefix" (list $.Values "config-cometbft") }}
               - secret:
                   {{ if not $.Values.node.keysSecret }}
-                  name: "cometbft-keys"
+                  name: {{ include "prefix" (list $.Values "cometbft-keys") }}
                   {{- else }}
                   name: {{ $.Values.node.keysSecret }}
                   {{- end }}
@@ -101,5 +100,5 @@ spec:
           # It is fine to use a persistent volume claim with a deployment instead of a stateful set,
           # since we are not going to scale this deployment.
           persistentVolumeClaim:
-            claimName: "cometbft-data"
+            claimName: {{ include "prefix" (list $.Values "cometbft-data") }}
 {{- end }}

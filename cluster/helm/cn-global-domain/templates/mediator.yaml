@@ -34,6 +34,18 @@ spec:
         - name: CANTON_MEDIATOR_POSTGRES_DB
           value: {{ .Values.postgresMediatorDb }}
         {{- end }}
+        # Use the same way to disable auto-init as we do in the sequencer and participant once https://github.com/DACH-NY/canton/issues/16179 is fixed
+        {{- if .Values.disableAutoInit }}
+        - name: ADDITIONAL_CONFIG_MEDIATOR_AUTO_INIT
+          value: |
+            canton {
+              mediators-x {
+                mediator {
+                    init.auto-init = false
+                }
+              }
+            }
+        {{- end }}
         imagePullPolicy: Always
         ports:
         - containerPort: 5007

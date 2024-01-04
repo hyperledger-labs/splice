@@ -11,6 +11,8 @@ Release Notes
   * The global domain helm chart now supports separate Postgres instances for the sequencer and mediator. They can be configured in the `sequencerPostgres` and `mediatorPostgres` values.
     The single `postgres` value has been deprecated and is no longer supported.
     (It is still possible to use a shared postgres instance, by configuring it under both `sequencerPostgres` and `mediatorPostgres`.)
+  * The CometBFT egress ports have changed from `26656, 26666, 26676, 26686, 26696` to `26016, 26026, 26036, 26046, 26096`
+  * The CometBFT founder port was updated in the `cometbft-values.yaml` file to `26016` (from `26656`). This is found under the `founder.externalAddress` field.
 
 * Bugfixes:
 

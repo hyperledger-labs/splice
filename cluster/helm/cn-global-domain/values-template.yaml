@@ -19,3 +19,5 @@ metrics:
   enable: false
   release: prometheus-grafana-monitoring
   interval: 30s
+
+disableAutoInit: false

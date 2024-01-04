@@ -26,7 +26,7 @@ import type { Auth0Client, CnInput, SvIdKey } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
-import { GlobalDomainNode } from './globalDomainNode';
+import { GlobalDomainUpgradeConfig, installGlobalDomain } from './globalDomainNode';
 import { installParticipant } from './ledger';
 import { initDatabase } from './postgres';
 import { installValidatorApp } from './validator';
@@ -105,6 +105,7 @@ async function getAcsBootstrappingDump(xns: ExactNamespace, config: Bootstrappin
 
 export async function installSvNode(
   config: SvConfig,
+  globalDomainUpgradeConfig: GlobalDomainUpgradeConfig,
   cometBftSyncSource?: k8s.helm.v3.Release
 ): Promise<{
   svApp: k8s.helm.v3.Release;
@@ -170,12 +171,17 @@ export async function installSvNode(
       )
     : sequencerPostgres;
 
-  const globalDomain = new GlobalDomainNode('default', xns, sequencerPostgres, mediatorPostgres, {
-    name: config.nodename,
-    onboardingName: config.onboardingName,
-    syncSource: cometBftSyncSource,
-  });
-
+  const globalDomain = installGlobalDomain(
+    globalDomainUpgradeConfig,
+    xns,
+    sequencerPostgres,
+    mediatorPostgres,
+    {
+      name: config.nodename,
+      onboardingName: config.onboardingName,
+      syncSource: cometBftSyncSource,
+    }
+  );
   const participantPostgres = config.splitPostgresInstances
     ? postgres.installPostgres(xns, 'participant-pg', true)
     : sequencerPostgres;
@@ -203,7 +209,7 @@ export async function installSvNode(
     onboardingName: config.onboardingName,
     cometBFT: {
       enabled: true,
-      connectionUri: `http://cometbft-${config.nodename}-cometbft-rpc:26657`,
+      connectionUri: pulumi.interpolate`http://${globalDomain.cometbftRpcService.metadata.name}:26657`,
     },
     globalDomainUrl: `http://${sequencerAddress}.sv-1:5008`,
     domain:
@@ -213,7 +219,8 @@ export async function installSvNode(
       {
         sequencerAddress: sequencerAddress,
         mediatorAddress: `${globalDomain.name}-mediator`,
-        sequencerPublicUrl: `https://sequencer.${config.nodename}.svc.${CLUSTER_BASENAME}.network.canton.global`,
+        // required to prevent participants from using new nodes when the domain is upgraded
+        sequencerPublicUrl: `https://sequencer-${globalDomain.id}.${config.nodename}.svc.${CLUSTER_BASENAME}.network.canton.global`,
         sequencerPruningConfig: config.sequencerPruningConfig,
       },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
@@ -259,7 +266,7 @@ export async function installSvNode(
       withSvIngress: true,
       ingress: {
         sequencer: {
-          activeGlobalDomain: globalDomain.id,
+          activeGlobalDomain: globalDomain.id.toString(),
         },
       },
       cluster: {

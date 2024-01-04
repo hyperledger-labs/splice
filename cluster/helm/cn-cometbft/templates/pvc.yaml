@@ -1,12 +1,11 @@
 ---
-{{- $fullName := "cometbft" }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: "cometbft-data"
+  name: {{ include "prefix" (list .Values "cometbft-data") }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ $fullName }}
+    app: {{ .Values.node.identifier }}
 spec:
   accessModes:
     - ReadWriteOnce

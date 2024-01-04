@@ -58,12 +58,12 @@ export function installCometBftNode(
     'cn-cometbft',
     _.mergeWith(cometBftValues, {
       node: {
-        externalAddress: `cometbft.svc.${CLUSTER_BASENAME}.network.canton.global:26696`,
+        externalAddress: `cometbft.svc.${CLUSTER_BASENAME}.network.canton.global:26096`,
       },
       istioVirtualService: {
         enabled: true,
         gateway: 'cluster-ingress/cn-apps-gateway',
-        port: 26696,
+        port: 26096,
       },
       stateSync: {
         rpcServers: rpcServiceAddress('sv-1') + ',' + rpcServiceAddress('sv-1'),

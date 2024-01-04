@@ -1153,33 +1153,33 @@
   },
   {
     "custom": false,
-    "id": "undefined/cometbft-sv-1-cometbft-rpc",
+    "id": "undefined/cometbft-0-sv-1-cometbft-rpc",
     "inputs": {},
-    "name": "cometbft-sv-1-cometbft-rpc",
+    "name": "cometbft-0-sv-1-cometbft-rpc",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
   },
   {
     "custom": false,
-    "id": "undefined/cometbft-sv-2-cometbft-rpc",
+    "id": "undefined/cometbft-0-sv-2-cometbft-rpc",
     "inputs": {},
-    "name": "cometbft-sv-2-cometbft-rpc",
+    "name": "cometbft-0-sv-2-cometbft-rpc",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
   },
   {
     "custom": false,
-    "id": "undefined/cometbft-sv-3-cometbft-rpc",
+    "id": "undefined/cometbft-0-sv-3-cometbft-rpc",
     "inputs": {},
-    "name": "cometbft-sv-3-cometbft-rpc",
+    "name": "cometbft-0-sv-3-cometbft-rpc",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
   },
   {
     "custom": false,
-    "id": "undefined/cometbft-sv-4-cometbft-rpc",
+    "id": "undefined/cometbft-0-sv-4-cometbft-rpc",
     "inputs": {},
-    "name": "cometbft-sv-4-cometbft-rpc",
+    "name": "cometbft-0-sv-4-cometbft-rpc",
     "provider": "",
     "type": "kubernetes:core/v1:Service"
   },
@@ -1456,13 +1456,10 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "cometbftPorts": [
-          26656,
-          26666,
-          26676,
-          26686,
-          26696
-        ],
+        "cometbftPorts": {
+          "domains": 1,
+          "nodes": 10
+        },
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
       }
@@ -2274,7 +2271,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cometbft/",
       "compat": "true",
-      "name": "cometbft-global-domain-default",
+      "name": "cometbft-global-domain-0",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -2336,7 +2333,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "founder": {
-          "externalAddress": "cometbft-sv-1-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "cometbft-0-sv-1-cometbft-p2p.sv-1.svc.cluster.local:26656",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -2349,7 +2346,7 @@
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26656
+          "port": 26016
         },
         "metrics": {
           "enable": true,
@@ -2357,10 +2354,10 @@
           "release": "prometheus-grafana-monitoring"
         },
         "node": {
-          "externalAddress": "mock.network.canton.global:26656",
+          "externalAddress": "mock.network.canton.global:26016",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
-          "identifier": "cometbft-sv-1",
-          "istioPort": 26656,
+          "identifier": "cometbft-0-sv-1",
+          "istioPort": 26016,
           "keysSecret": "",
           "p2pPort": 26656,
           "privateKey": "/7L74Bs18740fTPdEL04BeO2Gs+1lzEeCjAiB1DYcysmLnU1FAkg/Ho9XsOiIp4U/KT/YNrtIi/A0prm/Ew3eQ==",
@@ -2376,15 +2373,15 @@
         "nodeName": "Canton-Foundation-1",
         "peers": [
           {
-            "externalAddress": "cometbft-sv-2-cometbft-p2p.sv-2.svc.cluster.local:26656",
+            "externalAddress": "cometbft-0-sv-2-cometbft-p2p.sv-2.svc.cluster.local:26656",
             "nodeId": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1"
           },
           {
-            "externalAddress": "cometbft-sv-3-cometbft-p2p.sv-3.svc.cluster.local:26656",
+            "externalAddress": "cometbft-0-sv-3-cometbft-p2p.sv-3.svc.cluster.local:26656",
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           },
           {
-            "externalAddress": "cometbft-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
+            "externalAddress": "cometbft-0-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
@@ -2405,7 +2402,7 @@
         }
       }
     },
-    "name": "sv-1-cometbft-global-domain-default",
+    "name": "sv-1-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2413,7 +2410,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-1-global-domain-default",
+    "name": "sv-1-global-domain-0",
     "provider": "",
     "type": "canton:network:domain:global"
   },
@@ -2423,7 +2420,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-global-domain/",
       "compat": "true",
-      "name": "global-domain-default",
+      "name": "global-domain-0",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -2482,6 +2479,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "disableAutoInit": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -2493,8 +2491,8 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
-        "postgresMediatorDb": "global_domain_default_mediator",
-        "postgresSequencerDb": "global_domain_default_sequencer",
+        "postgresMediatorDb": "global_domain_0_mediator",
+        "postgresSequencerDb": "global_domain_0_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -2513,7 +2511,7 @@
         "sequencerPostgresSecretName": "postgres-secrets"
       }
     },
-    "name": "sv-1-global-domain-default",
+    "name": "sv-1-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2523,7 +2521,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
-      "name": "ingress-sequencer-global-domain-default",
+      "name": "ingress-sequencer-global-domain-0",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -2590,7 +2588,7 @@
           "scan": false,
           "sequencer": {
             "activeGlobalDomain": "",
-            "globalDomain": "default"
+            "globalDomain": "0"
           },
           "sv": false,
           "wallet": false
@@ -2598,7 +2596,7 @@
         "withSvIngress": true
       }
     },
-    "name": "sv-1-ingress-sequencer-global-domain-default",
+    "name": "sv-1-ingress-sequencer-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2674,7 +2672,7 @@
           "cns": true,
           "scan": true,
           "sequencer": {
-            "activeGlobalDomain": "default",
+            "activeGlobalDomain": "0",
             "globalDomain": ""
           },
           "sv": true,
@@ -2799,7 +2797,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-global-domain-default-mediator-e",
+      "name": "postgres-global-domain-0-mediator-e",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -2858,7 +2856,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "global_domain_default_mediator",
+          "database": "global_domain_0_mediator",
           "hostname": "postgres.sv-1.svc.cluster.local",
           "port": "5432"
         },
@@ -2875,7 +2873,7 @@
         }
       }
     },
-    "name": "sv-1-postgres-global-domain-default-mediator-e",
+    "name": "sv-1-postgres-global-domain-0-mediator-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2885,7 +2883,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-global-domain-default-sequencer-e",
+      "name": "postgres-global-domain-0-sequencer-e",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -2944,7 +2942,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "global_domain_default_sequencer",
+          "database": "global_domain_0_sequencer",
           "hostname": "postgres.sv-1.svc.cluster.local",
           "port": "5432"
         },
@@ -2961,7 +2959,7 @@
         }
       }
     },
-    "name": "sv-1-postgres-global-domain-default-sequencer-e",
+    "name": "sv-1-postgres-global-domain-0-sequencer-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3506,7 +3504,7 @@
             "memory": "1536Mi"
           }
         },
-        "sequencerAddress": "global-domain-default-sequencer"
+        "sequencerAddress": "global-domain-0-sequencer"
       }
     },
     "name": "sv-1-scan",
@@ -3632,17 +3630,17 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "cometBFT": {
-          "connectionUri": "http://cometbft-sv-1-cometbft-rpc:26657",
+          "connectionUri": "http://undefined:26657",
           "enabled": true
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
-          "mediatorAddress": "global-domain-default-mediator",
-          "sequencerAddress": "global-domain-default-sequencer",
+          "mediatorAddress": "global-domain-0-mediator",
+          "sequencerAddress": "global-domain-0-sequencer",
           "sequencerPruningConfig": {
             "enabled": false
           },
-          "sequencerPublicUrl": "https://sequencer.sv-1.svc.mock.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [
           {
@@ -3677,7 +3675,7 @@
           }
         ],
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain-default-sequencer.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -3845,7 +3843,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cometbft/",
       "compat": "true",
-      "name": "cometbft-global-domain-default",
+      "name": "cometbft-global-domain-0",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -3907,7 +3905,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "founder": {
-          "externalAddress": "cometbft-sv-1-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "cometbft-0-sv-1-cometbft-p2p.sv-1.svc.cluster.local:26656",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -3920,7 +3918,7 @@
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26666
+          "port": 26026
         },
         "metrics": {
           "enable": true,
@@ -3928,10 +3926,10 @@
           "release": "prometheus-grafana-monitoring"
         },
         "node": {
-          "externalAddress": "mock.network.canton.global:26666",
+          "externalAddress": "mock.network.canton.global:26026",
           "id": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1",
-          "identifier": "cometbft-sv-2",
-          "istioPort": 26666,
+          "identifier": "cometbft-0-sv-2",
+          "istioPort": 26026,
           "keysSecret": "",
           "p2pPort": 26656,
           "privateKey": "1Je33z2g+Dj2UWLqnsO+xwUwbalIS0LLcYAoj+fYuEE2le4kJjJ0h+L7FfVg+3mbgvrikdke91I2X5C2frj0Eg==",
@@ -3947,11 +3945,11 @@
         "nodeName": "Canton-Foundation-2",
         "peers": [
           {
-            "externalAddress": "cometbft-sv-3-cometbft-p2p.sv-3.svc.cluster.local:26656",
+            "externalAddress": "cometbft-0-sv-3-cometbft-p2p.sv-3.svc.cluster.local:26656",
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           },
           {
-            "externalAddress": "cometbft-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
+            "externalAddress": "cometbft-0-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
@@ -3972,7 +3970,7 @@
         }
       }
     },
-    "name": "sv-2-cometbft-global-domain-default",
+    "name": "sv-2-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3980,7 +3978,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-2-global-domain-default",
+    "name": "sv-2-global-domain-0",
     "provider": "",
     "type": "canton:network:domain:global"
   },
@@ -3990,7 +3988,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-global-domain/",
       "compat": "true",
-      "name": "global-domain-default",
+      "name": "global-domain-0",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -4049,6 +4047,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "disableAutoInit": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -4060,8 +4059,8 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
-        "postgresMediatorDb": "global_domain_default_mediator",
-        "postgresSequencerDb": "global_domain_default_sequencer",
+        "postgresMediatorDb": "global_domain_0_mediator",
+        "postgresSequencerDb": "global_domain_0_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -4080,7 +4079,7 @@
         "sequencerPostgresSecretName": "postgres-secrets"
       }
     },
-    "name": "sv-2-global-domain-default",
+    "name": "sv-2-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4090,7 +4089,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
-      "name": "ingress-sequencer-global-domain-default",
+      "name": "ingress-sequencer-global-domain-0",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -4157,7 +4156,7 @@
           "scan": false,
           "sequencer": {
             "activeGlobalDomain": "",
-            "globalDomain": "default"
+            "globalDomain": "0"
           },
           "sv": false,
           "wallet": false
@@ -4165,7 +4164,7 @@
         "withSvIngress": true
       }
     },
-    "name": "sv-2-ingress-sequencer-global-domain-default",
+    "name": "sv-2-ingress-sequencer-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4241,7 +4240,7 @@
           "cns": true,
           "scan": true,
           "sequencer": {
-            "activeGlobalDomain": "default",
+            "activeGlobalDomain": "0",
             "globalDomain": ""
           },
           "sv": true,
@@ -4366,7 +4365,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-global-domain-default-mediator-e",
+      "name": "postgres-global-domain-0-mediator-e",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -4425,7 +4424,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "global_domain_default_mediator",
+          "database": "global_domain_0_mediator",
           "hostname": "postgres.sv-2.svc.cluster.local",
           "port": "5432"
         },
@@ -4442,7 +4441,7 @@
         }
       }
     },
-    "name": "sv-2-postgres-global-domain-default-mediator-e",
+    "name": "sv-2-postgres-global-domain-0-mediator-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4452,7 +4451,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-global-domain-default-sequencer-e",
+      "name": "postgres-global-domain-0-sequencer-e",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -4511,7 +4510,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "global_domain_default_sequencer",
+          "database": "global_domain_0_sequencer",
           "hostname": "postgres.sv-2.svc.cluster.local",
           "port": "5432"
         },
@@ -4528,7 +4527,7 @@
         }
       }
     },
-    "name": "sv-2-postgres-global-domain-default-sequencer-e",
+    "name": "sv-2-postgres-global-domain-0-sequencer-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5073,7 +5072,7 @@
             "memory": "1536Mi"
           }
         },
-        "sequencerAddress": "global-domain-default-sequencer"
+        "sequencerAddress": "global-domain-0-sequencer"
       }
     },
     "name": "sv-2-scan",
@@ -5199,21 +5198,21 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "cometBFT": {
-          "connectionUri": "http://cometbft-sv-2-cometbft-rpc:26657",
+          "connectionUri": "http://undefined:26657",
           "enabled": true
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
-          "mediatorAddress": "global-domain-default-mediator",
-          "sequencerAddress": "global-domain-default-sequencer",
+          "mediatorAddress": "global-domain-0-mediator",
+          "sequencerAddress": "global-domain-0-sequencer",
           "sequencerPruningConfig": {
             "enabled": false
           },
-          "sequencerPublicUrl": "https://sequencer.sv-2.svc.mock.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-2.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain-default-sequencer.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -5384,7 +5383,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cometbft/",
       "compat": "true",
-      "name": "cometbft-global-domain-default",
+      "name": "cometbft-global-domain-0",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -5446,7 +5445,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "founder": {
-          "externalAddress": "cometbft-sv-1-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "cometbft-0-sv-1-cometbft-p2p.sv-1.svc.cluster.local:26656",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -5459,7 +5458,7 @@
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26676
+          "port": 26036
         },
         "metrics": {
           "enable": true,
@@ -5467,10 +5466,10 @@
           "release": "prometheus-grafana-monitoring"
         },
         "node": {
-          "externalAddress": "mock.network.canton.global:26676",
+          "externalAddress": "mock.network.canton.global:26036",
           "id": "0d8e87c54d199e85548ccec123c9d92966ec458c",
-          "identifier": "cometbft-sv-3",
-          "istioPort": 26676,
+          "identifier": "cometbft-0-sv-3",
+          "istioPort": 26036,
           "keysSecret": "",
           "p2pPort": 26656,
           "privateKey": "DdbW/buPo4TXxW+/cvQxp5Lh1BZyH5GYHGoU0uTUQA/S1oZ32DDu1+CZhtrZhqEFMuxPlXVXvyvXsZLBdCkgdQ==",
@@ -5486,11 +5485,11 @@
         "nodeName": "Canton-Foundation-3",
         "peers": [
           {
-            "externalAddress": "cometbft-sv-2-cometbft-p2p.sv-2.svc.cluster.local:26656",
+            "externalAddress": "cometbft-0-sv-2-cometbft-p2p.sv-2.svc.cluster.local:26656",
             "nodeId": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1"
           },
           {
-            "externalAddress": "cometbft-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
+            "externalAddress": "cometbft-0-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
@@ -5511,7 +5510,7 @@
         }
       }
     },
-    "name": "sv-3-cometbft-global-domain-default",
+    "name": "sv-3-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5519,7 +5518,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-3-global-domain-default",
+    "name": "sv-3-global-domain-0",
     "provider": "",
     "type": "canton:network:domain:global"
   },
@@ -5529,7 +5528,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-global-domain/",
       "compat": "true",
-      "name": "global-domain-default",
+      "name": "global-domain-0",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -5588,6 +5587,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "disableAutoInit": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -5599,8 +5599,8 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
-        "postgresMediatorDb": "global_domain_default_mediator",
-        "postgresSequencerDb": "global_domain_default_sequencer",
+        "postgresMediatorDb": "global_domain_0_mediator",
+        "postgresSequencerDb": "global_domain_0_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -5619,7 +5619,7 @@
         "sequencerPostgresSecretName": "sequencer-pg-secrets"
       }
     },
-    "name": "sv-3-global-domain-default",
+    "name": "sv-3-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5629,7 +5629,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
-      "name": "ingress-sequencer-global-domain-default",
+      "name": "ingress-sequencer-global-domain-0",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -5696,7 +5696,7 @@
           "scan": false,
           "sequencer": {
             "activeGlobalDomain": "",
-            "globalDomain": "default"
+            "globalDomain": "0"
           },
           "sv": false,
           "wallet": false
@@ -5704,7 +5704,7 @@
         "withSvIngress": true
       }
     },
-    "name": "sv-3-ingress-sequencer-global-domain-default",
+    "name": "sv-3-ingress-sequencer-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5780,7 +5780,7 @@
           "cns": true,
           "scan": true,
           "sequencer": {
-            "activeGlobalDomain": "default",
+            "activeGlobalDomain": "0",
             "globalDomain": ""
           },
           "sv": true,
@@ -5799,7 +5799,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "mediator-pg-global-domain-default-mediator-e",
+      "name": "mediator-pg-global-domain-0-mediator-e",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -5858,7 +5858,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "global_domain_default_mediator",
+          "database": "global_domain_0_mediator",
           "hostname": "mediator-pg.sv-3.svc.cluster.local",
           "port": "5432"
         },
@@ -5875,7 +5875,7 @@
         }
       }
     },
-    "name": "sv-3-mediator-pg-global-domain-default-mediator-e",
+    "name": "sv-3-mediator-pg-global-domain-0-mediator-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -6564,7 +6564,7 @@
             "memory": "1536Mi"
           }
         },
-        "sequencerAddress": "global-domain-default-sequencer"
+        "sequencerAddress": "global-domain-0-sequencer"
       }
     },
     "name": "sv-3-scan",
@@ -6577,7 +6577,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "sequencer-pg-global-domain-default-sequencer-e",
+      "name": "sequencer-pg-global-domain-0-sequencer-e",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -6636,7 +6636,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "global_domain_default_sequencer",
+          "database": "global_domain_0_sequencer",
           "hostname": "sequencer-pg.sv-3.svc.cluster.local",
           "port": "5432"
         },
@@ -6653,7 +6653,7 @@
         }
       }
     },
-    "name": "sv-3-sequencer-pg-global-domain-default-sequencer-e",
+    "name": "sv-3-sequencer-pg-global-domain-0-sequencer-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -6881,21 +6881,21 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "cometBFT": {
-          "connectionUri": "http://cometbft-sv-3-cometbft-rpc:26657",
+          "connectionUri": "http://undefined:26657",
           "enabled": true
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
-          "mediatorAddress": "global-domain-default-mediator",
-          "sequencerAddress": "global-domain-default-sequencer",
+          "mediatorAddress": "global-domain-0-mediator",
+          "sequencerAddress": "global-domain-0-sequencer",
           "sequencerPruningConfig": {
             "enabled": false
           },
-          "sequencerPublicUrl": "https://sequencer.sv-3.svc.mock.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-3.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain-default-sequencer.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -7448,7 +7448,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cometbft/",
       "compat": "true",
-      "name": "cometbft-global-domain-default",
+      "name": "cometbft-global-domain-0",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -7510,7 +7510,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "founder": {
-          "externalAddress": "cometbft-sv-1-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "cometbft-0-sv-1-cometbft-p2p.sv-1.svc.cluster.local:26656",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -7523,7 +7523,7 @@
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26686
+          "port": 26046
         },
         "metrics": {
           "enable": true,
@@ -7531,10 +7531,10 @@
           "release": "prometheus-grafana-monitoring"
         },
         "node": {
-          "externalAddress": "mock.network.canton.global:26686",
+          "externalAddress": "mock.network.canton.global:26046",
           "id": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8",
-          "identifier": "cometbft-sv-4",
-          "istioPort": 26686,
+          "identifier": "cometbft-0-sv-4",
+          "istioPort": 26046,
           "keysSecret": "",
           "p2pPort": 26656,
           "privateKey": "xMB8gnYbacyZqU94cgwJBK2OJO3DffO12uHgeieotVj/Q9LbZEwLue9GnG8+G5GNRDgX8z75txr/Z541Uqyb3A==",
@@ -7550,11 +7550,11 @@
         "nodeName": "Canton-Foundation-4",
         "peers": [
           {
-            "externalAddress": "cometbft-sv-2-cometbft-p2p.sv-2.svc.cluster.local:26656",
+            "externalAddress": "cometbft-0-sv-2-cometbft-p2p.sv-2.svc.cluster.local:26656",
             "nodeId": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1"
           },
           {
-            "externalAddress": "cometbft-sv-3-cometbft-p2p.sv-3.svc.cluster.local:26656",
+            "externalAddress": "cometbft-0-sv-3-cometbft-p2p.sv-3.svc.cluster.local:26656",
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           }
         ],
@@ -7575,7 +7575,7 @@
         }
       }
     },
-    "name": "sv-4-cometbft-global-domain-default",
+    "name": "sv-4-cometbft-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -7583,7 +7583,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-4-global-domain-default",
+    "name": "sv-4-global-domain-0",
     "provider": "",
     "type": "canton:network:domain:global"
   },
@@ -7593,7 +7593,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-global-domain/",
       "compat": "true",
-      "name": "global-domain-default",
+      "name": "global-domain-0",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -7652,6 +7652,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "disableAutoInit": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -7663,8 +7664,8 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
-        "postgresMediatorDb": "global_domain_default_mediator",
-        "postgresSequencerDb": "global_domain_default_sequencer",
+        "postgresMediatorDb": "global_domain_0_mediator",
+        "postgresSequencerDb": "global_domain_0_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -7683,7 +7684,7 @@
         "sequencerPostgresSecretName": "postgres-secrets"
       }
     },
-    "name": "sv-4-global-domain-default",
+    "name": "sv-4-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -7693,7 +7694,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
-      "name": "ingress-sequencer-global-domain-default",
+      "name": "ingress-sequencer-global-domain-0",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -7760,7 +7761,7 @@
           "scan": false,
           "sequencer": {
             "activeGlobalDomain": "",
-            "globalDomain": "default"
+            "globalDomain": "0"
           },
           "sv": false,
           "wallet": false
@@ -7768,7 +7769,7 @@
         "withSvIngress": true
       }
     },
-    "name": "sv-4-ingress-sequencer-global-domain-default",
+    "name": "sv-4-ingress-sequencer-global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -7844,7 +7845,7 @@
           "cns": true,
           "scan": true,
           "sequencer": {
-            "activeGlobalDomain": "default",
+            "activeGlobalDomain": "0",
             "globalDomain": ""
           },
           "sv": true,
@@ -7969,7 +7970,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-global-domain-default-mediator-e",
+      "name": "postgres-global-domain-0-mediator-e",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -8028,7 +8029,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "global_domain_default_mediator",
+          "database": "global_domain_0_mediator",
           "hostname": "postgres.sv-4.svc.cluster.local",
           "port": "5432"
         },
@@ -8045,7 +8046,7 @@
         }
       }
     },
-    "name": "sv-4-postgres-global-domain-default-mediator-e",
+    "name": "sv-4-postgres-global-domain-0-mediator-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8055,7 +8056,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-global-domain-default-sequencer-e",
+      "name": "postgres-global-domain-0-sequencer-e",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -8114,7 +8115,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "global_domain_default_sequencer",
+          "database": "global_domain_0_sequencer",
           "hostname": "postgres.sv-4.svc.cluster.local",
           "port": "5432"
         },
@@ -8131,7 +8132,7 @@
         }
       }
     },
-    "name": "sv-4-postgres-global-domain-default-sequencer-e",
+    "name": "sv-4-postgres-global-domain-0-sequencer-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8676,7 +8677,7 @@
             "memory": "1536Mi"
           }
         },
-        "sequencerAddress": "global-domain-default-sequencer"
+        "sequencerAddress": "global-domain-0-sequencer"
       }
     },
     "name": "sv-4-scan",
@@ -8802,21 +8803,21 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "cometBFT": {
-          "connectionUri": "http://cometbft-sv-4-cometbft-rpc:26657",
+          "connectionUri": "http://undefined:26657",
           "enabled": true
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
         "domain": {
-          "mediatorAddress": "global-domain-default-mediator",
-          "sequencerAddress": "global-domain-default-sequencer",
+          "mediatorAddress": "global-domain-0-mediator",
+          "sequencerAddress": "global-domain-0-sequencer",
           "sequencerPruningConfig": {
             "enabled": false
           },
-          "sequencerPublicUrl": "https://sequencer.sv-4.svc.mock.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv-4.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain-default-sequencer.sv-1:5008",
+        "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -9045,13 +9046,10 @@
           }
         },
         "clusterUrl": "mock.network.canton.global",
-        "cometbftPorts": [
-          26656,
-          26666,
-          26676,
-          26686,
-          26696
-        ],
+        "cometbftPorts": {
+          "domains": 1,
+          "nodes": 10
+        },
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
       }

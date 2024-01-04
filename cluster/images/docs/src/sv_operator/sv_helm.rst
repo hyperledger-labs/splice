@@ -758,7 +758,7 @@ Destination            Url                                                      
 Sponsor SV             sv.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                           HTTPS     sv-app
 Sponsor SV Sequencer   sequencer.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                    HTTPS     participant
 Sponsor SV Scan        scan.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                         HTTPS     validator-app
-CometBft P2P           CometBft p2p IPs and ports 26656, 26666, 26676, 26686, 26696                                     TCP       cometbft
+CometBft P2P           CometBft p2p IPs and ports 26016, 26026, 26036, 26046, 26096                                     TCP       cometbft
 CometBft JSON RPC      sv.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc  HTTPS     cometbft
 ====================== ================================================================================================ ========= ==============
 

@@ -5,7 +5,7 @@ kind: ServiceMonitor
 metadata:
   labels:
     release: {{ .Values.metrics.release }}
-  name: cometbft
+  name: {{ include "prefix" (list .Values "cometbft-sm") }}
   namespace: {{ .Release.Namespace }}
 spec:
   endpoints:

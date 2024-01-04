@@ -2,6 +2,7 @@ import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
 import { Release } from '@pulumi/kubernetes/helm/v3';
+import { CustomResourceOptions } from '@pulumi/pulumi';
 import {
   clusterLargeDisk,
   envFlag,
@@ -49,7 +50,7 @@ export interface Postgres extends pulumi.Resource {
   readonly address: pulumi.Output<string>;
   readonly secretName: string;
 
-  createDatabaseAndInstallMetrics: (name: string) => pulumi.Resource;
+  createDatabaseAndInstallMetrics: (name: string, opts?: CustomResourceOptions) => pulumi.Resource;
 }
 
 class CloudPostgres extends pulumi.ComponentResource implements Postgres {
@@ -125,7 +126,7 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
     });
   }
 
-  createDatabaseAndInstallMetrics(name: string): pulumi.Resource {
+  createDatabaseAndInstallMetrics(name: string, opts?: CustomResourceOptions): pulumi.Resource {
     const db = new gcp.sql.Database(
       `${this.namespace.logicalName}-db-${this.name}-${name}`,
       {
@@ -133,8 +134,11 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
         name: name,
       },
       {
-        parent: this,
-        deletedWith: this.pgSvc,
+        ...{
+          parent: this,
+          deletedWith: this.pgSvc,
+        },
+        ...opts,
       }
     );
     installCNHelmChart(
@@ -148,7 +152,7 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
         },
         postgresSecretName: this.secretName,
       },
-      { dependsOn: [db] }
+      { ...{ dependsOn: [db] }, ...opts }
     );
     return db;
   }
@@ -193,7 +197,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
     });
   }
 
-  createDatabaseAndInstallMetrics(name: string): pulumi.Resource {
+  createDatabaseAndInstallMetrics(name: string, opts?: CustomResourceOptions): pulumi.Resource {
     // when using CNPostgres, apps are expected to create their own database in init containers
     installCNHelmChart(
       this.namespace,
@@ -206,7 +210,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
         },
         postgresSecretName: this.secretName,
       },
-      { dependsOn: [this.pg] }
+      { ...{ dependsOn: [this.pg] }, ...opts }
     );
     return this; // don't return the metrics, because that's a circular dependency
   }

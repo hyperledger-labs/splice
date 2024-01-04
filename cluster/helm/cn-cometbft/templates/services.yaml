@@ -1,5 +1,4 @@
 ---
-{{- $fullName := "cometbft" }}
 {{- $fullP2pHostName := include "prefix" (list .Values "cometbft-p2p") }}
 {{- $fullRpcHostName := include "prefix" (list .Values "cometbft-rpc") }}
 {{- with .Values.node }}
@@ -18,7 +17,7 @@ spec:
       protocol: TCP
       name: cometbft-p2p
   selector:
-    app: {{ $fullName }}
+    app: {{ $.Values.node.identifier }}
 ---
 apiVersion: v1
 kind: Service
@@ -38,5 +37,5 @@ spec:
       protocol: TCP
       name: cometbft-metrics
   selector:
-    app: {{ $fullName }}
+    app: {{ $.Values.node.identifier }}
 {{- end }}

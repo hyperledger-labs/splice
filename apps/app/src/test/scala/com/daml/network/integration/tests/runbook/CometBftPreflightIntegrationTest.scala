@@ -7,9 +7,11 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import io.circe.*, io.circe.parser.*
+import io.circe.*
+import io.circe.parser.*
 
-import java.net.Socket
+import java.net.{InetSocketAddress, Socket}
+import scala.util.Using
 
 /** Preflight test that makes sure that the cometBFT nodes of *our* SVs (1-4) have initialized fine.
   */
@@ -26,12 +28,13 @@ class CometBftPreflightIntegrationTest
   "p2p port for all CometBft nodes is accessible" in { env =>
     env.svs.remote.zipWithIndex.map { case (_, index) =>
       val cometBftP2pHost = sys.env("NETWORK_APPS_ADDRESS")
-      val port = 26656 + index * 10
-      clue(s"Connection to $cometBftP2pHost with port $port") {
+      val port = 26016 + index * 10
+      withClue(s"Connection to $cometBftP2pHost with port $port") {
         // All we care about is the p2p port for CometBFT being accessible by other nodes
         // The socket connects in the constructor, therefore if no error is thrown during the initialization then a successful TCP connection is established
-        val socket = new Socket(cometBftP2pHost, port)
-        socket.close()
+        Using.resource(new Socket()) { socket =>
+          socket.connect(new InetSocketAddress(cometBftP2pHost, port), 1000)
+        }
       }
     }
   }

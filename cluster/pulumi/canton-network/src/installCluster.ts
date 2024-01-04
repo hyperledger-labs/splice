@@ -20,6 +20,7 @@ import {
 
 import { installDocs } from './docs';
 import { configureForwardAll } from './gateway';
+import { DomainIndex, GlobalDomainUpgradeConfig } from './globalDomainNode';
 import { installClusterIngress } from './ingress';
 import { Postgres } from './postgres';
 import { installSplitwell } from './splitwell';
@@ -56,6 +57,12 @@ type ApprovedSvIdentity = {
 const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
   ? JSON.parse(process.env.BOOTSTRAPPING_CONFIG)
   : undefined;
+
+const globalDomainUpgradeConfig: GlobalDomainUpgradeConfig = {
+  legacyGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_LEGACY_ID),
+  activeGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_ACTIVE_ID),
+  upgradeGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_UPGRADE_ID),
+};
 
 const sv2Key = svKeyFromSecret('sv2');
 const sv3Key = svKeyFromSecret('sv3');
@@ -154,28 +161,31 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     infraStack.requireOutput(InfrastructureOutputs.INGRESS_NAMESPACE) as pulumi.Output<string>
   );
 
-  const { svApp: sv1, sequencerPostgres: postgresDB1 } = await installSvNode({
-    auth0Client,
-    nodename: 'sv-1',
-    onboardingName: isDevNet ? 'Canton-Foundation-1' : 'Canton-Foundation',
-    validatorWalletUser: isDevNet
-      ? 'auth0|64afbc0956a97fe9577249d7'
-      : 'auth0|64529b128448ded6aa68048f',
-    onboarding: { type: 'found-collective' },
-    approvedSvIdentities,
-    expectedValidatorOnboardings: [
-      splitwellOnboarding,
-      validator1Onboarding,
-      standaloneValidatorOnboarding,
-    ],
-    isDevNet,
-    backupConfig,
-    bootstrappingDumpConfig,
-    topupConfig,
-    auth0ValidatorAppName: 'sv1_validator',
-    splitPostgresInstances: false,
-    sequencerPruningConfig,
-  });
+  const { svApp: sv1, sequencerPostgres: postgresDB1 } = await installSvNode(
+    {
+      auth0Client,
+      nodename: 'sv-1',
+      onboardingName: isDevNet ? 'Canton-Foundation-1' : 'Canton-Foundation',
+      validatorWalletUser: isDevNet
+        ? 'auth0|64afbc0956a97fe9577249d7'
+        : 'auth0|64529b128448ded6aa68048f',
+      onboarding: { type: 'found-collective' },
+      approvedSvIdentities,
+      expectedValidatorOnboardings: [
+        splitwellOnboarding,
+        validator1Onboarding,
+        standaloneValidatorOnboarding,
+      ],
+      isDevNet,
+      backupConfig,
+      bootstrappingDumpConfig,
+      topupConfig,
+      auth0ValidatorAppName: 'sv1_validator',
+      splitPostgresInstances: false,
+      sequencerPruningConfig,
+    },
+    globalDomainUpgradeConfig
+  );
 
   if (!singleSv) {
     await installSvNode(
@@ -195,6 +205,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         splitPostgresInstances: false,
         sequencerPruningConfig,
       },
+      globalDomainUpgradeConfig,
       sv1
     );
     await installSvNode(
@@ -214,6 +225,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         splitPostgresInstances: true,
         sequencerPruningConfig,
       },
+      globalDomainUpgradeConfig,
       sv1
     );
     await installSvNode(
@@ -233,6 +245,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         splitPostgresInstances: false,
         sequencerPruningConfig,
       },
+      globalDomainUpgradeConfig,
       sv1
     );
   }
@@ -267,4 +280,16 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     splitwell,
     docs
   );
+}
+
+function processIndex(maybeValue?: string) {
+  if (maybeValue == undefined) {
+    return undefined;
+  }
+  const index = Number(maybeValue);
+  if (index >= 0 && index < 10) {
+    return index as DomainIndex;
+  } else {
+    throw new Error(`Cannot process ${maybeValue} as domain index`);
+  }
 }

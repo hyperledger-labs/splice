@@ -11,76 +11,7 @@ import {
   isDevNet,
 } from 'cn-pulumi-common';
 
-const sv1NodeConfig = {
-  id: '5af57aa83abcec085c949323ed8538108757be9c',
-  privateKey:
-    '/7L74Bs18740fTPdEL04BeO2Gs+1lzEeCjAiB1DYcysmLnU1FAkg/Ho9XsOiIp4U/KT/YNrtIi/A0prm/Ew3eQ==',
-  identifier: 'cometbft-sv-1',
-  externalAddress: p2pExternalAddress(26656),
-  istioPort: 26656,
-  validator: {
-    keyAddress: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
-    privateKey:
-      'npgiYbG0Iaslb/JHzliAg5BkfYMOaK3tCdKWvvO4FjCCmTBzVYK20vxkBMEg9YgFEKtvR5XgnAwKeNFrnpEQ/A==',
-    publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
-  },
-};
-
-const founder = {
-  nodeId: sv1NodeConfig.id,
-  publicKey: sv1NodeConfig.validator.publicKey,
-  keyAddress: sv1NodeConfig.validator.keyAddress,
-  externalAddress: p2pServiceAddress('cometbft-sv-1', 'sv-1'),
-};
-
-const nodeConfigs: {
-  [key: string]: NodeConfig;
-} = {
-  'sv-1': sv1NodeConfig,
-  'sv-2': {
-    id: 'c36b3bbd969d993ba0b4809d1f587a3a341f22c1',
-    privateKey:
-      '1Je33z2g+Dj2UWLqnsO+xwUwbalIS0LLcYAoj+fYuEE2le4kJjJ0h+L7FfVg+3mbgvrikdke91I2X5C2frj0Eg==',
-    identifier: 'cometbft-sv-2',
-    externalAddress: p2pExternalAddress(26666),
-    istioPort: 26666,
-    validator: {
-      keyAddress: '04A57312179F1E0C93B868779EE4C7FAC41666F0',
-      privateKey:
-        '58rlJ+0WYnpfgn26k4TjBAibToi+irz8C2x4XEVBWIgFVIz3+48YtTuUmPvZJTDVrbrXPYvpjLZcouGlS9vGoQ==',
-      publicKey: 'BVSM9/uPGLU7lJj72SUw1a261z2L6Yy2XKLhpUvbxqE=',
-    },
-  },
-  'sv-3': {
-    id: '0d8e87c54d199e85548ccec123c9d92966ec458c',
-    privateKey:
-      'DdbW/buPo4TXxW+/cvQxp5Lh1BZyH5GYHGoU0uTUQA/S1oZ32DDu1+CZhtrZhqEFMuxPlXVXvyvXsZLBdCkgdQ==',
-    identifier: 'cometbft-sv-3',
-    externalAddress: p2pExternalAddress(26676),
-    istioPort: 26676,
-    validator: {
-      keyAddress: 'FFF137F42421B0257CDC8B2E41F777B81A081E80',
-      privateKey:
-        'y+vvdb5lKRMplJ3mWe5NMdN293Nm6BSzDJFV0txGGKt3GbifUxE/8a5ISQkjBt0HjNVwYB5pyiEUo21soryhEA==',
-      publicKey: 'dxm4n1MRP/GuSEkJIwbdB4zVcGAeacohFKNtbKK8oRA=',
-    },
-  },
-  'sv-4': {
-    id: 'ee738517c030b42c3ff626d9f80b41dfc4b1a3b8',
-    privateKey:
-      'xMB8gnYbacyZqU94cgwJBK2OJO3DffO12uHgeieotVj/Q9LbZEwLue9GnG8+G5GNRDgX8z75txr/Z541Uqyb3A==',
-    identifier: 'cometbft-sv-4',
-    retainBlocks: isDevNet ? 10000 : 700000, // sv4 starts pruning after 2 hours on devnet only for testing purposes
-    externalAddress: p2pExternalAddress(26686),
-    istioPort: 26686,
-    validator: {
-      keyAddress: 'DE36D23DE022948A11200ABB9EE07F049D17D903',
-      privateKey:
-        'nUSWALRjErKf+/SVI93LU5venfN/YvsLaVdLYhbYPFPa6Zl1RL3trpVRcwayAon9VtBtqfFZoVTErVCKaGUSOg==',
-      publicKey: '2umZdUS97a6VUXMGsgKJ/VbQbanxWaFUxK1QimhlEjo=',
-    },
-  },
-};
+import { DomainIndex } from './globalDomainNode';
 
 /**
  * The CometBft deployment uses a different port for the istio VirtualService for each node
@@ -95,11 +26,12 @@ export function installCometBftNode(
   xns: ExactNamespace,
   nodename: string,
   onboardingName: string,
-  domain: string,
+  domain: DomainIndex,
   syncSource?: Release,
   opts?: CustomResourceOptions
 ): Service {
-  const nodeConfig = nodeConfigs[nodename];
+  const configs = new CometBftNodeConfig(domain);
+  const nodeConfig = configs.nodeConfigs[nodename];
   let stateSyncConfig;
   if (syncSource) {
     const rpcServer = syncSource.status.namespace.apply(rpcServiceAddress);
@@ -112,19 +44,19 @@ export function installCometBftNode(
   }
   const cometbftRelease = installCNHelmChart(
     xns,
-    `cometbft-${domain}`,
+    `cometbft-global-domain-${domain}`,
     'cn-cometbft',
     {
       nodeName: onboardingName,
       imageName: 'cometbft',
-      founder: founder,
+      founder: configs.founder,
       istioVirtualService: {
         enabled: true,
         gateway: 'cluster-ingress/cn-apps-gateway',
         port: nodeConfig.istioPort,
       },
       node: nodeConfig,
-      peers: Object.keys(nodeConfigs)
+      peers: Object.keys(configs.nodeConfigs)
         .filter(key => key !== nodename && key !== 'sv-1')
         .map(svName => {
           /*
@@ -134,8 +66,8 @@ export function installCometBftNode(
            * sending the traffic through the loopback to satisfy the firewall rules
            * */
           return {
-            nodeId: nodeConfigs[svName].id,
-            externalAddress: p2pServiceAddress(`cometbft-${svName}`, svName),
+            nodeId: configs.nodeConfigs[svName].id,
+            externalAddress: configs.p2pServiceAddress(svName),
           };
         }),
       stateSync: stateSyncConfig,
@@ -176,14 +108,107 @@ type NodeConfig = {
   id: Output<string> | string;
 };
 
-function p2pExternalAddress(port: number): string {
-  return `${CLUSTER_DNS_NAME}:${port}`;
-}
-
-function p2pServiceAddress(nodename: string, namespace: string): string {
-  return `${nodename}-cometbft-p2p.${namespace}.svc.cluster.local:26656`;
-}
-
 function rpcServiceAddress(namespace: string): string {
   return `http://sv-app.${namespace}.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc`;
+}
+
+class CometBftNodeConfig {
+  private readonly _domain: number;
+
+  constructor(domain: number) {
+    this._domain = domain;
+  }
+
+  get sv1NodeConfig() {
+    return {
+      id: '5af57aa83abcec085c949323ed8538108757be9c',
+      privateKey:
+        '/7L74Bs18740fTPdEL04BeO2Gs+1lzEeCjAiB1DYcysmLnU1FAkg/Ho9XsOiIp4U/KT/YNrtIi/A0prm/Ew3eQ==',
+      identifier: this.nodeIdentifier('sv-1'),
+      externalAddress: this.p2pExternalAddress(1),
+      istioPort: this.istioExternalPort(1),
+      validator: {
+        keyAddress: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
+        privateKey:
+          'npgiYbG0Iaslb/JHzliAg5BkfYMOaK3tCdKWvvO4FjCCmTBzVYK20vxkBMEg9YgFEKtvR5XgnAwKeNFrnpEQ/A==',
+        publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
+      },
+    };
+  }
+
+  p2pServiceAddress(nodename: string): string {
+    return `${this.nodeIdentifier(nodename)}-cometbft-p2p.${nodename}.svc.cluster.local:26656`;
+  }
+
+  private nodeIdentifier(node: string) {
+    return `cometbft-${this._domain}-${node}`;
+  }
+
+  get founder() {
+    return {
+      nodeId: this.sv1NodeConfig.id,
+      publicKey: this.sv1NodeConfig.validator.publicKey,
+      keyAddress: this.sv1NodeConfig.validator.keyAddress,
+      externalAddress: this.p2pServiceAddress('sv-1'),
+    };
+  }
+
+  get nodeConfigs(): {
+    [key: string]: NodeConfig;
+  } {
+    return {
+      'sv-1': this.sv1NodeConfig,
+      'sv-2': {
+        id: 'c36b3bbd969d993ba0b4809d1f587a3a341f22c1',
+        privateKey:
+          '1Je33z2g+Dj2UWLqnsO+xwUwbalIS0LLcYAoj+fYuEE2le4kJjJ0h+L7FfVg+3mbgvrikdke91I2X5C2frj0Eg==',
+        identifier: this.nodeIdentifier('sv-2'),
+        externalAddress: this.p2pExternalAddress(2),
+        istioPort: this.istioExternalPort(2),
+        validator: {
+          keyAddress: '04A57312179F1E0C93B868779EE4C7FAC41666F0',
+          privateKey:
+            '58rlJ+0WYnpfgn26k4TjBAibToi+irz8C2x4XEVBWIgFVIz3+48YtTuUmPvZJTDVrbrXPYvpjLZcouGlS9vGoQ==',
+          publicKey: 'BVSM9/uPGLU7lJj72SUw1a261z2L6Yy2XKLhpUvbxqE=',
+        },
+      },
+      'sv-3': {
+        id: '0d8e87c54d199e85548ccec123c9d92966ec458c',
+        privateKey:
+          'DdbW/buPo4TXxW+/cvQxp5Lh1BZyH5GYHGoU0uTUQA/S1oZ32DDu1+CZhtrZhqEFMuxPlXVXvyvXsZLBdCkgdQ==',
+        identifier: this.nodeIdentifier('sv-3'),
+        externalAddress: this.p2pExternalAddress(3),
+        istioPort: this.istioExternalPort(3),
+        validator: {
+          keyAddress: 'FFF137F42421B0257CDC8B2E41F777B81A081E80',
+          privateKey:
+            'y+vvdb5lKRMplJ3mWe5NMdN293Nm6BSzDJFV0txGGKt3GbifUxE/8a5ISQkjBt0HjNVwYB5pyiEUo21soryhEA==',
+          publicKey: 'dxm4n1MRP/GuSEkJIwbdB4zVcGAeacohFKNtbKK8oRA=',
+        },
+      },
+      'sv-4': {
+        id: 'ee738517c030b42c3ff626d9f80b41dfc4b1a3b8',
+        privateKey:
+          'xMB8gnYbacyZqU94cgwJBK2OJO3DffO12uHgeieotVj/Q9LbZEwLue9GnG8+G5GNRDgX8z75txr/Z541Uqyb3A==',
+        identifier: this.nodeIdentifier('sv-4'),
+        retainBlocks: isDevNet ? 10000 : 700000, // sv4 starts pruning after 2 hours on devnet only for testing purposes
+        externalAddress: this.p2pExternalAddress(4),
+        istioPort: this.istioExternalPort(4),
+        validator: {
+          keyAddress: 'DE36D23DE022948A11200ABB9EE07F049D17D903',
+          privateKey:
+            'nUSWALRjErKf+/SVI93LU5venfN/YvsLaVdLYhbYPFPa6Zl1RL3trpVRcwayAon9VtBtqfFZoVTErVCKaGUSOg==',
+          publicKey: '2umZdUS97a6VUXMGsgKJ/VbQbanxWaFUxK1QimhlEjo=',
+        },
+      },
+    };
+  }
+
+  private p2pExternalAddress(nodeIndex: DomainIndex): string {
+    return `${CLUSTER_DNS_NAME}:${this.istioExternalPort(nodeIndex)}`;
+  }
+
+  private istioExternalPort(nodeIndex: DomainIndex) {
+    return Number(`26${this._domain}${nodeIndex}6`);
+  }
 }

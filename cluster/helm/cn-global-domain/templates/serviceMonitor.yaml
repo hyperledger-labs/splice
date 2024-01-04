@@ -4,7 +4,7 @@ kind: ServiceMonitor
 metadata:
   labels:
     release: {{ .Values.metrics.release }}
-  name: sequencer
+  name: {{ .Release.Name }}-sequencer-sm
   namespace: {{ .Release.Namespace }}
 spec:
   endpoints:
@@ -25,7 +25,7 @@ kind: ServiceMonitor
 metadata:
   labels:
     release: {{ .Values.metrics.release }}
-  name: mediator
+  name: {{ .Release.Name }}-mediator-sm
   namespace: {{ .Release.Namespace }}
 spec:
   endpoints:

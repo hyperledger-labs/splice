@@ -95,6 +95,12 @@ function configureGatewayService(
   istiod: k8s.helm.v3.Release
 ) {
   const externalIPRanges = loadIPRanges();
+  // see notes when installing a CometBft node in the full deployment
+  const cometBftIngressPorts = Array.from(Array(1).keys()).flatMap((domain: number) => {
+    return Array.from(Array(10).keys()).map(node => {
+      return ingressPort(`cometbft-${domain}-${node}-gw`, Number(`26${domain}${node}6`));
+    });
+  });
   const gateway = new k8s.helm.v3.Release(
     'istio-ingress',
     {
@@ -128,13 +134,7 @@ function configureGatewayService(
             ingressPort('grpc-sw-lg', 5201),
             ingressPort('sw-metrics', 10213),
             ingressPort('sw-lg-gw', 6201),
-            // see notes when installing a CometBft node in the full deployment
-            ingressPort('cometbft1-gw', 26656),
-            ingressPort('cometbft2-gw', 26666),
-            ingressPort('cometbft3-gw', 26676),
-            ingressPort('cometbft4-gw', 26686),
-            ingressPort('cometbft5-gw', 26696),
-          ],
+          ].concat(cometBftIngressPorts),
         },
       },
     },

@@ -19,10 +19,14 @@ spec:
   - number: 5008
     name: grpc-domain
     protocol: GRPC
-  {{- range $index, $value := .Values.cometbftPorts }}
-  - number: {{ $value }}
-    name: cometbft{{ add $index 1 }}-p2p
+  {{- $domains := untilStep 0 (int .Values.cometbftPorts.domains) 1 -}}
+  {{- $domainNodes := untilStep 0 (int .Values.cometbftPorts.nodes) 1 -}}
+  {{- range $index, $domain := $domains }}
+  {{- range $index, $domainNode := $domainNodes }}
+  - number: 26{{ $domain }}{{ $domainNode }}6
+    name: cometbft-{{ $domain }}-{{ $domainNode }}-p2p
     protocol: TCP
+  {{- end }}
   {{- end }}
   resolution: DNS
 ---

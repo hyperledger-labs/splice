@@ -160,19 +160,16 @@ spec:
     hosts:
     - "{{ (.Values.cluster).hostname }}"
     - "*.{{ (.Values.cluster).hostname }}"
-  {{- range $index, $value := .Values.cometbftPorts }}
+  {{- $domains := untilStep 0 (int .Values.cometbftPorts.domains) 1 -}}
+  {{- $domainNodes := untilStep 0 (int .Values.cometbftPorts.nodes) 1 -}}
+  {{- range $index, $domain := $domains }}
+  {{- range $index, $domainNode := $domainNodes }}
   - port:
-      number: {{ $value }}
-      name: cometbft{{ add $index 1 }}-gw
+      number: 26{{ $domain }}{{ $domainNode }}6
+      name: cometbft-{{ $domain }}-{{ $domainNode }}-gw
       protocol: TCP
     hosts:
       # We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
       - "*"
   {{- end }}
-  - port:
-      number: 26696
-      name: cometbft-sv-gw
-      protocol: TCP
-    hosts:
-      # We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
-      - "*"
+  {{- end }}

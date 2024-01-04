@@ -52,6 +52,10 @@ spec:
             - name: SEQUENCER_DRIVER_COMETBFT_PORT
               value: "{{ .Values.sequencerDriver.port }}"
         {{- end}}
+        {{- if .Values.disableAutoInit }}
+            - name: CANTON_SEQUENCER_AUTO_INIT
+              value: "false"
+        {{- end }}
           imagePullPolicy: Always
           ports:
             - containerPort: 5008

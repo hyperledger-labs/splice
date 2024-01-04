@@ -45,20 +45,17 @@ export function installParticipant(
   disableAutoInit = false,
   dependsOn: pulumi.Resource[] = []
 ): pulumi.Resource {
-  const postgresDbName = 'participant';
-
-  const postgresDb = postgres.createDatabaseAndInstallMetrics(postgresDbName);
+  const postgresDb = postgres.createDatabaseAndInstallMetrics(name);
 
   const initDb = initDatabase();
-
   return installCNHelmChart(
     xns,
     name,
     'cn-participant',
     {
       postgres: postgres.address,
-      postgresDb: postgresDbName,
-      postgresSchema: postgresDbName,
+      postgresDb: name,
+      postgresSchema: name,
       postgresSecretName: postgres.secretName,
       participantAdminUserNameFrom,
       disableAutoInit,

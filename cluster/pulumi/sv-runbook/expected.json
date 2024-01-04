@@ -215,7 +215,7 @@
       "timeout": 480,
       "values": {
         "founder": {
-          "externalAddress": "svrun.network.com.network.canton.global:26656"
+          "externalAddress": "svrun.network.com.network.canton.global:26016"
         },
         "genesis": {
           "chainId": "svrun"
@@ -224,10 +224,10 @@
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26696
+          "port": 26096
         },
         "node": {
-          "externalAddress": "cometbft.svc.svrun.network.canton.global:26696",
+          "externalAddress": "cometbft.svc.svrun.network.canton.global:26096",
           "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
           "identifier": "cometbft",
           "keysSecret": "cometbft-keys"

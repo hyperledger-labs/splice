@@ -1,4 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
+import { Service } from '@pulumi/kubernetes/core/v1';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ComponentResource } from '@pulumi/pulumi';
 import { CLUSTER_BASENAME, ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
@@ -7,17 +8,55 @@ import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { installCometBftNode } from './cometbft';
 import { initDatabase, Postgres } from './postgres';
 
+export type GlobalDomainUpgradeConfig = {
+  legacyGlobalDomainId?: DomainIndex;
+  activeGlobalDomainId?: DomainIndex;
+  upgradeGlobalDomainId?: DomainIndex;
+};
+
+export function installGlobalDomain(
+  globalDomainUpgradeConfig: GlobalDomainUpgradeConfig,
+  xns: ExactNamespace,
+  sequencerPostgres: Postgres,
+  mediatorPostgres: Postgres,
+  cometbft: {
+    name: string;
+    onboardingName: string;
+    syncSource?: Release;
+  }
+): GlobalDomainNode {
+  function createGlobalDomainNode(id: DomainIndex) {
+    return new GlobalDomainNode(id, xns, sequencerPostgres, mediatorPostgres, cometbft, true);
+  }
+
+  if (globalDomainUpgradeConfig.activeGlobalDomainId == undefined) {
+    return new GlobalDomainNode(0, xns, sequencerPostgres, mediatorPostgres, cometbft, false);
+  } else {
+    const activeDomain = createGlobalDomainNode(globalDomainUpgradeConfig.activeGlobalDomainId);
+    if (globalDomainUpgradeConfig.legacyGlobalDomainId) {
+      createGlobalDomainNode(globalDomainUpgradeConfig.legacyGlobalDomainId);
+    }
+    if (globalDomainUpgradeConfig.upgradeGlobalDomainId) {
+      createGlobalDomainNode(globalDomainUpgradeConfig.upgradeGlobalDomainId);
+    }
+    return activeDomain;
+  }
+}
+
+export type DomainIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+
 export class GlobalDomainNode extends ComponentResource {
-  id: string;
+  id: number;
   name: string;
   cometbft: {
     name: string;
     onboardingName: string;
     syncSource?: Release;
   };
+  cometbftRpcService: Service;
 
   constructor(
-    domainId: string,
+    domainId: DomainIndex,
     xns: ExactNamespace,
     sequencerPostgres: Postgres,
     mediatorPostgres: Postgres,
@@ -25,32 +64,39 @@ export class GlobalDomainNode extends ComponentResource {
       name: string;
       onboardingName: string;
       syncSource?: Release;
-    }
+    },
+    disableAutoInit: boolean
   ) {
     super('canton:network:domain:global', `${xns.logicalName}-global-domain-${domainId}`);
     this.id = domainId;
     this.cometbft = cometbft;
-    this.name = 'global-domain-' + domainId;
+    this.name = 'global-domain-' + domainId.toString();
 
     const sanitizedName = this.name.replaceAll('-', '_');
 
     const mediatorDbName = `${sanitizedName}_mediator`;
-    const mediatorDb = mediatorPostgres.createDatabaseAndInstallMetrics(mediatorDbName);
+    const mediatorDb = mediatorPostgres.createDatabaseAndInstallMetrics(mediatorDbName, {
+      parent: this,
+    });
 
     const sequencerDbName = `${sanitizedName}_sequencer`;
-    const sequencerDb = sequencerPostgres.createDatabaseAndInstallMetrics(sequencerDbName);
+    const sequencerDb = sequencerPostgres.createDatabaseAndInstallMetrics(sequencerDbName, {
+      parent: this,
+    });
     const cometBftService = installCometBftNode(
       xns,
       cometbft.name,
       cometbft.onboardingName,
-      this.name,
+      domainId,
       cometbft.syncSource,
       { parent: this }
     );
 
+    this.cometbftRpcService = cometBftService;
+
     const initDb = initDatabase();
 
-    installCNHelmChart(
+    const domainNodeRelease = installCNHelmChart(
       xns,
       this.name,
       'cn-global-domain',
@@ -70,6 +116,7 @@ export class GlobalDomainNode extends ComponentResource {
           enable: true,
         },
         additionalJvmOptions: jmxOptions(),
+        disableAutoInit: disableAutoInit,
         init: initDb && { initDb },
       },
       { dependsOn: [mediatorDb, sequencerDb, cometBftService], parent: this }
@@ -86,7 +133,7 @@ export class GlobalDomainNode extends ComponentResource {
           cns: false,
           scan: false,
           sequencer: {
-            globalDomain: domainId,
+            globalDomain: domainId.toString(),
           },
         },
         cluster: {
@@ -94,7 +141,7 @@ export class GlobalDomainNode extends ComponentResource {
           svNamespace: xns.logicalName,
         },
       },
-      { dependsOn: [xns.ns], parent: this }
+      { dependsOn: [xns.ns, domainNodeRelease], parent: this }
     );
   }
 }
