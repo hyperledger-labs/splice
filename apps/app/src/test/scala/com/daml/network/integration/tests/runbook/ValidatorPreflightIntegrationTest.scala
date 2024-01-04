@@ -147,8 +147,10 @@ abstract class ValidatorPreflightIntegrationTestBase
         }
       }
 
-      click on "logout-button"
-      waitForQuery(id("oidc-login-button"))
+      clue("Logging out") {
+        click on "logout-button"
+        waitForQuery(id("oidc-login-button"))
+      }
     }
 
     withFrontEnd("bob-validator") { implicit webDriver =>
@@ -161,34 +163,40 @@ abstract class ValidatorPreflightIntegrationTestBase
           }
         }
 
-        acceptButton.click()
-
-        click on "navlink-transactions"
-
-        eventually() {
-          inside(findAll(className("tx-row")).toSeq) { case Seq(tx) =>
-            val transaction = readTransactionFromRow(tx)
-            transaction.action should matchText("Received")
-            val partyR = s"${alicePartyId}.*${validatorName}_validator_service_user::.*".r
-            val description =
-              transaction.partyDescription.getOrElse(fail("There should be a party."))
-            description should fullyMatch regex partyR
-            transaction.ccAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
-            // we can't test a specific coin price as the coin price on a live network can change
-            val rateR = """^\s*(\d+(?:\.\d+)?)\s*CC/USD\s*$""".r
-            inside(transaction.rate) { case rateR(rate) =>
-              BigDecimal(rate) should be > BigDecimal(0)
-              transaction.usdAmount should beWithin(
-                transaction.ccAmount / BigDecimal(rate) - smallAmount,
-                transaction.ccAmount / BigDecimal(rate) + smallAmount,
-              )
+        actAndCheck(
+          "Accept transfer offer", {
+            click on acceptButton
+            click on "navlink-transactions"
+          },
+        )(
+          "Transfer appears in transactions log",
+          _ => {
+            inside(findAll(className("tx-row")).toSeq) { case Seq(tx) =>
+              val transaction = readTransactionFromRow(tx)
+              transaction.action should matchText("Received")
+              val partyR = s"${alicePartyId}.*${validatorName}_validator_service_user::.*".r
+              val description =
+                transaction.partyDescription.getOrElse(fail("There should be a party."))
+              description should fullyMatch regex partyR
+              transaction.ccAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
+              // we can't test a specific coin price as the coin price on a live network can change
+              val rateR = """^\s*(\d+(?:\.\d+)?)\s*CC/USD\s*$""".r
+              inside(transaction.rate) { case rateR(rate) =>
+                BigDecimal(rate) should be > BigDecimal(0)
+                transaction.usdAmount should beWithin(
+                  transaction.ccAmount / BigDecimal(rate) - smallAmount,
+                  transaction.ccAmount / BigDecimal(rate) + smallAmount,
+                )
+              }
             }
-          }
-        }
+          },
+        )
       }
 
-      click on "logout-button"
-      waitForQuery(id("oidc-login-button"))
+      clue("Logging out") {
+        click on "logout-button"
+        waitForQuery(id("oidc-login-button"))
+      }
     }
   }
 
@@ -348,7 +356,7 @@ abstract class ValidatorPreflightIntegrationTestBase
   private def loginAndOnboardToWalletUi(
       user: Auth0User
   )(implicit webDriver: WebDriverType): String = {
-    loginAndOnboardToUiViaAuth0(user, walletUiUrl, onboardUserToWallet = true)
+    loginAndOnboardToUiViaAuth0(user, walletUiUrl)
   }
 
   private def loginToSplitwellUi(
@@ -367,7 +375,6 @@ abstract class ValidatorPreflightIntegrationTestBase
   private def loginAndOnboardToUiViaAuth0(
       user: Auth0User,
       url: String,
-      onboardUserToWallet: Boolean,
   )(implicit webDriver: WebDriverType): String = {
 
     clue(s"Logging in to wallet UI at: ${url}") {
@@ -377,12 +384,17 @@ abstract class ValidatorPreflightIntegrationTestBase
         () => find(id("onboard-button")) should not be empty,
       )
 
-      if (onboardUserToWallet)
-        click on "onboard-button"
+      actAndCheck(
+        "Onboard wallet user", {
+          click on "onboard-button"
+        },
+      )(
+        "Party ID is displayed after onboarding finishes",
+        _ => {
+          findAll(className("party-id")) should have size 1
+        },
+      )
 
-      eventually() {
-        findAll(className("party-id")) should have size 1
-      }
       copyPartyId()
     }
   }
