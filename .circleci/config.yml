@@ -2984,6 +2984,7 @@ workflows:
               only:
                 - deployment/testnet
           cluster: "testnet"
+          wait_for_cluster_version: false
           context:
             - artifactory
             - canton-network-vpn
