@@ -1,5 +1,6 @@
 /* @ts-expect-error typings unavailable */
 import { randomIntBetween, randomItem } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
+import { sleep } from 'k6';
 import { z } from 'zod';
 
 export function jsonStringDecoder<Z extends z.ZodTypeAny = z.ZodNever>(
@@ -28,4 +29,21 @@ export function pickTwoRandom(nums: number): [number, number] {
   const second = randomItem(arrayOfNums.filter(n => n != first));
 
   return [first, second];
+}
+
+export function syncRetryUndefined<A>(action: () => A | undefined): A | undefined {
+  let retries = 5;
+  let final = undefined;
+  while (retries >= 0) {
+    const result = action();
+    if (typeof result === 'undefined') {
+      sleep(1);
+    } else {
+      final = result;
+      break;
+    }
+    retries = retries - 1;
+  }
+
+  return final;
 }

@@ -9,11 +9,16 @@ const validatorSchema = z.object({
       clientId: z.string().min(1),
       clientSecret: z.string().min(1),
     }),
+    admin: z.object({
+      email: z.string().email(),
+      password: z.string().min(1),
+    }),
     usersPassword: z.string().min(1),
   }),
 });
 
 export const configSchema = z.object({
+  isDevNet: z.boolean(),
   usersPerValidator: z.number().min(1),
   validators: z.array(validatorSchema).min(1),
   test: z.object({

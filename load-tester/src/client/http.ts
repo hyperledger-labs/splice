@@ -1,5 +1,13 @@
 import { sleep } from 'k6';
-import http, { RefinedResponse } from 'k6/http';
+import http, { RefinedParams, RefinedResponse, ResponseType } from 'k6/http';
+
+type ResponseHandler = {
+  then: <T>(handleResponse: (n: RefinedResponse<'text'>) => T) => T;
+};
+
+type RedirectResponseHandler = {
+  then: <T>(handleResponse: (n: RefinedResponse<'text'>, location: string) => T) => T;
+};
 
 // HTTP client built off of k6/http, that automatically handles retries
 export class HttpClient {
@@ -25,22 +33,24 @@ export class HttpClient {
   }
 
   // base HTTP request with simple error handling
-  private _request<R>(
+  private _request<R extends ResponseType>(
     url: string,
     method: 'GET' | 'POST',
     body: string | Buffer | undefined,
     expectedStatus: 200 | 201 | 302,
-    additionalHeaders: Record<string, string> | undefined,
     retries: number,
-    handleResponse: (resp: RefinedResponse<'text'>) => R,
-  ): R {
+    params: RefinedParams<R | undefined> | null | undefined,
+  ): ResponseHandler {
     console.debug(`Calling ${method} on endpoint: ${url}`);
 
     const headers = {
-      ...additionalHeaders,
+      ...params?.headers,
     };
 
-    const tags = this.tag ? { name: this.tag } : undefined;
+    const tags = {
+      ...params?.tags,
+      ...(this.tag ? { name: this.tag } : undefined),
+    };
 
     console.debug(`Request data: ${JSON.stringify({ headers, body, url })}`);
 
@@ -56,15 +66,7 @@ export class HttpClient {
         console.debug(`${retries} retries remaining...`);
 
         sleep(this.retryWait);
-        this._request(
-          url,
-          method,
-          body,
-          expectedStatus,
-          additionalHeaders,
-          retries - 1,
-          handleResponse,
-        );
+        return this._request(url, method, body, expectedStatus, retries - 1, params);
       } else {
         this.handleError(
           `Expected status code ${expectedStatus} but received ${resp.status} for ${method} ${url}`,
@@ -73,98 +75,77 @@ export class HttpClient {
       }
     }
 
-    return handleResponse(resp);
+    return {
+      then: function <T>(handleResponse: (resp: RefinedResponse<'text'>) => T) {
+        return handleResponse(resp);
+      },
+    };
   }
 
   // an HTTP request that is expected to return 302 redirect
-  private _redirect<R>(
+  private _redirect<R extends ResponseType>(
     url: string,
     method: 'GET' | 'POST',
     body: string | Buffer | undefined,
-    additionalHeaders: Record<string, string> | undefined,
-    handleResponse: (resp: RefinedResponse<'text'>, location: string) => R,
-  ): R {
-    return this._request(url, method, body, 302, additionalHeaders, this.retryCount, resp => {
+    params: RefinedParams<R | undefined> | null | undefined,
+  ): RedirectResponseHandler {
+    return this._request(url, method, body, 302, this.retryCount, params).then(resp => {
       const location = resp.headers['Location'];
 
-      if (typeof location === 'string') {
-        return handleResponse(resp, location);
-      } else {
+      if (typeof location !== 'string') {
         this.handleError(`Found a 302 but did not find a redirect location for ${url}.`, {
           headers: resp.headers,
           body: resp.body,
         });
-        return handleResponse(resp, '');
       }
+
+      return {
+        then: function <T>(
+          handleResponse: (_resp: RefinedResponse<'text'>, _location: string) => T,
+        ) {
+          return handleResponse(resp, location || '');
+        },
+      };
     });
   }
 
   public get = {
-    redirect: <R>(
+    redirect: <R extends ResponseType>(
       url: string,
-      additionalHeaders: Record<string, string>,
-      handleResponse: (resp: RefinedResponse<'text'>, location: string) => R,
-    ): R => {
-      return this._redirect(url, 'GET', undefined, additionalHeaders, handleResponse);
+      params: RefinedParams<R | undefined> | null | undefined,
+    ): RedirectResponseHandler => {
+      return this._redirect(url, 'GET', undefined, params);
     },
-    success: <R>(
+    success: <R extends ResponseType>(
       url: string,
       body: string | Buffer | undefined,
-      additionalHeaders: Record<string, string>,
-      handleResponse: (resp: RefinedResponse<'text'>) => R,
-    ): R => {
-      return this._request(
-        url,
-        'GET',
-        body,
-        200,
-        additionalHeaders,
-        this.retryCount,
-        handleResponse,
-      );
+      params: RefinedParams<R | undefined> | null | undefined,
+    ): ResponseHandler => {
+      return this._request(url, 'GET', body, 200, this.retryCount, params);
     },
   };
 
   public post = {
-    redirect: <R>(
+    redirect: <R extends ResponseType>(
       url: string,
       body: string | Buffer | undefined,
-      additionalHeaders: Record<string, string>,
-      handleResponse: (resp: RefinedResponse<'text'>, location: string) => R,
-    ): R => {
-      return this._redirect(url, 'POST', body, additionalHeaders, handleResponse);
+      params: RefinedParams<R | undefined> | null | undefined,
+    ): RedirectResponseHandler => {
+      return this._redirect(url, 'POST', body, params);
     },
-    success: <R>(
+    success: <R extends ResponseType>(
       url: string,
       body: string | Buffer | undefined,
-      additionalHeaders: Record<string, string>,
-      handleResponse: (resp: RefinedResponse<'text'>) => R,
-    ): R => {
-      return this._request(
-        url,
-        'POST',
-        body,
-        200,
-        additionalHeaders,
-        this.retryCount,
-        handleResponse,
-      );
+      params: RefinedParams<R | undefined> | null | undefined,
+    ): ResponseHandler => {
+      return this._request(url, 'POST', body, 200, this.retryCount, params);
     },
-    s201: <R>(
+    s201: <R extends ResponseType>(
       url: string,
       body: string | Buffer | undefined,
-      additionalHeaders: Record<string, string>,
-      handleResponse: (resp: RefinedResponse<'text'>) => R,
-    ): R => {
-      return this._request(
-        url,
-        'POST',
-        body,
-        201,
-        additionalHeaders,
-        this.retryCount,
-        handleResponse,
-      );
+      params: RefinedParams<R | undefined> | null | undefined,
+    ): ResponseHandler => {
+      return this._request(url, 'POST', body, 201, this.retryCount, params);
     },
   };
 }

@@ -103,7 +103,7 @@ export class Auth0Manager {
       'Sec-Fetch-User': '?1',
     };
 
-    return this.httpClient.get.redirect(url, headers, (_, location) => {
+    return this.httpClient.get.redirect(url, { headers }).then((_, location) => {
       const state = location.split('state=')[1];
       return { location, state };
     });
@@ -126,15 +126,12 @@ export class Auth0Manager {
       'Sec-Fetch-User': '?1',
     };
 
-    return this.httpClient.post.redirect(
-      `${this.auth0Tenant}${location}`,
-      data,
-      headers,
-      (_, loc) => {
+    return this.httpClient.post
+      .redirect(`${this.auth0Tenant}${location}`, data, { headers })
+      .then((_, loc) => {
         const state = loc.split('state=')[1];
         return { location: loc, state };
-      },
-    );
+      });
   };
 
   // Step through the /authorize/resume endpoint
@@ -153,10 +150,9 @@ export class Auth0Manager {
       'Sec-Fetch-User': '?1',
     };
 
-    return this.httpClient.get.redirect(
-      `${this.auth0Tenant}${location}`,
-      headers,
-      (_, location) => {
+    return this.httpClient.get
+      .redirect(`${this.auth0Tenant}${location}`, { headers })
+      .then((_, location) => {
         const querystr = location.split('/?')[1];
         const { state, code } = parse(querystr);
 
@@ -165,8 +161,7 @@ export class Auth0Manager {
         }
 
         return { location, state, code };
-      },
-    );
+      });
   };
 
   // Step through the /oauth/token endpoint
@@ -191,15 +186,17 @@ export class Auth0Manager {
       data += `&client_secret=${req.clientSecret}&audience=${req.audience}`;
     }
 
-    return this.httpClient.post.success(`${this.auth0Tenant}/oauth/token`, data, headers, resp => {
-      const json = JSON.parse(resp.body || '{}');
+    return this.httpClient.post
+      .success(`${this.auth0Tenant}/oauth/token`, data, { headers })
+      .then(resp => {
+        const json = JSON.parse(resp.body || '{}');
 
-      if (json && typeof json.access_token === 'string') {
-        return json.access_token;
-      } else {
-        throw new Error('Access token not found in response');
-      }
-    });
+        if (json && typeof json.access_token === 'string') {
+          return json.access_token;
+        } else {
+          throw new Error('Access token not found in response');
+        }
+      });
   };
 
   /**
@@ -232,29 +229,28 @@ export class Auth0Manager {
   public userExists = (email: string): boolean => {
     const query = `&search_engine=v3&q=${encodeURIComponent(`email:${email}`)}`;
 
-    const response = this.httpClient.get.success(
-      `${this.auth0Tenant}/api/v2/users?${query}`,
-      undefined,
-      {
-        Accept: 'application/json',
-        Authorization: `Bearer ${this.managementApiToken}`,
-      },
-      resp => jsonStringDecoder(listUsersResponse, resp.body),
-    );
+    const headers = {
+      Accept: 'application/json',
+      Authorization: `Bearer ${this.managementApiToken}`,
+    };
+
+    const response = this.httpClient.get
+      .success(`${this.auth0Tenant}/api/v2/users?${query}`, undefined, { headers })
+      .then(resp => jsonStringDecoder(listUsersResponse, resp.body));
 
     return !!response?.find(u => u.email === email);
   };
 
   public createUser = (email: string, password: string): void => {
+    const headers = {
+      Accept: 'application/json',
+      Authorization: `Bearer ${this.managementApiToken}`,
+    };
+
     this.httpClient.post.s201(
       `${this.auth0Tenant}/api/v2/users`,
       JSON.stringify({ email, password, connection: this.connection }),
-      {
-        Accept: 'application/json',
-        Authorization: `Bearer ${this.managementApiToken}`,
-        'Content-Type': 'application/json',
-      },
-      resp => resp,
+      { headers },
     );
   };
 }

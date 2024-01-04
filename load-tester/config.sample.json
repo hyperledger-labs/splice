@@ -1,5 +1,6 @@
 {
   "usersPerValidator": 10,
+  "isDevNet": "$IS_DEVNET",
   "validators": [
     {
       "walletBaseUrl": "$K6_WALLET_BASE_URL",
@@ -10,6 +11,10 @@
         "managementApi": {
           "clientId": "$AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
           "clientSecret": "$AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET"
+        },
+        "admin": {
+          "email": "admin@validator1.com",
+          "password": "$K6_VALIDATOR_ADMIN_PASSWORD"
         }
       }
     }

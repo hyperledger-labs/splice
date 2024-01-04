@@ -182,6 +182,8 @@ jobs:
             --keep CIRCLECI_TOKEN
             --keep CIRCLE_WORKFLOW_ID
             --keep K6_USERS_PASSWORD
+            --keep K6_VALIDATOR_ADMIN_USERNAME
+            --keep K6_VALIDATOR_ADMIN_PASSWORD
             --keep SLACK_ACCESS_TOKEN
           gce_authenticate: true
           cmd: |

@@ -2,26 +2,34 @@ import BigNumber from 'bignumber.js';
 
 /* @ts-expect-error typings unavailable */
 import { randomItem } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
-import { Counter, Trend } from 'k6/metrics';
+import { Counter, Gauge, Trend } from 'k6/metrics';
 
 import { Auth0Manager } from '../client/auth0/auth0';
 import { logInUser } from '../client/auth0/helpers';
-import { doIfOnboarded, sendAndWaitForTransferOffer } from '../client/validator/helpers';
+import {
+  doIfOnboarded,
+  sendAndWaitForTransferOffer,
+  waitForBalance,
+} from '../client/validator/helpers';
 import { ValidatorClient } from '../client/validator/validator';
 import settings from '../settings';
-import { pickTwoRandom } from '../utils';
+import { pickTwoRandom, syncRetryUndefined } from '../utils';
 
 export const options = { ...settings.options };
 
 const transactionsStarted = new Counter('transactions_started');
 const transactionsCompleted = new Counter('transactions_completed');
 const transactionLatency = new Trend('transaction_latency', true);
+const validatorOperatorBalance = new Gauge('validator_operator_balance');
 
-type ValidatorConf = { walletBaseUrl: string; tokens: string[] };
-type Data = ValidatorConf[];
+type ValidatorConf = {
+  walletBaseUrl: string;
+  adminToken: string;
+  userTokens: string[];
+};
 
-export function setup(): Data {
-  const validatorConfs: Data = [];
+export function setup(): ValidatorConf[] {
+  const validatorConfs: ValidatorConf[] = [];
 
   settings.validators.forEach((validator, validatorIndex) => {
     let tokens: string[] = [];
@@ -38,16 +46,22 @@ export function setup(): Data {
       tokens = [...tokens, t];
     }
 
-    validatorConfs[validatorIndex] = { tokens, walletBaseUrl: validator.walletBaseUrl };
+    const adminToken = logInUser(auth0, validator.auth.admin.email, validator.auth.admin.password);
+
+    validatorConfs[validatorIndex] = {
+      adminToken,
+      userTokens: tokens,
+      walletBaseUrl: validator.walletBaseUrl,
+    };
   });
 
   return validatorConfs;
 }
 
-export default function (data: Data): void {
+export default function (data: ValidatorConf[]): void {
   // Pick a random available validator
   const validatorConf: ValidatorConf = randomItem(data);
-  const userTokens = validatorConf.tokens;
+  const { adminToken, walletBaseUrl, userTokens } = validatorConf;
 
   // Pick two random users from that validator
   const [senderIndex, recipientIndex] = pickTwoRandom(userTokens.length);
@@ -55,20 +69,29 @@ export default function (data: Data): void {
   const senderToken = userTokens[senderIndex];
   const recipientToken = userTokens[recipientIndex];
 
-  const senderClient = new ValidatorClient(validatorConf.walletBaseUrl, senderToken);
-  const receipientClient = new ValidatorClient(validatorConf.walletBaseUrl, recipientToken);
+  const adminClient = new ValidatorClient(walletBaseUrl, adminToken);
+  const senderClient = new ValidatorClient(walletBaseUrl, senderToken);
+  const receipientClient = new ValidatorClient(walletBaseUrl, recipientToken);
+
+  // Track the admin's balance on non-devnet to send out top-up alerts
+  if (!settings.isDevNet) {
+    const adminBalance = syncRetryUndefined(adminClient.v0.wallet.getBalance);
+    if (adminBalance) {
+      validatorOperatorBalance.add(BigNumber(adminBalance.effective_unlocked_qty).toNumber());
+    }
+  }
+
+  const metrics = {
+    validatorOperatorBalance,
+    started: transactionsStarted,
+    completed: transactionsCompleted,
+    latency: transactionLatency,
+  };
 
   doIfOnboarded(receipientClient, () => {
     doIfOnboarded(senderClient, () => {
-      const balance = senderClient.v0.wallet.getBalance();
-      if (balance && BigNumber(balance?.effective_unlocked_qty).lte(10)) {
-        senderClient.v0.wallet.tap('1000.0');
-      }
-      transactionsStarted.add(1);
-      sendAndWaitForTransferOffer(senderClient, receipientClient, {
-        completed: transactionsCompleted,
-        latency: transactionLatency,
-      });
+      waitForBalance(senderClient, 10, '1000.0', adminClient, settings.isDevNet, metrics);
+      sendAndWaitForTransferOffer(senderClient, receipientClient, '1.00', metrics);
     });
   });
 }

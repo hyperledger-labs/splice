@@ -3,6 +3,7 @@ import {
   envFlag,
   exactNamespace,
   installCNHelmChart,
+  isDevNet,
   requireEnv,
 } from 'cn-pulumi-common';
 
@@ -48,6 +49,7 @@ export function scheduleLoadGenerator(): void {
         schedule,
         prometheusRw,
         config: JSON.stringify({
+          isDevNet,
           usersPerValidator: 10,
           validators: [
             {
@@ -59,6 +61,10 @@ export function scheduleLoadGenerator(): void {
                 managementApi: {
                   clientId: requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_ID'),
                   clientSecret: requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET'),
+                },
+                admin: {
+                  email: requireEnv('K6_VALIDATOR_ADMIN_USERNAME'),
+                  password: requireEnv('K6_VALIDATOR_ADMIN_PASSWORD'),
                 },
               },
             },

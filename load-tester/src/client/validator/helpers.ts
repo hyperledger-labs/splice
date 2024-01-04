@@ -1,6 +1,8 @@
-import { sleep } from 'k6';
+import BigNumber from 'bignumber.js';
 import { Counter, Trend } from 'k6/metrics';
 
+import { syncRetryUndefined } from '../../utils';
+import { GetBalanceResponse } from './models';
 import { ValidatorClient } from './validator';
 
 export function doIfOnboarded(validatorClient: ValidatorClient, action: () => void): void {
@@ -13,6 +15,7 @@ export function doIfOnboarded(validatorClient: ValidatorClient, action: () => vo
 }
 
 interface MetricsContext {
+  started: Counter;
   completed: Counter;
   latency: Trend;
 }
@@ -20,25 +23,21 @@ interface MetricsContext {
 export function sendAndWaitForTransferOffer(
   sender: ValidatorClient,
   receiver: ValidatorClient,
+  amount: string,
   metrics: MetricsContext,
 ): void {
+  metrics.started.add(1);
   const startTime = Date.now();
 
-  const transferOffer = sender.v0.wallet.createTransferOffer('1', receiver.partyId()!);
+  const receiverParty = receiver.partyId()!; // assumes doIfOnboarded has been called for receiver
+  const transferOffer = sender.v0.wallet.createTransferOffer(amount, receiverParty);
   if (transferOffer) {
-    let receivingOffer = receiver.v0.wallet
-      .listTransferOffers()
-      ?.offers.find(o => o.contract_id === transferOffer.offer_contract_id);
-    let retries = 5;
-    while (retries >= 0) {
-      if (!receivingOffer) {
-        sleep(1);
-        receivingOffer = receiver.v0.wallet
+    const receivingOffer = syncRetryUndefined(
+      () =>
+        receiver.v0.wallet
           .listTransferOffers()
-          ?.offers.find(o => o.contract_id === transferOffer.offer_contract_id);
-      }
-      retries = retries - 1;
-    }
+          ?.offers.find(o => o.contract_id === transferOffer.offer_contract_id),
+    );
 
     if (receivingOffer) {
       receiver.v0.wallet.acceptTransferOffer(receivingOffer.contract_id);
@@ -48,5 +47,34 @@ export function sendAndWaitForTransferOffer(
     }
   } else {
     console.error('We expected a transfer offer from the sending side');
+  }
+}
+
+export function waitForBalance(
+  client: ValidatorClient,
+  minBalanceThreshold: number,
+  topUpAmount: string,
+  admin: ValidatorClient,
+  isDevNet: boolean,
+  metrics: MetricsContext,
+): GetBalanceResponse | undefined {
+  const balance = syncRetryUndefined(client.v0.wallet.getBalance);
+  if (balance && BigNumber(balance?.effective_unlocked_qty).lte(minBalanceThreshold)) {
+    if (isDevNet) {
+      client.v0.wallet.tap(topUpAmount);
+      const balance = syncRetryUndefined(client.v0.wallet.getBalance);
+      return balance;
+    } else {
+      // In non-devnet environments, users must be sent coins from the validator admin. The validator admin will have to have
+      //  its wallet balance topped up manually
+      sendAndWaitForTransferOffer(admin, client, topUpAmount, metrics);
+      const balance = syncRetryUndefined(client.v0.wallet.getBalance);
+
+      if (!balance || BigNumber(balance.effective_unlocked_qty).lte(minBalanceThreshold)) {
+        console.error('Failed to topup the client from the validator operator');
+      }
+    }
+  } else {
+    return balance;
   }
 }

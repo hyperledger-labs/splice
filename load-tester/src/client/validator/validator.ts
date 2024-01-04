@@ -51,80 +51,81 @@ export class ValidatorClient {
   public v0 = {
     // -*--- VALIDATOR APIS -------------------------------------------------------*-
     register: (): void => {
-      this.http.post.success(
-        `${this.validatorBaseUrl}/api/validator/v0/register`,
-        undefined,
-        this.headers(),
-        () => {},
-      );
+      this.http.post.success(`${this.validatorBaseUrl}/api/validator/v0/register`, undefined, {
+        headers: this.headers(),
+      });
     },
 
     // -*--- WALLET APIS ----------------------------------------------------------*-
     wallet: {
       acceptTransferOffer: (transferOfferCid: string): AcceptTransferOfferResponse | undefined => {
-        return this.http.post.success(
-          `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers/${transferOfferCid}/accept`,
-          undefined,
-          this.headers(),
-          resp => jsonStringDecoder(acceptTransferOfferResponse, resp.body),
-        );
+        return this.http.post
+          .success(
+            `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers/${transferOfferCid}/accept`,
+            undefined,
+            {
+              headers: this.headers(),
+              tags: {
+                name: `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers/$transferOfferCid/accept`,
+              },
+            },
+          )
+          .then(resp => jsonStringDecoder(acceptTransferOfferResponse, resp.body));
       },
       getBalance: (): GetBalanceResponse | undefined => {
-        return this.http.get.success(
-          `${this.validatorBaseUrl}/api/validator/v0/wallet/balance`,
-          undefined,
-          this.headers(),
-          resp => jsonStringDecoder(getBalanceResponse, resp.body),
-        );
+        return this.http.get
+          .success(`${this.validatorBaseUrl}/api/validator/v0/wallet/balance`, undefined, {
+            headers: this.headers(),
+          })
+          .then(resp => jsonStringDecoder(getBalanceResponse, resp.body));
       },
       createTransferOffer: (
         amount: string,
         receiver_party_id: string,
       ): CreateTransferOfferResponse | undefined => {
-        return this.http.post.success(
-          `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers`,
-          JSON.stringify({
-            amount,
-            receiver_party_id,
-            description: 'createTransfer from load tester',
-            expires_at: getTomorrowMs(),
-            tracking_id: uuidv4(),
-          }),
-          this.headers(),
-          resp => jsonStringDecoder(createTransferOfferResponse, resp.body),
-        );
+        return this.http.post
+          .success(
+            `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers`,
+            JSON.stringify({
+              amount,
+              receiver_party_id,
+              description: 'createTransfer from load tester',
+              expires_at: getTomorrowMs(),
+              tracking_id: uuidv4(),
+            }),
+            { headers: this.headers() },
+          )
+          .then(resp => jsonStringDecoder(createTransferOfferResponse, resp.body));
       },
       listTransactions: (): ListTransactionsResponse | undefined => {
-        return this.http.post.success(
-          `${this.validatorBaseUrl}/api/validator/v0/wallet/transactions`,
-          JSON.stringify({ pageSize: 10 }),
-          this.headers(),
-          resp => jsonStringDecoder(listTransactionsResponse, resp.body),
-        );
+        return this.http.post
+          .success(
+            `${this.validatorBaseUrl}/api/validator/v0/wallet/transactions`,
+            JSON.stringify({ pageSize: 10 }),
+            { headers: this.headers() },
+          )
+          .then(resp => jsonStringDecoder(listTransactionsResponse, resp.body));
       },
       listTransferOffers: (): ListTransferOffersResponse | undefined => {
-        return this.http.get.success(
-          `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers`,
-          undefined,
-          this.headers(),
-          resp => jsonStringDecoder(listTransferOffersResponse, resp.body),
-        );
+        return this.http.get
+          .success(`${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers`, undefined, {
+            headers: this.headers(),
+          })
+          .then(resp => jsonStringDecoder(listTransferOffersResponse, resp.body));
       },
       tap: (amount: string): void => {
         this.http.post.success(
           `${this.validatorBaseUrl}/api/validator/v0/wallet/tap`,
           JSON.stringify({ amount }),
-          this.headers(),
-          () => {},
+          { headers: this.headers() },
         );
       },
       userStatus: (): UserStatusResponse | undefined => {
-        return this.http.get.success(
-          `${this.validatorBaseUrl}/api/validator/v0/wallet/user-status`,
-          undefined,
-          this.headers(),
-          resp => jsonStringDecoder(userStatusResponse, resp.body),
-        );
+        return this.http.get
+          .success(`${this.validatorBaseUrl}/api/validator/v0/wallet/user-status`, undefined, {
+            headers: this.headers(),
+          })
+          .then(resp => jsonStringDecoder(userStatusResponse, resp.body));
       },
     },
   };
