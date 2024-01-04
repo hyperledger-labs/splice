@@ -8,8 +8,13 @@ export const auth0Cfg: Auth0Config = {
     validator: 'uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr',
   },
 
-  // For the SV runbook, we use dedicated auth0 applications for each UI app, so we don't use the namespaceToUiCliendId mapping
-  namespaceToUiClientId: {},
+  namespaceToUiToClientId: {
+    sv: {
+      wallet: 'l9MS11POtbvPaVvgzns3Tdj9IDnosLwl',
+      sv: '8S8o4U6OYWWuw5vPCIpFQGzzWM2IpHkx',
+      cns: 'iwZgud30aDMMUYpZc5caSnjNATWwITzp',
+    },
+  },
 
   appToApiAudience: {
     participant: 'https://ledger_api.example.com', // The Ledger API in the sv-test tenant

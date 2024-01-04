@@ -34,7 +34,10 @@ export function scheduleLoadGenerator(): void {
     const schedule = `${minute} * * * *`;
 
     const oauthDomain = `https://${auth0Cfg.auth0Domain}`;
-    const oauthClientId = auth0Cfg.namespaceToUiClientId.validator1;
+    const oauthClientId = auth0Cfg.namespaceToUiToClientId?.validator1?.wallet;
+    if (!oauthClientId) {
+      throw new Error('Missing wallet UI ClientId for validator1');
+    }
     const usersPassword = requireEnv('K6_USERS_PASSWORD');
 
     // use internal cluster hostnames for the prometheus endpoint

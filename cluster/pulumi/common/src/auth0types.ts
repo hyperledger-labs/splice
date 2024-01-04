@@ -7,11 +7,13 @@ export type Auth0SecretMap = Map<string, Auth0ClientSecret>;
 
 export type ClientIdMap = Partial<Record<string, string>>;
 
+export type NamespaceToClientIdMapMap = Partial<Record<string, ClientIdMap>>;
+
 export type AudienceMap = Partial<Record<string, string>>;
 
 export type Auth0Config = {
   appToClientId: ClientIdMap;
-  namespaceToUiClientId: ClientIdMap;
+  namespaceToUiToClientId: NamespaceToClientIdMapMap;
   appToApiAudience: AudienceMap;
   appToClientAudience: AudienceMap;
   auth0Domain: string;

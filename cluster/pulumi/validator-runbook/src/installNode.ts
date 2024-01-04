@@ -27,7 +27,6 @@ import {
 } from 'cn-pulumi-common';
 
 import { auth0Cfg } from './auth0cfg';
-import { walletUIClientId, cnsClientId } from './secrets';
 import {
   CLUSTER_BASENAME,
   VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
@@ -197,10 +196,19 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     },
   };
 
+  const validatorNameSpaceAuth0Clients = auth0Cfg.namespaceToUiToClientId['validator'];
+  if (!validatorNameSpaceAuth0Clients) {
+    throw new Error('No validator namespace in auth0 config');
+  }
+  const walletUiClientId = validatorNameSpaceAuth0Clients['wallet'];
+  if (!walletUiClientId) {
+    throw new Error('No wallet ui client id in auth0 config');
+  }
+
   const { appSecret: validatorAppSecret, uiSecret: validatorUISecret } = await validatorSecrets(
     xns,
     auth0Client,
-    walletUIClientId
+    walletUiClientId
   );
 
   const validatorValues = {
@@ -237,10 +245,15 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
+  const cnsUiClientId = validatorNameSpaceAuth0Clients['cns'];
+  if (!cnsUiClientId) {
+    throw new Error('No validator ui client id in auth0 config');
+  }
+
   const dependsOn = imagePullDeps
     .concat([participant])
     .concat([validatorAppSecret, validatorUISecret])
-    .concat([cnsUiSecret(xns, auth0Client, cnsClientId)])
+    .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(
       onboardingSecret ? [installValidatorOnboardingSecret(xns, 'validator', onboardingSecret)] : []

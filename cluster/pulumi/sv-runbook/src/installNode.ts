@@ -37,7 +37,6 @@ import {
 import { auth0Cfg } from './auth0cfg';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installGlobalDomainNode } from './globalDomain';
-import { walletUIClientId, cnsClientId, svUIClientId } from './secrets';
 import { CLUSTER_BASENAME, localCharts, TARGET_CLUSTER, version } from './utils';
 
 if (!isDevNet) {
@@ -212,10 +211,19 @@ async function installSvAndValidator(config: SvConfig) {
     },
   };
 
+  const svNameSpaceAuth0Clients = auth0Cfg.namespaceToUiToClientId['sv'];
+  if (!svNameSpaceAuth0Clients) {
+    throw new Error('No SV namespace in auth0 config');
+  }
+  const svUiClientId = svNameSpaceAuth0Clients['sv'];
+  if (!svUiClientId) {
+    throw new Error('No SV ui client id in auth0 config');
+  }
+
   const { appSecret: svAppSecret, uiSecret: svAppUISecret } = await svAppSecrets(
     xns,
     auth0Client,
-    svUIClientId
+    svUiClientId
   );
 
   const participant = installCNRunbookHelmChart(
@@ -295,10 +303,14 @@ async function installSvAndValidator(config: SvConfig) {
     ...fixedTokensValue,
   };
 
+  const walletUiClientId = svNameSpaceAuth0Clients['wallet'];
+  if (!walletUiClientId) {
+    throw new Error('No SV ui client id in auth0 config');
+  }
   const { appSecret: svValidatorAppSecret, uiSecret: svValidatorUISecret } = await validatorSecrets(
     xns,
     auth0Client,
-    walletUIClientId
+    walletUiClientId
   );
 
   const sv = installCNRunbookHelmChart(
@@ -364,6 +376,11 @@ async function installSvAndValidator(config: SvConfig) {
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
+  const cnsUiClientId = svNameSpaceAuth0Clients['cns'];
+  if (!cnsUiClientId) {
+    throw new Error('No CNS ui client id in auth0 config');
+  }
+
   const validator = installCNRunbookHelmChart(
     xns,
     'validator',
@@ -374,7 +391,7 @@ async function installSvAndValidator(config: SvConfig) {
     imagePullDeps
       .concat([sv, participant])
       .concat([svValidatorAppSecret, svValidatorUISecret])
-      .concat([cnsUiSecret(xns, auth0Client, cnsClientId)])
+      .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
       .concat(backupConfigSecret ? [backupConfigSecret] : [])
   );
 

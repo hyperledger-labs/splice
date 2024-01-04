@@ -8,7 +8,12 @@ export const auth0Cfg: Auth0Config = {
   },
 
   // For the Validator runbook, we use dedicated auth0 applications for each UI app, so we don't use the namespaceToUiCliendId mapping
-  namespaceToUiClientId: {},
+  namespaceToUiToClientId: {
+    validator: {
+      wallet: '6wB6EGLJBEwaA1CfVYhRmsQG9OPcmJtj',
+      cns: 'jSDSTJu00KQNwYw7XLhJfHYxgDotDXrr',
+    },
+  },
 
   appToApiAudience: {
     participant: 'https://ledger_api.example.com', // The Ledger API in the validator-test tenant

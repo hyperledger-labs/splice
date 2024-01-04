@@ -222,11 +222,11 @@ export class Auth0Fetch implements Auth0Client {
   }
 }
 
-export function requireAuth0ClientId(clientIdMap: ClientIdMap, clientName: string): string {
-  const appClientId = clientIdMap[clientName];
+export function requireAuth0ClientId(clientIdMap: ClientIdMap, app: string): string {
+  const appClientId = clientIdMap[app];
 
   if (!appClientId) {
-    throw new Error(`Unknown Auth0 client ID for client: ${clientName}`);
+    throw new Error(`Unknown Auth0 client ID for app: ${app}`);
   }
 
   return appClientId;
@@ -235,14 +235,14 @@ export function requireAuth0ClientId(clientIdMap: ClientIdMap, clientName: strin
 function lookupClientSecrets(
   allSecrets: Auth0SecretMap,
   clientIdMap: ClientIdMap,
-  clientName: string
+  app: string
 ): Auth0ClientSecret {
-  const appClientId = requireAuth0ClientId(clientIdMap, clientName);
+  const appClientId = requireAuth0ClientId(clientIdMap, app);
 
   const clientSecret = allSecrets.get(appClientId);
 
   if (!clientSecret) {
-    throw new Error(`Client unknown to Auth0: ${clientName} (Client ID: ${appClientId})`);
+    throw new Error(`Client unknown to Auth0: ${app} (Client ID: ${appClientId})`);
   }
 
   /* This should never happen, allSecrets contains elements stored with their
@@ -316,11 +316,11 @@ export async function installAuth0UISecret(
   clientName: string
 ): Promise<k8s.core.v1.Secret> {
   const secrets = await auth0Client.getSecrets();
-  const id = lookupClientSecrets(
-    secrets,
-    auth0Client.getCfg().namespaceToUiClientId,
-    xns.logicalName
-  ).client_id;
+  const namespaceClientIds = auth0Client.getCfg().namespaceToUiToClientId[xns.logicalName];
+  if (!namespaceClientIds) {
+    throw new Error(`No Auth0 client IDs configured for namespace: ${xns.logicalName}`);
+  }
+  const id = lookupClientSecrets(secrets, namespaceClientIds, secretNameApp).client_id;
 
   return installAuth0UiSecretWithClientId(auth0Client, xns, secretNameApp, clientName, id);
 }

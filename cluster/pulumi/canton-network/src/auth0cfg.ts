@@ -17,13 +17,37 @@ export const auth0Cfg: Auth0Config = {
     sv4_validator: 'FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL',
   },
 
-  namespaceToUiClientId: {
-    validator1: '5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK',
-    splitwell: 'eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL',
-    'sv-1': 'Ez65bly75dMqcKxQiJDF8rIP9xxkxV3J',
-    'sv-2': 'G6Y5KYuiyOb0bnllGyQ2JKwjpwZM0Ai6',
-    'sv-3': 'cgxHguMv32JLeew9S6wBDgNPHmPCIKaP',
-    'sv-4': 'VoSuAamXhvwISHGgaCtULYmbRIWbQeTb',
+  namespaceToUiToClientId: {
+    validator1: {
+      wallet: '5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK',
+      cns: '5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK',
+      splitwell: '5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK',
+    },
+    splitwell: {
+      wallet: 'eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL',
+      cns: 'eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL',
+      splitwell: 'eeMLQ6qljnUcg9o1sJRbt4suCn2CYbSL',
+    },
+    'sv-1': {
+      wallet: 'Ez65bly75dMqcKxQiJDF8rIP9xxkxV3J',
+      cns: 'Ez65bly75dMqcKxQiJDF8rIP9xxkxV3J',
+      sv: 'Ez65bly75dMqcKxQiJDF8rIP9xxkxV3J',
+    },
+    'sv-2': {
+      wallet: 'G6Y5KYuiyOb0bnllGyQ2JKwjpwZM0Ai6',
+      cns: 'G6Y5KYuiyOb0bnllGyQ2JKwjpwZM0Ai6',
+      sv: 'G6Y5KYuiyOb0bnllGyQ2JKwjpwZM0Ai6',
+    },
+    'sv-3': {
+      wallet: 'cgxHguMv32JLeew9S6wBDgNPHmPCIKaP',
+      cns: 'cgxHguMv32JLeew9S6wBDgNPHmPCIKaP',
+      sv: 'cgxHguMv32JLeew9S6wBDgNPHmPCIKaP',
+    },
+    'sv-4': {
+      wallet: 'VoSuAamXhvwISHGgaCtULYmbRIWbQeTb',
+      cns: 'VoSuAamXhvwISHGgaCtULYmbRIWbQeTb',
+      sv: 'VoSuAamXhvwISHGgaCtULYmbRIWbQeTb',
+    },
   },
 
   appToApiAudience: {},
