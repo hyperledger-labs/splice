@@ -63,7 +63,7 @@ export function scheduleLoadGenerator(): void {
                   clientSecret: requireEnv('AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET'),
                 },
                 admin: {
-                  email: requireEnv('K6_VALIDATOR_ADMIN_USERNAME'),
+                  email: process.env['K6_VALIDATOR_ADMIN_USERNAME'] || 'admin@validator1.com',
                   password: requireEnv('K6_VALIDATOR_ADMIN_PASSWORD'),
                 },
               },
