@@ -44,8 +44,8 @@ To facilitate automatic nightly deployments, we use scheduled pipelines. CircleC
 
 However, with scheduled pipelines, schedules are set up externally to `config.yaml`. So there is some additional tooling here in the `.circleci` directory to keep that configuration source-controlled and consistently applied automatically.
 
-1. There is a payload in `run-schedule-pipeline.json` that defines the schedule's name, description, pipeline parameters, and timetable.
-2. There is a script `setup-pipeline.sh` that creates-or-updates the schedule defined by (1), and
+1. Each trigger's definition is placed in a JSON file in `triggers/enabled/` which includes the schedule's name, description, pipeline parameters, and timetable.
+2. There is a script `triggers/setup-pipeline.sh` that creates-or-updates the schedule defined by (1), and
 3. There is a CI job `update_pipeline_schedule` that runs during the `build` workflow that executes (2) automatically. This job is filtered to only run during a merge into the `main` branch.
 
 With these three bits of tooling, we have a setup where the schedule can be modified in-repo, put in a pull-request for review, and enacted automatically after approval & merge.

@@ -1731,7 +1731,7 @@ jobs:
            set -euo pipefail
 
            . .envrc.vars
-           .circleci/setup-pipeline.sh
+           .circleci/triggers/setup-pipeline.sh
 
   docker_images_push:
     machine:

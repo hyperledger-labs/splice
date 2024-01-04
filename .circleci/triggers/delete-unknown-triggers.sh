@@ -13,7 +13,7 @@ cci_api_schedule="https://circleci.com/api/v2/schedule"
 function is_remote_in_local {
     local remote_trigger_name="$1"
 
-    for TRIGGER in "$REPO_ROOT"/.circleci/trigger-*.json
+    for TRIGGER in "$REPO_ROOT"/.circleci/triggers/enabled/*.json
     do
         local_trigger_name=$(jq -r '.name' "${TRIGGER}")
         if [ "$remote_trigger_name" == "$local_trigger_name" ]; then
