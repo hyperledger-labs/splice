@@ -206,7 +206,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
         },
         postgresSecretName: this.secretName,
       },
-      { dependsOn: [this] }
+      { dependsOn: [this.pg] }
     );
     return this; // don't return the metrics, because that's a circular dependency
   }
