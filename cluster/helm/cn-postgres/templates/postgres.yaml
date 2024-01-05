@@ -65,13 +65,13 @@ spec:
         {{- end }}
         volumeMounts:
           - mountPath: /var/lib/postgresql/data
-            name: pg-data
+            name: {{ $.Values.db.pvcTemplateName }}
       restartPolicy: Always
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim
     metadata:
-      name: pg-data
+      name: {{ $.Values.db.pvcTemplateName }}
     spec:
       accessModes:
       - ReadWriteOnce

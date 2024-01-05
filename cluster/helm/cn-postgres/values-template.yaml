@@ -12,5 +12,6 @@ resources:
 db:
   volumeSize: 240Gi
   volumeStorageClass: standard-rwo
+  pvcTemplateName: pg-data
 
 postgresSecretName: "postgres-secrets"

@@ -2002,6 +2002,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
@@ -3392,6 +3393,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
@@ -4963,6 +4965,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
@@ -5970,6 +5973,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
@@ -6161,6 +6165,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
@@ -6458,6 +6463,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
@@ -6749,6 +6755,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
@@ -7114,6 +7121,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
@@ -7305,6 +7313,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
@@ -8574,6 +8583,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
@@ -9241,6 +9251,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
@@ -9618,6 +9629,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
