@@ -19,4 +19,4 @@ configureObservability(observabilityDependsOn);
 
 configureStorage();
 
-export const auth0 = configureAuth0();
+export const auth0 = configureAuth0(clusterBasename);
