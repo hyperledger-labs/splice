@@ -392,7 +392,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase {
         sv1Backend.getSvcInfo().svcRules.payload.epoch shouldBe 0
       }
 
-      loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
         actAndCheck(
           "sv3 creates a new election request for epoch 1", {
             val sv3 = sv3Backend.getSvcInfo().svParty.toProtoPrimitive
