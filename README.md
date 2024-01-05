@@ -557,7 +557,7 @@ Update the version in the `nix/cometbft-driver-sources.json` file
 
 #### Bumping Our Canton fork
 
-Current Canton commit: `067eebf12219a5755b599f0c9e1f3325e1e168c3`
+Current Canton commit: `5490bfb5f7facb261bf3f4e24f2d4df140d32b51`
 
 
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
@@ -591,7 +591,7 @@ Current Canton commit: `067eebf12219a5755b599f0c9e1f3325e1e168c3`
          server by the Canton binary not the Canton fork.
    6. Create another commit, `git add -A && git reset '*.rej' && git commit -m"Bump Canton commit and Canton/SDK versions"`
 5. Check if the `protocolVersions` in our `BuildInfoKeys` in `BuildCommon.scala` needs to be bumped.
-   - One way to do this is to run `start-canton.sh -w` with an updated Canton binary, and check `ProtocolVersions.latest` in the console.
+   - One way to do this is to run `start-canton.sh -w` with an updated Canton binary, and check `ProtocolVersion.latest` in the console.
 5. Test whether things compile using `sbt Test/compile`.
    In case of problems, here are some tips that help:
    - Check whether there are related `*.rej` files for the parts of our changes that could not be applied.

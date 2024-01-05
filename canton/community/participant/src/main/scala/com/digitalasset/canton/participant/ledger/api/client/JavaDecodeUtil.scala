@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.participant.ledger.api.client
 
-import com.daml.ledger.api.v2.TransactionOuterClass.Transaction as JavaTransactionV2
 import com.daml.ledger.javaapi.data.codegen.{
   Contract,
   ContractCompanion,
@@ -43,13 +42,6 @@ object JavaDecodeUtil {
       companion: ContractCompanion[TC, ?, ?]
   )(transaction: JavaTransaction): Seq[TC] =
     decodeAllCreatedFromEvents(companion)(transaction.getEvents.asScala.toSeq)
-
-  def decodeAllCreatedV2[TC](
-      companion: ContractCompanion[TC, ?, ?]
-  )(transaction: JavaTransactionV2): Seq[TC] =
-    decodeAllCreatedFromEvents(companion)(
-      transaction.getEventsList.asScala.toSeq.map(Event.fromProtoEvent)
-    )
 
   def decodeAllCreatedFromEvents[TC](
       companion: ContractCompanion[TC, ?, ?]

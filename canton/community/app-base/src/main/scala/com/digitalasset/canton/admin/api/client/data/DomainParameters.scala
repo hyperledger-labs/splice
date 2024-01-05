@@ -7,7 +7,13 @@ import cats.syntax.either.*
 import com.daml.nonempty.NonEmptyUtil
 import com.digitalasset.canton.admin.api.client.data.crypto.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveDurationSeconds}
+import com.digitalasset.canton.config.{
+  CommunityCryptoConfig,
+  CryptoConfig,
+  NonNegativeFiniteDuration,
+  PositiveDurationSeconds,
+}
+import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.protocol.DomainParameters.MaxRequestSize
 import com.digitalasset.canton.protocol.DynamicDomainParameters.{
   InvalidDynamicDomainParameters,
@@ -67,6 +73,36 @@ final case class StaticDomainParameters(
 }
 
 object StaticDomainParameters {
+
+  // This method is unsafe. Not prefixing by `try` to have nicer docs snippets.
+  def fromConfig(
+      config: DomainParametersConfig,
+      cryptoConfig: CryptoConfig,
+  ): StaticDomainParameters = {
+    val internal = config
+      .toStaticDomainParameters(cryptoConfig)
+      .valueOr(err =>
+        throw new IllegalArgumentException(s"Cannot instantiate static domain parameters: $err")
+      )
+
+    StaticDomainParameters(internal)
+  }
+
+  lazy val defaultsWithoutKMS: StaticDomainParameters =
+    defaults(CommunityCryptoConfig())
+
+  // This method is unsafe. Not prefixing by `try` to have nicer docs snippets.
+  def defaults(
+      cryptoConfig: CryptoConfig
+  ): StaticDomainParameters = {
+    val internal = DomainParametersConfig()
+      .toStaticDomainParameters(cryptoConfig)
+      .valueOr(err =>
+        throw new IllegalArgumentException(s"Cannot instantiate static domain parameters: $err")
+      )
+
+    StaticDomainParameters(internal)
+  }
 
   def apply(
       domain: StaticDomainParametersInternal

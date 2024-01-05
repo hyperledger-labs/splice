@@ -248,7 +248,7 @@ class InMemorySvSvcStore(
   ): Future[QueryResult[Option[Contract[Confirmation.ContractId, Confirmation]]]] =
     multiDomainAcsStore
       .findContractWithOffset(cn.svcrules.Confirmation.COMPANION) {
-        co: Contract[?, cn.svcrules.Confirmation] =>
+        (co: Contract[?, cn.svcrules.Confirmation]) =>
           co.payload.confirmer == confirmer.toProtoPrimitive && co.payload.action.toValue == action.toValue
       }
       .map(_ map (_ map (_.contract)))
@@ -310,7 +310,7 @@ class InMemorySvSvcStore(
   ): Future[QueryResult[Option[Contract[SvOnboardingRequest.ContractId, SvOnboardingRequest]]]] =
     for {
       cws <- multiDomainAcsStore.findContractWithOffset(so.SvOnboardingRequest.COMPANION) {
-        co: Contract[?, so.SvOnboardingRequest] => co.payload.token == token
+        (co: Contract[?, so.SvOnboardingRequest]) => co.payload.token == token
       }
     } yield cws map (_ map (_.contract))
 
@@ -364,7 +364,7 @@ class InMemorySvSvcStore(
   ): Future[QueryResult[Option[Contract[SvOnboardingRequest.ContractId, SvOnboardingRequest]]]] =
     multiDomainAcsStore
       .findContractWithOffset(so.SvOnboardingRequest.COMPANION) {
-        co: Contract[?, so.SvOnboardingRequest] =>
+        (co: Contract[?, so.SvOnboardingRequest]) =>
           co.payload.candidateParty == candidateParty.toProtoPrimitive
       }
       .map(_ map (_ map (_.contract)))
@@ -373,7 +373,7 @@ class InMemorySvSvcStore(
       tc: TraceContext
   ): Future[QueryResult[Option[Contract[ValidatorLicense.ContractId, ValidatorLicense]]]] = for {
     cws <- multiDomainAcsStore.findContractWithOffset(ValidatorLicense.COMPANION) {
-      co: Contract[?, ValidatorLicense] => co.payload.validator == validator.toProtoPrimitive
+      (co: Contract[?, ValidatorLicense]) => co.payload.validator == validator.toProtoPrimitive
     }
   } yield cws map (_ map (_.contract))
 
@@ -397,7 +397,7 @@ class InMemorySvSvcStore(
     multiDomainAcsStore
       .filterContracts(
         cn.svcrules.Vote.COMPANION,
-        { co: Contract[?, Vote] => cidSet.contains(co.payload.requestCid) },
+        { (co: Contract[?, Vote]) => cidSet.contains(co.payload.requestCid) },
         limit,
       )
       .map(_ map (_.contract))
@@ -407,7 +407,7 @@ class InMemorySvSvcStore(
       implicit tc: TraceContext
   ): Future[QueryResult[Option[Contract[Vote.ContractId, Vote]]]] =
     multiDomainAcsStore
-      .findContractWithOffset(cn.svcrules.Vote.COMPANION) { co: Contract[?, Vote] =>
+      .findContractWithOffset(cn.svcrules.Vote.COMPANION) { (co: Contract[?, Vote]) =>
         co.payload.requestCid == voteRequestCid && co.payload.voter == key.svParty.toProtoPrimitive
       }
       .map(_ map (_ map (_.contract)))
@@ -418,7 +418,7 @@ class InMemorySvSvcStore(
     QueryResult[Option[Contract[VoteRequest.ContractId, VoteRequest]]]
   ] = for {
     ct <- multiDomainAcsStore.findContractWithOffset(cn.svcrules.VoteRequest.COMPANION) {
-      co: Contract[?, cn.svcrules.VoteRequest] =>
+      (co: Contract[?, cn.svcrules.VoteRequest]) =>
         co.payload.requester == key.svParty.toProtoPrimitive && co.payload.action.toValue == action.toValue
     }
   } yield ct map (_ map (_.contract))
@@ -445,7 +445,7 @@ class InMemorySvSvcStore(
     multiDomainAcsStore
       .filterContracts(
         cp.CoinPriceVote.COMPANION,
-        { co: Contract[?, cp.CoinPriceVote] => co.payload.sv == key.svParty.toProtoPrimitive },
+        { (co: Contract[?, cp.CoinPriceVote]) => co.payload.sv == key.svParty.toProtoPrimitive },
       )
       .map(_.map(_.contract).headOption)
 
@@ -454,7 +454,7 @@ class InMemorySvSvcStore(
   ): Future[QueryResult[Option[Contract[SvOnboardingRequest.ContractId, SvOnboardingRequest]]]] =
     multiDomainAcsStore
       .findContractWithOffset(so.SvOnboardingRequest.COMPANION) {
-        co: Contract[?, so.SvOnboardingRequest] => co.payload.candidateName == candidateName
+        (co: Contract[?, so.SvOnboardingRequest]) => co.payload.candidateName == candidateName
       }
       .map(_ map (_ map (_.contract)))
 
@@ -464,7 +464,7 @@ class InMemorySvSvcStore(
   )(implicit tc: TraceContext): Future[Seq[SvSvcStore.IdleCnsSubscription]] = for {
     dueSubscriptions <- multiDomainAcsStore.filterContracts(
       SubscriptionIdleState.COMPANION,
-      filter = { e: Contract[?, SubscriptionIdleState] =>
+      filter = { (e: Contract[?, SubscriptionIdleState]) =>
         now.toInstant.isAfter(e.payload.nextPaymentDueAt)
       },
     )
@@ -526,7 +526,7 @@ class InMemorySvSvcStore(
       .filterContractsOnDomain(
         ElectionRequest.COMPANION,
         svcRules.domain,
-        { c: Contract[?, ElectionRequest] =>
+        { (c: Contract[?, ElectionRequest]) =>
           svcRules.payload.members.keySet
             .contains(c.payload.requester) && c.payload.epoch == svcRules.payload.epoch
         },
@@ -549,7 +549,7 @@ class InMemorySvSvcStore(
       tc: TraceContext
   ): Future[QueryResult[Option[Contract[ElectionRequest.ContractId, ElectionRequest]]]] = for {
     req <- multiDomainAcsStore.findContractWithOffset(ElectionRequest.COMPANION)(
-      { co: Contract[?, ElectionRequest] =>
+      { (co: Contract[?, ElectionRequest]) =>
         co.payload.epoch == epoch && co.payload.requester == requester.toProtoPrimitive
       }
     )
@@ -565,7 +565,7 @@ class InMemorySvSvcStore(
     for {
       contracts <- multiDomainAcsStore.filterContracts(
         ElectionRequest.COMPANION,
-        { co: Contract[?, ElectionRequest] =>
+        { (co: Contract[?, ElectionRequest]) =>
           co.payload.epoch < epoch
         },
         limit,
@@ -603,7 +603,7 @@ class InMemorySvSvcStore(
   ] = for {
     contexts <- multiDomainAcsStore.filterContracts(
       cn.cns.CnsEntryContext.COMPANION,
-      { co: Contract[cn.cns.CnsEntryContext.ContractId, cn.cns.CnsEntryContext] =>
+      { (co: Contract[cn.cns.CnsEntryContext.ContractId, cn.cns.CnsEntryContext]) =>
         co.payload.name == name
       },
     )

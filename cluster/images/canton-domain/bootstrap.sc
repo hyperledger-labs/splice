@@ -24,7 +24,6 @@ def main() {
         logger.info("Initializing domain")
         com.digitalasset.canton.console.EnterpriseConsoleMacros.bootstrap.domain(
           "domain",
-          staticParameters(sequencer),
           domainOwners = Seq(sequencer),
           sequencers = Seq(sequencer),
           mediators = Seq(mediator),

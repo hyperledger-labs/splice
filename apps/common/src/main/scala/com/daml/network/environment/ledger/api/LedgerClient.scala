@@ -8,16 +8,9 @@ import com.daml.ledger.api.v1.*
 import com.daml.ledger.api.v1.admin.*
 import com.daml.ledger.javaapi.data.{
   Command,
-  CreateUserRequest,
   CreateUserResponse,
-  GetLedgerEndResponse,
-  GetUserRequest,
-  GrantUserRightsRequest,
   LedgerOffset,
-  ListUsersRequest,
-  ListUserRightsRequest,
   ListUserRightsResponse,
-  RevokeUserRightsRequest,
   TransactionTree,
   User,
 }
@@ -34,18 +27,37 @@ import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.daml.ledger.api.v1 as lapiv1
+import com.daml.ledger.api.v1.admin.package_management_service.{
+  PackageManagementServiceGrpc,
+  UploadDarFileRequest,
+}
+import com.daml.ledger.api.v1.admin.party_management_service.{
+  GetPartiesRequest,
+  PartyManagementServiceGrpc,
+}
+import com.daml.ledger.api.v1.admin.user_management_service as v1User
+import com.daml.ledger.api.v1.command_service.CommandServiceGrpc
+import com.daml.ledger.api.v1.ledger_offset.LedgerOffset as V1LedgerOffset
+import com.daml.ledger.api.v1.package_service.{ListPackagesRequest, PackageServiceGrpc}
+import com.daml.ledger.api.v1.transaction.TransactionTree as V1TransactionTree
+import com.daml.ledger.api.v1.transaction_service.{
+  GetLedgerEndRequest,
+  GetTransactionByEventIdRequest,
+  TransactionServiceGrpc,
+}
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
+import com.daml.ledger.javaapi.data.User.Right
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
-import com.google.protobuf.{ByteString, Duration, FieldMask}
+import com.google.protobuf.{ByteString, Duration}
+import com.google.protobuf.field_mask.FieldMask
 import io.grpc.{Channel, StatusRuntimeException, Status as GrpcStatus}
 import io.grpc.stub.{AbstractStub, StreamObserver}
 
 import java.io.Closeable
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
 
 sealed abstract class DedupConfig
 
@@ -69,7 +81,6 @@ private[environment] class LedgerClient(
 )(implicit
     esf: ExecutionSequencerFactory,
     ec: ExecutionContext,
-    elc: ErrorLoggingContext,
 ) extends Closeable {
   import LedgerClient.{CompletionStreamResponse, GetUpdatesRequest, SubmitAndWaitFor}
 
@@ -84,18 +95,19 @@ private[environment] class LedgerClient(
   }
 
   private val commandServiceStub: CommandServiceGrpc.CommandServiceStub =
-    CommandServiceGrpc.newStub(channel)
+    CommandServiceGrpc.stub(channel)
   private val transactionServiceStub: TransactionServiceGrpc.TransactionServiceStub =
-    TransactionServiceGrpc.newStub(channel)
+    TransactionServiceGrpc.stub(channel)
   private val packageServiceStub: PackageServiceGrpc.PackageServiceStub =
-    PackageServiceGrpc.newStub(channel)
+    PackageServiceGrpc.stub(channel)
   private val packageManagementServiceStub
       : PackageManagementServiceGrpc.PackageManagementServiceStub =
-    PackageManagementServiceGrpc.newStub(channel)
+    PackageManagementServiceGrpc.stub(channel)
   private val partyManagementServiceStub: PartyManagementServiceGrpc.PartyManagementServiceStub =
-    PartyManagementServiceGrpc.newStub(channel)
-  private val userManagementServiceStub: UserManagementServiceGrpc.UserManagementServiceStub =
-    UserManagementServiceGrpc.newStub(channel)
+    PartyManagementServiceGrpc.stub(channel)
+  private val userManagementServiceStub
+      : v1User.UserManagementServiceGrpc.UserManagementServiceStub =
+    v1User.UserManagementServiceGrpc.stub(channel)
   private val updateServiceStub: lapi.update_service.UpdateServiceGrpc.UpdateServiceStub =
     lapi.update_service.UpdateServiceGrpc.stub(channel)
   private val commandSubmissionServiceStub
@@ -109,14 +121,6 @@ private[environment] class LedgerClient(
   private val identityProviderConfigServiceStub
       : lapiv1.admin.identity_provider_config_service.IdentityProviderConfigServiceGrpc.IdentityProviderConfigServiceStub =
     lapiv1.admin.identity_provider_config_service.IdentityProviderConfigServiceGrpc.stub(channel)
-
-  private def wrapFuture[T](
-      f: (StreamObserver[T] => Unit)
-  )(implicit elc: ErrorLoggingContext): Future[T] = {
-    val futureObserver = new LedgerClient.FutureObserver[T]
-    f(futureObserver)
-    futureObserver.promise.future
-  }
 
   private def toSource[T](f: Future[Source[T, NotUsed]]) =
     Source.futureSource(f).mapMaterializedValue(_ => NotUsed)
@@ -140,12 +144,13 @@ private[environment] class LedgerClient(
   }
 
   def participantLedgerEnd(): Future[LedgerOffset] = {
-    val req = TransactionServiceOuterClass.GetLedgerEndRequest.newBuilder.build
+    val req = GetLedgerEndRequest.defaultInstance
     for {
       stub <- withCredentials(transactionServiceStub)
-      res <- wrapFuture(stub.getLedgerEnd(req, _))
-        .map(GetLedgerEndResponse.fromProto(_).getOffset)
-    } yield res
+      res <- stub
+        .getLedgerEnd(req)
+        .map(_.getOffset)
+    } yield LedgerOffset.fromProto(V1LedgerOffset.toJavaProto(res))
   }
 
   def activeContracts(
@@ -162,14 +167,11 @@ private[environment] class LedgerClient(
       parties: Seq[String],
       id: String,
   ): Future[TransactionTree] = {
-    val req = TransactionServiceOuterClass.GetTransactionByEventIdRequest.newBuilder
-      .setEventId(id)
-      .addAllRequestingParties(parties.asJava)
-      .build()
+    val req = GetTransactionByEventIdRequest(eventId = id, requestingParties = parties)
     for {
       stub <- withCredentials(transactionServiceStub)
-      res <- wrapFuture(stub.getTransactionByEventId(req, _)).map { resp =>
-        TransactionTree.fromProto(resp.getTransaction)
+      res <- stub.getTransactionByEventId(req).map { resp =>
+        TransactionTree.fromProto(V1TransactionTree.toJavaProto(resp.getTransaction))
       }
     } yield res
   }
@@ -220,48 +222,48 @@ private[environment] class LedgerClient(
 
     for {
       stub <- withCredentials(commandServiceStub)
-      res <- wrapFuture(
-        waitFor.stubSubmit(stub, request, _)
-      ).map(waitFor.mapResponse)
+      res <-
+        waitFor.stubSubmit(stub, request, ec).map(waitFor.mapResponse)
     } yield res
   }
 
   def listPackages()(implicit ec: ExecutionContext): Future[Seq[String]] = {
-    val request = PackageServiceOuterClass.ListPackagesRequest.newBuilder().build()
+    val request = ListPackagesRequest()
     for {
       stub <- withCredentials(packageServiceStub)
-      res <- wrapFuture(stub.listPackages(request, _))
-        .map(_.getPackageIdsList.asScala.toSeq)
+      res <- stub
+        .listPackages(request)
+        .map(_.packageIds)
     } yield res
   }
 
   def uploadDarFile(darFile: ByteString)(implicit ec: ExecutionContext): Future[Unit] = {
-    val request = PackageManagementServiceOuterClass.UploadDarFileRequest
-      .newBuilder()
-      .setDarFile(darFile)
-      .build
+    val request = UploadDarFileRequest(darFile)
     for {
       stub <- withCredentials(packageManagementServiceStub)
-      res <- wrapFuture(stub.uploadDarFile(request, _)).map(_ => ())
+      res <- stub.uploadDarFile(request).map(_ => ())
     } yield res
   }
 
-  def listUsersProto(
+  private def listUsersProto(
       pageToken: Option[String],
-      pageSize: Int = 100,
+      pageSize: Int,
       identityProviderId: Option[String] = None,
   )(implicit
       ec: ExecutionContext
   ): Future[(Seq[UserManagementServiceOuterClass.User], Option[String])] = {
-    val requestBuilder = new ListUsersRequest(pageToken.toJava, pageSize).toProto.toBuilder
-    identityProviderId.foreach(requestBuilder.setIdentityProviderId(_))
+    val requestBuilder =
+      new v1User.ListUsersRequest(
+        pageToken.getOrElse(""),
+        pageSize,
+        identityProviderId.getOrElse(""),
+      )
     for {
       stub <- withCredentials(userManagementServiceStub)
-      res <- wrapFuture(stub.listUsers(requestBuilder.build, _))
-
+      res <- stub.listUsers(requestBuilder)
     } yield (
-      res.getUsersList().asScala.toSeq,
-      Option.when(res.getNextPageToken() != "")(res.getNextPageToken()),
+      res.users.map(v1User.User.toJavaProto),
+      Some(res.nextPageToken).filter(_.nonEmpty),
     )
   }
 
@@ -269,18 +271,17 @@ private[environment] class LedgerClient(
       ec: ExecutionContext
   ): Future[(Seq[User], Option[String])] =
     listUsersProto(pageToken, pageSize).map { case (users, nextPage) =>
-      (users.map(User.fromProto(_)), nextPage)
+      (users.map(User.fromProto), nextPage)
     }
 
   def getUserProto(
       userId: String,
       identityProviderId: Option[String],
   )(implicit ec: ExecutionContext): Future[UserManagementServiceOuterClass.User] = {
-    val requestBuilder = new GetUserRequest(userId).toProto.toBuilder
-    identityProviderId.foreach(requestBuilder.setIdentityProviderId(_))
+    val requestBuilder = v1User.GetUserRequest(userId, identityProviderId.getOrElse(""))
     for {
       stub <- withCredentials(userManagementServiceStub)
-      res <- wrapFuture(stub.getUser(requestBuilder.build, _)).map(_.getUser)
+      res <- stub.getUser(requestBuilder).map(u => v1User.User.toJavaProto(u.getUser))
     } yield res
   }
 
@@ -305,38 +306,55 @@ private[environment] class LedgerClient(
   def getParties(
       parties: Seq[PartyId]
   )(implicit ec: ExecutionContext): Future[Seq[PartyDetails]] = {
-    import com.daml.ledger.api.v1.admin.party_management_service.PartyDetails as ScalaPartyDetails
-    val requestBuilder = PartyManagementServiceOuterClass.GetPartiesRequest.newBuilder
-    requestBuilder.addAllParties(parties.map(_.toProtoPrimitive).asJava)
+    val request = GetPartiesRequest(parties.map(_.toProtoPrimitive))
     for {
       stub <- withCredentials(partyManagementServiceStub)
-      res <- wrapFuture(stub.getParties(requestBuilder.build, _)).map(r =>
-        r.getPartyDetailsList.asScala.toSeq.map(details =>
-          PartyDetails.fromProtoPartyDetails(ScalaPartyDetails.fromJavaProto(details))
-        )
-      )
+      res <- stub
+        .getParties(request)
+        .map(r => r.partyDetails.map(details => PartyDetails.fromProtoPartyDetails(details)))
     } yield res
   }
 
-  def createUser(user: User, initialRights: Seq[User.Right], identityProviderId: Option[String])(
-      implicit ec: ExecutionContext
+  def createUser(
+      user: User,
+      initialRights: Seq[User.Right],
+      identityProviderId: Option[String],
+  )(implicit
+      ec: ExecutionContext
   ): Future[User] = {
-    val request = initialRights match {
-      case hd +: tl => new CreateUserRequest(user, hd, tl: _*).toProto
-      case _ => throw new IllegalArgumentException("createUser requires at least one right")
-    }
-    val requestBuilder = request.toBuilder
-    val userBuilder = request.getUser.toBuilder
-    identityProviderId.foreach(
-      userBuilder.setIdentityProviderId(_)
-    )
-    requestBuilder.setUser(userBuilder.build)
-    for {
-      stub <- withCredentials(userManagementServiceStub)
-      res <- wrapFuture(stub.createUser(requestBuilder.build, _)).map(r =>
-        CreateUserResponse.fromProto(r).getUser
+    if (initialRights.isEmpty) {
+      throw new IllegalArgumentException("createUser requires at least one right")
+    } else {
+      val request = v1User.CreateUserRequest(
+        Some(
+          v1User.User
+            .fromJavaProto(user.toProto)
+            .withIdentityProviderId(identityProviderId.getOrElse(""))
+        ),
+        initialRights.map(javaRightToV1Right),
       )
-    } yield res
+      for {
+        stub <- withCredentials(userManagementServiceStub)
+        res <- stub
+          .createUser(request)
+          .map(r => CreateUserResponse.fromProto(v1User.CreateUserResponse.toJavaProto(r)).getUser)
+      } yield res
+    }
+  }
+
+  private def javaRightToV1Right(right: User.Right) = right match {
+    case as: Right.CanActAs =>
+      v1User.Right.defaultInstance.withCanActAs(v1User.Right.CanActAs(as.party))
+    case as: Right.CanReadAs =>
+      v1User.Right.defaultInstance.withCanReadAs(v1User.Right.CanReadAs(as.party))
+    case _: Right.IdentityProviderAdmin =>
+      v1User.Right.defaultInstance.withIdentityProviderAdmin(
+        v1User.Right.IdentityProviderAdmin()
+      )
+    case _: Right.ParticipantAdmin =>
+      v1User.Right.defaultInstance.withParticipantAdmin(v1User.Right.ParticipantAdmin())
+    case unsupported => throw new IllegalArgumentException(s"unsupported right: $unsupported")
+
   }
 
   def setUserPrimaryParty(
@@ -349,56 +367,72 @@ private[environment] class LedgerClient(
     for {
       user <- getUserProto(userId, identityProviderId)
       newUser = user.toBuilder.setPrimaryParty(primaryParty.toProtoPrimitive).build
-      _ <- updateUser(newUser, FieldMask.newBuilder.addPaths("primary_party").build)
+      _ <- updateUser(newUser, FieldMask(Seq("primary_party")))
     } yield ()
   }
 
   def updateUser(user: UserManagementServiceOuterClass.User, mask: FieldMask): Future[Unit] = {
-    val requestBuilder = admin.UserManagementServiceOuterClass.UpdateUserRequest.newBuilder()
-    requestBuilder.setUser(user)
-    requestBuilder.setUpdateMask(mask)
+    val request = v1User.UpdateUserRequest(
+      Some(v1User.User.fromJavaProto(user)),
+      Some(mask),
+    )
     for {
       stub <- withCredentials(userManagementServiceStub)
-      res <- wrapFuture(stub.updateUser(requestBuilder.build, _))
+      res <- stub.updateUser(request)
     } yield res
   }.map(_ => ())
 
   def listUserRights(userId: String)(implicit
       ec: ExecutionContext
   ): Future[Seq[User.Right]] = {
-    val request = new ListUserRightsRequest(userId).toProto
+    val request = v1User.ListUserRightsRequest(userId)
     for {
       stub <- withCredentials(userManagementServiceStub)
-      res <- wrapFuture(stub.listUserRights(request, _)).map(r =>
-        ListUserRightsResponse.fromProto(r).getRights.asScala.toSeq
-      )
+      res <- stub
+        .listUserRights(request)
+        .map(r =>
+          ListUserRightsResponse
+            .fromProto(v1User.ListUserRightsResponse.toJavaProto(r))
+            .getRights
+            .asScala
+            .toSeq
+        )
     } yield res
   }
 
   def grantUserRights(userId: String, rights: Seq[User.Right])(implicit
       ec: ExecutionContext
   ): Future[Unit] = {
-    val request = rights match {
-      case hd +: tl => new GrantUserRightsRequest(userId, hd, tl: _*).toProto
-      case _ => throw new IllegalArgumentException("grantUserRights requires at least one right")
+    if (rights.isEmpty) {
+      throw new IllegalArgumentException("grantUserRights requires at least one right")
+    } else {
+      val request = v1User.GrantUserRightsRequest(
+        userId,
+        rights.map(javaRightToV1Right),
+      )
+
+      for {
+        stub <- withCredentials(userManagementServiceStub)
+        res <- stub.grantUserRights(request).map(_ => ())
+      } yield res
     }
-    for {
-      stub <- withCredentials(userManagementServiceStub)
-      res <- wrapFuture(stub.grantUserRights(request, _)).map(_ => ())
-    } yield res
   }
 
   def revokeUserRights(userId: String, rights: Seq[User.Right])(implicit
       ec: ExecutionContext
   ): Future[Unit] = {
-    val request = rights match {
-      case hd +: tl => new RevokeUserRightsRequest(userId, hd, tl: _*).toProto
-      case _ => throw new IllegalArgumentException("revokeUserRights requires at least one right")
+    if (rights.isEmpty) {
+      throw new IllegalArgumentException("revokeUserRights requires at least one right")
+    } else {
+      val request = v1User.RevokeUserRightsRequest(
+        userId,
+        rights.map(javaRightToV1Right),
+      )
+      for {
+        stub <- withCredentials(userManagementServiceStub)
+        res <- stub.revokeUserRights(request).map(_ => ())
+      } yield res
     }
-    for {
-      stub <- withCredentials(userManagementServiceStub)
-      res <- wrapFuture(stub.revokeUserRights(request, _)).map(_ => ())
-    } yield res
   }
 
   def submitReassignment(
@@ -534,24 +568,40 @@ object LedgerClient {
 
     val CompletionOffset: SubmitAndWaitFor[String] =
       impl((_: CSOC.SubmitAndWaitForTransactionIdResponse).getCompletionOffset)(
-        _.submitAndWaitForTransactionId(_, _)
+        { case (stub, r, ec) =>
+          stub
+            .submitAndWaitForTransactionId(command_service.SubmitAndWaitRequest.fromJavaProto(r))
+            .map(r => command_service.SubmitAndWaitForTransactionIdResponse.toJavaProto(r))(ec)
+        }
       )
 
     val Transaction: SubmitAndWaitFor[jdata.Transaction] =
-      impl { response: CSOC.SubmitAndWaitForTransactionResponse =>
+      impl((response: CSOC.SubmitAndWaitForTransactionResponse) =>
         jdata.Transaction.fromProto(response.getTransaction)
-      }(_.submitAndWaitForTransaction(_, _))
+      ) {
+        { case (stub, r, ec) =>
+          stub
+            .submitAndWaitForTransaction(command_service.SubmitAndWaitRequest.fromJavaProto(r))
+            .map(r => command_service.SubmitAndWaitForTransactionResponse.toJavaProto(r))(ec)
+        }
+      }
 
     val TransactionTree: SubmitAndWaitFor[jdata.TransactionTree] =
-      impl { response: CSOC.SubmitAndWaitForTransactionTreeResponse =>
+      impl((response: CSOC.SubmitAndWaitForTransactionTreeResponse) =>
         jdata.TransactionTree.fromProto(response.getTransaction)
-      }(_.submitAndWaitForTransactionTree(_, _))
+      ) {
+        { case (stub, r, ec) =>
+          stub
+            .submitAndWaitForTransactionTree(command_service.SubmitAndWaitRequest.fromJavaProto(r))
+            .map(r => command_service.SubmitAndWaitForTransactionTreeResponse.toJavaProto(r))(ec)
+        }
+      }
 
     private type StubSubmit[R] = (
         CommandServiceGrpc.CommandServiceStub,
         CSOC.SubmitAndWaitRequest,
-        StreamObserver[R],
-    ) => Unit
+        ExecutionContext,
+    ) => Future[R]
 
     private[this] def impl[R, Z](mapResponse0: R => Z)(
         stubSubmit0: StubSubmit[R]

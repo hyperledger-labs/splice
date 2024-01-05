@@ -78,6 +78,10 @@ stderr: Finishing shakeRun .*exception: AsyncCancelled
 # compiling daml-errors can be safely ignored
 .*compiling.*daml-errors.*
 
+# using daml3-script
+.*\[install-dependencies\]
+You are using an unreleased and unstable version of daml-script intended for daml3. This will break without warning.
+
 # bundle ignore
 .*Error: ENOENT: no such file or directory.*
 .*\[.*info.*\].*Compiled with warnings.*

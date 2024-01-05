@@ -17,6 +17,7 @@ lazy val `canton-community-base` = BuildCommon.`canton-community-base`
 lazy val `canton-community-common` = BuildCommon.`canton-community-common`
 lazy val `canton-community-domain` = BuildCommon.`canton-community-domain`
 lazy val `canton-community-participant` = BuildCommon.`canton-community-participant`
+lazy val `canton-community-admin-api` = BuildCommon.`canton-community-admin-api`
 lazy val `canton-community-integration-testing` = BuildCommon.`canton-community-integration-testing`
 lazy val `canton-community-testing` = BuildCommon.`canton-community-testing`
 lazy val `canton-blake2b` = BuildCommon.`canton-blake2b`
@@ -30,6 +31,9 @@ lazy val `canton-ledger-common` = BuildCommon.`canton-ledger-common`
 lazy val `canton-ledger-api-core` = BuildCommon.`canton-ledger-api-core`
 lazy val `canton-ledger-json-api` = BuildCommon.`canton-ledger-json-api`
 lazy val `canton-daml-errors` = BuildCommon.`canton-daml-errors`
+lazy val `canton-ledger-api` = BuildCommon.`canton-ledger-api`
+lazy val `canton-bindings-java` = BuildCommon.`canton-bindings-java`
+lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common-protos-scala`
 
 lazy val `cn-wartremover-extension` = Wartremover.`cn-wartremover-extension`
 
@@ -84,6 +88,9 @@ lazy val root = (project in file("."))
     `canton-community-participant`,
     `canton-ledger-common`,
     `canton-ledger-api-core`,
+    `canton-ledger-api`,
+    `canton-bindings-java`,
+    `canton-google-common-protos-scala`,
     pulumi,
     `load-tester`,
     tools,
@@ -193,6 +200,7 @@ lazy val `canton-coin-upgrade-daml` =
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value,
     )
+    .dependsOn(`canton-bindings-java`)
 
 lazy val `svc-governance-daml` =
   project
@@ -221,6 +229,7 @@ lazy val `svc-governance-upgrade-daml` =
           (`canton-name-service-upgrade-daml` / Compile / damlBuild).value ++
           (`wallet-payments-upgrade-daml` / Compile / damlBuild).value,
     )
+    .dependsOn(`canton-bindings-java`)
 
 lazy val `sv-local-daml` =
   project
@@ -229,6 +238,7 @@ lazy val `sv-local-daml` =
     .settings(
       BuildCommon.damlSettings
     )
+    .dependsOn(`canton-bindings-java`)
 
 lazy val `validator-lifecycle-daml` =
   project
@@ -238,6 +248,7 @@ lazy val `validator-lifecycle-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`cn-util-daml` / Compile / damlBuild).value,
     )
+    .dependsOn(`canton-bindings-java`)
 
 // This defines the Daml model that we expose to app developers
 // to manage payments through the wallet.
@@ -264,6 +275,7 @@ lazy val `wallet-payments-upgrade-daml` =
         (`cn-util-daml` / Compile / damlBuild).value ++
           (`canton-coin-upgrade-daml` / Compile / damlBuild).value,
     )
+    .dependsOn(`canton-bindings-java`)
 
 // This defines the Daml model that we do not expose to app devs
 // but do use internally, e.g., for batching.
@@ -286,6 +298,7 @@ lazy val `wallet-upgrade-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`canton-coin-upgrade-daml` / Compile / damlBuild).value ++ (`wallet-payments-upgrade-daml` / Compile / damlBuild).value,
     )
+    .dependsOn(`canton-bindings-java`)
 
 lazy val `canton-name-service-daml` =
   project
@@ -306,6 +319,7 @@ lazy val `canton-name-service-upgrade-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`wallet-upgrade-daml` / Compile / damlBuild).value,
     )
+    .dependsOn(`canton-bindings-java`)
 
 lazy val `splitwell-daml` =
   project
@@ -326,6 +340,7 @@ lazy val `splitwell-upgrade-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`wallet-upgrade-daml` / Compile / damlBuild).value,
     )
+    .dependsOn(`canton-bindings-java`)
 
 lazy val `app-manager-daml` =
   project
@@ -334,6 +349,7 @@ lazy val `app-manager-daml` =
     .settings(
       BuildCommon.damlSettings
     )
+    .dependsOn(`canton-bindings-java`)
 
 lazy val `apps-common` =
   project
@@ -370,8 +386,6 @@ lazy val `apps-common` =
         scalatestScalacheck % Test,
         scalapb_runtime_grpc,
         scalapb_runtime,
-        daml_ledger_api_scalapb,
-        daml_ledger_api_proto % "protobuf",
         java_jwt,
         jwks_rsa,
         spray_json,
@@ -1031,6 +1045,8 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case PathList("com", "daml", "ledger", "api", "v1" | "v2", _*) => MergeStrategy.first
     // Hack for not getting trouble with different versions of generated classes of common openapi
     case PathList("com", "daml", "network", "http", "v0" | "commonAdmin", _*) => MergeStrategy.first
+    // this file comes in multiple flavors, from io.get-coursier:interface and from org.scala-lang.modules:scala-collection-compat. Since the content differs it is resolve this explicitly with this MergeStrategy.
+    case path if path.endsWith("scala-collection-compat.properties") => MergeStrategy.first
     case x => oldStrategy(x)
   }
 }

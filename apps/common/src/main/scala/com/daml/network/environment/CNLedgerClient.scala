@@ -8,7 +8,7 @@ import com.daml.network.environment.ledger.api.LedgerClient
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.ledger.client.configuration.LedgerClientChannelConfiguration
 import com.digitalasset.canton.lifecycle.FlagCloseable
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
@@ -28,7 +28,6 @@ class CNLedgerClient(
     ec: ExecutionContextExecutor,
     as: ActorSystem,
     esf: ExecutionSequencerFactory,
-    elc: ErrorLoggingContext,
 ) extends RetryProvider.Has
     with FlagCloseable
     with NamedLogging {

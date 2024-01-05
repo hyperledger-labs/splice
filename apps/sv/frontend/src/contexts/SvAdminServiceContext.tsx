@@ -28,7 +28,7 @@ import {
   UpdateVoteRequest,
 } from 'sv-openapi';
 
-import { RelTime } from '@daml.js/733e38d36a2759688a4b2c4cec69d48e7b55ecc8dedc8067b815926c917a182a/lib/DA/Time/Types';
+import { RelTime } from '@daml.js/b47113ba94c31372c553e3869fffed9a45ef1c0f5ac1be3287857cd9450c0bae/lib/DA/Time/Types';
 import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 const SvAdminContext = React.createContext<SvAdminClient | undefined>(undefined);

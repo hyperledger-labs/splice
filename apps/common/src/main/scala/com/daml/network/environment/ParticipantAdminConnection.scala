@@ -14,7 +14,6 @@ import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.health.admin.data.{NodeStatus, ParticipantStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.admin.v0.ExportAcsResponse
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.time.{Clock, FetchTimeResponse, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.store.TopologyStoreId
@@ -29,8 +28,8 @@ import io.grpc.Status
 import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
-
 import ParticipantAdminConnection.HasParticipantId
+import com.digitalasset.canton.admin.participant.v0.ExportAcsResponse
 
 /** Connection to the subset of the Canton admin API that we rely
   * on in our own applications.
@@ -411,8 +410,8 @@ class ParticipantAdminConnection(
 
 object ParticipantAdminConnection {
   import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-  import com.digitalasset.canton.participant.admin.v0.*
-  import com.digitalasset.canton.participant.admin.v0.PackageServiceGrpc.PackageServiceStub
+  import com.digitalasset.canton.admin.participant.v0.*
+  import com.digitalasset.canton.admin.participant.v0.PackageServiceGrpc.PackageServiceStub
   import io.grpc.ManagedChannel
 
   // The Canton APIs insist on writing the bytestring to a file so we define

@@ -46,7 +46,8 @@ class ConsoleHttpCommandRunner(
   private val httpRunner = new HttpCtlRunner(
     loggerFactory
   )
-  implicit val actorSystem = ActorSystem("ConsoleHttpCommandRunner", environment.config.pekkoConfig)
+  implicit val actorSystem: ActorSystem =
+    ActorSystem("ConsoleHttpCommandRunner", environment.config.pekkoConfig)
   implicit val mat: Materializer = Materializer(actorSystem)
 
   def runCommand[Result](

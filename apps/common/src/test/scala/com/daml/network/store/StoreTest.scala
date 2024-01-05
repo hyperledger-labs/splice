@@ -321,19 +321,19 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       signatories: Seq[PartyId] = Seq.empty,
   ): CreatedEvent = {
     new CreatedEvent(
-      eventId = "dummyEventId",
-      contractId = contract.contractId.contractId,
-      interfaceViews = Map.empty.asJava,
-      failedInterfaceViews = Map.empty.asJava,
-      templateId = contract.identifier,
-      arguments = contract.payload.toValue,
-      createdEventBlob = contract.createdEventBlob,
-      witnessParties = Seq.empty.asJava,
-      signatories = signatories.map(_.toProtoPrimitive).asJava,
-      observers = Seq.empty.asJava,
-      agreementText = None.toJava,
-      contractKey = None.toJava,
-      createdAt = contract.createdAt,
+      Seq.empty[String].asJava,
+      "dummyEventId",
+      contract.identifier,
+      contract.contractId.contractId,
+      contract.payload.toValue,
+      contract.createdEventBlob,
+      new java.util.HashMap(),
+      new java.util.HashMap(),
+      None.toJava,
+      None.toJava,
+      signatories.map(_.toProtoPrimitive).asJava,
+      Seq.empty.asJava,
+      contract.createdAt,
     )
   }
 
@@ -341,17 +341,17 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contract: Contract[TCid, T]
   ): ExercisedEvent = {
     new ExercisedEvent(
-      eventId = "dummyEventId",
-      contractId = contract.contractId.contractId,
-      templateId = contract.identifier,
-      interfaceId = None.toJava,
-      witnessParties = Seq.empty.asJava,
-      consuming = true,
-      choice = "DummyChoiceName",
-      choiceArgument = damlUnit.getInstance(),
-      exerciseResult = damlUnit.getInstance(),
-      actingParties = Seq.empty.asJava,
-      childEventIds = Seq.empty.asJava,
+      Seq.empty.asJava,
+      "dummyEventId",
+      contract.identifier,
+      None.toJava,
+      contract.contractId.contractId,
+      "DummyChoiceName",
+      damlUnit.getInstance(),
+      Seq.empty.asJava,
+      true,
+      Seq.empty.asJava,
+      damlUnit.getInstance(),
     )
   }
 
@@ -376,17 +376,17 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       result: damlValue,
   ): ExercisedEvent = {
     new ExercisedEvent(
-      eventId = "dummyEventId",
-      contractId = contractId,
-      templateId = templateId,
-      interfaceId = interfaceId.toJava,
-      witnessParties = Seq.empty.asJava,
-      consuming = consuming,
-      choice = choice,
-      choiceArgument = argument,
-      exerciseResult = result,
-      actingParties = Seq.empty.asJava,
-      childEventIds = Seq.empty.asJava,
+      Seq.empty.asJava,
+      "dummyEventId",
+      templateId,
+      interfaceId.toJava,
+      contractId,
+      choice,
+      argument,
+      Seq.empty.asJava,
+      consuming,
+      Seq.empty.asJava,
+      result,
     )
   }
 
@@ -396,50 +396,50 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   ): TreeEvent = event match {
     case created: CreatedEvent =>
       new CreatedEvent(
-        eventId = eventId,
-        contractId = created.getContractId,
-        interfaceViews = created.getInterfaceViews,
-        failedInterfaceViews = created.getFailedInterfaceViews,
-        templateId = created.getTemplateId,
-        arguments = created.getArguments,
-        createdEventBlob = created.getCreatedEventBlob,
-        witnessParties = created.getWitnessParties,
-        signatories = created.getSignatories,
-        observers = created.getObservers,
-        agreementText = created.getAgreementText,
-        contractKey = created.getContractKey,
-        createdAt = created.createdAt,
+        created.getWitnessParties,
+        eventId,
+        created.getTemplateId,
+        created.getContractId,
+        created.getArguments,
+        created.getCreatedEventBlob,
+        created.getInterfaceViews,
+        created.getFailedInterfaceViews,
+        created.getAgreementText,
+        created.getContractKey,
+        created.getSignatories,
+        created.getObservers,
+        created.createdAt,
       )
     case exercised: ExercisedEvent =>
       new ExercisedEvent(
-        eventId = eventId,
-        contractId = exercised.getContractId,
-        templateId = exercised.getTemplateId,
-        interfaceId = exercised.getInterfaceId,
-        witnessParties = exercised.getWitnessParties,
-        consuming = exercised.isConsuming,
-        choice = exercised.getChoice,
-        choiceArgument = exercised.getChoiceArgument,
-        exerciseResult = exercised.getExerciseResult,
-        actingParties = exercised.getActingParties,
-        childEventIds = exercised.getChildEventIds,
+        exercised.getWitnessParties,
+        eventId,
+        exercised.getTemplateId,
+        exercised.getInterfaceId,
+        exercised.getContractId,
+        exercised.getChoice,
+        exercised.getChoiceArgument,
+        exercised.getActingParties,
+        exercised.isConsuming,
+        exercised.getChildEventIds,
+        exercised.getExerciseResult,
       )
     case _ => sys.error("Catch-all required because of no exhaustiveness checks with Java")
   }
 
   protected def withChildren(exercised: ExercisedEvent, childEventIds: Seq[String]) =
     new ExercisedEvent(
-      eventId = exercised.getEventId,
-      contractId = exercised.getContractId,
-      templateId = exercised.getTemplateId,
-      interfaceId = exercised.getInterfaceId,
-      witnessParties = exercised.getWitnessParties,
-      consuming = exercised.isConsuming,
-      choice = exercised.getChoice,
-      choiceArgument = exercised.getChoiceArgument,
-      exerciseResult = exercised.getExerciseResult,
-      actingParties = exercised.getActingParties,
-      childEventIds = childEventIds.asJava,
+      exercised.getWitnessParties,
+      exercised.getEventId,
+      exercised.getTemplateId,
+      exercised.getInterfaceId,
+      exercised.getContractId,
+      exercised.getChoice,
+      exercised.getChoiceArgument,
+      exercised.getActingParties,
+      exercised.isConsuming,
+      childEventIds.asJava,
+      exercised.getExerciseResult,
     )
 
   protected lazy val dummyDomain = StoreTest.dummyDomain
@@ -748,13 +748,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     val eventsById = eventsWithId.map(e => e.getEventId -> e).toMap
     val rootEventIds = eventsWithId.map(_.getEventId)
     new TransactionTree(
-      transactionId = transactionId,
-      commandId = "",
-      workflowId = "",
-      effectiveAt = effectiveAt,
-      offset = offset,
-      eventsById = eventsById.asJava,
-      rootEventIds = rootEventIds.asJava,
+      transactionId,
+      "",
+      "",
+      effectiveAt,
+      eventsById.asJava,
+      rootEventIds.asJava,
+      offset,
     )
   }
 
@@ -773,13 +773,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     val eventsById = (rootWithId +: childrenWithId).map(e => e.getEventId -> e).toMap
     val rootEventIds = Seq(rootWithId.getEventId)
     new TransactionTree(
-      transactionId = transactionId,
-      commandId = "",
-      workflowId = "",
-      effectiveAt = effectiveAt,
-      offset = offset,
-      eventsById = eventsById.asJava,
-      rootEventIds = rootEventIds.asJava,
+      transactionId,
+      "",
+      "",
+      effectiveAt,
+      eventsById.asJava,
+      rootEventIds.asJava,
+      offset,
     )
   }
 
@@ -798,17 +798,17 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       exerciseResult: damlValue,
   ): TreeEvent =
     new ExercisedEvent(
-      eventId = "dummyEventId",
-      contractId = contract.contractId.contractId,
-      templateId = contract.identifier,
-      interfaceId = interfaceId.toJava,
-      witnessParties = Seq.empty.asJava,
-      consuming = false,
-      choice = choiceName,
-      choiceArgument = choiceArgument,
-      exerciseResult = exerciseResult,
-      actingParties = Seq.empty.asJava,
-      childEventIds = Seq.empty.asJava,
+      Seq.empty.asJava,
+      "dummyEventId",
+      contract.identifier,
+      interfaceId.toJava,
+      contract.contractId.contractId,
+      choiceName,
+      choiceArgument,
+      Seq.empty.asJava,
+      false,
+      Seq.empty.asJava,
+      exerciseResult,
     )
 
   /** Convenience wrapper that autoinfers the payloadValue assuming

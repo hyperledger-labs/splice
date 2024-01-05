@@ -5,7 +5,7 @@ import React from 'react';
 
 import { FormControl, Stack, Typography } from '@mui/material';
 
-import { Tuple2 } from '@daml.js/40f452260bef3f29dede136108fc08a88d5a5250310281067087da6f0baddff7/lib/DA/Types';
+import { Tuple2 } from '@daml.js/87530dd1038863bad7bdf02c59ae851bc00f469edb2d7dbc8be3172daafa638c/lib/DA/Types';
 import { CoinConfig, USD } from '@daml.js/canton-coin/lib/CC/CoinConfig';
 import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 

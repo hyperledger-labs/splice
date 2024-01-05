@@ -46,9 +46,9 @@ import com.digitalasset.canton.topology.{DomainId, Identifier, Namespace, PartyI
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{PekkoUtil, LoggerUtil}
+import com.digitalasset.canton.util.{LoggerUtil, PekkoUtil}
 import com.digitalasset.canton.util.ShowUtil.*
-import com.google.protobuf.FieldMask
+import com.google.protobuf.field_mask.FieldMask
 import io.grpc.{Status, StatusRuntimeException}
 
 import java.security.MessageDigest
@@ -316,10 +316,7 @@ class BaseLedgerConnection(
             ObjectMetaOuterClass.ObjectMeta.newBuilder.putAllAnnotations(annotations.asJava).build
           }
         newUser = user.toBuilder.setMetadata(newMetadata).build
-        mask = FieldMask.newBuilder
-          .addPaths("metadata.annotations")
-          .addPaths("metadata.resource_version")
-          .build
+        mask = FieldMask(Seq("metadata.annotations", "metadata.resource_version"))
         _ <- client.updateUser(newUser, mask)
       } yield (),
       logger,

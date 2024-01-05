@@ -28,6 +28,7 @@ import com.digitalasset.canton.console.{
   NodeReferences,
   StandardConsoleOutput,
 }
+import org.apache.pekko.actor.ActorSystem
 
 class CNNodeConsoleEnvironment(
     val environment: CNNodeEnvironmentImpl,
@@ -44,7 +45,7 @@ class CNNodeConsoleEnvironment(
       DarResources.cantonCoin.all ++
       DarResources.svcGovernance.all
   )
-  implicit val actorSystem = environment.actorSystem
+  implicit val actorSystem: ActorSystem = environment.actorSystem
   val templateDecoder = new ResourceTemplateDecoder(packageSignatures, environment.loggerFactory)
 
   lazy val httpCommandRunner: ConsoleHttpCommandRunner = new ConsoleHttpCommandRunner(

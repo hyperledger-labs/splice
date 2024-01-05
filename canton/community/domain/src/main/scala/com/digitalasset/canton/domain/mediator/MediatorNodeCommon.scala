@@ -55,7 +55,7 @@ trait MediatorNodeBootstrapCommon[
     (TopologyTransactionProcessorCommon, DomainTopologyClientWithInit),
   ]
 
-  protected val replicaManager: MediatorReplicaManagerStub
+  protected val replicaManager: MediatorReplicaManager
 
   protected def mediatorRuntimeFactory: MediatorRuntimeFactory
 
@@ -253,6 +253,7 @@ trait MediatorNodeBootstrapCommon[
                   info.sequencerConnections.default,
                   mediatorId,
                   requestSigner,
+                  allowReplay = false,
                 )
                 .flatMap(
                   ResourceUtil.withResourceEitherT(_)(

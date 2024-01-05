@@ -119,7 +119,7 @@ class InMemoryScanStore(
         case (closed, r: Closed) =>
           (closed + (r.round -> r)).asRight
         case (closed, r: Open) =>
-          closed.get(r.round).fold(closed.asRight[Closed]) { c: Closed =>
+          closed.get(r.round).fold(closed.asRight[Closed]) { (c: Closed) =>
             c.asLeft[Map[Long, Closed]]
           }
         case (z, _) => z.asRight
@@ -390,7 +390,7 @@ class InMemoryScanStore(
   ] =
     multiDomainAcsStore
       .findContract(coinCodegen.FeaturedAppRight.COMPANION) {
-        co: Contract[?, coinCodegen.FeaturedAppRight] =>
+        (co: Contract[?, coinCodegen.FeaturedAppRight]) =>
           co.payload.provider == providerPartyId.toProtoPrimitive
       }
 

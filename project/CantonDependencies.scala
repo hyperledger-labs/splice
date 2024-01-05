@@ -3,8 +3,8 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "2.9.0-snapshot.20231211.12491.0.vbb56339f"
-  val daml_language_versions = Seq("1.14", "1.15", "1.dev")
+  val version: String = "2.9.0-snapshot.20231221.12524.0.vc998203f"
+  val daml_language_versions = Seq("2.1", "2.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
   val daml_libraries_version = version
@@ -25,11 +25,11 @@ object CantonDependencies {
   lazy val auth0_java = "com.auth0" % "java-jwt" % "4.2.1"
   lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"
   lazy val awaitility = "org.awaitility" % "awaitility" % "4.2.0"
-  lazy val grpc_version = "1.59.0"
+  lazy val grpc_version = "1.60.0"
   lazy val logback_version = "1.4.5"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
-  lazy val ammonite_version = "2.5.5"
+  lazy val ammonite_version = "2.5.9"
   lazy val pprint_version = "0.7.1"
   // if you update the slick version, please also update our forked code in common/slick.util.*
   lazy val slick_version = "3.3.3"
@@ -39,7 +39,9 @@ object CantonDependencies {
 
   lazy val circe_version = "0.13.0"
 
-  lazy val scalatest_version = "3.2.9"
+  lazy val scalatest_version = "3.2.11"
+  lazy val scalacheck_version = "1.15.4"
+  lazy val mockito_scala_version = "1.16.3"
 
   lazy val netty_version = "4.1.97.Final"
 
@@ -97,7 +99,6 @@ object CantonDependencies {
   lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
   lazy val daml_contextualized_logging =
     "com.daml" %% "contextualized-logging" % daml_libraries_version
-  lazy val daml_ledger_rxjava_client = "com.daml" % "bindings-rxjava" % daml_libraries_version
   lazy val daml_telemetry = "com.daml" %% "telemetry" % daml_libraries_version
   lazy val daml_pekko_http_metrics = "com.daml" %% "pekko-http-metrics" % daml_libraries_version
   lazy val daml_tracing = "com.daml" %% "tracing" % daml_libraries_version
@@ -106,7 +107,6 @@ object CantonDependencies {
   lazy val daml_jwt = "com.daml" %% "jwt" % daml_libraries_version
   lazy val daml_ports = "com.daml" %% "ports" % daml_libraries_version
   lazy val daml_struct_spray_json = "com.daml" %% "struct-spray-json" % daml_libraries_version
-  lazy val daml_bindings_scala = "com.daml" %% "bindings-scala" % daml_java_codegen_version
   lazy val daml_ledger_resources = "com.daml" %% "ledger-resources" % daml_libraries_version
   lazy val daml_timer_utils = "com.daml" %% "timer-utils" % daml_libraries_version
   lazy val daml_rs_grpc_pekko = "com.daml" %% "rs-grpc-pekko" % daml_libraries_version
@@ -140,12 +140,12 @@ object CantonDependencies {
   lazy val pekko_http_testkit = "org.apache.pekko" %% "pekko-http-testkit" % pekko_http_version
 
   lazy val scala_logging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
-  lazy val scalacheck = "org.scalacheck" %% "scalacheck" % "1.15.4"
+  lazy val scalacheck = "org.scalacheck" %% "scalacheck" % scalacheck_version
   lazy val scalatest = "org.scalatest" %% "scalatest" % scalatest_version
   lazy val scalatestScalacheck =
     "org.scalatestplus" %% "scalacheck-1-15" % (scalatest_version + ".0")
-  lazy val mockito_scala = "org.mockito" %% "mockito-scala" % "1.16.3"
-  lazy val scalatestMockito = "org.scalatestplus" %% "mockito-3-4" % (scalatest_version + ".0")
+  lazy val mockito_scala = "org.mockito" %% "mockito-scala" % mockito_scala_version
+  lazy val scalatestMockito = "org.scalatestplus" %% "mockito-3-4" % ("3.2.10.0")
 
   // it should be kept up-to-date with the scaffeine version to avoid incompatibilities
   lazy val caffeine = "com.github.ben-manes.caffeine" % "caffeine" % "3.1.2"
@@ -255,8 +255,20 @@ object CantonDependencies {
 
   lazy val scalaz_scalacheck =
     "org.scalaz" %% "scalaz-scalacheck-binding" % "7.2.33-scalacheck-1.15"
+  lazy val fasterjackson_core = "com.fasterxml.jackson.core" % "jackson-core" % "2.14.3"
   lazy val scalapb_json4s = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1"
 
   lazy val spray_json_derived_codecs =
     "io.github.paoloboni" %% "spray-json-derived-codecs" % "2.3.10"
+
+  lazy val junit_jupiter_api = "org.junit.jupiter" % "junit-jupiter-api" % "5.9.2"
+  lazy val junit_jupiter_engine = "org.junit.jupiter" % "junit-jupiter-engine" % "5.9.2"
+  lazy val junit_platform_runner = "org.junit.platform" % "junit-platform-runner" % "1.9.2"
+  lazy val jupiter_interface = "net.aichler" % "jupiter-interface" % "0.9.0"
+
+  lazy val google_protobuf_java = "com.google.protobuf" % "protobuf-java" % "3.24.0"
+  lazy val protobuf_version = google_protobuf_java.revision
+  // To override 3.19.2 from the daml repo's maven_install_2.13.json
+  lazy val google_protobuf_java_util =
+    "com.google.protobuf" % "protobuf-java-util" % protobuf_version
 }

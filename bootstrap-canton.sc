@@ -37,7 +37,6 @@ def bootstrapOtherDomain(
 ) =
   bootstrap.domain(
     name,
-    staticParameters(sequencer),
     domainOwners = Seq(sequencer, mediator),
     sequencers = Seq(sequencer),
     mediators = Seq(mediator),

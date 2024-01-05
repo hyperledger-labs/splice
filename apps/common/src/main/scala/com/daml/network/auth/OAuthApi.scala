@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Failure
-import spray.json.DefaultJsonProtocol
+import spray.json.{DefaultJsonProtocol, RootJsonFormat}
 
 object OAuthApi {
   final case class ClientCredentialRequest(
@@ -46,8 +46,12 @@ object OAuthApi {
 }
 
 trait OAuthApiJson extends SprayJsonSupport with DefaultJsonProtocol {
-  implicit val wellKnownResponseFormat = jsonFormat4(OAuthApi.WellKnownResponse)
-  implicit val tokenResponseFormat = jsonFormat2(OAuthApi.TokenResponse)
+  implicit val wellKnownResponseFormat: RootJsonFormat[OAuthApi.WellKnownResponse] = jsonFormat4(
+    OAuthApi.WellKnownResponse
+  )
+  implicit val tokenResponseFormat: RootJsonFormat[OAuthApi.TokenResponse] = jsonFormat2(
+    OAuthApi.TokenResponse
+  )
 }
 
 class OAuthApi(

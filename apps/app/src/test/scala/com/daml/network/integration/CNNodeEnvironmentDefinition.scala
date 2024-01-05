@@ -348,7 +348,7 @@ case class CNNodeEnvironmentDefinition(
       new TestConsoleOutput(loggerFactory),
     ) with TestEnvironment[CNNodeEnvironmentImpl] {
       override val actorSystem = super[TestEnvironment].actorSystem
-      override val actualConfig: CNNodeConfig = environment.config
+      override val actualConfig: CNNodeConfig = this.environment.config
 
     }
 }

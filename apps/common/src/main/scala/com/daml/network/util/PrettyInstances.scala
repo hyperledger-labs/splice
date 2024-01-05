@@ -1,7 +1,6 @@
 package com.daml.network.util
 
 import org.apache.pekko.http.scaladsl.model.Uri
-import com.daml.ledger.client.binding.Primitive
 import com.daml.ledger.javaapi
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
@@ -19,20 +18,16 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
   import scala.jdk.CollectionConverters.*
   import scala.jdk.OptionConverters.*
 
-  private def prettyPrimitiveContractId: Pretty[Primitive.ContractId[_]] = prettyOfString { coid =>
-    val coidStr = scalaz.Tag.unwrap(coid)
-    val tokens = coidStr.split(':')
+  // Not made implicit to avoid interpreting all Strings as contract-ids
+  private[PrettyInstances] def prettyContractIdString: Pretty[String] = prettyOfString { coid =>
+    val tokens = coid.split(':')
     if (tokens.lengthCompare(2) == 0) {
       tokens(0).readableHash.toString + ":" + tokens(1).readableHash.toString
     } else {
       // Don't abbreviate anything for unusual contract ids
-      coidStr
+      coid
     }
   }
-
-  // Not made implicit to avoid interpreting all Strings as contract-ids
-  private[PrettyInstances] def prettyContractIdString: Pretty[String] =
-    coid => prettyPrimitiveContractId.treeOf(Primitive.ContractId[Any].apply(coid))
 
   implicit def prettyCodegenContractId: Pretty[javaapi.data.codegen.ContractId[?]] =
     coid => prettyContractIdString.treeOf(coid.contractId)

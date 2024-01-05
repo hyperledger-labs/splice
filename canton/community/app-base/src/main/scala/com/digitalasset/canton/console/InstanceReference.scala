@@ -3,17 +3,37 @@
 
 package com.digitalasset.canton.console
 
+import cats.syntax.either.*
 import com.digitalasset.canton.*
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.admin.api.client.data.StaticDomainParameters as ConsoleStaticDomainParameters
+import com.digitalasset.canton.common.domain.grpc.GrpcSequencerConnectClient
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, PositiveInt}
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.console.CommandErrors.NodeNotStarted
-import com.digitalasset.canton.console.commands.*
+import com.digitalasset.canton.console.commands.{SequencerNodeAdministrationGroupXWithInit, *}
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.domain.config.RemoteDomainConfig
+import com.digitalasset.canton.domain.mediator.{
+  MediatorNodeBootstrapX,
+  MediatorNodeConfigCommon,
+  MediatorNodeX,
+  RemoteMediatorConfig,
+}
+import com.digitalasset.canton.domain.sequencing.config.{
+  RemoteSequencerConfig,
+  SequencerNodeConfigCommon,
+}
+import com.digitalasset.canton.domain.sequencing.{SequencerNodeBootstrapX, SequencerNodeX}
 import com.digitalasset.canton.domain.{Domain, DomainNodeBootstrap}
 import com.digitalasset.canton.environment.*
-import com.digitalasset.canton.health.admin.data.{DomainStatus, NodeStatus, ParticipantStatus}
+import com.digitalasset.canton.health.admin.data.{
+  DomainStatus,
+  MediatorNodeStatus,
+  NodeStatus,
+  ParticipantStatus,
+  SequencerNodeStatus,
+}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.participant.config.{
@@ -29,11 +49,19 @@ import com.digitalasset.canton.participant.{
   ParticipantNodeX,
 }
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
-import com.digitalasset.canton.topology.{DomainId, NodeIdentity, ParticipantId}
-import com.digitalasset.canton.tracing.NoTracing
+import com.digitalasset.canton.topology.{
+  DomainId,
+  MediatorId,
+  Member,
+  NodeIdentity,
+  ParticipantId,
+  SequencerId,
+}
+import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracingConfig}
 import com.digitalasset.canton.util.ErrorUtil
 
-import scala.concurrent.{ExecutionContext, TimeoutException}
+import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.{Await, ExecutionContext, TimeoutException}
 import scala.util.hashing.MurmurHash3
 
 trait InstanceReferenceCommon
@@ -191,7 +219,7 @@ trait LocalInstanceReferenceCommon extends InstanceReferenceCommon with NoTracin
       ErrorUtil.withThrowableLogging(clear_cache())
     }
 
-  protected def migrateInstanceDb(): Either[StartupError, _] = nodes.migrateDatabase(name)
+  protected def migrateInstanceDb(): Either[StartupError, ?] = nodes.migrateDatabase(name)
   protected def repairMigrationOfInstance(force: Boolean): Either[StartupError, Unit] = {
     Either
       .cond(force, (), DidntUseForceOnRepairMigration(name))
@@ -212,7 +240,7 @@ trait LocalInstanceReferenceCommon extends InstanceReferenceCommon with NoTracin
       NodeNotStarted.ErrorCanton(this)
 
   override def adminCommand[Result](
-      grpcCommand: GrpcAdminCommand[_, _, Result]
+      grpcCommand: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] = {
     runCommandIfRunning(
       consoleEnvironment.grpcAdminCommandRunner
@@ -237,7 +265,7 @@ trait GrpcRemoteInstanceReference extends RemoteInstanceReference {
   def config: NodeConfig
 
   override def adminCommand[Result](
-      grpcCommand: GrpcAdminCommand[_, _, Result]
+      grpcCommand: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcAdminCommandRunner.runCommand(
       name,
@@ -428,7 +456,7 @@ class ExternalLedgerApiClient(
     throw new NotImplementedError("domain_of is not implemented for external ledger api clients")
 
   override def ledgerApiCommand[Result](
-      command: GrpcAdminCommand[_, _, Result]
+      command: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcAdminCommandRunner
       .runCommand("sourceLedger", command, ClientConfig(hostname, port, tls), token)
@@ -443,7 +471,10 @@ class ExternalLedgerApiClient(
 
 object ExternalLedgerApiClient {
 
-  def forReference(participant: LocalParticipantReference, token: String)(implicit
+  def forReference[ParticipantNodeT <: ParticipantNodeCommon](
+      participant: LocalParticipantReferenceCommon[ParticipantNodeT],
+      token: String,
+  )(implicit
       env: ConsoleEnvironment
   ): ExternalLedgerApiClient = {
     val cc = participant.config.ledgerApi.clientConfig
@@ -618,7 +649,7 @@ sealed trait RemoteParticipantReferenceCommon
   def config: RemoteParticipantConfig
 
   override def ledgerApiCommand[Result](
-      command: GrpcAdminCommand[_, _, Result]
+      command: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcAdminCommandRunner.runCommand(
       name,
@@ -669,17 +700,20 @@ class RemoteParticipantReference(environment: ConsoleEnvironment, override val n
 
 }
 
-sealed trait LocalParticipantReferenceCommon
+sealed trait LocalParticipantReferenceCommon[ParticipantNodeT <: ParticipantNodeCommon]
     extends LedgerApiCommandRunner
     with ParticipantReferenceCommon
-    with LocalInstanceReferenceCommon {
+    with LocalInstanceReferenceCommon
+    with BaseInspection[ParticipantNodeT] {
+
+  override val name: String
 
   def config: LocalParticipantConfig
 
   def adminToken: Option[String]
 
   override def ledgerApiCommand[Result](
-      command: GrpcAdminCommand[_, _, Result]
+      command: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
     runCommandIfRunning(
       consoleEnvironment.grpcAdminCommandRunner
@@ -701,11 +735,10 @@ class LocalParticipantReference(
     override val consoleEnvironment: ConsoleEnvironment,
     name: String,
 ) extends ParticipantReference(consoleEnvironment, name)
-    with LocalParticipantReferenceCommon
-    with LocalInstanceReference
-    with BaseInspection[ParticipantNode] {
+    with LocalParticipantReferenceCommon[ParticipantNode]
+    with LocalInstanceReference {
 
-  override protected[console] val nodes = consoleEnvironment.environment.participants
+  override val nodes = consoleEnvironment.environment.participants
 
   @Help.Summary("Return participant config")
   def config: LocalParticipantConfig =
@@ -817,7 +850,7 @@ abstract class ParticipantReferenceX(
                   val ret = onParticipantAuthorizedStore == onDomain
                   if (!ret) {
                     logger.debug(
-                      show"Still waiting for package vetting updates to be observed by Participant ${participant.name} on ${item.domainId}: vetted - onDomain is ${onParticipantAuthorizedStore -- onDomain} while onDomain -- vetted is ${onDomain -- onParticipantAuthorizedStore}"
+                      show"Still waiting for package vetting updates to be observed by Participant ${participant.name} on ${item.domainId}: vetted -- onDomain is ${onParticipantAuthorizedStore -- onDomain} while onDomain -- vetted is ${onDomain -- onParticipantAuthorizedStore}"
                     )
                   }
                   ret
@@ -874,11 +907,10 @@ class LocalParticipantReferenceX(
     override val consoleEnvironment: ConsoleEnvironment,
     name: String,
 ) extends ParticipantReferenceX(consoleEnvironment, name)
-    with LocalParticipantReferenceCommon
-    with LocalInstanceReferenceX
-    with BaseInspection[ParticipantNodeX] {
+    with LocalParticipantReferenceCommon[ParticipantNodeX]
+    with LocalInstanceReferenceX {
 
-  override protected[console] val nodes = consoleEnvironment.environment.participantsX
+  override val nodes = consoleEnvironment.environment.participantsX
 
   @Help.Summary("Return participant config")
   def config: LocalParticipantConfig =
@@ -923,4 +955,464 @@ class LocalParticipantReferenceX(
   @Help.Summary("Commands to repair the local participant contract state", FeatureFlag.Repair)
   @Help.Group("Repair")
   def repair: LocalParticipantRepairAdministration = repair_
+}
+
+trait SequencerNodeReferenceCommon
+    extends InstanceReferenceCommon
+    with InstanceReferenceWithSequencerConnection {
+
+  override type Status = SequencerNodeStatus
+
+  @Help.Summary(
+    "Yields the globally unique id of this sequencer. " +
+      "Throws an exception, if the id has not yet been allocated (e.g., the sequencer has not yet been started)."
+  )
+  def id: SequencerId = topology.idHelper(SequencerId(_))
+
+}
+
+object SequencerNodeReference {
+  val InstanceType = "Sequencer"
+}
+
+abstract class SequencerNodeReference(
+    val consoleEnvironment: ConsoleEnvironment,
+    name: String,
+) extends SequencerNodeReferenceCommon
+    with InstanceReferenceWithSequencer
+    with InstanceReference
+    with SequencerNodeAdministration {
+
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case x: SequencerNodeReference => x.consoleEnvironment == consoleEnvironment && x.name == name
+      case _ => false
+    }
+  }
+
+  override protected val instanceType: String = SequencerNodeReference.InstanceType
+  override protected val loggerFactory: NamedLoggerFactory =
+    consoleEnvironment.environment.loggerFactory.append("sequencer", name)
+
+  private lazy val parties_ = new PartiesAdministrationGroup(this, consoleEnvironment)
+
+  override def parties: PartiesAdministrationGroup = parties_
+
+  private lazy val topology_ =
+    new TopologyAdministrationGroup(
+      this,
+      health.status.successOption.map(_.topologyQueue),
+      consoleEnvironment,
+      loggerFactory,
+    )
+
+  override def topology: TopologyAdministrationGroup = topology_
+
+  private lazy val sequencer_ =
+    new SequencerAdministrationGroup(this, consoleEnvironment, loggerFactory)
+
+  @Help.Summary("Manage the sequencer")
+  @Help.Group("Sequencer")
+  override def sequencer: SequencerAdministrationGroup = sequencer_
+
+  @Help.Summary("Health and diagnostic related commands")
+  @Help.Group("Health")
+  override def health =
+    new HealthAdministration[SequencerNodeStatus](
+      this,
+      consoleEnvironment,
+      SequencerNodeStatus.fromProtoV0,
+    )
+
+}
+
+object SequencerNodeReferenceX {
+  val InstanceType = "SequencerX"
+}
+
+abstract class SequencerNodeReferenceX(
+    val consoleEnvironment: ConsoleEnvironment,
+    name: String,
+) extends SequencerNodeReferenceCommon
+    with InstanceReferenceX
+    with SequencerNodeAdministrationGroupXWithInit {
+  self =>
+
+  override protected def runner: AdminCommandRunner = this
+
+  override protected def disable_member(member: Member): Unit =
+    repair.disable_member(member)
+
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case x: SequencerNodeReferenceX =>
+        x.consoleEnvironment == consoleEnvironment && x.name == name
+      case _ => false
+    }
+  }
+
+  override protected val instanceType: String = SequencerNodeReferenceX.InstanceType
+  override protected val loggerFactory: NamedLoggerFactory =
+    consoleEnvironment.environment.loggerFactory.append("sequencerx", name)
+
+  private lazy val topology_ =
+    new TopologyAdministrationGroupX(
+      this,
+      health.status.successOption.map(_.topologyQueue),
+      consoleEnvironment,
+      loggerFactory,
+    )
+
+  private lazy val grpcSequencerConnectClient = new GrpcSequencerConnectClient(
+    sequencerConnection = sequencerConnection,
+    timeouts = ProcessingTimeout(),
+    traceContextPropagation = TracingConfig.Propagation.Enabled,
+    loggerFactory = loggerFactory,
+  )(consoleEnvironment.environment.executionContext)
+
+  override def topology: TopologyAdministrationGroupX = topology_
+
+  private lazy val parties_ = new PartiesAdministrationGroupX(this, consoleEnvironment)
+
+  override def parties: PartiesAdministrationGroupX = parties_
+
+  private val staticDomainParameters: AtomicReference[Option[ConsoleStaticDomainParameters]] =
+    new AtomicReference[Option[ConsoleStaticDomainParameters]](None)
+
+  private val domainId: AtomicReference[Option[DomainId]] =
+    new AtomicReference[Option[DomainId]](None)
+
+  @Help.Summary("Health and diagnostic related commands")
+  @Help.Group("Health")
+  override def health =
+    new HealthAdministrationX[SequencerNodeStatus](
+      this,
+      consoleEnvironment,
+      SequencerNodeStatus.fromProtoV0,
+    )
+
+  private lazy val sequencerXTrafficControl = new TrafficControlSequencerAdministrationGroup(
+    this,
+    topology,
+    this,
+    consoleEnvironment,
+    loggerFactory,
+  )
+
+  @Help.Summary("Admin traffic control related commands")
+  @Help.Group("Traffic")
+  override def traffic_control: TrafficControlSequencerAdministrationGroup =
+    sequencerXTrafficControl
+
+  @Help.Summary("Return domain id of the domain")
+  def domain_id: DomainId = {
+    domainId.get() match {
+      case Some(id) => id
+      case None =>
+        val id = TraceContext.withNewTraceContext { implicit traceContext =>
+          Await
+            .result(
+              grpcSequencerConnectClient.getDomainId(name).value,
+              consoleEnvironment.commandTimeouts.bounded.duration,
+            )
+            .valueOr(_ => throw new CommandFailure())
+        }
+
+        domainId.set(Some(id))
+        id
+    }
+  }
+
+  object mediators {
+    object groups {
+      @Help.Summary("Propose a new mediator group")
+      @Help.Description("""
+         group: the mediator group identifier
+         threshold: the minimum number of mediators that need to come to a consensus for a message to be sent to other members.
+         active: the list of mediators that will take part in the mediator consensus in this mediator group
+         observers: the mediators that will receive all messages but will not participate in mediator consensus
+         """)
+      def propose_new_group(
+          group: NonNegativeInt,
+          threshold: PositiveInt,
+          active: Seq[MediatorReferenceX],
+          observers: Seq[MediatorReferenceX] = Nil,
+      ): Unit = {
+
+        val domainId = domain_id
+        val staticDomainParameters = domain_parameters.static.get()
+
+        val mediators = active ++ observers
+
+        mediators.foreach { mediator =>
+          val identityState = mediator.topology.transactions.identity_transactions()
+
+          topology.transactions.load(identityState, domainId.filterString)
+        }
+
+        topology.mediators
+          .propose(
+            domainId = domainId,
+            threshold = threshold,
+            active = active.map(_.id),
+            observers = observers.map(_.id),
+            group = group,
+          )
+          .discard
+
+        mediators.foreach(
+          _.setup.assign(
+            domainId,
+            staticDomainParameters,
+            SequencerConnections.single(sequencerConnection),
+          )
+        )
+      }
+
+      @Help.Summary("Propose an update to a mediator group")
+      @Help.Description("""
+         group: the mediator group identifier
+         threshold: the minimum number of mediators that need to come to a consensus for a message to be sent to other members.
+         additionalActive: the new mediators that will take part in the mediator consensus in this mediator group
+         additionalObservers: the new mediators that will receive all messages but will not participate in mediator consensus
+         """)
+      def propose_delta(
+          group: NonNegativeInt,
+          threshold: PositiveInt,
+          additionalActive: Seq[MediatorReferenceX],
+          additionalObservers: Seq[MediatorReferenceX] = Nil,
+      ): Unit = {
+
+        val staticDomainParameters = domain_parameters.static.get()
+        val domainId = domain_id
+
+        val currentMediators = topology.mediators
+          .list(filterStore = domainId.filterString, group = Some(group))
+          .maxByOption(_.context.serial)
+          .getOrElse(throw new IllegalArgumentException(s"Unknown mediator group $group"))
+
+        val currentActive = currentMediators.item.active
+        val currentObservers = currentMediators.item.observers
+        val current = currentActive ++ currentObservers
+
+        val newMediators =
+          (additionalActive ++ additionalObservers).filterNot(m => current.contains(m.id))
+
+        newMediators.foreach { med =>
+          val identityState = med.topology.transactions.identity_transactions()
+
+          topology.transactions.load(identityState, domainId.filterString)
+        }
+
+        topology.mediators
+          .propose(
+            domainId = domainId,
+            threshold = threshold,
+            active = (currentActive ++ additionalActive.map(_.id)).distinct,
+            observers = (currentObservers ++ additionalObservers.map(_.id)).distinct,
+            group = group,
+          )
+          .discard
+
+        newMediators.foreach(
+          _.setup.assign(
+            domainId,
+            staticDomainParameters,
+            SequencerConnections.single(sequencerConnection),
+          )
+        )
+      }
+    }
+  }
+
+  @Help.Summary("Domain parameters related commands")
+  @Help.Group("Domain parameters")
+  object domain_parameters {
+    object static {
+      @Help.Summary("Return static domain parameters of the domain")
+      def get(): ConsoleStaticDomainParameters = {
+        staticDomainParameters.get() match {
+          case Some(parameters) => parameters
+          case None =>
+            val parameters = TraceContext.withNewTraceContext { implicit traceContext =>
+              Await
+                .result(
+                  grpcSequencerConnectClient.getDomainParameters(name).value,
+                  consoleEnvironment.commandTimeouts.bounded.duration,
+                )
+                .map(ConsoleStaticDomainParameters(_))
+                .valueOr(_ => throw new CommandFailure())
+            }
+
+            staticDomainParameters.set(Some(parameters))
+            parameters
+        }
+      }
+    }
+  }
+}
+
+trait LocalSequencerNodeReferenceCommon extends LocalInstanceReferenceCommon {
+  this: SequencerNodeReferenceCommon =>
+
+  def config: SequencerNodeConfigCommon
+
+  override lazy val sequencerConnection: GrpcSequencerConnection =
+    config.publicApi.toSequencerConnectionConfig.toConnection
+      .fold(err => sys.error(s"Sequencer $name has invalid connection config: $err"), identity)
+}
+
+class LocalSequencerNodeReferenceX(
+    override val consoleEnvironment: ConsoleEnvironment,
+    val name: String,
+) extends SequencerNodeReferenceX(consoleEnvironment, name)
+    with LocalSequencerNodeReferenceCommon
+    with LocalInstanceReferenceX
+    with BaseInspection[SequencerNodeX] {
+
+  override protected[canton] def executionContext: ExecutionContext =
+    consoleEnvironment.environment.executionContext
+
+  @Help.Summary("Returns the sequencerx configuration")
+  override def config: SequencerNodeConfigCommon =
+    consoleEnvironment.environment.config.sequencersByStringX(name)
+
+  val nodes: SequencerNodesX[?] =
+    consoleEnvironment.environment.sequencersX
+
+  override protected[console] def runningNode: Option[SequencerNodeBootstrapX] =
+    nodes.getRunning(name)
+
+  override protected[console] def startingNode: Option[SequencerNodeBootstrapX] =
+    nodes.getStarting(name)
+}
+
+trait RemoteSequencerNodeReferenceCommon
+    extends SequencerNodeReferenceCommon
+    with RemoteInstanceReference {
+  def environment: ConsoleEnvironment
+
+  @Help.Summary("Returns the remote sequencer configuration")
+  def config: RemoteSequencerConfig
+
+  override def sequencerConnection: GrpcSequencerConnection =
+    config.publicApi.toConnection
+      .fold(err => sys.error(s"Sequencer $name has invalid connection config: $err"), identity)
+
+  override def adminCommand[Result](
+      grpcCommand: GrpcAdminCommand[?, ?, Result]
+  ): ConsoleCommandResult[Result] =
+    config match {
+      case config: RemoteSequencerConfig.Grpc =>
+        consoleEnvironment.grpcAdminCommandRunner.runCommand(
+          name,
+          grpcCommand,
+          config.clientAdminApi,
+          None,
+        )
+    }
+}
+
+class RemoteSequencerNodeReferenceX(val environment: ConsoleEnvironment, val name: String)
+    extends SequencerNodeReferenceX(environment, name)
+    with RemoteSequencerNodeReferenceCommon {
+
+  override protected[canton] def executionContext: ExecutionContext =
+    consoleEnvironment.environment.executionContext
+
+  @Help.Summary("Returns the sequencerx configuration")
+  override def config: RemoteSequencerConfig =
+    environment.environment.config.remoteSequencersByStringX(name)
+}
+
+trait MediatorReferenceCommon extends InstanceReferenceCommon {
+
+  @Help.Summary(
+    "Yields the mediator id of this mediator. " +
+      "Throws an exception, if the id has not yet been allocated (e.g., the mediator has not yet been initialised)."
+  )
+  def id: MediatorId = topology.idHelper(MediatorId(_))
+
+  override type Status = MediatorNodeStatus
+
+}
+
+object MediatorReferenceX {
+  val InstanceType = "MediatorX"
+}
+
+abstract class MediatorReferenceX(val consoleEnvironment: ConsoleEnvironment, name: String)
+    extends MediatorReferenceCommon
+    with MediatorXAdministrationGroupWithInit
+    with InstanceReferenceX {
+
+  override protected def runner: AdminCommandRunner = this
+
+  override protected val instanceType: String = MediatorReferenceX.InstanceType
+  override protected val loggerFactory: NamedLoggerFactory =
+    consoleEnvironment.environment.loggerFactory
+      .append(MediatorNodeBootstrapX.LoggerFactoryKeyName, name)
+
+  @Help.Summary("Health and diagnostic related commands")
+  @Help.Group("Health")
+  override def health =
+    new HealthAdministrationX[MediatorNodeStatus](
+      this,
+      consoleEnvironment,
+      MediatorNodeStatus.fromProtoV0,
+    )
+
+  private lazy val topology_ =
+    new TopologyAdministrationGroupX(
+      this,
+      health.status.successOption.map(_.topologyQueue),
+      consoleEnvironment,
+      loggerFactory,
+    )
+
+  override def topology: TopologyAdministrationGroupX = topology_
+
+  private lazy val parties_ = new PartiesAdministrationGroupX(this, consoleEnvironment)
+
+  override def parties: PartiesAdministrationGroupX = parties_
+
+  override def equals(obj: Any): Boolean =
+    obj match {
+      case x: MediatorReferenceX => x.consoleEnvironment == consoleEnvironment && x.name == name
+      case _ => false
+    }
+}
+
+class LocalMediatorReferenceX(consoleEnvironment: ConsoleEnvironment, val name: String)
+    extends MediatorReferenceX(consoleEnvironment, name)
+    with LocalInstanceReferenceX
+    with SequencerConnectionAdministration
+    with BaseInspection[MediatorNodeX] {
+
+  override protected[canton] def executionContext: ExecutionContext =
+    consoleEnvironment.environment.executionContext
+
+  @Help.Summary("Returns the mediator-x configuration")
+  override def config: MediatorNodeConfigCommon =
+    consoleEnvironment.environment.config.mediatorsByStringX(name)
+
+  val nodes: MediatorNodesX[?] = consoleEnvironment.environment.mediatorsX
+
+  override protected[console] def runningNode: Option[MediatorNodeBootstrapX] =
+    nodes.getRunning(name)
+
+  override protected[console] def startingNode: Option[MediatorNodeBootstrapX] =
+    nodes.getStarting(name)
+}
+
+class RemoteMediatorReferenceX(val environment: ConsoleEnvironment, val name: String)
+    extends MediatorReferenceX(environment, name)
+    with GrpcRemoteInstanceReference {
+
+  @Help.Summary("Returns the remote mediator configuration")
+  def config: RemoteMediatorConfig =
+    environment.environment.config.remoteMediatorsByStringX(name)
+
+  override protected[canton] def executionContext: ExecutionContext =
+    consoleEnvironment.environment.executionContext
 }

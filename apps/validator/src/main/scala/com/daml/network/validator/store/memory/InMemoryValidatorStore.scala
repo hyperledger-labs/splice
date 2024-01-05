@@ -44,7 +44,7 @@ class InMemoryValidatorStore(
   )(implicit tc: TraceContext): Future[Option[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ]] = findOnlyContract(installCodegen.WalletAppInstall.COMPANION) {
-    payload: installCodegen.WalletAppInstall =>
+    (payload: installCodegen.WalletAppInstall) =>
       payload.endUserParty == endUserParty.toProtoPrimitive
   }
 
@@ -53,7 +53,7 @@ class InMemoryValidatorStore(
   )(implicit tc: TraceContext): Future[Option[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ]] = findOnlyContract(installCodegen.WalletAppInstall.COMPANION) {
-    payload: installCodegen.WalletAppInstall =>
+    (payload: installCodegen.WalletAppInstall) =>
       payload.endUserName == endUserName
   }
 
@@ -62,7 +62,7 @@ class InMemoryValidatorStore(
   ): Future[
     Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
   ] = findOnlyContract(coinCodegen.FeaturedAppRight.COMPANION) {
-    payload: coinCodegen.FeaturedAppRight =>
+    (payload: coinCodegen.FeaturedAppRight) =>
       payload.provider == walletKey.validatorParty.toProtoPrimitive
   }
 
@@ -85,7 +85,7 @@ class InMemoryValidatorStore(
   ] =
     multiDomainAcsStore.findContractWithOffset(
       validatorLicenseCodegen.ValidatorLicense.COMPANION
-    ) { vl: Contract[?, validatorLicenseCodegen.ValidatorLicense] =>
+    ) { (vl: Contract[?, validatorLicenseCodegen.ValidatorLicense]) =>
       vl.payload.validator == key.validatorParty.toProtoPrimitive
     } map clearDomainFromLookup
 

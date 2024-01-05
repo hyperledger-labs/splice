@@ -75,11 +75,12 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
   ): Assertion =
     loggerFactory.assertThrowsAndLogs[CommandFailure](
       within,
-      assertions.map(assertion => { (entry: LogEntry) =>
-        assertion(entry)
-        entry.commandFailureMessage
-        succeed
-      }): _*
+      assertions
+        .map(assertion => { (entry: LogEntry) =>
+          assertion(entry)
+          entry.commandFailureMessage
+          succeed
+        }) *,
     )
 
   /** Similar to [[com.digitalasset.canton.console.commands.ParticipantAdministration#ping]]

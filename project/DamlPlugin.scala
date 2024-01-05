@@ -33,7 +33,9 @@ object DamlPlugin extends AutoPlugin {
         "List of directory names used to sort the Daml building by order in this list"
       )
     val damlDarOutput = settingKey[File]("Directory to put generated DAR files in")
-    val damlScalaCodegenOutput =
+    val damlDarLfVersion =
+      settingKey[String]("Lf version for which to generate DAR files")
+    val damlScalaCodegenOutput = // TODO (#9170): remove
       settingKey[File]("Directory to put Scala sources generated from DARs")
     val damlJavaCodegenOutput =
       settingKey[File]("Directory to put Java sources generated from DARs")
@@ -76,6 +78,7 @@ object DamlPlugin extends AutoPlugin {
       resourceGenerators += damlBuild.taskValue,
       damlSourceDirectory := baseDirectory.value,
       damlDarOutput := damlSourceDirectory.value.getAbsoluteFile / ".daml" / "dist",
+      damlDarLfVersion := "",
       damlDependencies := Seq(),
       damlScalaCodegenOutput := sourceManaged.value / "daml-codegen-scala",
       damlJavaCodegenOutput := sourceManaged.value / "daml-codegen-java",
@@ -125,6 +128,7 @@ object DamlPlugin extends AutoPlugin {
       damlBuild := {
         val dependencies = damlDependencies.value
         val outputDirectory = damlDarOutput.value
+        val outputLfVersion = damlDarLfVersion.value
         val sourceDirectory = damlSourceDirectory.value
         // we don't really know dependencies between daml files, so just assume if any change then we need to rebuild all packages
         val cacheDir = streams.value.cacheDirectory
@@ -166,6 +170,7 @@ object DamlPlugin extends AutoPlugin {
                   log,
                   sourceDirectory,
                   outputDirectory,
+                  outputLfVersion,
                   sourceDirectory.toPath.relativize(projectFile.toPath).toFile,
                   damlCompilerVersion.value,
                   damlLanguageVersions.value,
@@ -376,15 +381,15 @@ object DamlPlugin extends AutoPlugin {
       log: Logger,
   ) = {
     // so far canton system dars depend on daml-script, but maybe daml-triggers or others some day?
-    val damlLibsDependencyTypes = Seq("daml-script")
-    val damlLibsDependencyVersions = damlLanguageVersions.foldLeft(Seq(""))(_ :+ "-" + _)
+    val damlLibsDependencyTypes = Seq("daml-script" -> "daml3-script")
+    val damlLibsDependencyVersions = damlLanguageVersions.foldLeft(Seq.empty[String])(_ :+ "-" + _)
     (for {
-      depType <- damlLibsDependencyTypes
+      (depType, depName) <- damlLibsDependencyTypes
       depVersion <- damlLibsDependencyVersions
     } yield {
       ensureArtifactAvailable(
         url = artifactoryUrl(damlVersion) + s"${depType}/",
-        artifactFilename = s"${depType}${depVersion}.dar",
+        artifactFilename = s"${depName}${depVersion}.dar",
         damlVersion = damlVersion,
         localSubdir = Some("daml-libs"),
         log = log,
@@ -396,6 +401,7 @@ object DamlPlugin extends AutoPlugin {
       log: Logger,
       sourceDirectory: File,
       outputDirectory: File,
+      outputLfVersion: String,
       relativeDamlProjectFile: File,
       damlVersion: String,
       damlLanguageVersions: Seq[String],
@@ -422,10 +428,16 @@ object DamlPlugin extends AutoPlugin {
     val outputDar =
       outputDirectory / s"$damlProjectName-$damlProjectVersion.dar"
 
+    val damlcCommand = damlc.getAbsolutePath :: "build" ::
+      "--project-root" :: projectDirectory.toString ::
+      "--output" :: outputDar.getAbsolutePath :: Nil
+    val command =
+      // if the damlDarLfVersion is not set the daml.yaml is expected to contain the target lf-version in the build-options
+      if (outputLfVersion.isEmpty) damlcCommand
+      else damlcCommand ::: ("--target" :: outputLfVersion :: Nil)
+
     val result = BuildUtil.runCommand(
-      damlc.getAbsolutePath :: "build" ::
-        "--project-root" :: projectDirectory.toString ::
-        "--output" :: outputDar.getAbsolutePath :: Nil,
+      command,
       log,
       optCwd = Some(projectDirectory),
       extraEnv = damlLibsEnv, // env variable set so that damlc finds daml-script dar

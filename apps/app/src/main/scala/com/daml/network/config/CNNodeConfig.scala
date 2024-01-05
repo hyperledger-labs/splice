@@ -55,6 +55,11 @@ import scala.util.control.NoStackTrace
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.domain.mediator.{CommunityMediatorNodeXConfig, RemoteMediatorConfig}
+import com.digitalasset.canton.domain.sequencing.config.{
+  CommunitySequencerNodeXConfig,
+  RemoteSequencerConfig,
+}
 
 case class CNNodeConfig(
     override val name: Option[String] = None,
@@ -275,6 +280,20 @@ case class CNNodeConfig(
   override def withDefaults(ports: DefaultPorts): CNNodeConfig =
     this // TODO(#736): CantonCommunityConfig does more here. Do we want to copy that?
   // NOTE(Simon): in particular it handles default ports derived from the ports object introduced in https://github.com/DACH-NY/canton/commit/ccff59fccf349893cc68413a7859e8ef748a94fa
+
+  // TODO(#736): we want to remove these mediator configs
+
+  override type MediatorNodeXConfigType = CommunityMediatorNodeXConfig
+
+  override def mediatorsX: Map[InstanceName, MediatorNodeXConfigType] = Map.empty
+
+  override def remoteMediatorsX: Map[InstanceName, RemoteMediatorConfig] = Map.empty
+
+  override type SequencerNodeXConfigType = CommunitySequencerNodeXConfig
+
+  override def sequencersX: Map[InstanceName, SequencerNodeXConfigType] = Map.empty
+
+  override def remoteSequencersX: Map[InstanceName, RemoteSequencerConfig] = Map.empty
 }
 
 // NOTE: the below is patterned after CantonCommunityConfig.
@@ -286,7 +305,7 @@ object CNNodeConfig {
     override def description: String = s"Config validation failed: $reason"
   }
 
-  lazy val empty = CNNodeConfig()
+  lazy val empty: CNNodeConfig = CNNodeConfig()
 
   private val logger: Logger = LoggerFactory.getLogger(classOf[CNNodeConfig])
   private[config] val elc = ErrorLoggingContext(
@@ -310,7 +329,8 @@ object CNNodeConfig {
     implicit val nonNegativeBigDecimalReader: ConfigReader[NonNegativeNumeric[BigDecimal]] =
       NonNegativeNumeric.nonNegativeNumericReader[BigDecimal]
 
-    implicit val authConfigHint = new FieldCoproductHint[AuthConfig]("algorithm")
+    implicit val authConfigHint: FieldCoproductHint[AuthConfig] =
+      new FieldCoproductHint[AuthConfig]("algorithm")
 
     implicit val hs256UnsafeConfig: ConfigReader[AuthConfig.Hs256Unsafe] =
       deriveReader[AuthConfig.Hs256Unsafe]
@@ -354,7 +374,7 @@ object CNNodeConfig {
       deriveReader[CNParticipantClientConfig]
     implicit val appInstanceReader: ConfigReader[AppInstance] =
       deriveReader[AppInstance]
-    implicit val scanClientConfigConfigHint =
+    implicit val scanClientConfigConfigHint: FieldCoproductHint[ScanClientValidatorConfig] =
       new FieldCoproductHint[ScanClientValidatorConfig]("type")
     implicit val scanClientConfigTrustSingleConfigReader
         : ConfigReader[ScanClientValidatorConfig.TrustSingle] =
@@ -373,7 +393,8 @@ object CNNodeConfig {
     implicit val svClientConfigReader: ConfigReader[SvAppClientConfig] =
       deriveReader[SvAppClientConfig]
 
-    implicit val gcpCredentialsConfigHint = new FieldCoproductHint[GcpCredentialsConfig]("type")
+    implicit val gcpCredentialsConfigHint: FieldCoproductHint[GcpCredentialsConfig] =
+      new FieldCoproductHint[GcpCredentialsConfig]("type")
     implicit val userCredentialsConfigReader: ConfigReader[GcpCredentialsConfig.User] =
       deriveReader[GcpCredentialsConfig.User]
     implicit val serviceAccountCredentialsConfigReader
@@ -382,7 +403,8 @@ object CNNodeConfig {
     implicit val gcpCredentialsConfigReader: ConfigReader[GcpCredentialsConfig] =
       deriveReader[GcpCredentialsConfig]
     implicit val gcpBucketConfig: ConfigReader[GcpBucketConfig] = deriveReader[GcpBucketConfig]
-    implicit val participantBootstrapDumpConfigHint =
+    implicit val participantBootstrapDumpConfigHint
+        : FieldCoproductHint[ParticipantBootstrapDumpConfig] =
       new FieldCoproductHint[ParticipantBootstrapDumpConfig]("type")
     implicit val participantBootstrapDumpConfigFileReader
         : ConfigReader[ParticipantBootstrapDumpConfig.File] =
@@ -390,14 +412,16 @@ object CNNodeConfig {
     implicit val participantBootstrapDumpConfigReader
         : ConfigReader[ParticipantBootstrapDumpConfig] =
       deriveReader[ParticipantBootstrapDumpConfig]
-    implicit val svBootstrapDumpConfigHint = new FieldCoproductHint[SvBootstrapDumpConfig]("type")
+    implicit val svBootstrapDumpConfigHint: FieldCoproductHint[SvBootstrapDumpConfig] =
+      new FieldCoproductHint[SvBootstrapDumpConfig]("type")
     implicit val svBootstrapDumpConfigFileReader: ConfigReader[SvBootstrapDumpConfig.File] =
       deriveReader[SvBootstrapDumpConfig.File]
     implicit val svBootstrapDumpConfigGcpReader: ConfigReader[SvBootstrapDumpConfig.Gcp] =
       deriveReader[SvBootstrapDumpConfig.Gcp]
     implicit val svBootstrapDumpConfigReader: ConfigReader[SvBootstrapDumpConfig] =
       deriveReader[SvBootstrapDumpConfig]
-    implicit val svOnboardingConfigHint = new FieldCoproductHint[SvOnboardingConfig]("type")
+    implicit val svOnboardingConfigHint: FieldCoproductHint[SvOnboardingConfig] =
+      new FieldCoproductHint[SvOnboardingConfig]("type")
     implicit val initialCnsConfigReader: ConfigReader[InitialCnsConfig] =
       deriveReader[InitialCnsConfig]
     implicit val trafficControlConfigReader: ConfigReader[TrafficControlConfig] =
@@ -427,7 +451,8 @@ object CNNodeConfig {
       deriveReader[SvGlobalDomainConfig]
     implicit val svDomainConfigReader: ConfigReader[SvDomainConfig] =
       deriveReader[SvDomainConfig]
-    implicit val backupDumpConfigHint = new FieldCoproductHint[BackupDumpConfig]("type")
+    implicit val backupDumpConfigHint: FieldCoproductHint[BackupDumpConfig] =
+      new FieldCoproductHint[BackupDumpConfig]("type")
     implicit val backupDumpConfigDirectoryReader: ConfigReader[BackupDumpConfig.Directory] =
       deriveReader[BackupDumpConfig.Directory]
     implicit val backupDumpConfigGcpReader: ConfigReader[BackupDumpConfig.Gcp] =
@@ -521,7 +546,7 @@ object CNNodeConfig {
     implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =
       deriveReader[CommunityParticipantConfig].applyDeprecations
 
-    implicit val cnNodeConfigReader = deriveReader[CNNodeConfig]
+    implicit val cnNodeConfigReader: ConfigReader[CNNodeConfig] = deriveReader[CNNodeConfig]
   }
 
   @nowarn("cat=unused")
@@ -539,7 +564,8 @@ object CNNodeConfig {
     // Also consider revisiting if the "leaked secrets check" in
     // `.circleci/canton-scripts/check-logs.sh` catches the new type of secret.
 
-    implicit val authConfigHint = new FieldCoproductHint[AuthConfig]("algorithm")
+    implicit val authConfigHint: FieldCoproductHint[AuthConfig] =
+      new FieldCoproductHint[AuthConfig]("algorithm")
 
     implicit val hs256UnsafeConfig: ConfigWriter[AuthConfig.Hs256Unsafe] =
       deriveWriter[AuthConfig.Hs256Unsafe]
@@ -585,7 +611,7 @@ object CNNodeConfig {
       deriveWriter[CNParticipantClientConfig]
     implicit val appInstanceWriter: ConfigWriter[AppInstance] =
       deriveWriter[AppInstance]
-    implicit val scanClientConfigConfigHint =
+    implicit val scanClientConfigConfigHint: FieldCoproductHint[ScanClientValidatorConfig] =
       new FieldCoproductHint[ScanClientValidatorConfig]("type")
     implicit val scanClientConfigTrustSingleConfigWriter
         : ConfigWriter[ScanClientValidatorConfig.TrustSingle] =
@@ -602,7 +628,8 @@ object CNNodeConfig {
     implicit val svClientConfigWriter: ConfigWriter[SvAppClientConfig] =
       deriveWriter[SvAppClientConfig]
 
-    implicit val gcpCredentialsConfigHint = new FieldCoproductHint[GcpCredentialsConfig]("type")
+    implicit val gcpCredentialsConfigHint: FieldCoproductHint[GcpCredentialsConfig] =
+      new FieldCoproductHint[GcpCredentialsConfig]("type")
     implicit val userCredentialsConfigWriter: ConfigWriter[GcpCredentialsConfig.User] =
       deriveWriter[GcpCredentialsConfig.User]
     implicit val serviceAccountCredentialsConfigWriter
@@ -611,7 +638,8 @@ object CNNodeConfig {
     implicit val gcpCredentialsConfigWriter: ConfigWriter[GcpCredentialsConfig] =
       confidentialWriter[GcpCredentialsConfig](GcpCredentialsConfig.hideConfidential)
     implicit val gcpBucketConfig: ConfigWriter[GcpBucketConfig] = deriveWriter[GcpBucketConfig]
-    implicit val participantBootstrapDumpConfigHint =
+    implicit val participantBootstrapDumpConfigHint
+        : FieldCoproductHint[ParticipantBootstrapDumpConfig] =
       new FieldCoproductHint[ParticipantBootstrapDumpConfig]("type")
     implicit val participantBootstrapDumpConfigFileWriter
         : ConfigWriter[ParticipantBootstrapDumpConfig.File] =
@@ -619,7 +647,8 @@ object CNNodeConfig {
     implicit val participantBootstrapDumpConfigWriter
         : ConfigWriter[ParticipantBootstrapDumpConfig] =
       deriveWriter[ParticipantBootstrapDumpConfig]
-    implicit val svBootstrapDumpConfigHint = new FieldCoproductHint[SvBootstrapDumpConfig]("type")
+    implicit val svBootstrapDumpConfigHint: FieldCoproductHint[SvBootstrapDumpConfig] =
+      new FieldCoproductHint[SvBootstrapDumpConfig]("type")
     implicit val svBootstrapDumpConfigFileWriter: ConfigWriter[SvBootstrapDumpConfig.File] =
       deriveWriter[SvBootstrapDumpConfig.File]
     implicit val svBootstrapDumpConfigGcpWriter: ConfigWriter[SvBootstrapDumpConfig.Gcp] =
@@ -660,7 +689,8 @@ object CNNodeConfig {
       deriveWriter[SvGlobalDomainConfig]
     implicit val svDomainConfigWriter: ConfigWriter[SvDomainConfig] =
       deriveWriter[SvDomainConfig]
-    implicit val backupDumpConfigHint = new FieldCoproductHint[BackupDumpConfig]("type")
+    implicit val backupDumpConfigHint: FieldCoproductHint[BackupDumpConfig] =
+      new FieldCoproductHint[BackupDumpConfig]("type")
     implicit val backupDumpConfigDirectoryWriter: ConfigWriter[BackupDumpConfig.Directory] =
       deriveWriter[BackupDumpConfig.Directory]
     implicit val backupDumpConfigGcpWriter: ConfigWriter[BackupDumpConfig.Gcp] =
@@ -759,7 +789,7 @@ object CNNodeConfig {
       .valueOr(error => throw CNNodeConfigException(error))
   }
 
-  lazy val defaultConfigRenderer =
+  lazy val defaultConfigRenderer: ConfigRenderOptions =
     ConfigRenderOptions.defaults().setOriginComments(false).setComments(false).setJson(false)
 
   // Used in scripts/transform-config.sc when spinning up nodes for UI development

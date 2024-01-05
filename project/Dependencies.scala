@@ -3,9 +3,9 @@ import sbt.*
 object Dependencies {
   private final val CD = CantonDependencies
 
-  lazy val scala_version = "2.13.10"
+  lazy val scala_version = "2.13.11"
 
-  lazy val scalatest_version = "3.2.9"
+  lazy val scalatest_version = "3.2.11"
 
   lazy val scalatest = "org.scalatest" %% "scalatest" % scalatest_version
 
@@ -21,12 +21,6 @@ object Dependencies {
   lazy val scalapb_runtime_grpc =
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
 
-  lazy val daml_ledger_api_scalapb =
-    "com.daml" %% "ledger-api-scalapb" % ledgerApiVersion
-
-  lazy val daml_ledger_api_proto =
-    "com.daml" % "ledger-api-proto" % ledgerApiVersion
-
   lazy val auth0 = "com.auth0" % "auth0" % "1.44.1"
 
   lazy val java_jwt =
@@ -37,9 +31,6 @@ object Dependencies {
 
   lazy val daml_lf_archive_reader =
     "com.daml" %% "daml-lf-archive-reader" % CantonDependencies.daml_libraries_version
-
-  lazy val daml_bindings_java =
-    "com.daml" % "bindings-java" % CantonDependencies.daml_java_codegen_version
 
   lazy val daml_lf_validation =
     "com.daml" %% "daml-lf-validation" % CantonDependencies.daml_libraries_version

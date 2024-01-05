@@ -1,11 +1,11 @@
 // Linting plugins
-addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.4.20")
-addSbtPlugin("org.wartremover" % "sbt-wartremover-contrib" % "2.0.1")
+addSbtPlugin("org.wartremover" % "sbt-wartremover" % "3.1.4")
+addSbtPlugin("org.wartremover" % "sbt-wartremover-contrib" % "2.1.0")
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.6")
-addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.10.3")
+addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.11.1")
 
 addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.6")
-libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.11.13"
+libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.11.14"
 
 addSbtPlugin("com.eed3si9n" %% "sbt-buildinfo" % "0.9.0")
 

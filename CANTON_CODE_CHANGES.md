@@ -22,6 +22,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * `AdminCommandRunner.adminCommand` made public
 * `DynamicDomainParameters` made public
 * `nonNegativeFiniteDurationWriter` made public
+* `CantonConfig.sequencerNodeParametersByStringX` made public
 ## Misc
 * Generalization of `Environment`
 * Generalization of `MetricsFactory`

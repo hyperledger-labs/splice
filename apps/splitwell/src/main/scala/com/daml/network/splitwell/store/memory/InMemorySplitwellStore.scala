@@ -48,7 +48,7 @@ class InMemorySplitwellStore(
       .filterContractsOnDomain(
         splitwellCodegen.SplitwellInstall.COMPANION,
         preferredId,
-        { co: Contract[?, splitwellCodegen.SplitwellInstall] =>
+        { (co: Contract[?, splitwellCodegen.SplitwellInstall]) =>
           allGroupMembers(co.payload.user)
         },
       )

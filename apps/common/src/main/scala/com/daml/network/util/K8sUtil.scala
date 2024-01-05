@@ -74,7 +74,9 @@ object K8sUtil {
     }
 
     private object TokenDataJsonProtocol extends DefaultJsonProtocol {
-      implicit val tokenFormat = jsonFormat2(Auth0PreflightTokenData)
+      implicit val tokenFormat: RootJsonFormat[Auth0PreflightTokenData] = jsonFormat2(
+        Auth0PreflightTokenData
+      )
     }
     import TokenDataJsonProtocol.*
 

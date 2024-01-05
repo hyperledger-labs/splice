@@ -201,12 +201,12 @@ private[apiserver] final class StoreBackedCommandExecutor(
         // authorize the resulting transaction.
         val commitAuthorizers = commands.actAs
         engine.submit(
-          commitAuthorizers,
-          commands.readAs,
-          commands.commands,
-          commands.disclosedContracts.map(_.toLf),
-          participant,
-          submissionSeed,
+          submitters = commitAuthorizers,
+          readAs = commands.readAs,
+          cmds = commands.commands,
+          disclosures = commands.disclosedContracts.map(_.toLf),
+          participantId = participant,
+          submissionSeed = submissionSeed,
         )
       }),
     )
@@ -548,7 +548,7 @@ private[apiserver] final class StoreBackedCommandExecutor(
                 Versioned(
                   unusedTxVersion,
                   GlobalKeyWithMaintainers
-                    .assertBuild(disclosedContract.templateId, value, maintainers),
+                    .assertBuild(disclosedContract.templateId, value, maintainers, shared = true),
                 )
             },
         ),
