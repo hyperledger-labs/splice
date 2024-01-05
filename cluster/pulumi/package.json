@@ -22,10 +22,7 @@
         "@pulumi/kubernetes": "4.5.4",
         "js-yaml": "^4.1.0",
         "lodash": "^4.17.21",
-        "node-fetch": "^2.6.1",
-        "@types/auth0": "^3.3.2",
-        "auth0": "^3.4.0",
-        "@pulumi/auth0": "^3.1.0"
+        "node-fetch": "^2.6.1"
     },
     "scripts": {
         "fix": "npm run fix --workspaces --if-present",
