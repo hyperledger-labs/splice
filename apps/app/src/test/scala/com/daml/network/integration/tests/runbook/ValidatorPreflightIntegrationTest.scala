@@ -420,8 +420,7 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
   override protected val includeSplitwellTests = false
 
   // TODO(tech-debt): consider de-hardcoding this
-  override protected val validatorWalletUser =
-    "auth0|6526fab5214c99a9a8e1e3cc"
+  override protected val validatorWalletUser = "auth0|6526fab5214c99a9a8e1e3cc"
 }
 
 class Validator1PreflightIntegrationTest extends ValidatorPreflightIntegrationTestBase {
@@ -434,6 +433,5 @@ class Validator1PreflightIntegrationTest extends ValidatorPreflightIntegrationTe
   override protected val validatorAuth0Audience = "https://canton.network.global"
 
   // TODO(tech-debt): consider de-hardcoding this
-  override protected val validatorWalletUser =
-    "auth0|63e3d75ff4114d87a2c1e4f5"
+  override protected val validatorWalletUser = "auth0|63e3d75ff4114d87a2c1e4f5"
 }
