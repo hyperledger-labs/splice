@@ -36,3 +36,9 @@ export interface Auth0Client {
   ) => Promise<string>;
   getCfg: () => Auth0Config;
 }
+
+export type Auth0ClusterConfig = {
+  cantonNetwork: Auth0Config;
+  svRunbook: Auth0Config;
+  validatorRunbook: Auth0Config;
+};

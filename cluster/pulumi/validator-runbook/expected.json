@@ -13,10 +13,10 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "audience": "https://ledger_api.example.com",
-          "client-id": "cznBUeB70fnpfjaq9TzblwiwjkVyvh5z",
+          "client-id": "validator-client-id",
           "client-secret": "***",
-          "ledger-api-user": "cznBUeB70fnpfjaq9TzblwiwjkVyvh5z@clients",
-          "url": "https://canton-network-validator-test.us.auth0.com/.well-known/openid-configuration"
+          "ledger-api-user": "validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
         }
       }
     },
@@ -37,8 +37,8 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "jSDSTJu00KQNwYw7XLhJfHYxgDotDXrr",
-          "url": "https://canton-network-validator-test.us.auth0.com"
+          "client-id": "cns-client-id",
+          "url": "https://auth0Domain"
         }
       }
     },
@@ -59,8 +59,8 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "6wB6EGLJBEwaA1CfVYhRmsQG9OPcmJtj",
-          "url": "https://canton-network-validator-test.us.auth0.com"
+          "client-id": "wallet-client-id",
+          "url": "https://auth0Domain"
         }
       }
     },
@@ -156,7 +156,7 @@
       "timeout": 480,
       "values": {
         "auth": {
-          "jwksUrl": "https://canton-network-validator-test.us.auth0.com/.well-known/jwks.json",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://ledger_api.example.com"
         },
         "disableAutoInit": false,
@@ -239,7 +239,7 @@
       "values": {
         "auth": {
           "audience": "https://validator.example.com/api",
-          "jwksUrl": "https://canton-network-validator-test.us.auth0.com/.well-known/jwks.json",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "validatorrun.network.com.network.canton.global",

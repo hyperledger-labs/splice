@@ -27,6 +27,13 @@ export function initDumpConfig(): void {
   pulumi.runtime.setConfig('test-project:VERSION_NUMBER', '0.0.1');
   pulumi.runtime.setConfig('test-project:IMAGE_TAG', '0.0.1-deadbeef');
 
+  process.env.AUTH0_CN_MANAGEMENT_API_CLIENT_ID = 'mgmt';
+  process.env.AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
+  process.env.AUTH0_SV_MANAGEMENT_API_CLIENT_ID = 'mgmt';
+  process.env.AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
+  process.env.AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID = 'mgmt';
+  process.env.AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
+
   // StackReferences cannot be mocked in tests currently
   // (see https://github.com/pulumi/pulumi/issues/9212)
   sinon

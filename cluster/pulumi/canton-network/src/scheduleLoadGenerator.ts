@@ -1,4 +1,5 @@
 import {
+  Auth0Client,
   CLUSTER_BASENAME,
   envFlag,
   exactNamespace,
@@ -7,9 +8,7 @@ import {
   requireEnv,
 } from 'cn-pulumi-common';
 
-import { auth0Cfg } from './auth0cfg';
-
-export function scheduleLoadGenerator(): void {
+export function scheduleLoadGenerator(auth0Client: Auth0Client): void {
   if (envFlag('K6_ENABLE_LOAD_GENERATOR')) {
     const xns = exactNamespace('load-tester', true);
 
@@ -33,11 +32,8 @@ export function scheduleLoadGenerator(): void {
     // trigger the job once every hour, starting 10 mins from now
     const schedule = `${minute} * * * *`;
 
-    const oauthDomain = `https://${auth0Cfg.auth0Domain}`;
-    const oauthClientId = auth0Cfg.namespaceToUiToClientId?.validator1?.wallet;
-    if (!oauthClientId) {
-      throw new Error('Missing wallet UI ClientId for validator1');
-    }
+    const oauthDomain = `https://${auth0Client.getCfg().auth0Domain}`;
+    const oauthClientId = auth0Client.getCfg().namespaceToUiToClientId?.validator1?.wallet;
     const usersPassword = requireEnv('K6_USERS_PASSWORD');
 
     // use internal cluster hostnames for the prometheus endpoint

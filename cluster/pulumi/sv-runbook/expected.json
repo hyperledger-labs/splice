@@ -13,10 +13,10 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "audience": "https://ledger_api.example.com",
-          "client-id": "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn",
+          "client-id": "sv-client-id",
           "client-secret": "***",
-          "ledger-api-user": "bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn@clients",
-          "url": "https://canton-network-sv-test.us.auth0.com/.well-known/openid-configuration"
+          "ledger-api-user": "sv-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
         }
       }
     },
@@ -38,10 +38,10 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "audience": "https://ledger_api.example.com",
-          "client-id": "uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr",
+          "client-id": "validator-client-id",
           "client-secret": "***",
-          "ledger-api-user": "uxeQGIBKueNDmugVs1RlMWEUZhZqyLyr@clients",
-          "url": "https://canton-network-sv-test.us.auth0.com/.well-known/openid-configuration"
+          "ledger-api-user": "validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
         }
       }
     },
@@ -62,8 +62,8 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "iwZgud30aDMMUYpZc5caSnjNATWwITzp",
-          "url": "https://canton-network-sv-test.us.auth0.com"
+          "client-id": "cns-client-id",
+          "url": "https://auth0Domain"
         }
       }
     },
@@ -84,8 +84,8 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "8S8o4U6OYWWuw5vPCIpFQGzzWM2IpHkx",
-          "url": "https://canton-network-sv-test.us.auth0.com"
+          "client-id": "sv-client-id",
+          "url": "https://auth0Domain"
         }
       }
     },
@@ -106,8 +106,8 @@
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "l9MS11POtbvPaVvgzns3Tdj9IDnosLwl",
-          "url": "https://canton-network-sv-test.us.auth0.com"
+          "client-id": "wallet-client-id",
+          "url": "https://auth0Domain"
         }
       }
     },
@@ -287,7 +287,7 @@
       "timeout": 480,
       "values": {
         "auth": {
-          "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "targetAudience": "https://ledger_api.example.com"
         },
         "disableAutoInit": false,
@@ -406,7 +406,7 @@
         ],
         "auth": {
           "audience": "https://sv.example.com/api",
-          "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "cometBFT": {
           "connectionUri": "http://cometbft-cometbft-rpc:26657",
@@ -472,7 +472,7 @@
       "values": {
         "auth": {
           "audience": "https://validator.example.com/api",
-          "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "svrun.network.com.network.canton.global",

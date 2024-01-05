@@ -34,7 +34,6 @@ import {
   sequencerPruningConfig,
 } from 'cn-pulumi-common';
 
-import { auth0Cfg } from './auth0cfg';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installGlobalDomainNode } from './globalDomain';
 import { CLUSTER_BASENAME, localCharts, TARGET_CLUSTER, version } from './utils';
@@ -198,7 +197,7 @@ async function installSvAndValidator(config: SvConfig) {
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
-      OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+      OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
     }),
     disableAutoInit: !!participantBootstrapDumpSecret,
   };
@@ -207,11 +206,11 @@ async function installSvAndValidator(config: SvConfig) {
     ...participantValues,
     auth: {
       ...participantValues.auth,
-      targetAudience: auth0Cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+      targetAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },
   };
 
-  const svNameSpaceAuth0Clients = auth0Cfg.namespaceToUiToClientId['sv'];
+  const svNameSpaceAuth0Clients = auth0Client.getCfg().namespaceToUiToClientId['sv'];
   if (!svNameSpaceAuth0Clients) {
     throw new Error('No SV namespace in auth0 config');
   }
@@ -263,7 +262,7 @@ async function installSvAndValidator(config: SvConfig) {
     {
       TARGET_CLUSTER: TARGET_CLUSTER,
       YOUR_SV_NAME: onboardingName,
-      OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+      OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
     }
   );
@@ -288,7 +287,7 @@ async function installSvAndValidator(config: SvConfig) {
     ...svValues,
     auth: {
       ...svValues.auth,
-      audience: auth0Cfg.appToApiAudience['sv'] || DEFAULT_AUDIENCE,
+      audience: auth0Client.getCfg().appToApiAudience['sv'] || DEFAULT_AUDIENCE,
     },
   };
 
@@ -351,7 +350,7 @@ async function installSvAndValidator(config: SvConfig) {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
       OPERATOR_WALLET_USER_ID: validatorWalletUserName,
-      OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+      OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
     }),
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),
     participantIdentitiesDumpPeriodicBackup: backupConfig,
@@ -361,8 +360,8 @@ async function installSvAndValidator(config: SvConfig) {
     ...validatorValues,
     auth: {
       ...validatorValues.auth,
-      audience: auth0Cfg.appToApiAudience['validator'] || DEFAULT_AUDIENCE,
-      ledgerApiAudience: auth0Cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+      audience: auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
+      ledgerApiAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },
   };
 

@@ -26,7 +26,6 @@ import {
   installPostgresPasswordSecret,
 } from 'cn-pulumi-common';
 
-import { auth0Cfg } from './auth0cfg';
 import {
   CLUSTER_BASENAME,
   VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
@@ -163,7 +162,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
-      OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+      OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
     }),
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
@@ -176,7 +175,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     ...participantValues,
     auth: {
       ...participantValues.auth,
-      targetAudience: auth0Cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+      targetAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },
   };
 
@@ -196,7 +195,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     },
   };
 
-  const validatorNameSpaceAuth0Clients = auth0Cfg.namespaceToUiToClientId['validator'];
+  const validatorNameSpaceAuth0Clients = auth0Client.getCfg().namespaceToUiToClientId['validator'];
   if (!validatorNameSpaceAuth0Clients) {
     throw new Error('No validator namespace in auth0 config');
   }
@@ -215,7 +214,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
       OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
-      OIDC_AUTHORITY_URL: auth0Cfg.auth0Domain,
+      OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
     }),
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
@@ -230,8 +229,8 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     ...validatorValues,
     auth: {
       ...validatorValues.auth,
-      audience: auth0Cfg.appToApiAudience['validator'] || DEFAULT_AUDIENCE,
-      ledgerApiAudience: auth0Cfg.appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+      audience: auth0Client.getCfg().appToApiAudience['validator'] || DEFAULT_AUDIENCE,
+      ledgerApiAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
     },
   };
 
@@ -249,7 +248,6 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
   if (!cnsUiClientId) {
     throw new Error('No validator ui client id in auth0 config');
   }
-
   const dependsOn = imagePullDeps
     .concat([participant])
     .concat([validatorAppSecret, validatorUISecret])
