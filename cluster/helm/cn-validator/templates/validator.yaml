@@ -25,7 +25,7 @@ spec:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
         - name: CN_APP_VALIDATOR_PARTICIPANT_ADDRESS
-          value: {{ .Values.participantAddress | default "participant" | quote }}
+          value: {{ .Values.participantAddress | quote }}
         {{ if .Values.appDars -}}
         - name: CN_APP_DARS
           value: {{ .Values.appDars | toJson | quote }}

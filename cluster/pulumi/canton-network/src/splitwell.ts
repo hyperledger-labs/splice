@@ -7,11 +7,15 @@ import {
   installCNHelmChart,
   CLUSTER_BASENAME,
   ValidatorTopupConfig,
+  ExactNamespace,
+  sanitizedForPostgres,
 } from 'cn-pulumi-common';
 import type { Auth0Client, BackupConfig, BootstrappingDumpConfig } from 'cn-pulumi-common';
+import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
-import { installDomain, installParticipant } from './ledger';
+import { installParticipant } from './ledger';
+import { initDatabase, Postgres } from './postgres';
 import { installValidatorApp } from './validator';
 
 export async function installSplitwell(
@@ -95,6 +99,7 @@ export async function installSplitwell(
     svSponsorAddress: 'http://sv-app.sv-1:5014',
     auth0AppName: 'splitwell_validator',
     participantBootstrapDump,
+    participantAddress: 'participant',
     topupConfig: topupConfig,
     svValidator: false,
     persistenceConfig: {
@@ -106,4 +111,32 @@ export async function installSplitwell(
       port: pulumi.Output.create(5432),
     },
   });
+}
+
+function installDomain(xns: ExactNamespace, name: string, postgres: Postgres): pulumi.Resource {
+  const sanitizedName = sanitizedForPostgres(name);
+
+  const mediatorDbName = `${sanitizedName}_mediator`;
+  const mediatorDb = postgres.createDatabaseAndInstallMetrics(mediatorDbName);
+
+  const sequencerDbName = `${sanitizedName}_sequencer`;
+  const sequencerDb = postgres.createDatabaseAndInstallMetrics(sequencerDbName);
+
+  const initDb = initDatabase();
+
+  return installCNHelmChart(
+    xns,
+    name,
+    'cn-domain',
+    {
+      postgres: postgres.address,
+      postgresMediatorDb: mediatorDbName,
+      postgresSequencerDb: sequencerDbName,
+      additionalJvmOptions: jmxOptions(),
+      init: initDb && { initDb },
+    },
+    {
+      dependsOn: [mediatorDb, sequencerDb],
+    }
+  );
 }

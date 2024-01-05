@@ -1,34 +1,39 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import type { Auth0Client, CnInput, SvIdKey } from 'cn-pulumi-common';
 import {
   auth0UserNameEnvVarSource,
-  btoa,
   BackupConfig,
   BootstrappingDumpConfig,
-  ValidatorTopupConfig,
+  btoa,
   ChartValues,
   CLUSTER_BASENAME,
   ExactNamespace,
   exactNamespace,
+  ExpectedValidatorOnboarding,
   fetchAndInstallParticipantBootstrapDump,
   getLatestSvcAcsDumpFile,
   installAuth0Secret,
   installAuth0UISecret,
-  installCNHelmChart,
   installBootstrapDataBucketSecret,
-  participantBootstrapDumpSecretName,
-  ExpectedValidatorOnboarding,
-  validatorOnboardingSecretName,
+  installCNHelmChart,
   installValidatorOnboardingSecret,
+  participantBootstrapDumpSecretName,
   PersistenceConfig,
+  validatorOnboardingSecretName,
+  ValidatorTopupConfig,
 } from 'cn-pulumi-common';
-import type { Auth0Client, CnInput, SvIdKey } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
-import { GlobalDomainUpgradeConfig, installGlobalDomain } from './globalDomainNode';
+import {
+  DomainIndex,
+  GlobalDomainUpgradeConfig,
+  installDomainSpecificComponent,
+  installGlobalDomain,
+} from './globalDomainNode';
 import { installParticipant } from './ledger';
-import { initDatabase } from './postgres';
+import { Postgres, initDatabase } from './postgres';
 import { installValidatorApp } from './validator';
 
 export function installSvKeySecret(
@@ -101,6 +106,39 @@ async function getAcsBootstrappingDump(xns: ExactNamespace, config: Bootstrappin
     path: file.name,
     bucket: config.bucket,
   };
+}
+
+function installParticipants(
+  globalUpradeDomainConfig: GlobalDomainUpgradeConfig,
+  config: SvConfig,
+  xns: ExactNamespace,
+  existingPostgres: Postgres
+) {
+  const participantPostgres = (id: DomainIndex) =>
+    config.splitPostgresInstances
+      ? postgres.installPostgres(xns, `participant-${id}-pg`, true)
+      : existingPostgres;
+
+  return installDomainSpecificComponent(
+    globalUpradeDomainConfig,
+    defaultId =>
+      installParticipant(
+        xns,
+        `participant-${defaultId}`,
+        participantPostgres(defaultId),
+        auth0UserNameEnvVarSource('sv'),
+        // If we have a dump, we disable auto init.
+        !!config.bootstrappingDumpConfig
+      ),
+    id =>
+      installParticipant(
+        xns,
+        `participant-${id}`,
+        participantPostgres(id),
+        auth0UserNameEnvVarSource('sv'),
+        true
+      )
+  );
 }
 
 export async function installSvNode(
@@ -182,17 +220,11 @@ export async function installSvNode(
       syncSource: cometBftSyncSource,
     }
   );
-  const participantPostgres = config.splitPostgresInstances
-    ? postgres.installPostgres(xns, 'participant-pg', true)
-    : sequencerPostgres;
-
-  const participant = installParticipant(
+  const participant = installParticipants(
+    globalDomainUpgradeConfig,
+    config,
     xns,
-    'participant',
-    participantPostgres,
-    auth0UserNameEnvVarSource('sv'),
-    // If we have a dump, we disable auto init.
-    !!config.bootstrappingDumpConfig
+    sequencerPostgres
   );
 
   const svAppPostgres = config.splitPostgresInstances
@@ -201,6 +233,7 @@ export async function installSvNode(
   const svAppName = config.nodename.replaceAll('-', '_');
   const svDb = svAppPostgres.createDatabaseAndInstallMetrics(svAppName);
   const sequencerAddress = `${globalDomain.name}-sequencer`;
+  const participantAddress = participant.name;
 
   const initDb = initDatabase();
 
@@ -249,6 +282,7 @@ export async function installSvNode(
       enable: true,
     },
     additionalJvmOptions: jmxOptions(),
+    participantAddress,
     init: initDb && { initDb },
   } as ChartValues;
 
@@ -296,6 +330,7 @@ export async function installSvNode(
     additionalJvmOptions: jmxOptions(),
     sequencerAddress: sequencerAddress,
     init: initDb && { initDb },
+    participantAddress,
   };
   installCNHelmChart(xns, 'scan', 'cn-scan', scanValues, {
     dependsOn: [svApp, scanAppPostgres, scanDb, globalDomain],
@@ -325,6 +360,7 @@ export async function installSvNode(
     persistenceConfig: persistenceConfig(validatorPostgres, validatorDbName),
     extraDependsOn: [svApp, validatorPostgres, validatorDb],
     svValidator: true,
+    participantAddress,
   });
 
   return { svApp, sequencerPostgres: sequencerPostgres };

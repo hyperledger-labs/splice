@@ -76,7 +76,7 @@ export class Auth0Fetch implements Auth0Client {
   }
 
   public async loadAuth0Cache(): Promise<void> {
-    await pulumi.log.info('Loading Auth0 Cache');
+    await pulumi.log.debug('Loading Auth0 Cache');
     const cacheMap = {} as Auth0CacheMap;
 
     try {
@@ -91,9 +91,9 @@ export class Auth0Fetch implements Auth0Client {
         cacheMap[clientId] = JSON.parse(Buffer.from(data[clientId], 'base64').toString('ascii'));
       }
 
-      await pulumi.log.info('Auth0 cache loaded...');
+      await pulumi.log.debug('Auth0 cache loaded...');
     } catch (e) {
-      await pulumi.log.info('No Auth0 cache secret found.');
+      await pulumi.log.debug('No Auth0 cache secret found.');
     }
 
     this.auth0Cache = cacheMap;
@@ -101,7 +101,7 @@ export class Auth0Fetch implements Auth0Client {
 
   public async saveAuth0Cache(): Promise<void> {
     const data = {} as Record<string, string>;
-    await pulumi.log.info('Saving Auth0 cache');
+    await pulumi.log.debug('Saving Auth0 cache');
 
     if (!this.auth0Cache) {
       console.error('No auth0 cache loaded in Auth0Fetch');
@@ -144,12 +144,12 @@ export class Auth0Fetch implements Auth0Client {
       }
     }
 
-    await pulumi.log.info('Auth0 cache saved');
+    await pulumi.log.debug('Auth0 cache saved');
   }
 
   public async getSecrets(): Promise<Auth0SecretMap> {
     if (this.secrets === undefined) {
-      await pulumi.log.info('Calling Auth0 API for getSecrets()');
+      await pulumi.log.debug('Calling Auth0 API for getSecrets()');
       this.secrets = await this.loadSecrets();
     }
     return this.secrets;
@@ -160,7 +160,7 @@ export class Auth0Fetch implements Auth0Client {
     clientSecret: string,
     audience?: string
   ): Promise<string> {
-    await pulumi.log.info('Getting access token for Auth0 client: ' + clientId);
+    await pulumi.log.debug('Getting access token for Auth0 client: ' + clientId);
 
     const now = new Date();
 
@@ -171,7 +171,7 @@ export class Auth0Fetch implements Auth0Client {
         if (addTimeSeconds(now, REQUIRED_TOKEN_LIFETIME) > cachedSecretExpiry) {
           await pulumi.log.info('Ignoring expired cached Auth0 token for client: ' + clientId);
         } else {
-          await pulumi.log.info('Using cached Auth0 token for client: ' + clientId);
+          await pulumi.log.debug('Using cached Auth0 token for client: ' + clientId);
           return cachedSecret.accessToken;
         }
       }
@@ -179,7 +179,7 @@ export class Auth0Fetch implements Auth0Client {
 
     const aud = audience || 'https://canton.network.global';
 
-    await pulumi.log.info(
+    await pulumi.log.debug(
       'Querying access token for Auth0 client: ' + clientId + ' with audience ' + aud
     );
     const auth0 = new AuthenticationClient({
@@ -208,7 +208,7 @@ export class Auth0Fetch implements Auth0Client {
     const expiry = addTimeSeconds(now, expires_in);
 
     if (this.auth0Cache && tokenResponse.access_token) {
-      await pulumi.log.info(
+      await pulumi.log.debug(
         'Caching access token for Auth0 client: ' + clientId + ' expiry: ' + expiry.toJSON()
       );
 

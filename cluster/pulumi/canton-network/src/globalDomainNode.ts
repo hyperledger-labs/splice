@@ -14,6 +14,27 @@ export type GlobalDomainUpgradeConfig = {
   upgradeGlobalDomainId?: DomainIndex;
 };
 
+export const DefaultGlobalDomainId = 0;
+
+export function installDomainSpecificComponent<T extends pulumi.Resource>(
+  globalDomainUpgradeConfig: GlobalDomainUpgradeConfig,
+  defaultComponent: (id: DomainIndex) => T,
+  component: (id: DomainIndex) => T
+): T {
+  if (globalDomainUpgradeConfig.activeGlobalDomainId == undefined) {
+    return defaultComponent(DefaultGlobalDomainId);
+  } else {
+    const activeComponent = component(globalDomainUpgradeConfig.activeGlobalDomainId);
+    if (globalDomainUpgradeConfig.legacyGlobalDomainId) {
+      component(globalDomainUpgradeConfig.legacyGlobalDomainId);
+    }
+    if (globalDomainUpgradeConfig.upgradeGlobalDomainId) {
+      component(globalDomainUpgradeConfig.upgradeGlobalDomainId);
+    }
+    return activeComponent;
+  }
+}
+
 export function installGlobalDomain(
   globalDomainUpgradeConfig: GlobalDomainUpgradeConfig,
   xns: ExactNamespace,
@@ -25,22 +46,13 @@ export function installGlobalDomain(
     syncSource?: Release;
   }
 ): GlobalDomainNode {
-  function createGlobalDomainNode(id: DomainIndex) {
-    return new GlobalDomainNode(id, xns, sequencerPostgres, mediatorPostgres, cometbft, true);
-  }
-
-  if (globalDomainUpgradeConfig.activeGlobalDomainId == undefined) {
-    return new GlobalDomainNode(0, xns, sequencerPostgres, mediatorPostgres, cometbft, false);
-  } else {
-    const activeDomain = createGlobalDomainNode(globalDomainUpgradeConfig.activeGlobalDomainId);
-    if (globalDomainUpgradeConfig.legacyGlobalDomainId) {
-      createGlobalDomainNode(globalDomainUpgradeConfig.legacyGlobalDomainId);
-    }
-    if (globalDomainUpgradeConfig.upgradeGlobalDomainId) {
-      createGlobalDomainNode(globalDomainUpgradeConfig.upgradeGlobalDomainId);
-    }
-    return activeDomain;
-  }
+  return installDomainSpecificComponent(
+    globalDomainUpgradeConfig,
+    defaultId =>
+      new GlobalDomainNode(defaultId, xns, sequencerPostgres, mediatorPostgres, cometbft, false),
+    (id: DomainIndex) =>
+      new GlobalDomainNode(id, xns, sequencerPostgres, mediatorPostgres, cometbft, true)
+  );
 }
 
 export type DomainIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;

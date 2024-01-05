@@ -943,12 +943,12 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "participant-pg-secrets",
+        "name": "participant-0-pg-secrets",
         "namespace": "sv-3"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-3-participant-pg-secrets",
+    "name": "cn-app-sv-3-participant-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -2216,6 +2216,7 @@
             "optional": false
           }
         },
+        "participantAddress": "participant",
         "persistence": {
           "databaseName": "val_splitwell",
           "host": "postgres.splitwell.svc.cluster.local",
@@ -2691,7 +2692,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-participant/",
       "compat": "true",
-      "name": "participant",
+      "name": "participant-0",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -2773,8 +2774,8 @@
           }
         },
         "postgres": "postgres.sv-1.svc.cluster.local",
-        "postgresDb": "participant",
-        "postgresSchema": "participant",
+        "postgresDb": "participant_0",
+        "postgresSchema": "participant_0",
         "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
@@ -2787,7 +2788,7 @@
         }
       }
     },
-    "name": "sv-1-participant",
+    "name": "sv-1-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2969,7 +2970,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-participant-e",
+      "name": "postgres-participant-0-e",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -3028,7 +3029,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "participant",
+          "database": "participant_0",
           "hostname": "postgres.sv-1.svc.cluster.local",
           "port": "5432"
         },
@@ -3045,7 +3046,7 @@
         }
       }
     },
-    "name": "sv-1-postgres-participant-e",
+    "name": "sv-1-postgres-participant-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3486,6 +3487,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "scan_sv_1",
           "host": "postgres.sv-1.svc.cluster.local",
@@ -3688,6 +3690,7 @@
         },
         "onboardingName": "Canton-Foundation-1",
         "onboardingType": "found-collective",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_1",
           "host": "postgres.sv-1.svc.cluster.local",
@@ -3790,6 +3793,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "validator_sv_1",
           "host": "postgres.sv-1.svc.cluster.local",
@@ -4259,7 +4263,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-participant/",
       "compat": "true",
-      "name": "participant",
+      "name": "participant-0",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -4341,8 +4345,8 @@
           }
         },
         "postgres": "postgres.sv-2.svc.cluster.local",
-        "postgresDb": "participant",
-        "postgresSchema": "participant",
+        "postgresDb": "participant_0",
+        "postgresSchema": "participant_0",
         "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
@@ -4355,7 +4359,7 @@
         }
       }
     },
-    "name": "sv-2-participant",
+    "name": "sv-2-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4537,7 +4541,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-participant-e",
+      "name": "postgres-participant-0-e",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -4596,7 +4600,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "participant",
+          "database": "participant_0",
           "hostname": "postgres.sv-2.svc.cluster.local",
           "port": "5432"
         },
@@ -4613,7 +4617,7 @@
         }
       }
     },
-    "name": "sv-2-postgres-participant-e",
+    "name": "sv-2-postgres-participant-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5054,6 +5058,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "scan_sv_2",
           "host": "postgres.sv-2.svc.cluster.local",
@@ -5228,6 +5233,7 @@
         },
         "onboardingName": "Canton-Foundation-2",
         "onboardingType": "join-with-key",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_2",
           "host": "postgres.sv-2.svc.cluster.local",
@@ -5330,6 +5336,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "validator_sv_2",
           "host": "postgres.sv-2.svc.cluster.local",
@@ -5990,7 +5997,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "participant-pg-participant-e",
+      "name": "participant-0-pg-participant-0-e",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -6049,11 +6056,11 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "participant",
-          "hostname": "participant-pg.sv-3.svc.cluster.local",
+          "database": "participant_0",
+          "hostname": "participant-0-pg.sv-3.svc.cluster.local",
           "port": "5432"
         },
-        "postgresSecretName": "participant-pg-secrets",
+        "postgresSecretName": "participant-0-pg-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -6066,7 +6073,7 @@
         }
       }
     },
-    "name": "sv-3-participant-pg-participant-e",
+    "name": "sv-3-participant-0-pg-participant-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -6078,7 +6085,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-3-participant-pg-passwd",
+    "name": "sv-3-participant-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -6086,7 +6093,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "sv-3-participant-pg",
+    "name": "sv-3-participant-0-pg",
     "provider": "",
     "type": "canton:network:postgres"
   },
@@ -6096,7 +6103,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres/",
       "compat": "true",
-      "name": "participant-pg",
+      "name": "participant-0-pg",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -6158,7 +6165,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretName": "participant-pg-secrets",
+        "postgresSecretName": "participant-0-pg-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -6171,7 +6178,7 @@
         }
       }
     },
-    "name": "sv-3-participant-pg",
+    "name": "sv-3-participant-0-pg",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -6181,7 +6188,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-participant/",
       "compat": "true",
-      "name": "participant",
+      "name": "participant-0",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -6262,10 +6269,10 @@
             "optional": false
           }
         },
-        "postgres": "participant-pg.sv-3.svc.cluster.local",
-        "postgresDb": "participant",
-        "postgresSchema": "participant",
-        "postgresSecretName": "participant-pg-secrets",
+        "postgres": "participant-0-pg.sv-3.svc.cluster.local",
+        "postgresDb": "participant_0",
+        "postgresSchema": "participant_0",
+        "postgresSecretName": "participant-0-pg-secrets",
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -6277,7 +6284,7 @@
         }
       }
     },
-    "name": "sv-3-participant",
+    "name": "sv-3-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -6546,6 +6553,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "scan_sv_3",
           "host": "scan-pg.sv-3.svc.cluster.local",
@@ -6911,6 +6919,7 @@
         },
         "onboardingName": "Canton-Foundation-3",
         "onboardingType": "join-with-key",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_3",
           "host": "sv-pg.sv-3.svc.cluster.local",
@@ -7395,6 +7404,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "validator_sv_3",
           "host": "validator-pg.sv-3.svc.cluster.local",
@@ -7864,7 +7874,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-participant/",
       "compat": "true",
-      "name": "participant",
+      "name": "participant-0",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -7946,8 +7956,8 @@
           }
         },
         "postgres": "postgres.sv-4.svc.cluster.local",
-        "postgresDb": "participant",
-        "postgresSchema": "participant",
+        "postgresDb": "participant_0",
+        "postgresSchema": "participant_0",
         "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
@@ -7960,7 +7970,7 @@
         }
       }
     },
-    "name": "sv-4-participant",
+    "name": "sv-4-participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8142,7 +8152,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-participant-e",
+      "name": "postgres-participant-0-e",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -8201,7 +8211,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "postgres": {
-          "database": "participant",
+          "database": "participant_0",
           "hostname": "postgres.sv-4.svc.cluster.local",
           "port": "5432"
         },
@@ -8218,7 +8228,7 @@
         }
       }
     },
-    "name": "sv-4-postgres-participant-e",
+    "name": "sv-4-postgres-participant-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8659,6 +8669,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "scan_sv_4",
           "host": "postgres.sv-4.svc.cluster.local",
@@ -8833,6 +8844,7 @@
         },
         "onboardingName": "Canton-Foundation-4",
         "onboardingType": "join-with-key",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_4",
           "host": "postgres.sv-4.svc.cluster.local",
@@ -8935,6 +8947,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "validator_sv_4",
           "host": "postgres.sv-4.svc.cluster.local",
@@ -9718,6 +9731,7 @@
             "optional": false
           }
         },
+        "participantAddress": "participant",
         "persistence": {
           "databaseName": "validator1",
           "host": "validator-pg.validator1.svc.cluster.local",

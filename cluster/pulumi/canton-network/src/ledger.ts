@@ -1,41 +1,10 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
+import { Release } from '@pulumi/kubernetes/helm/v3';
+import { ExactNamespace, installCNHelmChart, sanitizedForPostgres } from 'cn-pulumi-common';
 
 import { jmxOptions } from '../../common/src/jmx';
 import { initDatabase, Postgres } from './postgres';
-
-export function installDomain(
-  xns: ExactNamespace,
-  name: string,
-  postgres: Postgres
-): pulumi.Resource {
-  const sanitizedName = name.replaceAll('-', '_');
-
-  const mediatorDbName = `${sanitizedName}_mediator`;
-  const mediatorDb = postgres.createDatabaseAndInstallMetrics(mediatorDbName);
-
-  const sequencerDbName = `${sanitizedName}_sequencer`;
-  const sequencerDb = postgres.createDatabaseAndInstallMetrics(sequencerDbName);
-
-  const initDb = initDatabase();
-
-  return installCNHelmChart(
-    xns,
-    name,
-    'cn-domain',
-    {
-      postgres: postgres.address,
-      postgresMediatorDb: mediatorDbName,
-      postgresSequencerDb: sequencerDbName,
-      additionalJvmOptions: jmxOptions(),
-      init: initDb && { initDb },
-    },
-    {
-      dependsOn: [mediatorDb, sequencerDb],
-    }
-  );
-}
 
 export function installParticipant(
   xns: ExactNamespace,
@@ -44,8 +13,9 @@ export function installParticipant(
   participantAdminUserNameFrom: k8s.types.input.core.v1.EnvVarSource,
   disableAutoInit = false,
   dependsOn: pulumi.Resource[] = []
-): pulumi.Resource {
-  const postgresDb = postgres.createDatabaseAndInstallMetrics(name);
+): Release {
+  const pgName = sanitizedForPostgres(name);
+  const postgresDb = postgres.createDatabaseAndInstallMetrics(pgName);
 
   const initDb = initDatabase();
   return installCNHelmChart(
@@ -54,8 +24,8 @@ export function installParticipant(
     'cn-participant',
     {
       postgres: postgres.address,
-      postgresDb: name,
-      postgresSchema: name,
+      postgresDb: pgName,
+      postgresSchema: pgName,
       postgresSecretName: postgres.secretName,
       participantAdminUserNameFrom,
       disableAutoInit,

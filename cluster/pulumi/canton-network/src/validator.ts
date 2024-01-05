@@ -1,5 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import { Output } from '@pulumi/pulumi';
 import {
   CnInput,
   installAuth0Secret,
@@ -55,6 +56,7 @@ export type ValidatorConfig = {
   participantBootstrapDump?: BootstrappingDumpConfig;
   svValidator?: boolean;
   additionalJvmOptions?: string;
+  participantAddress: Output<string> | string;
 };
 
 export async function installValidatorApp(config: ValidatorConfig): Promise<pulumi.Resource> {
@@ -131,6 +133,7 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
         enable: true,
       },
       postgresSecretName: config.persistenceConfig.secretName,
+      participantAddress: config.participantAddress,
       init: initDb && { initDb },
     },
     { dependsOn }

@@ -96,6 +96,7 @@ export async function installValidator1(
     extraDependsOn,
     auth0AppName: 'validator1',
     participantBootstrapDump,
+    participantAddress: 'participant',
     topupConfig,
     svValidator: false,
     additionalJvmOptions: jmxOptions(),
