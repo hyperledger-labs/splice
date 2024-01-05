@@ -202,11 +202,7 @@ export async function installSvNode(
     config.splitPostgresInstances
   );
   const mediatorPostgres = config.splitPostgresInstances
-    ? postgres.installPostgres(
-        xns,
-        config.splitPostgresInstances ? 'mediator-pg' : 'postgres',
-        true
-      )
+    ? postgres.installPostgres(xns, 'mediator-pg', true)
     : sequencerPostgres;
 
   const globalDomain = installGlobalDomain(

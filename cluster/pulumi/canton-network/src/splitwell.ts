@@ -23,15 +23,20 @@ export async function installSplitwell(
   svc: pulumi.Resource,
   providerWalletUser: string,
   onboardingSecret: string,
+  splitPostgresInstances: boolean,
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
   topupConfig?: ValidatorTopupConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace('splitwell', true);
 
-  const postgresDb = postgres.installPostgres(xns, 'postgres');
+  const domainPostgres = postgres.installPostgres(
+    xns,
+    splitPostgresInstances ? 'domain-pg' : 'postgres',
+    splitPostgresInstances
+  );
 
-  const domain = installDomain(xns, 'domain', postgresDb);
+  const domain = installDomain(xns, 'domain', domainPostgres);
 
   const loopback = installCNHelmChart(
     xns,
@@ -45,22 +50,30 @@ export async function installSplitwell(
     { dependsOn: [xns.ns] }
   );
 
+  const participantPostgres = splitPostgresInstances
+    ? postgres.installPostgres(xns, 'participant-pg', true)
+    : domainPostgres;
+
   const participant = installParticipant(
     xns,
     'participant',
-    postgresDb,
+    participantPostgres,
     auth0UserNameEnvVarSource('validator'),
     // We disable auto-init if we have a dump to bootstrap from.
     !!participantBootstrapDump,
     [domain, loopback]
   );
 
+  const swPostgres = splitPostgresInstances
+    ? postgres.installPostgres(xns, 'sw-pg', true)
+    : domainPostgres;
+
   installCNHelmChart(
     xns,
     'splitwell-app',
     'cn-splitwell-app',
     {
-      postgres: postgresDb.address,
+      postgres: swPostgres.address,
       metrics: {
         enable: true,
       },
@@ -68,8 +81,11 @@ export async function installSplitwell(
     { dependsOn: [svc, participant] }
   );
 
+  const validatorPostgres = splitPostgresInstances
+    ? postgres.installPostgres(xns, 'validator-pg', true)
+    : domainPostgres;
   const validatorDbName = 'val_splitwell';
-  const validatorDb = postgresDb.createDatabaseAndInstallMetrics(validatorDbName);
+  const validatorDb = validatorPostgres.createDatabaseAndInstallMetrics(validatorDbName);
 
   const extraDependsOn = [
     svc,
@@ -103,9 +119,9 @@ export async function installSplitwell(
     topupConfig: topupConfig,
     svValidator: false,
     persistenceConfig: {
-      host: postgresDb.address,
+      host: validatorPostgres.address,
       databaseName: pulumi.Output.create(validatorDbName),
-      secretName: postgresDb.secretName,
+      secretName: validatorPostgres.secretName,
       schema: pulumi.Output.create(validatorDbName),
       user: pulumi.Output.create('cnadmin'),
       port: pulumi.Output.create(5432),
@@ -132,6 +148,7 @@ function installDomain(xns: ExactNamespace, name: string, postgres: Postgres): p
       postgres: postgres.address,
       postgresMediatorDb: mediatorDbName,
       postgresSequencerDb: sequencerDbName,
+      postgresSecretName: postgres.secretName,
       additionalJvmOptions: jmxOptions(),
       init: initDb && { initDb },
     },

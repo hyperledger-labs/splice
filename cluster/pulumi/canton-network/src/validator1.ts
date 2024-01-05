@@ -22,13 +22,18 @@ export async function installValidator1(
   name: string,
   onboardingSecret: string,
   validatorWalletUser: string,
+  splitPostgresInstances: boolean,
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
   topupConfig?: ValidatorTopupConfig
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name, true);
 
-  const participantPostgres = postgres.installPostgres(xns, 'participant-pg', true);
+  const participantPostgres = postgres.installPostgres(
+    xns,
+    splitPostgresInstances ? 'participant-pg' : 'postgres',
+    splitPostgresInstances
+  );
 
   const loopback = installCNHelmChart(
     xns,
@@ -62,7 +67,9 @@ export async function installValidator1(
     }
   );
 
-  const validatorPostgres = postgres.installPostgres(xns, 'validator-pg', true);
+  const validatorPostgres = splitPostgresInstances
+    ? postgres.installPostgres(xns, 'validator-pg', true)
+    : participantPostgres;
 
   const validatorDbName = 'validator1';
   const validatorDb = validatorPostgres.createDatabaseAndInstallMetrics(validatorDbName);

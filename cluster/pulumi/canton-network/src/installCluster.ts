@@ -44,6 +44,12 @@ if (singleSv) {
   console.error('Launching with a single SV');
 }
 
+// This flag determines whether to split postgres instances per app, or have one per namespace.
+// By default, we split instances on CloudSQL (where we expect longer-living environments, thus want to support backup&recovery),
+// but not on k8s-deployed postgres (where we optimize for faster deployment).
+// One can force splitting them by setting SPLIT_POSTGRES_INSTANCES to true.
+const splitPostgresInstances = envFlag('SPLIT_POSTGRES_INSTANCES') || envFlag('ENABLE_CLOUD_SQL');
+
 type BootstrapCliConfig = {
   cluster: string;
   date: string;
@@ -181,7 +187,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       bootstrappingDumpConfig,
       topupConfig,
       auth0ValidatorAppName: 'sv1_validator',
-      splitPostgresInstances: false,
+      splitPostgresInstances,
       sequencerPruningConfig,
     },
     globalDomainUpgradeConfig
@@ -202,7 +208,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         auth0ValidatorAppName: 'sv2_validator',
         bootstrappingDumpConfig,
         topupConfig,
-        splitPostgresInstances: false,
+        splitPostgresInstances,
         sequencerPruningConfig,
       },
       globalDomainUpgradeConfig,
@@ -222,7 +228,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         auth0ValidatorAppName: 'sv3_validator',
         bootstrappingDumpConfig,
         topupConfig,
-        splitPostgresInstances: true,
+        splitPostgresInstances,
         sequencerPruningConfig,
       },
       globalDomainUpgradeConfig,
@@ -242,7 +248,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         auth0ValidatorAppName: 'sv4_validator',
         bootstrappingDumpConfig,
         topupConfig,
-        splitPostgresInstances: false,
+        splitPostgresInstances,
         sequencerPruningConfig,
       },
       globalDomainUpgradeConfig,
@@ -256,6 +262,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     'validator1',
     validator1Onboarding.secret,
     'auth0|63e3d75ff4114d87a2c1e4f5',
+    splitPostgresInstances,
     backupConfig,
     bootstrappingDumpConfig,
     // x10 validator1's traffic targetThroughput for load tester -- see #9064
@@ -267,6 +274,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     sv1,
     'auth0|63e12e0415ad881ffe914e61',
     splitwellOnboarding.secret,
+    splitPostgresInstances,
     backupConfig,
     bootstrappingDumpConfig,
     topupConfig
