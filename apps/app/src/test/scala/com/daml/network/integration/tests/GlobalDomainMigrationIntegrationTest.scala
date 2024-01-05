@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
 import com.daml.network.codegen.java.cn.svcrules.SvcRules_AddMember
-import com.daml.network.console.SvAppBackendReference
+import com.daml.network.console.{SvAppBackendReference, ScanAppBackendReference}
 import com.daml.network.environment.{
   BaseLedgerConnection,
   CNLedgerClient,
@@ -23,6 +23,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.http.v0.definitions.TransactionHistoryRequest
 import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.UpgradeDomainNode
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UseInMemoryStores
@@ -82,7 +83,7 @@ import scala.util.Using
 class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with ProcessTestUtil {
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
-  // if not the newly started apps will use the old state
+  // TODO(#9014) make it work with persistend stores
   registerPlugin(new UseInMemoryStores(loggerFactory))
 
   override def environmentDefinition
@@ -95,7 +96,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
       .withZeroSequencerAvailabilityDelay
       .withManualStart
 
-  "migrate global domain to new nodes" in { implicit env =>
+  "migrate global domain to new nodes with downtime" in { implicit env =>
     import env.{actorSystem, executionContext, executionSequencerFactory}
     import env.environment.scheduler
     val retryProvider = new RetryProvider(
@@ -123,6 +124,14 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
       sv2ValidatorBackend,
       sv3ValidatorBackend,
       sv4ValidatorBackend,
+    )
+    actAndCheck("Create some transaction history", sv1WalletClient.tap(1337))(
+      "Scan transaction history is recorded and wallet balance is updated",
+      _ => {
+        // buffer to account for domain fee payments
+        assertInRange(sv1WalletClient.balance().unlockedQty, (1000, 2000))
+        countTapsFromScan(sv1ScanBackend, 1337) shouldEqual (1)
+      },
     )
     withCanton(
       Seq(
@@ -274,7 +283,6 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
                 .parTraverse(_.newParticipantConnection.disconnectDomain(globalDomainAlias))
                 .futureValue
                 .discard
-
               withCLueAndLog("restore acs snapshot") {
                 nodesWithMigrationDumps.parTraverse { case (node, domainMigrationDump) =>
                   node.restoreAcsSnapshot(domainMigrationDump.acsSnapshot)
@@ -328,7 +336,32 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
             upgradeDomainNode1.migrateUserAnnotation().futureValue
           }
           sv1LocalBackend.startSync()
+
+          startAllSync(
+            sv1LocalBackend,
+            sv1ScanLocalBackend,
+            sv1ValidatorLocalBackend,
+          )
           sv1LocalBackend.getSvcInfo().svcRules.payload.members.size() shouldBe 4
+
+          clue("Old wallet balance is recorded") {
+            assertInRange(sv1WalletLocalClient.balance().unlockedQty, (1000, 2000))
+          }
+          // TODO(#9014) make this work (with persistent stores)
+          // clue("Old scan transaction history is recorded"){
+          //   countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual (1)
+          //   countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual (0)
+          // }
+          actAndCheck("Create some new transaction history", sv1WalletLocalClient.tap(1338))(
+            "New transaction history is recorded and balance is updated",
+            _ => {
+              // TODO(#9014) make this work (with persistent stores)
+              // countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual (1)
+              countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual (1)
+              assertInRange(sv1WalletLocalClient.balance().unlockedQty, (2000, 4000))
+            },
+          )
+
           actAndCheck(
             "validate domain with create VoteRequest",
             sv1LocalBackend.createVoteRequest(
@@ -453,6 +486,16 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
         retryProvider,
       ),
     )
+  }
+
+  private def countTapsFromScan(scan: ScanAppBackendReference, tapAmount: Double) = {
+    listTransactionsFromScan(scan).count(
+      _.tap.map(a => BigDecimal(a.coinAmount)) == Some(BigDecimal(tapAmount))
+    )
+  }
+
+  private def listTransactionsFromScan(scan: ScanAppBackendReference) = {
+    scan.listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
   }
 }
 
