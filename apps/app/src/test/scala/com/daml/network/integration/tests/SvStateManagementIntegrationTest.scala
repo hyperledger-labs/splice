@@ -8,13 +8,19 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_SvcRules,
 }
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_AddFutureCoinConfigSchedule
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_SetConfig
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
+  SRARC_SetConfig,
+  SRARC_RemoveMember,
+}
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRulesConfig,
   SvcRules_SetConfig,
+  SvcRules_RemoveMember,
 }
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.sv.automation.leaderbased.ExpireVoteRequestTrigger
 import com.daml.network.util.Codec
 import com.digitalasset.canton.topology.PartyId
 
@@ -378,6 +384,54 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       }
     }
 
+  }
+
+  "Vote requests expire" in { implicit env =>
+    clue("Initialize SVC with 2 SVs") {
+      startAllSync(
+        sv1Backend,
+        sv2Backend,
+      )
+      eventually() {
+        sv1Backend.getSvcInfo().svcRules.payload.members should have size 2
+      }
+    }
+    clue("Pausing vote request expiration automation") {
+      sv1Backend.leaderBasedAutomation.trigger[ExpireVoteRequestTrigger].pause().futureValue
+    }
+    actAndCheck(
+      "SV2 creates a vote request for removing SV1", {
+        val sv1Party = sv1Backend.getSvcInfo().svParty
+        val sv2Party = sv2Backend.getSvcInfo().svParty
+        val action: ActionRequiringConfirmation = new ARC_SvcRules(
+          new SRARC_RemoveMember(new SvcRules_RemoveMember(sv1Party.toProtoPrimitive))
+        )
+
+        sv2Backend.createVoteRequest(
+          sv2Party.toProtoPrimitive,
+          action,
+          "url",
+          "description",
+          // expire in 5 seconds
+          new RelTime(5_000_000L),
+        )
+      },
+    )(
+      "The vote request has been created and all SVs observe it",
+      _ => {
+        sv1Backend.listVoteRequests() should have size 1
+        sv2Backend.listVoteRequests() should have size 1
+      },
+    )
+    clue("Resuming vote request expiration automation") {
+      sv1Backend.leaderBasedAutomation.trigger[ExpireVoteRequestTrigger].resume()
+    }
+    clue("Eventually the vote request expires and gets archived") {
+      eventually() {
+        sv1Backend.listVoteRequests() shouldBe empty
+        sv2Backend.listVoteRequests() shouldBe empty
+      }
+    }
   }
 
   private def getCoinPriceVoteMap()(implicit env: CNNodeTestConsoleEnvironment) =

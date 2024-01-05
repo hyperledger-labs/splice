@@ -413,7 +413,7 @@ class SvFrontendIntegrationTest
               val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
               rows.size shouldBe previousVoteRequestsActionNeeded + 1
 
-              rows.last.text should matchText(
+              rows.head.text should matchText(
                 createdVoteRequestAction
               )
               tb.findAllChildElements(className("vote-row-requester"))
@@ -422,7 +422,7 @@ class SvFrontendIntegrationTest
                 .text should matchText(
                 createdVoteRequestRequester
               )
-              rows.last.underlying
+              rows.head.underlying
             }
           },
         )
@@ -683,7 +683,7 @@ class SvFrontendIntegrationTest
         }
     }
 
-    "SV1 can create valid SRARC_SetConfig (new SvcRules Configuration) vote requests that can expire and get rejected by other SVs" ignore {
+    "SV1 can create valid SRARC_SetConfig (new SvcRules Configuration) vote requests that can expire and get rejected by other SVs" in {
       implicit env =>
         val requestReasonUrl = "This is a request reason url."
         val requestReasonBody = "This is a request reason."
@@ -717,11 +717,12 @@ class SvFrontendIntegrationTest
                 setExpirationDate(
                   "sv1",
                   DateTimeFormatter
-                    .ofPattern("MM/dd/yyyy HH:mm a")
+                    .ofPattern("MM/dd/yyyy hh:mm a")
                     .format(
                       LocalDateTime
                         .ofInstant(CantonTimestamp.now().toInstant, ZoneOffset.UTC)
-                        .plusSeconds(30)
+                        // Might not be wise to go lower than that because the date input doesn't do seconds
+                        .plusMinutes(1)
                     ),
                 )
               }
@@ -752,7 +753,7 @@ class SvFrontendIntegrationTest
             },
           )
 
-          clue("Deactivating vote request expiration automation") {
+          clue("Pausing vote request expiration automation") {
             sv1Backend.leaderBasedAutomation.trigger[ExpireVoteRequestTrigger].pause().futureValue
           }
 
@@ -783,7 +784,7 @@ class SvFrontendIntegrationTest
             },
           )
 
-          clue("Reactivating vote request expiration automation") {
+          clue("Resuming vote request expiration automation") {
             sv1Backend.leaderBasedAutomation.trigger[ExpireVoteRequestTrigger].resume()
           }
 
@@ -794,7 +795,7 @@ class SvFrontendIntegrationTest
           }
 
           clue("the vote requests get rejected (one by vote, one by expiry)") {
-            eventually() {
+            eventually(65.seconds) {
               val tbody = find(id("sv-voting-in-progress-table-body"))
               val tb = tbody.value
               val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
@@ -883,419 +884,418 @@ class SvFrontendIntegrationTest
     }
 
     "can create a CRARC_AddFutureCoinConfigSchedule vote request, update it via a CRARC_UpdateFutureCoinConfigSchedule vote request," +
-      " and remove it via a CRARC_RemoveFutureCoinConfigSchedule vote request." ignore {
-        implicit env =>
-          /* The following aspects are tested here:
-           * - the creation of Add/Update/Remove FutureCoinConfigSchedule
-           * - that the accepted Add vote requests is well displayed in Planned section
-           * - the alerting if such requests are touching the same schedule time
-           * - the vote request expiresAt < effectiveAt
-           * - tests if the modal closes when the last voter votes
-           * */
-          val requestNewTransferConfigFeeValue = "42"
-          val requestReasonUrl = "This is a request reason url."
-          val requestReasonBody = "This is a request reason."
+      " and remove it via a CRARC_RemoveFutureCoinConfigSchedule vote request." in { implicit env =>
+        /* The following aspects are tested here:
+         * - the creation of Add/Update/Remove FutureCoinConfigSchedule
+         * - that the accepted Add vote requests is well displayed in Planned section
+         * - the alerting if such requests are touching the same schedule time
+         * - the vote request expiresAt < effectiveAt
+         * - tests if the modal closes when the last voter votes
+         * */
+        val requestNewTransferConfigFeeValue = "42"
+        val requestReasonUrl = "This is a request reason url."
+        val requestReasonBody = "This is a request reason."
 
-          withFrontEnd("sv1") { implicit webDriver =>
-            actAndCheck(
-              "sv1 operator can login and browse to the governance tab", {
-                go to s"http://localhost:$sv1UIPort/votes"
-                loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
-              },
-            )(
-              "sv1 can see the create vote request button",
-              _ => {
-                find(id("create-voterequest-submit-button")) should not be empty
-              },
-            )
+        withFrontEnd("sv1") { implicit webDriver =>
+          actAndCheck(
+            "sv1 operator can login and browse to the governance tab", {
+              go to s"http://localhost:$sv1UIPort/votes"
+              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
+            },
+          )(
+            "sv1 can see the create vote request button",
+            _ => {
+              find(id("create-voterequest-submit-button")) should not be empty
+            },
+          )
 
-            click on "tab-panel-in-progress"
-            val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
+          click on "tab-panel-in-progress"
+          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
 
-            val (_, requestIdAdd) = actAndCheck(
-              "sv1 operator can create a request to add a new coin config schedule", {
-                val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-                dropDownAction.selectByValue("CRARC_AddFutureCoinConfigSchedule")
-                val effectiveDateTimePicker =
-                  webDriver.findElement(By.id("datetime-picker-coin-configuration"))
+          val (_, requestIdAdd) = actAndCheck(
+            "sv1 operator can create a request to add a new coin config schedule", {
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("CRARC_AddFutureCoinConfigSchedule")
+              val effectiveDateTimePicker =
+                webDriver.findElement(By.id("datetime-picker-coin-configuration"))
 
-                Seq(("07/12/2032 12:12 AM", 1)).foreach(e => {
-                  eventually() {
-                    clue(s"sv1 select a date $e") {
-                      effectiveDateTimePicker.clear()
-                      effectiveDateTimePicker.click()
-                      effectiveDateTimePicker.sendKeys(e._1)
-                      effectiveDateTimePicker.sendKeys(Keys.RETURN)
-                    }
+              Seq(("07/12/2032 12:12 AM", 1)).foreach(e => {
+                eventually() {
+                  clue(s"sv1 select a date $e") {
+                    effectiveDateTimePicker.clear()
+                    effectiveDateTimePicker.click()
+                    effectiveDateTimePicker.sendKeys(e._1)
+                    effectiveDateTimePicker.sendKeys(Keys.RETURN)
                   }
-
-                  clue("sv1 modifies one value") {
-                    find(id("transferConfig.createFee.fee-value")).value.underlying
-                      .sendKeys(requestNewTransferConfigFeeValue)
-                  }
-
-                })
-
-                clue("sv1 modifies the url") {
-                  find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
                 }
 
-                clue("sv1 modifies the summary") {
-                  find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+                clue("sv1 modifies one value") {
+                  find(id("transferConfig.createFee.fee-value")).value.underlying
+                    .sendKeys(requestNewTransferConfigFeeValue)
                 }
 
-                setExpirationDate("sv1", "07/11/2032 12:12 AM")
+              })
 
-                clue("sv1 creates the vote request") {
-                  clickVoteRequestSubmitButtonOnceEnabled()
-                }
-              },
-            )(
-              "sv1 can see the new vote request",
-              _ => {
-                click on "tab-panel-in-progress"
-
-                val tbody = find(id("sv-voting-in-progress-table-body"))
-                val tb = tbody.value
-                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-                rows.size shouldBe previousVoteRequestsInProgress + 1
-                rows.head.text shouldBe "CRARC_AddFutureCoinConfigSchedule"
-
-                val reviewButton = rows.head
-                reviewButton.underlying.click()
-
-                val requestId =
-                  inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
-                    tb.text
-                  }
-                requestId
-              },
-            )
-
-            vote(sv2Backend, requestIdAdd, true, "2", true)
-
-            actAndCheck(
-              "sv1 operator fails to create a vote request at the same datetime", {
-                val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-                dropDownAction.selectByValue("CRARC_AddFutureCoinConfigSchedule")
-                val effectiveDateTimePicker =
-                  webDriver.findElement(By.id("datetime-picker-coin-configuration"))
-
-                Seq(("07/12/2032 12:12 AM", 1)).foreach(e => {
-                  eventually() {
-                    clue(s"sv1 select a date $e") {
-                      effectiveDateTimePicker.clear()
-                      effectiveDateTimePicker.click()
-                      effectiveDateTimePicker.sendKeys(e._1)
-                      effectiveDateTimePicker.sendKeys(Keys.RETURN)
-                    }
-                  }
-
-                  clue("sv1 modifies one value") {
-                    find(id("transferConfig.createFee.fee-value")).value.underlying
-                      .sendKeys(requestNewTransferConfigFeeValue)
-                  }
-                })
-
-                clue("sv1 modifies the summary") {
-                  find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
-                }
-
-                setExpirationDate("sv1", "07/11/2032 12:12 AM")
-
-                clue("sv1 creates the vote request") {
-                  clickVoteRequestSubmitButtonOnceEnabled()
-                }
-              },
-            )(
-              "sv1 can see the alerting message preventing him to continue",
-              _ => {
-                inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
-                  tb.text should include("Another vote request for a schedule adjustment")
-                }
-              },
-            )
-
-            vote(sv3Backend, requestIdAdd, true, "3", true)
-
-            clue("the vote request is marked as planned") {
-              eventually() {
-                click on "tab-panel-planned"
-                val tbody = find(id("sv-vote-results-planned-table-body"))
-                val tb = tbody.value
-                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-                rows.size shouldBe 1
+              clue("sv1 modifies the url") {
+                find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
               }
-            }
 
-            actAndCheck(
-              "sv1 operator fails to create a vote request because the expiration date is after the effective date.", {
-                val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-                dropDownAction.selectByValue("CRARC_AddFutureCoinConfigSchedule")
-                val effectiveDateTimePicker =
-                  webDriver.findElement(By.id("datetime-picker-coin-configuration"))
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
 
-                Seq(("07/12/2033 12:12 AM", 1)).foreach(e => {
-                  eventually() {
-                    clue(s"sv1 select a date $e") {
-                      effectiveDateTimePicker.clear()
-                      effectiveDateTimePicker.click()
-                      effectiveDateTimePicker.sendKeys(e._1)
-                      effectiveDateTimePicker.sendKeys(Keys.RETURN)
-                    }
-                  }
+              setExpirationDate("sv1", "07/11/2032 12:12 AM")
 
-                  clue("sv1 modifies one value") {
-                    find(id("transferConfig.createFee.fee-value")).value.underlying
-                      .sendKeys(requestNewTransferConfigFeeValue)
-                  }
-                })
-
-                clue("sv1 modifies the summary") {
-                  find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
-                }
-
-                setExpirationDate("sv1", "07/12/2034 12:12 AM")
-
-                clue("sv1 creates the vote request") {
-                  clickVoteRequestSubmitButtonOnceEnabled()
-                }
-              },
-            )(
-              "sv1 can see the alerting message preventing him to continue",
-              _ => {
-                inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
-                  tb.text should include("The expiration date must be before the effective date")
-                }
-              },
-            )
-
-            eventually() {
+              clue("sv1 creates the vote request") {
+                clickVoteRequestSubmitButtonOnceEnabled()
+              }
+            },
+          )(
+            "sv1 can see the new vote request",
+            _ => {
               click on "tab-panel-in-progress"
 
               val tbody = find(id("sv-voting-in-progress-table-body"))
               val tb = tbody.value
               val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-              rows.size shouldBe previousVoteRequestsInProgress
-              sv1ScanBackend
-                .getCoinRules()
-                .contract
-                .payload
-                .configSchedule
-                .futureValues should not be empty
-            }
+              rows.size shouldBe previousVoteRequestsInProgress + 1
+              rows.head.text shouldBe "CRARC_AddFutureCoinConfigSchedule"
 
-            val (_, requestIdUpdate) = actAndCheck(
-              "sv1 operator can create a request to update a coin config schedule", {
+              val reviewButton = rows.head
+              reviewButton.underlying.click()
 
-                val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-                dropDownAction.selectByValue("CRARC_UpdateFutureCoinConfigSchedule")
-
-                val dropDownCoinConfigDate =
-                  new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
-                dropDownCoinConfigDate.selectByIndex(1)
-
-                clue("sv1 modifies one value") {
-                  find(id("transferConfig.createFee.fee-value")).value.underlying
-                    .sendKeys(requestNewTransferConfigFeeValue)
+              val requestId =
+                inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                  tb.text
                 }
+              requestId
+            },
+          )
 
-                clue("sv1 modifies the url") {
-                  find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
-                }
+          vote(sv2Backend, requestIdAdd, true, "2", true)
 
-                clue("sv1 modifies the summary") {
-                  find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
-                }
+          actAndCheck(
+            "sv1 operator fails to create a vote request at the same datetime", {
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("CRARC_AddFutureCoinConfigSchedule")
+              val effectiveDateTimePicker =
+                webDriver.findElement(By.id("datetime-picker-coin-configuration"))
 
-                setExpirationDate("sv1", "07/11/2030 12:12 AM")
-
-                clickVoteRequestSubmitButtonOnceEnabled()
-              },
-            )(
-              "sv1 can see the new vote request",
-              _ => {
-                click on "tab-panel-in-progress"
-
-                val tbody = find(id("sv-voting-in-progress-table-body"))
-                val tb = tbody.value
-                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-                rows.size shouldBe previousVoteRequestsInProgress + 1
-                rows.head.text shouldBe "CRARC_UpdateFutureCoinConfigSchedule"
-
-                val reviewButton = rows.head
-                reviewButton.underlying.click()
-
-                val requestId =
-                  inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
-                    tb.text
+              Seq(("07/12/2032 12:12 AM", 1)).foreach(e => {
+                eventually() {
+                  clue(s"sv1 select a date $e") {
+                    effectiveDateTimePicker.clear()
+                    effectiveDateTimePicker.click()
+                    effectiveDateTimePicker.sendKeys(e._1)
+                    effectiveDateTimePicker.sendKeys(Keys.RETURN)
                   }
-                requestId
-              },
-            )
-
-            vote(sv2Backend, requestIdUpdate, true, "2", true)
-
-            actAndCheck(
-              "sv1 operator fails to create a request to update a coin config scheduled at the same time", {
-
-                val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-                dropDownAction.selectByValue("CRARC_UpdateFutureCoinConfigSchedule")
-
-                val dropDownCoinConfigDate =
-                  new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
-                dropDownCoinConfigDate.selectByIndex(1)
+                }
 
                 clue("sv1 modifies one value") {
                   find(id("transferConfig.createFee.fee-value")).value.underlying
                     .sendKeys(requestNewTransferConfigFeeValue)
                 }
+              })
 
-                clue("sv1 modifies the summary") {
-                  find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
-                }
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
 
-                setExpirationDate("sv1", "07/11/2030 12:12 AM")
+              setExpirationDate("sv1", "07/11/2032 12:12 AM")
 
+              clue("sv1 creates the vote request") {
                 clickVoteRequestSubmitButtonOnceEnabled()
-              },
-            )(
-              "sv1 can see the alerting message preventing him to continue",
-              _ => {
-                inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
-                  tb.text should include("Another vote request for a schedule adjustment")
-                }
-              },
-            )
+              }
+            },
+          )(
+            "sv1 can see the alerting message preventing him to continue",
+            _ => {
+              inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
+                tb.text should include("Another vote request for a schedule adjustment")
+              }
+            },
+          )
 
-            vote(sv3Backend, requestIdUpdate, true, "3", true)
+          vote(sv3Backend, requestIdAdd, true, "3", true)
 
+          clue("the vote request is marked as planned") {
             eventually() {
+              click on "tab-panel-planned"
+              val tbody = find(id("sv-vote-results-planned-table-body"))
+              val tb = tbody.value
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              rows.size shouldBe 1
+            }
+          }
+
+          actAndCheck(
+            "sv1 operator fails to create a vote request because the expiration date is after the effective date.", {
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("CRARC_AddFutureCoinConfigSchedule")
+              val effectiveDateTimePicker =
+                webDriver.findElement(By.id("datetime-picker-coin-configuration"))
+
+              Seq(("07/12/2033 12:12 AM", 1)).foreach(e => {
+                eventually() {
+                  clue(s"sv1 select a date $e") {
+                    effectiveDateTimePicker.clear()
+                    effectiveDateTimePicker.click()
+                    effectiveDateTimePicker.sendKeys(e._1)
+                    effectiveDateTimePicker.sendKeys(Keys.RETURN)
+                  }
+                }
+
+                clue("sv1 modifies one value") {
+                  find(id("transferConfig.createFee.fee-value")).value.underlying
+                    .sendKeys(requestNewTransferConfigFeeValue)
+                }
+              })
+
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
+
+              setExpirationDate("sv1", "07/12/2034 12:12 AM")
+
+              clue("sv1 creates the vote request") {
+                clickVoteRequestSubmitButtonOnceEnabled()
+              }
+            },
+          )(
+            "sv1 can see the alerting message preventing him to continue",
+            _ => {
+              inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
+                tb.text should include("The expiration date must be before the effective date")
+              }
+            },
+          )
+
+          eventually() {
+            click on "tab-panel-in-progress"
+
+            val tbody = find(id("sv-voting-in-progress-table-body"))
+            val tb = tbody.value
+            val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+            rows.size shouldBe previousVoteRequestsInProgress
+            sv1ScanBackend
+              .getCoinRules()
+              .contract
+              .payload
+              .configSchedule
+              .futureValues should not be empty
+          }
+
+          val (_, requestIdUpdate) = actAndCheck(
+            "sv1 operator can create a request to update a coin config schedule", {
+
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("CRARC_UpdateFutureCoinConfigSchedule")
+
+              val dropDownCoinConfigDate =
+                new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
+              dropDownCoinConfigDate.selectByIndex(1)
+
+              clue("sv1 modifies one value") {
+                find(id("transferConfig.createFee.fee-value")).value.underlying
+                  .sendKeys(requestNewTransferConfigFeeValue)
+              }
+
+              clue("sv1 modifies the url") {
+                find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
+              }
+
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
+
+              setExpirationDate("sv1", "07/11/2030 12:12 AM")
+
+              clickVoteRequestSubmitButtonOnceEnabled()
+            },
+          )(
+            "sv1 can see the new vote request",
+            _ => {
               click on "tab-panel-in-progress"
 
               val tbody = find(id("sv-voting-in-progress-table-body"))
               val tb = tbody.value
               val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-              rows.size shouldBe previousVoteRequestsInProgress
-              sv1ScanBackend
-                .getCoinRules()
-                .contract
-                .payload
-                .configSchedule
-                .futureValues should not be empty
-            }
+              rows.size shouldBe previousVoteRequestsInProgress + 1
+              rows.head.text shouldBe "CRARC_UpdateFutureCoinConfigSchedule"
 
-            val (_, requestIdRemove) = actAndCheck(
-              "sv1 operator can create a request to remove a coin config schedule", {
-                val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-                dropDownAction.selectByValue("CRARC_RemoveFutureCoinConfigSchedule")
+              val reviewButton = rows.head
+              reviewButton.underlying.click()
 
-                val dropDownCoinConfigDate =
-                  new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
-                dropDownCoinConfigDate.selectByIndex(1)
-
-                clue("sv1 modifies the url") {
-                  find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
+              val requestId =
+                inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                  tb.text
                 }
+              requestId
+            },
+          )
 
-                clue("sv1 modifies the summary") {
-                  find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+          vote(sv2Backend, requestIdUpdate, true, "2", true)
+
+          actAndCheck(
+            "sv1 operator fails to create a request to update a coin config scheduled at the same time", {
+
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("CRARC_UpdateFutureCoinConfigSchedule")
+
+              val dropDownCoinConfigDate =
+                new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
+              dropDownCoinConfigDate.selectByIndex(1)
+
+              clue("sv1 modifies one value") {
+                find(id("transferConfig.createFee.fee-value")).value.underlying
+                  .sendKeys(requestNewTransferConfigFeeValue)
+              }
+
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
+
+              setExpirationDate("sv1", "07/11/2030 12:12 AM")
+
+              clickVoteRequestSubmitButtonOnceEnabled()
+            },
+          )(
+            "sv1 can see the alerting message preventing him to continue",
+            _ => {
+              inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
+                tb.text should include("Another vote request for a schedule adjustment")
+              }
+            },
+          )
+
+          vote(sv3Backend, requestIdUpdate, true, "3", true)
+
+          eventually() {
+            click on "tab-panel-in-progress"
+
+            val tbody = find(id("sv-voting-in-progress-table-body"))
+            val tb = tbody.value
+            val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+            rows.size shouldBe previousVoteRequestsInProgress
+            sv1ScanBackend
+              .getCoinRules()
+              .contract
+              .payload
+              .configSchedule
+              .futureValues should not be empty
+          }
+
+          val (_, requestIdRemove) = actAndCheck(
+            "sv1 operator can create a request to remove a coin config schedule", {
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("CRARC_RemoveFutureCoinConfigSchedule")
+
+              val dropDownCoinConfigDate =
+                new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
+              dropDownCoinConfigDate.selectByIndex(1)
+
+              clue("sv1 modifies the url") {
+                find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
+              }
+
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
+
+              setExpirationDate("sv1", "07/11/2030 12:12 AM")
+
+              clue("sv1 creates the vote request") {
+                clickVoteRequestSubmitButtonOnceEnabled()
+              }
+            },
+          )(
+            "sv1 can see the new vote request",
+            _ => {
+              click on "tab-panel-in-progress"
+
+              val tbody = find(id("sv-voting-in-progress-table-body"))
+              val tb = tbody.value
+              val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
+              rows.size shouldBe previousVoteRequestsInProgress + 1
+              rows.head.text shouldBe "CRARC_RemoveFutureCoinConfigSchedule"
+
+              val reviewButton = rows.head
+              reviewButton.underlying.click()
+
+              val requestId =
+                inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                  tb.text
                 }
+              requestId
+            },
+          )
 
-                setExpirationDate("sv1", "07/11/2030 12:12 AM")
+          vote(sv3Backend, requestIdRemove, true, "2", true)
 
-                clue("sv1 creates the vote request") {
-                  clickVoteRequestSubmitButtonOnceEnabled()
-                }
-              },
-            )(
-              "sv1 can see the new vote request",
-              _ => {
-                click on "tab-panel-in-progress"
+          actAndCheck(
+            "sv1 operator fails create a request to remove a coin config scheduled at the same time", {
+              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+              dropDownAction.selectByValue("CRARC_RemoveFutureCoinConfigSchedule")
 
-                val tbody = find(id("sv-voting-in-progress-table-body"))
-                val tb = tbody.value
+              val dropDownCoinConfigDate =
+                new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
+              dropDownCoinConfigDate.selectByIndex(1)
+
+              clue("sv1 modifies the summary") {
+                find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
+              }
+
+              setExpirationDate("sv1", "07/11/2030 12:12 AM")
+
+              clue("sv1 creates the vote request") {
+                clickVoteRequestSubmitButtonOnceEnabled()
+              }
+            },
+          )(
+            "sv1 can see the alerting message preventing him to continue",
+            _ => {
+              inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
+                tb.text should include("Another vote request for a schedule adjustment")
+              }
+            },
+          )
+
+        }
+
+        withFrontEnd("sv2") { implicit webDriver =>
+          actAndCheck(
+            "sv2 operator login and browse to the governance tab", {
+              go to s"http://localhost:$sv2UIPort/votes"
+              loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
+            },
+          )(
+            "sv2 sees the new vote request",
+            _ => {
+              click on "tab-panel-action-needed"
+
+              val tbodyActionNeeded = find(id("sv-voting-action-needed-table-body"))
+              inside(tbodyActionNeeded) { case Some(tb) =>
                 val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-                rows.size shouldBe previousVoteRequestsInProgress + 1
-                rows.head.text shouldBe "CRARC_RemoveFutureCoinConfigSchedule"
 
                 val reviewButton = rows.head
                 reviewButton.underlying.click()
+              }
+            },
+          )
 
-                val requestId =
-                  inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
-                    tb.text
-                  }
-                requestId
-              },
-            )
-
-            vote(sv3Backend, requestIdRemove, true, "2", true)
-
-            actAndCheck(
-              "sv1 operator fails create a request to remove a coin config scheduled at the same time", {
-                val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-                dropDownAction.selectByValue("CRARC_RemoveFutureCoinConfigSchedule")
-
-                val dropDownCoinConfigDate =
-                  new Select(webDriver.findElement(By.id("dropdown-display-schedules-datetime")))
-                dropDownCoinConfigDate.selectByIndex(1)
-
-                clue("sv1 modifies the summary") {
-                  find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
-                }
-
-                setExpirationDate("sv1", "07/11/2030 12:12 AM")
-
-                clue("sv1 creates the vote request") {
-                  clickVoteRequestSubmitButtonOnceEnabled()
-                }
-              },
-            )(
-              "sv1 can see the alerting message preventing him to continue",
-              _ => {
-                inside(find(id("alerting-datetime-mismatch"))) { case Some(tb) =>
-                  tb.text should include("Another vote request for a schedule adjustment")
-                }
-              },
-            )
-
-          }
-
-          withFrontEnd("sv2") { implicit webDriver =>
-            actAndCheck(
-              "sv2 operator login and browse to the governance tab", {
-                go to s"http://localhost:$sv2UIPort/votes"
-                loginOnCurrentPage(sv2UIPort, sv2Backend.config.ledgerApiUser)
-              },
-            )(
-              "sv2 sees the new vote request",
-              _ => {
-                click on "tab-panel-action-needed"
-
-                val tbodyActionNeeded = find(id("sv-voting-action-needed-table-body"))
-                inside(tbodyActionNeeded) { case Some(tb) =>
-                  val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-
-                  val reviewButton = rows.head
-                  reviewButton.underlying.click()
-                }
-              },
-            )
-
-            actAndCheck(
-              "sv2 operator accepts the requests", {
-                click on "cast-vote-button"
-                click on "accept-vote-button"
-                click on "save-vote-button"
-              },
-            )(
-              "sv2's modal closes as the threshold of 3 was reached",
-              _ => {
-                find(id("accept-vote-button")) shouldBe empty
-              },
-            )
-          }
+          actAndCheck(
+            "sv2 operator accepts the requests", {
+              click on "cast-vote-button"
+              click on "accept-vote-button"
+              click on "save-vote-button"
+            },
+          )(
+            "sv2's modal closes as the threshold of 3 was reached",
+            _ => {
+              find(id("accept-vote-button")) shouldBe empty
+            },
+          )
+        }
       }
 
     "can request SVC leader election" in { implicit env =>
@@ -1346,7 +1346,7 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "if two AddFutureCoinConfigSchedule actions scheduled at the same time are created concurrently, then one is marked as staled" ignore {
+    "if two AddFutureCoinConfigSchedule actions scheduled at the same time are created concurrently, then one is marked as staled" in {
       implicit env =>
         val requestReasonUrl = "This is a request reason url."
         val requestReasonBody = "This is a request reason."
@@ -1519,7 +1519,7 @@ class SvFrontendIntegrationTest
 
       Seq((expirationDate, 1)).foreach(e => {
         eventually() {
-          clue(s"sv1 select an expiration date") {
+          clue(s"sv1 selects the expiration date $expirationDate") {
             expirationDateTimePicker.clear()
             expirationDateTimePicker.click()
             expirationDateTimePicker.sendKeys(e._1)
