@@ -176,17 +176,6 @@ function _uses_pulumi_stack() {
             stack init \
             --secrets-provider="gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}" \
             2> /dev/null || true
-
-    # Since the command above will take no effect if the stack already exists, we also explicitly change the secrets provider on the stack.
-    # This way, for stacks that already exist, and do not use gcpkms (because they were created before we starting using it),
-    # we will reconfigure them to use it here. Note that this also works if the stack is currently up.
-    # We also need to set the passphrase here for now, in order to be able to read from a stack that hasn't been migrated yet
-    # (where the secrets are encrypted with this passphrase)
-    # TODO(#7735): remove this once all stacks on all clusters use kms provider
-    local -x PULUMI_CONFIG_PASSPHRASE=''
-    _pulumi --stack "organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
-            --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
-            stack change-secrets-provider "gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}"
 }
 
 function _retry_until_success() {
