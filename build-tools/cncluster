@@ -176,6 +176,12 @@ function _uses_pulumi_stack() {
             stack init \
             --secrets-provider="gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}" \
             2> /dev/null || true
+
+    # TODO(#9186): remove this once we figure out how. See issue for more details.
+    local -x PULUMI_CONFIG_PASSPHRASE=''
+    _pulumi --stack "organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
+            --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
+            stack change-secrets-provider "gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}"
 }
 
 function _retry_until_success() {
