@@ -360,19 +360,7 @@ class SvFrontendIntegrationTest
                 element.underlying.sendKeys(requestReasonBody)
               }
 
-              val expirationDateTimePicker =
-                webDriver.findElement(By.id("datetime-picker-vote-request-expiration"))
-
-              Seq(("07/12/2034 12:12 AM", 1)).foreach(e => {
-                eventually() {
-                  clue(s"sv1 select an expiration date") {
-                    expirationDateTimePicker.clear()
-                    expirationDateTimePicker.click()
-                    expirationDateTimePicker.sendKeys(e._1)
-                    expirationDateTimePicker.sendKeys(Keys.RETURN)
-                  }
-                }
-              })
+              setExpirationDate("sv1", "07/12/2034 12:12 AM")
 
               clickVoteRequestSubmitButtonOnceEnabled()
             },
@@ -713,7 +701,6 @@ class SvFrontendIntegrationTest
                 element.underlying.sendKeys(requestReasonUrl)
               }
               if (expiresSoon) {
-                // TODO(#8835) This actually results in some expiration date in the past, at least when run locally.
                 setExpirationDate(
                   "sv1",
                   DateTimeFormatter
@@ -795,7 +782,8 @@ class SvFrontendIntegrationTest
           }
 
           clue("the vote requests get rejected (one by vote, one by expiry)") {
-            eventually(65.seconds) {
+            // Generous buffer for expiry
+            eventually(120.seconds) {
               val tbody = find(id("sv-voting-in-progress-table-body"))
               val tb = tbody.value
               val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
@@ -916,25 +904,13 @@ class SvFrontendIntegrationTest
             "sv1 operator can create a request to add a new coin config schedule", {
               val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
               dropDownAction.selectByValue("CRARC_AddFutureCoinConfigSchedule")
-              val effectiveDateTimePicker =
-                webDriver.findElement(By.id("datetime-picker-coin-configuration"))
 
-              Seq(("07/12/2032 12:12 AM", 1)).foreach(e => {
-                eventually() {
-                  clue(s"sv1 select a date $e") {
-                    effectiveDateTimePicker.clear()
-                    effectiveDateTimePicker.click()
-                    effectiveDateTimePicker.sendKeys(e._1)
-                    effectiveDateTimePicker.sendKeys(Keys.RETURN)
-                  }
-                }
+              setCoinConfigDate("sv1", "07/12/2032 12:12 AM")
 
-                clue("sv1 modifies one value") {
-                  find(id("transferConfig.createFee.fee-value")).value.underlying
-                    .sendKeys(requestNewTransferConfigFeeValue)
-                }
-
-              })
+              clue("sv1 modifies one value") {
+                find(id("transferConfig.createFee.fee-value")).value.underlying
+                  .sendKeys(requestNewTransferConfigFeeValue)
+              }
 
               clue("sv1 modifies the url") {
                 find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
@@ -978,24 +954,13 @@ class SvFrontendIntegrationTest
             "sv1 operator fails to create a vote request at the same datetime", {
               val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
               dropDownAction.selectByValue("CRARC_AddFutureCoinConfigSchedule")
-              val effectiveDateTimePicker =
-                webDriver.findElement(By.id("datetime-picker-coin-configuration"))
 
-              Seq(("07/12/2032 12:12 AM", 1)).foreach(e => {
-                eventually() {
-                  clue(s"sv1 select a date $e") {
-                    effectiveDateTimePicker.clear()
-                    effectiveDateTimePicker.click()
-                    effectiveDateTimePicker.sendKeys(e._1)
-                    effectiveDateTimePicker.sendKeys(Keys.RETURN)
-                  }
-                }
+              setCoinConfigDate("sv1", "07/12/2032 12:12 AM")
 
-                clue("sv1 modifies one value") {
-                  find(id("transferConfig.createFee.fee-value")).value.underlying
-                    .sendKeys(requestNewTransferConfigFeeValue)
-                }
-              })
+              clue("sv1 modifies one value") {
+                find(id("transferConfig.createFee.fee-value")).value.underlying
+                  .sendKeys(requestNewTransferConfigFeeValue)
+              }
 
               clue("sv1 modifies the summary") {
                 find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
@@ -1032,24 +997,13 @@ class SvFrontendIntegrationTest
             "sv1 operator fails to create a vote request because the expiration date is after the effective date.", {
               val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
               dropDownAction.selectByValue("CRARC_AddFutureCoinConfigSchedule")
-              val effectiveDateTimePicker =
-                webDriver.findElement(By.id("datetime-picker-coin-configuration"))
 
-              Seq(("07/12/2033 12:12 AM", 1)).foreach(e => {
-                eventually() {
-                  clue(s"sv1 select a date $e") {
-                    effectiveDateTimePicker.clear()
-                    effectiveDateTimePicker.click()
-                    effectiveDateTimePicker.sendKeys(e._1)
-                    effectiveDateTimePicker.sendKeys(Keys.RETURN)
-                  }
-                }
+              setCoinConfigDate("sv1", "07/12/2033 12:12 AM")
 
-                clue("sv1 modifies one value") {
-                  find(id("transferConfig.createFee.fee-value")).value.underlying
-                    .sendKeys(requestNewTransferConfigFeeValue)
-                }
-              })
+              clue("sv1 modifies one value") {
+                find(id("transferConfig.createFee.fee-value")).value.underlying
+                  .sendKeys(requestNewTransferConfigFeeValue)
+              }
 
               clue("sv1 modifies the summary") {
                 find(id("create-reason-summary")).value.underlying.sendKeys(requestReasonBody)
@@ -1366,23 +1320,14 @@ class SvFrontendIntegrationTest
           eventually() {
             val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
             dropDownAction.selectByValue("CRARC_AddFutureCoinConfigSchedule")
-            val effectiveDateTimePicker =
-              webDriver.findElement(By.id("datetime-picker-coin-configuration"))
-            Seq(("07/12/2030 12:12 AM", 1)).foreach(e => {
-              eventually() {
-                clue(s"sv1 select a date $e") {
-                  effectiveDateTimePicker.clear()
-                  effectiveDateTimePicker.click()
-                  effectiveDateTimePicker.sendKeys(e._1)
-                  effectiveDateTimePicker.sendKeys(Keys.RETURN)
-                }
-              }
-              clue("sv1 modifies one value") {
-                find(id("transferConfig.createFee.fee-value")).value.underlying
-                  .sendKeys("4444")
-              }
 
-            })
+            setCoinConfigDate("sv1", "07/12/2030 12:12 AM")
+
+            clue("sv1 modifies one value") {
+              find(id("transferConfig.createFee.fee-value")).value.underlying
+                .sendKeys("4444")
+            }
+
             clue("sv1 modifies the url") {
               find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
             }
@@ -1408,23 +1353,14 @@ class SvFrontendIntegrationTest
           eventually() {
             val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
             dropDownAction.selectByValue("CRARC_AddFutureCoinConfigSchedule")
-            val effectiveDateTimePicker =
-              webDriver.findElement(By.id("datetime-picker-coin-configuration"))
-            Seq(("07/12/2030 12:12 AM", 1)).foreach(e => {
-              eventually() {
-                clue(s"sv2 select a date $e") {
-                  effectiveDateTimePicker.clear()
-                  effectiveDateTimePicker.click()
-                  effectiveDateTimePicker.sendKeys(e._1)
-                  effectiveDateTimePicker.sendKeys(Keys.RETURN)
-                }
-              }
-              clue("sv2 modifies one value") {
-                find(id("transferConfig.createFee.fee-value")).value.underlying
-                  .sendKeys("5555")
-              }
 
-            })
+            setCoinConfigDate("sv2", "07/12/2030 12:12 AM")
+
+            clue("sv2 modifies one value") {
+              find(id("transferConfig.createFee.fee-value")).value.underlying
+                .sendKeys("5555")
+            }
+
             clue("sv2 modifies the url") {
               find(id("create-reason-url")).value.underlying.sendKeys(requestReasonUrl)
             }
@@ -1510,23 +1446,32 @@ class SvFrontendIntegrationTest
     }
   }
 
-  def setExpirationDate(party: String, expirationDate: String)(implicit
+  def setExpirationDate(party: String, dateTime: String)(implicit
       webDriver: WebDriverType
   ) = {
-    clue(s"$party modifies the expiration date") {
-      val expirationDateTimePicker =
-        webDriver.findElement(By.id("datetime-picker-vote-request-expiration"))
+    setDateTime(party, "datetime-picker-vote-request-expiration", dateTime)
+  }
 
-      Seq((expirationDate, 1)).foreach(e => {
-        eventually() {
-          clue(s"sv1 selects the expiration date $expirationDate") {
-            expirationDateTimePicker.clear()
-            expirationDateTimePicker.click()
-            expirationDateTimePicker.sendKeys(e._1)
-            expirationDateTimePicker.sendKeys(Keys.RETURN)
-          }
-        }
-      })
+  def setCoinConfigDate(party: String, dateTime: String)(implicit
+      webDriver: WebDriverType
+  ) = {
+    setDateTime(party, "datetime-picker-coin-configuration", dateTime)
+  }
+
+  def setDateTime(party: String, pickerId: String, dateTime: String)(implicit
+      webDriver: WebDriverType
+  ) = {
+    clue(s"$party selects the date $dateTime") {
+      val dateTimePicker = webDriver.findElement(By.id(pickerId))
+      eventually() {
+        dateTimePicker.clear()
+        dateTimePicker.click()
+        // Typing in the "filler" characters can mess up the input badly
+        dateTimePicker.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
+        eventually()(
+          dateTimePicker.getAttribute("value") shouldBe dateTime
+        )
+      }
     }
   }
 
