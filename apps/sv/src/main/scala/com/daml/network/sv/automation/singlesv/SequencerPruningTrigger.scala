@@ -3,6 +3,7 @@ package com.daml.network.sv.automation.singlesv
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.environment.SequencerAdminConnection
 import com.daml.network.sv.store.SvSvcStore
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
@@ -59,10 +60,12 @@ class SequencerPruningTrigger(
       unauthenticatedMembersRetentionPeriod.toInternal
     )
     _ <- Future.traverse(unauthenticatedMembers)(sequencerAdminConnection.disableMember)
-    _ = if (unauthenticatedMembers.nonEmpty)
+    _ = if (unauthenticatedMembers.nonEmpty) {
+      val unauthenticated = unauthenticatedMembers.map(_.toProtoPrimitive)
       logger.warn(
-        s"Automatically disabled ${unauthenticatedMembers.size} unauthenticated member clients."
+        show"Automatically disabled ${unauthenticatedMembers.size} unauthenticated member clients. $unauthenticated"
       )
+    }
     res <- sequencerAdminConnection.prune(pruningTimestamp)
   } yield res
 }
