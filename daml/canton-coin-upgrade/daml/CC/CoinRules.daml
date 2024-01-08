@@ -190,11 +190,15 @@ template CoinRules
       : ContractId OpenMiningRound
       with
         coinPrice : Decimal
+        initialRoundNumber : Int
       controller svc
       do
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
         let tickDuration = configUsd.tickDuration
+        let nr0 = initialRoundNumber
+        let nr1 = nr0 + 1
+        let nr2 = nr1 + 1
         let opensAt0 = now
         let opensAt1 = now
         let opensAt2 = addRelTime now tickDuration
@@ -216,11 +220,11 @@ template CoinRules
         let transferConfigUsd = configUsd.transferConfig
 
         create OpenMiningRound with
-          svc; round = Round 0; coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
+          svc; round = Round nr0; coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
         create OpenMiningRound with
-          svc; round = Round 1; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
+          svc; round = Round nr1; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
         create OpenMiningRound with
-          svc; round = Round 2; coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
+          svc; round = Round nr2; coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
 
     nonconsuming choice CoinRules_AdvanceOpenMiningRounds
       : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)

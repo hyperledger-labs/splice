@@ -26,13 +26,13 @@ import CN.SVC.GlobalDomain
 import CN.Scripts.CnsRulesParameters
 
 initMainNetCollective : Script (CCApp, Party, (Party, Party, Party, Party))
-initMainNetCollective = initCollective None False
+initMainNetCollective = initCollective 1 False
 
 initDevNetCollective : Script (CCApp, Party, (Party, Party, Party, Party))
-initDevNetCollective = initCollective None True
+initDevNetCollective = initCollective 1 True
 
-initCollective : Optional [OpenMiningRound] -> Bool -> Script (CCApp, Party, (Party, Party, Party, Party))
-initCollective initialOpenRounds isDevNet = do
+initCollective : Int -> Bool -> Script (CCApp, Party, (Party, Party, Party, Party))
+initCollective initialRoundNumber isDevNet = do
   -- allocate users for the four founding members
   [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
 
@@ -91,10 +91,10 @@ initCollective initialOpenRounds isDevNet = do
         )]
       coinConfig
       coinPrice = 1.0
+      initialRoundNumber
       cnsRulesConfig
       config
       initialTrafficState = Map.empty
-      initialOpenRounds
       isDevNet
     SvcBootstrap_Bootstrap
 

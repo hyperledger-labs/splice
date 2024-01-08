@@ -68,6 +68,7 @@ genericSetupApp svcPrefix = do
 
   submitExerciseCoinRulesByKey app [svc] [] CoinRules_Bootstrap_Rounds with
       coinPrice = 1.0
+      initialRoundNumber = 0
 
   -- return the off-ledger reference to the app for later script steps
   return app

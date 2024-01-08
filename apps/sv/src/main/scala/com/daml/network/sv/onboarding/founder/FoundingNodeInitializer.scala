@@ -1,6 +1,5 @@
 package com.daml.network.sv.onboarding.founder
 
-import org.apache.pekko.stream.Materializer
 import cats.implicits.{
   catsSyntaxTuple2Semigroupal,
   catsSyntaxTuple3Semigroupal,
@@ -63,10 +62,10 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
 
 /** Container for the methods required by the SvApp to initialize the founding SV node. */
 class FoundingNodeInitializer(
@@ -383,7 +382,7 @@ class FoundingNodeInitializer(
       )
     }
 
-    private def importAcsSnapshot(): Future[Option[Seq[cc.round.OpenMiningRound]]] =
+    private def importAcsSnapshot(): Future[Option[cc.round.types.Round]] =
       foundingConfig.bootstrappingDump match {
         case None =>
           logger.debug("Skipping importing an ACS snapshot, as none was configured.")
@@ -448,18 +447,13 @@ class FoundingNodeInitializer(
               )
               None
             } else {
-              import com.daml.network.util.PrettyInstances.*
 
-              val openMiningRounds = AcsStoreDump.extractOpenMiningRounds(jsonDump.contracts)
-              if (!(openMiningRounds.size == 3))
-                logger.error(
-                  show"Expected 3 open mining rounds, but found ${openMiningRounds.size} open mining rounds: ${openMiningRounds
-                      .map(_.toValue)}"
-                )
+              val initialOpenMiningRound =
+                AcsStoreDump.extractEarliestOpenMiningRound(jsonDump.contracts)
               logger.info(
                 s"Completed importing ACS store dump by submitting ${cmds.size} commands in one transaction."
               )
-              Some(openMiningRounds)
+              initialOpenMiningRound
             }
           }
       }
@@ -507,7 +501,8 @@ class FoundingNodeInitializer(
                 )
               case None =>
                 for {
-                  optOpenMiningRounds <- importAcsSnapshot()
+                  optInitialOpenMiningRound <- importAcsSnapshot()
+                  initialRoundNumber = optInitialOpenMiningRound.fold(0L)(_.number)
                   founderDomainNodes <- SvUtil.getFounderDomainNodeConfig(
                     cometBftNode,
                     localDomainNode,
@@ -515,7 +510,9 @@ class FoundingNodeInitializer(
                     clock,
                   )
                   _ = logger
-                    .info(s"Bootstrapping SVC as $svcParty with BFT nodes $founderDomainNodes")
+                    .info(
+                      s"Bootstrapping SVC as $svcParty with initial round number $initialRoundNumber and BFT nodes $founderDomainNodes"
+                    )
                   _ <- svcStoreWithIngestion.connection
                     .submit(
                       actAs = Seq(svcParty),
@@ -526,6 +523,7 @@ class FoundingNodeInitializer(
                         foundingConfig.name,
                         participantId.toProtoPrimitive,
                         founderDomainNodes,
+                        initialRoundNumber,
                         defaultCoinConfig(
                           foundingConfig.initialTickDuration,
                           foundingConfig.initialMaxNumInputs,
@@ -541,7 +539,6 @@ class FoundingNodeInitializer(
                           foundingConfig.initialCnsConfig.entryFee,
                         ),
                         svcRulesConfig,
-                        optOpenMiningRounds.map(_.asJava).toJava,
                         trafficStateForAllMembers
                           .map(m =>
                             m.member.toProtoPrimitive -> new cn.svcrules.TrafficState(

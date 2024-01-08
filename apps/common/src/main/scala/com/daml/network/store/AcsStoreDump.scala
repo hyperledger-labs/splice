@@ -52,15 +52,28 @@ object AcsStoreDump {
     Contract.fromHttp(companion)(fixedContract)
   }
 
-  def extractOpenMiningRounds(
+  def extractEarliestOpenMiningRound(
       contracts: Seq[http.Contract]
-  )(implicit templateDecoder: TemplateJsonDecoder): Seq[cc.round.OpenMiningRound] =
-    contracts.collect(
+  ): Option[cc.round.types.Round] = {
+    val qualifiedName =
+      cc.round.OpenMiningRound.TEMPLATE_ID.getModuleName + ":" +
+        cc.round.OpenMiningRound.TEMPLATE_ID.getEntityName
+    // Iterate through all contracts, check their templateId, and extract the payload.round.number field
+    val candidates = contracts.collect(
       Function.unlift(co =>
-        fromJsonIgnoringPackageId(cc.round.OpenMiningRound.COMPANION)(co).toOption
-          .map(_.payload)
+        for {
+          _ <- Option.when(
+            co.templateId.endsWith(qualifiedName)
+          )(())
+          payload <- co.payload.asObject
+          round <- payload("round").flatMap(_.asObject)
+          number <- round("number").flatMap(_.asString).flatMap(_.toLongOption)
+        } yield number
       )
     )
+    // Return the minimum of all candidates, provided there are some
+    candidates.minOption.map(new cc.round.types.Round(_))
+  }
 
   def extractImportCommands(svcParty: PartyId)(
       contracts: Seq[http.Contract]

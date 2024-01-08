@@ -15,7 +15,6 @@ import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
 import java.nio.file.{Files, Paths}
-import java.time.Instant
 
 // Separate from the export as we need a different config for SV1
 abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
@@ -109,12 +108,8 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
               .filterJava(cc.round.OpenMiningRound.COMPANION)(
                 svcParty
               )
-            // we expect to have imported 1,2,3, and that a round change happens shortly after importing
-            openMiningRounds.map(_.data.round.number).sorted shouldBe Seq(2L, 3L, 4L)
-            // we expect that our testing dump is from quite some time ago
-            openMiningRounds.filter(
-              _.data.targetClosesAt.isBefore(Instant.now())
-            ) should have length 2
+            // we expect to have bootstrapped from round 1
+            openMiningRounds.map(_.data.round.number).sorted shouldBe Seq(1L, 2L, 3L)
           }
         }
         val alice = onboardWalletUser(aliceWalletClient, aliceValidatorLocalBackend)

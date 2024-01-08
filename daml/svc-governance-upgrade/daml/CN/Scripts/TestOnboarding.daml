@@ -16,14 +16,12 @@ import CN.SVC.GlobalDomain
 import CN.SvOnboarding
 
 import CC.Scripts.Util
-import CC.Scripts.Parameters
 import CN.Scripts.SvcTestUtils
 import CC.GlobalDomain (MemberTraffic, initialMemberTraffic)
 import CC.Coin (Coin)
 import CC.CoinRules (CoinRules)
 import CC.Round
 import CC.Round.Types
-import CC.Schedule
 
 
 testOnboardValidator : Script ()
@@ -353,45 +351,7 @@ testSvMemberOverwriteInDevNet = do
 
 testTapAfterRestoringOpenRounds : Script ()
 testTapAfterRestoringOpenRounds = do
-  now <- getTime
-  -- copied from `CoinRules_BootstrapRounds`: not a perfect approximation for importing rounds but good enough
-  let Some svc = partyFromText "SVC"
-  let configUsd = getValueAsOf now defaultCoinConfigSchedule
-  let tickDuration = configUsd.tickDuration
-  let opensAt0 = now
-  let opensAt1 = now
-  let opensAt2 = addRelTime now tickDuration
-
-  let targetClosesAt0 = addRelTime now tickDuration
-  let targetClosesAt1 = addRelTime targetClosesAt0 tickDuration
-  let targetClosesAt2 = addRelTime targetClosesAt1 tickDuration
-
-  -- We accept that round 0 will only be open for one tickDuration in contrast to all other ones.
-  -- Its SVC rewards are compensation for the extra effort of bootstrapping.
-  let issuingFor0 = days 0
-  let issuingFor1 = issuingFor0 + tickDuration
-  let issuingFor2 = issuingFor1 + tickDuration
-
-  let issuanceConfig0 = getValueAsOf issuingFor0 configUsd.issuanceCurve
-  let issuanceConfig1 = getValueAsOf issuingFor1 configUsd.issuanceCurve
-  let issuanceConfig2 = getValueAsOf issuingFor2 configUsd.issuanceCurve
-
-  let transferConfigUsd = configUsd.transferConfig
-  let coinPrice = 2.0
-
-  let initialOpenRounds =
-        [ OpenMiningRound with
-            -- rounds shifted by 10 to check that the new numbers get picked up
-            svc; round = Round 10; coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
-        , OpenMiningRound with
-            svc; round = Round 12; coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
-        -- moved after Round 12 on purpose to see that init works with sorting rounds
-        , OpenMiningRound with
-            svc; round = Round 11; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
-        ]
-
-
-  (app, _, _) <- initCollective (Some initialOpenRounds) True
+  (app, _, _) <- initCollective 10 True
   -- all members are onboarded in the earliest open round, which is required as
   -- they all were members of that round when the data export happened
   -- NOTE: members that join later after a data import will though miss some SvRewards. We're OK with this.
