@@ -82,4 +82,8 @@ Failed to submit submission due to Error\(RequestRefused\(Overloaded\(Submission
 # TODO(#8594): investigate and decide if we can remove it.
 Sender .* of send request .* is not registered so cannot send or receive events\. Dropping send request\.
 
+# This is happenening during party migration and is expected. We can remove this in the future if/when canton detects and handles this warning
+.*Received a commitment where we have no shared contract.*ACS_MISMATCH_NO_SHARED_CONTRACTS.*
+
+
 # Make sure to have a trailing newline
