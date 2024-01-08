@@ -50,7 +50,7 @@ spec:
                 key: postgresPassword
                 name: {{ .Values.postgresSecretName }}
         command:
-          - 'sh'
+          - 'bash'
           - '-c'
           - |
             until errmsg=$(psql -h {{ .Values.postgres.hostname }} --username=cnadmin --dbname={{ .Values.postgres.database }} -p {{ .Values.postgres.port }} -c 'select 1' 2>&1); do

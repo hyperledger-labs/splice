@@ -100,7 +100,7 @@ spec:
                   key: postgresPassword
                   name: {{ .Values.sequencerPostgresSecretName }}
           command:
-            - 'sh'
+            - 'bash'
             - '-c'
             - |
               until errmsg=$(psql -h {{ .Values.sequencerPostgres }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.postgresSequencerDb }}' 2>&1); do

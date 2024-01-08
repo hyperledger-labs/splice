@@ -69,7 +69,7 @@ spec:
                   key: postgresPassword
                   name: {{ .Values.mediatorPostgresSecretName }}
           command:
-            - 'sh'
+            - 'bash'
             - '-c'
             - |
               until errmsg=$(psql -h {{ .Values.mediatorPostgres }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.postgresMediatorDb }}' 2>&1); do

@@ -101,7 +101,7 @@ spec:
                   key: postgresPassword
                   name: {{ .Values.postgresSecretName }}
           command:
-            - 'sh'
+            - 'bash'
             - '-c'
             - |
               until errmsg=$(psql -h {{ .Values.postgres }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.postgresDb }}' 2>&1); do
