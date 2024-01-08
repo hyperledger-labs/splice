@@ -24,3 +24,5 @@ cometBFT:
 domain:
   sequencerPublicUrl: "https://sequencer.sv.svc.YOUR_HOSTNAME"
   sequencerAvailabilityDelay: "60 seconds"
+  sequencerPruningConfig:
+    enabled: false
