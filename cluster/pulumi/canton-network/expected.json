@@ -1990,6 +1990,7 @@
       "timeout": 480,
       "values": {
         "additionalConfig": "canton.validator-apps.validator_backend.app-instances.splitwise = {\n  service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}\n  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}\n  dars = [\"cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar\"]\n}",
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [
           {
             "name": "CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME",
@@ -3595,6 +3596,7 @@
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "appDars": [],
         "cluster": {
@@ -5139,6 +5141,7 @@
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "appDars": [],
         "cluster": {
@@ -6683,6 +6686,7 @@
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "appDars": [],
         "cluster": {
@@ -8227,6 +8231,7 @@
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "appDars": [],
         "cluster": {
@@ -8893,6 +8898,7 @@
       "namespace": "validator1",
       "timeout": 480,
       "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "appDars": [
           "cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"

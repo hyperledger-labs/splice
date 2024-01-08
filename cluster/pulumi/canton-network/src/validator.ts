@@ -20,6 +20,7 @@ import {
   installValidatorOnboardingSecret,
   validatorOnboardingSecretName,
 } from 'cn-pulumi-common';
+import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import { PersistenceConfig } from '../../common';
 import { initDatabase } from './postgres';
@@ -55,7 +56,6 @@ export type ValidatorConfig = {
   additionalUsers?: k8s.types.input.core.v1.EnvVar[];
   participantBootstrapDump?: BootstrappingDumpConfig;
   svValidator?: boolean;
-  additionalJvmOptions?: string;
   participantAddress: Output<string> | string;
 };
 
@@ -135,6 +135,7 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       postgresSecretName: config.persistenceConfig.secretName,
       participantAddress: config.participantAddress,
       init: initDb && { initDb },
+      additionalJvmOptions: jmxOptions(),
     },
     { dependsOn }
   );

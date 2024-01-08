@@ -10,7 +10,6 @@ import {
   CLUSTER_BASENAME,
 } from 'cn-pulumi-common';
 import type { Auth0Client } from 'cn-pulumi-common';
-import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
 import { installParticipant } from './ledger';
@@ -106,6 +105,5 @@ export async function installValidator1(
     participantAddress: 'participant',
     topupConfig,
     svValidator: false,
-    additionalJvmOptions: jmxOptions(),
   });
 }
