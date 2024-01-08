@@ -5,7 +5,6 @@ version: 0.1.0
 dependencies:
   - daml-prim
   - daml-stdlib
-  - daml3-script
 data-dependencies:
 - ../canton-coin/.daml/dist/canton-coin-0.1.0.dar
 - ../canton-name-service/.daml/dist/canton-name-service-0.1.0.dar

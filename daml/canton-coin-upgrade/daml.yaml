@@ -10,7 +10,6 @@ version: 0.2.0
 dependencies:
   - daml-prim
   - daml-stdlib
-  - daml3-script
 data-dependencies:
   - ../cn-util/.daml/dist/cn-util-0.1.0.dar
 build-options:

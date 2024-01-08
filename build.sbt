@@ -61,18 +61,28 @@ lazy val root = (project in file("."))
     `apps-frontends`,
     `cn-util-daml`,
     `canton-coin-daml`,
+    `canton-coin-test-daml`,
     `canton-coin-upgrade-daml`,
+    `canton-coin-test-upgrade-daml`,
     `canton-name-service-daml`,
+    `canton-name-service-test-daml`,
     `canton-name-service-upgrade-daml`,
+    `canton-name-service-test-upgrade-daml`,
     `wallet-payments-daml`,
     `wallet-payments-upgrade-daml`,
     `wallet-daml`,
+    `wallet-test-daml`,
     `wallet-upgrade-daml`,
+    `wallet-test-upgrade-daml`,
     `splitwell-daml`,
+    `splitwell-upgrade-daml`,
+    `splitwell-test-daml`,
+    `splitwell-test-upgrade-daml`,
     `svc-governance-daml`,
     `svc-governance-upgrade-daml`,
     `sv-local-daml`,
     `validator-lifecycle-daml`,
+    `validator-lifecycle-test-daml`,
     `app-manager-daml`,
     `build-tools-dar-lock-checker`,
     `canton-community-base`,
@@ -191,6 +201,18 @@ lazy val `canton-coin-daml` =
       Compile / damlEnableJavaCodegen := false,
     )
 
+lazy val `canton-coin-test-daml` =
+  project
+    .in(file("daml/canton-coin-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`canton-coin-daml` / Compile / damlBuild).value,
+      // We generate code for the latest version
+      Compile / damlEnableJavaCodegen := false,
+    )
+
 lazy val `canton-coin-upgrade-daml` =
   project
     .in(file("daml/canton-coin-upgrade"))
@@ -199,6 +221,17 @@ lazy val `canton-coin-upgrade-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `canton-coin-test-upgrade-daml` =
+  project
+    .in(file("daml/canton-coin-test-upgrade"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`canton-coin-upgrade-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -217,6 +250,22 @@ lazy val `svc-governance-daml` =
       Compile / damlEnableJavaCodegen := false,
     )
 
+lazy val `svc-governance-test-daml` =
+  project
+    .in(file("daml/svc-governance-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cn-util-daml` / Compile / damlBuild).value ++
+          (`canton-coin-test-daml` / Compile / damlBuild).value ++
+          (`canton-name-service-test-daml` / Compile / damlBuild).value ++
+          (`svc-governance-daml` / Compile / damlBuild).value ++
+          (`wallet-payments-daml` / Compile / damlBuild).value,
+      // We generate code for the latest version
+      Compile / damlEnableJavaCodegen := false,
+    )
+
 lazy val `svc-governance-upgrade-daml` =
   project
     .in(file("daml/svc-governance-upgrade"))
@@ -227,6 +276,21 @@ lazy val `svc-governance-upgrade-daml` =
         (`cn-util-daml` / Compile / damlBuild).value ++
           (`canton-coin-upgrade-daml` / Compile / damlBuild).value ++
           (`canton-name-service-upgrade-daml` / Compile / damlBuild).value ++
+          (`wallet-payments-upgrade-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `svc-governance-test-upgrade-daml` =
+  project
+    .in(file("daml/svc-governance-test-upgrade"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cn-util-daml` / Compile / damlBuild).value ++
+          (`canton-coin-upgrade-daml` / Compile / damlBuild).value ++
+          (`canton-name-service-upgrade-daml` / Compile / damlBuild).value ++
+          (`canton-name-service-test-upgrade-daml` / Compile / damlBuild).value ++
           (`wallet-payments-upgrade-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
@@ -247,6 +311,16 @@ lazy val `validator-lifecycle-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`cn-util-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `validator-lifecycle-test-daml` =
+  project
+    .in(file("daml/validator-lifecycle-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`cn-util-daml` / Compile / damlBuild).value ++ (`validator-lifecycle-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -290,6 +364,17 @@ lazy val `wallet-daml` =
       Compile / damlEnableJavaCodegen := false,
     )
 
+lazy val `wallet-test-daml` =
+  project
+    .in(file("daml/wallet-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`canton-coin-test-daml` / Compile / damlBuild).value ++ (`wallet-daml` / Compile / damlBuild).value,
+      // We generate code for the latest version
+      Compile / damlEnableJavaCodegen := false,
+    )
+
 lazy val `wallet-upgrade-daml` =
   project
     .in(file("daml/wallet-upgrade"))
@@ -300,13 +385,34 @@ lazy val `wallet-upgrade-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
+lazy val `wallet-test-upgrade-daml` =
+  project
+    .in(file("daml/wallet-test-upgrade"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`canton-coin-test-upgrade-daml` / Compile / damlBuild).value ++ (`wallet-upgrade-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
 lazy val `canton-name-service-daml` =
   project
     .in(file("daml/canton-name-service"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`wallet-payments-daml` / Compile / damlBuild).value,
+      // We generate code for the latest version
+      Compile / damlEnableJavaCodegen := false,
+    )
+
+lazy val `canton-name-service-test-daml` =
+  project
+    .in(file("daml/canton-name-service-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`wallet-test-upgrade-daml` / Compile / damlBuild).value ++ (`canton-coin-test-daml` / Compile / damlBuild).value ++ (`canton-name-service-daml` / Compile / damlBuild).value,
       // We generate code for the latest version
       Compile / damlEnableJavaCodegen := false,
     )
@@ -321,13 +427,34 @@ lazy val `canton-name-service-upgrade-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
+lazy val `canton-name-service-test-upgrade-daml` =
+  project
+    .in(file("daml/canton-name-service-test-upgrade"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`wallet-test-upgrade-daml` / Compile / damlBuild).value ++ (`canton-coin-test-upgrade-daml` / Compile / damlBuild).value ++ (`canton-name-service-upgrade-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
 lazy val `splitwell-daml` =
   project
     .in(file("daml/splitwell"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`wallet-payments-daml` / Compile / damlBuild).value,
+      // We generate code for the latest version
+      Compile / damlEnableJavaCodegen := false,
+    )
+
+lazy val `splitwell-test-daml` =
+  project
+    .in(file("daml/splitwell-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`wallet-test-daml` / Compile / damlBuild).value ++ (`splitwell-daml` / Compile / damlBuild).value,
       // We generate code for the latest version
       Compile / damlEnableJavaCodegen := false,
     )
@@ -339,6 +466,16 @@ lazy val `splitwell-upgrade-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies := (`wallet-upgrade-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splitwell-test-upgrade-daml` =
+  project
+    .in(file("daml/splitwell-test-upgrade"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`splitwell-upgrade-daml` / Compile / damlBuild).value ++ (`wallet-test-upgrade-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 

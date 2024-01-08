@@ -5,12 +5,10 @@ version: 0.1.0
 dependencies:
   - daml-prim
   - daml-stdlib
-  - daml3-script
 data-dependencies:
   - ../canton-coin/.daml/dist/canton-coin-0.1.0.dar
   - ../cn-util/.daml/dist/cn-util-0.1.0.dar
   - ../wallet-payments/.daml/dist/wallet-payments-0.1.0.dar
-  - ../wallet/.daml/dist/wallet-0.1.0.dar
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches

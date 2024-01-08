@@ -19,11 +19,16 @@ diff_project() {
 
 projects=(
     canton-coin
+    canton-coin-test
     wallet
+    wallet-test
     wallet-payments
     svc-governance
+    svc-governance-test
     canton-name-service
+    canton-name-service-test
     splitwell
+    splitwell-test
 )
 
 for project in "${projects[@]}"; do
