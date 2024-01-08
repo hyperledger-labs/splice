@@ -873,8 +873,11 @@ template SvcRules with
       do
         require "Sponsor is a collective member" (sponsor `Map.member` members)
         -- create license that records in particular which SV sponsored the onboarding of the validator
-        create ValidatorLicense with ..
-
+        create ValidatorLicense with
+          svc
+          sponsor
+          validator
+          faucetState = None
 
 
     -- SV onboarding

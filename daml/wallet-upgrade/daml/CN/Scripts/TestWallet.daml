@@ -20,6 +20,7 @@ import CN.Scripts.Wallet.TestSubscriptions
 
 import CC.Fees
 import CC.Scripts.Util
+import CC.Scripts.Parameters
 
 createPaymentRequest : CCApp -> Party -> Party -> [(Party, PaymentAmount)] -> Script (ContractId AppPaymentRequest)
 createPaymentRequest app provider sender receiverAmounts = do
@@ -374,7 +375,8 @@ testTerminatedPayments = script do
 
   (paymentRequest, acceptedPayment) <- createAcceptedPayment
   context <- getAppTransferContext app alice
-  passTime (minutes 10)
+  let tickDuration = defaultCoinConfig.tickDuration
+  passTime (tickDuration + tickDuration + seconds 1) -- pass one full round of time
   submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Expire context)
   assertTerminatedPayment alice.primaryParty paymentRequest
 

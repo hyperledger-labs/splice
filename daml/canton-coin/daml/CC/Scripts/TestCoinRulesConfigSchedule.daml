@@ -27,10 +27,10 @@ testAddFutureCoinConfigSchedule = do
       elevenDaysLater = addRelTime now (days 11)
       hundredYearsLater = addRelTime now (days (100 * 365))
 
-      coinConfig_initial = makeCoinConfig (seconds 150) (RatePerRound 0.000005)
-      coinConfig1 = makeCoinConfig (seconds 100) (RatePerRound 0.000001)
-      coinConfig2 = makeCoinConfig (seconds 120) (RatePerRound 0.000004)
-      coinConfig3 = makeCoinConfig (seconds 170) (RatePerRound 0.000003)
+      coinConfig_initial = makeCoinConfig (minutes 10) (RatePerRound 0.000020)
+      coinConfig1 = makeCoinConfig (seconds 100) (RatePerRound 0.000004)
+      coinConfig2 = makeCoinConfig (seconds 120) (RatePerRound 0.000016)
+      coinConfig3 = makeCoinConfig (seconds 170) (RatePerRound 0.000012)
 
       newSchedule1 = Schedule with
         initialValue = coinConfig_initial
@@ -111,8 +111,8 @@ testRemoveFutureCoinConfigSchedule = do
   let thirteenHoursLater = addRelTime now (hours 13)
       oneYearLater = addRelTime now (days 365)
 
-      coinConfig_initial = makeCoinConfig (seconds 150) (RatePerRound 0.000005)
-      coinConfig1 = makeCoinConfig (seconds 100) (RatePerRound 0.000001)
+      coinConfig_initial = makeCoinConfig (minutes 10) (RatePerRound 0.00002)
+      coinConfig1 = makeCoinConfig (seconds 100) (RatePerRound 0.000004)
 
       newSchedule1 = Schedule with
         initialValue = coinConfig_initial
@@ -159,9 +159,9 @@ testUpdateFutureCoinConfigSchedule = do
   let thirteenHoursLater = addRelTime now (hours 13)
       oneYearLater = addRelTime now (days 365)
 
-      coinConfig_initial = makeCoinConfig (seconds 150) (RatePerRound 0.000005)
-      coinConfig1 = makeCoinConfig (seconds 100) (RatePerRound 0.000001)
-      coinConfig2 = makeCoinConfig (seconds 120) (RatePerRound 0.00003)
+      coinConfig_initial = makeCoinConfig (minutes 10) (RatePerRound 0.00002)
+      coinConfig1 = makeCoinConfig (seconds 100) (RatePerRound 0.000004)
+      coinConfig2 = makeCoinConfig (seconds 120) (RatePerRound 0.00012)
 
       newSchedule1 = Schedule with
         initialValue = coinConfig_initial

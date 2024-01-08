@@ -22,6 +22,7 @@ import CC.Issuance
 import CC.Round
 import CC.Round.Types
 import CC.GlobalDomain
+import CC.ValidatorLicense
 
 import CN.Util.Assert
 
@@ -251,6 +252,7 @@ template CoinRules
         newSummarizingRound <- create SummarizingMiningRound with
             svc
             round = roundToArchive.round
+            coinPrice = roundToArchive.coinPrice
             issuanceConfig = roundToArchive.issuanceConfig
             tickDuration = roundToArchive.tickDuration
         newOpenRound <- do
@@ -288,7 +290,8 @@ template CoinRules
         require "SVC matches" (miningRound.svc == svc)
         validateOpenMiningRoundSummary summary
 
-        let params = computeIssuingRoundParameters miningRound.tickDuration miningRound.issuanceConfig summary
+        let params = computeIssuingRoundParameters
+              miningRound.tickDuration miningRound.coinPrice miningRound.issuanceConfig summary
 
         -- record reward for the SVC
         create SvcReward with
@@ -315,6 +318,7 @@ template CoinRules
           issuancePerValidatorRewardCoupon = params.issuancePerValidatorRewardCoupon
           issuancePerFeaturedAppRewardCoupon = params.issuancePerFeaturedAppRewardCoupon
           issuancePerUnfeaturedAppRewardCoupon = params.issuancePerUnfeaturedAppRewardCoupon
+          issuancePerValidatorFaucetCoupon = params.issuancePerValidatorFaucetCoupon
 
 
     nonconsuming choice CoinRules_MiningRound_Close
@@ -336,6 +340,7 @@ template CoinRules
           issuancePerValidatorRewardCoupon = issuingRound.issuancePerValidatorRewardCoupon
           issuancePerFeaturedAppRewardCoupon = issuingRound.issuancePerFeaturedAppRewardCoupon
           issuancePerUnfeaturedAppRewardCoupon = issuingRound.issuancePerUnfeaturedAppRewardCoupon
+          issuancePerValidatorFaucetCoupon = issuingRound.issuancePerValidatorFaucetCoupon
           round = issuingRound.round
 
     nonconsuming choice CoinRules_MiningRound_Archive
@@ -354,8 +359,9 @@ template CoinRules
       : Optional (ContractId UnclaimedReward)
       with
         closedRoundCid : ContractId ClosedMiningRound
-        validatorCouponCids : [ContractId ValidatorRewardCoupon]
+        validatorRewardCouponCids : [ContractId ValidatorRewardCoupon]
         appCouponCids : [ContractId AppRewardCoupon]
+        validatorFaucetCouponCids : [ContractId ValidatorFaucetCoupon]
       controller svc
       do
         -- retrieve round
@@ -363,10 +369,16 @@ template CoinRules
         require "SVC matches" (closedRound.svc == svc)
 
         -- expire validator rewards and compute their unclaimed rewards
-        expiredValidatorRewards <- forA validatorCouponCids $ \validatorCouponCid -> do
-          exercise validatorCouponCid ValidatorRewardCoupon_SvcExpire with closedRoundCid
+        expiredValidatorRewards <- forA validatorRewardCouponCids $ \validatorRewardCouponCid -> do
+          exercise validatorRewardCouponCid ValidatorRewardCoupon_SvcExpire with closedRoundCid
 
         let validatorRewards = sum expiredValidatorRewards
+
+        -- expire validator faucet coupons and compute their unclaimed rewards
+        forA_ validatorFaucetCouponCids $ \validatorFaucetCouponCid -> do
+          exercise validatorFaucetCouponCid ValidatorFaucetCoupon_SvcExpire with closedRoundCid
+
+        let numValidatorFaucetCoupons = intToDecimal $ length validatorFaucetCouponCids
 
         -- expire app rewards and compute their unclaimed rewards
         expiredAppRewards <- forA appCouponCids $ \appCouponCid -> do
@@ -378,6 +390,7 @@ template CoinRules
         -- create unclaimed reward for the total
         let amount =
               validatorRewards * closedRound.issuancePerValidatorRewardCoupon +
+              numValidatorFaucetCoupons * closedRound.issuancePerValidatorFaucetCoupon +
               featuredAppRewards * closedRound.issuancePerFeaturedAppRewardCoupon +
               unfeaturedAppRewards * closedRound.issuancePerUnfeaturedAppRewardCoupon
         if (amount <= 0.0)
@@ -536,6 +549,7 @@ data TransferInputsSummary = TransferInputsSummary with
     totalCoinAmount : Decimal
     totalAppRewardAmount : Decimal
     totalValidatorRewardAmount : Decimal
+    totalValidatorFaucetAmount : Decimal
     totalHoldingFees : Decimal
     amountArchivedAsOfRoundZero : Decimal
     changeToHoldingFeesRate : Decimal
@@ -611,6 +625,7 @@ summarizeAndConsumeInputs csum svc sender inps = do
       totalCoinAmount = 0.0
       totalAppRewardAmount = 0.0
       totalValidatorRewardAmount = 0.0
+      totalValidatorFaucetAmount = 0.0
       totalHoldingFees = 0.0
       amountArchivedAsOfRoundZero = 0.0
       changeToHoldingFeesRate = 0.0
@@ -629,6 +644,7 @@ summarizeAndConsumeInputs csum svc sender inps = do
         totalCoinAmount = s.totalCoinAmount + coin.amount.initialAmount
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
         totalHoldingFees = s.totalHoldingFees + holdingFee
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero + getValueAsOfRound0 coin.amount
         changeToHoldingFeesRate = s.changeToHoldingFeesRate - coin.amount.ratePerRound.rate
@@ -649,6 +665,7 @@ summarizeAndConsumeInputs csum svc sender inps = do
         totalCoinAmount = s.totalCoinAmount
         totalAppRewardAmount = s.totalAppRewardAmount + coupon.amount * issuancePerCoupon
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
@@ -670,6 +687,25 @@ summarizeAndConsumeInputs csum svc sender inps = do
         totalCoinAmount = s.totalCoinAmount
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount + coupon.amount * miningRound.issuancePerValidatorRewardCoupon
+        totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
+        totalHoldingFees = s.totalHoldingFees
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
+        changeToHoldingFeesRate = s.changeToHoldingFeesRate
+
+    summarizeAndConsumeInput _round s (InputValidatorFaucetCoupon couponCid) = do
+      -- fetch and archive
+      coupon <- fetch couponCid
+      archive couponCid
+      -- check coupon
+      require "SVC matches" (svc == coupon.svc)
+      require "Sender matches validator" (sender == coupon.validator)
+      -- compute balance change
+      miningRound <- getIssuingMiningRound csum coupon.round
+      return TransferInputsSummary with
+        totalCoinAmount = s.totalCoinAmount
+        totalAppRewardAmount = s.totalAppRewardAmount
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalValidatorFaucetAmount = s.totalValidatorFaucetAmount + miningRound.issuancePerValidatorFaucetCoupon
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
@@ -723,7 +759,10 @@ summarizeTransfer sender openRound transferConfigCC inp preprocessedOutputs = do
     outputFees = map (.outputFee) preprocessedOutputs
     totalOutputAmount = sum $ map (.amount) preprocessedOutputs
     leftOverAmount =
-      inp.totalCoinAmount + inp.totalAppRewardAmount + inp.totalValidatorRewardAmount
+      inp.totalCoinAmount
+      + inp.totalAppRewardAmount
+      + inp.totalValidatorRewardAmount
+      + inp.totalValidatorFaucetAmount
       - inp.totalHoldingFees - totalOutputAmount - sum outputFees
     senderChangeFee = min transferConfigCC.createFee.fee leftOverAmount
     senderChangeAmount = leftOverAmount - senderChangeFee
@@ -744,6 +783,7 @@ summarizeTransfer sender openRound transferConfigCC inp preprocessedOutputs = do
       balanceChanges = balanceChanges
       inputAppRewardAmount = inp.totalAppRewardAmount
       inputValidatorRewardAmount = inp.totalValidatorRewardAmount
+      inputValidatorFaucetAmount = inp.totalValidatorFaucetAmount
       holdingFees = inp.totalHoldingFees
       outputFees
       senderChangeFee
@@ -889,6 +929,7 @@ data CreatedCoin
 data TransferInput
   = InputAppRewardCoupon (ContractId AppRewardCoupon)
   | InputValidatorRewardCoupon (ContractId ValidatorRewardCoupon)
+  | InputValidatorFaucetCoupon (ContractId ValidatorFaucetCoupon)
   | InputCoin (ContractId Coin)
   deriving (Eq, Ord, Show)
 
@@ -935,7 +976,8 @@ data TransferResult
 -- All amounts are denominated in CC.
 data TransferSummary = TransferSummary with
     inputAppRewardAmount : Decimal -- ^ Total amount of app rewards input into this transfer.
-    inputValidatorRewardAmount : Decimal -- ^ Total amount of validator rewards input into this transfer.
+    inputValidatorRewardAmount : Decimal -- ^ Total amount of validator rewards coupons input into this transfer.
+    inputValidatorFaucetAmount : Decimal -- ^ Total amount of validator faucet coupons input into this transfer.
     inputCoinAmount : Decimal -- ^ Total input amount of coin input into this transfer, before deducting holding fees.
     balanceChanges : Map Party BalanceChange -- ^ Balance changes per party
     holdingFees : Decimal -- ^ Holding fees paid by the sender on their input coins.

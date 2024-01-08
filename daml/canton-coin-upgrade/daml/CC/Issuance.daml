@@ -18,6 +18,7 @@ data IssuanceConfig = IssuanceConfig with
     validatorRewardCap : Decimal
     featuredAppRewardCap : Decimal
     unfeaturedAppRewardCap : Decimal
+    validatorFaucetCap : Decimal -- ^ Maximal amount in $ for the per-validator issuance of validator faucet coupons
   deriving (Eq, Show)
 
 validIssuanceCurve : Schedule RelTime IssuanceConfig -> Bool
@@ -31,6 +32,7 @@ validIssuanceConfig IssuanceConfig{..} =
     && validatorRewardCap >= 0.0
     && featuredAppRewardCap >= 0.0
     && unfeaturedAppRewardCap >= 0.0
+    && validatorFaucetCap >= 0.0
 
 -- computation of issuance per round
 ------------------------------------
@@ -40,6 +42,7 @@ data OpenMiningRoundSummary = OpenMiningRoundSummary with
     totalValidatorRewardCoupons : Decimal
     totalFeaturedAppRewardCoupons : Decimal
     totalUnfeaturedAppRewardCoupons : Decimal
+    totalValidatorFaucetCoupons : Int
   deriving (Eq, Show)
 
 -- | Parameters to use in a round that issues coin as rewards for collected coupons.
@@ -47,6 +50,7 @@ data IssuingRoundParameters = IssuingRoundParameters with
     issuancePerValidatorRewardCoupon : Decimal
     issuancePerFeaturedAppRewardCoupon : Decimal
     issuancePerUnfeaturedAppRewardCoupon : Decimal
+    issuancePerValidatorFaucetCoupon : Decimal
     coinsToIssueToSvc : Decimal
     unclaimedAppRewards : Decimal
     unclaimedValidatorRewards : Decimal
@@ -57,19 +61,20 @@ validateOpenMiningRoundSummary summary = do
     require "totalValidatorRewardCoupons >= 0.0" (summary.totalValidatorRewardCoupons >= 0.0)
     require "totalFeaturedAppRewardCoupons >= 0.0" (summary.totalFeaturedAppRewardCoupons >= 0.0)
     require "totalUnfeaturedAppRewardCoupons >= 0.0" (summary.totalUnfeaturedAppRewardCoupons >= 0.0)
+    require "totalValidatorFaucetCoupons >= 0" (summary.totalValidatorFaucetCoupons >= 0)
 
-computeIssuingRoundParameters : RelTime -> IssuanceConfig -> OpenMiningRoundSummary -> IssuingRoundParameters
-computeIssuingRoundParameters tickDuration config summary =
+computeIssuingRoundParameters : RelTime -> Decimal -> IssuanceConfig -> OpenMiningRoundSummary -> IssuingRoundParameters
+computeIssuingRoundParameters tickDuration coinPrice config summary =
     IssuingRoundParameters with
       coinsToIssueToSvc =
-        coinsToIssueInRound - validatorIssuance.rewardsToIssue - unfeaturedAppIssuance.rewardsToIssue
+        coinsToIssueInRound - validatorRewardIssuance.rewardsToIssue - unfeaturedAppIssuance.rewardsToIssue
 
-      issuancePerValidatorRewardCoupon = validatorIssuance.issuancePerCoupon
+      issuancePerValidatorRewardCoupon = validatorRewardIssuance.issuancePerCoupon
       issuancePerUnfeaturedAppRewardCoupon = unfeaturedAppIssuance.issuancePerCoupon
       issuancePerFeaturedAppRewardCoupon =
         unfeaturedAppIssuance.issuancePerCoupon + featuredAppIssuance.issuancePerCoupon
-
-      unclaimedValidatorRewards = validatorIssuance.unclaimedRewards
+      issuancePerValidatorFaucetCoupon = validatorFaucetIssuance.issuancePerCoupon
+      unclaimedValidatorRewards = validatorFaucetIssuance.unclaimedRewards
       unclaimedAppRewards = featuredAppIssuance.unclaimedRewards
   where
     roundsPerYear =
@@ -77,10 +82,16 @@ computeIssuingRoundParameters tickDuration config summary =
       intToDecimal (convertRelTimeToMicroseconds tickDuration)
     coinsToIssueInRound = config.coinToIssuePerYear / roundsPerYear
 
-    validatorIssuance = computeIssuanceTranche
+    validatorRewardIssuance = computeIssuanceTranche
       (coinsToIssueInRound * config.validatorRewardPercentage)
       config.validatorRewardCap
       summary.totalValidatorRewardCoupons
+
+    -- validator faucets receive the remainder of the validator tranche
+    validatorFaucetIssuance = computeIssuanceTranche
+      validatorRewardIssuance.unclaimedRewards
+      (config.validatorFaucetCap / coinPrice)
+      (intToDecimal summary.totalValidatorFaucetCoupons)
 
     unfeaturedAppIssuance = computeIssuanceTranche
       (coinsToIssueInRound * config.appRewardPercentage)

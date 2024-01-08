@@ -302,6 +302,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           dummyDecimal,
           dummyDecimal,
           dummyDecimal,
+          dummyDecimal,
           oldestRound.payload.opensAt,
           newestRound.payload.targetClosesAt,
         )
@@ -311,6 +312,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         new cc.round.ClosedMiningRound(
           svcParty.toProtoPrimitive,
           dummyRound,
+          dummyDecimal,
           dummyDecimal,
           dummyDecimal,
           dummyDecimal,

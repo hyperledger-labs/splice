@@ -161,6 +161,9 @@ object CNNodeUtil {
 
     // unfeaturedAppRewardCap
     damlDecimal(0.6),
+
+    // validatorFaucetCap
+    damlDecimal(2.85),
   )
 
   private def hours(h: Long): RelTime = new RelTime(TimeUnit.HOURS.toMicros(h))

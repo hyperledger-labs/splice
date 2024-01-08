@@ -1,10 +1,84 @@
 module CC.ValidatorLicense where
 
+import CC.Round
+import CC.Round.Types
+import CN.Util.Assert
+
+data FaucetState = FaucetState with
+    firstReceivedFor : Round -- ^ The first round for which a coupon was received.
+    lastReceivedFor : Round -- ^ The last round for which a coupon was received.
+    numCouponsMissed : Int -- ^ The number of rounds for which no coupon was received.
+  deriving (Eq, Show)
+
 -- | The existence of a validator license is what makes a validator an (onboarded) validator.
 template ValidatorLicense with
     validator : Party           -- ^ The validator (party) that this license is about.
     sponsor : Party             -- ^ The SV node that sponsored the onboarding.
     svc : Party                 -- ^ The party representing the network's SV collective.
+    faucetState : Optional FaucetState
   where
-    signatory svc
-    observer validator
+    signatory svc -- sponsor is not a signatory as that complicates re-issuing crates
+    observer validator -- not a signatory to simplify the creation of the license as part of onboarding
+
+
+    -- We expect the wallet of the validator to call this choice automatically.
+    choice ValidatorLicense_ReceiveFaucetCoupon : (ContractId ValidatorLicense, ContractId ValidatorFaucetCoupon)
+      with
+        openRoundCid : ContractId OpenMiningRound
+      controller validator
+      do
+        now <- getTime
+        openRound <- exercise openRoundCid (OpenMiningRound_Fetch validator)
+        require "SVC of open round matches" (openRound.svc == svc)
+        require "OpenRound is open" (openRound.opensAt <= now)
+
+        newFaucetState <- case faucetState of
+          None -> return $ Some FaucetState with
+            firstReceivedFor = openRound.round
+            lastReceivedFor = openRound.round
+            numCouponsMissed = 0
+
+          Some state -> do
+            require "Not yet received" (state.lastReceivedFor < openRound.round)
+            return $ Some FaucetState with
+              firstReceivedFor = state.firstReceivedFor
+              lastReceivedFor = openRound.round
+              numCouponsMissed = state.numCouponsMissed + (openRound.round.number - state.lastReceivedFor.number - 1)
+
+        licenseCid <- create this with faucetState = newFaucetState
+
+        couponCid <- create ValidatorFaucetCoupon with
+          svc
+          validator
+          round = openRound.round
+
+        return (licenseCid, couponCid)
+
+    -- We expect the SVC to call this choice for misbehaving validators.
+    choice ValidatorLicense_Withdraw : ()
+      with
+        reason : Text
+      controller svc
+      do return ()
+
+    choice ValidatorLicense_Cancel : ()
+      with
+        reason : Text
+      controller validator
+      do return ()
+
+
+template ValidatorFaucetCoupon with
+    svc : Party
+    validator : Party
+    round : Round
+  where
+    signatory svc, validator
+
+    choice ValidatorFaucetCoupon_SvcExpire : ()
+      with
+        closedRoundCid : ContractId ClosedMiningRound
+      controller svc
+      do closedRound <- fetch closedRoundCid
+         require "SVC matches" (svc == closedRound.svc)
+         require "Mining round matches" (round == closedRound.round)

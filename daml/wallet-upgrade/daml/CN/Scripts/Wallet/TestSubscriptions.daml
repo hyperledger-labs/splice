@@ -61,7 +61,7 @@ testSubscription = script do
   None <- queryContractId alice.primaryParty subscriptionRequestCid
 
   -- expire...
-  passTime (minutes 6)
+  passTime (minutes 21) -- pass one round duration and a bit
   transferContext <- getAppTransferContext app alice
   _ <- submitUser alice.userId $ exerciseCmd initialPaymentCid SubscriptionInitialPayment_Expire with actor = alice.primaryParty, transferContext
   assertTerminatedSubscription alice.primaryParty subscriptionRequestCid

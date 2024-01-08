@@ -14,6 +14,7 @@ import CC.CoinRules
 import CC.Issuance
 import CC.Round
 import CC.Round.Types
+import CC.ValidatorLicense
 
 import CC.Scripts.Util
 import CC.Scripts.Parameters
@@ -171,13 +172,15 @@ runNextIssuanceD app coinPrice = do
       -- collect all unclaimed rewards into the unclaimed rewards fund
       validatorRewards <- (queryFilter @ValidatorRewardCoupon app.svc (\r -> r.round == miningRound.round))
       appRewards <- queryFilter @AppRewardCoupon app.svc (\r -> r.round == miningRound.round)
+      validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.svc (\r -> r.round == miningRound.round)
       leaderSubmits app $ \cid -> exerciseCmd cid $
         SvcRules_ClaimExpiredRewards with
           coinRulesCid = coinRulesCid
           choiceArg = CoinRules_ClaimExpiredRewards with
             closedRoundCid = miningRoundCid
-            validatorCouponCids = map fst validatorRewards
+            validatorRewardCouponCids = map fst validatorRewards
             appCouponCids = map fst appRewards
+            validatorFaucetCouponCids = map fst validatorFaucetCoupons
 
       -- the closed round
       confirmAWC_MiningRound_Archive app
@@ -209,11 +212,13 @@ runNextIssuanceD app coinPrice = do
     -- compute total burn
     appRewardCoupons <- queryFilter @AppRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
     validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
+    validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.svc (\bc -> bc.round == roundToArchive.round)
 
     let summary = OpenMiningRoundSummary with
           totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
           totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
           totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
+          totalValidatorFaucetCoupons = length validatorFaucetCoupons
 
     -- create issuing mining round
     submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with
@@ -271,7 +276,7 @@ executeAllDefinitiveVotes app = do
   forA_ requests $ \(requestCid, _) -> do
     -- fetch the corresponding votes
     voteContracts <- queryFilter @Vote app.svc (\vote -> vote.requestCid == requestCid)
-    let votes = map (\(_, v) -> v) voteContracts
+    let votes = map (._2) voteContracts
     let numYays = length $ filter (.accept) votes
     let numNays = length $ filter (\vote -> not vote.accept) votes
     when (numYays >= s.requiredNumVotes || numNays >= s.requiredNumVotes) $

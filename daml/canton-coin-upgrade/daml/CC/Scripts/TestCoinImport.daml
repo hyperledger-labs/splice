@@ -32,6 +32,7 @@ testImportCrates = do
         svc = app.svc
         validator = alice
         sponsor = app.svc
+        faucetState = None
   licenseCrate <- submit newApp.svc $ createCmd ImportCrate with
     svc = newApp.svc
     receiver = alice

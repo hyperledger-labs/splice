@@ -93,6 +93,7 @@ testUsageFees = do
   ignoreBalanceChanges === TransferSummary with
     inputAppRewardAmount = 0.0
     inputValidatorRewardAmount = 0.0
+    inputValidatorFaucetAmount = 0.0
     inputCoinAmount = 100.0
     balanceChanges = Map.empty
     holdingFees = inputCoinHoldingFees
@@ -164,7 +165,7 @@ testCoinUsedAfterHoldingFeeChanged = do
   let DefaultAppWithUsers{..} = defaultAppWithUsers
   now <- getTime
 
-  let holdingFee = 0.000005
+  let holdingFee = 0.00002
       smallerHoldingFee = 0.00005
       transferAmount = 10.0
 
@@ -209,10 +210,10 @@ testCoinUsedAfterHoldingFeeChanged = do
 
   -- Actual amount of a coin created before holding fee change will be computed using the old holding fee
   -- even if it is used as transfer input at a round with conifig that holding fee is reduced.
-  transferResult2.summary.holdingFees === 0.000005 * (7.0 - 2.0)
+  transferResult2.summary.holdingFees === holdingFee * (7.0 - 2.0)
 
   -- Smaller holding fee is used as the coin is created in round 3 when holding fee is redueced
-  transferResult3.summary.holdingFees === 0.00005 * (7.0 - 3.0)
+  transferResult3.summary.holdingFees === smallerHoldingFee * (7.0 - 3.0)
 
 submitTransfer: ContractId CoinRules -> TransferContext -> Party -> Party -> Party -> ContractId Coin -> Decimal -> Script TransferResult
 submitTransfer coinRulesCid transferContext svc sender receiver coinCid amount = do
@@ -234,7 +235,7 @@ testSenderChangeAndOutput = do
   defaultAppWithUsers <- setupDefaultAppWithUsers
   let DefaultAppWithUsers{..} = defaultAppWithUsers
 
-  let holdingFee = 0.000005
+  let holdingFee = 0.00002
   let coin1Amount = 100.0
   let outputAmount1 = 20.0
   let outputAmount2 = 30.0
@@ -284,7 +285,7 @@ testSenderNoChange = do
   defaultAppWithUsers <- setupDefaultAppWithUsers
   let DefaultAppWithUsers{..} = defaultAppWithUsers
 
-  let holdingFee = 0.000005
+  let holdingFee = 0.00002
   let coin1Amount = 100.0
   let outputAmount1 = 49.7
   let outputAmount2 = 30.0
@@ -331,7 +332,7 @@ testSenderNoChangeNoSenderOutput = do
   defaultAppWithUsers <- setupDefaultAppWithUsers
   let DefaultAppWithUsers{..} = defaultAppWithUsers
 
-  let holdingFee = 0.000005
+  let holdingFee = 0.00002
   let coin1Amount = 100.0
   let outputAmount1 = 58.97
   let outputAmount2 = 39.98

@@ -41,6 +41,7 @@ testOnboardValidator = do
     validator = v1
     sponsor = sv2
     svc
+    faucetState = None
 
   -- so v1 is onboarded!
   pure ()

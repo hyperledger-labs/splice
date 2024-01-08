@@ -22,6 +22,7 @@ import CC.Fees
 import CC.Round.Types
 import CC.RelRound
 import CC.Schedule
+import CC.ValidatorLicense
 
 import CC.Scripts.Parameters
 import CN.Util.Assert
@@ -85,6 +86,13 @@ setupValidator app name = do
 setupValidator' : CCApp -> Text -> Script CCUser
 setupValidator' app name = do
   validatorParty <- allocatePartyWithHint name (PartyIdHint name)
+  sponsorParty <- allocateParty (name <> "_dummy_SV_sponsor")
+  submitMulti [validatorParty, app.svc] [] $ createCmd ValidatorLicense with
+    svc = app.svc
+    sponsor = sponsorParty
+    validator = validatorParty
+    faucetState = None
+
   userId <- validateUserId name
   -- TODO(#2957): remove read-as SVC.
   createUser (User userId (Some validatorParty)) [CanActAs validatorParty, CanReadAs app.svc]
@@ -216,11 +224,13 @@ runNextIssuanceInternal app coinPrice = do
     -- compute total burn
     appRewardCoupons <- queryFilter @AppRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
     validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
+    validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.svc (\bc -> bc.round == roundToArchive.round)
 
     let summary = OpenMiningRoundSummary with
           totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
           totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
           totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
+          totalValidatorFaucetCoupons = length validatorFaucetCoupons
 
     -- create issuing mining round
     submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with
@@ -348,6 +358,18 @@ lockTo1 app sender lockHolder coinAmount lockDuration = do
     CoinRules_Transfer with
       transfer, context = coinTransferContext openRound featuredAppRight
 
+-- | Draw on validator faucets for all open rounds.
+drawOnAllValidatorFaucets : CCApp -> Script ()
+drawOnAllValidatorFaucets app = do
+  openRounds <- getOpenRoundsSorted app
+  forA_ openRounds $ \openRound -> do
+    licenses <- queryFilter @ValidatorLicense app.svc
+      (\l -> optional True (\state -> state.lastReceivedFor < openRound._2.round) l.faucetState)
+    forA_ licenses $ \(lcid, l) ->
+      -- submitMulti as the OpenMiningRound would be disclosed using explicit disclosure
+      submitMulti [l.validator] [app.svc] $ exerciseCmd lcid ValidatorLicense_ReceiveFaucetCoupon with
+        openRoundCid = openRound._1
+
 -- | Deposit all coins together with new issuances into a single coin.
 runCoinDepositBots : CCApp -> Script ()
 runCoinDepositBots app = do
@@ -372,6 +394,9 @@ runCoinDepositBots app = do
     validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc $ \c ->
       c.round `elem` issuingRoundNumbers && c.user `Map.member` validatorRights
 
+    validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.svc $ \c ->
+      c.round `elem` issuingRoundNumbers && c.validator == user
+
     -- get all coins of this user
     coins <- getCoinInputs user
     -- Need readAs rights for all hosted users to collect their validator rewards,
@@ -385,9 +410,11 @@ runCoinDepositBots app = do
           inputs =
               map (InputAppRewardCoupon . fst) appRewardCoupons ++
               map (InputValidatorRewardCoupon . fst) validatorRewardCoupons ++
+              map (InputValidatorFaucetCoupon . fst) validatorFaucetCoupons ++
               coins
           outputs = []
-    when (not (null appRewardCoupons) || not (null validatorRewardCoupons) || length coins > 1) $ void $
+    -- merge multiple coins or rewards and claim rewards even if there are no coins yet
+    when (length transfer.inputs > 1 || (length transfer.inputs == 1 && null coins)) $ void $
       submitExerciseCoinRulesByKey app [user] readAs CoinRules_Transfer with
         transfer
         context = mkContext validatorRights
@@ -498,7 +525,7 @@ getTransferContext app user featuredAppRight = do
     validatorRights = Map.fromList
       [ (right.user, rightCid) | (rightCid, right) <- validatorRights, right.validator == user.primaryParty]
     openMiningRound
-    featuredAppRight = fmap (\cid -> cid) featuredAppRight
+    featuredAppRight = featuredAppRight
 
 tap : CCApp -> CCUser -> Decimal -> Script (ContractId Coin)
 tap app user amount = do

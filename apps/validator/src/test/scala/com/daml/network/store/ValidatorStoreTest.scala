@@ -29,6 +29,8 @@ import scala.concurrent.Future
 import com.daml.network.http.v0.definitions
 import io.circe.syntax.*
 
+import java.util.Optional
+
 abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
 
   "ValidatorStore" should {
@@ -469,6 +471,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       validator.toProtoPrimitive,
       sponsor.toProtoPrimitive,
       svcParty.toProtoPrimitive,
+      Optional.empty(),
     )
     contract(
       identifier = templateId,

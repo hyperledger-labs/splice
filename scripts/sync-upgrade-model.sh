@@ -9,7 +9,8 @@ sync_project() {
   local project_name="$1"
   git apply "$REPO_ROOT/daml/upgrade-diffs/$project.diff" --directory daml -p 2 -R
   rsync -av --delete "daml/${project_name}/" "daml/${project_name}-upgrade"
-  git apply "$REPO_ROOT/daml/upgrade-diffs/$project.diff" --directory daml -p 2 --reject
+  # Proceed on rejection to ensure all projects are synced, and the `wiggle` CLI tool can be used afterwards to resolve the rejections
+  git apply "$REPO_ROOT/daml/upgrade-diffs/$project.diff" --directory daml -p 2 --reject || true
 }
 
 projects=(

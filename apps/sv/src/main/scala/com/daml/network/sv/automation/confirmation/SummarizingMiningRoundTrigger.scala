@@ -134,6 +134,8 @@ class SummarizingMiningRoundTrigger(
         .collect[BigDecimal] { case c if !c.payload.featured => BigDecimal(c.payload.amount) }
         .sum
         .bigDecimal,
+      // TODO(#8819): total up validator faucet coupons,
+      0,
     )
   }
 

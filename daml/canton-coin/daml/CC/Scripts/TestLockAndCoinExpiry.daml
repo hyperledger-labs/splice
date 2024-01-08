@@ -21,7 +21,6 @@ import DA.Time
 test : Script ()
 test = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
-
   currentTime <- getTime
   let coinPrice = 2.5
       config = scaleCoinConfig coinPrice defaultCoinConfig
@@ -79,6 +78,8 @@ test = script do
   let lockExpiresBeforeLargeCoin = doesLockExpireBeforeCoin openRound3 lockExpiresAt12_30 largeAmount config.tickDuration
   assert lockExpiresBeforeLargeCoin
 
+  pure ()
+
 -- From #2336, This test case is to make sure we handle DA.Time overflow
 -- in estimateOpenRoundCreatedAt when the coin amount is too large
 testLargeCoinExpiry : Script ()
@@ -110,11 +111,11 @@ testLargeCoinExpiry = script do
 testExpireLockedCoin : Script ()
 testExpireLockedCoin = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
-  passTime (minutes 6)
+  passTime (minutes 20) -- pass enough time so that round 2 expires in 10 minutes
 
   -- Locking the coin with with initialAmount 0.000005 and created at round 2 but with a
-  -- lock for 1.5 minutes should fail, as round 2 ends in 1.5 minutes
-  getLockedCoinMustFail app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (seconds 90)
+  -- lock for 10 minutes should fail, as round 2 ends in 10 minutes
+  getLockedCoinMustFail app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (minutes 10)
 
   -- Lock the coin with initialAmount 0.000005 and created at round 2
   -- As the holding fee is 0.000005 so the coin will be expired at round 3
@@ -154,6 +155,7 @@ testExpireLockedCoin = do
 
   lockedCoins <- query @LockedCoin bob.primaryParty
   lockedCoins === []
+
   pure ()
 
 testExpireCoin : Script ()
@@ -164,12 +166,12 @@ testExpireCoin = do
   [(_, onlyCoin)] <- query @Coin alice.primaryParty
   onlyCoin.amount.initialAmount === 1.0
 
-  cid <- tap app alice 0.0000050001
-  -- Lock the coin with initialAmount 0.0000050001 and created at round 1
+  cid <- tap app alice 0.0000200001
+  -- Lock the coin with initialAmount 0.0000200001 and created at round 1
   -- As the holding fee is 0.000005 so the coin will be expired at round 3
   Some(coin) <- queryContractId @Coin alice.primaryParty cid
 
-  coin.amount.initialAmount === 0.0000050001
+  coin.amount.initialAmount === 0.0000200001
   coin.amount.createdAt === Round 1
 
   -- current latest active round is 3
@@ -182,6 +184,7 @@ testExpireCoin = do
 
   -- current latest active round is 4
   latestActiveRoundCid <- advanceRound app (Round 4)
+
 
   -- 2 rounds before current latest active round => 4 - 2 = 2 which is before round 3 when the coin expires
   -- svc fails to expire the coin
@@ -210,6 +213,7 @@ testExpireCoin = do
   -- alice now only owns a coin with initial amount of 1.0
   [(_, onlyCoin)] <- query @Coin alice.primaryParty
   onlyCoin.amount.initialAmount === 1.0
+
   pure ()
 
 advanceRound : CCApp -> Round -> Script (ContractId OpenMiningRound)

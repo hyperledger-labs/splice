@@ -9,6 +9,7 @@ import CC.Coin
 import CC.CoinRules
 import CC.Round
 import CC.Round.Types
+import CC.ValidatorLicense
 import CC.Scripts.Util
 import CC.Scripts.TestIssuance
 import CC.Scripts.Parameters
@@ -38,6 +39,16 @@ testUnclaimedRewards = do
     amount = 2.3
     round = Round 0
 
+  validatorFaucet1 <- submitMulti [app.svc, alice.primaryParty] [] $ createCmd ValidatorFaucetCoupon with
+    svc = app.svc
+    validator = alice.primaryParty
+    round = Round 0
+
+  validatorFaucet2 <- submitMulti [app.svc, provider1Validator.primaryParty] [] $ createCmd ValidatorFaucetCoupon with
+    svc = app.svc
+    validator = provider1Validator.primaryParty
+    round = Round 0
+
   -- -- start issuing so the SVC has some coins to invite users
   runNextIssuance app
   runCoinDepositBots app
@@ -49,7 +60,8 @@ testUnclaimedRewards = do
       allocatedRewards =
         5.7 * issuanceConfig_0_0p5.featuredAppRewardCap +
         3.3 * issuanceConfig_0_0p5.unfeaturedAppRewardCap +
-        2.3 * issuanceConfig_0_0p5.validatorRewardCap
+        2.3 * issuanceConfig_0_0p5.validatorRewardCap +
+        2.0 * issuanceConfig_0_0p5.validatorFaucetCap
   mergeAndCheckUnclaimedRewardAmount app (totalAppAndValidatorRewardsPerRound - allocatedRewards)
 
   -- run another two issuances
@@ -67,8 +79,9 @@ testUnclaimedRewards = do
   [(closedRoundCid, _)] <- query @ClosedMiningRound app.svc
   let collect = CoinRules_ClaimExpiredRewards with
         closedRoundCid
-        validatorCouponCids = [validatorCoupon1]
+        validatorRewardCouponCids = [validatorCoupon1]
         appCouponCids = [appCoupon1, appCoupon2]
+        validatorFaucetCouponCids = [validatorFaucet1, validatorFaucet2]
   submitExerciseCoinRulesByKey app [app.svc] [] collect
 
   -- check that the addition is done correctly

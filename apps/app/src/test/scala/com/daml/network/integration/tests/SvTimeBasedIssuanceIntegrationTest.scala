@@ -227,7 +227,8 @@ class SvTimeBasedIssuanceIntegrationTest
         // we should expect logs of creating confirmation by at least 3 SV which is the required number of confirmations.
         forAtLeast(3, entries)(
           _.message should include(
-            s"created confirmation for summarizing mining round with com.daml.network.codegen.java.cc.issuance.OpenMiningRoundSummary(10000.0000000000, 200.0000000000, 9800.0000000000)"
+            // TODO(#8819): also test for validator faucet coupons once they are summarized as well
+            s"created confirmation for summarizing mining round with com.daml.network.codegen.java.cc.issuance.OpenMiningRoundSummary(10000.0000000000, 200.0000000000, 9800.0000000000, 0)"
           )
         ),
     )

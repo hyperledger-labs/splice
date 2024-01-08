@@ -21,10 +21,10 @@ defaultTransferConfig = TransferConfig with
 
     -- Fee for keeping a coin around.
     -- This is roughly equivalent to 1.05$/365 days but expressed as rounds
-    -- with one day corresponding to 24*60/2.5 rounds, i.e., one round
-    -- every 2.5 minutes.
+    -- with one day corresponding to 24*60/10 rounds, i.e., one round
+    -- every 10 minutes.
     -- Incentivizes users to actively merge their coins.
-    holdingFee = RatePerRound 0.000005
+    holdingFee = RatePerRound 0.00002
 
     -- Fee per lock holder.
     -- Chosen to match the update to cover the cost of informing lock-holders about
@@ -64,8 +64,7 @@ defaultCoinConfig = CoinConfig with
   globalDomain = defaultCoinGlobalDomainConfig
 
   -- Duration of one tick, which is half the target duration of one round
-  -- default: 2.5 minutes
-  tickDuration = seconds 150
+  tickDuration = minutes 10
   packageConfig = PackageConfig with
     cantonCoin = "0.1.0"
     cantonNameService = "0.1.0"
@@ -117,6 +116,7 @@ issuanceConfig_10plus = IssuanceConfig with
   appRewardPercentage = 0.75
   validatorRewardCap = 0.2
   featuredAppRewardCap = 100.0
+  validatorFaucetCap = 2.85
   unfeaturedAppRewardCap = 0.6
 
 

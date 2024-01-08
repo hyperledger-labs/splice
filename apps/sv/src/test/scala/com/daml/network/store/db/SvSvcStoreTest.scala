@@ -737,6 +737,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
                 userParty(1).toProtoPrimitive,
                 storeSvParty.toProtoPrimitive,
                 svcParty.toProtoPrimitive,
+                Optional.empty(),
               )
             ),
           )
@@ -755,6 +756,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
                 userParty(n).toProtoPrimitive,
                 storeSvParty.toProtoPrimitive,
                 svcParty.toProtoPrimitive,
+                Optional.empty(),
               )
             ),
           )

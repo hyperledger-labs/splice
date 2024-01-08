@@ -9,6 +9,7 @@ import CC.CoinRules
 import CC.Round
 import CC.Round.Types
 import CC.Scripts.Util
+import CC.ValidatorLicense
 
 testRewardComputation: Script ()
 testRewardComputation = do
@@ -39,11 +40,15 @@ testRewardComputation = do
     amount = validatorRewardCoupon
     round = Round 0
 
+  drawOnAllValidatorFaucets app
+  [(validatorFaucetCoupon, _)] <- queryFilter @ValidatorFaucetCoupon aliceValidator.primaryParty (\c -> c.round.number == 0)
+
   -- Advance until issuing mining round 0 is opened.
   runNextIssuance app
   runNextIssuance app
 
   context <- getPaymentTransferContext app aliceValidator
+
 
   transferResult <- submitMulti [aliceValidator.primaryParty, bob.primaryParty, provider1.primaryParty] [app.svc] $ exerciseCmd context.coinRules CoinRules_Transfer with
     transfer = Transfer with
@@ -52,7 +57,8 @@ testRewardComputation = do
       inputs = [
           InputAppRewardCoupon appCoupon1,
           InputAppRewardCoupon appCoupon2,
-          InputValidatorRewardCoupon validatorCoupon1
+          InputValidatorRewardCoupon validatorCoupon1,
+          InputValidatorFaucetCoupon validatorFaucetCoupon
         ]
       outputs = [ TransferOutput with
                     receiver = bob.primaryParty
@@ -69,6 +75,10 @@ testRewardComputation = do
   transferResult.summary.inputAppRewardAmount === featuredAppRewardCoupon * issuingMiningRound0.issuancePerFeaturedAppRewardCoupon
     + unfeaturedAppRewardCoupon * issuingMiningRound0.issuancePerUnfeaturedAppRewardCoupon
   transferResult.summary.inputValidatorRewardAmount === validatorRewardCoupon * issuingMiningRound0.issuancePerValidatorRewardCoupon
+  transferResult.summary.inputValidatorFaucetAmount === issuingMiningRound0.issuancePerValidatorFaucetCoupon
   transferResult.summary.inputCoinAmount === 0.0
+
+  -- the round 0 coupon is gone
+  [] <- queryFilter @ValidatorFaucetCoupon aliceValidator.primaryParty (\c -> c.round.number == 0)
 
   return ()

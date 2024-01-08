@@ -69,6 +69,7 @@ class ExpireRewardCouponsTrigger(
           expiredRewardsTask.closedRound,
           expiredRewardsTask.validatorCoupons.asJava,
           Seq.empty.asJava,
+          Seq.empty.asJava,
         ),
       )
     )
@@ -79,9 +80,11 @@ class ExpireRewardCouponsTrigger(
           expiredRewardsTask.closedRound,
           Seq.empty.asJava,
           expiredRewardsTask.appCoupons.asJava,
+          Seq.empty.asJava,
         ),
       )
     )
+    // TODO(#8818): claim expired validator faucet coupons
     val cmds = Seq(validatorRewardCmd, appRewardCmd)
     for {
       _ <- Future.sequence(
