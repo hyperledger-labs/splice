@@ -1671,6 +1671,24 @@ In case you need to patch the tests without redeploying the cluster, you can che
 You will also need to disable version compatibility enforcement (since the tests will no longer match the version tag of the cluster)
 by pushing another commit that sets `failOnVersionMismatch` to `false` in [NetworkAppClientConfig.scala](https://github.com/DACH-NY/canton-network-node/blob/b08bd36f1eb1c34545921816e863236b7cb2a0cd/apps/common/src/main/scala/com/daml/network/config/NetworkAppClientConfig.scala#L14).
 
+If we're deploying the sv runbook from the cluster branch then the cometbft chain id must be hardcoded to the cluster deployed version as well. 
+One example of a given patch here:
+
+```
+diff --git a/cluster/helm/cn-cometbft/templates/partials/_json-configs.tpl b/cluster/helm/cn-cometbft/templates/partials/_json-configs.tpl
+--- a/cluster/helm/cn-cometbft/templates/partials/_json-configs.tpl	(revision 541c55596e2d6f8812c6922b43c86ca3204c5235)
++++ b/cluster/helm/cn-cometbft/templates/partials/_json-configs.tpl	(revision 85cdd0eb5a20562dcf3e5267f5addcc2e1a11b55)
+@@ -3,7 +3,7 @@
+ {{- define "genesisJson" }}
+ {
+   "genesis_time": "2023-02-27T13:07:44.448442974488Z",
+-  "chain_id": "{{ printf "%s-%s" $.Values.genesis.chainId $.Chart.Version | trunc 50 }}",
++  "chain_id": "{{ printf "%s-%s" $.Values.genesis.chainId "0.1.1-snapshot.20231222.4426.0.vf8927949" | trunc 50 }}",
+   "initial_height": "0",
+   "consensus_params": {
+     "block": {
+```
+
 ## Appendix: Kubernetes and Other Deployment Resources
 
 * Kubernetes Documentation
