@@ -26,7 +26,7 @@
        1. [Bumping CometBFT](#bumping-cometbft)
        1. [Bumping Canton](#bumping-canton)
        1. [Bumping Our Canton fork](#bumping-our-canton-fork)
-            1. [Message Definitions](#message-definitions)
+    1. [Message Definitions](#message-definitions)
     1. [Code Layout](#code-layout)
     1. [Domain Specific Naming](#domain-specific-naming)
     1. [App Architecture - Initialization](#app-architecture---initialization)
@@ -572,13 +572,13 @@ Current Canton commit: `5490bfb5f7facb261bf3f4e24f2d4df140d32b51`
    2. Create a Canton patch file capturing all our changes relative to that `./scripts/diff-canton.sh $PATH_TO_CANTON_OSS/ > canton.patch`
    3. Undo our changes: `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton -R canton.patch`
       The exclusion is because those files are under a symlink and we don’t want to change them twice.
-   4. Create a commit to ease review, `git add canton/ && git commit -m"Undo our changes"`
+   4. Create a commit to ease review, `git add canton/ && git commit -m"Undo our changes" --no-verify`
 3. Checkout the commit of the Canton OSS repo to which you have decided to upgrade in Step 1.2
 4. Execute the following steps in your Canton Network Node repo:
    1. Copy the Canton changes: `./scripts/copy-canton.sh $PATH_TO_CANTON_OSS`
-   2. Create a commit to ease review, `git add canton/ && git commit -m"Bump Canton commit"`
+   2. Create a commit to ease review, `git add canton/ && git commit -m"Bump Canton commit" --no-verify`
    3. Reapply our changes `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton --reject canton.patch`.
-   4. Create a commit to ease review `git add canton/ && git reset '*.rej' && git commit -m"Reapply our changes"`
+   4. Create a commit to ease review `git add canton/ && git reset '*.rej' && git commit -m"Reapply our changes" --no-verify`
    5. Bump the SDK/Canton versions in the following places:
       1. The current Canton commit in this `README.md`
       2. Set `version` in `CantonDependencies.scala` to the SDK version from Step 1.2
@@ -589,10 +589,10 @@ Current Canton commit: `5490bfb5f7facb261bf3f4e24f2d4df140d32b51`
          Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
       6. You might also want to bump ``ledgerApiVersion`` in ``Dependencies.scala``. However, in general this must be kept in sync with the ledger API version
          server by the Canton binary not the Canton fork.
-   6. Create another commit, `git add -A && git reset '*.rej' && git commit -m"Bump Canton commit and Canton/SDK versions"`
+   6. Create another commit, `git add -A && git reset '*.rej' && git commit -m"Bump Canton commit and Canton/SDK versions" --no-verify`
 5. Check if the `protocolVersions` in our `BuildInfoKeys` in `BuildCommon.scala` needs to be bumped.
    - One way to do this is to run `start-canton.sh -w` with an updated Canton binary, and check `ProtocolVersion.latest` in the console.
-5. Test whether things compile using `sbt Test/compile`.
+6. Test whether things compile using `sbt Test/compile`.
    In case of problems, here are some tips that help:
    - Check whether there are related `*.rej` files for the parts of our changes that could not be applied.
      The previous PR that bumped our Canton fork can serve as a point of comparison here.
@@ -609,12 +609,13 @@ Current Canton commit: `5490bfb5f7facb261bf3f4e24f2d4df140d32b51`
      - If the file defining the class exists in the OSS repo but not in our fork, copy it over manually. You should also fix `copy-canton.sh` to ensure it gets
        copied over correctly in the future.
      - If the file already exists in our fork, you may need to [update the build dependencies](#updating-canton-build-dependencies).
-6. Step 5 may have made changes to `package-lock.json` files; commit all of these changes.
-7. Run `sbt damlDarsLockFileUpdate` and commit the changes to `daml/dars.lock`.
-8. Run `sbt cantonDarsLockFileUpdate` and commit the changes to `canton/dars.lock`.
-9. Make a PR with your changes, so CI starts churning.
-10. If there are any, remove all `*.rej` files.
-11. Once complete, close your "bump canton fork" issue, create a new one, and assign the new issue to a random person in the team (ideally on a different squad from you).
+7. Step 5 may have made changes to `package-lock.json` files; commit all of these changes.
+   Note that you might need to fix the file formatting or dars.lock files (see the next points), due to the usage of `--no-verify` when committing in steps 1-4.
+8. Run `sbt damlDarsLockFileUpdate` and commit the changes to `daml/dars.lock`.
+9. Run `sbt cantonDarsLockFileUpdate` and commit the changes to `canton/dars.lock`.
+10. Make a PR with your changes, so CI starts churning.
+11. If there are any, remove all `*.rej` files.
+12. Once complete, close your "bump canton fork" issue, create a new one, and assign the new issue to a random person in the team (ideally on a different squad from you).
 
 You can refer to https://github.com/DACH-NY/canton-network-node/pull/446/commits for an example of how the update PR should look like.
 
