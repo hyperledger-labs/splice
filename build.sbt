@@ -80,6 +80,8 @@ lazy val root = (project in file("."))
     `splitwell-test-upgrade-daml`,
     `svc-governance-daml`,
     `svc-governance-upgrade-daml`,
+    `svc-governance-test-daml`,
+    `svc-governance-test-upgrade-daml`,
     `sv-local-daml`,
     `validator-lifecycle-daml`,
     `validator-lifecycle-test-daml`,

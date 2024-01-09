@@ -1,4 +1,3 @@
-Only in ../daml/splitwell/daml/CN: Scripts
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/splitwell/daml.yaml ../daml/splitwell-upgrade/daml.yaml
 --- ../daml/splitwell/daml.yaml
 +++ ../daml/splitwell-upgrade/daml.yaml
