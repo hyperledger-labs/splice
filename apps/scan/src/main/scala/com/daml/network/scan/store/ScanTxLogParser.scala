@@ -12,6 +12,7 @@ import com.daml.network.scan.store.TxLogEntry.*
 import com.daml.network.util.{Codec, ExerciseNode}
 import com.daml.network.util.CNNodeUtil.dollarsToCC
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -132,7 +133,7 @@ class ScanTxLogParser(
           (
             ac.domainId,
             Some(contractId),
-            entryFromCoin(eventId, ac.domainId, c.payload.amount),
+            entryFromCoin(eventId, ac.domainId, c.payload),
           )
         )
       case LockedCoinCreate(lc) =>
@@ -141,7 +142,7 @@ class ScanTxLogParser(
           (
             ac.domainId,
             Some(contractId),
-            entryFromCoin(eventId, ac.domainId, lc.payload.coin.amount),
+            entryFromCoin(eventId, ac.domainId, lc.payload.coin),
           )
         )
       case CoinImportCrate(ic) =>
@@ -150,7 +151,7 @@ class ScanTxLogParser(
           (
             ac.domainId,
             Some(contractId),
-            entryFromCoin(eventId, ac.domainId, ic.amount),
+            entryFromCoin(eventId, ac.domainId, ic),
           )
         )
       case _ =>
@@ -199,7 +200,7 @@ class ScanTxLogParser(
 
 object ScanTxLogParser {
 
-  case class State(
+  private case class State(
       entries: immutable.Queue[TxLogEntry]
   ) {
     def appended(other: State): State = State(
@@ -208,7 +209,9 @@ object ScanTxLogParser {
     def append(entry: TxLogEntry) = State(entries = entries :+ entry)
   }
 
-  object State {
+  import BalanceChangeLogEntry.PartyBalanceChange
+
+  private object State {
     def apply(entry: TxLogEntry): State = {
       State(immutable.Queue(entry))
     }
@@ -226,16 +229,24 @@ object ScanTxLogParser {
         event: TreeEvent,
         domainId: DomainId,
         coin: cc.coin.Coin,
-    ): State =
+    ): State = {
+      val amountAO0 = amountAsOfRoundZero(coin.amount)
       State(
         BalanceChangeLogEntry(
           eventId = event.getEventId(),
           domainId = domainId,
           round = coin.amount.createdAt.number,
-          changeToInitialAmountAsOfRoundZero = amountAsOfRoundZero(coin.amount),
+          changeToInitialAmountAsOfRoundZero = amountAO0,
           changeToHoldingFeesRate = coin.amount.ratePerRound.rate,
+          partyBalanceChanges = Map(
+            PartyId.tryFromProtoPrimitive(coin.owner) -> PartyBalanceChange(
+              amountAO0,
+              coin.amount.ratePerRound.rate,
+            )
+          ),
         )
       )
+    }
 
     private def getCoinFromSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
         tx: TransactionTree,
@@ -308,7 +319,7 @@ object ScanTxLogParser {
         ScanTxLogParser.entryFromCoin(
           event.getEventId(),
           domainId,
-          coin.amount,
+          coin,
         )
       ).append(activityEntry)
     }
@@ -373,6 +384,13 @@ object ScanTxLogParser {
           changeToHoldingFeesRate = node.result.value.summary.balanceChanges.values.asScala
             .map(bc => BigDecimal(bc.changeToHoldingFeesRate))
             .sum,
+          partyBalanceChanges =
+            node.result.value.summary.balanceChanges.asScala.toMap.map { case (party, bc) =>
+              PartyId.tryFromProtoPrimitive(party) -> PartyBalanceChange(
+                bc.changeToInitialAmountAsOfRoundZero,
+                bc.changeToHoldingFeesRate,
+              )
+            },
         )
       )
 
@@ -398,6 +416,12 @@ object ScanTxLogParser {
           round = cxsum.round.number,
           changeToInitialAmountAsOfRoundZero = cxsum.changeToInitialAmountAsOfRoundZero,
           changeToHoldingFeesRate = cxsum.changeToHoldingFeesRate,
+          partyBalanceChanges = Map(
+            PartyId.tryFromProtoPrimitive(cxsum.owner) -> PartyBalanceChange(
+              cxsum.changeToInitialAmountAsOfRoundZero,
+              cxsum.changeToHoldingFeesRate,
+            )
+          ),
         )
       )
     }
@@ -498,14 +522,22 @@ object ScanTxLogParser {
               s"was not found in transaction ${tx.getTransactionId}"
           )
         )
+      // negative value for both initial amount and holding fee so that the total balance can be calculated correctly
+      val amountAO0 = -amountAsOfRoundZero(burntCoin.amount)
+      val holdingFees = -burntCoin.amount.ratePerRound.rate
       State(
         BalanceChangeLogEntry(
           eventId = rootEventId.getOrElse(event.getEventId()),
           domainId = domainId,
           round = burntCoin.amount.createdAt.number,
-          // negative value for both initial amount and holding fee so that the total balance can be calculated correctly
-          changeToInitialAmountAsOfRoundZero = -amountAsOfRoundZero(burntCoin.amount),
-          changeToHoldingFeesRate = -burntCoin.amount.ratePerRound.rate,
+          changeToInitialAmountAsOfRoundZero = amountAO0,
+          changeToHoldingFeesRate = holdingFees,
+          partyBalanceChanges = Map(
+            PartyId.tryFromProtoPrimitive(burntCoin.owner) -> PartyBalanceChange(
+              amountAO0,
+              holdingFees,
+            )
+          ),
         )
       )
     }
@@ -553,14 +585,22 @@ object ScanTxLogParser {
   private def entryFromCoin(
       eventId: String,
       domainId: DomainId,
-      amount: ExpiringAmount,
+      coin: cc.coin.Coin,
   ): TxLogEntry = {
+    val amount = coin.amount
+    val amountAO0 = amountAsOfRoundZero(amount)
     BalanceChangeLogEntry(
       eventId = eventId,
       domainId = domainId,
       round = amount.createdAt.number,
-      changeToInitialAmountAsOfRoundZero = amountAsOfRoundZero(amount),
+      changeToInitialAmountAsOfRoundZero = amountAO0,
       changeToHoldingFeesRate = amount.ratePerRound.rate,
+      partyBalanceChanges = Map(
+        PartyId.tryFromProtoPrimitive(coin.owner) -> PartyBalanceChange(
+          amountAO0,
+          amount.ratePerRound.rate,
+        )
+      ),
     )
   }
 

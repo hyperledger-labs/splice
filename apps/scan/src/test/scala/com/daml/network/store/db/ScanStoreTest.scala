@@ -177,6 +177,63 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 
     }
 
+    "getWalletBalance" should {
+      "return correct wallet balance for the round where the transfer happened and for the rounds before and after" in {
+        val keptCoinAmount = 60.0
+        val sentCoinAmount = 40.0
+        val coinAmount = keptCoinAmount + sentCoinAmount
+        for {
+          store <- mkStore()
+          coinRulesContract = coinRules()
+          _ <- dummyDomain.exercise(
+            coinRulesContract,
+            interfaceId = Some(cc.coinrules.CoinRules.TEMPLATE_ID),
+            Transfer.choice.name,
+            mkCoinRulesTransfer(user1, coinAmount),
+            mkTransferResult(
+              round = 2,
+              inputAppRewardAmount = 0,
+              inputCoinAmount = coinAmount,
+              inputValidatorRewardAmount = 0,
+              balanceChanges = Map(
+                user1.toProtoPrimitive -> new cc.coinrules.BalanceChange(
+                  BigDecimal(keptCoinAmount).bigDecimal,
+                  BigDecimal(holdingFee).bigDecimal,
+                ),
+                user2.toProtoPrimitive -> new cc.coinrules.BalanceChange(
+                  BigDecimal(sentCoinAmount).bigDecimal,
+                  BigDecimal(holdingFee).bigDecimal,
+                ),
+              ),
+              coinPrice = 0.0005,
+            ),
+            "011",
+          )(
+            store.multiDomainAcsStore
+          )
+        } yield {
+          // 100.0 is the initial amount as of round 0, so at the end of round 2 the holding fee was applied three times
+          forEvery(
+            Table(
+              ("user", "coin amount"),
+              (user1, keptCoinAmount),
+              (user2, sentCoinAmount),
+            )
+          ) { (user, coinAmount) =>
+            store.getWalletBalance(user, 1).futureValue shouldBe (0.0) withClue "at round 1"
+            store
+              .getWalletBalance(user, 2)
+              .futureValue shouldBe (coinAmount - 3 * holdingFee) withClue "at round 2"
+            store
+              .getWalletBalance(user, 3)
+              .futureValue shouldBe (coinAmount - 4 * holdingFee) withClue "at round 3"
+          }
+        }
+      }
+
+      // TODO (#9207) more cases
+    }
+
     "getTotalRewardsCollectedEver" should {
 
       "return the sum of reward amounts (ValidatorReward & AppReward)" in {

@@ -319,6 +319,28 @@ class DbScanStore(
     } yield result.getOrElse(0)
   }
 
+  override def getWalletBalance(partyId: PartyId, asOfEndOfRound: Long)(implicit
+      tc: TraceContext
+  ): Future[BigDecimal] = waitUntilAcsIngested {
+    for {
+      result <- storage.query(
+        sql"""
+             select sum((entry_data -> 'partyBalanceChanges' -> $partyId
+                         ->> 'changeToInitialAmountAsOfRoundZero')::numeric)
+                    - ($asOfEndOfRound + 1)
+                      * sum((entry_data -> 'partyBalanceChanges' -> $partyId
+                             ->> 'changeToHoldingFeesRate')::numeric)
+             from scan_txlog_store
+             where store_id = $storeId
+               and entry_type = ${TxLogEntry.BalanceChangeLogEntry.dbType}
+               and round <= $asOfEndOfRound
+               and (entry_data -> 'partyBalanceChanges') ?? $partyId;
+           """.as[Option[BigDecimal]].headOption,
+        "getWalletBalance",
+      )
+    } yield result.flatten.getOrElse(0)
+  }
+
   override def getCoinConfigForRound(round: Long)(implicit
       tc: TraceContext
   ): Future[TxLogEntry.OpenMiningRoundLogEntry] = waitUntilAcsIngested {

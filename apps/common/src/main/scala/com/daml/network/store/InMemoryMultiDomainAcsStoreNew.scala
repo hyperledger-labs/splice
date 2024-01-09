@@ -519,14 +519,11 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
       offset -> state.txLog.view.collectFirst(query)
     }
 
-  def getTxLogEntriesByFilter(filter: TXE => Boolean): Future[Seq[TXE]] =
-    Future.successful(stateVar.txLog.view.filter(filter).toSeq)
+  final def collectTxLogEntries[T](filter: PartialFunction[TXE, T]): Future[Seq[T]] =
+    Future.successful(stateVar.txLog.view.collect(filter).toSeq)
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def collectTxLogIndicesType[T](implicit tag: ClassTag[T]): Future[Seq[T]] =
-    Future.successful(stateVar.txLog.view.collect {
-      case c if tag.runtimeClass.isInstance(c) => c.asInstanceOf[T]
-    }.toSeq)
+  final def collectTxLogIndicesType[T: ClassTag]: Future[Seq[T]] =
+    collectTxLogEntries { case c: T => c }
 
   private def offsetAndStateAfterIngestingAcs()
       : Future[(String, InMemoryMultiDomainAcsStoreNew.State[TXE])] =

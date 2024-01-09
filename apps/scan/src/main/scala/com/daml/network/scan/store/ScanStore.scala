@@ -88,6 +88,10 @@ trait ScanStore
   def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal]
   def getRewardsCollectedInRound(round: Long)(implicit tc: TraceContext): Future[BigDecimal]
 
+  def getWalletBalance(partyId: PartyId, asOfEndOfRound: Long)(implicit
+      tc: TraceContext
+  ): Future[BigDecimal]
+
   def getCoinConfigForRound(round: Long)(implicit
       tc: TraceContext
   ): Future[TxLogEntry.OpenMiningRoundLogEntry]

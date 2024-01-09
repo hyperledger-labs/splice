@@ -281,6 +281,20 @@ class HttpScanHandler(
     }
   }
 
+  override def getWalletBalance(
+      respond: v0.ScanResource.GetWalletBalanceResponse.type
+  )(
+      partyId: String,
+      asOfEndOfRound: Long,
+  )(extracted: TraceContext): Future[v0.ScanResource.GetWalletBalanceResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getWalletBalance") { _ => _ =>
+      for {
+        total <- store.getWalletBalance(PartyId tryFromProtoPrimitive partyId, asOfEndOfRound)
+      } yield definitions.GetWalletBalanceResponse(Codec.encode(total))
+    }
+  }
+
   def getCoinConfigForRound(
       response: v0.ScanResource.GetCoinConfigForRoundResponse.type
   )(round: Long)(extracted: TraceContext): Future[v0.ScanResource.GetCoinConfigForRoundResponse] = {

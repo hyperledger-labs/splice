@@ -97,8 +97,13 @@ object TxLogEntry {
         }
       }
 
+    import BalanceChangeLogEntry.PartyBalanceChange
+
+    implicit val partyBalanceChangeFormat: RootJsonFormat[PartyBalanceChange] =
+      jsonFormat2(PartyBalanceChange.apply)
+
     implicit val errorEntryFormat: RootJsonFormat[ErrorLogEntry] = jsonFormat1(ErrorLogEntry.apply)
-    implicit val balanceChangeEntryFormat: RootJsonFormat[BalanceChangeLogEntry] = jsonFormat5(
+    implicit val balanceChangeEntryFormat: RootJsonFormat[BalanceChangeLogEntry] = jsonFormat6(
       BalanceChangeLogEntry.apply
     )
     implicit val closedMiningRoundEntryFormat: RootJsonFormat[ClosedMiningRoundLogEntry] =
@@ -153,10 +158,16 @@ object TxLogEntry {
       round: Long,
       changeToInitialAmountAsOfRoundZero: BigDecimal,
       changeToHoldingFeesRate: BigDecimal,
+      partyBalanceChanges: Map[PartyId, BalanceChangeLogEntry.PartyBalanceChange],
   ) extends TxLogEntry
 
   object BalanceChangeLogEntry {
     val dbType: String3 = String3.tryCreate("bac")
+
+    final case class PartyBalanceChange(
+        changeToInitialAmountAsOfRoundZero: BigDecimal,
+        changeToHoldingFeesRate: BigDecimal,
+    )
   }
 
   sealed trait RewardLogEntry extends TxLogEntry {

@@ -70,25 +70,32 @@ class InMemoryScanStore(
   ): Future[BigDecimal] = {
     for {
       totalCoinBalance <- multiDomainAcsStore
-        .getTxLogEntriesByFilter(_ match {
-          case balanceChange: TxLogEntry.BalanceChangeLogEntry =>
-            balanceChange.round <= asOfEndOfRound
-          case _ => false
-        })
+        .collectTxLogEntries {
+          case balanceChange: TxLogEntry.BalanceChangeLogEntry
+              if balanceChange.round <= asOfEndOfRound =>
+            balanceChange
+        }
         .map(txLogEntries =>
-          txLogEntries.foldLeft(BigDecimal.valueOf(0.0))((sum, entry) =>
-            entry match {
-              case e: TxLogEntry.BalanceChangeLogEntry =>
-                sum + e.changeToInitialAmountAsOfRoundZero - e.changeToHoldingFeesRate * (asOfEndOfRound + 1)
-              case _ =>
-                throw Status.INTERNAL
-                  .withDescription("Unexpected log entry type")
-                  .asRuntimeException()
-            }
+          txLogEntries.foldLeft(BigDecimal.valueOf(0.0))((sum, e) =>
+            sum + e.changeToInitialAmountAsOfRoundZero - e.changeToHoldingFeesRate * (asOfEndOfRound + 1)
           )
         )
     } yield totalCoinBalance
   }
+
+  override def getWalletBalance(partyId: PartyId, asOfEndOfRound: Long)(implicit
+      tc: TraceContext
+  ): Future[BigDecimal] = for {
+    txLogEntries <- multiDomainAcsStore.collectTxLogEntries(Function unlift {
+      case balanceChange: TxLogEntry.BalanceChangeLogEntry
+          if balanceChange.round <= asOfEndOfRound =>
+        balanceChange.partyBalanceChanges get partyId
+      case _ => None
+    })
+  } yield txLogEntries.foldMap(pbc =>
+    pbc.changeToInitialAmountAsOfRoundZero
+      - pbc.changeToHoldingFeesRate * (asOfEndOfRound + 1)
+  )
 
   override def getCoinConfigForRound(
       round: Long
@@ -137,23 +144,11 @@ class InMemoryScanStore(
   private def getRewardsCollected(round: Option[Long]): Future[BigDecimal] = {
     for {
       ret <- multiDomainAcsStore
-        .getTxLogEntriesByFilter(_ match {
-          case reward: TxLogEntry.RewardLogEntry =>
-            round.fold(true)(_ == reward.round)
-          case _ => false
-        })
-        .map(rewards =>
-          rewards.foldLeft(BigDecimal.valueOf(0.0))((sum, reward) =>
-            reward match {
-              case r: TxLogEntry.RewardLogEntry =>
-                sum + r.amount
-              case _ =>
-                throw Status.INTERNAL
-                  .withDescription("Unexpected log entry type")
-                  .asRuntimeException()
-            }
-          )
-        )
+        .collectTxLogEntries {
+          case reward: TxLogEntry.RewardLogEntry if round.fold(true)(_ == reward.round) =>
+            reward
+        }
+        .map(rewards => rewards.foldLeft(BigDecimal.valueOf(0.0))((sum, r) => sum + r.amount))
     } yield ret
   }
 
@@ -163,23 +158,13 @@ class InMemoryScanStore(
   ) =
     for {
       ret <- multiDomainAcsStore
-        .getTxLogEntriesByFilter {
+        .collectTxLogEntries {
           case reward: TxLogEntry.RewardLogEntry
               if reward.round == round && rewardTypeFilter(reward) =>
-            true
-          case _ => false
+            reward
         }
         .map(rewards =>
-          rewards.foldLeft(Map[PartyId, BigDecimal]())((m, reward) =>
-            reward match {
-              case r: TxLogEntry.RewardLogEntry =>
-                m |+| Map((r.party -> r.amount))
-              case _ =>
-                throw Status.INTERNAL
-                  .withDescription("Unexpected log entry type")
-                  .asRuntimeException()
-            }
-          )
+          rewards.foldLeft(Map[PartyId, BigDecimal]())((m, r) => m |+| Map((r.party -> r.amount)))
         )
     } yield ret
 
@@ -289,43 +274,35 @@ class InMemoryScanStore(
       round: Long
   ): Future[Map[PartyId, ValidatorPurchasedTraffic]] =
     multiDomainAcsStore
-      .getTxLogEntriesByFilter {
+      .collectTxLogEntries {
         case indexRecord: TxLogEntry.ExtraTrafficPurchaseLogEntry if indexRecord.round == round =>
-          true
-        case _ => false
+          indexRecord
       }
       .map(
-        _.foldLeft(Map.empty[PartyId, ValidatorPurchasedTraffic])((acc, entry) => {
-          entry match {
-            case e: TxLogEntry.ExtraTrafficPurchaseLogEntry =>
-              acc.updatedWith(e.validator) {
-                case None =>
-                  Some(
-                    ValidatorPurchasedTraffic(
-                      e.validator,
-                      1,
-                      e.trafficPurchased,
-                      e.ccSpent,
-                      e.round,
-                    )
-                  )
-                case Some(t) =>
-                  Some(
-                    ValidatorPurchasedTraffic(
-                      t.validator,
-                      t.numPurchases + 1,
-                      t.totalTrafficPurchased + e.trafficPurchased,
-                      t.totalCcSpent + e.ccSpent,
-                      Math.max(t.lastPurchasedInRound, e.round),
-                    )
-                  )
-              }
-            case _ =>
-              throw Status.INTERNAL
-                .withDescription("Unexpected log entry type")
-                .asRuntimeException()
+        _.foldLeft(Map.empty[PartyId, ValidatorPurchasedTraffic]) { (acc, e) =>
+          acc.updatedWith(e.validator) {
+            case None =>
+              Some(
+                ValidatorPurchasedTraffic(
+                  e.validator,
+                  1,
+                  e.trafficPurchased,
+                  e.ccSpent,
+                  e.round,
+                )
+              )
+            case Some(t) =>
+              Some(
+                ValidatorPurchasedTraffic(
+                  t.validator,
+                  t.numPurchases + 1,
+                  t.totalTrafficPurchased + e.trafficPurchased,
+                  t.totalCcSpent + e.ccSpent,
+                  Math.max(t.lastPurchasedInRound, e.round),
+                )
+              )
           }
-        })
+        }
       )
 
   override def getTopValidatorsByPurchasedTraffic(asOfEndOfRound: Long, limit: Int)(implicit
