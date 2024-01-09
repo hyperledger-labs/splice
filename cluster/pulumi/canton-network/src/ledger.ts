@@ -23,10 +23,12 @@ export function installParticipant(
     name,
     'cn-participant',
     {
-      postgres: postgres.address,
-      postgresDb: pgName,
-      postgresSchema: pgName,
-      postgresSecretName: postgres.secretName,
+      persistence: {
+        databaseName: pgName,
+        schema: pgName,
+        host: postgres.address,
+        secretName: postgres.secretName,
+      },
       participantAdminUserNameFrom,
       disableAutoInit,
       metrics: {

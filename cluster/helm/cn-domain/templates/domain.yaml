@@ -24,19 +24,19 @@ spec:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
         - name: CANTON_DOMAIN_POSTGRES_SERVER
-          value: {{ .Values.postgres }}
+          value: {{ .Values.sequencer.persistence.host }}
         - name: CANTON_DOMAIN_POSTGRES_PASSWORD
           valueFrom:
            secretKeyRef:
-              name: {{ .Values.postgresSecretName }}
+              name: {{ .Values.sequencer.persistence.secretName }}
               key: postgresPassword
-        {{- if .Values.postgresSequencerDb }}
+        {{- if .Values.sequencer.persistence.databaseName }}
         - name: CANTON_SEQUENCER_POSTGRES_DB
-          value: {{ .Values.postgresSequencerDb }}
+          value: {{ .Values.sequencer.persistence.databaseName }}
         {{- end }}
-        {{- if .Values.postgresMediatorDb }}
+        {{- if .Values.mediator.persistence.databaseName }}
         - name: CANTON_MEDIATOR_POSTGRES_DB
-          value: {{ .Values.postgresMediatorDb }}
+          value: {{ .Values.mediator.persistence.databaseName }}
         {{- end }}
         imagePullPolicy: Always
         ports:
@@ -83,18 +83,18 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: postgresPassword
-                  name: {{ .Values.postgresSecretName }}
+                  name: {{ .Values.sequencer.persistence.secretName }}
           command:
             - 'bash'
             - '-c'
             - |
-              until errmsg=$(psql -h {{ .Values.postgres }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.postgresSequencerDb }}' 2>&1); do
+              until errmsg=$(psql -h {{ .Values.sequencer.persistence.host }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.sequencer.persistence.databaseName }}' 2>&1); do
                 if [[ $errmsg == *"already exists"* ]]; then
-                  echo "Database {{ .Values.postgresSequencerDb }} already exists. Done."
+                  echo "Database {{ .Values.sequencer.persistence.databaseName }} already exists. Done."
                   break
                 fi
 
-                echo "trying to create postgres database {{ .Values.postgresSequencerDb }}, last error: $errmsg";
+                echo "trying to create postgres database {{ .Values.sequencer.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
         - name: {{ .Release.Name }}-init-mediator
@@ -104,18 +104,18 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: postgresPassword
-                  name: {{ .Values.postgresSecretName }}
+                  name: {{ .Values.mediator.persistence.secretName }}
           command:
             - 'sh'
             - '-c'
             - |
-              until errmsg=$(psql -h {{ .Values.postgres }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.postgresMediatorDb }}' 2>&1); do
+              until errmsg=$(psql -h {{ .Values.mediator.persistence.host }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.mediator.persistence.databaseName }}' 2>&1); do
                 if [[ $errmsg == *"already exists"* ]]; then
-                  echo "Database {{ .Values.postgresMediatorDb }} already exists. Done."
+                  echo "Database {{ .Values.mediator.persistence.databaseName }} already exists. Done."
                   break
                 fi
 
-                echo "trying to create postgres database {{ .Values.postgresMediatorDb }}, last error: $errmsg";
+                echo "trying to create postgres database {{ .Values.mediator.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
       {{- end}}

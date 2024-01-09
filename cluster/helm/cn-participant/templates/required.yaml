@@ -5,9 +5,9 @@
 {{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
 
 {{ $_ := required ".Values.defaultJvmOptions is required." .Values.defaultJvmOptions }}
-{{ $_ := required ".Values.postgres is required." .Values.postgres }}
-{{ $_ := required ".Values.postgresSchema is required." .Values.postgresSchema }}
-{{ $_ := required ".Values.postgresSecretName is required" .Values.postgresSecretName }}
+{{ $_ := required ".Values.persistence.host is required." .Values.persistence.host }}
+{{ $_ := required ".Values.persistence.schema is required." .Values.persistence.schema }}
+{{ $_ := required ".Values.persistence.secretName is required" .Values.persistence.secretName }}
 {{ $_ := required ".Values.participantAdminUserNameFrom is required." .Values.participantAdminUserNameFrom }}
 {{ $_ := required ".Values.auth.jwksUrl is required." .Values.auth.jwksUrl }}
 {{ $_ := required ".Values.auth.targetAudience is required." .Values.auth.targetAudience }}

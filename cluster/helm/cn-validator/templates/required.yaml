@@ -11,4 +11,4 @@
 {{ $_ := required ".Values.topup.minTopupInterval is required when topup is enabled." .Values.topup.minTopupInterval }}
 {{- end }}
 
-{{ $_ := required ".Values.postgresSecretName is required" .Values.postgresSecretName }}
+{{ $_ := required ".Values.persistence.secretName is required" .Values.persistence.secretName }}

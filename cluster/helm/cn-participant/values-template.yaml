@@ -27,4 +27,5 @@ metrics:
   release: prometheus-grafana-monitoring
   interval: 30s
 
-postgresSecretName: "postgres-secrets"
+persistence:
+  secretName: "postgres-secrets"

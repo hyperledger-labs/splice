@@ -1,6 +1,6 @@
 {{ $_ := required ".Release.Name is required." .Release.Name }}
 {{ $_ := required ".Release.Namespace is required." .Release.Namespace }}
-{{ $_ := required ".Values.postgres.hostname is required." .Values.postgres.hostname }}
-{{ $_ := required ".Values.postgres.port is required." .Values.postgres.port }}
-{{ $_ := required ".Values.postgres.database is required." .Values.postgres.database }}
-{{ $_ := required ".Values.postgresSecretName is required" .Values.postgresSecretName }}
+{{ $_ := required ".Values.persistence.host is required." .Values.persistence.host }}
+{{ $_ := required ".Values.persistence.port is required." .Values.persistence.port }}
+{{ $_ := required ".Values.persistence.databaseName is required." .Values.persistence.databaseName }}
+{{ $_ := required ".Values.persistence.secretName is required" .Values.persistence.secretName }}

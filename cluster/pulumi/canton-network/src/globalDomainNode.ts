@@ -113,16 +113,24 @@ export class GlobalDomainNode extends ComponentResource {
       this.name,
       'cn-global-domain',
       {
-        sequencerPostgres: sequencerPostgres.address,
-        sequencerPostgresSecretName: sequencerPostgres.secretName,
-        mediatorPostgres: mediatorPostgres.address,
-        mediatorPostgresSecretName: mediatorPostgres.secretName,
-        postgresMediatorDb: mediatorDbName,
-        postgresSequencerDb: sequencerDbName,
-        sequencerDriver: {
-          type: 'cometbft',
-          host: pulumi.interpolate`${cometBftService.metadata.name}.${cometBftService.metadata.namespace}.svc.cluster.local`,
-          port: 26657,
+        sequencer: {
+          persistence: {
+            databaseName: sequencerDbName,
+            secretName: sequencerPostgres.secretName,
+            host: sequencerPostgres.address,
+          },
+          driver: {
+            type: 'cometbft',
+            host: pulumi.interpolate`${cometBftService.metadata.name}.${cometBftService.metadata.namespace}.svc.cluster.local`,
+            port: 26657,
+          },
+        },
+        mediator: {
+          persistence: {
+            databaseName: mediatorDbName,
+            secretName: mediatorPostgres.secretName,
+            host: mediatorPostgres.address,
+          },
         },
         metrics: {
           enable: true,

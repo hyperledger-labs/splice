@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: {{ .Release.Name }}-sequencer
-        {{- if eq .Values.sequencerDriver.type "cometbft"}}
+        {{- if eq .Values.sequencer.driver.type "cometbft"}}
           image: "{{ .Values.imageRepo }}/canton-cometbft-sequencer:{{ .Values.cluster.imageTag }}"
         {{- else}}
           image: "{{ .Values.imageRepo }}/canton-sequencer:{{ .Values.cluster.imageTag }}"
@@ -28,29 +28,29 @@ spec:
             - name: JAVA_TOOL_OPTIONS
               value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
             - name: CANTON_DOMAIN_POSTGRES_SERVER
-              value: {{ .Values.sequencerPostgres }}
+              value: {{ .Values.sequencer.persistence.host }}
             - name: CANTON_DOMAIN_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.sequencerPostgresSecretName }}
+                  name: {{ .Values.sequencer.persistence.secretName }}
                   key: postgresPassword
-        {{- if .Values.postgresSequencerDb }}
+        {{- if .Values.sequencer.persistence.databaseName }}
             - name: CANTON_SEQUENCER_POSTGRES_DB
-              value: {{ .Values.postgresSequencerDb }}
+              value: {{ .Values.sequencer.persistence.databaseName }}
         {{- end }}
-        {{- if eq .Values.sequencerDriver.type "postgres"}}
+        {{- if eq .Values.sequencer.driver.type "postgres"}}
             - name: SEQUENCER_DRIVER_DATABASE_ADDRESS
-              value: {{ .Values.sequencerDriver.address }}
+              value: {{ .Values.sequencer.driver.address }}
             - name: SEQUENCER_DRIVER_DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.postgresSecretName }}
+                  name: {{ .Values.sequencer.persistence.secretName }}
                   key: postgresPassword
-        {{- else if eq .Values.sequencerDriver.type "cometbft"}}
+        {{- else if eq .Values.sequencer.driver.type "cometbft"}}
             - name: SEQUENCER_DRIVER_COMETBFT_HOST
-              value: {{ .Values.sequencerDriver.host }}
+              value: {{ .Values.sequencer.driver.host }}
             - name: SEQUENCER_DRIVER_COMETBFT_PORT
-              value: "{{ .Values.sequencerDriver.port }}"
+              value: "{{ .Values.sequencer.driver.port }}"
         {{- end}}
         {{- if .Values.disableAutoInit }}
             - name: CANTON_SEQUENCER_AUTO_INIT
@@ -98,18 +98,18 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: postgresPassword
-                  name: {{ .Values.sequencerPostgresSecretName }}
+                  name: {{ .Values.sequencer.persistence.secretName }}
           command:
             - 'bash'
             - '-c'
             - |
-              until errmsg=$(psql -h {{ .Values.sequencerPostgres }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.postgresSequencerDb }}' 2>&1); do
+              until errmsg=$(psql -h {{ .Values.sequencer.persistence.host }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.sequencer.persistence.databaseName }}' 2>&1); do
                 if [[ $errmsg == *"already exists"* ]]; then
-                  echo "Database {{ .Values.postgresSequencerDb }} already exists. Done."
+                  echo "Database {{ .Values.sequencer.persistence.databaseName }} already exists. Done."
                   break
                 fi
 
-                echo "trying to create postgres database {{ .Values.postgresSequencerDb }}, last error: $errmsg";
+                echo "trying to create postgres database {{ .Values.sequencer.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
       {{- end }}

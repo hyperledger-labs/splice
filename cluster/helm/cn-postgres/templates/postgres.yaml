@@ -37,7 +37,7 @@ spec:
         - name: POSTGRES_PASSWORD
           valueFrom:
            secretKeyRef:
-              name: {{ .Values.postgresSecretName }}
+              name: {{ .Values.persistence.secretName }}
               key: postgresPassword
         envFrom:
         - configMapRef:

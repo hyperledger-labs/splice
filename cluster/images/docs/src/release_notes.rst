@@ -3,6 +3,35 @@
 Release Notes
 =============
 
+2024-01-15
+----------
+
+* Deployment:
+
+  * The syntax of the Helm charts configuring persistence has been standardized through the different images.
+    The provided snippet highlights the optional fields and its syntax.
+    To find the expected values for each image, refer to the _required.yaml_ Helm files.::
+
+        sequencer:
+          driver:
+            type:
+            port:
+            host:
+          persistence:
+            databaseName:
+            host:
+            port:
+            user:
+            secretName:
+        mediator:
+          persistence:
+            databaseName:
+            host:
+            port:
+            user:
+            secretName:
+
+
 2024-01-08
 ----------
 

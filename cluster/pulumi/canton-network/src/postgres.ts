@@ -146,11 +146,11 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
       `${this.name}-${sanitizedForHelm(name)}-e`,
       'cn-postgres-metrics',
       {
-        postgres: {
-          hostname: this.address,
-          database: name,
+        persistence: {
+          host: this.address,
+          databaseName: name,
+          secretName: this.secretName,
         },
-        postgresSecretName: this.secretName,
       },
       { ...{ dependsOn: [db] }, ...opts }
     );
@@ -185,7 +185,9 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
         db: {
           volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
         },
-        postgresSecretName: this.secretName,
+        persistence: {
+          secretName: this.secretName,
+        },
       },
       { dependsOn: [passwordSecret] }
     );
@@ -204,11 +206,11 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
       `${this.name}-${sanitizedForHelm(name)}-e`,
       'cn-postgres-metrics',
       {
-        postgres: {
-          hostname: this.address,
-          database: name,
+        persistence: {
+          host: this.address,
+          databaseName: name,
+          secretName: this.secretName,
         },
-        postgresSecretName: this.secretName,
       },
       { ...{ dependsOn: [this.pg] }, ...opts }
     );

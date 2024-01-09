@@ -173,8 +173,10 @@
             "optional": false
           }
         },
-        "postgres": "postgres",
-        "postgresSchema": "sv_participant"
+        "persistence": {
+          "host": "postgres",
+          "schema": "sv_participant"
+        }
       }
     },
     "name": "participant",

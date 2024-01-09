@@ -1241,10 +1241,13 @@
         "init": {
           "initDb": "cantonnet"
         },
-        "postgres": "postgres.splitwell.svc.cluster.local",
-        "postgresMediatorDb": "domain_mediator",
-        "postgresSecretName": "postgres-secrets",
-        "postgresSequencerDb": "domain_sequencer",
+        "mediator": {
+          "persistence": {
+            "databaseName": "domain_mediator",
+            "host": "postgres.splitwell.svc.cluster.local",
+            "secretName": "postgres-secrets"
+          }
+        },
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -1252,6 +1255,13 @@
           "requests": {
             "cpu": "1",
             "memory": "8Gi"
+          }
+        },
+        "sequencer": {
+          "persistence": {
+            "databaseName": "domain_sequencer",
+            "host": "postgres.splitwell.svc.cluster.local",
+            "secretName": "postgres-secrets"
           }
         }
       }
@@ -1423,10 +1433,12 @@
             "optional": false
           }
         },
-        "postgres": "postgres.splitwell.svc.cluster.local",
-        "postgresDb": "participant",
-        "postgresSchema": "participant",
-        "postgresSecretName": "postgres-secrets",
+        "persistence": {
+          "databaseName": "participant",
+          "host": "postgres.splitwell.svc.cluster.local",
+          "schema": "participant",
+          "secretName": "postgres-secrets"
+        },
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -1506,12 +1518,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "domain_mediator",
-          "hostname": "postgres.splitwell.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "domain_mediator",
+          "host": "postgres.splitwell.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -1592,12 +1604,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "domain_sequencer",
-          "hostname": "postgres.splitwell.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "domain_sequencer",
+          "host": "postgres.splitwell.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -1678,12 +1690,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "participant",
-          "hostname": "postgres.splitwell.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "participant",
+          "host": "postgres.splitwell.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -1776,12 +1788,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "val_splitwell",
-          "hostname": "postgres.splitwell.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "val_splitwell",
+          "host": "postgres.splitwell.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -1875,7 +1887,9 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretName": "postgres-secrets",
+        "persistence": {
+          "secretName": "postgres-secrets"
+        },
         "resources": {
           "limits": {
             "cpu": "2",
@@ -2095,7 +2109,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -2355,15 +2368,18 @@
         "init": {
           "initDb": "cantonnet"
         },
-        "mediatorPostgres": "postgres.sv-1.svc.cluster.local",
-        "mediatorPostgresSecretName": "postgres-secrets",
+        "mediator": {
+          "persistence": {
+            "databaseName": "global_domain_0_mediator",
+            "host": "postgres.sv-1.svc.cluster.local",
+            "secretName": "postgres-secrets"
+          }
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
-        "postgresMediatorDb": "global_domain_0_mediator",
-        "postgresSequencerDb": "global_domain_0_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -2373,13 +2389,18 @@
             "memory": "4Gi"
           }
         },
-        "sequencerDriver": {
-          "host": "undefined.undefined.svc.cluster.local",
-          "port": 26657,
-          "type": "cometbft"
-        },
-        "sequencerPostgres": "postgres.sv-1.svc.cluster.local",
-        "sequencerPostgresSecretName": "postgres-secrets"
+        "sequencer": {
+          "driver": {
+            "host": "undefined.undefined.svc.cluster.local",
+            "port": 26657,
+            "type": "cometbft"
+          },
+          "persistence": {
+            "databaseName": "global_domain_0_sequencer",
+            "host": "postgres.sv-1.svc.cluster.local",
+            "secretName": "postgres-secrets"
+          }
+        }
       }
     },
     "name": "sv-1-global-domain-0",
@@ -2643,10 +2664,12 @@
             "optional": false
           }
         },
-        "postgres": "postgres.sv-1.svc.cluster.local",
-        "postgresDb": "participant_0",
-        "postgresSchema": "participant_0",
-        "postgresSecretName": "postgres-secrets",
+        "persistence": {
+          "databaseName": "participant_0",
+          "host": "postgres.sv-1.svc.cluster.local",
+          "schema": "participant_0",
+          "secretName": "postgres-secrets"
+        },
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -2726,12 +2749,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "global_domain_0_mediator",
-          "hostname": "postgres.sv-1.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "global_domain_0_mediator",
+          "host": "postgres.sv-1.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -2812,12 +2835,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "global_domain_0_sequencer",
-          "hostname": "postgres.sv-1.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "global_domain_0_sequencer",
+          "host": "postgres.sv-1.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -2898,12 +2921,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "participant_0",
-          "hostname": "postgres.sv-1.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "participant_0",
+          "host": "postgres.sv-1.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -2996,12 +3019,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "scan_sv_1",
-          "hostname": "postgres.sv-1.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "scan_sv_1",
+          "host": "postgres.sv-1.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -3082,12 +3105,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_1",
-          "hostname": "postgres.sv-1.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "sv_1",
+          "host": "postgres.sv-1.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -3168,12 +3191,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "validator_sv_1",
-          "hostname": "postgres.sv-1.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "validator_sv_1",
+          "host": "postgres.sv-1.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -3267,7 +3290,9 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretName": "postgres-secrets",
+        "persistence": {
+          "secretName": "postgres-secrets"
+        },
         "resources": {
           "limits": {
             "cpu": "2",
@@ -3367,7 +3392,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "1536Mi"
@@ -3570,7 +3594,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -3674,7 +3697,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -3928,15 +3950,18 @@
         "init": {
           "initDb": "cantonnet"
         },
-        "mediatorPostgres": "postgres.sv-2.svc.cluster.local",
-        "mediatorPostgresSecretName": "postgres-secrets",
+        "mediator": {
+          "persistence": {
+            "databaseName": "global_domain_0_mediator",
+            "host": "postgres.sv-2.svc.cluster.local",
+            "secretName": "postgres-secrets"
+          }
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
-        "postgresMediatorDb": "global_domain_0_mediator",
-        "postgresSequencerDb": "global_domain_0_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -3946,13 +3971,18 @@
             "memory": "4Gi"
           }
         },
-        "sequencerDriver": {
-          "host": "undefined.undefined.svc.cluster.local",
-          "port": 26657,
-          "type": "cometbft"
-        },
-        "sequencerPostgres": "postgres.sv-2.svc.cluster.local",
-        "sequencerPostgresSecretName": "postgres-secrets"
+        "sequencer": {
+          "driver": {
+            "host": "undefined.undefined.svc.cluster.local",
+            "port": 26657,
+            "type": "cometbft"
+          },
+          "persistence": {
+            "databaseName": "global_domain_0_sequencer",
+            "host": "postgres.sv-2.svc.cluster.local",
+            "secretName": "postgres-secrets"
+          }
+        }
       }
     },
     "name": "sv-2-global-domain-0",
@@ -4216,10 +4246,12 @@
             "optional": false
           }
         },
-        "postgres": "postgres.sv-2.svc.cluster.local",
-        "postgresDb": "participant_0",
-        "postgresSchema": "participant_0",
-        "postgresSecretName": "postgres-secrets",
+        "persistence": {
+          "databaseName": "participant_0",
+          "host": "postgres.sv-2.svc.cluster.local",
+          "schema": "participant_0",
+          "secretName": "postgres-secrets"
+        },
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -4299,12 +4331,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "global_domain_0_mediator",
-          "hostname": "postgres.sv-2.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "global_domain_0_mediator",
+          "host": "postgres.sv-2.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4385,12 +4417,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "global_domain_0_sequencer",
-          "hostname": "postgres.sv-2.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "global_domain_0_sequencer",
+          "host": "postgres.sv-2.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4471,12 +4503,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "participant_0",
-          "hostname": "postgres.sv-2.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "participant_0",
+          "host": "postgres.sv-2.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4569,12 +4601,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "scan_sv_2",
-          "hostname": "postgres.sv-2.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "scan_sv_2",
+          "host": "postgres.sv-2.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4655,12 +4687,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_2",
-          "hostname": "postgres.sv-2.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "sv_2",
+          "host": "postgres.sv-2.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4741,12 +4773,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "validator_sv_2",
-          "hostname": "postgres.sv-2.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "validator_sv_2",
+          "host": "postgres.sv-2.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4840,7 +4872,9 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretName": "postgres-secrets",
+        "persistence": {
+          "secretName": "postgres-secrets"
+        },
         "resources": {
           "limits": {
             "cpu": "2",
@@ -4940,7 +4974,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "1536Mi"
@@ -5115,7 +5148,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -5219,7 +5251,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -5473,15 +5504,18 @@
         "init": {
           "initDb": "cantonnet"
         },
-        "mediatorPostgres": "postgres.sv-3.svc.cluster.local",
-        "mediatorPostgresSecretName": "postgres-secrets",
+        "mediator": {
+          "persistence": {
+            "databaseName": "global_domain_0_mediator",
+            "host": "postgres.sv-3.svc.cluster.local",
+            "secretName": "postgres-secrets"
+          }
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
-        "postgresMediatorDb": "global_domain_0_mediator",
-        "postgresSequencerDb": "global_domain_0_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -5491,13 +5525,18 @@
             "memory": "4Gi"
           }
         },
-        "sequencerDriver": {
-          "host": "undefined.undefined.svc.cluster.local",
-          "port": 26657,
-          "type": "cometbft"
-        },
-        "sequencerPostgres": "postgres.sv-3.svc.cluster.local",
-        "sequencerPostgresSecretName": "postgres-secrets"
+        "sequencer": {
+          "driver": {
+            "host": "undefined.undefined.svc.cluster.local",
+            "port": 26657,
+            "type": "cometbft"
+          },
+          "persistence": {
+            "databaseName": "global_domain_0_sequencer",
+            "host": "postgres.sv-3.svc.cluster.local",
+            "secretName": "postgres-secrets"
+          }
+        }
       }
     },
     "name": "sv-3-global-domain-0",
@@ -5761,10 +5800,12 @@
             "optional": false
           }
         },
-        "postgres": "postgres.sv-3.svc.cluster.local",
-        "postgresDb": "participant_0",
-        "postgresSchema": "participant_0",
-        "postgresSecretName": "postgres-secrets",
+        "persistence": {
+          "databaseName": "participant_0",
+          "host": "postgres.sv-3.svc.cluster.local",
+          "schema": "participant_0",
+          "secretName": "postgres-secrets"
+        },
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -5844,12 +5885,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "global_domain_0_mediator",
-          "hostname": "postgres.sv-3.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "global_domain_0_mediator",
+          "host": "postgres.sv-3.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -5930,12 +5971,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "global_domain_0_sequencer",
-          "hostname": "postgres.sv-3.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "global_domain_0_sequencer",
+          "host": "postgres.sv-3.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -6016,12 +6057,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "participant_0",
-          "hostname": "postgres.sv-3.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "participant_0",
+          "host": "postgres.sv-3.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -6114,12 +6155,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "scan_sv_3",
-          "hostname": "postgres.sv-3.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "scan_sv_3",
+          "host": "postgres.sv-3.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -6200,12 +6241,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_3",
-          "hostname": "postgres.sv-3.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "sv_3",
+          "host": "postgres.sv-3.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -6286,12 +6327,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "validator_sv_3",
-          "hostname": "postgres.sv-3.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "validator_sv_3",
+          "host": "postgres.sv-3.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -6385,7 +6426,9 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretName": "postgres-secrets",
+        "persistence": {
+          "secretName": "postgres-secrets"
+        },
         "resources": {
           "limits": {
             "cpu": "2",
@@ -6485,7 +6528,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "1536Mi"
@@ -6660,7 +6702,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -6764,7 +6805,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -7018,15 +7058,18 @@
         "init": {
           "initDb": "cantonnet"
         },
-        "mediatorPostgres": "postgres.sv-4.svc.cluster.local",
-        "mediatorPostgresSecretName": "postgres-secrets",
+        "mediator": {
+          "persistence": {
+            "databaseName": "global_domain_0_mediator",
+            "host": "postgres.sv-4.svc.cluster.local",
+            "secretName": "postgres-secrets"
+          }
+        },
         "metrics": {
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
-        "postgresMediatorDb": "global_domain_0_mediator",
-        "postgresSequencerDb": "global_domain_0_sequencer",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -7036,13 +7079,18 @@
             "memory": "4Gi"
           }
         },
-        "sequencerDriver": {
-          "host": "undefined.undefined.svc.cluster.local",
-          "port": 26657,
-          "type": "cometbft"
-        },
-        "sequencerPostgres": "postgres.sv-4.svc.cluster.local",
-        "sequencerPostgresSecretName": "postgres-secrets"
+        "sequencer": {
+          "driver": {
+            "host": "undefined.undefined.svc.cluster.local",
+            "port": 26657,
+            "type": "cometbft"
+          },
+          "persistence": {
+            "databaseName": "global_domain_0_sequencer",
+            "host": "postgres.sv-4.svc.cluster.local",
+            "secretName": "postgres-secrets"
+          }
+        }
       }
     },
     "name": "sv-4-global-domain-0",
@@ -7306,10 +7354,12 @@
             "optional": false
           }
         },
-        "postgres": "postgres.sv-4.svc.cluster.local",
-        "postgresDb": "participant_0",
-        "postgresSchema": "participant_0",
-        "postgresSecretName": "postgres-secrets",
+        "persistence": {
+          "databaseName": "participant_0",
+          "host": "postgres.sv-4.svc.cluster.local",
+          "schema": "participant_0",
+          "secretName": "postgres-secrets"
+        },
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -7389,12 +7439,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "global_domain_0_mediator",
-          "hostname": "postgres.sv-4.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "global_domain_0_mediator",
+          "host": "postgres.sv-4.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -7475,12 +7525,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "global_domain_0_sequencer",
-          "hostname": "postgres.sv-4.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "global_domain_0_sequencer",
+          "host": "postgres.sv-4.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -7561,12 +7611,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "participant_0",
-          "hostname": "postgres.sv-4.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "participant_0",
+          "host": "postgres.sv-4.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -7659,12 +7709,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "scan_sv_4",
-          "hostname": "postgres.sv-4.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "scan_sv_4",
+          "host": "postgres.sv-4.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -7745,12 +7795,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "sv_4",
-          "hostname": "postgres.sv-4.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "sv_4",
+          "host": "postgres.sv-4.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -7831,12 +7881,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "validator_sv_4",
-          "hostname": "postgres.sv-4.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "validator_sv_4",
+          "host": "postgres.sv-4.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -7930,7 +7980,9 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretName": "postgres-secrets",
+        "persistence": {
+          "secretName": "postgres-secrets"
+        },
         "resources": {
           "limits": {
             "cpu": "2",
@@ -8030,7 +8082,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "1536Mi"
@@ -8205,7 +8256,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -8309,7 +8359,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "8Gi"
@@ -8511,10 +8560,12 @@
             "optional": false
           }
         },
-        "postgres": "postgres.validator1.svc.cluster.local",
-        "postgresDb": "participant",
-        "postgresSchema": "participant",
-        "postgresSecretName": "postgres-secrets",
+        "persistence": {
+          "databaseName": "participant",
+          "host": "postgres.validator1.svc.cluster.local",
+          "schema": "participant",
+          "secretName": "postgres-secrets"
+        },
         "resources": {
           "limits": {
             "memory": "32Gi"
@@ -8594,12 +8645,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "participant",
-          "hostname": "postgres.validator1.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "participant",
+          "host": "postgres.validator1.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -8692,12 +8743,12 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": {
-          "database": "validator1",
-          "hostname": "postgres.validator1.svc.cluster.local",
-          "port": "5432"
+        "persistence": {
+          "databaseName": "validator1",
+          "host": "postgres.validator1.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "cpu": "2",
@@ -8791,7 +8842,9 @@
           "volumeStorageClass": "standard-rwo"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgresSecretName": "postgres-secrets",
+        "persistence": {
+          "secretName": "postgres-secrets"
+        },
         "resources": {
           "limits": {
             "cpu": "2",
@@ -8990,7 +9043,6 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
-        "postgresSecretName": "postgres-secrets",
         "resources": {
           "limits": {
             "memory": "8Gi"

@@ -265,7 +265,6 @@ export async function installSvNode(
     isDevNet: config.isDevNet,
     approvedSvIdentities: config.approvedSvIdentities,
     persistence: persistenceConfig(svAppPostgres, svAppName),
-    postgresSecretName: svAppPostgres.secretName,
     acsDumpPeriodicExport: backupConfig,
     acsDumpImport:
       config.bootstrappingDumpConfig && config.onboarding.type === 'found-collective'
@@ -322,7 +321,6 @@ export async function installSvNode(
       enable: true,
     },
     persistence: persistenceConfig(scanAppPostgres, scanDbName),
-    postgresSecretName: scanAppPostgres.secretName,
     additionalJvmOptions: jmxOptions(),
     sequencerAddress: sequencerAddress,
     init: initDb && { initDb },

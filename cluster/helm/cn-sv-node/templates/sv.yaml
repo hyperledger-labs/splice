@@ -90,7 +90,7 @@ spec:
             - name: CN_APP_POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ $.Values.postgresSecretName }}
+                  name: {{ $.Values.persistence.secretName }}
                   key: postgresPassword
             {{- end }}
             {{- with .Values.joinWithKeyOnboarding }}
@@ -238,7 +238,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: postgresPassword
-                  name: {{ .Values.postgresSecretName }}
+                  name: {{ .Values.persistence.secretName }}
           command:
             - 'bash'
             - '-c'

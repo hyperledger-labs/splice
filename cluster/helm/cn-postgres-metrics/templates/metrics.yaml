@@ -18,7 +18,7 @@ spec:
       volumes:
         - name: postgres-password
           secret:
-            secretName: {{ .Values.postgresSecretName }}
+            secretName: {{ .Values.persistence.secretName }}
             items:
               - key: postgresPassword
                 path: postgresPassword
@@ -31,7 +31,7 @@ spec:
           - name: DATA_SOURCE_USER
             value: cnadmin
           - name: DATA_SOURCE_URI
-            value: {{ .Values.postgres.hostname }}:{{ .Values.postgres.port }}/{{ .Values.postgres.database }}?sslmode=disable
+            value: {{ .Values.persistence.host }}:{{ .Values.persistence.port }}/{{ .Values.persistence.databaseName }}?sslmode=disable
         volumeMounts:
           - name: postgres-password
             mountPath: "/tmp/pwd"
@@ -48,13 +48,13 @@ spec:
             valueFrom:
               secretKeyRef:
                 key: postgresPassword
-                name: {{ .Values.postgresSecretName }}
+                name: {{ .Values.persistence.secretName }}
         command:
           - 'bash'
           - '-c'
           - |
-            until errmsg=$(psql -h {{ .Values.postgres.hostname }} --username=cnadmin --dbname={{ .Values.postgres.database }} -p {{ .Values.postgres.port }} -c 'select 1' 2>&1); do
-                echo "Waiting for database {{ .Values.postgres.database }}, at hostname {{ .Values.postgres.hostname }}, port {{ .Values.postgres.port }} to be accessible. Last error: $errmsg"
+            until errmsg=$(psql -h {{ .Values.persistence.host }} --username=cnadmin --dbname={{ .Values.persistence.databaseName }} -p {{ .Values.persistence.port }} -c 'select 1' 2>&1); do
+                echo "Waiting for database {{ .Values.persistence.databaseName }}, at hostname {{ .Values.persistence.host }}, port {{ .Values.persistence.port }} to be accessible. Last error: $errmsg"
                 sleep 2;
             done
 ---
@@ -65,7 +65,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Release.Name }}
-    server: {{ .Values.postgres.hostname }}
+    server: {{ .Values.persistence.host }}
 spec:
   ports:
   - name: postgres-metrics

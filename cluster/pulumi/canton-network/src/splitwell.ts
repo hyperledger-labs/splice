@@ -145,10 +145,20 @@ function installDomain(xns: ExactNamespace, name: string, postgres: Postgres): p
     name,
     'cn-domain',
     {
-      postgres: postgres.address,
-      postgresMediatorDb: mediatorDbName,
-      postgresSequencerDb: sequencerDbName,
-      postgresSecretName: postgres.secretName,
+      mediator: {
+        persistence: {
+          databaseName: mediatorDbName,
+          host: postgres.address,
+          secretName: postgres.secretName,
+        },
+      },
+      sequencer: {
+        persistence: {
+          databaseName: sequencerDbName,
+          host: postgres.address,
+          secretName: postgres.secretName,
+        },
+      },
       additionalJvmOptions: jmxOptions(),
       init: initDb && { initDb },
     },

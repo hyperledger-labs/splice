@@ -4,15 +4,15 @@
 {{ $_ := required ".Values.cluster.imageTag is required." (.Values.cluster).imageTag }}
 {{ $_ := required ".Values.defaultJvmOptions is required." .Values.defaultJvmOptions }}
 {{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
-{{ $_ := required ".Values.sequencerPostgres is required." .Values.sequencerPostgres }}
-{{ $_ := required ".Values.sequencerPostgresSecretName is required" .Values.sequencerPostgresSecretName }}
-{{ $_ := required ".Values.mediatorPostgres is required." .Values.mediatorPostgres }}
-{{ $_ := required ".Values.mediatorPostgresSecretName is required" .Values.mediatorPostgresSecretName }}
-{{ $_ := required ".Values.sequencerDriver.type is required." (.Values.sequencerDriver).type }}
-{{- if eq .Values.sequencerDriver.type "postgres"}}
-{{ $_ := required ".Values.sequencerDriver.address is required." (.Values.sequencerDriver).address }}
-{{ $_ := required ".Values.sequencerDriver.password is required." (.Values.sequencerDriver).password }}
-{{- else if eq .Values.sequencerDriver.type "cometbft"}}
-{{ $_ := required ".Values.sequencerDriver.host is required." (.Values.sequencerDriver).host }}
-{{ $_ := required ".Values.sequencerDriver.port is required." (.Values.sequencerDriver).port }}
+{{ $_ := required ".Values.sequencer.persistence.host is required." .Values.sequencer.persistence.host }}
+{{ $_ := required ".Values.sequencer.persistence.secretName is required" .Values.sequencer.persistence.secretName }}
+{{ $_ := required ".Values.mediator.persistence.host  is required." .Values.mediator.persistence.host }}
+{{ $_ := required ".Values.mediator.persistence.secretName  is required" .Values.mediator.persistence.secretName }}
+{{ $_ := required ".Values.sequencer.driver.type is required." (.Values.sequencer.driver).type }}
+{{- if eq .Values.sequencer.driver.type "postgres"}}
+{{ $_ := required ".Values.sequencer.driver.address is required." (.Values.sequencer.driver).address }}
+{{ $_ := required ".Values.sequencer.driver.password is required." (.Values.sequencer.driver).password }}
+{{- else if eq .Values.sequencer.driver.type "cometbft"}}
+{{ $_ := required ".Values.sequencer.driver.host is required." (.Values.sequencer.driver).host }}
+{{ $_ := required ".Values.sequencer.driver.port is required." (.Values.sequencer.driver).port }}
 {{- end}}

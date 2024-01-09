@@ -6,8 +6,7 @@ resources:
     cpu: "2"
     memory: 1Gi
 
-postgres:
-  hostname: "postgres"
+persistence:
+  host: "postgres"
   port: "5432"
-
-postgresSecretName: "postgres-secrets"
+  secretName: "postgres-secrets"

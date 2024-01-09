@@ -10,5 +10,12 @@ resources:
     cpu: "1"
     memory: 8Gi
 
-postgres: postgres.sv-1.svc.cluster.local
-postgresSecretName: "postgres-secrets"
+mediator:
+  persistence:
+    host: postgres.sv-1.svc.cluster.local
+    secretName: "postgres-secrets"
+
+sequencer:
+  persistence:
+    host: postgres.sv-1.svc.cluster.local
+    secretName: "postgres-secrets"

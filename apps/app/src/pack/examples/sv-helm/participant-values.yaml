@@ -1,5 +1,6 @@
-postgres: postgres
-postgresSchema: sv_participant
+persistence:
+  host: postgres
+  schema: sv_participant
 globalDomain:
   alias: global
   # replace TARGET_CLUSTER with your actual target cluster

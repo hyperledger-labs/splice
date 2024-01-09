@@ -253,13 +253,21 @@
       "timeout": 480,
       "values": {
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "mediatorPostgres": "postgres",
-        "sequencerDriver": {
-          "host": "cometbft-cometbft-rpc",
-          "port": 26657,
-          "type": "cometbft"
+        "mediator": {
+          "persistence": {
+            "host": "postgres"
+          }
         },
-        "sequencerPostgres": "postgres"
+        "sequencer": {
+          "driver": {
+            "host": "cometbft-cometbft-rpc",
+            "port": 26657,
+            "type": "cometbft"
+          },
+          "persistence": {
+            "host": "postgres"
+          }
+        }
       }
     },
     "name": "global-domain",
@@ -297,8 +305,10 @@
           "url": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
-        "postgres": "postgres",
-        "postgresSchema": "sv_participant"
+        "persistence": {
+          "host": "postgres",
+          "schema": "sv_participant"
+        }
       }
     },
     "name": "participant",

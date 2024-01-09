@@ -132,7 +132,6 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       metrics: {
         enable: true,
       },
-      postgresSecretName: config.persistenceConfig.secretName,
       participantAddress: config.participantAddress,
       init: initDb && { initDb },
       additionalJvmOptions: jmxOptions(),

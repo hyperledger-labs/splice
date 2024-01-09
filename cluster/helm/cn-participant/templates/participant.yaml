@@ -25,9 +25,9 @@ spec:
         - name: JAVA_TOOL_OPTIONS
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
         - name: CANTON_PARTICIPANT_POSTGRES_SERVER
-          value: {{ .Values.postgres }}
+          value: {{ .Values.persistence.host }}
         - name: CANTON_PARTICIPANT_POSTGRES_SCHEMA
-          value: {{ .Values.postgresSchema }}
+          value: {{ .Values.persistence.schema }}
         - name: CANTON_PARTICIPANT_ADMIN_USER_NAME
           valueFrom: {{ .Values.participantAdminUserNameFrom | toYaml | nindent 12 }}
         - name: AUTH_JWKS_URL
@@ -37,11 +37,11 @@ spec:
         - name: CANTON_PARTICIPANT_POSTGRES_PASSWORD
           valueFrom:
            secretKeyRef:
-             name: {{ .Values.postgresSecretName }}
+             name: {{ .Values.persistence.secretName }}
              key: postgresPassword
-        {{- if .Values.postgresDb }}
+        {{- if .Values.persistence.databaseName }}
         - name: CANTON_PARTICIPANT_POSTGRES_DB
-          value: {{ .Values.postgresDb }}
+          value: {{ .Values.persistence.databaseName }}
         {{- end }}
         {{- with .Values.globalDomain }}
         {{- if .alias }}
@@ -99,18 +99,18 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: postgresPassword
-                  name: {{ .Values.postgresSecretName }}
+                  name: {{ .Values.persistence.secretName }}
           command:
             - 'bash'
             - '-c'
             - |
-              until errmsg=$(psql -h {{ .Values.postgres }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.postgresDb }}' 2>&1); do
+              until errmsg=$(psql -h {{ .Values.persistence.host }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.persistence.databaseName }}' 2>&1); do
                 if [[ $errmsg == *"already exists"* ]]; then
-                  echo "Database {{ .Values.postgresDb }} already exists. Done."
+                  echo "Database {{ .Values.persistence.databaseName }} already exists. Done."
                   break
                 fi
 
-                echo "trying to create postgres database {{ .Values.postgresDb }}, last error: $errmsg";
+                echo "trying to create postgres database {{ .Values.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
       {{- end }}
