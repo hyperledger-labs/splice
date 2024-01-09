@@ -1,8 +1,5 @@
 package com.daml.network.environment
 
-import org.apache.pekko.Done
-import org.apache.pekko.stream.StreamTcpException
-import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
@@ -17,8 +14,8 @@ import com.digitalasset.canton.lifecycle.{
   RunOnShutdown,
   UnlessShutdown,
 }
-import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -30,9 +27,15 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
   NoErrorKind,
   TransientErrorKind,
 }
+import com.digitalasset.canton.DiscardOps
 import io.grpc.Status
 import io.grpc.protobuf.StatusProto
+import org.apache.pekko.Done
+import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
+import org.apache.pekko.stream.StreamTcpException
 
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.Collections
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Try}
 
@@ -53,23 +56,31 @@ final class RetryProvider(
     with FlagCloseable {
   import RetryProvider.Retryable
 
-  // shutdown signal as a promise so we can wait on it more easily than polling isClosing.
+  // Keep track of promises directly to avoid the promise accumulating references to stale futures that it should complete.
+  // For more details check https://github.com/DACH-NY/canton-network-node/issues/9178
   // TODO(#4405) Derive from FlagCloseable isClosing state.
-  private val shutdownSignal = Promise[UnlessShutdown[Nothing]]()
+  private val promisesRunningThatAreShutdownAware: java.util.Set[Promise[UnlessShutdown[?]]] =
+    Collections.synchronizedSet(
+      Collections.newSetFromMap(
+        new java.util.WeakHashMap()
+      )
+    )
+  private val shutdown = new AtomicBoolean(false)
 
   runOnShutdown_(new RunOnShutdown {
     override def name: String = s"trigger promise for shutdown signal"
-    override def done: Boolean = shutdownSignal.isCompleted
+    override def done: Boolean = promisesRunningThatAreShutdownAware.isEmpty && shutdown.get()
     override def run(): Unit = {
       logger.debug("Sending node-level shutdown signal (via future).")(
         TraceContext.empty
       )
-      val _ = shutdownSignal.trySuccess(UnlessShutdown.AbortedDueToShutdown)
+      shutdown.set(true)
+      promisesRunningThatAreShutdownAware.forEach(promise => {
+        promise.trySuccess(UnlessShutdown.AbortedDueToShutdown).discard
+      })
+      promisesRunningThatAreShutdownAware.clear()
     }
   })(TraceContext.empty)
-
-  /** Completes when node-level shutdown was initiated. */
-  def shutdownInitiated: Future[UnlessShutdown[Nothing]] = shutdownSignal.future
 
   /** Use this function to log unexpected terminations from background processing loops and
     * ignore exceptions propagated on shutdown.
@@ -108,12 +119,21 @@ final class RetryProvider(
     * Use this for all functions that wait for an indefinite amount of time,
     * and thereby avoid blocking a clean shutdown.
     */
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def waitUnlessShutdown[T](
       waitForSignal: Future[T]
   )(implicit ec: ExecutionContext): FutureUnlessShutdown[T] = {
     val signalOrShutdown = Promise[UnlessShutdown[T]]()
+    promisesRunningThatAreShutdownAware
+      .add(
+        signalOrShutdown.asInstanceOf[Promise[UnlessShutdown[?]]]
+      )
+      .discard
     signalOrShutdown.completeWith(waitForSignal.map(UnlessShutdown.Outcome(_)))
-    signalOrShutdown.completeWith(shutdownInitiated)
+    // complete in case this call raced with the shutdown of the RetryProvider
+    if (shutdown.get()) {
+      signalOrShutdown.trySuccess(UnlessShutdown.AbortedDueToShutdown).discard
+    }
     FutureUnlessShutdown(signalOrShutdown.future)
   }
 
