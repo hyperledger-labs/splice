@@ -319,6 +319,7 @@ workflows:
     - preflight_check:
         name: preflight_check_devnet
         cluster: "cidaily"
+        channel_notify: C06DEUJ2LBT # TODO(#9130) -- return to original channel after
         <<: *main-branch-only
         context:
           - artifactory
@@ -408,6 +409,7 @@ workflows:
           - datadog
           - slack-context
         cluster: "cidaily"
+        channel_notify: C06DEUJ2LBT # TODO(#9130) -- return to original channel after
         requires:
           - deploy_sv_runbook_devnet
     - preflight_sv_check:
@@ -430,6 +432,7 @@ workflows:
           - datadog
           - slack-context
         cluster: "cidaily"
+        channel_notify: C06DEUJ2LBT # TODO(#9130) -- return to original channel after
         requires:
           - deploy_validator_runbook_devnet
 
@@ -735,6 +738,7 @@ workflows:
               only:
                 - deployment/cidaily
           cluster: "cidaily"
+          channel_notify: C06DEUJ2LBT # TODO(#9130) -- return to original channel after
           wait_for_cluster_version: false
           context:
             - artifactory
