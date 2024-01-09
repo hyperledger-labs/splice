@@ -293,6 +293,7 @@ lazy val `svc-governance-test-upgrade-daml` =
           (`canton-coin-upgrade-daml` / Compile / damlBuild).value ++
           (`canton-name-service-upgrade-daml` / Compile / damlBuild).value ++
           (`canton-name-service-test-upgrade-daml` / Compile / damlBuild).value ++
+          (`svc-governance-upgrade-daml` / Compile / damlBuild).value ++
           (`wallet-payments-upgrade-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
