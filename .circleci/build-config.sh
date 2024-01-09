@@ -39,7 +39,7 @@ fi
     cat "${REPO_ROOT}/.circleci/config/workflows.yml"
 } > "${OUTPUT_CONF}"
 
-for clustername in scratchneta scratchnetb scratchnetc scratchnetd
+for clustername in scratchneta scratchnetb scratchnetc scratchnetd scratchnete
 do
     sed "s/_CLUSTERNAME_/${clustername}/g" \
         < "${REPO_ROOT}/.circleci/config/deploy_scratchnet_workflow.yml" \
