@@ -1769,7 +1769,7 @@ function subcmd_participant_console() {
         _error "Usage: $SCRIPTNAME participant_console <namespace-name>"
     fi
 
-    if ! participant_pod=$(_get_single_pod "$namespace" "participant"); then
+    if ! participant_pod=$(_get_single_pod "$namespace" "participant-0"); then
       _error "No participant found in namespace '$namespace'."
     fi
 
