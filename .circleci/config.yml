@@ -3195,6 +3195,7 @@ workflows:
             - datadog
             - slack-context
           cluster: "cidaily"
+          channel_notify: C06DEUJ2LBT # TODO(#9130) -- return to original channel after
           wait_for_cluster_version: false
           requires:
             - deploy_sv_runbook
