@@ -56,7 +56,7 @@ export async function setupBootstrapping(config: BootstrapParams): Promise<Boots
   let backupConfigSecret: pulumi.Resource | undefined;
   let backupConfig: BackupConfig | undefined;
 
-  const bootstrapBucketSpec = bootstrapDataBucketSpec('da-cn-devnet', 'da-cn-data-dumps');
+  const bootstrapBucketSpec = await bootstrapDataBucketSpec('da-cn-devnet', 'da-cn-data-dumps');
 
   if (bootstrappingConfig || !isDevNet) {
     backupConfig = {

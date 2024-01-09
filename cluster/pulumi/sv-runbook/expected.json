@@ -243,6 +243,14 @@
     "type": "kubernetes:helm.sh/v3:Release"
   },
   {
+    "custom": false,
+    "id": "projects/da-cn-scratchnet/secrets/gcp-bucket-sa-key-secret/versions/1",
+    "inputs": {},
+    "name": "data-export-bucket-sa-key-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
     "custom": true,
     "id": "",
     "inputs": {
@@ -276,11 +284,11 @@
   },
   {
     "custom": false,
-    "id": "organization/infra/infra.mock",
+    "id": "organization/infra/infra.svrun",
     "inputs": {
-      "name": "organization/infra/infra.mock"
+      "name": "organization/infra/infra.svrun"
     },
-    "name": "organization/infra/infra.mock",
+    "name": "organization/infra/infra.svrun",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
   },

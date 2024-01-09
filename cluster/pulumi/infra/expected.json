@@ -68,7 +68,7 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "key.json": "bW9jay1qc29u"
+          "key.json": "ZG5zLXNlY3JldA=="
         }
       },
       "kind": "Secret",
@@ -160,6 +160,14 @@
     "name": "dev-vsc",
     "provider": "",
     "type": "kubernetes:snapshot.storage.k8s.io/v1:VolumeSnapshotClass"
+  },
+  {
+    "custom": false,
+    "id": "projects/da-cn-scratchnet/secrets/dns01-sa-key-secret/versions/1",
+    "inputs": {},
+    "name": "dns01-sa-key-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
   },
   {
     "custom": true,

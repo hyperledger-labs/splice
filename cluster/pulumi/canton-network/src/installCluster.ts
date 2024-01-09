@@ -137,32 +137,32 @@ const standaloneValidatorOnboarding = {
 let backupConfig: BackupConfig | undefined;
 let bootstrappingDumpConfig: BootstrappingDumpConfig | undefined;
 
-const bootstrapBucketSpec = bootstrapDataBucketSpec('da-cn-devnet', 'da-cn-data-dumps');
-
-if (!isDevNet) {
-  backupConfig = { backupInterval: '10m', bucket: bootstrapBucketSpec };
-}
-
-const topupConfig: ValidatorTopupConfig = {
-  targetThroughput: domainFeesConfig.targetThroughput,
-  minTopupInterval: domainFeesConfig.minTopupInterval,
-};
-
-if (bootstrappingConfig) {
-  const end = new Date(Date.parse(bootstrappingConfig.date));
-  // We search within an interval of 24 hours. Given that we usually backups every 10min, this gives us
-  // more than enough of a threshold to make sure each node has one backup in that interval
-  // while also having sufficiently few backups that the bucket query is fast.
-  const start = new Date(end.valueOf() - 24 * 60 * 60 * 1000);
-  bootstrappingDumpConfig = {
-    bucket: bootstrapBucketSpec,
-    cluster: bootstrappingConfig.cluster,
-    start,
-    end,
-  };
-}
-
 export async function installCluster(auth0Client: Auth0Client): Promise<void> {
+  const bootstrapBucketSpec = await bootstrapDataBucketSpec('da-cn-devnet', 'da-cn-data-dumps');
+
+  if (!isDevNet) {
+    backupConfig = { backupInterval: '10m', bucket: bootstrapBucketSpec };
+  }
+
+  const topupConfig: ValidatorTopupConfig = {
+    targetThroughput: domainFeesConfig.targetThroughput,
+    minTopupInterval: domainFeesConfig.minTopupInterval,
+  };
+
+  if (bootstrappingConfig) {
+    const end = new Date(Date.parse(bootstrappingConfig.date));
+    // We search within an interval of 24 hours. Given that we usually backups every 10min, this gives us
+    // more than enough of a threshold to make sure each node has one backup in that interval
+    // while also having sufficiently few backups that the bucket query is fast.
+    const start = new Date(end.valueOf() - 24 * 60 * 60 * 1000);
+    bootstrappingDumpConfig = {
+      bucket: bootstrapBucketSpec,
+      cluster: bootstrappingConfig.cluster,
+      start,
+      end,
+    };
+  }
+
   configureForwardAll(
     infraStack.requireOutput(InfrastructureOutputs.INGRESS_NAMESPACE) as pulumi.Output<string>
   );

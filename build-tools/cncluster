@@ -111,19 +111,8 @@ function _needs_auth0_validator_management_api_creds() {
 function _cluster_apply() {
     IMAGE_TAG=$1
 
-    VERSION_NUMBER=$(get-snapshot-version)
-
-    local args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
-          -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
-
     if [ -n "${IMAGE_TAG:-}" ]; then
-        args+=(-c "IMAGE_TAG=${IMAGE_TAG}")
-    fi
-
-    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
-        args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
-    else
-        args+=(-c "FIXED_TOKENS=0")
+        local -x IMAGE_TAG=${IMAGE_TAG}
     fi
 
     _info "Applying Pulumi Infra Stack"
@@ -132,7 +121,6 @@ function _cluster_apply() {
     _info "Applying Pulumi Stack"
 
     subcmd_install_data_export_bucket_key
-    _get_data_export_bucket_secret | subcmd_pulumi canton-network config set --secret DATA_EXPORT_BUCKET_SA_KEY_JSON
     subcmd_pulumi canton-network up --yes --skip-preview --show-sames "${args[@]}"
 }
 
@@ -177,11 +165,14 @@ function _uses_pulumi_stack() {
             --secrets-provider="gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}" \
             2> /dev/null || true
 
-    # TODO(#9186): remove this once we figure out how. See issue for more details.
-    local -x PULUMI_CONFIG_PASSPHRASE=''
-    _pulumi --stack "organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
-            --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
-            stack change-secrets-provider "gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}"
+    if [ ! -f "${REPO_ROOT}/cluster/pulumi/${pulumi_project}/Pulumi.${pulumi_project}.${GCP_CLUSTER_BASENAME}.yaml" ]; then
+        # Even though we do not use pulumi configs, pulumi insists on creating a local settings file, and on having a secrets-provider for it. We therefore create it here if it doesn't exist.
+        _info "Creating Pulumi stack for ${pulumi_project} project (file ${REPO_ROOT}/cluster/pulumi/${pulumi_project}/Pulumi.${pulumi_project}.${GCP_CLUSTER_BASENAME}.yaml does not exist)"
+        local -x PULUMI_CONFIG_PASSPHRASE=''
+        _pulumi --stack "organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
+                --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
+                stack change-secrets-provider "gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}"
+    fi
 }
 
 function _retry_until_success() {
@@ -554,14 +545,6 @@ function _get_gcloud_secret() {
   gcloud secrets versions access 1 --secret="$secret_name"
 }
 
-function _get_dns01_secret() {
-    _get_gcloud_secret "${DNS01_SA_KEY_SECRET}"
-}
-
-function _get_data_export_bucket_secret() {
-    _get_gcloud_secret "${DATA_EXPORT_BUCKET_SA_KEY_SECRET}"
-}
-
 function _get_service_account_key_id() {
     local -r secret_name="$1"
     _get_gcloud_secret "$secret_name" | jq -r '.private_key_id'
@@ -669,9 +652,6 @@ function subcmd_infra_up() {
     subcmd_install_dns01_key
 
     _uses_pulumi_stack infra
-
-    _get_dns01_secret | subcmd_pulumi infra config set --secret DNS01_SA_KEY_JSON
-    subcmd_pulumi infra config set CLUSTER_BASENAME "${GCP_CLUSTER_BASENAME}"
 
     subcmd_pulumi infra up --yes --skip-preview
 }
@@ -1292,28 +1272,13 @@ function subcmd_apply() {
     done
     set -- "${POSITIONAL_ARGS[@]}"
 
-    VERSION_NUMBER=$(get-snapshot-version)
-
     if [ -n "${1-}" ]; then
+        VERSION_NUMBER=$(get-snapshot-version)
         IMAGE_TAG=$1
         _warning "Overriding image tag: ${IMAGE_TAG} (was: ${VERSION_NUMBER})"
     fi
 
-    local args=(-c "VERSION_NUMBER=${VERSION_NUMBER}"
-          -c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
-
-    if [ -n "${IMAGE_TAG:-}" ]; then
-        args+=(-c "IMAGE_TAG=${IMAGE_TAG}")
-    fi
-
-    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
-        args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
-    else
-        args+=(-c "FIXED_TOKENS=0")
-    fi
-
     subcmd_install_data_export_bucket_key
-    _get_data_export_bucket_secret | subcmd_pulumi canton-network config set --secret DATA_EXPORT_BUCKET_SA_KEY_JSON
 
     if [ -n "${preview:-}" ]; then
         make -C "${REPO_ROOT}" cluster/helm/build -j
@@ -1381,13 +1346,6 @@ function subcmd_apply_sv(){
         _error "Usage: $SCRIPTNAME apply_sv <target-domain-cluster> [<charts-version>]"
     fi
 
-    local args=(-c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
-    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
-        args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
-    else
-        args+=(-c "FIXED_TOKENS=0")
-    fi
-
     _production_gate
     _prompt_to_confirm
     _cluster_must_exist
@@ -1397,7 +1355,6 @@ function subcmd_apply_sv(){
     _uses_pulumi_stack sv-runbook
 
     subcmd_install_data_export_bucket_key
-    _get_data_export_bucket_secret | subcmd_pulumi sv-runbook config set --secret DATA_EXPORT_BUCKET_SA_KEY_JSON
 
     subcmd_pulumi sv-runbook up --yes --skip-preview --show-sames "${args[@]}"
 }
@@ -1416,13 +1373,6 @@ function subcmd_ci_apply_sv() {
 
     if [ -z "${CI-}" ]; then
         _error "This subcommand is available to CI jobs only."
-    fi
-
-    local args=(-c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
-    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
-        args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
-    else
-        args+=(-c "FIXED_TOKENS=0")
     fi
 
     # By default, this is unset and we infer the previous values based on the currently running cluster.
@@ -1446,7 +1396,6 @@ function subcmd_ci_apply_sv() {
     _uses_pulumi_stack sv-runbook
 
     subcmd_install_data_export_bucket_key
-    _get_data_export_bucket_secret | subcmd_pulumi sv-runbook config set --secret DATA_EXPORT_BUCKET_SA_KEY_JSON
 
     subcmd_pulumi sv-runbook up --yes --skip-preview "${args[@]}"
 }
@@ -1488,13 +1437,6 @@ function subcmd_apply_validator(){
         _error "Usage: $SCRIPTNAME apply_validator <target-domain-cluster> [<charts-version>]"
     fi
 
-    local args=(-c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
-    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
-        args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
-    else
-        args+=(-c "FIXED_TOKENS=0")
-    fi
-
     _production_gate
     _prompt_to_confirm
     _cluster_must_exist
@@ -1504,7 +1446,6 @@ function subcmd_apply_validator(){
     _uses_pulumi_stack validator-runbook
 
     subcmd_install_data_export_bucket_key
-    _get_data_export_bucket_secret | subcmd_pulumi validator-runbook config set --secret DATA_EXPORT_BUCKET_SA_KEY_JSON
 
     subcmd_pulumi validator-runbook up --yes --skip-preview --show-sames "${args[@]}"
 }
@@ -1523,13 +1464,6 @@ function subcmd_ci_apply_validator() {
 
     if [ -z "${CI-}" ]; then
         _error "This subcommand is available to CI jobs only."
-    fi
-
-    local args=(-c "CLUSTER_BASENAME=${GCP_CLUSTER_BASENAME}")
-    if [ -n "${CNCLUSTER_FIXED_TOKENS:-}" ]; then
-        args+=(-c "FIXED_TOKENS=${CNCLUSTER_FIXED_TOKENS}")
-    else
-        args+=(-c "FIXED_TOKENS=0")
     fi
 
     # By default, this is unset and we infer the previous values based on the currently running cluster.
@@ -1553,7 +1487,6 @@ function subcmd_ci_apply_validator() {
     _uses_pulumi_stack validator-runbook
 
     subcmd_install_data_export_bucket_key
-    _get_data_export_bucket_secret | subcmd_pulumi validator-runbook config set --secret DATA_EXPORT_BUCKET_SA_KEY_JSON
 
     subcmd_pulumi validator-runbook up --yes --skip-preview "${args[@]}"
 }

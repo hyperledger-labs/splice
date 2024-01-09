@@ -20,13 +20,9 @@ export class SecretsFixtureMap extends Map<string, Auth0ClientSecret> {
 }
 
 export function initDumpConfig(): void {
-  pulumi.runtime.setConfig('test-project:CLUSTER_BASENAME', 'mock');
-  pulumi.runtime.setConfig('test-project:DNS01_SA_KEY_JSON', 'mock-json');
-  pulumi.runtime.setConfig('test-project:DATA_EXPORT_BUCKET_SA_KEY_JSON', 'mock-json');
-  pulumi.runtime.setConfig('test-project:FIXED_TOKENS', '0');
-  pulumi.runtime.setConfig('test-project:VERSION_NUMBER', '0.0.1');
-  pulumi.runtime.setConfig('test-project:IMAGE_TAG', '0.0.1-deadbeef');
-
+  process.env.GCP_CLUSTER_BASENAME = 'mock';
+  process.env.CNCLUSTER_FIXED_TOKENS = '0';
+  process.env.IMAGE_TAG = '0.0.1-deadbeef';
   process.env.AUTH0_CN_MANAGEMENT_API_CLIENT_ID = 'mgmt';
   process.env.AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
   process.env.AUTH0_SV_MANAGEMENT_API_CLIENT_ID = 'mgmt';

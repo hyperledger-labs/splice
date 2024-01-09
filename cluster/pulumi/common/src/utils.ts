@@ -14,7 +14,7 @@ export const config = new pulumi.Config();
 export const HELM_CHART_TIMEOUT_SEC = 480;
 
 export const REPO_ROOT = requireEnv('REPO_ROOT', 'root directory of the repo');
-export const CLUSTER_BASENAME = config.require('CLUSTER_BASENAME');
+export const CLUSTER_BASENAME = requireEnv('GCP_CLUSTER_BASENAME');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 export const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
 
@@ -137,8 +137,10 @@ export function loadJsonFromFile(path: PathLike): any {
   }
 }
 
+const _fixedTokens = envFlag('CNCLUSTER_FIXED_TOKENS', false);
+
 export function fixedTokens(): boolean {
-  return config.require('FIXED_TOKENS') !== '0';
+  return _fixedTokens;
 }
 
 type IpRangesDict = { [key: string]: IpRangesDict } | string[];
@@ -186,7 +188,7 @@ export function cnChartValues(chartPath: string, overrideValues: ChartValues = {
     process.env.REPO_ROOT + '/cluster/helm/' + chartPath + '/values.yaml'
   );
 
-  const imageTagOverride = config.get('IMAGE_TAG');
+  const imageTagOverride = process.env['IMAGE_TAG'];
 
   const values = _.mergeWith(
     {},

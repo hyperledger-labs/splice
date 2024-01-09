@@ -2,9 +2,7 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as certmanager from '@pulumi/kubernetes-cert-manager';
 import * as pulumi from '@pulumi/pulumi';
-import { config, btoa } from 'cn-pulumi-common';
-
-const DNS01_SA_KEY_JSON = config.require('DNS01_SA_KEY_JSON');
+import { btoa, requireEnv } from 'cn-pulumi-common';
 
 function ipAddress(addressName: string): gcp.compute.Address {
   return new gcp.compute.Address(addressName, {
@@ -101,22 +99,31 @@ function clusterCertificate(
     }
   );
 
-  new k8s.core.v1.Secret(
-    'clouddns-dns01-solver-svc-acct',
-    {
-      metadata: {
-        name: 'clouddns-dns01-solver-svc-acct',
-        namespace: ns.metadata.name,
+  const project = requireEnv('CLOUDSDK_CORE_PROJECT');
+  const gcpSecretName = requireEnv('DNS01_SA_KEY_SECRET');
+
+  gcp.secretmanager.SecretVersion.get(
+    'dns01-sa-key-secret',
+    `projects/${project}/secrets/${gcpSecretName}/versions/1`
+  ).secretData.apply(dns01SaKeySecret => {
+    new k8s.core.v1.Secret(
+      'clouddns-dns01-solver-svc-acct',
+      {
+        metadata: {
+          name: 'clouddns-dns01-solver-svc-acct',
+          namespace: ns.metadata.name,
+        },
+        type: 'Opaque',
+        data: {
+          // TODO(#9227): Handle this correctly in dump-config. Currently it gets here with an undefined value.
+          'key.json': btoa(dns01SaKeySecret || 'dns-secret'),
+        },
       },
-      type: 'Opaque',
-      data: {
-        'key.json': btoa(DNS01_SA_KEY_JSON),
-      },
-    },
-    {
-      dependsOn: ns,
-    }
-  );
+      {
+        dependsOn: ns,
+      }
+    );
+  });
 
   return new k8s.apiextensions.CustomResource(
     'certificate',
