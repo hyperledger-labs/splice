@@ -6,6 +6,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 
 import scala.jdk.CollectionConverters.*
@@ -63,6 +64,7 @@ trait SvTestUtil extends CNNodeTestCommon {
           .exerciseSvcRules_AddMember(
             svParty.toProtoPrimitive,
             svName,
+            dummySvRewardWeight,
             svParticipantId.toProtoPrimitive,
             nextMiningRound,
             coinConfig.globalDomain.activeDomain,

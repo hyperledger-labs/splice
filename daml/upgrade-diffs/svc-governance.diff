@@ -1,7 +1,7 @@
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/svc-governance/daml/CN/SvcBootstrap.daml ../daml/svc-governance-upgrade/daml/CN/SvcBootstrap.daml
 --- ../daml/svc-governance/daml/CN/SvcBootstrap.daml
 +++ ../daml/svc-governance-upgrade/daml/CN/SvcBootstrap.daml
-@@ -41,6 +41,7 @@
+@@ -42,6 +42,7 @@
              initialValue = coinConfig
              futureValues = []
            isDevNet

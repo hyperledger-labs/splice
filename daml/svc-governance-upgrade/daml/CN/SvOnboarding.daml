@@ -28,6 +28,7 @@ template SvOnboardingRequest with
 template SvOnboardingConfirmed with
     svParty : Party
     svName : Text
+    svRewardWeight : Int
     reason : Text
     svc : Party
     expiresAt : Time            -- ^ When this contract can be archived.

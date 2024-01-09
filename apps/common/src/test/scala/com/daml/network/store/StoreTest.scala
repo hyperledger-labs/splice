@@ -149,6 +149,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       numeric(1),
       numeric(1),
       numeric(1),
+      numeric(1),
     )
 
     contract(

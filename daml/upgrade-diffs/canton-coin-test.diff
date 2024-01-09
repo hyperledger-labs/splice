@@ -21,7 +21,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
      context = context.context
  
    let config = scaleFees 1.0 defaultTransferConfig
-@@ -149,6 +150,7 @@
+@@ -150,6 +151,7 @@
                        amount = 10.0
                        lock = None
                        receiverFeeRatio = 0.4 ]
@@ -29,7 +29,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
        context = contextWithRound1.context
  
    -- Input amount is exactly 100.0.
-@@ -228,6 +230,7 @@
+@@ -229,6 +231,7 @@
                        amount
                        lock = None
                        receiverFeeRatio = 1.0]
@@ -37,7 +37,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
        context = transferContext
  
  testSenderChangeAndOutput: Script ()
-@@ -270,6 +273,7 @@
+@@ -271,6 +274,7 @@
                      amount = outputAmount3
                      lock = None
                  ]
@@ -45,7 +45,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
      context = context.context
    assertMsg "senderChangeAmount > 0"
      (transferResult.summary.senderChangeAmount > 0.0)
-@@ -319,6 +323,7 @@
+@@ -320,6 +324,7 @@
                      amount = outputAmount3
                      lock = None
                  ]
@@ -53,7 +53,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
      context = context.context
    assertMsg "senderChangeAmount == 0"
      (transferResult.summary.senderChangeAmount == 0.0)
-@@ -360,6 +365,7 @@
+@@ -361,6 +366,7 @@
                      lock = None
  
                  ]
@@ -110,7 +110,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
           exerciseAppTransfer transferContext transfer
  
  -- | This matches the example in the design doc
-@@ -191,10 +192,12 @@
+@@ -192,10 +193,12 @@
        svc = app.svc
        owner = alice.primaryParty
        amount = expiringAmount transferConfig.holdingFee 1000.25 c2.round
@@ -123,7 +123,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
  
    payment === Coin with
      svc = app.svc
-@@ -202,6 +205,7 @@
+@@ -203,6 +206,7 @@
      amount =
        let amount = arbiterPaymentAmount - transferredCoinFee
        in expiringAmount transferConfig.holdingFee amount c2.round
@@ -145,7 +145,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
 diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scripts/TestRewardComputation.daml ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestRewardComputation.daml
 --- ../daml/canton-coin-test/daml/CC/Scripts/TestRewardComputation.daml
 +++ ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestRewardComputation.daml
-@@ -66,6 +66,7 @@
+@@ -82,6 +82,7 @@
                      amount = 8.0
                      lock = None
                  ]
@@ -164,7 +164,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
      ..
  
    submitExerciseCoinRulesByKey app [svc] [] CoinRules_Bootstrap_Rounds with
-@@ -324,6 +325,7 @@
+@@ -326,6 +327,7 @@
                receiverFeeRatio = transferFeeRatio
                lock = None
            ]
@@ -172,7 +172,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
    (openRound, _) <- getLatestOpenRound app
    featuredAppRight <- getFeaturedAppRight app sender.primaryParty
    void $ submitExerciseCoinRulesByKey app [sender.primaryParty, recipient] readAs
-@@ -352,6 +354,7 @@
+@@ -354,6 +356,7 @@
                  expiresAt = now `addRelTime` lockDuration
                receiverFeeRatio = 0.0
            ]
@@ -180,8 +180,8 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
    (openRound, _) <- getLatestOpenRound app
    featuredAppRight <- getFeaturedAppRight app sender.primaryParty
    void $ submitExerciseCoinRulesByKey app [sender.primaryParty, lockHolder] readAs
-@@ -413,6 +416,7 @@
-               map (InputValidatorFaucetCoupon . fst) validatorFaucetCoupons ++
+@@ -419,6 +422,7 @@
+               map (InputSvRewardCoupon . fst) svRewardCoupons ++
                coins
            outputs = []
 +          upgrade = Some ()

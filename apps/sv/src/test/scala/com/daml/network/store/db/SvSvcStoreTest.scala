@@ -56,6 +56,7 @@ import com.daml.network.sv.store.SvcTxLogParser.TxLogIndexRecord.DefiniteVoteInd
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.sv.store.{SvStore, SvSvcStore}
+import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.{
   AssignedContract,
   Contract,
@@ -1143,6 +1144,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new SvcRules_AddMember(
         userParty(666).toProtoPrimitive,
         "user666",
+        dummySvRewardWeight,
         "user666ParticipantId",
         new Round(1L),
         dummyDomain.toProtoPrimitive,
@@ -1155,6 +1157,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new SvcRules_AddMember(
         userParty(667).toProtoPrimitive,
         "user667",
+        dummySvRewardWeight,
         "user667ParticipantId",
         new Round(1L),
         dummyDomain.toProtoPrimitive,
@@ -1329,7 +1332,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def memberInfo(name: String) = {
-    new MemberInfo(name, new Round(1L), Collections.emptyMap())
+    new MemberInfo(name, new Round(1L), new Round(123L), 456L, 789L, Collections.emptyMap())
   }
 
   private def memberTraffic(member: Member, totalPurchased: Long) = {
@@ -1460,6 +1463,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     val template = new SvOnboardingConfirmed(
       candidate.toProtoPrimitive,
       name,
+      dummySvRewardWeight,
       "reason",
       svcParty.toProtoPrimitive,
       expiry,

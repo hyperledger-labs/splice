@@ -23,6 +23,7 @@ import com.daml.network.config.CNNodeConfigTransforms.{
   updateAllValidatorConfigs,
 }
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
+import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.{
   AssignedContract,
   CoinConfigSchedule,
@@ -198,6 +199,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
               new svcr.SvcRules_AddMember(
                 "alice",
                 "Alice",
+                dummySvRewardWeight,
                 "alice-participant-id",
                 dummyRound,
                 previousGlobalId.toProtoPrimitive,
@@ -282,6 +284,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         new so.SvOnboardingConfirmed(
           sv1Party.toProtoPrimitive,
           "irrelevant name",
+          dummySvRewardWeight,
           "observing domain migration",
           svcParty.toProtoPrimitive,
           mostDistantPossibleExpiry,
@@ -303,6 +306,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           dummyDecimal,
           dummyDecimal,
           dummyDecimal,
+          dummyDecimal,
           oldestRound.payload.opensAt,
           newestRound.payload.targetClosesAt,
         )
@@ -312,6 +316,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         new cc.round.ClosedMiningRound(
           svcParty.toProtoPrimitive,
           dummyRound,
+          dummyDecimal,
           dummyDecimal,
           dummyDecimal,
           dummyDecimal,

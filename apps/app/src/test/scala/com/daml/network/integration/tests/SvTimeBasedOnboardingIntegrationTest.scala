@@ -8,6 +8,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
   SvcRulesConfig,
   SvcRules_SetConfig,
 }
+import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 
 import java.time.Duration as JavaDuration
 import scala.jdk.CollectionConverters.*
@@ -85,6 +86,7 @@ class SvTimeBasedOnboardingIntegrationTest
               .exerciseSvcRules_ConfirmSvOnboarding(
                 svYParty.toProtoPrimitive,
                 "new random party",
+                dummySvRewardWeight,
                 "create new `SvOnboardingConfirmed` contract",
               )
               .commands

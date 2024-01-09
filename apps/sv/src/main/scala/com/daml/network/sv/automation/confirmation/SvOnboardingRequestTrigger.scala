@@ -20,6 +20,7 @@ import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.SvApp
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -54,7 +55,13 @@ class SvOnboardingRequestTrigger(
       reason: String,
   ): ActionRequiringConfirmation = new ARC_SvcRules(
     new SRARC_ConfirmSvOnboarding(
-      new SvcRules_ConfirmSvOnboarding(candidateParty.toProtoPrimitive, candidateName, reason)
+      // TODO(#9173): include SV reward weights in the onboarding configs
+      new SvcRules_ConfirmSvOnboarding(
+        candidateParty.toProtoPrimitive,
+        candidateName,
+        dummySvRewardWeight,
+        reason,
+      )
     )
   )
 

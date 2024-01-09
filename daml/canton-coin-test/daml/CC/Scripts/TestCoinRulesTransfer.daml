@@ -94,6 +94,7 @@ testUsageFees = do
     inputAppRewardAmount = 0.0
     inputValidatorRewardAmount = 0.0
     inputValidatorFaucetAmount = 0.0
+    inputSvRewardAmount = 0.0
     inputCoinAmount = 100.0
     balanceChanges = Map.empty
     holdingFees = inputCoinHoldingFees

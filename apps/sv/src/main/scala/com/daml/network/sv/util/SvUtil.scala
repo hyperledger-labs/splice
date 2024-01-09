@@ -45,6 +45,9 @@ import scala.jdk.OptionConverters.*
 
 object SvUtil {
 
+  // TODO(#9173): include SV reward weights in the onboarding configs and double-check all usages of this dummy weight wrt how they need changing
+  val dummySvRewardWeight: Long = 12345L
+
   private def defaultCometBftNetworkLimits: CometBftConfigLimits = new CometBftConfigLimits(
     2, // maxNumCometBftNodes
     2, // maxNumGovernanceKeys

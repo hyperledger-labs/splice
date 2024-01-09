@@ -503,6 +503,8 @@ class TreasuryService(
       val createFeeUsd = configUsd.createFee.fee
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(
+          // TODO(#8819): also merge in validator faucet coupons,
+          // TODO(#9173): also merge in reward coupons weights,
           appRewardsTotalCoinQuantity + validatorRewardsCoinQuantity,
           coinInputsAndQuantity,
           createFeeUsd,

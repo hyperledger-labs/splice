@@ -136,6 +136,8 @@ class SummarizingMiningRoundTrigger(
         .bigDecimal,
       // TODO(#8819): total up validator faucet coupons,
       0,
+      // TODO(#9173): total up SV reward coupons weights,
+      0,
     )
   }
 

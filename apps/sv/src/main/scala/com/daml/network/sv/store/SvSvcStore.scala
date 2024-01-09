@@ -44,6 +44,7 @@ import com.daml.network.sv.store.SvSvcStore.ignoredContractsForAcsDump
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.db.SvcTables.SvcAcsStoreRowData
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
+import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.*
 import com.digitalasset.canton.config.CantonRequireTypes.String3
@@ -534,6 +535,8 @@ trait SvSvcStore
         new SvcRules_ConfirmSvOnboarding(
           svOnboarding.payload.candidateParty,
           svOnboarding.payload.candidateName,
+          // TODO(#9173): include SV reward weights in the onboarding configs
+          dummySvRewardWeight,
           svOnboarding.payload.token,
         )
       )

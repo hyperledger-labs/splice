@@ -18,6 +18,7 @@ template SvcBootstrap with
     svc : Party
     founderParty : Party -- ^ the founding SV
     founderName : Text -- ^ human-readable name of the founding SV
+    founderRewardWeight : Int -- ^ the weight of the founding SV in the reward distribution
     founderParticipantId : Text -- ^ the id of the participant of the founding SV
     founderDomainNodes : DomainNodeConfigMap -- ^ Domain nodes on which this workflow runs
     initialRoundNumber : Int
@@ -60,6 +61,9 @@ template SvcBootstrap with
         let founderInfo = MemberInfo with
               name = founderName
               joinedAsOfRound = Round initialRoundNumber
+              lastReceivedRewardFor = Round (initialRoundNumber - 1)
+              numRewardCouponsMissed = 0
+              svRewardWeight = founderRewardWeight
               domainNodes = founderDomainNodes
         _ <- create SvcRules with
           svc

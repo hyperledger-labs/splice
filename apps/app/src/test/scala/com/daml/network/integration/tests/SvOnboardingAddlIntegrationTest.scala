@@ -6,10 +6,11 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.sv.util.SvOnboardingToken
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
-import scala.jdk.OptionConverters.*
 
+import scala.jdk.OptionConverters.*
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardingStatus
+import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
@@ -259,6 +260,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase {
               .exerciseSvcRules_ConfirmSvOnboarding(
                 sv2Party.toProtoPrimitive,
                 "Canton-Foundation-2",
+                dummySvRewardWeight,
                 "no reason",
               ),
           )
@@ -309,6 +311,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase {
               .exerciseSvcRules_AddMember(
                 fakeSv4Party.toProtoPrimitive,
                 "Canton-Foundation-4",
+                dummySvRewardWeight,
                 sv1Backend.participantClient.id.toProtoPrimitive,
                 new Round(3),
                 coinConfig.globalDomain.activeDomain,

@@ -11,11 +11,25 @@ import CC.Round
 import CC.Round.Types
 import CC.ValidatorLicense
 import CC.Scripts.Util
-import CC.Scripts.TestIssuance
 import CC.Scripts.Parameters
 
-testUnclaimedRewards : Script ()
-testUnclaimedRewards = do
+totalRewardsPerRound : Decimal
+totalRewardsPerRound = issuanceConfig_0_0p5.coinToIssuePerYear / (365.0 * 24.0 * 6.0) -- one round every 10'
+
+testUnclaimedRewards_noActivity : Script ()
+testUnclaimedRewards_noActivity = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  -- start issuing so the SVC has some coins to invite users
+  runNextIssuance app
+  runCoinDepositBots app
+
+  -- check size of unclaimed reward issuance
+  mergeAndCheckUnclaimedRewardAmount app totalRewardsPerRound
+
+
+testUnclaimedRewards_withCoupons : Script ()
+testUnclaimedRewards_withCoupons = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   -- bare-create all three kinds of rewards
@@ -54,22 +68,19 @@ testUnclaimedRewards = do
   runCoinDepositBots app
 
   -- check size of unclaimed reward issuance
-  let totalAppAndValidatorRewardsPerRound =
-        expectedParameters_NoActivity_0_0p5.unclaimedAppRewards +
-        expectedParameters_NoActivity_0_0p5.unclaimedValidatorRewards
-      allocatedRewards =
+  let allocatedRewards =
         5.7 * issuanceConfig_0_0p5.featuredAppRewardCap +
         3.3 * issuanceConfig_0_0p5.unfeaturedAppRewardCap +
         2.3 * issuanceConfig_0_0p5.validatorRewardCap +
         2.0 * issuanceConfig_0_0p5.validatorFaucetCap
-  mergeAndCheckUnclaimedRewardAmount app (totalAppAndValidatorRewardsPerRound - allocatedRewards)
+  mergeAndCheckUnclaimedRewardAmount app (totalRewardsPerRound - allocatedRewards)
 
   -- run another two issuances
   runNextIssuance app
   runNextIssuance app
 
   let numIssuingRoundsToDate = 3.0
-  mergeAndCheckUnclaimedRewardAmount app (numIssuingRoundsToDate * totalAppAndValidatorRewardsPerRound - allocatedRewards)
+  mergeAndCheckUnclaimedRewardAmount app (numIssuingRoundsToDate * totalRewardsPerRound - allocatedRewards)
 
   -- run another two issuance such that round 0 becomes closed
   runNextIssuance app
@@ -89,7 +100,7 @@ testUnclaimedRewards = do
   -- note that now the reward coupons have been collected as well, and we thus
   -- don't have to subtract the allocatedRewards anymore. They've been merged back
   -- into the `UnclaimedReward`s fund.
-  mergeAndCheckUnclaimedRewardAmount app (numIssuingRoundsToDate * totalAppAndValidatorRewardsPerRound)
+  mergeAndCheckUnclaimedRewardAmount app (numIssuingRoundsToDate * totalRewardsPerRound)
   pure ()
 
 mergeAndCheckUnclaimedRewardAmount : CCApp -> Decimal -> Script ()

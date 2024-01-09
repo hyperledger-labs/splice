@@ -134,6 +134,7 @@ testRequiredNumOfConfirmation = do
         svcAction = SRARC_AddMember $ SvcRules_AddMember with
           newMemberParty = svX
           newMemberName = "svX"
+          newMemberRewardWeight = 1
           newMemberParticipantId = "svX-participant-id"
           joinedAsOfRound = (Round 3)
           domainId
@@ -177,6 +178,7 @@ testConfirmationExpiry = do
       svcAction = SRARC_AddMember $ SvcRules_AddMember with
         newMemberParty = svX
         newMemberName = "svX"
+        newMemberRewardWeight = 1
         newMemberParticipantId = "svX-participant-id"
         joinedAsOfRound = (Round 3)
         domainId

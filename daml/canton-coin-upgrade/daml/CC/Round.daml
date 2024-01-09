@@ -53,6 +53,7 @@ template IssuingMiningRound
     issuancePerFeaturedAppRewardCoupon : Decimal
     issuancePerUnfeaturedAppRewardCoupon : Decimal
     issuancePerValidatorFaucetCoupon : Decimal
+    issuancePerSvRewardCoupon : Decimal
     opensAt : Time-- ^ Time after which rewards from this mining round can be collected
     targetClosesAt : Time -- ^ Time when the SVC expects to close this round. The round SHOULD NOT be archived before this time.
   where
@@ -69,6 +70,7 @@ template ClosedMiningRound
     issuancePerFeaturedAppRewardCoupon : Decimal
     issuancePerUnfeaturedAppRewardCoupon : Decimal
     issuancePerValidatorFaucetCoupon : Decimal
+    issuancePerSvRewardCoupon : Decimal
   where
     signatory svc
     ensure isDefinedRound round

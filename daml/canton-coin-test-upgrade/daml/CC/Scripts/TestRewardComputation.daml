@@ -10,6 +10,7 @@ import CC.Round
 import CC.Round.Types
 import CC.Scripts.Util
 import CC.ValidatorLicense
+import CN.Util.Assert
 
 testRewardComputation: Script ()
 testRewardComputation = do
@@ -43,6 +44,20 @@ testRewardComputation = do
   drawOnAllValidatorFaucets app
   [(validatorFaucetCoupon, _)] <- queryFilter @ValidatorFaucetCoupon aliceValidator.primaryParty (\c -> c.round.number == 0)
 
+  -- assume both alice and bob are SVs
+  let aliceSvWeight = 10
+  svRewardAlice <- submitMulti [app.svc, aliceValidator.primaryParty] [] $ createCmd SvRewardCoupon with
+    svc = app.svc
+    sv = aliceValidator.primaryParty
+    weight = aliceSvWeight
+    round = Round 0
+
+  _ <- submitMulti [app.svc, bobValidator.primaryParty] [] $ createCmd SvRewardCoupon with
+    svc = app.svc
+    sv = bobValidator.primaryParty
+    weight = 2
+    round = Round 0
+
   -- Advance until issuing mining round 0 is opened.
   runNextIssuance app
   runNextIssuance app
@@ -50,7 +65,7 @@ testRewardComputation = do
   context <- getPaymentTransferContext app aliceValidator
 
 
-  transferResult <- submitMulti [aliceValidator.primaryParty, bob.primaryParty, provider1.primaryParty] [app.svc] $ exerciseCmd context.coinRules CoinRules_Transfer with
+  transferResult <- submitMulti [aliceValidator.primaryParty, alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.svc] $ exerciseCmd context.coinRules CoinRules_Transfer with
     transfer = Transfer with
       sender = aliceValidator.primaryParty
       provider = provider1.primaryParty
@@ -58,7 +73,8 @@ testRewardComputation = do
           InputAppRewardCoupon appCoupon1,
           InputAppRewardCoupon appCoupon2,
           InputValidatorRewardCoupon validatorCoupon1,
-          InputValidatorFaucetCoupon validatorFaucetCoupon
+          InputValidatorFaucetCoupon validatorFaucetCoupon,
+          InputSvRewardCoupon svRewardAlice
         ]
       outputs = [ TransferOutput with
                     receiver = bob.primaryParty
@@ -72,13 +88,25 @@ testRewardComputation = do
   issuingMiningRounds <- queryFilter @IssuingMiningRound app.svc (\r -> r.round == Round 0)
   let Some (_, issuingMiningRound0) = head issuingMiningRounds
 
-  transferResult.summary.inputAppRewardAmount === featuredAppRewardCoupon * issuingMiningRound0.issuancePerFeaturedAppRewardCoupon
+  transferResult.summary.inputAppRewardAmount ===
+    featuredAppRewardCoupon * issuingMiningRound0.issuancePerFeaturedAppRewardCoupon
     + unfeaturedAppRewardCoupon * issuingMiningRound0.issuancePerUnfeaturedAppRewardCoupon
   transferResult.summary.inputValidatorRewardAmount === validatorRewardCoupon * issuingMiningRound0.issuancePerValidatorRewardCoupon
   transferResult.summary.inputValidatorFaucetAmount === issuingMiningRound0.issuancePerValidatorFaucetCoupon
+  transferResult.summary.inputSvRewardAmount ===
+    intToDecimal aliceSvWeight * issuingMiningRound0.issuancePerSvRewardCoupon
   transferResult.summary.inputCoinAmount === 0.0
 
-  -- the round 0 coupon is gone
+  let change = transferResult.summary.senderChangeAmount
+  require ("Change " <> show change <> "is large enough") $ change >=
+    (featuredAppRewardCoupon * issuingMiningRound0.issuancePerFeaturedAppRewardCoupon
+    + unfeaturedAppRewardCoupon * issuingMiningRound0.issuancePerUnfeaturedAppRewardCoupon
+    + validatorRewardCoupon * issuingMiningRound0.issuancePerValidatorRewardCoupon
+    + issuingMiningRound0.issuancePerValidatorFaucetCoupon
+    + intToDecimal aliceSvWeight * issuingMiningRound0.issuancePerSvRewardCoupon
+    - 8.2) -- 8.0 plus fees
+
+  -- the round 0 faucet coupon is gone
   [] <- queryFilter @ValidatorFaucetCoupon aliceValidator.primaryParty (\c -> c.round.number == 0)
 
   return ()

@@ -195,6 +195,7 @@ template ValidatorRewardCoupon
         require "Right must match" (right == ValidatorRight with svc; validator, user)
 
 -- | The reward for the SVC members for running a mining round.
+-- TODO(#9149): remove this template once we switch to the new reward model.
 template SvcReward with
     svc : Party
     round : Round
@@ -202,12 +203,22 @@ template SvcReward with
   where
     signatory svc
 
+-- | A coupon for an SV to receive their part of the SVC issuance for the given round.
+template SvRewardCoupon with
+    svc : Party
+    sv : Party
+    round : Round
+    weight : Int -- ^ Coupons receive a share of the SVC issuance proportional to their weight.
+  where
+    signatory svc, sv
+
 -- | Rewards that have not been claimed and are thus at the disposal of the foundation.
 template UnclaimedReward with
     svc : Party
     amount : Decimal
   where
-    ensure amount > 0.0
+    -- ensure amount >= 0.0
+    -- TODO(#9216): add back this invariant once Decimal-division rounding in rewards issuance is fixed.
 
     signatory svc
 

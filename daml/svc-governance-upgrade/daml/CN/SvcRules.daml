@@ -105,7 +105,10 @@ data CnsEntryContext_ActionRequiringConfirmation
 -- | Information about members relevant to collective governance.
 data MemberInfo = MemberInfo with
     name : Text -- ^ Human-readable name; must be unique.
-    joinedAsOfRound : Round
+    joinedAsOfRound : Round -- ^ Round in which the member joined the collective.
+    lastReceivedRewardFor : Round -- ^ Last round for which the member received a reward coupon.
+    numRewardCouponsMissed : Int -- ^ Number of reward coupons missed since they joined.
+    svRewardWeight : Int -- ^ Weight of the SV in the SVC reward distribution.
     domainNodes : DomainNodeConfigMap
     -- ^ This is the config for the CometBFT nodes under control of this member.
     -- We expect the SvApp to run a reconciliation loop that applies all changes to this
@@ -326,6 +329,7 @@ template SvcRules with
       with
         newMemberParty : Party
         newMemberName : Text
+        newMemberRewardWeight : Int
         newMemberParticipantId : Text
         joinedAsOfRound : Round
         domainId : Text
@@ -346,7 +350,12 @@ template SvcRules with
               pure offboardedMembers
         let info = MemberInfo with
               name = newMemberName
-              joinedAsOfRound = joinedAsOfRound
+              joinedAsOfRound
+              lastReceivedRewardFor = Round (joinedAsOfRound.number - 1)
+              -- For simplicity we only count missed coupons for the most recent joining, and not across reonboardings.
+              -- TODO(#9175): consider counting missed coupons across reonboardings
+              numRewardCouponsMissed = 0
+              svRewardWeight = newMemberRewardWeight
               domainNodes = noDomainNodes
         let membersNotMatchingNewMemberName = Map.filter (\m -> m.name /= newMemberName) members
         now <- getTime
@@ -488,6 +497,7 @@ template SvcRules with
         exercise self SvcRules_AddMember with
           newMemberParty = sv
           newMemberName = svOnboardingConfirmed.svName
+          newMemberRewardWeight = svOnboardingConfirmed.svRewardWeight
           newMemberParticipantId = svParticipantId
           joinedAsOfRound = earliestRound.round
           domainId = coinConfig.globalDomain.activeDomain
@@ -920,6 +930,7 @@ template SvcRules with
       with
         newMemberParty : Party
         newMemberName : Text
+        newMemberRewardWeight : Int
         reason : Text
       controller svc
       do
@@ -933,6 +944,7 @@ template SvcRules with
         create SvOnboardingConfirmed with
           svParty = newMemberParty
           svName = newMemberName
+          svRewardWeight = newMemberRewardWeight
           reason
           svc
           expiresAt
@@ -1037,6 +1049,42 @@ template SvcRules with
     -- Reward management driven directly by the leader
     --------------------------------------------------
 
+    -- Round durations are long enough that it's OK to have this bit of contention from all members drawing on their
+    -- coupons at about the same time.
+    choice SvcRules_ReceiveSvRewardCoupon
+      : (ContractId SvRewardCoupon, ContractId SvcRules)
+      with
+        sv : Party
+        openRoundCid : ContractId OpenMiningRound
+      controller sv
+      do
+        case Map.lookup sv members of
+          None -> fail "SV is not a collective member"
+          Some info -> do
+            now <- getTime
+            openRound <- fetch openRoundCid
+            require "SVC matches" (openRound.svc == svc)
+            require "OpenRound is open" (openRound.opensAt <= now)
+            require "Not yet received" (info.lastReceivedRewardFor < openRound.round)
+
+            let newInfo = info with
+                  lastReceivedRewardFor = openRound.round
+                  numRewardCouponsMissed =
+                    info.numRewardCouponsMissed + (openRound.round.number - info.lastReceivedRewardFor.number - 1)
+
+            rulesCid <- create this with
+              members = Map.insert sv newInfo members
+
+            couponCid <- create SvRewardCoupon with
+              svc
+              sv
+              weight = info.svRewardWeight
+              round = openRound.round
+
+            return (couponCid, rulesCid)
+
+
+    -- TODO(#9149): remove this choice once the apps switched to the new SV reward issuance
     nonconsuming choice SvcRules_CollectSvcReward : ()
       with
         rewardCid : ContractId SvcReward
@@ -1060,6 +1108,7 @@ template SvcRules with
             round = reward.round
             amount = issuancePerSV
 
+    -- TODO(#9149): remove this choice once the apps switched to the new SV reward issuance
     nonconsuming choice SvcRules_CollectSvReward : CoinCreateSummary (ContractId Coin)
       with
         sv : Party

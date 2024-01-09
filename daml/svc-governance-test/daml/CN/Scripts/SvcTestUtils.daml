@@ -27,10 +27,10 @@ import CN.SVC.GlobalDomain
 import CN.Scripts.CnsRulesParameters
 
 initMainNetCollective : Script (CCApp, Party, (Party, Party, Party, Party))
-initMainNetCollective = initCollective 1 False
+initMainNetCollective = initCollective 0 False
 
 initDevNetCollective : Script (CCApp, Party, (Party, Party, Party, Party))
-initDevNetCollective = initCollective 1 True
+initDevNetCollective = initCollective 0 True
 
 initCollective : Int -> Bool -> Script (CCApp, Party, (Party, Party, Party, Party))
 initCollective initialRoundNumber isDevNet = do
@@ -73,6 +73,7 @@ initCollective initialRoundNumber isDevNet = do
       svc
       founderParty = sv1
       founderName = "sv1"
+      founderRewardWeight = 10 -- Tier 1 SVs get weight 10
       founderParticipantId = "sv1-participant-id"
       founderDomainNodes = Map.fromList
         -- NOTE: the Canton domain and CometBft keys and config need to be allocated before bootstrapping the SvcRules
@@ -116,6 +117,7 @@ initCollective initialRoundNumber isDevNet = do
     submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember with
       newMemberParty = svParty
       newMemberName = svName
+      newMemberRewardWeight = 3 -- Simulate the new nodes being Tier 2 SV nodes
       newMemberParticipantId = svName <> "-participant-id"
       joinedAsOfRound = earliestOpenRound.round
       domainId = coinConfig.globalDomain.activeDomain
@@ -213,12 +215,14 @@ runNextIssuanceD app coinPrice = do
     appRewardCoupons <- queryFilter @AppRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
     validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
     validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.svc (\bc -> bc.round == roundToArchive.round)
+    svRewardCoupons <- queryFilter @SvRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
 
     let summary = OpenMiningRoundSummary with
           totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
           totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
           totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
           totalValidatorFaucetCoupons = length validatorFaucetCoupons
+          totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
 
     -- create issuing mining round
     submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with

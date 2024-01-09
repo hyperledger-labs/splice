@@ -225,12 +225,14 @@ runNextIssuanceInternal app coinPrice = do
     appRewardCoupons <- queryFilter @AppRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
     validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
     validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.svc (\bc -> bc.round == roundToArchive.round)
+    svRewardCoupons <- queryFilter @SvRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
 
     let summary = OpenMiningRoundSummary with
           totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
           totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
           totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
           totalValidatorFaucetCoupons = length validatorFaucetCoupons
+          totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
 
     -- create issuing mining round
     submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with
@@ -397,6 +399,9 @@ runCoinDepositBots app = do
     validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.svc $ \c ->
       c.round `elem` issuingRoundNumbers && c.validator == user
 
+    svRewardCoupons <- queryFilter @SvRewardCoupon app.svc $ \c ->
+      c.round `elem` issuingRoundNumbers && c.sv == user
+
     -- get all coins of this user
     coins <- getCoinInputs user
     -- Need readAs rights for all hosted users to collect their validator rewards,
@@ -411,6 +416,7 @@ runCoinDepositBots app = do
               map (InputAppRewardCoupon . fst) appRewardCoupons ++
               map (InputValidatorRewardCoupon . fst) validatorRewardCoupons ++
               map (InputValidatorFaucetCoupon . fst) validatorFaucetCoupons ++
+              map (InputSvRewardCoupon . fst) svRewardCoupons ++
               coins
           outputs = []
     -- merge multiple coins or rewards and claim rewards even if there are no coins yet

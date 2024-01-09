@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
 import com.daml.network.codegen.java.cn.svcrules.SvcRules_AddMember
-import com.daml.network.console.{SvAppBackendReference, ScanAppBackendReference}
+import com.daml.network.console.{ScanAppBackendReference, SvAppBackendReference}
 import com.daml.network.environment.{
   BaseLedgerConnection,
   CNLedgerClient,
@@ -29,6 +29,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.setup.NodeInitializer
+import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.sv.{DomainMigrationDump, LocalDomainNode}
 import com.daml.network.util.{ProcessTestUtil, TemplateJsonDecoder}
 import com.daml.nonempty.NonEmpty
@@ -371,6 +372,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
                   new SvcRules_AddMember(
                     "alice",
                     "Alice",
+                    dummySvRewardWeight,
                     "alice-participant-id",
                     new Round(42),
                     globalDomainId.toProtoPrimitive,

@@ -47,7 +47,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/CoinRules
                    ..
          return CoinCreateSummary with
                    coin
-@@ -531,6 +534,7 @@
+@@ -533,6 +536,7 @@
    return TransferResult with
      round = csum.openRound.round
      summary = summary
@@ -55,7 +55,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/CoinRules
      ..
  
  data TransferContextSummary = TransferContextSummary with
-@@ -822,11 +826,13 @@
+@@ -851,11 +855,13 @@
              svc
              owner = sender
              amount = expiringAmount transferConfigCC.holdingFee summary.senderChangeAmount currentOpenRound.round
@@ -69,7 +69,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/CoinRules
  
        case out.lock of
          None -> TransferResultCoin <$> create coin
-@@ -933,6 +939,7 @@
+@@ -963,6 +969,7 @@
      provider : Party
      inputs : [TransferInput]
      outputs : [TransferOutput]
@@ -77,7 +77,7 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/CoinRules
    deriving (Eq, Ord, Show)
  
  -- | An individual output for a batch transfer.
-@@ -958,6 +965,7 @@
+@@ -988,6 +995,7 @@
      senderChangeCoin: Optional (ContractId Coin)
        -- ^ Optional reference to the coin for the change returned to the sender.
        -- Only created if there was some change to be returned after deducting the fee for returning change.

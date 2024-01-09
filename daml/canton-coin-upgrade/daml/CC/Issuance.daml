@@ -43,6 +43,7 @@ data OpenMiningRoundSummary = OpenMiningRoundSummary with
     totalFeaturedAppRewardCoupons : Decimal
     totalUnfeaturedAppRewardCoupons : Decimal
     totalValidatorFaucetCoupons : Int
+    totalSvRewardWeight : Int
   deriving (Eq, Show)
 
 -- | Parameters to use in a round that issues coin as rewards for collected coupons.
@@ -51,9 +52,12 @@ data IssuingRoundParameters = IssuingRoundParameters with
     issuancePerFeaturedAppRewardCoupon : Decimal
     issuancePerUnfeaturedAppRewardCoupon : Decimal
     issuancePerValidatorFaucetCoupon : Decimal
+    issuancePerSvRewardCoupon : Decimal
+    -- TODO(#9149): remove once we switched to the new SV reward model
     coinsToIssueToSvc : Decimal
     unclaimedAppRewards : Decimal
     unclaimedValidatorRewards : Decimal
+    unclaimedSvRewards : Decimal -- ^ Can be non-zero due to rounding, or no SV having had the chance to claim their coupons.
   deriving (Eq, Show)
 
 validateOpenMiningRoundSummary : CanAssert m => OpenMiningRoundSummary -> m ()
@@ -66,17 +70,27 @@ validateOpenMiningRoundSummary summary = do
 computeIssuingRoundParameters : RelTime -> Decimal -> IssuanceConfig -> OpenMiningRoundSummary -> IssuingRoundParameters
 computeIssuingRoundParameters tickDuration coinPrice config summary =
     IssuingRoundParameters with
-      coinsToIssueToSvc =
-        coinsToIssueInRound - validatorRewardIssuance.rewardsToIssue - unfeaturedAppIssuance.rewardsToIssue
-
+      coinsToIssueToSvc
       issuancePerValidatorRewardCoupon = validatorRewardIssuance.issuancePerCoupon
       issuancePerUnfeaturedAppRewardCoupon = unfeaturedAppIssuance.issuancePerCoupon
       issuancePerFeaturedAppRewardCoupon =
         unfeaturedAppIssuance.issuancePerCoupon + featuredAppIssuance.issuancePerCoupon
       issuancePerValidatorFaucetCoupon = validatorFaucetIssuance.issuancePerCoupon
+      issuancePerSvRewardCoupon
       unclaimedValidatorRewards = validatorFaucetIssuance.unclaimedRewards
       unclaimedAppRewards = featuredAppIssuance.unclaimedRewards
+      unclaimedSvRewards
   where
+    coinsToIssueToSvc =
+      coinsToIssueInRound - validatorRewardIssuance.rewardsToIssue - unfeaturedAppIssuance.rewardsToIssue
+
+    issuancePerSvRewardCoupon =
+      if summary.totalSvRewardWeight == 0
+        then 0.0
+        else coinsToIssueToSvc / intToDecimal summary.totalSvRewardWeight
+
+    unclaimedSvRewards = coinsToIssueToSvc - issuancePerSvRewardCoupon * intToDecimal summary.totalSvRewardWeight
+
     roundsPerYear =
       intToDecimal (convertRelTimeToMicroseconds (days 365)) /
       intToDecimal (convertRelTimeToMicroseconds tickDuration)

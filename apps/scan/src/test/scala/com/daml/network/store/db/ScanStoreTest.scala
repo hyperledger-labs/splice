@@ -930,6 +930,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       inputAppRewardAmount: Double,
       inputValidatorRewardAmount: Double,
       inputValidatorFaucetAmount: Double,
+      inputSvRewardAmount: Double,
       inputCoinAmount: Double,
       balanceChanges: Map[String, cc.coinrules.BalanceChange],
       coinPrice: Double,
@@ -937,6 +938,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     new java.math.BigDecimal(inputAppRewardAmount),
     new java.math.BigDecimal(inputValidatorRewardAmount),
     new java.math.BigDecimal(inputValidatorFaucetAmount),
+    new java.math.BigDecimal(inputSvRewardAmount),
     new java.math.BigDecimal(inputCoinAmount),
     balanceChanges.asJava,
     new java.math.BigDecimal(0.0),
@@ -960,6 +962,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         inputAppRewardAmount,
         inputValidatorRewardAmount,
         // TODO(#8819): also test for validator faucet rewards once the scan store supports them
+        0.0,
+        // TODO (#9173): also test for sv rewards once the scan store supports them
         0.0,
         inputCoinAmount,
         balanceChanges,

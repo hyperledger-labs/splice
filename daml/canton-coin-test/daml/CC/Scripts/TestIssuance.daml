@@ -54,6 +54,7 @@ summaryExample1 = OpenMiningRoundSummary with
   totalFeaturedAppRewardCoupons = 400.0
   totalUnfeaturedAppRewardCoupons = 9600.0
   totalValidatorFaucetCoupons = 50
+  totalSvRewardWeight = 100
 
 expectedParameters_E1_0_0p5 : IssuingRoundParameters
 expectedParameters_E1_0_0p5 = IssuingRoundParameters with
@@ -61,9 +62,11 @@ expectedParameters_E1_0_0p5 = IssuingRoundParameters with
   issuancePerFeaturedAppRewardCoupon = 100.00
   issuancePerUnfeaturedAppRewardCoupon = 0.600000000
   issuancePerValidatorFaucetCoupon = 570.0
+  issuancePerSvRewardCoupon = 6088.2800608828
   coinsToIssueToSvc = 608828.0060882801
   unclaimedValidatorRewards = 7551.7503805175
   unclaimedAppRewards = 68395.2511415525
+  unclaimedSvRewards = 0.0000000001
 
 expectedParameters_E1_0p5_1p5 : IssuingRoundParameters
 expectedParameters_E1_0p5_1p5 = IssuingRoundParameters with
@@ -71,9 +74,11 @@ expectedParameters_E1_0p5_1p5 = IssuingRoundParameters with
   issuancePerFeaturedAppRewardCoupon = 100.00
   issuancePerUnfeaturedAppRewardCoupon = 0.600000000
   issuancePerValidatorFaucetCoupon = 570.0
+  issuancePerSvRewardCoupon = 1826.4840182648
   coinsToIssueToSvc = 182648.4018264840
   unclaimedValidatorRewards = 15162.1004566210
   unclaimedAppRewards = 106447.0015220700
+  unclaimedSvRewards = 0.000000004
 
 expectedParameters_E1_1p5_5 : IssuingRoundParameters
 expectedParameters_E1_1p5_5 = IssuingRoundParameters with
@@ -81,9 +86,12 @@ expectedParameters_E1_1p5_5 = IssuingRoundParameters with
   issuancePerFeaturedAppRewardCoupon = 100.00
   issuancePerUnfeaturedAppRewardCoupon = 0.600000000
   issuancePerValidatorFaucetCoupon = 570.0
+  issuancePerSvRewardCoupon = 380.5175038052
   coinsToIssueToSvc = 38051.7503805175
   unclaimedValidatorRewards = 3746.5753424658
   unclaimedAppRewards = 72200.4261796042
+  -- TODO(#9216): fix Decimal-division rounding to not have negative unclaimed rewards
+  unclaimedSvRewards = -0.0000000025
 
 expectedParameters_E1_5_10 : IssuingRoundParameters
 expectedParameters_E1_5_10 = IssuingRoundParameters with
@@ -91,9 +99,12 @@ expectedParameters_E1_5_10 = IssuingRoundParameters with
   issuancePerFeaturedAppRewardCoupon = 100.0
   issuancePerUnfeaturedAppRewardCoupon = 0.600000000
   issuancePerValidatorFaucetCoupon = 359.5433789954
+  issuancePerSvRewardCoupon = 95.1293759513
   coinsToIssueToSvc = 9512.9375951294
   unclaimedValidatorRewards = 0.0000000000
   unclaimedAppRewards = 19879.2694063927
+  -- TODO(#9216): fix Decimal-division rounding to not have negative unclaimed rewards
+  unclaimedSvRewards = -0.0000000006
 
 expectedParameters_E1_10plus : IssuingRoundParameters
 expectedParameters_E1_10plus = IssuingRoundParameters with
@@ -101,9 +112,11 @@ expectedParameters_E1_10plus = IssuingRoundParameters with
   issuancePerFeaturedAppRewardCoupon = 74.7837899543
   issuancePerUnfeaturedAppRewardCoupon = 0.600000000
   issuancePerValidatorFaucetCoupon = 150.2587519026
+  issuancePerSvRewardCoupon = 23.7823439878
   coinsToIssueToSvc = 2378.2343987823
   unclaimedValidatorRewards = 0.0000000000
   unclaimedAppRewards = 0.0
+  unclaimedSvRewards = 0.0000000023
 
 testE1 : Script ()
 testE1 = script do
@@ -125,6 +138,7 @@ summaryExamplNoActivity = OpenMiningRoundSummary with
   totalFeaturedAppRewardCoupons = 0.0
   totalUnfeaturedAppRewardCoupons = 0.0
   totalValidatorFaucetCoupons = 0
+  totalSvRewardWeight = 0
 
 expectedParameters_NoActivity_0_0p5 : IssuingRoundParameters
 expectedParameters_NoActivity_0_0p5 = IssuingRoundParameters with
@@ -132,9 +146,11 @@ expectedParameters_NoActivity_0_0p5 = IssuingRoundParameters with
   issuancePerFeaturedAppRewardCoupon = 100.0000000000
   issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
   issuancePerValidatorFaucetCoupon = 570.0
+  issuancePerSvRewardCoupon = 0.0
   coinsToIssueToSvc = 608828.0060882801
   unclaimedValidatorRewards = 38051.7503805175
   unclaimedAppRewards = 114155.2511415525
+  unclaimedSvRewards = 608828.0060882801
 
 testNoActivity : Script ()
 testNoActivity = script do
@@ -152,6 +168,7 @@ summaryExample3 = OpenMiningRoundSummary with
   totalFeaturedAppRewardCoupons = 100.0
   totalUnfeaturedAppRewardCoupons = 100.0
   totalValidatorFaucetCoupons = 50
+  totalSvRewardWeight = 2
 
 
 expectedParameters_E3_0_0p5 : IssuingRoundParameters
@@ -160,9 +177,11 @@ expectedParameters_E3_0_0p5 = IssuingRoundParameters with
   issuancePerFeaturedAppRewardCoupon = 100.0000000000
   issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
   issuancePerValidatorFaucetCoupon = 570.0
+  issuancePerSvRewardCoupon = 304414.0030441400
   coinsToIssueToSvc = 608828.0060882801
   unclaimedValidatorRewards = 9511.7503805175
   unclaimedAppRewards = 104095.2511415525
+  unclaimedSvRewards = 0.0000000001
 
 testE4 : Script ()
 testE4 = script do

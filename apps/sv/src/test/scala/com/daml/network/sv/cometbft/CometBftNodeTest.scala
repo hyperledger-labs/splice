@@ -11,6 +11,7 @@ import com.daml.network.codegen.java.cn.cometbft.{
   SequencingKeyConfig,
 }
 import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
+import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.digitalasset.canton.topology.DomainId
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -95,6 +96,9 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
           new daml.svcrules.MemberInfo(
             mkSvNodeId(svNodeNr),
             new Round(0L),
+            new Round(456L), // last received reward for round
+            123L, // num coupons missed
+            dummySvRewardWeight, // SV reward weight
             Map(
               dummySvcDomainId.toProtoPrimitive -> new DomainNodeConfig(
                 new CometBftConfig(
