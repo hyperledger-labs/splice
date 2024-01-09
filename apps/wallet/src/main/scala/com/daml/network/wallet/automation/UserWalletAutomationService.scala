@@ -61,6 +61,7 @@ class UserWalletAutomationService(
   registerTrigger(
     new ExpireAcceptedTransferOfferTrigger(triggerContext, store, connection)
   )
+  registerTrigger(new ExpireBuyTrafficRequestsTrigger(triggerContext, store, connection))
   registerTrigger(
     new ExpireAppPaymentRequestsTrigger(triggerContext, store, connection)
   )
@@ -69,7 +70,7 @@ class UserWalletAutomationService(
     new AcceptedTransferOfferTrigger(triggerContext, store, treasury, connection)
   )
   registerTrigger(
-    new BuyTrafficRequestTrigger(triggerContext, store, treasury, connection)
+    new CompleteBuyTrafficRequestTrigger(triggerContext, store, treasury, connection)
   )
   if (automationConfig.enableAutomaticRewardsCollectionAndCoinMerging) {
     registerTrigger(

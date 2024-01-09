@@ -93,6 +93,15 @@ trait UserWalletStore
       tc: TraceContext
   ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]]]
 
+  def listExpiredBuyTrafficRequests: ListExpiredContracts[
+    trafficRequestCodegen.BuyTrafficRequest.ContractId,
+    trafficRequestCodegen.BuyTrafficRequest,
+  ] = multiDomainAcsStore.listExpiredFromPayloadExpiry(
+    trafficRequestCodegen.BuyTrafficRequest.COMPANION
+  )(
+    _.expiresAt
+  )
+
   def getLatestBuyTrafficRequestEventByTrackingId(
       trackingId: String
   )(implicit

@@ -8,7 +8,10 @@ import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.TopupMemberTrafficTrigger
-import com.daml.network.wallet.automation.BuyTrafficRequestTrigger
+import com.daml.network.wallet.automation.{
+  CompleteBuyTrafficRequestTrigger,
+  ExpireBuyTrafficRequestsTrigger,
+}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -142,7 +145,7 @@ class WalletBuyTrafficRequestIntegrationTest
         aliceValidatorBackend.appState.automation.trigger[TopupMemberTrafficTrigger]
 
       // Pause TopupMemberTrafficTrigger to prevent automatic top-ups from interfering with the top-up(s) done here
-      bracket(topupMemberTrafficTrigger.pause(), topupMemberTrafficTrigger.resume()) {
+      bracket(topupMemberTrafficTrigger.pause().futureValue, topupMemberTrafficTrigger.resume()) {
         // Since we run multiple suites against the same shared Canton instance, MemberTraffic contracts corresponding to
         // traffic purchases made in a previous suite and synced to the domain could be missing when this test is run.
         // This step creates a new MemberTraffic contract to reconcile these differences, if they exist.
@@ -194,6 +197,47 @@ class WalletBuyTrafficRequestIntegrationTest
           }
         }
       }
+    }
+
+    "eventually expire" in { implicit env =>
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      aliceWalletClient.tap(100.0)
+
+      val trackingId = "expiring"
+
+      actAndCheck(
+        "Create a traffic request that immediately expires", {
+
+          def expireBuyTrafficRequestsTrigger = aliceValidatorBackend
+            .userWalletAutomation(aliceWalletClient.config.ledgerApiUser)
+            .trigger[ExpireBuyTrafficRequestsTrigger]
+
+          bracket(
+            expireBuyTrafficRequestsTrigger.pause().futureValue,
+            expireBuyTrafficRequestsTrigger.resume(),
+          ) {
+            createValidTrafficRequest(
+              aliceWalletClient,
+              aliceValidatorBackend,
+              aliceValidatorBackend,
+              trafficAmount = Some(minTopupAmount - 1),
+              trackingId = Some(trackingId),
+              expiresAt = Some(env.environment.clock.now.plus(Duration.ofNanos(1))),
+            )
+          }
+
+        },
+      )(
+        "Alice sees the traffic request as Expired",
+        _ => {
+          val response = aliceWalletClient.getTrafficRequestStatus(trackingId)
+          inside(response) {
+            case d0.GetBuyTrafficRequestStatusResponse(status, _, Some(failureReason), None) =>
+              status shouldBe d0.GetBuyTrafficRequestStatusResponse.Status.Failed
+              failureReason shouldBe d0.GetBuyTrafficRequestStatusResponse.FailureReason.Expired
+          }
+        },
+      )
     }
 
     "be deduplicated" in { implicit env =>
@@ -289,12 +333,15 @@ class WalletBuyTrafficRequestIntegrationTest
   )(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment) = {
     val now = env.environment.clock.now
 
-    def buyTrafficRequestTrigger = buyerValidator
+    def completeBuyTrafficRequestTrigger = buyerValidator
       .userWalletAutomation(buyer.config.ledgerApiUser)
-      .trigger[BuyTrafficRequestTrigger]
+      .trigger[CompleteBuyTrafficRequestTrigger]
 
-    // Pause BuyTrafficRequestTrigger so the request doesn't immediately move from Created to Completed
-    bracket(buyTrafficRequestTrigger.pause(), buyTrafficRequestTrigger.resume()) {
+    // Pause CompleteBuyTrafficRequestTrigger so the request doesn't immediately move from Created to Completed
+    bracket(
+      completeBuyTrafficRequestTrigger.pause().futureValue,
+      completeBuyTrafficRequestTrigger.resume(),
+    ) {
       actAndCheck(
         "Alice creates a buy traffic request",
         buyer.createBuyTrafficRequest(
