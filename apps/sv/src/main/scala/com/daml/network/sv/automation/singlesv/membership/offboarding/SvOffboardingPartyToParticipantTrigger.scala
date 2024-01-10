@@ -1,4 +1,4 @@
-package com.daml.network.sv.automation.singlesv.offboarding
+package com.daml.network.sv.automation.singlesv.membership.offboarding
 
 import cats.implicits.showInterpolator
 import com.daml.network.automation.{

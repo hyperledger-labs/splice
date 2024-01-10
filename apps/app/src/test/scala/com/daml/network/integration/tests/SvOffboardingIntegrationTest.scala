@@ -146,21 +146,42 @@ class SvOffboardingIntegrationTest extends SvIntegrationTestBase {
     )(
       "The majority voted yet, thus the trigger should remove the svc party hosting for sv4",
       _ => {
-        val mapping = sv3Backend.appState.participantAdminConnection
-          .getPartyToParticipant(globalDomainId, sv3Backend.getSvcInfo().svcParty)
-          .futureValue
-          .mapping
-        mapping.threshold shouldBe PositiveInt.tryCreate(1)
-        mapping.participants.map(_.participantId.uid.namespace) should not contain (sv4Backend
-          .getSvcInfo()
-          .svParty
-          .uid
-          .namespace)
-        sv3Backend.getSvcInfo().svcRules.payload.offboardedMembers.keySet() should contain(
-          sv4Backend.getSvcInfo().svParty.toProtoPrimitive
-        )
+        suppressFailedClues(loggerFactory) {
+          clue("Check partyToParticipant offboarding") {
+            val mapping = sv3Backend.appState.participantAdminConnection
+              .getPartyToParticipant(globalDomainId, sv3Backend.getSvcInfo().svcParty)
+              .futureValue
+              .mapping
+            mapping.threshold shouldBe PositiveInt.tryCreate(1)
+            mapping.participants.map(_.participantId.uid.namespace) should not contain sv4Backend
+              .getSvcInfo()
+              .svParty
+              .uid
+              .namespace
+            sv3Backend.getSvcInfo().svcRules.payload.offboardedMembers.keySet() should contain(
+              sv4Backend.getSvcInfo().svParty.toProtoPrimitive
+            )
+          }
+
+          clue("Check decentralized namespace offboarding") {
+            val decentralizedNamespaces =
+              sv1Backend.participantClient.topology.decentralized_namespaces
+                .list(
+                  filterStore = globalDomainId.filterString,
+                  filterNamespace = svcParty.uid.namespace.toProtoPrimitive,
+                )
+            inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>
+              decentralizedNamespace.item.owners shouldBe Seq(
+                sv1Backend,
+                sv2Backend,
+                sv3Backend,
+              )
+                .map(_.participantClient.id.uid.namespace)
+                .toSet
+            }
+          }
+        }
       },
     )
   }
-
 }

@@ -22,10 +22,10 @@ import com.daml.network.sv.automation.confirmation.{
   SvOnboardingRequestTrigger,
 }
 import com.daml.network.sv.automation.singlesv.*
-import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingPartyToParticipantProposalTrigger
-import com.daml.network.sv.automation.singlesv.onboarding.{
+import com.daml.network.sv.automation.singlesv.membership.SvOnboardingNamespaceProposalTrigger
+import com.daml.network.sv.automation.singlesv.membership.offboarding.SvOffboardingPartyToParticipantProposalTrigger
+import com.daml.network.sv.automation.singlesv.membership.onboarding.{
   SvOnboardingMediatorProposalTrigger,
-  SvOnboardingNamespaceProposalTrigger,
   SvOnboardingPartyToParticipantProposalTrigger,
   SvOnboardingSequencerProposalTrigger,
 }

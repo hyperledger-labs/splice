@@ -823,6 +823,33 @@ abstract class TopologyAdminConnection(
       retryFor,
     )
 
+  def ensureDecentralizedNamespaceDefinitionRemovalProposal(
+      domainId: DomainId,
+      decentralizedNamespace: Namespace,
+      ownerToRemove: Namespace,
+      signedBy: Fingerprint,
+      retryFor: RetryFor,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[TopologyResult[DecentralizedNamespaceDefinitionX]] =
+    ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
+      show"Namespace $ownerToRemove was removed from the decentralized namespace definition",
+      domainId,
+      decentralizedNamespace,
+      owners =>
+        NonEmpty
+          .from(owners.excl(ownerToRemove))
+          .getOrElse(
+            throw Status.UNKNOWN
+              .withDescription(
+                s"$ownerToRemove is not an owner or decentralized namespace has only 1 owner in decentralized namespace $decentralizedNamespace "
+              )
+              .asRuntimeException()
+          ),
+      signedBy,
+      retryFor,
+    )
+
   def ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
       description: String,
       domainId: DomainId,

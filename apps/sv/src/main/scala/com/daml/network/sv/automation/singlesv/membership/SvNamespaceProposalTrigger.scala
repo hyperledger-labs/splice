@@ -1,6 +1,5 @@
-package com.daml.network.sv.automation.singlesv.onboarding
+package com.daml.network.sv.automation.singlesv.membership
 
-import org.apache.pekko.stream.Materializer
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.automation.*
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
@@ -12,6 +11,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.CollectionHasAsScala
@@ -49,11 +49,13 @@ class SvOnboardingNamespaceProposalTrigger(
       .getDecentralizedNamespaceDefinition(task.domain, svcParty.uid.namespace)
       .flatMap { decentralizedNamespace =>
         val svcRulesPayload = task.contract.payload
-        svcRulesPayload.members
+        val svcRulesMembers = svcRulesPayload.members
           .keySet()
           .asScala
           .map(PartyId.tryFromProtoPrimitive)
           .toSeq
+
+        val namespaceAdditions = svcRulesMembers
           .filter(svcMemberParty =>
             !decentralizedNamespace.mapping.owners.contains(svcMemberParty.uid.namespace)
           )
@@ -71,9 +73,44 @@ class SvOnboardingNamespaceProposalTrigger(
               RetryFor.Automation,
             )
           }
-          .map { proposals =>
-            if (proposals.nonEmpty) TaskSuccess(show"Created proposals $proposals") else TaskStale
+
+        // TODO(#9256): enforce the following statement during onboarding
+        // Parties are only hosted on participants with the same namespace which is also the namespace that is used in the decentralized namespace.
+        // Therefore we remove the namespace from the decentralized namespace only if
+        // a namespace is present in the offboardedMembers list and not present in the members list
+        val namespaceRemovals = svcRulesPayload.offboardedMembers
+          .keySet()
+          .asScala
+          .map(PartyId.tryFromProtoPrimitive)
+          .toSeq
+          .filter(svcMemberParty =>
+            decentralizedNamespace.mapping.owners
+              .contains(svcMemberParty.uid.namespace) && !svcRulesMembers
+              .map(_.uid.namespace)
+              .contains(svcMemberParty.uid.namespace)
+          )
+          // parallel to ensure that if one proposal is never accepted the rest of them are eventually accepted
+          // this increases contention but the call will always redo the proposal when a new state is accepted
+          .parTraverse { svcMemberParty =>
+            logger.info(
+              s"Proposing $svcMemberParty to be removed from the decentralized namespace, will wait for it to take effect."
+            )
+            participantAdminConnection.ensureDecentralizedNamespaceDefinitionRemovalProposal(
+              task.domain,
+              svcParty.uid.namespace,
+              svcMemberParty.uid.namespace,
+              svParty.uid.namespace.fingerprint,
+              RetryFor.Automation,
+            )
           }
+
+        val combinedProposals = namespaceAdditions.flatMap { additions =>
+          namespaceRemovals.map { removals => additions ++ removals }
+        }
+
+        combinedProposals.map { proposals =>
+          if (proposals.nonEmpty) TaskSuccess(show"Created proposals $proposals") else TaskStale
+        }
       }
   }
 }

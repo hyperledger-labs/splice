@@ -1,4 +1,4 @@
-package com.daml.network.sv.automation.singlesv.onboarding
+package com.daml.network.sv.automation.singlesv.membership.onboarding
 
 import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
