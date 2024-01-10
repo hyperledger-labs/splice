@@ -67,10 +67,10 @@ jobs:
         type: string
       start_canton_options:
         type: string
-      extra_pre_sbt_cmd:
+      pre_sbt_cmd:
         type: string
         default: ""
-      extra_post_sbt_cmd:
+      post_sbt_cmd:
         type: string
         default: ""
       parallelism:
@@ -110,10 +110,11 @@ jobs:
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - run_splitted_scala_tests:
-          extra_pre_sbt_cmd: << parameters.extra_pre_sbt_cmd >>
-          extra_post_sbt_cmd: << parameters.extra_post_sbt_cmd >>
+          pre_sbt_cmd: << parameters.pre_sbt_cmd >>
+          post_sbt_cmd: << parameters.post_sbt_cmd >>
           cmd_retry_count: << parameters.cmd_retry_count >>
           start_canton_options: << parameters.start_canton_options >>
+      - stop_canton
       - cleanup_sbt_test_job
       - collect_failing_test_data_and_send_to_datadog
       - collect_test_timings_and_send_to_datadog

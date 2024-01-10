@@ -21,12 +21,18 @@ function docker_start() {
   echo "Starting Postgres docker container"
   # From https://docs.daml.com/canton/usermanual/docker.html#running-postgres-in-docker
   docker run -d --rm \
+    --log-driver json-file \
     --name "$DOCKER_POSTGRES_CONTAINER_NAME" \
     -e POSTGRES_USER="$POSTGRES_USER" \
     -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
     -p 5432:5432 \
     postgres:14 \
-    postgres -c max_connections=8000 \
+    postgres \
+    -c max_connections=8000 \
+    -c log_statement=all \
+    -c logging_collector=on \
+    -c log_destination=csvlog \
+    -c log_filename='postgresql.log' \
     >> "$LOG_FILE"
 }
 
