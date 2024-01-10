@@ -655,7 +655,6 @@ class FoundingNodeInitializer(
             SequencerPruningConfig(
               pruningConfig.pruningInterval,
               pruningConfig.retentionPeriod,
-              pruningConfig.unauthenticatedMembersRetentionPeriod,
             )
           ),
         )

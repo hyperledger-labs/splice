@@ -182,10 +182,6 @@ final case class SequencerPruningConfig(
     pruningInterval: NonNegativeFiniteDuration,
     // data within the retention period preceding the current time will not be removed during the pruning process
     retentionPeriod: NonNegativeFiniteDuration,
-    // retention period for unauthenticated Members before they are disabled
-    // the default value of 1 hour is copied from canton `RetentionPeriodDefaults`
-    unauthenticatedMembersRetentionPeriod: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofHours(1),
 )
 
 final case class SvSequencerConfig(

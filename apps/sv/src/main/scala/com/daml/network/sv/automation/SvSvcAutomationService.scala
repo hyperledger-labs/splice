@@ -249,7 +249,6 @@ class SvSvcAutomationService(
           sequencerContext.sequencerAdminConnection,
           clock,
           pruningConfig.retentionPeriod,
-          pruningConfig.unauthenticatedMembersRetentionPeriod,
         )
       )
     }

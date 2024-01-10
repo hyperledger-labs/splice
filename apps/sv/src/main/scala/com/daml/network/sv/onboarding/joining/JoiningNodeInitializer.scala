@@ -547,7 +547,6 @@ class JoiningNodeInitializer(
               SequencerPruningConfig(
                 pruningConfig.pruningInterval,
                 pruningConfig.retentionPeriod,
-                pruningConfig.unauthenticatedMembersRetentionPeriod,
               )
             ),
           )
@@ -621,7 +620,6 @@ class JoiningNodeInitializer(
             SequencerPruningConfig(
               pruningConfig.pruningInterval,
               pruningConfig.retentionPeriod,
-              pruningConfig.unauthenticatedMembersRetentionPeriod,
             )
           ),
         )

@@ -10,7 +10,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.jdk.DurationConverters.*
-import com.digitalasset.canton.time.EnrichedDurations.*
+import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -22,7 +22,6 @@ class SequencerPruningTrigger(
     sequencerAdminConnection: SequencerAdminConnection,
     clock: Clock,
     retentionPeriod: NonNegativeFiniteDuration,
-    unauthenticatedMembersRetentionPeriod: NonNegativeFiniteDuration,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -50,22 +49,31 @@ class SequencerPruningTrigger(
       }
     } yield false
 
-  // This method is replicating the prune command defined in `com.digitalasset.canton.console.commands.SequencerAdministrationGroupCommon`
-  // which also prunes the unauthenticated members indicating by the `SequencerPruningStatus`
-  // https://github.com/DACH-NY/canton/issues/7064
+  // This method is replicating the force_prune command defined in `com.digitalasset.canton.console.commands.SequencerAdministrationGroupCommon`
+  // Which will prunes the member preventing pruning
   private def prune()(implicit traceContext: TraceContext) = for {
     status <- sequencerAdminConnection.getSequencerPruningStatus()
     pruningTimestamp = status.now.minus(retentionPeriod.underlying.toJava)
-    unauthenticatedMembers = status.unauthenticatedMembersToDisable(
-      unauthenticatedMembersRetentionPeriod.toInternal
-    )
-    _ <- Future.traverse(unauthenticatedMembers)(sequencerAdminConnection.disableMember)
-    _ = if (unauthenticatedMembers.nonEmpty) {
-      val unauthenticated = unauthenticatedMembers.map(_.toProtoPrimitive)
+    membersToDisable = status.clientsPreventingPruning(pruningTimestamp).members
+
+    // disabling member preventing pruning
+    _ <- Future.traverse(membersToDisable)(sequencerAdminConnection.disableMember)
+    _ = if (membersToDisable.nonEmpty) {
+      val disabled = membersToDisable.map(_.toProtoPrimitive)
       logger.warn(
-        show"Automatically disabled ${unauthenticatedMembers.size} unauthenticated member clients. $unauthenticated"
+        show"disabling ${disabled.size} member clients. $disabled"
       )
     }
-    res <- sequencerAdminConnection.prune(pruningTimestamp)
+
+    statusAfterDisabling <- sequencerAdminConnection.getSequencerPruningStatus()
+    safeTimestamp = statusAfterDisabling.safePruningTimestamp
+    res =
+      if (safeTimestamp < pruningTimestamp) {
+        val message = (
+          s"We disabled all clients preventing pruning at $pruningTimestamp however the safe timestamp is set to $safeTimestamp"
+        )
+        Future.failed(Status.INTERNAL.withDescription(message).asRuntimeException())
+      } else sequencerAdminConnection.prune(pruningTimestamp)
+
   } yield res
 }
