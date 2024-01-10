@@ -176,6 +176,19 @@ abstract class RunbookSvPreflightIntegrationTestBase
       svActiveDomain shouldBe sv1ActiveDomain
       svActiveDomain
     }
+    clue("Can get hosting participant id for a party from Scan") {
+      eventually() {
+        val participantIdFromSv = svScanClient.getPartyToParticipant(
+          activeDomain,
+          svValidatorClient.getValidatorPartyId(),
+        )
+        val participantIdFromSv1 = sv1ScanClient.getPartyToParticipant(
+          activeDomain,
+          svValidatorClient.getValidatorPartyId(),
+        )
+        participantIdFromSv shouldBe participantIdFromSv1
+      }
+    }
     clue("Can get member traffic status from Scan") {
       eventually() {
         val svTrafficStatus =

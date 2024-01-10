@@ -21,7 +21,7 @@ import com.daml.network.http.v0.definitions.{GetCnsRulesRequest, GetCoinRulesReq
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.codegen.java.cc
 import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
-import com.digitalasset.canton.topology.{DomainId, PartyId, SequencerId, Member}
+import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
@@ -556,6 +556,29 @@ object HttpScanAppClient {
 
     override protected def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case externalHttp.GetMemberTrafficStatusResponse.OK(response) => Right(response.trafficStatus)
+    }
+  }
+
+  case class GetPartyToParticipant(domainId: DomainId, partyId: PartyId)
+      extends ExternalBaseCommand[
+        externalHttp.GetPartyToParticipantResponse,
+        ParticipantId,
+      ] {
+
+    override def submitRequest(
+        client: externalHttp.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], externalHttp.GetPartyToParticipantResponse] =
+      client.getPartyToParticipant(domainId.toProtoPrimitive, partyId.toProtoPrimitive, headers)
+
+    override protected def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case externalHttp.GetPartyToParticipantResponse.OK(response) =>
+        for {
+          participantId <- Codec.decode(Codec.Participant)(response.participantId)
+        } yield participantId
     }
   }
 

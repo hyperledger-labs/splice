@@ -163,7 +163,7 @@ class HttpExternalWalletHandler(
             receivingValidator,
           )
           .transform(
-            _.mapping.participantIds.toList,
+            _.mapping.participantIds,
             // We translate NOT_FOUND raised by getPartyToParticipant to INVALID_ARGUMENT
             // if no PartyToParticipantX state is found
             {
@@ -178,19 +178,19 @@ class HttpExternalWalletHandler(
             },
           )
           .map {
-            case Nil =>
+            case Seq() =>
               throw io.grpc.Status.INVALID_ARGUMENT
                 .withDescription(
                   s"Could not find participant hosting ${receivingValidator} on domain ${domainId}"
                 )
                 .asRuntimeException()
-            case only :: Nil => only
-            case first :: _ =>
-              logger.info(
-                s"Receiving validator party ${receivingValidator} is hosted on multiple participants. " +
-                  s"Selecting the first one ${first} to buy extra traffic for."
-              )
-              first
+            case Seq(participantId) => participantId
+            case _ =>
+              throw io.grpc.Status.INTERNAL
+                .withDescription(
+                  s"Receiving validator party ${receivingValidator} is hosted on multiple participants, which is not currently supported"
+                )
+                .asRuntimeException()
           }
         result <- userWalletStore
           .getLatestBuyTrafficRequestEventByTrackingId(request.trackingId)

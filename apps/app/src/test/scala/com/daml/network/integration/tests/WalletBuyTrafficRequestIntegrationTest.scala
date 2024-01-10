@@ -166,11 +166,15 @@ class WalletBuyTrafficRequestIntegrationTest
                 activeDomainId,
               ) shouldBe expectedTotalPurchasedTraffic
               // double-check that scan returns the same result
+              val participantId = sv1ScanBackend.getPartyToParticipant(
+                activeDomainId,
+                aliceValidatorBackend.getValidatorPartyId(),
+              )
               eventually()(
                 sv1ScanBackend
                   .getMemberTrafficStatus(
                     activeDomainId,
-                    aliceValidatorBackend.participantClient.id,
+                    participantId,
                   )
                   .target
                   .totalPurchased shouldBe expectedTotalPurchasedTraffic
@@ -187,10 +191,14 @@ class WalletBuyTrafficRequestIntegrationTest
               activeDomainId,
             ) shouldBe expectedTrafficLimit
             // double-check that scan returns the same result
+            val participantId = sv1ScanBackend.getPartyToParticipant(
+              activeDomainId,
+              aliceValidatorBackend.getValidatorPartyId(),
+            )
             sv1ScanBackend
               .getMemberTrafficStatus(
                 activeDomainId,
-                aliceValidatorBackend.participantClient.id,
+                participantId,
               )
               .actual
               .totalLimit shouldBe expectedTrafficLimit
@@ -291,9 +299,11 @@ class WalletBuyTrafficRequestIntegrationTest
       def purchasedTraffic =
         getTotalPurchasedTraffic(validatorApp.participantClient.id, activeDomainId)
       // double-check that scan returns the same result
+      val participantId =
+        sv1ScanBackend.getPartyToParticipant(activeDomainId, validatorApp.getValidatorPartyId())
       eventually()(
         sv1ScanBackend
-          .getMemberTrafficStatus(activeDomainId, validatorApp.participantClient.id)
+          .getMemberTrafficStatus(activeDomainId, participantId)
           .target
           .totalPurchased shouldBe purchasedTraffic
       )
@@ -301,7 +311,7 @@ class WalletBuyTrafficRequestIntegrationTest
       def sequencerTrafficLimit = getSequencerTrafficLimit(validatorApp, activeDomainId)
       // double-check that scan returns the same result
       sv1ScanBackend
-        .getMemberTrafficStatus(activeDomainId, validatorApp.participantClient.id)
+        .getMemberTrafficStatus(activeDomainId, participantId)
         .actual
         .totalLimit shouldBe sequencerTrafficLimit
 

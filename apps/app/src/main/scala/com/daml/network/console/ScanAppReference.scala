@@ -21,7 +21,7 @@ import com.daml.network.util.{CNNodeUtil, CoinConfigSchedule, Contract, Contract
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 
 import java.time.Instant
 
@@ -239,6 +239,17 @@ abstract class ScanAppReference(
   ): definitions.MemberTrafficStatus =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetMemberTrafficStatus(domainId, memberId))
+    }
+
+  @Help.Summary(
+    "Get the id of the participant hosting a given party"
+  )
+  def getPartyToParticipant(
+      domainId: DomainId,
+      partyId: PartyId,
+  ): ParticipantId =
+    consoleEnvironment.run {
+      httpCommand(HttpScanAppClient.GetPartyToParticipant(domainId, partyId))
     }
 
   @Help.Summary(
