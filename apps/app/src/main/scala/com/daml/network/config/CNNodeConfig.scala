@@ -11,6 +11,7 @@ import com.daml.network.http.v0.definitions.{
   ReleaseConfiguration,
   Timespan,
 }
+import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.splitwell.config.{
   SplitwellAppBackendConfig,
@@ -374,15 +375,15 @@ object CNNodeConfig {
       deriveReader[CNParticipantClientConfig]
     implicit val appInstanceReader: ConfigReader[AppInstance] =
       deriveReader[AppInstance]
-    implicit val scanClientConfigConfigHint: FieldCoproductHint[ScanClientValidatorConfig] =
-      new FieldCoproductHint[ScanClientValidatorConfig]("type")
+    implicit val scanClientConfigConfigHint: FieldCoproductHint[BftScanClientConfig] =
+      new FieldCoproductHint[BftScanClientConfig]("type")
     implicit val scanClientConfigTrustSingleConfigReader
-        : ConfigReader[ScanClientValidatorConfig.TrustSingle] =
-      deriveReader[ScanClientValidatorConfig.TrustSingle]
-    implicit val scanClientConfigSeedsConfigReader: ConfigReader[ScanClientValidatorConfig.Bft] =
-      deriveReader[ScanClientValidatorConfig.Bft]
-    implicit val scanClientConfigConfigReader: ConfigReader[ScanClientValidatorConfig] =
-      deriveReader[ScanClientValidatorConfig]
+        : ConfigReader[BftScanClientConfig.TrustSingle] =
+      deriveReader[BftScanClientConfig.TrustSingle]
+    implicit val scanClientConfigSeedsConfigReader: ConfigReader[BftScanClientConfig.Bft] =
+      deriveReader[BftScanClientConfig.Bft]
+    implicit val scanClientConfigConfigReader: ConfigReader[BftScanClientConfig] =
+      deriveReader[BftScanClientConfig]
     implicit val scanClientConfigReader: ConfigReader[ScanAppClientConfig] =
       deriveReader[ScanAppClientConfig]
     implicit val domainConfigReader: ConfigReader[DomainConfig] =
@@ -611,15 +612,15 @@ object CNNodeConfig {
       deriveWriter[CNParticipantClientConfig]
     implicit val appInstanceWriter: ConfigWriter[AppInstance] =
       deriveWriter[AppInstance]
-    implicit val scanClientConfigConfigHint: FieldCoproductHint[ScanClientValidatorConfig] =
-      new FieldCoproductHint[ScanClientValidatorConfig]("type")
+    implicit val scanClientConfigConfigHint: FieldCoproductHint[BftScanClientConfig] =
+      new FieldCoproductHint[BftScanClientConfig]("type")
     implicit val scanClientConfigTrustSingleConfigWriter
-        : ConfigWriter[ScanClientValidatorConfig.TrustSingle] =
-      deriveWriter[ScanClientValidatorConfig.TrustSingle]
-    implicit val scanClientConfigSeedsConfigWriter: ConfigWriter[ScanClientValidatorConfig.Bft] =
-      deriveWriter[ScanClientValidatorConfig.Bft]
-    implicit val scanClientConfigConfigWriter: ConfigWriter[ScanClientValidatorConfig] =
-      deriveWriter[ScanClientValidatorConfig]
+        : ConfigWriter[BftScanClientConfig.TrustSingle] =
+      deriveWriter[BftScanClientConfig.TrustSingle]
+    implicit val scanClientConfigSeedsConfigWriter: ConfigWriter[BftScanClientConfig.Bft] =
+      deriveWriter[BftScanClientConfig.Bft]
+    implicit val scanClientConfigConfigWriter: ConfigWriter[BftScanClientConfig] =
+      deriveWriter[BftScanClientConfig]
     implicit val scanClientConfigWriter: ConfigWriter[ScanAppClientConfig] =
       deriveWriter[ScanAppClientConfig]
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =

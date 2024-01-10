@@ -12,7 +12,6 @@ import com.daml.network.environment.{
   CNLedgerClient,
   HttpAppConnection,
   PackageIdResolver,
-  RetryFor,
   RetryProvider,
 }
 import com.daml.network.scan.admin.api.client.ScanConnection.*
@@ -45,9 +44,9 @@ import scala.jdk.OptionConverters.*
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the SVC party id.
   */
-final class ScanConnection private (
+class ScanConnection private (
     coinLedgerClient: CNLedgerClient,
-    config: ScanAppClientConfig,
+    private[client] val config: ScanAppClientConfig,
     clock: Clock,
     retryProvider: RetryProvider,
     loggerFactory: NamedLoggerFactory,
@@ -107,8 +106,7 @@ final class ScanConnection private (
   /** Query for the SVC party id. This caches the result internally so
     * clients can call this repeatedly without having to implement caching themselves.
     */
-  // NOTE: made private as there does not seem to be another use of calling this w/o retries right now.
-  private def getSvcPartyId(): Future[PartyId] = {
+  def getSvcPartyId(): Future[PartyId] = {
     val prev = svcRef.get()
     prev match {
       case Some(partyId) => Future.successful(partyId)
@@ -122,18 +120,6 @@ final class ScanConnection private (
         }
     }
   }
-
-  /** Query for the SVC party id, retrying until it succeeds.
-    *
-    * Intended to be used for app init.
-    */
-  def getSvcPartyIdWithRetries(): Future[PartyId] =
-    retryProvider.getValueWithRetries(
-      RetryFor.WaitingOnInitDependency,
-      "SVC party ID from scan",
-      getSvcPartyId(),
-      logger,
-    )
 
   def getTransferContextWithInstances()(implicit
       ec: ExecutionContext,

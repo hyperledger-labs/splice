@@ -1,30 +1,24 @@
 package com.daml.network.wallet.automation
 
-import org.apache.pekko.stream.Materializer
+import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
+import com.daml.network.automation.UnassignTrigger.GetTargetDomain
 import com.daml.network.automation.{
   AssignTrigger,
   CNNodeAppAutomationService,
   TransferFollowTrigger,
   UnassignTrigger,
 }
-import TransferFollowTrigger.Task as FollowTask
-import UnassignTrigger.GetTargetDomain
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{
-  DarResources,
-  CNLedgerClient,
-  PackageIdResolver,
-  ParticipantAdminConnection,
-  RetryProvider,
-}
-import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.environment.*
+import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.util.QualifiedName
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -36,7 +30,7 @@ class UserWalletAutomationService(
     globalDomain: GetTargetDomain,
     automationConfig: AutomationConfig,
     clock: Clock,
-    scanConnection: ScanConnection,
+    scanConnection: BftScanConnection,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit

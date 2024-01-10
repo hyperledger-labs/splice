@@ -1,22 +1,22 @@
 package com.daml.network.validator.admin.http
 
-import org.apache.pekko.stream.Materializer
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.http.v0.{external, definitions as d0}
 import com.daml.network.http.v0.external.cns.CnsResource as r0
-import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.http.v0.{external, definitions as d0}
+import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.util.DisclosedContracts
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.HttpWalletHandlerUtil
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpExternalCnsHandler(
     override val walletManager: UserWalletManager,
-    scanConnection: ScanConnection,
+    scanConnection: BftScanConnection,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,

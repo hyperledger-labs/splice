@@ -1,15 +1,8 @@
 package com.daml.network.wallet
 
-import org.apache.pekko.stream.Materializer
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{
-  CNLedgerClient,
-  CNLedgerConnection,
-  PackageIdResolver,
-  ParticipantAdminConnection,
-  RetryProvider,
-}
-import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.environment.*
+import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.AcsStoreDump
 import com.daml.network.util.{HasHealth, TemplateJsonDecoder}
 import com.daml.network.wallet.automation.UserWalletAutomationService
@@ -23,6 +16,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.ExecutionContext
 
@@ -38,7 +32,7 @@ class UserWalletService(
     storage: Storage,
     override protected[this] val retryProvider: RetryProvider,
     loggerFactory0: NamedLoggerFactory,
-    scanConnection: ScanConnection,
+    scanConnection: BftScanConnection,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

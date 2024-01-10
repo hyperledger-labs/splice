@@ -1,43 +1,39 @@
 package com.daml.network.wallet.treasury
 
-import org.apache.pekko.Done
-import org.apache.pekko.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
-import org.apache.pekko.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
-import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import com.daml.ledger.javaapi.data.codegen.Exercised
-import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.round.types.Round
-import com.daml.network.codegen.java.cc.coin.{ValidatorRight}
-import com.daml.network.codegen.java.cc.coinrules.{
-  PaymentTransferContext,
-  TransferContext,
-  TransferInput,
-}
+import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.coin.ValidatorRight
 import com.daml.network.codegen.java.cc.coinrules.transferinput.{
   InputAppRewardCoupon,
   InputCoin,
   InputValidatorRewardCoupon,
 }
-import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.codegen.java.cn.wallet.{
-  install as installCodegen,
-  payment as walletCodegen,
-  subscriptions as subsCodegen,
-  transferoffer as transferOffersCodegen,
-  buytrafficrequest as trafficRequestCodegen,
+import com.daml.network.codegen.java.cc.coinrules.{
+  PaymentTransferContext,
+  TransferContext,
+  TransferInput,
 }
+import com.daml.network.codegen.java.cc.round.IssuingMiningRound
+import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
 import com.daml.network.codegen.java.cn.wallet.install.{
   ExecuteBatchResult,
   WalletAppInstall,
   coinoperation,
 }
-import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
+import com.daml.network.codegen.java.cn.wallet.{
+  buytrafficrequest as trafficRequestCodegen,
+  install as installCodegen,
+  payment as walletCodegen,
+  subscriptions as subsCodegen,
+  transferoffer as transferOffersCodegen,
+}
 import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}
-import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.PageLimit
-import com.daml.network.util.{AssignedContract, CNNodeUtil, DisclosedContracts, HasHealth}
 import com.daml.network.util.PrettyInstances.*
+import com.daml.network.util.{AssignedContract, CNNodeUtil, DisclosedContracts, HasHealth}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
@@ -49,19 +45,23 @@ import com.digitalasset.canton.lifecycle.{
   FlagCloseableAsync,
   RunOnShutdown,
 }
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   NamedLoggerFactory,
   NamedLogging,
   TracedLogger,
 }
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.Done
+import org.apache.pekko.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
+import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
+import org.apache.pekko.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
@@ -80,7 +80,7 @@ class TreasuryService(
     userStore: UserWalletStore,
     walletManager: UserWalletManager,
     override protected[this] val retryProvider: RetryProvider,
-    scanConnection: ScanConnection,
+    scanConnection: BftScanConnection,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
     extends NamedLogging

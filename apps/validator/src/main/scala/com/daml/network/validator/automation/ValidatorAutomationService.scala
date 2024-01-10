@@ -1,23 +1,15 @@
 package com.daml.network.validator.automation
 
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
-import org.apache.pekko.stream.Materializer
+import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.automation.{
   AssignTrigger,
   CNNodeAppAutomationService,
   TransferFollowTrigger,
 }
-import TransferFollowTrigger.Task as FollowTask
 import com.daml.network.config.{AutomationConfig, BackupDumpConfig}
-import com.daml.network.environment.{
-  CNLedgerClient,
-  DarResources,
-  PackageIdResolver,
-  ParticipantAdminConnection,
-  RetryProvider,
-}
+import com.daml.network.environment.*
 import com.daml.network.identities.NodeIdentitiesStore
-import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.util.QualifiedName
 import com.daml.network.validator.config.{AppManagerConfig, BuyExtraTrafficConfig}
 import com.daml.network.validator.store.{AppManagerStore, ValidatorStore}
@@ -28,6 +20,8 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -42,7 +36,7 @@ class ValidatorAutomationService(
     clock: Clock,
     walletManager: UserWalletManager,
     store: ValidatorStore,
-    scanConnection: ScanConnection,
+    scanConnection: BftScanConnection,
     ledgerClient: CNLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
     participantIdentitiesStore: NodeIdentitiesStore,

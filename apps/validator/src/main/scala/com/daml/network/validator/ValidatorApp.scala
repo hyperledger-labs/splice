@@ -25,8 +25,9 @@ import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.http.v0.validator_admin.ValidatorAdminResource
 import com.daml.network.http.v0.validator_public.ValidatorPublicResource
 import com.daml.network.http.v0.wallet.WalletResource as InternalWalletResource
-import com.daml.network.scan.admin.api.client.{MinimalScanConnection, ScanConnection}
+import com.daml.network.scan.admin.api.client.MinimalScanConnection
 import com.daml.network.scan.config.ScanAppClientConfig
+import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.setup.ParticipantInitializer
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
@@ -37,7 +38,6 @@ import com.daml.network.validator.admin.http.*
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{
   AppInstance,
-  ScanClientValidatorConfig,
   ValidatorAppBackendConfig,
   ValidatorOnboardingConfig,
 }
@@ -67,6 +67,8 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.daml.network.validator.admin.http.HttpExternalCnsHandler
 import com.daml.network.http.v0.external.cns.CnsResource
 import com.daml.network.identities.NodeIdentitiesStore
+import com.daml.network.scan.admin.api.client
+import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequencer
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
@@ -129,7 +131,13 @@ class ValidatorApp(
       _ <-
         withParticipantAdminConnection { participantAdminConnection =>
           for {
-            scanConnection <- getScanConnection(ledgerClient)
+            scanConnection <- client.BftScanConnection(
+              ledgerClient,
+              config.scanClient,
+              clock,
+              retryProvider,
+              loggerFactory,
+            )
             _ <- ensureGlobalDomainRegistered(participantAdminConnection, scanConnection)
             _ <- ensureExtraDomainsRegistered(participantAdminConnection)
             // Note that for the validator of an SV app, the user will be created by the SV app with a
@@ -145,29 +153,6 @@ class ValidatorApp(
           } yield ()
         }
     } yield ()
-
-  // TODO: (#8951): Replace with BftScanConnection
-  private def getScanConnection(ledgerClient: CNLedgerClient): Future[ScanConnection] = {
-    config.scanClient match {
-      case ScanClientValidatorConfig.TrustSingle(url, coinRulesCacheTimeToLive) =>
-        ScanConnection(
-          ledgerClient,
-          ScanAppClientConfig(NetworkAppClientConfig(url), coinRulesCacheTimeToLive),
-          clock,
-          retryProvider,
-          loggerFactory,
-        )
-      case ScanClientValidatorConfig.Bft(seedUrls, coinRulesCacheTimeToLive) =>
-        ScanConnection(
-          ledgerClient,
-          // TODO: (#8951): seedUrls.head is obviously not what we want
-          ScanAppClientConfig(NetworkAppClientConfig(seedUrls.head), coinRulesCacheTimeToLive),
-          clock,
-          retryProvider,
-          loggerFactory,
-        )
-    }
-  }
 
   private def setupWalletDars(
       participantAdminConnection: ParticipantAdminConnection
@@ -271,7 +256,7 @@ class ValidatorApp(
   }
 
   private def waitForSequencerConnectionsFromScan(
-      scanConnection: ScanConnection,
+      scanConnection: BftScanConnection,
       logger: TracedLogger,
       retryProvider: RetryProvider,
   ) = {
@@ -296,18 +281,18 @@ class ValidatorApp(
     )
   }
 
-  private def ensureVersionMatch(scanClientConfig: ScanClientValidatorConfig): Future[Unit] =
+  private def ensureVersionMatch(scanClientConfig: BftScanClientConfig): Future[Unit] =
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
       "version checked via scan",
       // we checkVersionCompatibility on every CN app connection
       scanClientConfig match {
-        case ScanClientValidatorConfig.TrustSingle(url, _) =>
+        case BftScanClientConfig.TrustSingle(url, _) =>
           val config = ScanAppClientConfig(NetworkAppClientConfig(url))
           MinimalScanConnection(config, retryProvider, loggerFactory).flatMap(con =>
             con.checkActive().andThen(_ => con.close())
           )
-        case ScanClientValidatorConfig.Bft(seedUrls, _) =>
+        case BftScanClientConfig.Bft(seedUrls, _) =>
           seedUrls
             .traverse { url =>
               val config = ScanAppClientConfig(NetworkAppClientConfig(url))
@@ -353,7 +338,7 @@ class ValidatorApp(
 
   private def ensureGlobalDomainRegistered(
       participantAdminConnection: ParticipantAdminConnection,
-      scanConnection: ScanConnection,
+      scanConnection: BftScanConnection,
   ): Future[Unit] = {
     // TODO (#8450) config.domains.global.alias and config.domains.global.url are wrong if global has migrated
     config.domains.global.url match {
@@ -397,7 +382,7 @@ class ValidatorApp(
   private def ensureDomainRegisteredFromScan(
       alias: DomainAlias,
       participantAdminConnection: ParticipantAdminConnection,
-      scanConnection: ScanConnection,
+      scanConnection: BftScanConnection,
   ): Future[Unit] = {
     for {
       _ <- waitForSequencerConnectionsFromScan(
@@ -431,7 +416,7 @@ class ValidatorApp(
 
   private def newTrafficBalanceService(
       participantAdminConnection: ParticipantAdminConnection,
-      scanConnection: ScanConnection,
+      scanConnection: BftScanConnection,
   ) = {
     def lookupReservedTraffic(domainId: DomainId): Future[Option[NonNegativeLong]] = {
       config.domains.global.trafficReservedForTopupsO
@@ -488,7 +473,13 @@ class ValidatorApp(
         loggerFactory,
       )
       scanConnection <- appInitStep("Get scan connection") {
-        getScanConnection(ledgerClient)
+        client.BftScanConnection(
+          ledgerClient,
+          config.scanClient,
+          clock,
+          retryProvider,
+          loggerFactory,
+        )
       }
 
       // Register the traffic balance service
@@ -832,7 +823,7 @@ class ValidatorApp(
 
 object ValidatorApp {
   case class State(
-      scanConnection: ScanConnection,
+      scanConnection: BftScanConnection,
       participantAdminConnection: ParticipantAdminConnection,
       storage: Storage,
       store: ValidatorStore,
@@ -863,7 +854,7 @@ object ValidatorApp {
   }
 
   def getSequencerConnectionsFromScan(
-      scanConnection: ScanConnection,
+      scanConnection: BftScanConnection,
       logger: TracedLogger,
       domainTime: CantonTimestamp,
   )(implicit

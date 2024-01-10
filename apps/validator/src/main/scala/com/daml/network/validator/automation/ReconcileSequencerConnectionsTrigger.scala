@@ -3,7 +3,7 @@ package com.daml.network.validator.automation
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.ParticipantAdminConnection
-import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.validator.ValidatorApp
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DomainAlias
@@ -23,7 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class ReconcileSequencerConnectionsTrigger(
     override protected val context: TriggerContext,
     participantAdminConnection: ParticipantAdminConnection,
-    scanConnection: ScanConnection,
+    scanConnection: BftScanConnection,
     globalDomainAlias: DomainAlias,
 )(implicit
     override val ec: ExecutionContext,

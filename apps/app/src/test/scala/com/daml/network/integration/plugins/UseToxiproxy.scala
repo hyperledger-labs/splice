@@ -3,7 +3,7 @@ package com.daml.network.integration.plugins.toxiproxy
 import com.daml.network.config.{CNNodeConfig, CNParticipantClientConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.validator.config.ScanClientValidatorConfig
+import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import eu.rekawek.toxiproxy.{Proxy, ToxiproxyClient}
@@ -95,22 +95,22 @@ case class UseToxiproxy(
               .map { case ((n, config), i) =>
                 val basePortBump = i * 100
                 config.scanClient match {
-                  case ScanClientValidatorConfig.TrustSingle(url, coinRulesCacheTimeToLive) =>
+                  case BftScanClientConfig.TrustSingle(url, coinRulesCacheTimeToLive) =>
                     val newUrl = addScanAppHttpProxy(n.unwrap, url, basePortBump)
                     (
                       n,
                       config.copy(scanClient =
-                        ScanClientValidatorConfig.TrustSingle(newUrl, coinRulesCacheTimeToLive)
+                        BftScanClientConfig.TrustSingle(newUrl, coinRulesCacheTimeToLive)
                       ),
                     )
-                  case ScanClientValidatorConfig.Bft(seedUrls, coinRulesCacheTimeToLive) =>
+                  case BftScanClientConfig.Bft(seedUrls, coinRulesCacheTimeToLive) =>
                     val newSeedUrls = seedUrls.zipWithIndex.map { case (seedUrl, ii) =>
                       addScanAppHttpProxy(n.unwrap, seedUrl, basePortBump + ii)
                     }
                     (
                       n,
                       config.copy(scanClient =
-                        ScanClientValidatorConfig.Bft(newSeedUrls, coinRulesCacheTimeToLive)
+                        BftScanClientConfig.Bft(newSeedUrls, coinRulesCacheTimeToLive)
                       ),
                     )
                 }

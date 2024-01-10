@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
-import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.Limit
 import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder}
 import com.daml.network.wallet.config.TreasuryConfig
@@ -34,7 +34,7 @@ class UserWalletManager(
     treasuryConfig: TreasuryConfig,
     storage: Storage,
     retryProvider: RetryProvider,
-    scanConnection: ScanConnection,
+    scanConnection: BftScanConnection,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,

@@ -1,6 +1,5 @@
 package com.daml.network.validator.automation
 
-import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_BuyMemberTraffic
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
@@ -15,7 +14,7 @@ import com.daml.network.environment.{
   CommandPriority,
   ParticipantAdminConnection,
 }
-import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{CoinConfigSchedule, Contract}
 import com.daml.network.validator.config.BuyExtraTrafficConfig
@@ -29,6 +28,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.traffic.MemberTrafficStatus
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import java.time.Instant
 import java.util.Optional
@@ -42,7 +42,7 @@ class TopupMemberTrafficTrigger(
     buyExtraTrafficConfig: BuyExtraTrafficConfig,
     clock: Clock,
     walletManager: UserWalletManager,
-    scanConnection: ScanConnection,
+    scanConnection: BftScanConnection,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,

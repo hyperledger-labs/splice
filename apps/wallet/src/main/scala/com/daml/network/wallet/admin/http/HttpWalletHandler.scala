@@ -21,7 +21,7 @@ import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.environment.{CommandPriority, RetryProvider}
 import com.daml.network.http.v0.wallet.WalletResource as r0
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
-import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.{Limit, PageLimit}
 import com.daml.network.util.{CNNodeUtil, Codec, Contract, DisclosedContracts}
 import com.daml.network.wallet.UserWalletManager
@@ -47,7 +47,7 @@ import scala.util.{Failure, Success, Try}
 
 class HttpWalletHandler(
     override protected val walletManager: UserWalletManager,
-    scanConnection: ScanConnection,
+    scanConnection: BftScanConnection,
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
 )(implicit

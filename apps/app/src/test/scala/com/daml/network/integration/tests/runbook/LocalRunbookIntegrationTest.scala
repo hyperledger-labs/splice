@@ -8,9 +8,9 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.daml.network.sv.config.ExpectedValidatorOnboardingConfig
 import com.daml.network.util.ProcessTestUtil
-import com.daml.network.validator.config.ScanClientValidatorConfig
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import com.typesafe.config.ConfigFactory
@@ -159,7 +159,7 @@ class LocalRunbookIntegrationTest
     CNNodeConfigTransforms.updateAllValidatorConfigs_(vc =>
       vc.focus(_.scanClient)
         .replace(
-          ScanClientValidatorConfig.TrustSingle("http://localhost:5012")
+          BftScanClientConfig.TrustSingle("http://localhost:5012")
         )
     )(conf)
   }

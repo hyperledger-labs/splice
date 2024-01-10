@@ -64,7 +64,7 @@ abstract class BaseAppConnection(
 }
 
 object BaseAppConnection {
-  final class UnexpectedHttpResponse(response: HttpResponse)
+  final class UnexpectedHttpResponse(val response: HttpResponse)
       extends Throwable(s"Unexpected Http Response: $response")
 }
 
