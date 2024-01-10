@@ -359,6 +359,7 @@ class FoundingNodeInitializer(
     private val domainNodeReconciler = new DomainNodeReconciler(
       svcStore,
       svcStoreWithIngestion.connection,
+      config.scan,
       clock,
       retryProvider,
       logger,
@@ -506,6 +507,7 @@ class FoundingNodeInitializer(
                   founderDomainNodes <- SvUtil.getFounderDomainNodeConfig(
                     cometBftNode,
                     localDomainNode,
+                    config.scan,
                     domainId,
                     clock,
                   )

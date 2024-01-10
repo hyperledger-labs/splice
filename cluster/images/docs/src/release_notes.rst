@@ -40,6 +40,13 @@ Release Notes
 ----------
 
 * Deployment:
+  * The SV-app helm chart now expects `scan.publicUrl` to be set to the URL of the Scan app.
+
+
+2024-01-08
+----------
+
+* Deployment:
 
   * The global domain helm chart now supports separate Postgres instances for the sequencer and mediator. They can be configured in the `sequencerPostgres` and `mediatorPostgres` values.
     The single `postgres` value has been deprecated and is no longer supported.

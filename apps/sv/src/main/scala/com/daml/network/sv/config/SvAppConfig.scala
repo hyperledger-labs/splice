@@ -22,6 +22,7 @@ import com.digitalasset.canton.config.RequireTypes.{
 }
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
+import org.apache.pekko.http.scaladsl.model.Uri
 
 import java.nio.file.Path
 
@@ -154,6 +155,7 @@ case class SvAppBackendConfig(
     initialCoinPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[CometBftConfig] = None,
     localDomainNode: Option[SvDomainNodeConfig],
+    scan: Option[SvScanConfig],
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     acsStoreDump: Option[BackupDumpConfig] = None,
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(6),
@@ -198,6 +200,10 @@ final case class SvSequencerConfig(
 
 final case class SvMediatorConfig(
     adminApi: ClientConfig
+)
+
+final case class SvScanConfig(
+    publicUrl: Uri
 )
 
 final case class SvDomainNodeConfig(

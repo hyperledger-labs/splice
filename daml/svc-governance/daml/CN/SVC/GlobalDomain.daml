@@ -71,6 +71,12 @@ data MediatorConfig = MediatorConfig with
     -- ^ The id of the mediator.
   deriving (Eq, Show)
 
+-- | Config for a Scan instance.
+data ScanConfig = ScanConfig with
+    publicUrl : Text
+    -- ^ The publicly accessible URL of the Scan instance.
+  deriving (Eq, Show)
+
 -- | A map from domain-ids to the configuration of a member's node for this domain.
 type DomainNodeConfigMap = Map.Map Text DomainNodeConfig
 
@@ -85,6 +91,9 @@ data DomainNodeConfig = DomainNodeConfig with
 
     mediator : Optional MediatorConfig
     -- ^ The configuration of this member's optional local mediator.
+
+    scan: Optional ScanConfig
+    -- ^ The configuration of this member's optional Scan instance.
   deriving (Eq, Show)
 
 noDomainNodes : DomainNodeConfigMap
@@ -99,7 +108,7 @@ data DomainNodeConfigLimits = DomainNodeConfigLimits with
 -----------------
 
 emptyDomainNodeConfig : DomainNodeConfig
-emptyDomainNodeConfig = DomainNodeConfig emptyCometBftConfig None None
+emptyDomainNodeConfig = DomainNodeConfig emptyCometBftConfig None None None
 
 
 -- helper functions

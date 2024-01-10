@@ -14,6 +14,7 @@
 {{ $_ := required ".Values.globalDomainUrl is required." .Values.globalDomainUrl }}
 {{ $_ := required ".Values.domain.sequencerPublicUrl is required." .Values.domain.sequencerPublicUrl }}
 {{ $_ := required ".Values.persistence.secretName is required" .Values.persistence.secretName }}
+{{ $_ := required ".Values.scan.publicUrl is required." .Values.scan.publicUrl }}
 
 {{- if ((.Values.domain).sequencerPruningConfig).enabled }}
 {{ $_ := required ".Values.domain.sequencerPruningConfig.pruningInterval is required if sequencerPruningConfig is enabled." ((.Values.domain).sequencerPruningConfig).pruningInterval }}

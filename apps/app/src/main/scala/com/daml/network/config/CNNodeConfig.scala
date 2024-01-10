@@ -446,6 +446,8 @@ object CNNodeConfig {
       deriveReader[SequencerPruningConfig]
     implicit val svMediatorConfig: ConfigReader[SvMediatorConfig] =
       deriveReader[SvMediatorConfig]
+    implicit val svScanConfig: ConfigReader[SvScanConfig] =
+      deriveReader[SvScanConfig]
     implicit val svDomainNodeConfig: ConfigReader[SvDomainNodeConfig] =
       deriveReader[SvDomainNodeConfig]
     implicit val svGlobalDomainConfigReader: ConfigReader[SvGlobalDomainConfig] =
@@ -684,6 +686,8 @@ object CNNodeConfig {
       deriveWriter[SequencerPruningConfig]
     implicit val svMediatorConfig: ConfigWriter[SvMediatorConfig] =
       deriveWriter[SvMediatorConfig]
+    implicit val svScanConfig: ConfigWriter[SvScanConfig] =
+      deriveWriter[SvScanConfig]
     implicit val svDomainNodeConfig: ConfigWriter[SvDomainNodeConfig] =
       deriveWriter[SvDomainNodeConfig]
     implicit val svGlobalDomainConfigWriter: ConfigWriter[SvGlobalDomainConfig] =

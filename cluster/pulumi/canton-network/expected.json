@@ -3610,6 +3610,9 @@
             "cpu": 1,
             "memory": "4096Mi"
           }
+        },
+        "scan": {
+          "publicUrl": "https://scan.sv-1.svc.mock.network.canton.global"
         }
       }
     },
@@ -5164,6 +5167,9 @@
             "cpu": 1,
             "memory": "4096Mi"
           }
+        },
+        "scan": {
+          "publicUrl": "https://scan.sv-2.svc.mock.network.canton.global"
         }
       }
     },
@@ -6718,6 +6724,9 @@
             "cpu": 1,
             "memory": "4096Mi"
           }
+        },
+        "scan": {
+          "publicUrl": "https://scan.sv-3.svc.mock.network.canton.global"
         }
       }
     },
@@ -8272,6 +8281,9 @@
             "cpu": 1,
             "memory": "4096Mi"
           }
+        },
+        "scan": {
+          "publicUrl": "https://scan.sv-4.svc.mock.network.canton.global"
         }
       }
     },

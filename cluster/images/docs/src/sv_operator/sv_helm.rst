@@ -520,6 +520,7 @@ For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/exa
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Update the ``auth.jwksUrl`` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - Please set `domain.sequencerPublicUrl` to the URL to your sequencer service in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
+- Please set `scan.publicUrl` to the URL to your Scan app in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
 
 Your SV node will also be configured with a set of SV identities for your node to auto-approve as peer SVC members. The bundled artifacts consist of the lists of recommended values as follows:
 

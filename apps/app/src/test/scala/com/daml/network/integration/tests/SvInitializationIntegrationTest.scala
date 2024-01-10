@@ -11,6 +11,7 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 class SvInitializationIntegrationTest extends SvIntegrationTestBase {
 
@@ -120,6 +121,19 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
         .mapping
         .threshold
         .value shouldBe 2
+    }
+
+    clue("All SVs have reported their Scan URLs in SVC rules") {
+      eventually() {
+        val svcRules = sv1Backend.appState.svcStore.getSvcRules().futureValue.contract.payload
+        svcRules.members.asScala
+          .flatMap(_._2.domainNodes.get(globalDomainId.toProtoPrimitive).scan.toScala)
+          // onle sv1 and sv2 have scan apps
+          .map(_.publicUrl) should contain theSameElementsAs Seq(
+          "http://localhost:5012",
+          "http://localhost:5112",
+        )
+      }
     }
   }
 

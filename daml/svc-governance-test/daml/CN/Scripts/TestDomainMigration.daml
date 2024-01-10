@@ -54,6 +54,8 @@ testDomainMigration = do
           availableAfter = Some now
         mediator = Some MediatorConfig with
           mediatorId = "mediator-id-" <> partyToText sv
+        scan = Some ScanConfig with
+          publicUrl = "https://" <> partyToText sv <> ".example.com"
 
   -- The SVC marks the domain as operational
   executeSvcRulesConfigChange app $ \config ->

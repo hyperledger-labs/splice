@@ -35,6 +35,8 @@ testDomainMigration = do
           availableAfter = Some now
         mediator = Some MediatorConfig with
           mediatorId = "mediator-id-" <> partyToText sv
+        scan = Some ScanConfig with
+          publicUrl = "https://" <> partyToText sv <> ".example.com"
 
   -- sequencer info are published to svcRules and coinRules
   [(_, svcRules)] <- query @SvcRules svc

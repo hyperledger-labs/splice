@@ -90,6 +90,8 @@ initCollective initialRoundNumber isDevNet = do
                   availableAfter = Some now
                 mediator = Some MediatorConfig with
                   mediatorId = "mediator-id"
+                scan = Some ScanConfig with
+                  publicUrl = "https://sv1.example.com"
         )]
       coinConfig
       coinPrice = 1.0

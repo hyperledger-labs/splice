@@ -183,10 +183,14 @@ testSvOnboarding = do
   let mediatorConfig = Some MediatorConfig with
         mediatorId = "mediator-id"
 
+  let scanConfig = Some ScanConfig with
+        publicUrl = "https://scan1234.example.com"
+
   let newNodeConfig = DomainNodeConfig with
         cometBft = cometBftConfig
         sequencer = sequencerConfig
         mediator = mediatorConfig
+        scan = scanConfig
 
   submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_SetDomainNodeConfig with
     sv = svX

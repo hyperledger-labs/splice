@@ -200,6 +200,9 @@ spec:
                   file = /participant-bootstrapping-dump/content
                 }
             {{- end }}
+            - name: ADDITIONAL_CONFIG_SCAN_PUBLIC_URL
+              value: |
+                canton.sv-apps.sv.scan.public-url = {{ .Values.scan.publicUrl | quote }}
           ports:
             - name: sv-api
               containerPort: 5014

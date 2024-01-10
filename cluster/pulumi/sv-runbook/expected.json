@@ -442,7 +442,10 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global"
         },
-        "onboardingName": "DA-Helm-Test-Node"
+        "onboardingName": "DA-Helm-Test-Node",
+        "scan": {
+          "publicUrl": "https://scan.sv.svc.svrun.network.canton.global"
+        }
       }
     },
     "name": "sv-app",

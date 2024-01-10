@@ -233,6 +233,8 @@ export async function installSvNode(
 
   const initDb = initDatabase();
 
+  const clusterUrl = `${CLUSTER_BASENAME}.network.canton.global`;
+
   const svValues = {
     onboardingType: config.onboarding.type,
     onboardingName: config.onboardingName,
@@ -252,6 +254,9 @@ export async function installSvNode(
         sequencerPublicUrl: `https://sequencer-${globalDomain.id}.${config.nodename}.svc.${CLUSTER_BASENAME}.network.canton.global`,
         sequencerPruningConfig: config.sequencerPruningConfig,
       },
+    scan: {
+      publicUrl: `https://scan.${config.nodename}.svc.${clusterUrl}`,
+    },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
       expiresIn: onboarding.expiresIn,
       secretFrom: {
@@ -316,7 +321,7 @@ export async function installSvNode(
   const scanDbName = `scan_${svAppName}`;
   const scanDb = scanAppPostgres.createDatabaseAndInstallMetrics(scanDbName);
   const scanValues = {
-    clusterUrl: `${CLUSTER_BASENAME}.network.canton.global`,
+    clusterUrl,
     metrics: {
       enable: true,
     },

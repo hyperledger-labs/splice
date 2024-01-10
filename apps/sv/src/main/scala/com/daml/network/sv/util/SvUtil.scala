@@ -10,11 +10,12 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
   DomainConfig,
   DomainNodeConfig,
   DomainNodeConfigLimits,
-  SvcGlobalDomainConfig,
   MediatorConfig,
+  ScanConfig,
   SequencerConfig,
+  SvcGlobalDomainConfig,
 }
-import com.daml.network.codegen.java.cn.svcrules.{SvcRulesConfig}
+import com.daml.network.codegen.java.cn.svcrules.SvcRulesConfig
 import com.daml.network.codegen.java.cn.{cometbft, svc}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.BackupDumpConfig
@@ -23,8 +24,9 @@ import com.daml.network.http.v0.definitions as http
 import com.daml.network.store.MultiDomainAcsStore.JsonAcsSnapshot
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.cometbft.CometBftNode
+import com.daml.network.sv.config.SvScanConfig
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.{BackupDump}
+import com.daml.network.util.BackupDump
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.time.Clock
@@ -112,6 +114,7 @@ object SvUtil {
   def getFounderDomainNodeConfig(
       cometBftNode: Option[CometBftNode],
       localDomainNode: LocalDomainNode,
+      scanConfig: Option[SvScanConfig],
       domainId: DomainId,
       clock: Clock,
   )(implicit
@@ -163,6 +166,7 @@ object SvUtil {
           cometBftConfig,
           sequencerConfig.toJava,
           mediatorConfig.toJava,
+          scanConfig.map(c => new ScanConfig(c.publicUrl.toString())).toJava,
         )
       ).asJava
     }

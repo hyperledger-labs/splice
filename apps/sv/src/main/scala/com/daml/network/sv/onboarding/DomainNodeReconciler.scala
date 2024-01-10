@@ -3,10 +3,12 @@ package com.daml.network.sv.onboarding
 import com.daml.network.codegen.java.cn.svc.globaldomain.{
   DomainNodeConfig,
   MediatorConfig,
+  ScanConfig,
   SequencerConfig,
 }
 import com.daml.network.environment.{CNLedgerConnection, RetryFor, RetryProvider}
 import com.daml.network.sv.LocalDomainNode
+import com.daml.network.sv.config.SvScanConfig
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
@@ -25,6 +27,7 @@ import scala.jdk.OptionConverters.{RichOption, RichOptional}
 class DomainNodeReconciler(
     svcStore: SvSvcStore,
     connection: CNLedgerConnection,
+    scanConfig: Option[SvScanConfig],
     clock: Clock,
     retryProvider: RetryProvider,
     logger: TracedLogger,
@@ -92,6 +95,7 @@ class DomainNodeReconciler(
                 )
               )
               .toJava,
+            scanConfig.map(c => new ScanConfig(c.publicUrl.toString())).toJava,
           )
           logger.info(show"Setting domain node config to $nodeConfig")
           val cmd = svcRules.exercise(

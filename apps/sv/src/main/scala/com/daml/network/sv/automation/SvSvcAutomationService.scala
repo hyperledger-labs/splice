@@ -100,6 +100,7 @@ class SvSvcAutomationService(
           svcStore,
           connection,
           node,
+          config.scan,
         )
       )
       registerTrigger(
