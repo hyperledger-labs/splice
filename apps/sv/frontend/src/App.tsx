@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   AuthProvider,
   ErrorBoundary,
+  ErrorRouterPage,
   UserProvider,
   cnReplaceEqualDeep,
   theme,
@@ -59,6 +60,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route
+      errorElement={<ErrorRouterPage />}
       element={
         <Providers>
           <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />

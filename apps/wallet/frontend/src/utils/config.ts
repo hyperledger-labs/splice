@@ -10,6 +10,7 @@ type WalletConfig = {
   auth: z.infer<typeof authSchema>;
   testAuth?: z.infer<typeof testAuthSchema>;
   services: WalletServicesConfig;
+  clusterUrl: string;
 };
 
 const reader = new ConfigReader(
@@ -20,6 +21,7 @@ const reader = new ConfigReader(
       validator: serviceSchema,
       scan: serviceSchema,
     }),
+    clusterUrl: z.string().url(),
   })
 );
 

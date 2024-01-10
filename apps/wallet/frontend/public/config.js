@@ -24,6 +24,7 @@ window.canton_network_config = {
       // Edit this to the cluster you're trying to connect on.
       url: 'https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/scan',
     },
-    // END_WALLET_CLUSTER_BACKEND_CONFIG
   },
+  clusterUrl: `https://TARGET_CLUSTER.network.canton.global`,
+  // END_WALLET_CLUSTER_BACKEND_CONFIG
 };

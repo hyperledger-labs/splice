@@ -1,6 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { AuthProvider, theme, UserProvider, cnReplaceEqualDeep } from 'common-frontend';
+import {
+  AuthProvider,
+  theme,
+  UserProvider,
+  cnReplaceEqualDeep,
+  ErrorRouterPage,
+} from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
 import {
@@ -50,6 +56,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route
+      errorElement={<ErrorRouterPage />}
       element={
         <Providers>
           <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />

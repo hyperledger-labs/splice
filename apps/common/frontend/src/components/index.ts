@@ -8,6 +8,7 @@ import DateDisplay from './DateDisplay';
 import DevNetOnly from './DevNetOnly';
 import ErrorBoundary from './ErrorBoundary';
 import ErrorDisplay from './ErrorDisplay';
+import ErrorRouterPage from './ErrorRouterPage';
 import IntervalDisplay from './IntervalDisplay';
 import Loading from './Loading';
 import Login from './Login';
@@ -18,23 +19,24 @@ import TitledTable from './TitledTable';
 import { TransferButton, SubscriptionButton } from './WalletButtons';
 
 export {
+  AmountDisplay,
   AuthProvider,
-  CopyableTypography,
   CnsEntry,
-  ErrorBoundary,
-  Login,
+  CnsField,
+  CopyableTypography,
+  Copyright,
   DateDisplay,
   DevNetOnly,
-  Copyright,
+  ErrorBoundary,
+  ErrorDisplay,
+  ErrorRouterPage,
+  IntervalDisplay,
+  Loading,
+  Login,
+  LoginFailed,
   PartyId,
-  CnsField,
-  AmountDisplay,
   RateDisplay,
   TitledTable,
   TransferButton,
   SubscriptionButton,
-  IntervalDisplay,
-  Loading,
-  LoginFailed,
-  ErrorDisplay,
 };

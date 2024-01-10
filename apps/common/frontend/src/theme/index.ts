@@ -41,6 +41,12 @@ declare module '@mui/material/Button' {
   }
 }
 
+declare module '@mui/material/Typography' {
+  interface TypographyPropsVariantOverrides {
+    pill: true;
+  }
+}
+
 declare module '@mui/material/TableCell' {
   interface TableCellPropsVariantOverrides {
     party: true;
@@ -224,6 +230,23 @@ theme = createTheme(theme, {
             color: 'white',
           },
         },
+      ],
+    },
+    MuiLink: {
+      variants: [
+        // primary pill button-like link
+        stylePillButton(
+          {
+            bgColor: theme.palette.primary.main,
+            bgHoverColor: theme.palette.primary.light,
+            bgDisableColor: theme.palette.colors.neutral[25],
+            borderFocus: `2px solid ${theme.palette.primary.main}`,
+            textColor: 'black',
+          },
+          {
+            padding: 16,
+          }
+        ),
       ],
     },
     MuiChip: {

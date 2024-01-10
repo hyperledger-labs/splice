@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { cnReplaceEqualDeep, theme } from 'common-frontend';
+import { ErrorRouterPage, cnReplaceEqualDeep, theme } from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
 import {
@@ -41,7 +41,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 
 const router = createBrowserRouter(
   createRoutesFromElements(
-    <Route>
+    <Route errorElement={<ErrorRouterPage />}>
       <Route path="/" element={<Root />}>
         <Route index element={<Activity />} />
         <Route path="recent-activity" element={<Activity />} />

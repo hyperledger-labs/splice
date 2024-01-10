@@ -27,6 +27,7 @@ const config = {
     },
     // END_WALLET_CLUSTER_BACKEND_CONFIG
   },
+  clusterUrl: `https://TARGET_CLUSTER.network.canton.global`,
 };
 
 export { config };

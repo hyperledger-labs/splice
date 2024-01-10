@@ -36,7 +36,10 @@ interface PillButtonConfig {
   borderDisableColor?: string;
 }
 
-export const stylePillButton = (config: PillButtonConfig): Record<string, unknown> => {
+export const stylePillButton = (
+  config: PillButtonConfig,
+  additionalStyles?: Record<string, string | number>
+): Record<string, unknown> => {
   const {
     props,
     bgColor = 'none',
@@ -58,6 +61,7 @@ export const stylePillButton = (config: PillButtonConfig): Record<string, unknow
       backgroundColor: bgColor,
       border: border,
       color: textColor,
+      ...additionalStyles,
 
       '&:hover': {
         backgroundColor: bgHoverColor,

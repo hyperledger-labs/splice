@@ -1,7 +1,13 @@
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { AuthProvider, cnReplaceEqualDeep, theme, UserProvider } from 'common-frontend';
+import {
+  AuthProvider,
+  cnReplaceEqualDeep,
+  ErrorRouterPage,
+  theme,
+  UserProvider,
+} from 'common-frontend';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import {
   createBrowserRouter,
@@ -20,6 +26,7 @@ import AuthCheck from './routes/authCheck';
 import ConfirmPayment from './routes/confirmPayment';
 import ConfirmSubscription from './routes/confirmSubscription';
 import Confirmation from './routes/confirmation';
+import Faqs from './routes/faqs';
 import Root from './routes/root';
 import Subscriptions from './routes/subscriptions';
 import Transactions from './routes/transactions';
@@ -62,6 +69,7 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route
+      errorElement={<ErrorRouterPage />}
       element={
         <Providers>
           <AuthCheck authConfig={config.auth} testAuthConfig={config.testAuth} />
@@ -73,6 +81,7 @@ const router = createBrowserRouter(
         <Route path="transactions" element={<Transactions />} />
         <Route path="transfer" element={<Transfer />} />
         <Route path="subscriptions" element={<Subscriptions />} />
+        <Route path="faqs" element={<Faqs />} />
       </Route>
       <Route element={<Confirmation />}>
         <Route path="confirm-payment/:cid/" element={<ConfirmPayment />} />

@@ -16,4 +16,5 @@ window.canton_network_config = {
       url: `https://scan.sv-1.svc.${cluster}/api/scan`,
     },
   },
+  clusterUrl: `https://${cluster}`,
 };
