@@ -67,13 +67,25 @@ class SequencerPruningTrigger(
 
     statusAfterDisabling <- sequencerAdminConnection.getSequencerPruningStatus()
     safeTimestamp = statusAfterDisabling.safePruningTimestamp
-    res =
+    res <-
       if (safeTimestamp < pruningTimestamp) {
         val message = (
           s"We disabled all clients preventing pruning at $pruningTimestamp however the safe timestamp is set to $safeTimestamp"
         )
         Future.failed(Status.INTERNAL.withDescription(message).asRuntimeException())
-      } else sequencerAdminConnection.prune(pruningTimestamp)
+      } else
+        sequencerAdminConnection
+          .prune(pruningTimestamp)
+          .transform(
+            identity,
+            err => {
+              val lastAcknowledged =
+                statusAfterDisabling.members
+                  .map(m => m.member.toProtoPrimitive -> m.safePruningTimestamp)
+              logger.warn(s"failed to prune with sequencer pruning status: $lastAcknowledged")
+              err
+            },
+          )
 
   } yield res
 }
