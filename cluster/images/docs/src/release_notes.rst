@@ -31,6 +31,10 @@ Release Notes
             user:
             secretName:
 
+* Documentation:
+
+    * Removed the section `Renaming an SV` in the page "Kubernetes-Based Deployment of a Super Validator node". Not longer possible through the JSON API.
+
 
 2024-01-08
 ----------
