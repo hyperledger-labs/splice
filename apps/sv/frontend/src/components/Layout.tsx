@@ -1,19 +1,42 @@
 import * as React from 'react';
+import { Header, useUserState } from 'common-frontend';
 
-import { Box } from '@mui/material';
+import { Logout } from '@mui/icons-material';
+import { Box, Button, Divider, Stack } from '@mui/material';
 import Container from '@mui/material/Container';
-
-import Header from './Header';
+import Link from '@mui/material/Link';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
+  const { logout } = useUserState();
+
   return (
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
       <Container maxWidth="xl">
-        <Header />
+        <Header
+          title="Super Validator Operations"
+          navLinks={[
+            { name: 'Information', path: 'svc' },
+            { name: 'Validator Onboarding', path: 'validator-onboarding' },
+            { name: 'Canton Coin Price', path: 'cc-price' },
+            { name: 'Governance', path: 'votes' },
+          ]}
+        >
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Divider key="divider" orientation="vertical" variant="middle" flexItem />
+            <Button key="button" id="logout-button" onClick={logout} color="inherit">
+              <Stack direction="row" alignItems="center">
+                <Logout />
+                <Link color="inherit" textTransform="none">
+                  Logout
+                </Link>
+              </Stack>
+            </Button>
+          </Stack>
+        </Header>
       </Container>
 
       <Box bgcolor="colors.neutral.15" sx={{ flex: 1 }}>

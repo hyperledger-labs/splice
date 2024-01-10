@@ -1,10 +1,13 @@
 import * as React from 'react';
+import { Header } from 'common-frontend';
 
-import { Box } from '@mui/material';
+import { Box, Divider, Stack } from '@mui/material';
 import Container from '@mui/material/Container';
 
-import Header from './Header';
+import CurrentUser from './CurrentUser';
+import FeaturedAppRight from './FeaturedAppRight';
 import Hero from './Hero';
+import LogoutButton from './LogoutButton';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,7 +17,22 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   return (
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
       <Container maxWidth="xl">
-        <Header />
+        <Header
+          title="Canton Coin Wallet"
+          navLinks={[
+            { name: 'Transactions', path: 'transactions' },
+            { name: 'Transfer', path: 'transfer' },
+            { name: 'Subscriptions', path: 'subscriptions' },
+            { name: 'FAQs', path: 'faqs' },
+          ]}
+        >
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <CurrentUser key="current-user" />
+            <FeaturedAppRight key="featured-app-right" />
+            <Divider key="divider" orientation="vertical" variant="middle" flexItem />
+            <LogoutButton key="logout-button" />
+          </Stack>
+        </Header>
       </Container>
 
       <Container maxWidth="lg">

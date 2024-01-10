@@ -20,9 +20,10 @@ test('recent activity link from tab opens a tab', async () => {
   expect(href?.endsWith('recent-activity')).toBe(true);
 
   fireEvent.click(recentActivityLink);
-  expect(screen.getByTestId('activity-table')).toBeDefined();
+  const table = screen.getByTestId('activity-table');
+  expect(table).toBeDefined();
 
-  const rows = await screen.findAllByRole('row');
+  const rows = await within(table).findAllByRole('row');
   const firstRow = rows[1];
   expect(within(firstRow).getByText('Merge Fee Burn')).toBeDefined();
   expect(within(firstRow).getByText('0.03 CC')).toBeDefined();

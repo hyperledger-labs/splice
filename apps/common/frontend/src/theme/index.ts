@@ -1,4 +1,4 @@
-import 'common-typeface-termina';
+import 'common-typeface-termina/index.css';
 
 import { createTheme, TypographyStyle } from '@mui/material';
 

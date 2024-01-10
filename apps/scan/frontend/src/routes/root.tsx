@@ -1,9 +1,10 @@
-import * as React from 'react';
+import { Header, PollingStrategy } from 'common-frontend';
+import { useGetRoundOfLatestData } from 'common-frontend/scan-api';
+import React, { useMemo } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
-import { Grid, Tab, Tabs, Typography, Box } from '@mui/material';
+import { Grid, Tab, Tabs, Typography, Box, Stack } from '@mui/material';
 
-import Header from '../components/Header';
 import NetworkInfo from '../components/NetworkInfo';
 import TotalCoinBalance from '../components/TotalCoinBalance';
 import TotalRewards from '../components/TotalRewards';
@@ -20,10 +21,37 @@ const Root: React.FC = () => {
   const currentPath = useLocation().pathname;
   const selected = navLinks.find(({ path }) => currentPath.includes(path)) || navLinks[0];
 
+  const { data: latestRound, error } = useGetRoundOfLatestData(PollingStrategy.FIXED);
+
+  const round = useMemo(() => {
+    if (error) {
+      if (
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (error as any).code === 404 &&
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (error as any).body.error === 'No data has been made available yet'
+      ) {
+        // Backend is working, but no round data is available
+        return '??';
+      } else {
+        return '--';
+      }
+    }
+    return latestRound?.round || '--';
+  }, [latestRound, error]);
+
   return (
     <Grid container margin={4} pr={4} spacing={4} justifyContent="center" sx={{ width: 'auto' }}>
       <Grid item xs={12}>
-        <Header />
+        <Header noBorder title="Canton Coin Scan" titleVariant="h1">
+          <Stack direction="row" alignItems="center">
+            <div id="as-of-round">
+              <Typography variant="body2">
+                The content on this page is computed as of round: {round}
+              </Typography>
+            </div>
+          </Stack>
+        </Header>
       </Grid>
 
       <Grid item xs={12}>

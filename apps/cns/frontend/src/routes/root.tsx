@@ -1,7 +1,7 @@
-import { ErrorBoundary, Loading, PartyId, useUserState } from 'common-frontend';
+import { ErrorBoundary, Header, Loading, PartyId, useUserState } from 'common-frontend';
 import { Outlet } from 'react-router-dom';
 
-import { Box, Button, Toolbar, Typography } from '@mui/material';
+import { Box, Button, Stack } from '@mui/material';
 
 import { usePrimaryParty } from '../hooks/queries/usePrimaryParty';
 
@@ -13,25 +13,16 @@ const Root: React.FC = () => {
     <ErrorBoundary>
       <Box height="100%" sx={{ display: 'flex', flexDirection: 'column' }}>
         <Box bgcolor="colors.neutral.20">
-          <Toolbar>
-            <Typography
-              variant="h4"
-              textTransform="uppercase"
-              fontFamily={theme => theme.fonts.monospace.fontFamily}
-              fontWeight={theme => theme.fonts.monospace.fontWeight}
-              sx={{ flexGrow: 1 }}
-            >
-              Canton Name Service
-            </Typography>
-            {primaryPartyId && (
-              // Using a DirectoryEntry here seems a bit circular
-              <PartyId partyId={primaryPartyId} id="logged-in-user" />
-            )}
-
-            <Button color="inherit" onClick={logout} id="logout-button">
-              Log Out
-            </Button>
-          </Toolbar>
+          <Header title="Canton Name Service">
+            <Stack direction="row" alignItems="center" spacing={1}>
+              {primaryPartyId && ( // Using a DirectoryEntry here seems a bit circular
+                <PartyId partyId={primaryPartyId} id="logged-in-user" />
+              )}
+              <Button key="logout" color="inherit" onClick={logout} id="logout-button">
+                Log Out
+              </Button>
+            </Stack>
+          </Header>
         </Box>
         {primaryPartyId ? <Outlet /> : <Loading />}
       </Box>
