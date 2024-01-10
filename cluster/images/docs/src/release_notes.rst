@@ -8,6 +8,8 @@ Release Notes
 
 * Deployment:
 
+  * The SV-app helm chart now expects `scan.publicUrl` to be set to the URL of the Scan app.
+
   * The syntax of the Helm charts configuring persistence has been standardized through the different images.
     The provided snippet highlights the optional fields and its syntax.
     To find the expected values for each image, refer to the _required.yaml_ Helm files.::
@@ -34,13 +36,6 @@ Release Notes
 * Documentation:
 
     * Removed the section `Renaming an SV` in the page "Kubernetes-Based Deployment of a Super Validator node". Not longer possible through the JSON API.
-
-
-2024-01-08
-----------
-
-* Deployment:
-  * The SV-app helm chart now expects `scan.publicUrl` to be set to the URL of the Scan app.
 
 
 2024-01-08
