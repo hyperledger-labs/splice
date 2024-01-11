@@ -45,6 +45,7 @@ export async function installValidator1(
         basename: CLUSTER_BASENAME,
       },
     },
+    [],
     { dependsOn: [xns.ns] }
   );
 
@@ -58,29 +59,18 @@ export async function installValidator1(
     [loopback]
   );
 
-  installCNHelmChart(
-    xns,
-    'splitwell-web-ui',
-    'cn-splitwell-web-ui',
-    {},
-    {
-      dependsOn: [await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell')],
-    }
-  );
+  installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, [], {
+    dependsOn: [await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell')],
+  });
 
   const validatorPostgres = splitPostgresInstances
     ? postgres.installPostgres(xns, 'validator-pg', true)
     : participantPostgres;
 
   const validatorDbName = 'validator1';
-  const validatorDb = validatorPostgres.createDatabaseAndInstallMetrics(validatorDbName);
+  const validatorDb = validatorPostgres.createDatabase(validatorDbName);
 
-  const extraDependsOn: pulumi.Resource[] = [
-    svc,
-    participantPostgres,
-    validatorPostgres,
-    validatorDb,
-  ];
+  const extraDependsOn: pulumi.Resource[] = [svc, participantPostgres, validatorPostgres];
 
   return installValidatorApp({
     auth0Client,
@@ -107,5 +97,6 @@ export async function installValidator1(
     participantAddress: 'participant',
     topupConfig,
     svValidator: false,
+    validatorDb,
   });
 }

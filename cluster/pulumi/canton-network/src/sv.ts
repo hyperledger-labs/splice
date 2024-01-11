@@ -215,6 +215,7 @@ export async function installSvNode(
         svNamespace: xns.logicalName,
       },
     },
+    [],
     { dependsOn: [xns.ns] }
   );
 
@@ -234,7 +235,7 @@ export async function installSvNode(
     ? postgres.installPostgres(xns, 'scan-pg', true)
     : sequencerPostgres;
   const scanDbName = `scan_${sanitizedForPostgres(config.nodename)}`;
-  const scanDb = scanAppPostgres.createDatabaseAndInstallMetrics(scanDbName);
+  const scanDb = scanAppPostgres.createDatabase(scanDbName);
   const scanValues = {
     clusterUrl,
     metrics: {
@@ -246,15 +247,15 @@ export async function installSvNode(
     init: initDb && { initDb },
     participantAddress,
   };
-  installCNHelmChart(xns, 'scan', 'cn-scan', scanValues, {
-    dependsOn: [svApp, scanAppPostgres, scanDb, globalDomain],
+  installCNHelmChart(xns, 'scan', 'cn-scan', scanValues, [scanDb], {
+    dependsOn: [svApp, globalDomain],
   });
 
   const validatorPostgres = config.splitPostgresInstances
     ? postgres.installPostgres(xns, 'validator-pg', true)
     : sequencerPostgres;
   const validatorDbName = `validator_${sanitizedForPostgres(config.nodename)}`;
-  const validatorDb = validatorPostgres.createDatabaseAndInstallMetrics(validatorDbName);
+  const validatorDb = validatorPostgres.createDatabase(validatorDbName);
 
   await installValidatorApp({
     auth0Client: config.auth0Client,
@@ -272,9 +273,10 @@ export async function installSvNode(
           }
         : undefined,
     persistenceConfig: persistenceConfig(validatorPostgres, validatorDbName),
-    extraDependsOn: [svApp, validatorPostgres, validatorDb],
+    extraDependsOn: [svApp, validatorPostgres],
     svValidator: true,
     participantAddress,
+    validatorDb,
   });
 
   return { svApp, sequencerPostgres: sequencerPostgres };
@@ -341,7 +343,7 @@ function installSvApps(
       ? postgres.installPostgres(xns, `sv-app-${id}-pg`, true)
       : defaultPostgres;
     const svAppName = sanitizedForPostgres(`${config.nodename}-${id}`);
-    const svDb = svAppPostgres.createDatabaseAndInstallMetrics(svAppName);
+    const svDb = svAppPostgres.createDatabase(svAppName);
 
     const svValues = {
       domainId: id.toString(),
@@ -401,8 +403,8 @@ function installSvApps(
       };
     }
 
-    return installCNHelmChart(xns, `sv-app-${id}`, 'cn-sv-node', svValues, {
-      dependsOn: dependsOn.concat([participant, svAppPostgres, svDb, globalDomain]),
+    return installCNHelmChart(xns, `sv-app-${id}`, 'cn-sv-node', svValues, [svDb], {
+      dependsOn: dependsOn.concat([participant, svAppPostgres, globalDomain]),
     });
   };
   return installDomainSpecificComponent(

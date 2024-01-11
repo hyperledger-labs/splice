@@ -2,9 +2,10 @@ import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
 import { Release } from '@pulumi/kubernetes/helm/v3';
-import { CustomResourceOptions } from '@pulumi/pulumi';
 import {
   clusterLargeDisk,
+  CNCustomResourceOptions,
+  Database,
   envFlag,
   ExactNamespace,
   installCNHelmChart,
@@ -51,7 +52,7 @@ export interface Postgres extends pulumi.Resource {
   readonly address: pulumi.Output<string>;
   readonly secretName: string;
 
-  createDatabaseAndInstallMetrics: (name: string, opts?: CustomResourceOptions) => pulumi.Resource;
+  createDatabase: (name: string, opts?: CNCustomResourceOptions) => Database;
 }
 
 class CloudPostgres extends pulumi.ComponentResource implements Postgres {
@@ -102,7 +103,8 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
 
     this.address = this.pgSvc.privateIpAddress;
 
-    const pgDB = this.createDatabaseAndInstallMetrics('cantonnet');
+    const { db: pgDB, installMetrics } = this.createDatabase('cantonnet');
+    installMetrics([]);
 
     const password = generatePassword(`${logicalName}-passwd`, { parent: this }).result;
     const passwordSecret = installPostgresPasswordSecret(xns, password, this.secretName);
@@ -127,7 +129,7 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
     });
   }
 
-  createDatabaseAndInstallMetrics(name: string, opts?: CustomResourceOptions): pulumi.Resource {
+  createDatabase(name: string, opts?: CNCustomResourceOptions): Database {
     const db = new gcp.sql.Database(
       `${this.namespace.logicalName}-db-${this.name}-${name}`,
       {
@@ -142,20 +144,24 @@ class CloudPostgres extends pulumi.ComponentResource implements Postgres {
         ...opts,
       }
     );
-    installCNHelmChart(
-      this.namespace,
-      `${this.name}-${sanitizedForHelm(name)}-e`,
-      'cn-postgres-metrics',
-      {
-        persistence: {
-          host: this.address,
-          databaseName: name,
-          secretName: this.secretName,
-        },
-      },
-      { ...{ dependsOn: [db] }, ...opts }
-    );
-    return db;
+    return {
+      db,
+      installMetrics: (dependsOn: pulumi.Input<pulumi.Resource>[]) =>
+        installCNHelmChart(
+          this.namespace,
+          `${this.name}-${sanitizedForHelm(name)}-e`,
+          'cn-postgres-metrics',
+          {
+            persistence: {
+              host: this.address,
+              databaseName: name,
+              secretName: this.secretName,
+            },
+          },
+          [],
+          { ...{ dependsOn: [db, ...dependsOn] }, ...opts }
+        ),
+    };
   }
 }
 
@@ -190,6 +196,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
           secretName: this.secretName,
         },
       },
+      [],
       { dependsOn: [passwordSecret] }
     );
     this.pg = pg;
@@ -200,22 +207,26 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
     });
   }
 
-  createDatabaseAndInstallMetrics(name: string, opts?: CustomResourceOptions): pulumi.Resource {
+  createDatabase(name: string, opts?: CNCustomResourceOptions): Database {
     // when using CNPostgres, apps are expected to create their own database in init containers
-    installCNHelmChart(
-      this.namespace,
-      `${this.name}-${sanitizedForHelm(name)}-e`,
-      'cn-postgres-metrics',
-      {
-        persistence: {
-          host: this.address,
-          databaseName: name,
-          secretName: this.secretName,
-        },
-      },
-      { ...{ dependsOn: [this.pg] }, ...opts }
-    );
-    return this; // don't return the metrics, because that's a circular dependency
+    return {
+      db: this,
+      installMetrics: (dependsOn: pulumi.Input<pulumi.Resource>[]) =>
+        installCNHelmChart(
+          this.namespace,
+          `${this.name}-${sanitizedForHelm(name)}-e`,
+          'cn-postgres-metrics',
+          {
+            persistence: {
+              host: this.address,
+              databaseName: name,
+              secretName: this.secretName,
+            },
+          },
+          [],
+          { ...{ dependsOn: [this.pg, ...dependsOn] }, ...opts }
+        ),
+    };
   }
 }
 

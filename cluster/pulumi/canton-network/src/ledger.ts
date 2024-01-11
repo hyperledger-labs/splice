@@ -15,7 +15,7 @@ export function installParticipant(
   dependsOn: pulumi.Resource[] = []
 ): Release {
   const pgName = sanitizedForPostgres(name);
-  const postgresDb = postgres.createDatabaseAndInstallMetrics(pgName);
+  const postgresDb = postgres.createDatabase(pgName);
 
   const initDb = initDatabase();
   return installCNHelmChart(
@@ -37,8 +37,9 @@ export function installParticipant(
       additionalJvmOptions: jmxOptions(),
       init: initDb && { initDb },
     },
+    [postgresDb],
     {
-      dependsOn: dependsOn.concat([postgresDb]),
+      dependsOn,
     }
   );
 }

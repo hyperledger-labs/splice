@@ -3,6 +3,7 @@ import * as pulumi from '@pulumi/pulumi';
 import { Output } from '@pulumi/pulumi';
 import {
   CnInput,
+  Database,
   installAuth0Secret,
   installAuth0UISecret,
   installCNHelmChart,
@@ -57,6 +58,7 @@ export type ValidatorConfig = {
   participantBootstrapDump?: BootstrappingDumpConfig;
   svValidator?: boolean;
   participantAddress: Output<string> | string;
+  validatorDb: Database;
 };
 
 export async function installValidatorApp(config: ValidatorConfig): Promise<pulumi.Resource> {
@@ -136,6 +138,7 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       init: initDb && { initDb },
       additionalJvmOptions: jmxOptions(),
     },
+    [config.validatorDb],
     { dependsOn }
   );
 }

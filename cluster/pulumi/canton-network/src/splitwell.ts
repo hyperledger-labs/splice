@@ -49,6 +49,7 @@ export async function installSplitwell(
         basename: CLUSTER_BASENAME,
       },
     },
+    [],
     { dependsOn: [xns.ns] }
   );
 
@@ -80,6 +81,7 @@ export async function installSplitwell(
         enable: true,
       },
     },
+    [],
     { dependsOn: [svc, participant] }
   );
 
@@ -87,12 +89,11 @@ export async function installSplitwell(
     ? postgres.installPostgres(xns, 'validator-pg', true)
     : domainPostgres;
   const validatorDbName = 'val_splitwell';
-  const validatorDb = validatorPostgres.createDatabaseAndInstallMetrics(validatorDbName);
+  const validatorDb = validatorPostgres.createDatabase(validatorDbName);
 
   const extraDependsOn = [
     svc,
     await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell'),
-    validatorDb,
   ];
 
   return installValidatorApp({
@@ -128,6 +129,7 @@ export async function installSplitwell(
       user: pulumi.Output.create('cnadmin'),
       port: pulumi.Output.create(5432),
     },
+    validatorDb,
   });
 }
 
@@ -135,10 +137,10 @@ function installDomain(xns: ExactNamespace, name: string, postgres: Postgres): p
   const sanitizedName = sanitizedForPostgres(name);
 
   const mediatorDbName = `${sanitizedName}_mediator`;
-  const mediatorDb = postgres.createDatabaseAndInstallMetrics(mediatorDbName);
+  const mediatorDb = postgres.createDatabase(mediatorDbName);
 
   const sequencerDbName = `${sanitizedName}_sequencer`;
-  const sequencerDb = postgres.createDatabaseAndInstallMetrics(sequencerDbName);
+  const sequencerDb = postgres.createDatabase(sequencerDbName);
 
   const initDb = initDatabase();
 
@@ -164,8 +166,6 @@ function installDomain(xns: ExactNamespace, name: string, postgres: Postgres): p
       additionalJvmOptions: jmxOptions(),
       init: initDb && { initDb },
     },
-    {
-      dependsOn: [mediatorDb, sequencerDb],
-    }
+    [mediatorDb, sequencerDb]
   );
 }

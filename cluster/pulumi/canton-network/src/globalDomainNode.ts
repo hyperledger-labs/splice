@@ -87,12 +87,12 @@ export class GlobalDomainNode extends ComponentResource {
     const sanitizedName = this.name.replaceAll('-', '_');
 
     const mediatorDbName = `${sanitizedName}_mediator`;
-    const mediatorDb = mediatorPostgres.createDatabaseAndInstallMetrics(mediatorDbName, {
+    const mediatorDb = mediatorPostgres.createDatabase(mediatorDbName, {
       parent: this,
     });
 
     const sequencerDbName = `${sanitizedName}_sequencer`;
-    const sequencerDb = sequencerPostgres.createDatabaseAndInstallMetrics(sequencerDbName, {
+    const sequencerDb = sequencerPostgres.createDatabase(sequencerDbName, {
       parent: this,
     });
     const cometBftService = installCometBftNode(
@@ -139,7 +139,8 @@ export class GlobalDomainNode extends ComponentResource {
         disableAutoInit: disableAutoInit,
         init: initDb && { initDb },
       },
-      { dependsOn: [mediatorDb, sequencerDb, cometBftService], parent: this }
+      [mediatorDb, sequencerDb],
+      { dependsOn: [cometBftService], parent: this }
     );
     installCNHelmChart(
       xns,
@@ -162,6 +163,7 @@ export class GlobalDomainNode extends ComponentResource {
           svNamespace: xns.logicalName,
         },
       },
+      [],
       { dependsOn: [xns.ns, domainNodeRelease], parent: this }
     );
   }
