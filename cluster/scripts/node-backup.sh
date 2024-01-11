@@ -138,6 +138,8 @@ function backup_postgres() {
     backup_pvc_postgres "$description" "$namespace" "$instance"
   elif [ "$type" == "canton:cloud:postgres" ]; then
     backup_cloudsql "$description" "$full_instance"
+  elif [ -z "$type" ]; then
+    _error "No postgres instance $full_instance found. Is the cluster deployed with split DB instances?"
   else
     _error "Unknown postgres type: $type"
   fi
@@ -169,10 +171,10 @@ function backup_component() {
   local requested_component=$3
 
   if [ "$component" == "$requested_component" ] || [ -z "$requested_component" ]; then
-    if [ "$component" == "cometbft" ]; then
+    if [ "$component" == "cometbft-0" ]; then
       # TODO(#8920): replace the hard-coded "cometbft-data" with the actual pvc currently in use by the pod
       # (it might have been changed manually, e.g. if already recovered from backup)
-      backup_pvc "cometBFT" "$namespace" "cometbft-data"
+      backup_pvc "cometBFT" "$namespace" "global-domain-0-cometbft-cometbft-data"
     else
       backup_postgres "$component" "$namespace" "$component-pg"
     fi
@@ -187,10 +189,10 @@ function wait_for_backup() {
   local requested_component=$3
 
   if [ "$component" == "$requested_component" ] || [ -z "$requested_component" ]; then
-    if [ "$component" == "cometbft" ]; then
+    if [ "$component" == "cometbft-0" ]; then
       # TODO(#8920): replace the hard-coded "cometbft-data" with the actual pvc currently in use by the pod
       # (it might have been changed manually, e.g. if already recovered from backup)
-      wait_for_pvc_backup "cometBFT" "$namespace" "cometbft-data"
+      wait_for_pvc_backup "cometBFT" "$namespace" "global-domain-0-cometbft-cometbft-data"
     else
       wait_for_postgres_backup "$component" "$namespace" "$component-pg"
     fi
@@ -212,6 +214,8 @@ function main() {
   local namespace=$2
   local requested_component="${3:-}"
 
+  # TODO(#8920): support multiple domains / non-default-ID'd ones
+
   if [ "$1" == "validator" ]; then
     _info "Backing up validator $namespace"
     backup_component "$namespace" "validator" "$requested_component"
@@ -224,28 +228,28 @@ function main() {
 
     backup_component "$namespace" "validator" "$requested_component"
     backup_component "$namespace" "scan" "$requested_component"
-    backup_component "$namespace" "sv" "$requested_component"
+    backup_component "$namespace" "sv-app-0" "$requested_component"
     backup_component "$namespace" "mediator" "$requested_component"
     backup_component "$namespace" "sequencer" "$requested_component"
-    backup_component "$namespace" "cometbft" "$requested_component"
+    backup_component "$namespace" "cometbft-0" "$requested_component"
 
     wait_for_backup "$namespace" "validator" "$requested_component"
     wait_for_backup "$namespace" "scan" "$requested_component"
-    wait_for_backup "$namespace" "sv" "$requested_component"
+    wait_for_backup "$namespace" "sv-app-0" "$requested_component"
 
     # CN apps must be strictly before participant, so we sync on apps before starting the participant backup
-    backup_component "$namespace" "participant" "$requested_component"
+    backup_component "$namespace" "participant-0" "$requested_component"
 
-    wait_for_backup "$namespace" "participant" "$requested_component"
+    wait_for_backup "$namespace" "participant-0" "$requested_component"
     wait_for_backup "$namespace" "mediator" "$requested_component"
     wait_for_backup "$namespace" "sequencer" "$requested_component"
-    wait_for_backup "$namespace" "cometbft" "$requested_component"
+    wait_for_backup "$namespace" "cometbft-0" "$requested_component"
   else
     usage
     exit 1
   fi
 
-  _info "Completed all backups, RUN_ID = $RUN_ID"
+  _info "Completed all backups for namespace $namespace, RUN_ID = $RUN_ID"
 }
 
 main "$@"

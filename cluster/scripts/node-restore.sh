@@ -8,12 +8,13 @@ set -euo pipefail
 source "${TOOLS_LIB}/libcli.source"
 
 declare -A component_to_deployment
-component_to_deployment["sequencer"]="global-domain-default-sequencer"
-component_to_deployment["mediator"]="global-domain-default-mediator"
+component_to_deployment["sequencer"]="global-domain-0-sequencer"
+component_to_deployment["mediator"]="global-domain-0-mediator"
 component_to_deployment["participant"]="participant"
-component_to_deployment["cometbft"]="cometbft"
+component_to_deployment["participant-0"]="participant-0"
+component_to_deployment["cometbft-0"]="global-domain-0-cometbft"
 component_to_deployment["validator"]="validator-app"
-component_to_deployment["sv"]="sv-app"
+component_to_deployment["sv-app-0"]="sv-app-0"
 component_to_deployment["scan"]="scan-app"
 
 
@@ -66,8 +67,10 @@ EOF
 function use_restored_pvc_in_cometbft() {
   local -r pvc_name=$1
 
+  local -r component="cometbft-0"
+
   _info "Patching cometbft deployment to use the restored PVC $pvc_name"
-  kubectl patch -n "$namespace" deployment cometbft --patch-file /dev/stdin <<EOF
+  kubectl patch -n "$namespace" deployment "${component_to_deployment[$component]}" --patch-file /dev/stdin <<EOF
 spec:
   template:
     spec:
@@ -182,10 +185,10 @@ function restore_cloudsql_postgres() {
 function restore_component() {
   local -r component=$1
 
-  if [ "$component" == "cometbft" ]; then
+  if [ "$component" == "cometbft-0" ]; then
     _info "Restoring cometbft"
-    create_pvc_from_snapshot "cometbft-data-$run_id" "cometbft-data-$run_id-restore"
-    use_restored_pvc_in_cometbft "cometbft-data-$run_id-restore"
+    create_pvc_from_snapshot "global-domain-0-cometbft-cometbft-data-$run_id" "global-domain-0-cometbft-cometbft-data-$run_id-restore"
+    use_restored_pvc_in_cometbft "global-domain-0-cometbft-cometbft-data-$run_id-restore"
   else
     _info "Restoring $component"
     type=$(get_postgres_type "$namespace-$component-pg")

@@ -1844,6 +1844,36 @@ function _get_preflight_test_names() {
   awk '{print $1}' "$REPO_ROOT"/"$tests_filename" | paste -s -d' ' -
 }
 
+###
+
+subcommand_whitelist[backup_nodes]='Backup one or more CN nodes in the cluster'
+
+function subcmd_backup_nodes() {
+    _cluster_must_exist
+
+    if [ $# -eq 0 ]; then
+        nodes="sv-1 sv-2 sv-3 sv-4 validator1 splitwell"
+    else
+        nodes="$*"
+    fi
+
+    for node in $nodes; do
+        case "$node" in
+            sv-1|sv-2|sv-3|sv-4)
+                _info "Backing up sv node $node"
+                "$REPO_ROOT"/cluster/scripts/node-backup.sh sv "$node"
+                ;;
+            validator1|splitwell)
+                _info "Backing up validator node $node"
+                "$REPO_ROOT"/cluster/scripts/node-backup.sh validator "$node"
+                ;;
+            *)
+                _error "Unknown node $node"
+                ;;
+        esac
+    done
+}
+
 ################################
 ### Main
 ################################

@@ -74,6 +74,7 @@
   - [Testing](#testing)
     - [Writing Tests against different Clusters](#writing-tests-against-different-clusters)
     - [Patching healthchecks against a deployed cluster](#patching-healthchecks-against-a-deployed-cluster)
+  - [Backup and Recovery](#backup-and-recovery)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -1704,6 +1705,73 @@ diff --git a/cluster/helm/cn-cometbft/templates/partials/_json-configs.tpl b/clu
    "consensus_params": {
      "block": {
 ```
+
+## Backup and Recovery
+
+On most clusters, especially the long-running ones, all persistent storage is backed up
+regularly, and we maintain a restore script for restoring from backup in case of data
+corruption, or other unrecoverable state. CloudSQL instances are also configured to support
+point-in-time recovery for finer granularity, but our scripts are not currently designed to  use that.
+
+Note that there are certain ordering requirements on backups, which are all addressed
+automatically in our scripts.
+
+### Backup
+
+The [node-backup.sh script](scripts/node-backup.sh) can back up one or more components in a
+node (where a "node" in this context is a single SV or a single validator). It produces a set
+of backups of all relevant persistent storage, identified by a RUN_ID. These backups are
+guaranteed to be consistent in terms of ordering requirements.
+
+This script can also be invoked from `cncluster` through `cnsluster backup_nodes <node...>`, where node can be one (or more) of {sv-1, sv-2, sv-3, sv-4, validator1, splitwell}.
+
+For every node, at the end of the backup process, the script will report something like:
+```
+Info: Completed all backups for namespace sv-3, RUN_ID = 1704915116
+```
+
+This RUN_ID is an identifier of the backup run, and can later be used for restoring backups.
+
+cidaily, (and soon cidaily-testnet, cilr, devnet and testnet) are backed up periodically through CircleCI, where the RUN_IDs of the latest backup can be found.
+
+### Restore
+
+Backups created through `node-backup.sh` (or the corresponding `cncluster backup_nodes`
+command) can be used for recovery using the `node-restore.sh` command.
+
+To do that, run: `node-backup.sh <node> <run_id> <component...>`, where `component` can be one
+or more out of {validator, participant} for a validator and one or more out of
+{validator, scan, sv, participant-0, mediator, sequencer, cometbft-0} for an SV.
+
+While the script will currently allow any subset of components to be specified, it is highly
+advisable to always recover all layers above any component that is being recovered.
+
+Specifically, the following dependencies should be followed:
+```
+cometbft -> sequencer -> mediator
+                      \
+                       -> participant -> {validator, sv, scan}
+```
+
+Current caveats:
+- Currently, Pulumi will not be aware of any changes performed by the recovery script,
+  so Pulumi commands applied to the same cluster at a later point will most probably go wrong
+  in many ways.
+- Command deduplication on the participant may break after a recovery. Avoiding that is WIP,
+  and will be fixed in the future by placing the apps in read-only mode for a while after
+  recovering (until observing a "far enough" offset from the participant).
+- While a component is catching up on everything that happened after the point of recovery,
+  it will typically report healthy, but in fact will be busy catching up.
+  - To see the latest block known to the CometBFT node, browse to the SV UI, navigate to
+    the CometBFT debug info tab, and inspect the last_block_height. You can compare the height
+    of the recovering node to that observed in other SVs.
+  - To see the latest block handled by the sequencer, search for log messages containing
+    "Handle block with height" in the sequencer's output.
+  - The mediator and participant expose a `canton.<component>.sequencer-client.delay` metric,
+    which compares the sequencing time of the latest processed sequencer message with the local
+    clock of the component. High values of this metric indicate that this component is catching
+    up. In a coming Canton upgrade, the sequencer will be reporting that metric for itself as
+    well, which could be used to detect that the sequencer itself is catching up.
 
 ## Appendix: Kubernetes and Other Deployment Resources
 

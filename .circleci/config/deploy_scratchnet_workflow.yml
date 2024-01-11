@@ -84,6 +84,15 @@
           cluster: "_CLUSTERNAME_"
           requires:
             - hold
+      - backup_cluster:
+          <<: *main-branch-never
+          cluster: "_CLUSTERNAME_"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
       - reset_cluster:
           <<: *main-branch-never
           cluster: "_CLUSTERNAME_"

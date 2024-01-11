@@ -46,6 +46,7 @@ parameters:
         redeploy-sv-runbook-cidaily,
         redeploy-sv-runbook-cilr,
         redeploy-sv-runbook-devnet,
+        backup-cidaily,
         publish-public-artifacts,
         auth0-user-cleanup,
         cluster-lock-reaper,
@@ -1423,6 +1424,8 @@ jobs:
                 exit 1
               fi
             fi
+            # All CI-deployed clusters use split postgres instances per app, to support backups.
+            export SPLIT_POSTGRES_INSTANCES=1
             cncluster activate
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
@@ -1993,6 +1996,40 @@ jobs:
             .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
               "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
               << parameters.max_pipeline_age_secs >> cancel_pipeline
+
+  backup_cluster:
+    parameters:
+      <<: *cluster-parameter
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    parallelism: 3
+    steps:
+      - checkout
+      - setup_vpn
+      - setup_nix
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run:
+          # TODO(#9267): testnet-like clusters do not have SVs 2-4.
+          name: Split backup tasks
+          command: |
+            echo "sv-1 sv-2 sv-3 sv-4 validator1 splitwell" | circleci tests run --command "xargs ./.circleci/grab-tests.sh"
+            echo "Nodes to backup: $(cat tests-to-run.txt)"
+      - run_bash_command_in_nix:
+          cmd_name: Backup nodes
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            # We use readiness of validator-app as an approximation to the node's readiness
+            for ns in $(cat tests-to-run.txt); do
+              cncluster wait $ns validator-app
+            done
+            cncluster backup_nodes $(cat tests-to-run.txt)
 
   preflight_check:
     parameters:
@@ -2612,6 +2649,15 @@ workflows:
           - slack-context
         requires:
           - wait_for_previous_pipeline
+    - backup_cluster:
+        <<: *main-branch-only
+        cluster: "cimain"
+        context:
+          - artifactory
+          - canton-network-vpn
+          - slack-context
+        requires:
+          - deploy_cluster
 
   deploy_cidaily_and_cidaily_testnet:
     when:
@@ -3308,6 +3354,34 @@ workflows:
           requires:
             - deploy_sv_runbook
 
+  backup_cidaily:
+    when:
+      equal: [ backup-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily_and_cidaily_testnet"
+      - backup_cluster:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          cluster: "cidaily"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+
   auth0_user_cleanup:
     when:
       equal: [ auth0-user-cleanup, << pipeline.parameters.run-job >> ]
@@ -3423,6 +3497,15 @@ workflows:
           cluster: "scratchneta"
           requires:
             - hold
+      - backup_cluster:
+          <<: *main-branch-never
+          cluster: "scratchneta"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchneta"
@@ -3519,6 +3602,15 @@ workflows:
           cluster: "scratchnetb"
           requires:
             - hold
+      - backup_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnetb"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetb"
@@ -3615,6 +3707,15 @@ workflows:
           cluster: "scratchnetc"
           requires:
             - hold
+      - backup_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnetc"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetc"
@@ -3711,6 +3812,15 @@ workflows:
           cluster: "scratchnetd"
           requires:
             - hold
+      - backup_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnetd"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetd"
@@ -3807,6 +3917,15 @@ workflows:
           cluster: "scratchnete"
           requires:
             - hold
+      - backup_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnete"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnete"
