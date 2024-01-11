@@ -18,7 +18,7 @@ spec:
         app: {{ .Release.Name }}-mediator
     spec:
       containers:
-      - name: {{ .Release.Name }}-mediator
+      - name: mediator
         image: "{{ .Values.imageRepo }}/canton-mediator:{{ .Values.cluster.imageTag }}"
         env:
         - name: JAVA_TOOL_OPTIONS
@@ -60,7 +60,7 @@ spec:
       restartPolicy: Always
       {{- if .Values.init }}
       initContainers:
-        - name: {{ .Release.Name }}-init
+        - name: pg-init
           image: postgres:14
           env:
             - name: PGPASSWORD

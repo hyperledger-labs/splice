@@ -18,7 +18,7 @@ spec:
         app: {{ .Release.Name }}
     spec:
       containers:
-      - name: {{ .Release.Name }}
+      - name: participant
         image: "{{ .Values.imageRepo }}/canton-participant:{{ .Values.cluster.imageTag }}"
         imagePullPolicy: Always
         env:
@@ -92,7 +92,7 @@ spec:
         {{- end }}
       {{- if .Values.init }}
       initContainers:
-        - name: {{ .Release.Name }}-init
+        - name: pg-init
           image: postgres:14
           env:
             - name: PGPASSWORD

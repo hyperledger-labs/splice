@@ -18,7 +18,7 @@ spec:
         app: {{ .Release.Name }}-sequencer
     spec:
       containers:
-        - name: {{ .Release.Name }}-sequencer
+        - name: sequencer
         {{- if eq .Values.sequencer.driver.type "cometbft"}}
           image: "{{ .Values.imageRepo }}/canton-cometbft-sequencer:{{ .Values.cluster.imageTag }}"
         {{- else}}
@@ -91,7 +91,7 @@ spec:
       restartPolicy: Always
       {{- if .Values.init }}
       initContainers:
-        - name: {{ .Release.Name }}-init
+        - name: pg-init
           image: postgres:14
           env:
             - name: PGPASSWORD

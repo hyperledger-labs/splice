@@ -376,34 +376,31 @@ function subcmd_rlogs() {
         _error "No app specified"
     fi
 
+    _cluster_must_exist
+
     namespace=$1
     app=$2
-    domain_suffixed_app=""
+    domain=${3:-0}
+    app_container="$app"
 
-    if [ -z "${3-}" ]; then
-      domain_suffixed_app="${app}"
-    else
-      domain_suffixed_app="${app}-$3"
-    fi
-
-    _cluster_must_exist
+    k8s_labels_for_app
 
     if POD_SPEC=$(kubectl get pod \
                           -n "${namespace}" \
-                          -l app="${domain_suffixed_app}" \
+                          -l app="${app}" \
                           -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
                           2> /dev/null); then
 
 
         if [ -n "${raw-}" ] ; then
             # shellcheck disable=SC2086
-            kubectl logs ${POD_SPEC} "${app}" -f
+            kubectl logs ${POD_SPEC} "${app_container}" -f
         else
             # shellcheck disable=SC2086
-            kubectl logs ${POD_SPEC} "${app}" -f | _json_log_format
+            kubectl logs ${POD_SPEC} "${app_container}" -f | _json_log_format
         fi
     else
-        _error "No pod for app found: ${domain_suffixed_app}"
+        _error "No pod for app found: ${app}"
     fi
 }
 
@@ -412,38 +409,52 @@ function subcmd_rlogs() {
 subcommand_whitelist[logs]='View an running application log stream in lnav'
 
 function subcmd_logs() {
-    if [ -z "${1-}" ]; then
-        _error "No namespace specified"
-    fi
 
-    if [ -z "${2-}" ]; then
-        _error "No app specified"
-    fi
-
-    namespace=$1
-    app=$2
-    domain_suffixed_app=""
-
-    if [ -z "${3-}" ]; then
-      domain_suffixed_app="${app}"
-    else
-      domain_suffixed_app="${app}-$3"
+    if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+       echo "Usage: $0 <namespace> <app> [domain]"
+       exit 1
     fi
 
     _cluster_must_exist
 
+    namespace=$1
+    app=$2
+
+    domain=${3:-0}
+
+    app_container="$app"
+
+    k8s_labels_for_app
+
     if POD_SPEC=$(kubectl get pod \
                           -n "${namespace}" \
-                          -l app="${domain_suffixed_app}" \
+                          -l app="${app}" \
                           -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
                           2> /dev/null); then
 
         LOGFILE=$(mktemp cnlogXXXXXXX.clog)
         # shellcheck disable=SC2086
-        (kubectl logs ${POD_SPEC} "${app}" -f >> "${LOGFILE}" & lnav "${LOGFILE}")
+        (kubectl logs ${POD_SPEC} "${app_container}" -f >> "${LOGFILE}" & lnav "${LOGFILE}")
         rm "${LOGFILE}"
     else
-        _error "No pod for app found: ${domain_suffixed_app}"
+        _error "No pod for app found: ${app}"
+    fi
+}
+
+
+function k8s_labels_for_app() {
+    local non_domain_specific_namespaces=("sv" "validator1" "splitwell")
+    local global_domain_specific_apps=("global-domain-cometbft" "global-domain-sequencer" "global-domain-mediator")
+    local domain_specific_apps=("participant" "sv-app")
+
+    # shellcheck disable=SC2076
+    if [[ " ${global_domain_specific_apps[*]} " =~ " ${app} " && ! " ${non_domain_specific_namespaces[*]} " =~ " ${namespace} " ]]; then
+       # If the app is in the list, append the domain to the app
+       app_container=${app#"global-domain-"}
+       app="global-domain-${domain}-${app#"global-domain-"}"
+    elif [[ " ${domain_specific_apps[*]} " =~ " ${app} " && ! " ${non_domain_specific_namespaces[*]} " =~ " ${namespace} " ]]; then
+       # If the app is in the list, append the domain to the app
+       app="${app}-${domain}"
     fi
 }
 
