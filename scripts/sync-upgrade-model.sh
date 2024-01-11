@@ -7,22 +7,16 @@ cd "$REPO_ROOT"
 # This is effectively git rebase without a git repo.
 sync_project() {
   local project_name="$1"
-  git apply "$REPO_ROOT/daml/upgrade-diffs/$project.diff" --directory daml -p 2 -R
+  git apply "$REPO_ROOT/daml/upgrade-diffs/$project.diff" -p 0 -R
   rsync -av --delete "daml/${project_name}/" "daml/${project_name}-upgrade"
   # Proceed on rejection to ensure all projects are synced, and the `wiggle` CLI tool can be used afterwards to resolve the rejections
-  git apply "$REPO_ROOT/daml/upgrade-diffs/$project.diff" --directory daml -p 2 --reject || true
+  git apply "$REPO_ROOT/daml/upgrade-diffs/$project.diff" -p 0 --reject || true
 }
 
-projects=(
-    canton-coin
-    wallet
-    wallet-payments
-    svc-governance
-    canton-name-service
-    splitwell
-)
+readarray -t projects < <(./scripts/lib/get-upgraded-daml-projects.sh)
 
 for project in "${projects[@]}"; do
+    echo "Syncing $project..."
     sync_project "$project"
 done
 

@@ -1,6 +1,6 @@
-diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Coin.daml ../daml/canton-coin-upgrade/daml/CC/Coin.daml
---- ../daml/canton-coin/daml/CC/Coin.daml
-+++ ../daml/canton-coin-upgrade/daml/CC/Coin.daml
+diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/Coin.daml daml/canton-coin-upgrade/daml/CC/Coin.daml
+--- daml/canton-coin/daml/CC/Coin.daml
++++ daml/canton-coin-upgrade/daml/CC/Coin.daml
 @@ -35,6 +35,7 @@
      svc : Party
      owner : Party
@@ -9,9 +9,9 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/Coin.daml
    where
      signatory svc, owner
      ensure validExpiringAmount amount
-diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/CoinImport.daml ../daml/canton-coin-upgrade/daml/CC/CoinImport.daml
---- ../daml/canton-coin/daml/CC/CoinImport.daml
-+++ ../daml/canton-coin-upgrade/daml/CC/CoinImport.daml
+diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinImport.daml daml/canton-coin-upgrade/daml/CC/CoinImport.daml
+--- daml/canton-coin/daml/CC/CoinImport.daml
++++ daml/canton-coin-upgrade/daml/CC/CoinImport.daml
 @@ -39,6 +39,7 @@
                svc = svc
                owner = receiver
@@ -20,9 +20,9 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/CoinImpor
              return $ Some CoinCreateSummary with
                coin = coinCid
                -- NOTE: this price is not the price at which the original coin was created.
-diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/CoinRules.daml ../daml/canton-coin-upgrade/daml/CC/CoinRules.daml
---- ../daml/canton-coin/daml/CC/CoinRules.daml
-+++ ../daml/canton-coin-upgrade/daml/CC/CoinRules.daml
+diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.daml daml/canton-coin-upgrade/daml/CC/CoinRules.daml
+--- daml/canton-coin/daml/CC/CoinRules.daml
++++ daml/canton-coin-upgrade/daml/CC/CoinRules.daml
 @@ -33,6 +33,7 @@
      svc : Party
      configSchedule : Schedule Time (CoinConfig USD)
@@ -85,9 +85,9 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml/CC/CoinRules
    deriving (Show, Eq)
  
  -- | Summary of input and output amounts and fees paid.
-diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin/daml.yaml ../daml/canton-coin-upgrade/daml.yaml
---- ../daml/canton-coin/daml.yaml
-+++ ../daml/canton-coin-upgrade/daml.yaml
+diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml.yaml daml/canton-coin-upgrade/daml.yaml
+--- daml/canton-coin/daml.yaml
++++ daml/canton-coin-upgrade/daml.yaml
 @@ -6,7 +6,7 @@
  sdk-version: 2.9.0-snapshot.20231221.12524.0.vc998203f
  name: canton-coin

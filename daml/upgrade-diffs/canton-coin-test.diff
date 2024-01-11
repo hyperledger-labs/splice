@@ -1,6 +1,6 @@
-diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scripts/TestCoinImport.daml ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestCoinImport.daml
---- ../daml/canton-coin-test/daml/CC/Scripts/TestCoinImport.daml
-+++ ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestCoinImport.daml
+diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts/TestCoinImport.daml daml/canton-coin-test-upgrade/daml/CC/Scripts/TestCoinImport.daml
+--- daml/canton-coin-test/daml/CC/Scripts/TestCoinImport.daml
++++ daml/canton-coin-test-upgrade/daml/CC/Scripts/TestCoinImport.daml
 @@ -60,7 +60,7 @@
      openRoundCid = newOpenRoundCid
  
@@ -10,9 +10,9 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
    newCoins <- query @Coin newApp.svc
    map snd newCoins === [newCoin]
  
-diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scripts/TestCoinRulesTransfer.daml ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestCoinRulesTransfer.daml
---- ../daml/canton-coin-test/daml/CC/Scripts/TestCoinRulesTransfer.daml
-+++ ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestCoinRulesTransfer.daml
+diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts/TestCoinRulesTransfer.daml daml/canton-coin-test-upgrade/daml/CC/Scripts/TestCoinRulesTransfer.daml
+--- daml/canton-coin-test/daml/CC/Scripts/TestCoinRulesTransfer.daml
++++ daml/canton-coin-test-upgrade/daml/CC/Scripts/TestCoinRulesTransfer.daml
 @@ -69,6 +69,7 @@
                        holders = [alice.primaryParty, bob.primaryParty, bob.primaryParty] -- duplicates get removed
  
@@ -61,9 +61,9 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
      context = context.context
    assertMsg "senderChangeAmount == 0"
      (transferResult.summary.senderChangeAmount == 0.0)
-diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scripts/TestCoinRulesTransferLimits.daml ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestCoinRulesTransferLimits.daml
---- ../daml/canton-coin-test/daml/CC/Scripts/TestCoinRulesTransferLimits.daml
-+++ ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestCoinRulesTransferLimits.daml
+diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts/TestCoinRulesTransferLimits.daml daml/canton-coin-test-upgrade/daml/CC/Scripts/TestCoinRulesTransferLimits.daml
+--- daml/canton-coin-test/daml/CC/Scripts/TestCoinRulesTransferLimits.daml
++++ daml/canton-coin-test-upgrade/daml/CC/Scripts/TestCoinRulesTransferLimits.daml
 @@ -44,6 +44,7 @@
            provider = alice.primaryParty
            inputs = inputCoins
@@ -88,9 +88,9 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
        context = context
        expectedError = "Fewer than the allowed number of lock holders"
      return ()
-diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scripts/TestComputeFees.daml ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestComputeFees.daml
---- ../daml/canton-coin-test/daml/CC/Scripts/TestComputeFees.daml
-+++ ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestComputeFees.daml
+diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts/TestComputeFees.daml daml/canton-coin-test-upgrade/daml/CC/Scripts/TestComputeFees.daml
+--- daml/canton-coin-test/daml/CC/Scripts/TestComputeFees.daml
++++ daml/canton-coin-test-upgrade/daml/CC/Scripts/TestComputeFees.daml
 @@ -124,6 +124,7 @@
                        amount = 10.0
                        lock = None
@@ -99,9 +99,9 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
        context = context.context
  
    -- Actual holding fee should be based on the coin price when the coin was created, not the current one
-diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scripts/TestDesignExample.daml ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestDesignExample.daml
---- ../daml/canton-coin-test/daml/CC/Scripts/TestDesignExample.daml
-+++ ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestDesignExample.daml
+diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts/TestDesignExample.daml daml/canton-coin-test-upgrade/daml/CC/Scripts/TestDesignExample.daml
+--- daml/canton-coin-test/daml/CC/Scripts/TestDesignExample.daml
++++ daml/canton-coin-test-upgrade/daml/CC/Scripts/TestDesignExample.daml
 @@ -58,6 +58,7 @@
                       lock = None
                       receiverFeeRatio = 1.0
@@ -131,9 +131,9 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
  
    -- check app reward issued by the escrow refresh
    [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 50002)
-diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scripts/TestLockAndCoinExpiry.daml ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestLockAndCoinExpiry.daml
---- ../daml/canton-coin-test/daml/CC/Scripts/TestLockAndCoinExpiry.daml
-+++ ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestLockAndCoinExpiry.daml
+diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts/TestLockAndCoinExpiry.daml daml/canton-coin-test-upgrade/daml/CC/Scripts/TestLockAndCoinExpiry.daml
+--- daml/canton-coin-test/daml/CC/Scripts/TestLockAndCoinExpiry.daml
++++ daml/canton-coin-test-upgrade/daml/CC/Scripts/TestLockAndCoinExpiry.daml
 @@ -255,6 +255,7 @@
                  expiresAt = now `addRelTime` lockDuration
                receiverFeeRatio = 0.0
@@ -142,9 +142,9 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
    (openRound, _) <- getLatestOpenRound app
    featuredAppRight <- getFeaturedAppRight app owner.primaryParty
  
-diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scripts/TestRewardComputation.daml ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestRewardComputation.daml
---- ../daml/canton-coin-test/daml/CC/Scripts/TestRewardComputation.daml
-+++ ../daml/canton-coin-test-upgrade/daml/CC/Scripts/TestRewardComputation.daml
+diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts/TestRewardComputation.daml daml/canton-coin-test-upgrade/daml/CC/Scripts/TestRewardComputation.daml
+--- daml/canton-coin-test/daml/CC/Scripts/TestRewardComputation.daml
++++ daml/canton-coin-test-upgrade/daml/CC/Scripts/TestRewardComputation.daml
 @@ -82,6 +82,7 @@
                      amount = 8.0
                      lock = None
@@ -153,9 +153,9 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
      context = context.context
  
    issuingMiningRounds <- queryFilter @IssuingMiningRound app.svc (\r -> r.round == Round 0)
-diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scripts/Util.daml ../daml/canton-coin-test-upgrade/daml/CC/Scripts/Util.daml
---- ../daml/canton-coin-test/daml/CC/Scripts/Util.daml
-+++ ../daml/canton-coin-test-upgrade/daml/CC/Scripts/Util.daml
+diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts/Util.daml daml/canton-coin-test-upgrade/daml/CC/Scripts/Util.daml
+--- daml/canton-coin-test/daml/CC/Scripts/Util.daml
++++ daml/canton-coin-test-upgrade/daml/CC/Scripts/Util.daml
 @@ -65,6 +65,7 @@
    _ <- submit svc $ createCmd CoinRules with
      configSchedule = defaultCoinConfigSchedule
@@ -188,9 +188,9 @@ diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml/CC/Scri
      -- merge multiple coins or rewards and claim rewards even if there are no coins yet
      when (length transfer.inputs > 1 || (length transfer.inputs == 1 && null coins)) $ void $
        submitExerciseCoinRulesByKey app [user] readAs CoinRules_Transfer with
-diff -ur -x '*~' -x target -x dar -x .daml ../daml/canton-coin-test/daml.yaml ../daml/canton-coin-test-upgrade/daml.yaml
---- ../daml/canton-coin-test/daml.yaml
-+++ ../daml/canton-coin-test-upgrade/daml.yaml
+diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml.yaml daml/canton-coin-test-upgrade/daml.yaml
+--- daml/canton-coin-test/daml.yaml
++++ daml/canton-coin-test-upgrade/daml.yaml
 @@ -6,14 +6,14 @@
  sdk-version: 2.9.0-snapshot.20231221.12524.0.vc998203f
  name: canton-coin-test

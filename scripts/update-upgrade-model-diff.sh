@@ -2,9 +2,9 @@
 
 set -eou pipefail
 
-cd "$(dirname "${BASH_SOURCE[0]}")"
+cd "$REPO_ROOT"
 
-TARGET_DIR=../daml/upgrade-diffs
+TARGET_DIR=daml/upgrade-diffs
 
 if [ "$#" -ge 1 ]; then
     TARGET_DIR="$1"
@@ -14,22 +14,10 @@ diff_project() {
   local project_name="$1"
   # gnu diff includes dumb timestamps in the diff result so we `sed` them away.
   # this is great.
-  diff -ur -x '*~' -x target -x dar -x .daml "../daml/$project_name" "../daml/$project_name-upgrade" | sed -E 's/^((---|\+\+\+) [^[:space:]]+).*/\1/g' > "$TARGET_DIR/$project_name.diff" || true
+  diff -ur -x '*~' -x target -x dar -x .daml "daml/$project_name" "daml/$project_name-upgrade" | sed -E 's/^((---|\+\+\+) [^[:space:]]+).*/\1/g' > "$TARGET_DIR/$project_name.diff" || true
 }
 
-projects=(
-    canton-coin
-    canton-coin-test
-    wallet
-    wallet-test
-    wallet-payments
-    svc-governance
-    svc-governance-test
-    canton-name-service
-    canton-name-service-test
-    splitwell
-    splitwell-test
-)
+readarray -t projects < <(./scripts/lib/get-upgraded-daml-projects.sh)
 
 for project in "${projects[@]}"; do
     diff_project "$project"
