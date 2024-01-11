@@ -556,8 +556,7 @@ testBuyMemberTraffic = script do
   let minTopupAmount = globalDomainConfig.fees.minTopupAmount
   outcome <- executeCoinOperation app aliceValidator $
     CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId domainId (minutes 1) (Some topupStateCid)
-  let errorMsg = "The requirement 'trafficAmount " <> show (minTopupAmount-1) <> " is at least as much as the configured minTopupAmount " <> show minTopupAmount <> "' was not met."
-  outcome === COO_Error (ITR_Other errorMsg)
+  outcome === COO_Error (ITR_InsufficientTopupAmount (minTopupAmount-1) minTopupAmount)
 
   -- test that providing an invalid global domain ID fails
   let invalidDomainId = domainId <> "_invalid"
@@ -565,7 +564,7 @@ testBuyMemberTraffic = script do
     createCmd (initialValidatorTopUpState aliceValidator.primaryParty testParticipantId invalidDomainId)
   outcome <- executeCoinOperation app aliceValidator $
     CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId invalidDomainId (minutes 1) (Some invalidTopupStateCid)
-  outcome === COO_Error (ITR_Other ("The requirement 'Known domain-id' was not met."))
+  outcome === COO_Error (ITR_UnknownDomain invalidDomainId)
   submit aliceValidator.primaryParty $ archiveCmd invalidTopupStateCid
 
   -- test that creating the initial traffic contract works

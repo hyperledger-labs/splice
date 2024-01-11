@@ -10,7 +10,9 @@ import com.daml.network.codegen.java.cc.coin.CoinCreateSummary
 import com.daml.network.codegen.java.cc.coinrules.InvalidTransferReason
 import com.daml.network.codegen.java.cc.coinrules.invalidtransferreason.{
   ITR_InsufficientFunds,
+  ITR_InsufficientTopupAmount,
   ITR_Other,
+  ITR_UnknownDomain,
 }
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.{
   CO_AppPayment,
@@ -217,6 +219,10 @@ class UserWalletTxLogParser(
                   val details = reason match {
                     case r: ITR_InsufficientFunds =>
                       s"ITR_InsufficientFunds: missing ${r.missingAmount} CC"
+                    case r: ITR_UnknownDomain =>
+                      s"ITR_UnknownDomain: domainId ${r.domainId}"
+                    case r: ITR_InsufficientTopupAmount =>
+                      s"ITR_InsufficientTopupAmount: requested ${r.requestedTopupAmount}, minimum required ${r.minTopupAmount}"
                     case r: ITR_Other => s"ITR_Other: ${r.description}"
                     case _ => throw new RuntimeException(s"Invalid reason $reason")
                   }

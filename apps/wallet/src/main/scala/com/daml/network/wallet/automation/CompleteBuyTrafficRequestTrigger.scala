@@ -22,7 +22,6 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.matching.Regex
 
 class CompleteBuyTrafficRequestTrigger(
     override protected val context: TriggerContext,
@@ -62,29 +61,15 @@ class CompleteBuyTrafficRequestTrigger(
                   s"Insufficient funds to purchase traffic $missingStr, cancelling traffic request"
                 )
                 cancelTrafficRequest(trafficRequest, s"out of funds $missingStr")
-              case otherError: invalidtransferreason.ITR_Other =>
-                // TODO(#8903): Create COO_Error subtypes for these cases
-                val unknownDomainId: Regex = "The requirement 'Known domain-id' was not met.".r
-                val insufficientTrafficAmount: Regex =
-                  "The requirement 'trafficAmount (.*) is at least as much as the configured minTopupAmount (.*)' was not met.".r
-                otherError.description match {
-                  case unknownDomainId() =>
-                    cancelTrafficRequest(
-                      trafficRequest,
-                      s"unknown domainId ${trafficRequest.payload.domainId}",
-                    )
-                  case insufficientTrafficAmount(requestedAmount, minimumAmount) =>
-                    cancelTrafficRequest(
-                      trafficRequest,
-                      s"not enough traffic requested (trafficAmount $requestedAmount < minTopupAmount $minimumAmount)",
-                    )
-                  case _ =>
-                    val msg = s"Unexpectedly failed to buy extra traffic due to $otherError"
-                    // We report this as INTERNAL, as we don't want to retry on this.
-                    Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
-                }
+              case domainError: invalidtransferreason.ITR_UnknownDomain =>
+                cancelTrafficRequest(trafficRequest, s"unknown domainId ${domainError.domainId}")
+              case topupAmountError: invalidtransferreason.ITR_InsufficientTopupAmount =>
+                cancelTrafficRequest(
+                  trafficRequest,
+                  s"not enough traffic requested (trafficAmount ${topupAmountError.requestedTopupAmount} < minTopupAmount ${topupAmountError.minTopupAmount})",
+                )
               case otherError =>
-                val msg = s"Unexpectedly failed to complete buy traffic request due to $otherError"
+                val msg = s"Unexpectedly failed to buy extra traffic due to $otherError"
                 // We report this as INTERNAL, as we don't want to retry on this.
                 Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
             }

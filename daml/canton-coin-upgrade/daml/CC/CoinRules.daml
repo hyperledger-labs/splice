@@ -73,10 +73,9 @@ template CoinRules
         -- validate choice parameters
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
-        require "Known domain-id" (domainId `Set.member` configUsd.globalDomain.requiredDomains)
-        let minTopupAmount = configUsd.globalDomain.fees.minTopupAmount
-        require ("trafficAmount " <> show trafficAmount <> " is at least as much as the configured minTopupAmount " <> show minTopupAmount)
-          (trafficAmount >= minTopupAmount)
+        case validateBuyMemberTrafficInputs configUsd domainId trafficAmount of
+          Left err -> throw (InvalidTransfer err)
+          Right _ -> pure ()
         (trafficCostCc, trafficCostUsd) <- computeDomainFees provider trafficAmount this context
         let transfer = Transfer with
               sender = provider
@@ -497,6 +496,10 @@ computeOutputFee transferConfigCC sender out =
 
 data InvalidTransferReason
   = ITR_InsufficientFunds with missingAmount : Decimal
+  | ITR_UnknownDomain with domainId : Text
+  | ITR_InsufficientTopupAmount with
+      requestedTopupAmount : Int
+      minTopupAmount : Int
   | ITR_Other with description : Text
   deriving (Eq, Show)
 
@@ -885,6 +888,14 @@ scaleFees s c = TransferConfig with
 
 transferConfigCCFromOpenRound : OpenMiningRound -> TransferConfig CC
 transferConfigCCFromOpenRound openRound = scaleFees (1.0 / openRound.coinPrice) openRound.transferConfigUsd
+
+validateBuyMemberTrafficInputs : CoinConfig USD -> Text -> Int -> Either InvalidTransferReason ()
+validateBuyMemberTrafficInputs configUsd domainId trafficAmount
+  | not (domainId `Set.member` configUsd.globalDomain.requiredDomains) = Left $ ITR_UnknownDomain with domainId
+  | trafficAmount < configUsd.globalDomain.fees.minTopupAmount = Left $ ITR_InsufficientTopupAmount with
+      requestedTopupAmount = trafficAmount
+      minTopupAmount = configUsd.globalDomain.fees.minTopupAmount
+  | otherwise = Right ()
 
 -- | Computing domain fees
 computeDomainFees : Party -> Int -> CoinRules -> PaymentTransferContext -> Update (Decimal, Decimal)

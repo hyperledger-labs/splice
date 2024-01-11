@@ -39,7 +39,7 @@ class WalletTxLogWithDomainFeesIntegrationTest
           inside(
             buyMemberTraffic(sv1ValidatorBackend, domainFeesConfig.minTopupAmount - 1, now)
           ) { case coo: COO_Error =>
-            coo.toString should include regex ("trafficAmount .* is at least as much as the configured minTopupAmount")
+            coo.invalidTransferReasonValue.toString should startWith("ITR_InsufficientTopupAmount")
           }
         },
       )(
