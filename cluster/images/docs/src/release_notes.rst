@@ -408,7 +408,7 @@ Release Notes
 
 * Documentation:
 
-    * Added a section :ref:`Renaming an SV <helm-rename-sv>` in the page "Kubernetes-Based Deployment of a Super Validator node" for step-by-step guide of renaming an SV.
+    * Added a section `Renaming an SV` in the page "Kubernetes-Based Deployment of a Super Validator node" for step-by-step guide of renaming an SV.
 
 2023-07-16
 ----------
