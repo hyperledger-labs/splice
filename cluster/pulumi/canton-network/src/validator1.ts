@@ -12,6 +12,7 @@ import {
 import type { Auth0Client } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
+import { DomainIndex } from './globalDomainNode';
 import { installParticipant } from './ledger';
 import { installValidatorApp } from './validator';
 
@@ -22,6 +23,7 @@ export async function installValidator1(
   onboardingSecret: string,
   validatorWalletUser: string,
   splitPostgresInstances: boolean,
+  svActiveDomain: DomainIndex,
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
   topupConfig?: ValidatorTopupConfig
@@ -88,7 +90,7 @@ export async function installValidator1(
     appDars: ['cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar'],
     validatorPartyHint: `${name}_validator_service_user`,
     extraDomains: [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
-    svSponsorAddress: 'http://sv-app.sv-1:5014',
+    svSponsorAddress: `http://sv-app-${svActiveDomain}.sv-1:5014`,
     onboardingSecret,
     persistenceConfig: {
       host: validatorPostgres.address,

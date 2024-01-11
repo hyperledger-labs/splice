@@ -270,6 +270,7 @@ export const btoa: (s: string) => string = (s: string) => Buffer.from(s).toStrin
 export function sanitizedForHelm(value: string): string {
   return value.replaceAll('_', '-');
 }
+
 export function sanitizedForPostgres(value: string): string {
   return value.replaceAll('-', '_');
 }

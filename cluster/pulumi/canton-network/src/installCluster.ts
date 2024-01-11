@@ -20,7 +20,7 @@ import {
 
 import { installDocs } from './docs';
 import { configureForwardAll } from './gateway';
-import { DomainIndex, GlobalDomainUpgradeConfig } from './globalDomainNode';
+import { DefaultGlobalDomainId, DomainIndex, GlobalDomainUpgradeConfig } from './globalDomainNode';
 import { installClusterIngress } from './ingress';
 import { Postgres } from './postgres';
 import { installSplitwell } from './splitwell';
@@ -69,6 +69,9 @@ const globalDomainUpgradeConfig: GlobalDomainUpgradeConfig = {
   activeGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_ACTIVE_ID),
   upgradeGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_UPGRADE_ID),
 };
+const svActiveDomain: DomainIndex = globalDomainUpgradeConfig.activeGlobalDomainId
+  ? globalDomainUpgradeConfig.activeGlobalDomainId
+  : DefaultGlobalDomainId;
 
 const sv2Key = svKeyFromSecret('sv2');
 const sv3Key = svKeyFromSecret('sv3');
@@ -109,7 +112,7 @@ function joinViaSv1(
 ): SvOnboarding {
   return {
     type: 'join-with-key',
-    sponsorApiUrl: 'http://sv-app.sv-1:5014',
+    sponsorApiUrl: `http://sv-app-${svActiveDomain}.sv-1:5014`,
     sponsorRelease: sv1,
     sequencerDatabase,
     keys,
@@ -263,6 +266,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     validator1Onboarding.secret,
     'auth0|63e3d75ff4114d87a2c1e4f5',
     splitPostgresInstances,
+    svActiveDomain,
     backupConfig,
     bootstrappingDumpConfig,
     // x10 validator1's traffic targetThroughput for load tester -- see #9064
@@ -275,6 +279,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     'auth0|63e12e0415ad881ffe914e61',
     splitwellOnboarding.secret,
     splitPostgresInstances,
+    svActiveDomain,
     backupConfig,
     bootstrappingDumpConfig,
     topupConfig

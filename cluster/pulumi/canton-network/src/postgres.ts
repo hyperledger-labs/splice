@@ -13,6 +13,7 @@ import {
 } from 'cn-pulumi-common';
 
 const enableCloudSql = envFlag('ENABLE_CLOUD_SQL', false);
+
 export function initDatabase(): string | undefined {
   if (enableCloudSql) {
     return undefined;

@@ -1,22 +1,23 @@
 ---
+{{- $appIdentifier := include "domainOrDefaultValue" (list .Values "sv-app") }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sv-app
+  name: {{ $appIdentifier }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: sv-app
+    app: {{ $appIdentifier }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: sv-app
+      app: {{ $appIdentifier }}
   strategy:
     type: "Recreate"
   template:
     metadata:
       labels:
-        app: sv-app
+        app: {{ $appIdentifier }}
     spec:
       containers:
         - name: sv-app
@@ -266,17 +267,17 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: sv-app
+  name: {{ $appIdentifier }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: sv-app
+    app: {{ $appIdentifier }}
 spec:
   selector:
-    app: sv-app
+    app: {{ $appIdentifier }}
   ports:
-  - name: sv-api
-    port: 5014
-    protocol: TCP
-  - name: metrics
-    port: 10013
-    protocol: TCP
+    - name: sv-api
+      port: 5014
+      protocol: TCP
+    - name: metrics
+      port: 10013
+      protocol: TCP

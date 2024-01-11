@@ -1,23 +1,24 @@
+{{- $appIdentifier := include "domainOrDefaultValue" (list .Values "sv-app") }}
 {{- if .Values.metrics.enable }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
     release: {{ .Values.metrics.release }}
-  name: sv
+  name: {{ $appIdentifier }}
   namespace: {{ .Release.Namespace }}
 spec:
   endpoints:
 
-  - port: metrics
-    interval: {{ .Values.metrics.interval }}
+    - port: metrics
+      interval: {{ .Values.metrics.interval }}
 
   selector:
     matchLabels:
-      app: sv-app
+      app: {{ $appIdentifier }}
 
   namespaceSelector:
     matchNames:
-    - {{ .Release.Namespace }}
+      - {{ .Release.Namespace }}
 
 {{- end }}

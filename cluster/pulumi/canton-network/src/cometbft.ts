@@ -34,7 +34,9 @@ export function installCometBftNode(
   const nodeConfig = configs.nodeConfigs[nodename];
   let stateSyncConfig;
   if (syncSource) {
-    const rpcServer = syncSource.status.namespace.apply(rpcServiceAddress);
+    const rpcServer = syncSource.status.namespace.apply(namespace =>
+      rpcServiceAddress(namespace, domain)
+    );
     stateSyncConfig = {
       enable: true,
       rpcServers: pulumi.interpolate`${rpcServer},${rpcServer}`,
@@ -89,7 +91,7 @@ export function installCometBftNode(
     }
   );
   return Service.get(
-    `${nodeConfig.identifier}-cometbft-rpc`,
+    `${nodename}-${domain}-cometbft-rpc`,
     pulumi.interpolate`${cometbftRelease.status.namespace}/${nodeConfig.identifier}-cometbft-rpc`
   );
 }
@@ -108,8 +110,8 @@ type NodeConfig = {
   id: Output<string> | string;
 };
 
-function rpcServiceAddress(namespace: string): string {
-  return `http://sv-app.${namespace}.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc`;
+function rpcServiceAddress(namespace: string, domain: DomainIndex): string {
+  return `http://sv-app-${domain}.${namespace}.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc`;
 }
 
 class CometBftNodeConfig {
@@ -124,7 +126,7 @@ class CometBftNodeConfig {
       id: '5af57aa83abcec085c949323ed8538108757be9c',
       privateKey:
         '/7L74Bs18740fTPdEL04BeO2Gs+1lzEeCjAiB1DYcysmLnU1FAkg/Ho9XsOiIp4U/KT/YNrtIi/A0prm/Ew3eQ==',
-      identifier: this.nodeIdentifier('sv-1'),
+      identifier: this.nodeIdentifier,
       externalAddress: this.p2pExternalAddress(1),
       istioPort: this.istioExternalPort(1),
       validator: {
@@ -137,11 +139,11 @@ class CometBftNodeConfig {
   }
 
   p2pServiceAddress(nodename: string): string {
-    return `${this.nodeIdentifier(nodename)}-cometbft-p2p.${nodename}.svc.cluster.local:26656`;
+    return `${this.nodeIdentifier}-cometbft-p2p.${nodename}.svc.cluster.local:26656`;
   }
 
-  private nodeIdentifier(node: string) {
-    return `cometbft-${this._domain}-${node}`;
+  get nodeIdentifier() {
+    return `global-domain-${this._domain}-cometbft`;
   }
 
   get founder() {
@@ -162,7 +164,7 @@ class CometBftNodeConfig {
         id: 'c36b3bbd969d993ba0b4809d1f587a3a341f22c1',
         privateKey:
           '1Je33z2g+Dj2UWLqnsO+xwUwbalIS0LLcYAoj+fYuEE2le4kJjJ0h+L7FfVg+3mbgvrikdke91I2X5C2frj0Eg==',
-        identifier: this.nodeIdentifier('sv-2'),
+        identifier: this.nodeIdentifier,
         externalAddress: this.p2pExternalAddress(2),
         istioPort: this.istioExternalPort(2),
         validator: {
@@ -176,7 +178,7 @@ class CometBftNodeConfig {
         id: '0d8e87c54d199e85548ccec123c9d92966ec458c',
         privateKey:
           'DdbW/buPo4TXxW+/cvQxp5Lh1BZyH5GYHGoU0uTUQA/S1oZ32DDu1+CZhtrZhqEFMuxPlXVXvyvXsZLBdCkgdQ==',
-        identifier: this.nodeIdentifier('sv-3'),
+        identifier: this.nodeIdentifier,
         externalAddress: this.p2pExternalAddress(3),
         istioPort: this.istioExternalPort(3),
         validator: {
@@ -190,7 +192,7 @@ class CometBftNodeConfig {
         id: 'ee738517c030b42c3ff626d9f80b41dfc4b1a3b8',
         privateKey:
           'xMB8gnYbacyZqU94cgwJBK2OJO3DffO12uHgeieotVj/Q9LbZEwLue9GnG8+G5GNRDgX8z75txr/Z541Uqyb3A==',
-        identifier: this.nodeIdentifier('sv-4'),
+        identifier: this.nodeIdentifier,
         retainBlocks: isDevNet ? 10000 : 700000, // sv4 starts pruning after 2 hours on devnet only for testing purposes
         externalAddress: this.p2pExternalAddress(4),
         istioPort: this.istioExternalPort(4),

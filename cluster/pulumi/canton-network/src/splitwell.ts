@@ -14,6 +14,7 @@ import type { Auth0Client, BackupConfig, BootstrappingDumpConfig } from 'cn-pulu
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
+import { DomainIndex } from './globalDomainNode';
 import { installParticipant } from './ledger';
 import { initDatabase, Postgres } from './postgres';
 import { installValidatorApp } from './validator';
@@ -24,6 +25,7 @@ export async function installSplitwell(
   providerWalletUser: string,
   onboardingSecret: string,
   splitPostgresInstances: boolean,
+  svActiveDomain: DomainIndex,
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
   topupConfig?: ValidatorTopupConfig
@@ -112,7 +114,7 @@ export async function installSplitwell(
     ].join('\n'),
     onboardingSecret,
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
-    svSponsorAddress: 'http://sv-app.sv-1:5014',
+    svSponsorAddress: `http://sv-app-${svActiveDomain}.sv-1:5014`,
     auth0AppName: 'splitwell_validator',
     participantBootstrapDump,
     participantAddress: 'participant',

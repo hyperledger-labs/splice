@@ -149,11 +149,12 @@ export class GlobalDomainNode extends ComponentResource {
         withSvIngress: true,
         ingress: {
           wallet: false,
-          sv: false,
           cns: false,
           scan: false,
-          sequencer: {
-            globalDomain: domainId.toString(),
+          sequencer: true,
+          sv: true,
+          globalDomain: {
+            globalDomainId: domainId.toString(),
           },
         },
         cluster: {
@@ -163,5 +164,17 @@ export class GlobalDomainNode extends ComponentResource {
       },
       { dependsOn: [xns.ns, domainNodeRelease], parent: this }
     );
+  }
+
+  get namespaceInternalSequencerAddress(): string {
+    return `${this.name}-sequencer`;
+  }
+
+  get namespaceInternalMediatorAddress(): string {
+    return `${this.name}-mediator`;
+  }
+
+  get founderInternalSequencerAddress(): string {
+    return `http://${this.namespaceInternalSequencerAddress}.sv-1:5008`;
   }
 }

@@ -1021,38 +1021,6 @@
   },
   {
     "custom": false,
-    "id": "undefined/cometbft-0-sv-1-cometbft-rpc",
-    "inputs": {},
-    "name": "cometbft-0-sv-1-cometbft-rpc",
-    "provider": "",
-    "type": "kubernetes:core/v1:Service"
-  },
-  {
-    "custom": false,
-    "id": "undefined/cometbft-0-sv-2-cometbft-rpc",
-    "inputs": {},
-    "name": "cometbft-0-sv-2-cometbft-rpc",
-    "provider": "",
-    "type": "kubernetes:core/v1:Service"
-  },
-  {
-    "custom": false,
-    "id": "undefined/cometbft-0-sv-3-cometbft-rpc",
-    "inputs": {},
-    "name": "cometbft-0-sv-3-cometbft-rpc",
-    "provider": "",
-    "type": "kubernetes:core/v1:Service"
-  },
-  {
-    "custom": false,
-    "id": "undefined/cometbft-0-sv-4-cometbft-rpc",
-    "inputs": {},
-    "name": "cometbft-0-sv-4-cometbft-rpc",
-    "provider": "",
-    "type": "kubernetes:core/v1:Service"
-  },
-  {
-    "custom": false,
     "id": "projects/da-cn-scratchnet/secrets/gcp-bucket-sa-key-secret/versions/1",
     "inputs": {},
     "name": "data-export-bucket-sa-key-secret",
@@ -2126,7 +2094,7 @@
             "memory": "8Gi"
           }
         },
-        "svSponsorAddress": "http://sv-app.sv-1:5014",
+        "svSponsorAddress": "http://sv-app-0.sv-1:5014",
         "svValidator": false,
         "topup": {
           "enabled": true,
@@ -2156,6 +2124,14 @@
     "name": "splitwell",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": false,
+    "id": "undefined/global-domain-0-cometbft-cometbft-rpc",
+    "inputs": {},
+    "name": "sv-1-0-cometbft-rpc",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
   },
   {
     "custom": true,
@@ -2225,7 +2201,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "founder": {
-          "externalAddress": "cometbft-0-sv-1-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -2248,7 +2224,7 @@
         "node": {
           "externalAddress": "mock.network.canton.global:26016",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
-          "identifier": "cometbft-0-sv-1",
+          "identifier": "global-domain-0-cometbft",
           "istioPort": 26016,
           "keysSecret": "",
           "p2pPort": 26656,
@@ -2265,15 +2241,15 @@
         "nodeName": "Canton-Foundation-1",
         "peers": [
           {
-            "externalAddress": "cometbft-0-sv-2-cometbft-p2p.sv-2.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
             "nodeId": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1"
           },
           {
-            "externalAddress": "cometbft-0-sv-3-cometbft-p2p.sv-3.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           },
           {
-            "externalAddress": "cometbft-0-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
@@ -2485,12 +2461,13 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "ingress": {
           "cns": false,
-          "scan": false,
-          "sequencer": {
-            "activeGlobalDomain": "",
-            "globalDomain": "0"
+          "globalDomain": {
+            "activeGlobalDomainId": "",
+            "globalDomainId": "0"
           },
-          "sv": false,
+          "scan": false,
+          "sequencer": true,
+          "sv": true,
           "wallet": false
         },
         "withSvIngress": true
@@ -2570,11 +2547,12 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "ingress": {
           "cns": true,
-          "scan": true,
-          "sequencer": {
-            "activeGlobalDomain": "0",
-            "globalDomain": ""
+          "globalDomain": {
+            "activeGlobalDomainId": "0",
+            "globalDomainId": ""
           },
+          "scan": true,
+          "sequencer": true,
           "sv": true,
           "wallet": true
         },
@@ -3055,7 +3033,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-sv-1-e",
+      "name": "postgres-sv-1-0-e",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -3114,7 +3092,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "persistence": {
-          "databaseName": "sv_1",
+          "databaseName": "sv_1_0",
           "host": "postgres.sv-1.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
@@ -3131,7 +3109,7 @@
         }
       }
     },
-    "name": "sv-1-postgres-sv-1-e",
+    "name": "sv-1-postgres-sv-1-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3422,7 +3400,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-sv-node/",
       "compat": "true",
-      "name": "sv-app",
+      "name": "sv-app-0",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -3547,6 +3525,7 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global"
         },
+        "domainId": "0",
         "expectedValidatorOnboardings": [
           {
             "expiresIn": "24h",
@@ -3595,10 +3574,10 @@
         "onboardingType": "found-collective",
         "participantAddress": "participant-0",
         "persistence": {
-          "databaseName": "sv_1",
+          "databaseName": "sv_1_0",
           "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
-          "schema": "sv_1",
+          "schema": "sv_1_0",
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
@@ -3616,7 +3595,7 @@
         }
       }
     },
-    "name": "sv-1-sv-app",
+    "name": "sv-1-sv-app-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3747,6 +3726,14 @@
     "type": "kubernetes:core/v1:Namespace"
   },
   {
+    "custom": false,
+    "id": "undefined/global-domain-0-cometbft-cometbft-rpc",
+    "inputs": {},
+    "name": "sv-2-0-cometbft-rpc",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
     "custom": true,
     "id": "",
     "inputs": {
@@ -3814,7 +3801,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "founder": {
-          "externalAddress": "cometbft-0-sv-1-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -3837,7 +3824,7 @@
         "node": {
           "externalAddress": "mock.network.canton.global:26026",
           "id": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1",
-          "identifier": "cometbft-0-sv-2",
+          "identifier": "global-domain-0-cometbft",
           "istioPort": 26026,
           "keysSecret": "",
           "p2pPort": 26656,
@@ -3854,11 +3841,11 @@
         "nodeName": "Canton-Foundation-2",
         "peers": [
           {
-            "externalAddress": "cometbft-0-sv-3-cometbft-p2p.sv-3.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           },
           {
-            "externalAddress": "cometbft-0-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
@@ -3874,7 +3861,7 @@
         },
         "stateSync": {
           "enable": true,
-          "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
+          "rpcServers": "http://sv-app-0.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app-0.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }
       }
@@ -4070,12 +4057,13 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "ingress": {
           "cns": false,
-          "scan": false,
-          "sequencer": {
-            "activeGlobalDomain": "",
-            "globalDomain": "0"
+          "globalDomain": {
+            "activeGlobalDomainId": "",
+            "globalDomainId": "0"
           },
-          "sv": false,
+          "scan": false,
+          "sequencer": true,
+          "sv": true,
           "wallet": false
         },
         "withSvIngress": true
@@ -4155,11 +4143,12 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "ingress": {
           "cns": true,
-          "scan": true,
-          "sequencer": {
-            "activeGlobalDomain": "0",
-            "globalDomain": ""
+          "globalDomain": {
+            "activeGlobalDomainId": "0",
+            "globalDomainId": ""
           },
+          "scan": true,
+          "sequencer": true,
           "sv": true,
           "wallet": true
         },
@@ -4640,7 +4629,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-sv-2-e",
+      "name": "postgres-sv-2-0-e",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -4699,7 +4688,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "persistence": {
-          "databaseName": "sv_2",
+          "databaseName": "sv_2_0",
           "host": "postgres.sv-2.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
@@ -4716,7 +4705,7 @@
         }
       }
     },
-    "name": "sv-2-postgres-sv-2-e",
+    "name": "sv-2-postgres-sv-2-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5007,7 +4996,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-sv-node/",
       "compat": "true",
-      "name": "sv-app",
+      "name": "sv-app-0",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -5132,6 +5121,7 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-2.svc.mock.network.canton.global"
         },
+        "domainId": "0",
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
@@ -5141,7 +5131,7 @@
         },
         "isDevNet": true,
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "http://sv-app.sv-1:5014"
+          "sponsorApiUrl": "http://sv-app-0.sv-1:5014"
         },
         "metrics": {
           "enable": true,
@@ -5152,10 +5142,10 @@
         "onboardingType": "join-with-key",
         "participantAddress": "participant-0",
         "persistence": {
-          "databaseName": "sv_2",
+          "databaseName": "sv_2_0",
           "host": "postgres.sv-2.svc.cluster.local",
           "port": 5432,
-          "schema": "sv_2",
+          "schema": "sv_2_0",
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
@@ -5173,7 +5163,7 @@
         }
       }
     },
-    "name": "sv-2-sv-app",
+    "name": "sv-2-sv-app-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5304,6 +5294,14 @@
     "type": "kubernetes:core/v1:Namespace"
   },
   {
+    "custom": false,
+    "id": "undefined/global-domain-0-cometbft-cometbft-rpc",
+    "inputs": {},
+    "name": "sv-3-0-cometbft-rpc",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
     "custom": true,
     "id": "",
     "inputs": {
@@ -5371,7 +5369,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "founder": {
-          "externalAddress": "cometbft-0-sv-1-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -5394,7 +5392,7 @@
         "node": {
           "externalAddress": "mock.network.canton.global:26036",
           "id": "0d8e87c54d199e85548ccec123c9d92966ec458c",
-          "identifier": "cometbft-0-sv-3",
+          "identifier": "global-domain-0-cometbft",
           "istioPort": 26036,
           "keysSecret": "",
           "p2pPort": 26656,
@@ -5411,11 +5409,11 @@
         "nodeName": "Canton-Foundation-3",
         "peers": [
           {
-            "externalAddress": "cometbft-0-sv-2-cometbft-p2p.sv-2.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
             "nodeId": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1"
           },
           {
-            "externalAddress": "cometbft-0-sv-4-cometbft-p2p.sv-4.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-4.svc.cluster.local:26656",
             "nodeId": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8"
           }
         ],
@@ -5431,7 +5429,7 @@
         },
         "stateSync": {
           "enable": true,
-          "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
+          "rpcServers": "http://sv-app-0.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app-0.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }
       }
@@ -5627,12 +5625,13 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "ingress": {
           "cns": false,
-          "scan": false,
-          "sequencer": {
-            "activeGlobalDomain": "",
-            "globalDomain": "0"
+          "globalDomain": {
+            "activeGlobalDomainId": "",
+            "globalDomainId": "0"
           },
-          "sv": false,
+          "scan": false,
+          "sequencer": true,
+          "sv": true,
           "wallet": false
         },
         "withSvIngress": true
@@ -5712,11 +5711,12 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "ingress": {
           "cns": true,
-          "scan": true,
-          "sequencer": {
-            "activeGlobalDomain": "0",
-            "globalDomain": ""
+          "globalDomain": {
+            "activeGlobalDomainId": "0",
+            "globalDomainId": ""
           },
+          "scan": true,
+          "sequencer": true,
           "sv": true,
           "wallet": true
         },
@@ -6197,7 +6197,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-sv-3-e",
+      "name": "postgres-sv-3-0-e",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -6256,7 +6256,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "persistence": {
-          "databaseName": "sv_3",
+          "databaseName": "sv_3_0",
           "host": "postgres.sv-3.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
@@ -6273,7 +6273,7 @@
         }
       }
     },
-    "name": "sv-3-postgres-sv-3-e",
+    "name": "sv-3-postgres-sv-3-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -6564,7 +6564,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-sv-node/",
       "compat": "true",
-      "name": "sv-app",
+      "name": "sv-app-0",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -6689,6 +6689,7 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-3.svc.mock.network.canton.global"
         },
+        "domainId": "0",
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
@@ -6698,7 +6699,7 @@
         },
         "isDevNet": true,
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "http://sv-app.sv-1:5014"
+          "sponsorApiUrl": "http://sv-app-0.sv-1:5014"
         },
         "metrics": {
           "enable": true,
@@ -6709,10 +6710,10 @@
         "onboardingType": "join-with-key",
         "participantAddress": "participant-0",
         "persistence": {
-          "databaseName": "sv_3",
+          "databaseName": "sv_3_0",
           "host": "postgres.sv-3.svc.cluster.local",
           "port": 5432,
-          "schema": "sv_3",
+          "schema": "sv_3_0",
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
@@ -6730,7 +6731,7 @@
         }
       }
     },
-    "name": "sv-3-sv-app",
+    "name": "sv-3-sv-app-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -6861,6 +6862,14 @@
     "type": "kubernetes:core/v1:Namespace"
   },
   {
+    "custom": false,
+    "id": "undefined/global-domain-0-cometbft-cometbft-rpc",
+    "inputs": {},
+    "name": "sv-4-0-cometbft-rpc",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
     "custom": true,
     "id": "",
     "inputs": {
@@ -6928,7 +6937,7 @@
           "volumeStorageClass": "standard-rwo"
         },
         "founder": {
-          "externalAddress": "cometbft-0-sv-1-cometbft-p2p.sv-1.svc.cluster.local:26656",
+          "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-1.svc.cluster.local:26656",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -6951,7 +6960,7 @@
         "node": {
           "externalAddress": "mock.network.canton.global:26046",
           "id": "ee738517c030b42c3ff626d9f80b41dfc4b1a3b8",
-          "identifier": "cometbft-0-sv-4",
+          "identifier": "global-domain-0-cometbft",
           "istioPort": 26046,
           "keysSecret": "",
           "p2pPort": 26656,
@@ -6968,11 +6977,11 @@
         "nodeName": "Canton-Foundation-4",
         "peers": [
           {
-            "externalAddress": "cometbft-0-sv-2-cometbft-p2p.sv-2.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
             "nodeId": "c36b3bbd969d993ba0b4809d1f587a3a341f22c1"
           },
           {
-            "externalAddress": "cometbft-0-sv-3-cometbft-p2p.sv-3.svc.cluster.local:26656",
+            "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
             "nodeId": "0d8e87c54d199e85548ccec123c9d92966ec458c"
           }
         ],
@@ -6988,7 +6997,7 @@
         },
         "stateSync": {
           "enable": true,
-          "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
+          "rpcServers": "http://sv-app-0.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app-0.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }
       }
@@ -7184,12 +7193,13 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "ingress": {
           "cns": false,
-          "scan": false,
-          "sequencer": {
-            "activeGlobalDomain": "",
-            "globalDomain": "0"
+          "globalDomain": {
+            "activeGlobalDomainId": "",
+            "globalDomainId": "0"
           },
-          "sv": false,
+          "scan": false,
+          "sequencer": true,
+          "sv": true,
           "wallet": false
         },
         "withSvIngress": true
@@ -7269,11 +7279,12 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "ingress": {
           "cns": true,
-          "scan": true,
-          "sequencer": {
-            "activeGlobalDomain": "0",
-            "globalDomain": ""
+          "globalDomain": {
+            "activeGlobalDomainId": "0",
+            "globalDomainId": ""
           },
+          "scan": true,
+          "sequencer": true,
           "sv": true,
           "wallet": true
         },
@@ -7754,7 +7765,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-sv-4-e",
+      "name": "postgres-sv-4-0-e",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -7813,7 +7824,7 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "persistence": {
-          "databaseName": "sv_4",
+          "databaseName": "sv_4_0",
           "host": "postgres.sv-4.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
@@ -7830,7 +7841,7 @@
         }
       }
     },
-    "name": "sv-4-postgres-sv-4-e",
+    "name": "sv-4-postgres-sv-4-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -8121,7 +8132,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-sv-node/",
       "compat": "true",
-      "name": "sv-app",
+      "name": "sv-app-0",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -8246,6 +8257,7 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-4.svc.mock.network.canton.global"
         },
+        "domainId": "0",
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
@@ -8255,7 +8267,7 @@
         },
         "isDevNet": true,
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "http://sv-app.sv-1:5014"
+          "sponsorApiUrl": "http://sv-app-0.sv-1:5014"
         },
         "metrics": {
           "enable": true,
@@ -8266,10 +8278,10 @@
         "onboardingType": "join-with-key",
         "participantAddress": "participant-0",
         "persistence": {
-          "databaseName": "sv_4",
+          "databaseName": "sv_4_0",
           "host": "postgres.sv-4.svc.cluster.local",
           "port": 5432,
-          "schema": "sv_4",
+          "schema": "sv_4_0",
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
@@ -8287,7 +8299,7 @@
         }
       }
     },
-    "name": "sv-4-sv-app",
+    "name": "sv-4-sv-app-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -9072,7 +9084,7 @@
             "memory": "8Gi"
           }
         },
-        "svSponsorAddress": "http://sv-app.sv-1:5014",
+        "svSponsorAddress": "http://sv-app-0.sv-1:5014",
         "svValidator": false,
         "topup": {
           "enabled": true,

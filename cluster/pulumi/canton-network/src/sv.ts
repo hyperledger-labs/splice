@@ -1,6 +1,8 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import type { Auth0Client, CnInput, SvIdKey } from 'cn-pulumi-common';
+import { Release } from '@pulumi/kubernetes/helm/v3';
+import { Resource } from '@pulumi/pulumi';
+import { Auth0Client, CnInput, sanitizedForPostgres, SvIdKey } from 'cn-pulumi-common';
 import {
   auth0UserNameEnvVarSource,
   BackupConfig,
@@ -28,6 +30,7 @@ import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import * as postgres from './postgres';
 import {
   DomainIndex,
+  GlobalDomainNode,
   GlobalDomainUpgradeConfig,
   installDomainSpecificComponent,
   installGlobalDomain,
@@ -108,38 +111,7 @@ async function getAcsBootstrappingDump(xns: ExactNamespace, config: Bootstrappin
   };
 }
 
-function installParticipants(
-  globalUpradeDomainConfig: GlobalDomainUpgradeConfig,
-  config: SvConfig,
-  xns: ExactNamespace,
-  existingPostgres: Postgres
-) {
-  const participantPostgres = (id: DomainIndex) =>
-    config.splitPostgresInstances
-      ? postgres.installPostgres(xns, `participant-${id}-pg`, true)
-      : existingPostgres;
-
-  return installDomainSpecificComponent(
-    globalUpradeDomainConfig,
-    defaultId =>
-      installParticipant(
-        xns,
-        `participant-${defaultId}`,
-        participantPostgres(defaultId),
-        auth0UserNameEnvVarSource('sv'),
-        // If we have a dump, we disable auto init.
-        !!config.bootstrappingDumpConfig
-      ),
-    id =>
-      installParticipant(
-        xns,
-        `participant-${id}`,
-        participantPostgres(id),
-        auth0UserNameEnvVarSource('sv'),
-        true
-      )
-  );
-}
+const clusterUrl = `${CLUSTER_BASENAME}.network.canton.global`;
 
 export async function installSvNode(
   config: SvConfig,
@@ -223,74 +195,9 @@ export async function installSvNode(
     sequencerPostgres
   );
 
-  const svAppPostgres = config.splitPostgresInstances
-    ? postgres.installPostgres(xns, 'sv-pg', true)
-    : sequencerPostgres;
-  const svAppName = config.nodename.replaceAll('-', '_');
-  const svDb = svAppPostgres.createDatabaseAndInstallMetrics(svAppName);
-  const sequencerAddress = `${globalDomain.name}-sequencer`;
   const participantAddress = participant.name;
 
   const initDb = initDatabase();
-
-  const clusterUrl = `${CLUSTER_BASENAME}.network.canton.global`;
-
-  const svValues = {
-    onboardingType: config.onboarding.type,
-    onboardingName: config.onboardingName,
-    cometBFT: {
-      enabled: true,
-      connectionUri: pulumi.interpolate`http://${globalDomain.cometbftRpcService.metadata.name}:26657`,
-    },
-    globalDomainUrl: `http://${sequencerAddress}.sv-1:5008`,
-    domain:
-      // defaults for ports and address are fine,
-      // we need to include a dummy value though
-      // because helm does not distinguish between an empty object and unset.
-      {
-        sequencerAddress: sequencerAddress,
-        mediatorAddress: `${globalDomain.name}-mediator`,
-        // required to prevent participants from using new nodes when the domain is upgraded
-        sequencerPublicUrl: `https://sequencer-${globalDomain.id}.${config.nodename}.svc.${CLUSTER_BASENAME}.network.canton.global`,
-        sequencerPruningConfig: config.sequencerPruningConfig,
-      },
-    scan: {
-      publicUrl: `https://scan.${config.nodename}.svc.${clusterUrl}`,
-    },
-    expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
-      expiresIn: onboarding.expiresIn,
-      secretFrom: {
-        secretKeyRef: {
-          name: validatorOnboardingSecretName(onboarding.name),
-          key: 'secret',
-          optional: false,
-        },
-      },
-    })),
-    isDevNet: config.isDevNet,
-    approvedSvIdentities: config.approvedSvIdentities,
-    persistence: persistenceConfig(svAppPostgres, svAppName),
-    acsDumpPeriodicExport: backupConfig,
-    acsDumpImport:
-      config.bootstrappingDumpConfig && config.onboarding.type === 'found-collective'
-        ? getAcsBootstrappingDump(xns, config.bootstrappingDumpConfig)
-        : undefined,
-    participantIdentitiesDumpImport: config.bootstrappingDumpConfig
-      ? { secretName: participantBootstrapDumpSecretName }
-      : undefined,
-    metrics: {
-      enable: true,
-    },
-    additionalJvmOptions: jmxOptions(),
-    participantAddress,
-    init: initDb && { initDb },
-  } as ChartValues;
-
-  if (config.onboarding.type == 'join-with-key') {
-    svValues.joinWithKeyOnboarding = {
-      sponsorApiUrl: config.onboarding.sponsorApiUrl,
-    };
-  }
 
   installCNHelmChart(
     xns,
@@ -299,8 +206,8 @@ export async function installSvNode(
     {
       withSvIngress: true,
       ingress: {
-        sequencer: {
-          activeGlobalDomain: globalDomain.id.toString(),
+        globalDomain: {
+          activeGlobalDomainId: globalDomain.id.toString(),
         },
       },
       cluster: {
@@ -311,14 +218,22 @@ export async function installSvNode(
     { dependsOn: [xns.ns] }
   );
 
-  const svApp = installCNHelmChart(xns, 'sv-app', 'cn-sv-node', svValues, {
-    dependsOn: dependsOn.concat([participant, svAppPostgres, svDb, globalDomain]),
-  });
+  const svApp = installSvApps(
+    globalDomainUpgradeConfig,
+    config,
+    xns,
+    dependsOn,
+    participant,
+    sequencerPostgres,
+    globalDomain,
+    backupConfig,
+    participantAddress
+  );
 
   const scanAppPostgres = config.splitPostgresInstances
     ? postgres.installPostgres(xns, 'scan-pg', true)
     : sequencerPostgres;
-  const scanDbName = `scan_${svAppName}`;
+  const scanDbName = `scan_${sanitizedForPostgres(config.nodename)}`;
   const scanDb = scanAppPostgres.createDatabaseAndInstallMetrics(scanDbName);
   const scanValues = {
     clusterUrl,
@@ -327,7 +242,7 @@ export async function installSvNode(
     },
     persistence: persistenceConfig(scanAppPostgres, scanDbName),
     additionalJvmOptions: jmxOptions(),
-    sequencerAddress: sequencerAddress,
+    sequencerAddress: globalDomain.namespaceInternalSequencerAddress,
     init: initDb && { initDb },
     participantAddress,
   };
@@ -338,7 +253,7 @@ export async function installSvNode(
   const validatorPostgres = config.splitPostgresInstances
     ? postgres.installPostgres(xns, 'validator-pg', true)
     : sequencerPostgres;
-  const validatorDbName = `validator_${svAppName}`;
+  const validatorDbName = `validator_${sanitizedForPostgres(config.nodename)}`;
   const validatorDb = validatorPostgres.createDatabaseAndInstallMetrics(validatorDbName);
 
   await installValidatorApp({
@@ -375,4 +290,124 @@ function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): Persi
     user: pulumi.Output.create('cnadmin'),
     port: pulumi.Output.create(5432),
   };
+}
+
+function installParticipants(
+  globalUpradeDomainConfig: GlobalDomainUpgradeConfig,
+  config: SvConfig,
+  xns: ExactNamespace,
+  existingPostgres: Postgres
+) {
+  const participantPostgres = (id: DomainIndex) =>
+    config.splitPostgresInstances
+      ? postgres.installPostgres(xns, `participant-${id}-pg`, true)
+      : existingPostgres;
+
+  return installDomainSpecificComponent(
+    globalUpradeDomainConfig,
+    defaultId =>
+      installParticipant(
+        xns,
+        `participant-${defaultId}`,
+        participantPostgres(defaultId),
+        auth0UserNameEnvVarSource('sv'),
+        // If we have a dump, we disable auto init.
+        !!config.bootstrappingDumpConfig
+      ),
+    id =>
+      installParticipant(
+        xns,
+        `participant-${id}`,
+        participantPostgres(id),
+        auth0UserNameEnvVarSource('sv'),
+        true
+      )
+  );
+}
+
+function installSvApps(
+  globalUpgradeDomainConfig: GlobalDomainUpgradeConfig,
+  config: SvConfig,
+  xns: ExactNamespace,
+  dependsOn: CnInput<Resource>[],
+  participant: Release,
+  defaultPostgres: Postgres,
+  globalDomain: GlobalDomainNode,
+  backupConfig: BackupConfig | undefined,
+  participantAddress: CnInput<string>
+) {
+  const svAppInstall = (id: DomainIndex) => {
+    const svAppPostgres = config.splitPostgresInstances
+      ? postgres.installPostgres(xns, `sv-pg-${id}`, true)
+      : defaultPostgres;
+    const svAppName = sanitizedForPostgres(`${config.nodename}-${id}`);
+    const svDb = svAppPostgres.createDatabaseAndInstallMetrics(svAppName);
+
+    const svValues = {
+      domainId: id.toString(),
+      onboardingType: config.onboarding.type,
+      onboardingName: config.onboardingName,
+      cometBFT: {
+        enabled: true,
+        connectionUri: pulumi.interpolate`http://${globalDomain.cometbftRpcService.metadata.name}:26657`,
+      },
+      globalDomainUrl: globalDomain.founderInternalSequencerAddress,
+      domain:
+        // defaults for ports and address are fine,
+        // we need to include a dummy value though
+        // because helm does not distinguish between an empty object and unset.
+        {
+          sequencerAddress: globalDomain.namespaceInternalSequencerAddress,
+          mediatorAddress: globalDomain.namespaceInternalMediatorAddress,
+          // required to prevent participants from using new nodes when the domain is upgraded
+          sequencerPublicUrl: `https://sequencer-${globalDomain.id}.${config.nodename}.svc.${CLUSTER_BASENAME}.network.canton.global`,
+          sequencerPruningConfig: config.sequencerPruningConfig,
+        },
+      scan: {
+        publicUrl: `https://scan.${config.nodename}.svc.${clusterUrl}`,
+      },
+      expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
+        expiresIn: onboarding.expiresIn,
+        secretFrom: {
+          secretKeyRef: {
+            name: validatorOnboardingSecretName(onboarding.name),
+            key: 'secret',
+            optional: false,
+          },
+        },
+      })),
+      isDevNet: config.isDevNet,
+      approvedSvIdentities: config.approvedSvIdentities,
+      persistence: persistenceConfig(svAppPostgres, svAppName),
+      acsDumpPeriodicExport: backupConfig,
+      acsDumpImport:
+        config.bootstrappingDumpConfig && config.onboarding.type === 'found-collective'
+          ? getAcsBootstrappingDump(xns, config.bootstrappingDumpConfig)
+          : undefined,
+      participantIdentitiesDumpImport: config.bootstrappingDumpConfig
+        ? { secretName: participantBootstrapDumpSecretName }
+        : undefined,
+      metrics: {
+        enable: true,
+      },
+      additionalJvmOptions: jmxOptions(),
+      participantAddress,
+      init: initDatabase() && { initDb: initDatabase() },
+    } as ChartValues;
+
+    if (config.onboarding.type == 'join-with-key') {
+      svValues.joinWithKeyOnboarding = {
+        sponsorApiUrl: config.onboarding.sponsorApiUrl,
+      };
+    }
+
+    return installCNHelmChart(xns, `sv-app-${id}`, 'cn-sv-node', svValues, {
+      dependsOn: dependsOn.concat([participant, svAppPostgres, svDb, globalDomain]),
+    });
+  };
+  return installDomainSpecificComponent(
+    globalUpgradeDomainConfig,
+    defaultId => svAppInstall(defaultId),
+    id => svAppInstall(id)
+  );
 }

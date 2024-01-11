@@ -9,6 +9,7 @@ ingress:
   sv: true
   cns: true
   scan: true
-  sequencer:
-    globalDomain: ""
-    activeGlobalDomain: ""
+  sequencer: true
+  globalDomain:
+    globalDomainId: ""
+    activeGlobalDomainId: ""

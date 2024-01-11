@@ -28,36 +28,6 @@ spec:
         host: wallet-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
 {{- end }}
-{{- if and .Values.withSvIngress .Values.ingress.sv }}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: sv-sv-{{ (.Values.cluster).svNamespace }}
-  namespace: {{ .Release.Namespace }}
-spec:
-  hosts:
-  - "sv.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
-  gateways:
-  - cluster-ingress/cn-http-gateway
-  http:
-  - match:
-    - port: 443
-      uri:
-        prefix: "/api/sv/"
-    route:
-    - destination:
-        port:
-          number: 5014
-        host: sv-app.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
-  - match:
-    - port: 443
-    route:
-    - destination:
-        port:
-          number: 80
-        host: sv-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
----
-{{- end }}
 {{- if and .Values.withSvIngress .Values.ingress.scan }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
@@ -116,47 +86,5 @@ spec:
             port:
               number: 80
             host: cns-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
----
-{{- end }}
-{{- if and .Values.withSvIngress ((.Values.ingress).sequencer).globalDomain }}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: sequencer-global-{{ .Values.ingress.sequencer.globalDomain }}-{{ (.Values.cluster).svNamespace }}
-  namespace: {{ .Release.Namespace }}
-spec:
-  hosts:
-    - "sequencer-{{ .Values.ingress.sequencer.globalDomain }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
-  gateways:
-    - cluster-ingress/cn-http-gateway
-  http:
-  - match:
-      - port: 443
-    route:
-    - destination:
-        port:
-          number: 5008
-        host: global-domain-{{ .Values.ingress.sequencer.globalDomain }}-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
----
-{{- end }}
-{{- if and .Values.withSvIngress ((.Values.ingress).sequencer).activeGlobalDomain }}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: sequencer-sv-{{ (.Values.cluster).svNamespace }}
-  namespace: {{ .Release.Namespace }}
-spec:
-  hosts:
-    - "sequencer.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
-  gateways:
-    - cluster-ingress/cn-http-gateway
-  http:
-    - match:
-        - port: 443
-      route:
-        - destination:
-            port:
-              number: 5008
-            host: global-domain-{{ .Values.ingress.sequencer.activeGlobalDomain }}-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
 {{- end }}

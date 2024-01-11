@@ -1,21 +1,22 @@
+{{- $appIdentifier := include "domainOrDefaultValue" (list .Values "sv-web-ui") }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: sv-web-ui
-  name: sv-web-ui
+    app: {{ $appIdentifier }}
+  name: {{ $appIdentifier }}
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: sv-web-ui
+      app: {{ $appIdentifier }}
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: sv-web-ui
+        app: {{ $appIdentifier }}
     spec:
       containers:
         - env:
@@ -52,11 +53,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: sv-web-ui
+  name: {{ $appIdentifier }}
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: sv-web-ui
+    app: {{ $appIdentifier }}
   ports:
     - name: http
       port: 80

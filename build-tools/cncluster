@@ -378,12 +378,19 @@ function subcmd_rlogs() {
 
     namespace=$1
     app=$2
+    domain_suffixed_app=""
+
+    if [ -z "${3-}" ]; then
+      domain_suffixed_app="${app}"
+    else
+      domain_suffixed_app="${app}-$3"
+    fi
 
     _cluster_must_exist
 
     if POD_SPEC=$(kubectl get pod \
                           -n "${namespace}" \
-                          -l app="${app}" \
+                          -l app="${domain_suffixed_app}" \
                           -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
                           2> /dev/null); then
 
@@ -396,7 +403,7 @@ function subcmd_rlogs() {
             kubectl logs ${POD_SPEC} "${app}" -f | _json_log_format
         fi
     else
-        _error "No pod for app found: ${app}"
+        _error "No pod for app found: ${domain_suffixed_app}"
     fi
 }
 
@@ -415,12 +422,19 @@ function subcmd_logs() {
 
     namespace=$1
     app=$2
+    domain_suffixed_app=""
+
+    if [ -z "${3-}" ]; then
+      domain_suffixed_app="${app}"
+    else
+      domain_suffixed_app="${app}-$3"
+    fi
 
     _cluster_must_exist
 
     if POD_SPEC=$(kubectl get pod \
                           -n "${namespace}" \
-                          -l app="${app}" \
+                          -l app="${domain_suffixed_app}" \
                           -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
                           2> /dev/null); then
 
@@ -429,7 +443,7 @@ function subcmd_logs() {
         (kubectl logs ${POD_SPEC} "${app}" -f >> "${LOGFILE}" & lnav "${LOGFILE}")
         rm "${LOGFILE}"
     else
-        _error "No pod for app found: ${app}"
+        _error "No pod for app found: ${domain_suffixed_app}"
     fi
 }
 
