@@ -338,7 +338,7 @@ function installSvApps(
 ) {
   const svAppInstall = (id: DomainIndex) => {
     const svAppPostgres = config.splitPostgresInstances
-      ? postgres.installPostgres(xns, `sv-pg-${id}`, true)
+      ? postgres.installPostgres(xns, `sv-app-${id}-pg`, true)
       : defaultPostgres;
     const svAppName = sanitizedForPostgres(`${config.nodename}-${id}`);
     const svDb = svAppPostgres.createDatabaseAndInstallMetrics(svAppName);
