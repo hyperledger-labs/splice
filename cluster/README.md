@@ -1739,14 +1739,21 @@ cidaily, (and soon cidaily-testnet, cilr, devnet and testnet) are backed up peri
 Backups created through `node-backup.sh` (or the corresponding `cncluster backup_nodes`
 command) can be used for recovery using the `node-restore.sh` command.
 
-To do that, run: `node-backup.sh <node> <run_id> <component...>`, where `component` can be one
+To do that, run: `node-restore.sh <node> <run_id> <component...>`, where `component` can be one
 or more out of {validator, participant} for a validator and one or more out of
-{validator, scan, sv, participant-0, mediator, sequencer, cometbft-0} for an SV.
+{validator, scan, sv-app-0, participant-0, mediator, sequencer, cometbft-0} for an SV.
 
-While the script will currently allow any subset of components to be specified, it is highly
-advisable to always recover all layers above any component that is being recovered.
+Most components can, in general, be restored independently of others.
 
-Specifically, the following dependencies should be followed:
+The only strict requirement is that if a participant is restored, then all CN apps
+(validator, sv-app, scan) must be restored too.
+
+In certain cases, one may need to restore more than one component. For example, if a participant
+in an SV node declares a sequencer to be forked, then both the sequencer and the participant
+will need to be restored from a backup before that point. Restoring only the sequencer will not
+"convince" the participant to trust that sequencer again. The dependencies between components is
+as follows:
+
 ```
 cometbft -> sequencer -> mediator
                       \
@@ -1757,9 +1764,11 @@ Current caveats:
 - Currently, Pulumi will not be aware of any changes performed by the recovery script,
   so Pulumi commands applied to the same cluster at a later point will most probably go wrong
   in many ways.
-- Command deduplication on the participant may break after a recovery. Avoiding that is WIP,
-  and will be fixed in the future by placing the apps in read-only mode for a while after
-  recovering (until observing a "far enough" offset from the participant).
+- Command deduplication on the participant may, in theory, break after a recovery. However, for
+  this to happen, an app must be up and running within 1 minute (the default
+  ledger-time-record-time-tolerance of a domain) from the time the participant
+  submitted its last command before going down for the backup restore. Since that is highly
+  unlikely, we choose to ignore this potential corner case.
 - While a component is catching up on everything that happened after the point of recovery,
   it will typically report healthy, but in fact will be busy catching up.
   - To see the latest block known to the CometBFT node, browse to the SV UI, navigate to
@@ -1767,11 +1776,9 @@ Current caveats:
     of the recovering node to that observed in other SVs.
   - To see the latest block handled by the sequencer, search for log messages containing
     "Handle block with height" in the sequencer's output.
-  - The mediator and participant expose a `canton.<component>.sequencer-client.delay` metric,
-    which compares the sequencing time of the latest processed sequencer message with the local
-    clock of the component. High values of this metric indicate that this component is catching
-    up. In a coming Canton upgrade, the sequencer will be reporting that metric for itself as
-    well, which could be used to detect that the sequencer itself is catching up.
+  - The sequencer, mediator and participant also expose a `canton.<component>.sequencer-client.delay`
+    metric, which compares the sequencing time of the latest processed sequencer message with the local
+    clock of the component. High values of this metric indicate that this component is catching up.
 
 ## Appendix: Kubernetes and Other Deployment Resources
 
