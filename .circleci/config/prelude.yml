@@ -41,6 +41,7 @@ parameters:
         redeploy-sv-runbook-cilr,
         redeploy-sv-runbook-devnet,
         backup-cidaily,
+        backup-cidaily-testnet,
         publish-public-artifacts,
         auth0-user-cleanup,
         cluster-lock-reaper,

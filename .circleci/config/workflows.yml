@@ -1007,6 +1007,34 @@ workflows:
           requires:
             - wait_for_previous_pipeline
 
+  backup_cidaily_testnet:
+    when:
+      equal: [ backup-cidaily-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily-testnet
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily_and_cidaily_testnet"
+      - backup_cluster:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily-testnet
+          cluster: "cidaily-testnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+
   auth0_user_cleanup:
     when:
       equal: [ auth0-user-cleanup, << pipeline.parameters.run-job >> ]

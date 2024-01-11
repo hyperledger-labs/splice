@@ -520,11 +520,21 @@ jobs:
       - setup_nix
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Listing nodes for backup
+          cluster: << parameters.cluster >>
+          cmd: |
+            # note that ["${IS_DEVNET-}" = true] is not equivalent when IS_DEVNET is not defined
+            if [[ "${IS_DEVNET-}" != false ]]; then
+              echo "sv-1 sv-2 sv-3 sv-4 validator1 splitwell" > nodes.txt
+            else
+              echo "sv-1 validator1 splitwell" > nodes.txt
+            fi
       - run:
-          # TODO(#9267): testnet-like clusters do not have SVs 2-4.
           name: Split backup tasks
           command: |
-            echo "sv-1 sv-2 sv-3 sv-4 validator1 splitwell" | circleci tests run --command "xargs ./.circleci/grab-tests.sh"
+            nodes=$(cat nodes.txt)
+            echo "$nodes" | circleci tests run --command "xargs ./.circleci/grab-tests.sh"
             echo "Nodes to backup: $(cat tests-to-run.txt)"
       - run_bash_command_in_nix:
           cmd_name: Backup nodes
