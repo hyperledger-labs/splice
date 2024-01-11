@@ -10,6 +10,7 @@ import { AuthConfig, TestAuthConfig } from '../config/schema';
 import { useUserState } from '../contexts';
 import { theme } from '../theme';
 import LoginFailed from './LoginFailed';
+import { DisableConditionally } from './index';
 
 interface LoginProps {
   title: string;
@@ -127,20 +128,23 @@ const SstLoginPrompt: React.FC<SstLoginPromptProps> = ({ secret, audience, scope
         }
         sx={{ borderRadius: '9999px', paddingLeft: 0 }}
       />
-      <Button
-        id="login-button"
-        variant="pill"
-        fullWidth
-        size="large"
-        disabled={!isValidUserId}
-        onClick={e => {
-          e.preventDefault();
-          loginWithSst(userId, secret, audience, scope);
-          setUserId('');
-        }}
+      <DisableConditionally
+        conditions={[{ disabled: !isValidUserId, reason: `Invalid user ID '${userId}'` }]}
       >
-        Log In
-      </Button>
+        <Button
+          id="login-button"
+          variant="pill"
+          fullWidth
+          size="large"
+          onClick={e => {
+            e.preventDefault();
+            loginWithSst(userId, secret, audience, scope);
+            setUserId('');
+          }}
+        >
+          Log In
+        </Button>
+      </DisableConditionally>
     </>
   );
 };

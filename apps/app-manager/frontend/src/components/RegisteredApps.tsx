@@ -1,5 +1,5 @@
 import * as openapi from 'validator-openapi';
-import { CnsEntry, ErrorDisplay, Loading } from 'common-frontend';
+import { CnsEntry, DisableConditionally, ErrorDisplay, Loading } from 'common-frontend';
 import { MuiFileInput } from 'mui-file-input';
 import React, { useState } from 'react';
 
@@ -60,13 +60,16 @@ const RegisteredApp: React.FC<{ app: openapi.RegisteredApp }> = ({ app }) => {
               value={appRelease}
               onChange={value => setAppRelease(value)}
             />
-            <Button
-              onClick={onPublishAppRelease}
-              disabled={!appRelease}
-              className="registered-app-publish-release-button"
+            <DisableConditionally
+              conditions={[{ disabled: !appRelease, reason: 'No app release...' }]}
             >
-              Publish Release
-            </Button>
+              <Button
+                onClick={onPublishAppRelease}
+                className="registered-app-publish-release-button"
+              >
+                Publish Release
+              </Button>
+            </DisableConditionally>
           </Stack>
           {!updatedAppConfiguration && (
             <Button
@@ -159,19 +162,29 @@ const RegisteredApps: React.FC = () => {
             value={appProviderUser}
             onChange={e => setAppProviderUser(e.target.value)}
           />
-          <Button
-            id="register-app-button"
-            onClick={() =>
-              registerAppMutation.mutate({
-                configuration: appConfig,
-                release: appRelease!,
-                providerUserId: appProviderUser!,
-              })
-            }
-            disabled={!appRelease || !validAppConfiguration(appConfig) || !appProviderUser}
+          <DisableConditionally
+            conditions={[
+              { disabled: !appRelease, reason: 'No app release...' },
+              {
+                disabled: !validAppConfiguration(appConfig),
+                reason: 'Invalid app configuration...',
+              },
+              { disabled: !appProviderUser, reason: 'No app provider user...' },
+            ]}
           >
-            Register app
-          </Button>
+            <Button
+              id="register-app-button"
+              onClick={() =>
+                registerAppMutation.mutate({
+                  configuration: appConfig,
+                  release: appRelease!,
+                  providerUserId: appProviderUser!,
+                })
+              }
+            >
+              Register app
+            </Button>
+          </DisableConditionally>
         </CardContent>
       </Card>
       <Stack>

@@ -1,4 +1,4 @@
-import { Loading, useUserState } from 'common-frontend';
+import { DisableConditionally, Loading, useUserState } from 'common-frontend';
 import { useState } from 'react';
 
 import { Button, Grid, Typography } from '@mui/material';
@@ -40,18 +40,19 @@ const Onboarding: React.FC = () => {
         the button below to start using the wallet.
       </Typography>
 
-      <Button
-        variant="pill"
-        sx={{ margin: '15px' }}
-        onClick={e => {
-          e.preventDefault();
-          onOnboardUser();
-        }}
-        disabled={onboardClicked}
-        id="onboard-button"
-      >
-        Onboard yourself
-      </Button>
+      <DisableConditionally conditions={[{ disabled: onboardClicked, reason: 'Loading...' }]}>
+        <Button
+          variant="pill"
+          sx={{ margin: '15px' }}
+          onClick={e => {
+            e.preventDefault();
+            onOnboardUser();
+          }}
+          id="onboard-button"
+        >
+          Onboard yourself
+        </Button>
+      </DisableConditionally>
 
       <Typography variant="body2">
         Note: In the future, this functionality may move to a dedicated validator application.

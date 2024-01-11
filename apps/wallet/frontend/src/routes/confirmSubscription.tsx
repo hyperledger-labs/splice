@@ -6,6 +6,7 @@ import {
   ErrorDisplay,
   IntervalDisplay,
   Contract,
+  DisableConditionally,
 } from 'common-frontend';
 import { useCoinPrice } from 'common-frontend/scan-api';
 import { useState } from 'react';
@@ -134,14 +135,10 @@ const ConfirmSubscriptionButton: React.FC<{ cid: ContractId<damlSubscriptionRequ
   };
 
   return (
-    <Button
-      variant="pill"
-      size="large"
-      onClick={onAccept}
-      disabled={clicked}
-      className="sub-request-accept-button"
-    >
-      Confirm Subscription
-    </Button>
+    <DisableConditionally conditions={[{ disabled: clicked, reason: 'Loading...' }]}>
+      <Button variant="pill" size="large" onClick={onAccept} className="sub-request-accept-button">
+        Confirm Subscription
+      </Button>
+    </DisableConditionally>
   );
 };

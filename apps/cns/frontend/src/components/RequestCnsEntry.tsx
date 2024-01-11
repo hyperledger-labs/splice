@@ -1,4 +1,9 @@
-import { AmountDisplay, IntervalDisplay, SubscriptionButton } from 'common-frontend';
+import {
+  AmountDisplay,
+  DisableConditionally,
+  IntervalDisplay,
+  SubscriptionButton,
+} from 'common-frontend';
 import { useGetCnsRules, useLookupCnsEntryByName } from 'common-frontend/scan-api';
 import React, { useState } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
@@ -37,7 +42,6 @@ const RequestCnsEntry: React.FC = () => {
     : entryLookupResult === null
     ? 'available'
     : 'taken';
-  const searchButtonDisabled = nameLookupStatus === 'loading';
 
   return (
     <Stack justifyContent="center" mt={2} spacing={2}>
@@ -57,17 +61,20 @@ const RequestCnsEntry: React.FC = () => {
           onChange={event => debounced(event.target.value)}
           id="entry-name-field"
         />
-        <Button
-          variant="pill"
-          id="search-entry-button"
-          disabled={searchButtonDisabled}
-          onClick={() => {
-            setDisplayValidationResult(true);
-            debounced.flush();
-          }}
+        <DisableConditionally
+          conditions={[{ disabled: nameLookupStatus === 'loading', reason: 'Loading...' }]}
         >
-          Search
-        </Button>
+          <Button
+            variant="pill"
+            id="search-entry-button"
+            onClick={() => {
+              setDisplayValidationResult(true);
+              debounced.flush();
+            }}
+          >
+            Search
+          </Button>
+        </DisableConditionally>
       </Stack>
       {displayValidationResult && (
         <SubscriptionBar entryName={entryName} nameLookupStatus={nameLookupStatus} />

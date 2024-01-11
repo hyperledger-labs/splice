@@ -1,5 +1,11 @@
 import { useMutation } from '@tanstack/react-query';
-import { DateDisplay, Loading, SvClientProvider, CopyableTypography } from 'common-frontend';
+import {
+  DateDisplay,
+  DisableConditionally,
+  Loading,
+  SvClientProvider,
+  CopyableTypography,
+} from 'common-frontend';
 import React from 'react';
 
 import { Button, Stack, Table, TableContainer, TableHead, Typography } from '@mui/material';
@@ -39,16 +45,19 @@ const ValidatorOnboardingSecrets: React.FC = () => {
       <Typography mt={4} variant="h4">
         Validator Onboarding Secrets
       </Typography>
-      <Button
-        id="create-validator-onboarding-secret"
-        variant="pill"
-        fullWidth
-        size="large"
-        onClick={() => prepareOnboardingMutation.mutate()}
-        disabled={prepareOnboardingMutation.isLoading}
+      <DisableConditionally
+        conditions={[{ disabled: prepareOnboardingMutation.isLoading, reason: 'Loading...' }]}
       >
-        Create a validator onboarding secret
-      </Button>
+        <Button
+          id="create-validator-onboarding-secret"
+          variant="pill"
+          fullWidth
+          size="large"
+          onClick={() => prepareOnboardingMutation.mutate()}
+        >
+          Create a validator onboarding secret
+        </Button>
+      </DisableConditionally>
       <TableContainer>
         <Table style={{ tableLayout: 'fixed' }} className="onboarding-secret-table">
           <TableHead>

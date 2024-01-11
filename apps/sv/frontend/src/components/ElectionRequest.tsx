@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { Loading, SvClientProvider } from 'common-frontend';
+import { DisableConditionally, Loading, SvClientProvider } from 'common-frontend';
 import { Contract } from 'common-frontend';
 import React, { useEffect, useState } from 'react';
 
@@ -122,21 +122,29 @@ const ElectionRequests: React.FC = () => {
       </Typography>
       <RankingForm users={ranking} updateRanking={setRanking} />
       <Alerting alertState={alertState} />
-      <Button
-        id={'submit-ranking-leader-election'}
-        type={'submit'}
-        size="large"
-        onClick={() => {
-          createElectionRequestMutation.mutate();
-        }}
-        disabled={
-          electionContextQuery.data!.ranking.find(
-            e => e.payload.requester === svcInfosQuery.data?.svPartyId!
-          ) !== undefined
-        }
+      <DisableConditionally
+        conditions={[
+          { disabled: createElectionRequestMutation.isLoading, reason: 'Submitting...' },
+          {
+            disabled:
+              electionContextQuery.data!.ranking.find(
+                e => e.payload.requester === svcInfosQuery.data?.svPartyId!
+              ) !== undefined,
+            reason: `Party ${svcInfosQuery.data?.svPartyId} has already submitted`,
+          },
+        ]}
       >
-        Submit Ranking
-      </Button>
+        <Button
+          id={'submit-ranking-leader-election'}
+          type={'submit'}
+          size="large"
+          onClick={() => {
+            createElectionRequestMutation.mutate();
+          }}
+        >
+          Submit Ranking
+        </Button>
+      </DisableConditionally>
     </Stack>
   );
 };

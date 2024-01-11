@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
-import { CnsField } from 'common-frontend';
+import { CnsField, DisableConditionally } from 'common-frontend';
 import { useCoinPrice } from 'common-frontend/scan-api';
 import addHours from 'date-fns/addHours';
 import React, { useMemo, useState } from 'react';
@@ -152,16 +152,19 @@ const SendTransfer: React.FC = () => {
             />
           </Stack>
 
-          <Button
-            id="create-offer-submit-button"
-            variant="pill"
-            fullWidth
-            size="large"
-            onClick={() => transferMutation.mutate()}
-            disabled={transferMutation.isLoading}
+          <DisableConditionally
+            conditions={[{ disabled: transferMutation.isLoading, reason: 'Loading...' }]}
           >
-            Send
-          </Button>
+            <Button
+              id="create-offer-submit-button"
+              variant="pill"
+              fullWidth
+              size="large"
+              onClick={() => transferMutation.mutate()}
+            >
+              Send
+            </Button>
+          </DisableConditionally>
         </CardContent>
       </Card>
     </Stack>

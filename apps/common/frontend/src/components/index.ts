@@ -6,6 +6,7 @@ import CopyableTypography from './CopyableTypography';
 import Copyright from './Copyright';
 import DateDisplay from './DateDisplay';
 import DevNetOnly from './DevNetOnly';
+import DisableConditionally from './DisableConditionally';
 import ErrorBoundary from './ErrorBoundary';
 import ErrorDisplay from './ErrorDisplay';
 import ErrorRouterPage from './ErrorRouterPage';
@@ -27,6 +28,7 @@ export {
   CopyableTypography,
   Copyright,
   DateDisplay,
+  DisableConditionally,
   DevNetOnly,
   ErrorBoundary,
   ErrorDisplay,

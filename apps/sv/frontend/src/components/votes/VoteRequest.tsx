@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { getUTCWithOffset, SvClientProvider } from 'common-frontend';
+import { DisableConditionally, getUTCWithOffset, SvClientProvider } from 'common-frontend';
 import { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -291,18 +291,25 @@ const VoteRequest: React.FC = () => {
             />
           </Stack>
           <Alerting alertState={alertMessage} />
-          <Button
-            id="create-voterequest-submit-button"
-            fullWidth
-            type={'submit'}
-            size="large"
-            onClick={() => {
-              createVoteRequestMutation.mutate();
-            }}
-            disabled={createVoteRequestMutation.isLoading || action === undefined || summary === ''}
+          <DisableConditionally
+            conditions={[
+              { disabled: createVoteRequestMutation.isLoading, reason: 'Loading...' },
+              { disabled: action === undefined, reason: 'No action' },
+              { disabled: summary === '', reason: 'No summary' },
+            ]}
           >
-            Send request to collective
-          </Button>
+            <Button
+              id="create-voterequest-submit-button"
+              fullWidth
+              type={'submit'}
+              size="large"
+              onClick={() => {
+                createVoteRequestMutation.mutate();
+              }}
+            >
+              Send request to collective
+            </Button>
+          </DisableConditionally>
         </CardContent>
       </Card>
     </Stack>

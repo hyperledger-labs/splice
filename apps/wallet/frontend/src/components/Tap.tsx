@@ -1,6 +1,6 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { ErrorDisplay } from 'common-frontend';
+import { DisableConditionally, ErrorDisplay } from 'common-frontend';
 import { useState } from 'react';
 
 import { Button, Stack, TextField } from '@mui/material';
@@ -23,14 +23,20 @@ const Tap: React.FC = () => {
         type="text"
         id="tap-amount-field"
       />
-      <Button
-        variant="contained"
-        disabled={isInvalidAmount}
-        onClick={() => mutation.mutate(BigNumber(tapValueText))}
-        id="tap-button"
+      <DisableConditionally
+        conditions={[
+          { disabled: mutation.isLoading, reason: 'Loading...' },
+          { disabled: isInvalidAmount, reason: 'Invalid amount' },
+        ]}
       >
-        Tap
-      </Button>
+        <Button
+          variant="contained"
+          onClick={() => mutation.mutate(BigNumber(tapValueText))}
+          id="tap-button"
+        >
+          Tap
+        </Button>
+      </DisableConditionally>
 
       {mutation.isError ? <ErrorDisplay message={'Tap operation failed'} /> : null}
     </Stack>

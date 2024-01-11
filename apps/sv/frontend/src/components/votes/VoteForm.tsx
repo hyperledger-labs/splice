@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { SvClientProvider } from 'common-frontend';
+import { DisableConditionally, SvClientProvider } from 'common-frontend';
 import React, { useState } from 'react';
 
 import CheckIcon from '@mui/icons-material/Check';
@@ -79,15 +79,13 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
               <EditIcon fontSize={'small'} />
             </IconButton>
           ) : (
-            <Button
-              id="cast-vote-button"
-              size="small"
-              variant="contained"
-              disabled={castOrUpdateVoteMutation.isLoading}
-              onClick={startEditing}
+            <DisableConditionally
+              conditions={[{ disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' }]}
             >
-              vote
-            </Button>
+              <Button id="cast-vote-button" size="small" variant="contained" onClick={startEditing}>
+                vote
+              </Button>
+            </DisableConditionally>
           ))}
       </Typography>
       <Stack direction="column" mb={4} spacing={1}>
@@ -99,22 +97,28 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
                   <Typography variant="h6">Your Vote</Typography>
                 </TableCell>
                 <TableCell>
-                  <ToggleButtonGroup
-                    value={isEditing ? voteEditing : voteFromLedger}
-                    exclusive
-                    onChange={handleChange}
-                    aria-label="Platform"
-                    disabled={!isEditing || castOrUpdateVoteMutation.isLoading}
+                  <DisableConditionally
+                    conditions={[
+                      { disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' },
+                      { disabled: !isEditing, reason: 'Not editing' },
+                    ]}
                   >
-                    <ToggleButton id="reject-vote-button" color="error" value="reject">
-                      <ClearIcon />
-                      Reject
-                    </ToggleButton>
-                    <ToggleButton id="accept-vote-button" color="success" value="accept">
-                      <CheckIcon />
-                      Accept
-                    </ToggleButton>
-                  </ToggleButtonGroup>
+                    <ToggleButtonGroup
+                      value={isEditing ? voteEditing : voteFromLedger}
+                      exclusive
+                      onChange={handleChange}
+                      aria-label="Platform"
+                    >
+                      <ToggleButton id="reject-vote-button" color="error" value="reject">
+                        <ClearIcon />
+                        Reject
+                      </ToggleButton>
+                      <ToggleButton id="accept-vote-button" color="success" value="accept">
+                        <CheckIcon />
+                        Accept
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </DisableConditionally>
                 </TableCell>
               </TableRow>
               <TableRow>
@@ -123,15 +127,20 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
                 </TableCell>
                 <TableCell>
                   {isEditing ? (
-                    <TextField
-                      sx={{ width: '100%' }}
-                      id="vote-reason-body"
-                      rows={4}
-                      multiline
-                      onChange={e => setReasonBody(e.target.value)}
-                      value={reasonBody}
-                      disabled={castOrUpdateVoteMutation.isLoading}
-                    />
+                    <DisableConditionally
+                      conditions={[
+                        { disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' },
+                      ]}
+                    >
+                      <TextField
+                        sx={{ width: '100%' }}
+                        id="vote-reason-body"
+                        rows={4}
+                        multiline
+                        onChange={e => setReasonBody(e.target.value)}
+                        value={reasonBody}
+                      />
+                    </DisableConditionally>
                   ) : (
                     <Typography id="vote-request-modal-vote-reason-body" variant="h6">
                       {vote ? vote.reason.body : ''}
@@ -145,13 +154,18 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
                 </TableCell>
                 <TableCell>
                   {isEditing ? (
-                    <TextField
-                      sx={{ width: '100%' }}
-                      id="vote-reason-url"
-                      onChange={e => setReasonUrl(e.target.value)}
-                      value={reasonUrl}
-                      disabled={castOrUpdateVoteMutation.isLoading}
-                    />
+                    <DisableConditionally
+                      conditions={[
+                        { disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' },
+                      ]}
+                    >
+                      <TextField
+                        sx={{ width: '100%' }}
+                        id="vote-reason-url"
+                        onChange={e => setReasonUrl(e.target.value)}
+                        value={reasonUrl}
+                      />
+                    </DisableConditionally>
                   ) : (
                     <Typography id="vote-request-modal-vote-reason-url" variant="h6">
                       {vote ? vote.reason.url : ''}
@@ -166,22 +180,29 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
                   </TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={2}>
-                      <Button
-                        variant="outlined"
-                        disabled={castOrUpdateVoteMutation.isLoading}
-                        onClick={() => setIsEditing(false)}
+                      <DisableConditionally
+                        conditions={[
+                          { disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' },
+                        ]}
                       >
-                        Cancel
-                      </Button>
-                      <Button
-                        id="save-vote-button"
-                        variant="contained"
-                        disabled={castOrUpdateVoteMutation.isLoading}
-                        endIcon={<SendIcon />}
-                        onClick={() => castOrUpdateVoteMutation.mutate()}
+                        <Button variant="outlined" onClick={() => setIsEditing(false)}>
+                          Cancel
+                        </Button>
+                      </DisableConditionally>
+                      <DisableConditionally
+                        conditions={[
+                          { disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' },
+                        ]}
                       >
-                        Save
-                      </Button>
+                        <Button
+                          id="save-vote-button"
+                          variant="contained"
+                          endIcon={<SendIcon />}
+                          onClick={() => castOrUpdateVoteMutation.mutate()}
+                        >
+                          Save
+                        </Button>
+                      </DisableConditionally>
                     </Stack>
                   </TableCell>
                 </TableRow>

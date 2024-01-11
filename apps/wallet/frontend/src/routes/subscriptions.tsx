@@ -1,6 +1,13 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, CnsEntry, ErrorDisplay, IntervalDisplay, Loading } from 'common-frontend';
+import {
+  AmountDisplay,
+  CnsEntry,
+  DisableConditionally,
+  ErrorDisplay,
+  IntervalDisplay,
+  Loading,
+} from 'common-frontend';
 import { useCoinPrice } from 'common-frontend/scan-api';
 import differenceInMilliseconds from 'date-fns/differenceInMilliseconds';
 import intlFormat from 'date-fns/intlFormat';
@@ -112,15 +119,20 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
         <PaymentDue state={subscription.state} />
       </TableCell>
       <TableCell>
-        <Button
-          className="sub-cancel-button"
-          variant="pill"
-          size="small"
-          onClick={cancelSubscription}
-          disabled={subscription.state.type !== 'idle'}
+        <DisableConditionally
+          conditions={[
+            { disabled: subscription.state.type !== 'idle', reason: 'Subscription is not idle' },
+          ]}
         >
-          Cancel
-        </Button>
+          <Button
+            className="sub-cancel-button"
+            variant="pill"
+            size="small"
+            onClick={cancelSubscription}
+          >
+            Cancel
+          </Button>
+        </DisableConditionally>
       </TableCell>
     </TableRow>
   );

@@ -1,4 +1,10 @@
-import { AssignedContract, Contract, ErrorDisplay, Loading } from 'common-frontend';
+import {
+  AssignedContract,
+  Contract,
+  DisableConditionally,
+  ErrorDisplay,
+  Loading,
+} from 'common-frontend';
 import { useCallback, useState } from 'react';
 
 import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from '@mui/material';
@@ -17,15 +23,23 @@ interface GroupSetupProps {
   rulesMap: SplitwellRulesMap;
 }
 
-type GroupInviteInput = { originalText: string } & (
-  | {
-      type: 'good';
-      inviteContract: AssignedContract<GroupInvite>;
-      rules: Contract<SplitwellRules>;
-    }
-  | { type: 'noparse'; failure: string }
-  | { type: 'noinstall'; domainId: string }
-);
+type GroupInviteInputGood = {
+  type: 'good';
+  originalText: string;
+  inviteContract: AssignedContract<GroupInvite>;
+  rules: Contract<SplitwellRules>;
+};
+type GroupInviteInputNoParse = {
+  type: 'noparse';
+  originalText: string;
+  failure: string;
+};
+type GroupInviteInputNoInstall = {
+  type: 'noinstall';
+  originalText: string;
+  domainId: string;
+};
+type GroupInviteInput = GroupInviteInputGood | GroupInviteInputNoParse | GroupInviteInputNoInstall;
 
 const GroupSetup: React.FC<GroupSetupProps> = ({
   party,
@@ -128,14 +142,19 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
         value={groupInvite.originalText}
         onChange={event => setGroupInviteInput(event.target.value)}
       ></TextField>
-      <Button
-        variant="contained"
-        id="request-membership-link"
-        disabled={groupInvite.type !== 'good'}
-        onClick={onJoinGroup}
+      <DisableConditionally
+        conditions={[
+          { disabled: groupInvite.type === 'noinstall', reason: 'Splitwell install not found' },
+          {
+            disabled: groupInvite.type === 'noparse',
+            reason: (groupInvite as GroupInviteInputNoParse).failure,
+          },
+        ]}
       >
-        Request to join group
-      </Button>
+        <Button variant="contained" id="request-membership-link" onClick={onJoinGroup}>
+          Request to join group
+        </Button>
+      </DisableConditionally>
       <List>
         <Typography>Created group invites</Typography>
         {groupInvites.data.map(({ contract: invite, domainId }) => {

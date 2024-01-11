@@ -1,5 +1,12 @@
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, CnsEntry, ErrorDisplay, Loading, RateDisplay } from 'common-frontend';
+import {
+  AmountDisplay,
+  CnsEntry,
+  DisableConditionally,
+  ErrorDisplay,
+  Loading,
+  RateDisplay,
+} from 'common-frontend';
 import { useCoinPrice, useGetCoinRules } from 'common-frontend/scan-api';
 import React from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
@@ -288,14 +295,18 @@ const ConfirmPaymentButton: React.FC<{
   };
 
   return (
-    <Button
-      variant="pill"
-      size="large"
-      onClick={onAccept}
-      className="payment-accept"
-      disabled={!domainId || domainId !== coinRulesDomain}
+    <DisableConditionally
+      conditions={[
+        { disabled: !domainId, reason: 'No domainId (request is in flight)' },
+        {
+          disabled: domainId !== coinRulesDomain,
+          reason: `Wrong domainId (request is on domain ${domainId}, coin rules are on domain ${coinRulesDomain})`,
+        },
+      ]}
     >
-      Send Payment
-    </Button>
+      <Button variant="pill" size="large" onClick={onAccept} className="payment-accept">
+        Send Payment
+      </Button>
+    </DisableConditionally>
   );
 };
