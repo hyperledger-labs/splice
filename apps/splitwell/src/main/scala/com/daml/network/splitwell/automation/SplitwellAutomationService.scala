@@ -82,7 +82,7 @@ class SplitwellAutomationService(
       store,
       connection,
       scanConnection.getCoinRulesDomain,
-      store.providerParty,
+      store.key.providerParty,
       splitwellCodegen.TransferInProgress.COMPANION,
     )
   )
@@ -92,7 +92,7 @@ class SplitwellAutomationService(
       triggerContext,
       store,
       connection,
-      store.providerParty,
+      store.key.providerParty,
     )
   )
 
@@ -101,7 +101,7 @@ class SplitwellAutomationService(
       triggerContext,
       store,
       connection,
-      store.providerParty,
+      store.key.providerParty,
       implicit tc =>
         (
           store.listLaggingBalanceUpdates(),

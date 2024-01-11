@@ -54,7 +54,7 @@ private[automation] class UpgradeGroupTrigger(
     for {
       preferredDomain <- store.defaultAcsDomainIdF
       _ <- connection.submitReassignmentAndWaitNoDedup(
-        submitter = store.providerParty,
+        submitter = store.key.providerParty,
         command = ReassignmentCommand.Unassign(
           contractId = groupId,
           source = domainId,

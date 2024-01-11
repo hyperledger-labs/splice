@@ -129,7 +129,7 @@ object TxLogStoreNew {
   }
 
   object Config {
-    lazy val empty: Config[Entry] = new Config[Entry] {
+    def empty[TXE]: Config[TXE] = new Config[TXE] {
       override def parser = Parser.empty
       override def entryToRow = throw new RuntimeException(
         "This app does not serialize any TxLog entries"

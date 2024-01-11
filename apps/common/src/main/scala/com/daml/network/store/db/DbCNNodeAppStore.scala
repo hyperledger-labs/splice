@@ -144,3 +144,43 @@ abstract class DbCNNodeAppStoreWithNewHistory[
   // The following members will be removed
   override def txLog = ???
 }
+
+abstract class DbCNNodeAppStoreWithoutNewHistory[
+    TXE <: TxLogStoreNew.Entry
+](
+    storage: DbStorage,
+    acsTableName: String,
+    storeDescriptor: io.circe.Json,
+)(implicit
+    protected val ec: ExecutionContext,
+    templateJsonDecoder: TemplateJsonDecoder,
+    closeContext: CloseContext,
+) extends CNNodeAppStoreWithoutNewHistory[TXE] {
+
+  protected def retryProvider: RetryProvider
+  final protected def futureSupervisor: FutureSupervisor = retryProvider.futureSupervisor
+
+  override val multiDomainAcsStore: DbMultiDomainAcsStoreNew[TXE] =
+    new DbMultiDomainAcsStoreNew(
+      storage,
+      acsTableName,
+      "THIS_STORE_DOES_NOT_HAVE_A_TXLOG",
+      storeDescriptor,
+      loggerFactory,
+      acsContractFilter,
+      TxLogStoreNew.Config.empty,
+      retryProvider,
+    )
+
+  override lazy val domains: InMemoryDomainStore =
+    new InMemoryDomainStore(
+      acsContractFilter.ingestionFilter.primaryParty,
+      loggerFactory,
+      retryProvider,
+    )
+
+  override def close(): Unit = ()
+
+  // The following members will be removed
+  override def txLog = ???
+}

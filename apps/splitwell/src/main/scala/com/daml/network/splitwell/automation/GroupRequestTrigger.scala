@@ -40,7 +40,7 @@ class GroupRequestTrigger(
         splitwellCodegen.GroupRequest,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val provider = store.providerParty
+    val provider = store.key.providerParty
     val user = PartyId.tryFromProtoPrimitive(req.payload.group.owner)
     val groupId = req.payload.group.id
     for {

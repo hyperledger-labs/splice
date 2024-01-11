@@ -63,3 +63,12 @@ trait CNNodeAppStoreWithNewHistory[
   override def txLogParser = ???
   override def txLog = ???
 }
+
+trait CNNodeAppStoreWithoutNewHistory[
+    TXE <: TxLogStoreNew.Entry
+] extends CNNodeAppStore[TxLogStore.IndexRecord, TxLogStore.Entry[TxLogStore.IndexRecord]] {
+
+  // The following members will be deleted
+  override protected def txLogParser = ???
+  override def txLog = ???
+}

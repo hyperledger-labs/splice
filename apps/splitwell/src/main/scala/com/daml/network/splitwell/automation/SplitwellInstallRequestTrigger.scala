@@ -41,7 +41,7 @@ class SplitwellInstallRequestTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
-    val provider = store.providerParty
+    val provider = store.key.providerParty
     for {
       queryResult <- store.lookupInstallWithOffset(req.domain, user)
       taskOutcome <- queryResult match {

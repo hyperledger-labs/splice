@@ -46,11 +46,11 @@ class TerminatedAppPaymentTrigger(
         case Some(transferInProgress) =>
           connection
             .submit(
-              Seq(store.providerParty),
+              Seq(store.key.providerParty),
               Seq.empty,
               task.exercise { tapContractId =>
                 transferInProgress.contractId.exerciseTransferInProgress_Terminate(
-                  store.providerParty.toProtoPrimitive,
+                  store.key.providerParty.toProtoPrimitive,
                   tapContractId,
                 )
               },

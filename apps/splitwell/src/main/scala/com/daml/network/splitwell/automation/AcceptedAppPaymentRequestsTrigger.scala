@@ -43,7 +43,7 @@ class AcceptedAppPaymentRequestsTrigger(
         walletCodegen.AcceptedAppPayment,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val provider = store.providerParty
+    val provider = store.key.providerParty
     val round = payment.payload.round
     def rejectPayment(
         reason: String,
@@ -53,7 +53,7 @@ class AcceptedAppPaymentRequestsTrigger(
       logger.warn(s"rejecting accepted app payment: $reason")
       val cmd = payment.exercise(_.exerciseAcceptedAppPayment_Reject(transferContext))
       connection
-        .submit(Seq(store.providerParty), Seq(), cmd)
+        .submit(Seq(store.key.providerParty), Seq(), cmd)
         .withDisclosedContracts(disclosedContracts)
         .noDedup
         .yieldResult()
@@ -61,7 +61,7 @@ class AcceptedAppPaymentRequestsTrigger(
     }
     for {
       transferContextE <- scanConnection
-        .getAppTransferContextForRound(store.providerParty, round)
+        .getAppTransferContextForRound(store.key.providerParty, round)
       result <- transferContextE match {
         case Right((transferContext, disclosedContracts)) =>
           for {
@@ -88,7 +88,7 @@ class AcceptedAppPaymentRequestsTrigger(
           } yield TaskSuccess("accepted payment and completed transfer")
         case Left(err) =>
           scanConnection
-            .getAppTransferContext(store.providerParty)
+            .getAppTransferContext(store.key.providerParty)
             .flatMap { case (transferContext, disclosedContracts) =>
               rejectPayment(
                 s"Round ${payment.payload.round} is no longer active: $err",

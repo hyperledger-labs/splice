@@ -78,11 +78,8 @@ class SplitwellApp(
 
   override def initialize(
       ledgerClient: CNLedgerClient,
-      party: PartyId,
+      partyId: PartyId,
   ): Future[SplitwellApp.State] = for {
-    store <- Future.successful(
-      SplitwellStore(party, storage, config.domains, loggerFactory, retryProvider)
-    )
     scanConnection <- appInitStep(s"Get scan connection") {
       ScanConnection(
         ledgerClient,
@@ -92,6 +89,8 @@ class SplitwellApp(
         loggerFactory,
       )
     }
+    storeKey = SplitwellStore.Key(providerParty = partyId)
+    store = SplitwellStore(storeKey, storage, config.domains, loggerFactory, retryProvider)
     participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
       loggerFactory,
@@ -125,7 +124,7 @@ class SplitwellApp(
     handler = new HttpSplitwellHandler(
       participantAdminConnection,
       SplitwellDomains(preferred, others),
-      party,
+      storeKey.providerParty,
       store,
       loggerFactory,
     )
@@ -186,17 +185,17 @@ class SplitwellApp(
       case QueryResult(offset, None) =>
         automation.connection
           .submit(
-            Seq(automation.store.providerParty),
+            Seq(automation.store.key.providerParty),
             Seq.empty,
             new splitwellCodegen.SplitwellRules(
-              automation.store.providerParty.toProtoPrimitive
+              automation.store.key.providerParty.toProtoPrimitive
             ).create,
           )
           .withDomainId(domain)
           .withDedup(
             CNLedgerConnection.CommandId(
               "com.daml.network.splitwell.createSplitwellRules",
-              Seq(automation.store.providerParty),
+              Seq(automation.store.key.providerParty),
               domain.toProtoPrimitive,
             ),
             offset,

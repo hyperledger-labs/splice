@@ -5,16 +5,14 @@ import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.splitwell.config.SplitwellDomainConfig
+import com.daml.network.splitwell.store.db.DbSplitwellStore
+import com.daml.network.splitwell.store.db.SplitwellTables.SplitwellAcsStoreRowData
 import com.daml.network.splitwell.store.memory.InMemorySplitwellStore
-import com.daml.network.store.db.AcsRowData
-import com.daml.network.store.{
-  CNNodeAppStoreWithoutHistory,
-  InMemoryMultiDomainAcsStore,
-  MultiDomainAcsStore,
-  TxLogStore,
-}
-import com.daml.network.util.{AssignedContract, Contract, ContractWithState}
+import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
+import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
+import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -25,7 +23,8 @@ import scala.jdk.CollectionConverters.*
 trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   import MultiDomainAcsStore.QueryResult
 
-  def providerParty: PartyId
+  /** The key identifying the parties considered by this store. */
+  val key: SplitwellStore.Key
 
   protected[this] def domainConfig: SplitwellDomainConfig
 
@@ -34,76 +33,46 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   private[splitwell] final def defaultAcsDomainIdF(implicit tc: TraceContext): Future[DomainId] =
     domains.waitForDomainConnection(defaultAcsDomain)
 
-  override def multiDomainAcsStore: InMemoryMultiDomainAcsStore[
-    TxLogStore.IndexRecord,
-    TxLogStore.Entry[TxLogStore.IndexRecord],
-  ]
+  override def multiDomainAcsStore: MultiDomainAcsStore
 
   def lookupInstallWithOffset(
       domainId: DomainId,
       user: PartyId,
-  ): Future[QueryResult[Option[
+  )(implicit tc: TraceContext): Future[QueryResult[Option[
     Contract[splitwellCodegen.SplitwellInstall.ContractId, splitwellCodegen.SplitwellInstall]
-  ]]] =
-    multiDomainAcsStore.findContractOnDomainWithOffset(splitwellCodegen.SplitwellInstall.COMPANION)(
-      domainId,
-      co => co.payload.user == user.toProtoPrimitive,
-    )
+  ]]]
 
   def lookupGroupWithOffset(
       owner: PartyId,
       id: splitwellCodegen.GroupId,
-  ): Future[
+  )(implicit tc: TraceContext): Future[
     QueryResult[
       Option[ContractWithState[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]]
     ]
-  ] =
-    multiDomainAcsStore.findContractWithOffset(splitwellCodegen.Group.COMPANION)(co =>
-      co.payload.owner == owner.toProtoPrimitive && co.payload.id == id
-    )
+  ]
 
   def listGroups(
       user: PartyId
   )(implicit
       traceContext: TraceContext
-  ): Future[Seq[ContractWithState[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]]] =
-    multiDomainAcsStore.filterContracts(
-      splitwellCodegen.Group.COMPANION,
-      c => groupMembers(c.payload).contains(user.toProtoPrimitive),
-    )
+  ): Future[Seq[ContractWithState[splitwellCodegen.Group.ContractId, splitwellCodegen.Group]]]
 
   def listGroupInvites(owner: PartyId)(implicit traceContext: TraceContext): Future[
     Seq[ContractWithState[splitwellCodegen.GroupInvite.ContractId, splitwellCodegen.GroupInvite]]
-  ] =
-    multiDomainAcsStore.filterContracts(
-      splitwellCodegen.GroupInvite.COMPANION,
-      c => c.payload.group.owner == owner.toProtoPrimitive,
-    )
+  ]
 
   def listAcceptedGroupInvites(owner: PartyId, groupId: String)(implicit
       traceContext: TraceContext
   ): Future[Seq[ContractWithState[
     splitwellCodegen.AcceptedGroupInvite.ContractId,
     splitwellCodegen.AcceptedGroupInvite,
-  ]]] =
-    multiDomainAcsStore.filterContracts(
-      splitwellCodegen.AcceptedGroupInvite.COMPANION,
-      c =>
-        c.payload.groupKey.owner == owner.toProtoPrimitive &&
-          c.payload.groupKey == groupKey(owner, groupId),
-    )
+  ]]]
 
   def listBalanceUpdates(user: PartyId, key: splitwellCodegen.GroupKey)(implicit
       traceContext: TraceContext
   ): Future[Seq[
     ContractWithState[splitwellCodegen.BalanceUpdate.ContractId, splitwellCodegen.BalanceUpdate]
-  ]] =
-    multiDomainAcsStore.filterContracts(
-      splitwellCodegen.BalanceUpdate.COMPANION,
-      c =>
-        groupMembers(c.payload.group).contains(user.toProtoPrimitive) &&
-          groupKey(c.payload.group) == key,
-    )
+  ]]
 
   /** Contract IDs of groups that can be transferred from
     * [[com.daml.network.splitwell.config.SplitwellDomains#others]] because all
@@ -123,33 +92,23 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
       splitwellCodegen.SplitwellInstall.ContractId,
       splitwellCodegen.SplitwellInstall,
     ]
-  ]] =
-    multiDomainAcsStore.filterAssignedContracts(
-      splitwellCodegen.SplitwellInstall.COMPANION,
-      c => c.payload.user == user.toProtoPrimitive,
-    )
+  ]]
 
   def listSplitwellRules()(implicit traceContext: TraceContext): Future[Seq[
     AssignedContract[
       splitwellCodegen.SplitwellRules.ContractId,
       splitwellCodegen.SplitwellRules,
     ]
-  ]] =
-    multiDomainAcsStore.filterAssignedContracts(
-      splitwellCodegen.SplitwellRules.COMPANION,
-      _ => true,
-    )
+  ]]
 
-  def lookupSplitwellRules(domainId: DomainId): Future[QueryResult[Option[
+  def lookupSplitwellRules(
+      domainId: DomainId
+  )(implicit tc: TraceContext): Future[QueryResult[Option[
     Contract[
       splitwellCodegen.SplitwellRules.ContractId,
       splitwellCodegen.SplitwellRules,
     ]
-  ]]] =
-    multiDomainAcsStore.findContractOnDomainWithOffset(splitwellCodegen.SplitwellRules.COMPANION)(
-      domainId,
-      (_: Any) => true,
-    )
+  ]]]
 
   /** List balance updates that are lagging behind the corresponding group contract meaning the
     * have not yet transferred to the same domain.
@@ -189,28 +148,22 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
 
   def lookupTransferInProgress(
       paymentRequest: walletCodegen.AppPaymentRequest.ContractId
-  ): Future[QueryResult[Option[ContractWithState[
+  )(implicit tc: TraceContext): Future[QueryResult[Option[ContractWithState[
     splitwellCodegen.TransferInProgress.ContractId,
     splitwellCodegen.TransferInProgress,
-  ]]]] =
-    multiDomainAcsStore.findContractWithOffset(splitwellCodegen.TransferInProgress.COMPANION)(
-      (co: Contract[
-        splitwellCodegen.TransferInProgress.ContractId,
-        splitwellCodegen.TransferInProgress,
-      ]) => co.payload.reference == paymentRequest
-    )
+  ]]]]
 
   protected[this] def groupMembers(group: splitwellCodegen.Group): Set[String] =
     group.members.asScala.toSet + group.owner
 
-  private def groupKey(owner: PartyId, id: String): splitwellCodegen.GroupKey =
+  protected[this] def groupKey(owner: PartyId, id: String): splitwellCodegen.GroupKey =
     new splitwellCodegen.GroupKey(
       owner.toProtoPrimitive,
-      providerParty.toProtoPrimitive,
+      key.providerParty.toProtoPrimitive,
       new splitwellCodegen.GroupId(id),
     )
 
-  private def groupKey(group: splitwellCodegen.Group): splitwellCodegen.GroupKey =
+  protected[this] def groupKey(group: splitwellCodegen.Group): splitwellCodegen.GroupKey =
     new splitwellCodegen.GroupKey(
       group.owner,
       group.provider,
@@ -220,70 +173,131 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
 
 object SplitwellStore {
   def apply(
-      providerParty: PartyId,
+      key: Key,
       storage: Storage,
       domainConfig: SplitwellDomainConfig,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
   )(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      templateJsonDecoder: TemplateJsonDecoder,
+      close: CloseContext,
   ): SplitwellStore =
     storage match {
       case _: MemoryStorage =>
         new InMemorySplitwellStore(
-          providerParty,
+          key,
           domainConfig,
           loggerFactory,
           retryProvider,
         )
-      case _: DbStorage => throw new RuntimeException("Not implemented")
+      case dbStorage: DbStorage =>
+        new DbSplitwellStore(key, domainConfig, dbStorage, loggerFactory, retryProvider)
     }
 
-  def contractFilter(providerPartyId: PartyId): MultiDomainAcsStore.ContractFilter[AcsRowData] = {
-    import MultiDomainAcsStore.mkFilter
-    val provider = providerPartyId.toProtoPrimitive
-
-    // TODO (#8293): make it db
-    def splitwellIsInMemoryOnly(contract: Contract[?, ?]) = throw new IllegalArgumentException(
-      "This shouldn't have been called on splitwell."
+  case class Key(
+      providerParty: PartyId
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[Key] = prettyOfClass(
+      param("providerParty", _.providerParty)
     )
+  }
+
+  def contractFilter(key: Key): MultiDomainAcsStore.ContractFilter[SplitwellAcsStoreRowData] = {
+    import MultiDomainAcsStore.mkFilter
+    val provider = key.providerParty.toProtoPrimitive
 
     MultiDomainAcsStore.SimpleContractFilter(
-      providerPartyId,
+      key.providerParty,
       Map(
-        mkFilter(splitwellCodegen.SplitwellRules.COMPANION)(co => co.payload.provider == provider)(
-          splitwellIsInMemoryOnly
-        ),
+        mkFilter(splitwellCodegen.SplitwellRules.COMPANION)(co => co.payload.provider == provider) {
+          contract =>
+            SplitwellAcsStoreRowData(
+              contract = contract
+            )
+        },
         mkFilter(splitwellCodegen.SplitwellInstallRequest.COMPANION)(co =>
           co.payload.provider == provider
-        )(splitwellIsInMemoryOnly),
+        ) { contract =>
+          SplitwellAcsStoreRowData(
+            contract = contract,
+            installUser = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+          )
+        },
         mkFilter(splitwellCodegen.SplitwellInstall.COMPANION)(co =>
           co.payload.provider == provider
-        )(splitwellIsInMemoryOnly),
+        ) { contract =>
+          SplitwellAcsStoreRowData(
+            contract = contract,
+            installUser = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+          )
+        },
         mkFilter(splitwellCodegen.TransferInProgress.COMPANION)(co =>
           co.payload.group.provider == provider
-        )(splitwellIsInMemoryOnly),
-        mkFilter(splitwellCodegen.Group.COMPANION)(co => co.payload.provider == provider)(
-          splitwellIsInMemoryOnly
-        ),
+        ) { contract =>
+          SplitwellAcsStoreRowData(
+            contract = contract,
+            paymentRequestCid = Some(contract.payload.reference),
+          )
+        },
+        mkFilter(splitwellCodegen.Group.COMPANION)(co => co.payload.provider == provider) {
+          contract =>
+            SplitwellAcsStoreRowData(
+              contract = contract,
+              groupId = Some(contract.payload.id.unpack),
+              groupOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.owner)),
+            )
+        },
         mkFilter(splitwellCodegen.GroupRequest.COMPANION)(co =>
           co.payload.group.provider == provider
-        )(splitwellIsInMemoryOnly),
+        ) { contract =>
+          SplitwellAcsStoreRowData(
+            contract = contract,
+            groupId = Some(contract.payload.group.id.unpack),
+            groupOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.group.owner)),
+          )
+        },
         mkFilter(splitwellCodegen.GroupInvite.COMPANION)(co =>
           co.payload.group.provider == provider
-        )(splitwellIsInMemoryOnly),
+        ) { contract =>
+          SplitwellAcsStoreRowData(
+            contract = contract,
+            groupId = Some(contract.payload.group.id.unpack),
+            groupOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.group.owner)),
+          )
+        },
         mkFilter(splitwellCodegen.AcceptedGroupInvite.COMPANION)(co =>
           co.payload.groupKey.provider == provider
-        )(splitwellIsInMemoryOnly),
+        ) { contract =>
+          SplitwellAcsStoreRowData(
+            contract = contract,
+            groupId = Some(contract.payload.groupKey.id.unpack),
+            groupOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.groupKey.owner)),
+          )
+        },
         mkFilter(splitwellCodegen.BalanceUpdate.COMPANION)(co =>
           co.payload.group.provider == provider
-        )(splitwellIsInMemoryOnly),
-        mkFilter(walletCodegen.AcceptedAppPayment.COMPANION)(co => co.payload.provider == provider)(
-          splitwellIsInMemoryOnly
-        ),
+        ) { contract =>
+          SplitwellAcsStoreRowData(
+            contract = contract,
+            groupId = Some(contract.payload.group.id.unpack),
+            groupOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.group.owner)),
+          )
+        },
+        mkFilter(walletCodegen.AcceptedAppPayment.COMPANION)(co =>
+          co.payload.provider == provider
+        ) { contract =>
+          SplitwellAcsStoreRowData(
+            contract = contract
+          )
+        },
         mkFilter(walletCodegen.TerminatedAppPayment.COMPANION)(co =>
           co.payload.provider == provider
-        )(splitwellIsInMemoryOnly),
+        ) { contract =>
+          SplitwellAcsStoreRowData(
+            contract = contract
+          )
+        },
       ),
     )
   }

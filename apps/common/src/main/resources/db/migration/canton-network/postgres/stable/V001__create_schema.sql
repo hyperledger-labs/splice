@@ -644,3 +644,28 @@ create table svc_txlog_store
 create index svc_txlog_store_sid_irt_r_en
     on svc_txlog_store (store_id, index_record_type, action_name, executed desc)
     where svc_txlog_store.action_name is not null and executed is not null;
+
+-- Splitwell store
+------------------
+
+create table splitwell_acs_store(
+    like acs_store_template including all,
+
+    -- reestablish foreign key constraint as that one is not copied by the LIKE statement above
+    foreign key (store_id) references store_descriptors(id),
+
+    -- index columns
+    ----------------
+
+    -- the party of the user of a SplitwellInstall or SplitwellInstallRequest contract
+    install_user                                             text,
+
+    -- the ID of the splitwell group
+    group_id                                                 text,
+
+    -- the party of the owner of a splitwell group
+    group_owner                                              text,
+
+    -- contract ID of the payment request
+    payment_request_contract_id                              text
+);
