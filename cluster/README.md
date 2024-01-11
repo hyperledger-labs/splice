@@ -21,6 +21,7 @@
     - [Manually Deploying via CI](#manually-deploying-via-ci)
       - [Optional deployment settings](#optional-deployment-settings)
       - [Confirming the Deployment](#confirming-the-deployment)
+    - [CloudSQL and ScratchNet Clusters](#cloudsql-and-scratchnet-clusters)
     - [Observing Cluster Operation](#observing-cluster-operation)
       - [Kubectl and `cncluster` operations.](#kubectl-and-cncluster-operations)
       - [GCE Dashboards](#gce-dashboards)
@@ -588,6 +589,21 @@ you do this, all data will be lost.***
 
 ```
 cncluster reset
+```
+
+### CloudSQL and ScratchNet Clusters
+
+
+By default, scratchnet clusters do not enable the `ENABLE_CLOUD_SQL`
+environment variable in their `.envrc.vars` file and instead deploy
+self-hosted postgres instances. This is mainly done to speed up
+deployment.
+
+If you explicitly want to test a CloudSQL deployment on scratchnet,
+add the following line to the `.envrc.vars` file of the cluster:
+
+```
+export ENABLE_CLOUD_SQL=true
 ```
 
 ### Observing Cluster Operation
@@ -1671,7 +1687,7 @@ In case you need to patch the tests without redeploying the cluster, you can che
 You will also need to disable version compatibility enforcement (since the tests will no longer match the version tag of the cluster)
 by pushing another commit that sets `failOnVersionMismatch` to `false` in [NetworkAppClientConfig.scala](https://github.com/DACH-NY/canton-network-node/blob/b08bd36f1eb1c34545921816e863236b7cb2a0cd/apps/common/src/main/scala/com/daml/network/config/NetworkAppClientConfig.scala#L14).
 
-If we're deploying the sv runbook from the cluster branch then the cometbft chain id must be hardcoded to the cluster deployed version as well. 
+If we're deploying the sv runbook from the cluster branch then the cometbft chain id must be hardcoded to the cluster deployed version as well.
 One example of a given patch here:
 
 ```
