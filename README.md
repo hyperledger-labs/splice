@@ -1,70 +1,77 @@
 # Table of Contents
 
-1. [Setting up Your Development Environment](#setting-up-your-development-environment)
-    1. [Private Environment Variables](#private-environment-variables)
-    1. [Directory Layout](#directory-layout)
-    1. [IntelliJ Setup](#intellij-setup)
-    1. [VS Code Setup](#vs-code-setup)
-        1. [VS Code for Scala](#configuring-vs-code-for-scala-development)
-    1. [Using `sbt`](#using-sbt)
-        1. [`sbt` settings](#sbt-settings)
-        1. [`sbt` Commands](#sbt-commands)
-        1. [`sbt` Tips\&Tricks](#sbt-tipstricks)
-1. [Contributing Changes](#contributing-changes)
-    1. [Contributing as a New Joiner](#contributing-as-a-new-joiner)
-    1. [The Support Rotation](#the-support-rotation)
-    1. [Contribution Guide](#contribution-guide)
-    1. [Branch naming](#branch-naming)
-    1. [Unused Import Warnings](#unused-import-warnings)
-    1. [TODO Comments](#todo-comments)
-    1. [Configuration](#configuration)
-    1. [DB migrations](#db-migrations)
-    1. [Daml Numerics](#daml-numerics)
-    1. [Protobuf and GRPC Guidelines](#protobuf-and-grpc-guidelines)
-    1. [Editing Daml](#editing-daml)
-    1. [Bumping External Dependencies](#bumping-external-dependencies)
-       1. [Bumping CometBFT](#bumping-cometbft)
-       1. [Bumping Canton](#bumping-canton)
-       1. [Bumping Our Canton fork](#bumping-our-canton-fork)
-    1. [Message Definitions](#message-definitions)
-    1. [Code Layout](#code-layout)
-    1. [Domain Specific Naming](#domain-specific-naming)
-    1. [App Architecture - Initialization](#app-architecture---initialization)
-        1. [Validator App](#validator-app)
-        1. [All Other Applications](#all-other-applications)
-    1. [Frontend Code](#frontend-code)
-        1. [Background](#background)
-        1. [New Packages](#new-packages)
-        1. [Common libs](#common-libs)
-    1. [Conversions between Java \& Scala types](#conversions-between-java--scala-types)
-1. [Testing](#testing)
-    1. [Managing Canton for Tests](#managing-canton-for-tests)
-    1. [Managing Frontends for Tests](#managing-frontends-for-tests)
-    1. [Running and Debugging Integration Tests](#running-and-debugging-integration-tests)
-    1. [Testing App Behaviour Outside of Tests Without Running Bundle](#testing-app-behaviour-outside-of-tests-without-running-bundle)
-    1. [Testing Auth0 Auth Flows Locally](#testing-auth0-auth-flows-locally)
-    1. [Running The Preflight Check](#running-the-preflight-check)
-        1. [Configure Auth0 Environment](#configure-auth0-environment)
-        1. [Configure SV Web UI Password](#configure-sv-web-ui-password)
-        1. [Setting up `lnav` to Inspect Canton logs](#setting-up-lnav-to-inspect-canton-logs)
-        1. [Handling Errors in Integration Tests](#handling-errors-in-integration-tests)
-    1. [Testing CircleCI Deployment Config Changes](#testing-circleci-deployment-config-changes)
-    1. [Connecting external tools to the shared Canton instances](#connecting-external-tools-to-the-shared-canton-instances)
-1. [Building and Running the Wallet and Splitwell Apps](#building-and-running-the-wallet-and-splitwell-apps)
-    1. [Building the Wallet and Splitwell Frontend](#building-the-wallet-and-splitwell-frontend)
-    1. [Running the Wallet and Splitwell Frontend](#running-the-wallet-and-splitwell-frontend)
-    1. [NPM Lock file issues](#npm-lock-file-issues)
-1. [Auth0 Configuration](#auth0-configuration)
-1. [CircleCI Configuration](#circleci-configuration)
-1. [CircleCI Tokens](#circleci-tokens)
-    1. [Auth0 Tokens](#auth0-tokens)
-        1. [Step 1: rotate all secrets that can be used to gain new access tokens](#step-1-rotate-all-secrets-that-can-be-used-to-gain-new-access-tokens)
-        1. [Step 2: revoke all existing access tokens by revoking the token signing key](#step-2-revoke-all-existing-access-tokens-by-revoking-the-token-signing-key)
-        1. [Step 3: restart all services](#step-3-restart-all-services)
-    1. [CircleCI Token](#circleci-token)
-    1. [GCP Token](#gcp-token)
-    1. [Github Tokens](#github-tokens)
-    1. [VPN Secrets](#vpn-secrets)
+- [Table of Contents](#table-of-contents)
+  - [Setting up Your Development Environment](#setting-up-your-development-environment)
+    - [Private Environment Variables](#private-environment-variables)
+    - [Directory Layout](#directory-layout)
+    - [IntelliJ Setup](#intellij-setup)
+    - [VS Code Setup](#vs-code-setup)
+      - [Configuring VS Code for Daml Development](#configuring-vs-code-for-daml-development)
+      - [Configuring VS Code for Scala Development](#configuring-vs-code-for-scala-development)
+    - [Using `sbt`](#using-sbt)
+      - [`sbt` settings](#sbt-settings)
+      - [`sbt` Commands](#sbt-commands)
+      - [`sbt` Tips\&Tricks](#sbt-tipstricks)
+  - [Contributing Changes](#contributing-changes)
+    - [Contributing as a New Joiner](#contributing-as-a-new-joiner)
+    - [The Support Rotation](#the-support-rotation)
+    - [Contribution Guide](#contribution-guide)
+    - [Branch naming](#branch-naming)
+    - [Unused Import Warnings](#unused-import-warnings)
+    - [TODO Comments](#todo-comments)
+    - [Configuration](#configuration)
+    - [DB migrations](#db-migrations)
+    - [Daml Numerics](#daml-numerics)
+    - [Editing Daml](#editing-daml)
+    - [Preparing for upgrades that add variant constructors](#preparing-for-upgrades-that-add-variant-constructors)
+    - [Editing Daml Upgrade Models](#editing-daml-upgrade-models)
+    - [Bumping External Dependencies](#bumping-external-dependencies)
+      - [Bumping CometBFT](#bumping-cometbft)
+      - [Bumping Canton](#bumping-canton)
+      - [Bumping Our Canton fork](#bumping-our-canton-fork)
+        - [Updating Canton build dependencies](#updating-canton-build-dependencies)
+    - [Message Definitions](#message-definitions)
+    - [Config parameters](#config-parameters)
+    - [Code Layout](#code-layout)
+    - [Domain Specific Naming](#domain-specific-naming)
+    - [App Architecture - Initialization](#app-architecture---initialization)
+      - [Validator App](#validator-app)
+      - [All Other Applications](#all-other-applications)
+    - [Frontend Code](#frontend-code)
+      - [Background](#background)
+      - [New Packages](#new-packages)
+      - [Common libs](#common-libs)
+    - [Conversions between Java \& Scala types](#conversions-between-java--scala-types)
+  - [Testing](#testing)
+    - [Managing Canton for Tests](#managing-canton-for-tests)
+      - [Using a local build of Canton](#using-a-local-build-of-canton)
+    - [Managing Frontends for Tests](#managing-frontends-for-tests)
+    - [Running and Debugging Integration Tests](#running-and-debugging-integration-tests)
+    - [Testing App Behaviour Outside of Tests Without Running Bundle](#testing-app-behaviour-outside-of-tests-without-running-bundle)
+    - [Testing Auth0 Auth Flows Locally](#testing-auth0-auth-flows-locally)
+    - [Running The Preflight Check](#running-the-preflight-check)
+      - [Configure Auth0 Environment](#configure-auth0-environment)
+      - [Configure SV Web UI Password](#configure-sv-web-ui-password)
+      - [Setting up `lnav` to Inspect Canton and CometBFT logs](#setting-up-lnav-to-inspect-canton-and-cometbft-logs)
+      - [Handling Errors in Integration Tests](#handling-errors-in-integration-tests)
+    - [Testing CircleCI Deployment Config Changes](#testing-circleci-deployment-config-changes)
+    - [Connecting external tools to the shared Canton instances](#connecting-external-tools-to-the-shared-canton-instances)
+  - [Building and Running the Wallet and Splitwell Apps](#building-and-running-the-wallet-and-splitwell-apps)
+    - [Building the Wallet and Splitwell Frontend](#building-the-wallet-and-splitwell-frontend)
+    - [Running the Wallet and Splitwell Frontend](#running-the-wallet-and-splitwell-frontend)
+    - [NPM Lock file issues](#npm-lock-file-issues)
+  - [Auth0 Configuration](#auth0-configuration)
+  - [CircleCI Configuration](#circleci-configuration)
+  - [CircleCI Tokens](#circleci-tokens)
+    - [Auth0 Tokens](#auth0-tokens)
+      - [Step 1: rotate all secrets that can be used to gain new access tokens](#step-1-rotate-all-secrets-that-can-be-used-to-gain-new-access-tokens)
+      - [Step 2: revoke all existing access tokens by revoking the token signing key](#step-2-revoke-all-existing-access-tokens-by-revoking-the-token-signing-key)
+      - [Step 3: restart all services](#step-3-restart-all-services)
+    - [CircleCI Token](#circleci-token)
+    - [GCP Token](#gcp-token)
+    - [GCP Service Account Key for the cluster DNS challenge](#gcp-service-account-key-for-the-cluster-dns-challenge)
+    - [Github Tokens](#github-tokens)
+    - [VPN Secrets](#vpn-secrets)
 
 For information on the runtime configuration of a Canton Network
 cluster, please see the [cluster specific documentation](/cluster/README.md).
@@ -519,7 +526,68 @@ in daml/dars.lock. CI verifies that those package IDs are correct. If you intent
 changes in daml code, please run `sbt damlDarsLockFileUpdate` and commit the updated `dars.lock`
 file along with your dar changes.
 
-#### Editing Daml Upgrade Models
+### Preparing for upgrades that add variant constructors
+
+Daml 3.0 does not yet support adding new constructors to variants.
+We therefore add an extension constructor to every variant that is stored on-ledger, i.e., occurs
+directly or indirectly in a template argument, choice argument, or choice result.
+For example, the original `TransferInput` variant is defined as follows:
+```
+data TransferInput
+  = InputAppRewardCoupon (ContractId AppRewardCoupon)
+  | InputValidatorRewardCoupon (ContractId ValidatorRewardCoupon)
+  | InputSvRewardCoupon (ContractId SvRewardCoupon)
+  | InputCoin (ContractId Coin)
+  | ExtTransferInput with
+      dummyUnitField : ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
+  deriving (Eq, Ord, Show)
+```
+such that we can enable the following upgrade to add a new constructor:
+```
+data TransferInput
+  = InputAppRewardCoupon (ContractId AppRewardCoupon)
+...
+  | ExtTransferInput with
+      dummyUnitField : ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
+      optInputValidatorFaucetCoupon : Optional (ContractId ValidatorFaucetCoupon)
+        -- ^ Added in CIP-3. Optional validator faucet coupon input into this transfer.
+  deriving (Eq, Ord, Show)
+```
+
+Please add extension constructors to all variants that are stored on ledger using the naming scheme:
+```
+data Foo
+  = ...
+  | ExtFoo with
+      dummyUnitField : ()
+        --  ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
+```
+whenever you encounter this constructor in a case distinction you should error out as follows:
+```
+  case fooValue of
+     ExtFoo _dummyUnitField -> error "ExtFoo: bare extension constructors are not allowed at runtime"
+     ...
+```
+This matches the expectation that down-casting a constructor added in a later version of the variant would
+fail at runtime. Note that we add the `_dummyUnitField` so that the compiler errors out on this case
+once a new field is added.
+
+**Note:** enums are represented as variants whose constructors have no arguments.
+Such variants receive special treatment by the Java codegen. We recommend to drop the `_dummyUnitField`
+for these enums; i.e., use the following pattern:
+```
+data Bar
+  = ...
+  | ExtBar
+      -- ^  Extension constructor to work around the current lack of upgrading for variants in Daml 3.0
+      -- Will serve as the default value in a containing record in case of an upgrade.
+```
+This matches the guidance given for protobuf enums: https://protobuf.dev/programming-guides/dos-donts/#unspecified-enum
+
+
+### Editing Daml Upgrade Models
 
 To test Daml upgrade models, some models are duplicated with minor
 changes, e.g., canton-coin and canton-coin-upgrade. To make the

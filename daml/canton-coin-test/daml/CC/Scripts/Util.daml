@@ -415,7 +415,7 @@ runCoinDepositBots app = do
           inputs =
               map (InputAppRewardCoupon . fst) appRewardCoupons ++
               map (InputValidatorRewardCoupon . fst) validatorRewardCoupons ++
-              map (InputValidatorFaucetCoupon . fst) validatorFaucetCoupons ++
+              map (mkInputValidatorFaucetCoupon . fst) validatorFaucetCoupons ++
               map (InputSvRewardCoupon . fst) svRewardCoupons ++
               coins
           outputs = []

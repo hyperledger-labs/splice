@@ -65,6 +65,10 @@ data ActionRequiringConfirmation
   | ARC_CnsEntryContext with
       cnsEntryContextCid : ContractId CnsEntryContext
       cnsEntryContextAction : CnsEntryContext_ActionRequiringConfirmation
+  | ExtActionRequiringConformation with
+      dummyUnitField : ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
+        -- This on takes care of providing extensibility for the specific variants below.
   deriving (Eq, Show)
 
 data CoinRules_ActionRequiringConfirmation
@@ -138,6 +142,9 @@ data ElectionRequestReason
   = ERR_LeaderUnavailable
   -- TODO(#7649): add case for leader asking to be relieved for a graceful shutdown
   | ERR_OtherReason Text
+  | ExtElectionRequestReason with
+      dummyUnitField : ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   deriving (Eq, Ord, Show)
 
 -- | A request to elect a new leader for the SVC.
@@ -747,6 +754,7 @@ template SvcRules with
                       CRARC_MiningRound_StartIssuing _ -> now
                   ARC_SvcRules with .. -> now
                   ARC_CnsEntryContext with .. -> now
+                  ExtActionRequiringConformation _dummyUnitField -> now
           votedAt = now
           acceptedBy = map (.voter) $ acceptedByVotes
           rejectedBy = map (.voter) $ rejectedByVotes
@@ -1248,6 +1256,7 @@ executeActionRequiringConfirmation svcRulesCid coinRulesCid act = case act of
     case cnsEntryContextAction of
       CNSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise cnsEntryContextCid choiceArg
       CNSRARC_RejectEntryInitialPayment choiceArg -> void $ exercise cnsEntryContextCid choiceArg
+  ExtActionRequiringConformation _dummyUnitField -> pure ()
 
 -- Functions implementing instant-runoff voting
 -----------------------------------------------

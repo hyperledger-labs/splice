@@ -108,6 +108,7 @@ queryBalances p k = do
       Netting {..} -> case M.lookup p.primaryParty balanceChanges of
         None -> acc
         Some changes -> foldl (\acc (p', v) -> M.insertWith (+) p' v acc) acc (M.toList changes)
+      ExtBalanceUpdateType _dummyUnitField -> error "ExtBalanceUpdate: bare extension constructors are not allowed at runtime"
 
 enterPayment : CCUser -> CCUser -> GroupKey -> Decimal -> Text -> Script ()
 enterPayment payer provider groupKey amount description = do

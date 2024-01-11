@@ -1,7 +1,7 @@
 diff -ur -x '*~' -x target -x dar -x .daml daml/wallet/daml/CN/Wallet/Install.daml daml/wallet-upgrade/daml/CN/Wallet/Install.daml
 --- daml/wallet/daml/CN/Wallet/Install.daml
 +++ daml/wallet-upgrade/daml/CN/Wallet/Install.daml
-@@ -140,6 +140,7 @@
+@@ -141,6 +141,7 @@
          provider = endUserP
          inputs = inputs
          outputs = []

@@ -502,6 +502,9 @@ data InvalidTransferReason
       requestedTopupAmount : Int
       minTopupAmount : Int
   | ITR_Other with description : Text
+  | ExtInvalidTransferReason with
+      dummyUnitField : ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   deriving (Eq, Show)
 
 exception InvalidTransfer
@@ -704,26 +707,6 @@ summarizeAndConsumeInputs csum svc sender inps = do
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
 
-    summarizeAndConsumeInput _round s (InputValidatorFaucetCoupon couponCid) = do
-      -- fetch and archive
-      coupon <- fetch couponCid
-      archive couponCid
-      -- check coupon
-      require "SVC matches" (svc == coupon.svc)
-      require "Sender matches validator" (sender == coupon.validator)
-      -- compute balance change
-      miningRound <- getIssuingMiningRound csum coupon.round
-      return TransferInputsSummary with
-        totalCoinAmount = s.totalCoinAmount
-        totalAppRewardAmount = s.totalAppRewardAmount
-        totalValidatorRewardAmount = s.totalValidatorRewardAmount
-        totalValidatorFaucetAmount = s.totalValidatorFaucetAmount +
-          getIssuingMiningRoundIssuancePerValidatorFaucetCoupon miningRound
-        totalSvRewardAmount = s.totalSvRewardAmount
-        totalHoldingFees = s.totalHoldingFees
-        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
-        changeToHoldingFeesRate = s.changeToHoldingFeesRate
-
     summarizeAndConsumeInput _round s (InputSvRewardCoupon couponCid) = do
       -- fetch and archive
       coupon <- fetch couponCid
@@ -742,6 +725,30 @@ summarizeAndConsumeInputs csum svc sender inps = do
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
+
+    summarizeAndConsumeInput _round s (ExtTransferInput _dummyUnitField optInputValidatorFaucetCoupon) = do
+      optional (pure s) (summarizeAndConsumeValidatorFaucetInput s) optInputValidatorFaucetCoupon
+
+    summarizeAndConsumeValidatorFaucetInput s couponCid = do
+      -- fetch and archive
+      coupon <- fetch couponCid
+      archive couponCid
+      -- check coupon
+      require "SVC matches" (svc == coupon.svc)
+      require "Sender matches validator" (sender == coupon.validator)
+      -- compute balance change
+      miningRound <- getIssuingMiningRound csum coupon.round
+      return TransferInputsSummary with
+        totalCoinAmount = s.totalCoinAmount
+        totalAppRewardAmount = s.totalAppRewardAmount
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalValidatorFaucetAmount =
+          s.totalValidatorFaucetAmount + getIssuingMiningRoundIssuancePerValidatorFaucetCoupon miningRound
+        totalSvRewardAmount = s.totalSvRewardAmount
+        totalHoldingFees = s.totalHoldingFees
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
+        changeToHoldingFeesRate = s.changeToHoldingFeesRate
+
 
 preprocessOutputs : TransferConfig CC -> Party -> [TransferOutput] -> Update TransferOutputsSummary
 preprocessOutputs transferConfigCC sender outs =
@@ -968,16 +975,28 @@ coinTransferContext openMiningRound featuredAppRight = TransferContext with
 data CreatedCoin
   = TransferResultCoin (ContractId Coin)
   | TransferResultLockedCoin (ContractId LockedCoin)
+  | ExtCreatedCoin with
+      dummyUnitField : ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   deriving (Show, Eq, Ord)
 
 -- | An individual input for a batch transfer.
 data TransferInput
   = InputAppRewardCoupon (ContractId AppRewardCoupon)
   | InputValidatorRewardCoupon (ContractId ValidatorRewardCoupon)
-  | InputValidatorFaucetCoupon (ContractId ValidatorFaucetCoupon)
   | InputSvRewardCoupon (ContractId SvRewardCoupon)
   | InputCoin (ContractId Coin)
+  | ExtTransferInput with
+      dummyUnitField : ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
+      optInputValidatorFaucetCoupon : Optional (ContractId ValidatorFaucetCoupon)
+        -- ^ Added in CIP-3. Optional validator faucet coupon input into this transfer.
+        -- TODO(#9281): remove this and all other CIP-3 code from the base Daml model
   deriving (Eq, Ord, Show)
+
+-- | Smart constructor for inputing validator faucet coupons into a transfer.
+mkInputValidatorFaucetCoupon : ContractId ValidatorFaucetCoupon -> TransferInput
+mkInputValidatorFaucetCoupon cid = ExtTransferInput with dummyUnitField = (); optInputValidatorFaucetCoupon = Some cid
 
 -- | Representation of a batch transfer.
 data Transfer = Transfer with

@@ -73,7 +73,7 @@ testRewardComputation = do
           InputAppRewardCoupon appCoupon1,
           InputAppRewardCoupon appCoupon2,
           InputValidatorRewardCoupon validatorCoupon1,
-          InputValidatorFaucetCoupon validatorFaucetCoupon,
+          mkInputValidatorFaucetCoupon validatorFaucetCoupon,
           InputSvRewardCoupon svRewardAlice
         ]
       outputs = [ TransferOutput with

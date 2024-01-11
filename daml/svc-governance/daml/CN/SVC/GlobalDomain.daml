@@ -48,6 +48,9 @@ data DomainState
     -- deleting the domain config, as decomissioning likely takes a while, and we
     -- want to avoid confusion among SV operators when they see errors raised from
     -- some of their domain nodes.
+  | ExtDomainState
+      -- ^ Extension constructor to work around the current lack of upgrading for variants in Daml 3.0.
+      -- Will serve as the default value in a containing record in case of an extension.
   deriving (Eq, Show)
 
 

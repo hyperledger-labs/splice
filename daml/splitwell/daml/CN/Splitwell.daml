@@ -317,6 +317,9 @@ data BalanceUpdateType
       balanceChanges : Map Party (Map Party Decimal)
       -- Map of Party to map of balance changes for each party. The balance changes for each party must add up to zero
       -- and they must be symmetric: If balance for (a,b) goes up by x, balance for (b, a) must go down by x.
+  | ExtBalanceUpdateType with
+      dummyUnitField : ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   deriving (Eq, Show)
 
 template GroupInvite

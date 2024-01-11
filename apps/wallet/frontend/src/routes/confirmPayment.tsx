@@ -112,6 +112,12 @@ function computeTotal(receiverAmounts: ReceiverAmount[], coinPrice: BigNumber): 
         case 'USD':
           newAcc = { totalUSD: acc.totalUSD.plus(next.amount.amount), totalCC: acc.totalCC };
           break;
+        case 'ExtCurrency':
+          console.error(
+            'Unexpectedly encountered the ExtCurrency extension constructor. Ignoring.'
+          );
+          newAcc = acc;
+          break;
       }
       return newAcc;
     },

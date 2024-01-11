@@ -50,6 +50,7 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
     CO_Tap tapAmount -> do
       ccsum <- catchAll (exercise context.coinRules (CoinRules_DevNet_Tap endUserP tapAmount context.context.openMiningRound))
       handleResultTap ccsum
+    ExtCoinOperation _dummyUnitField -> error "ExtCoinOperation: bare extension constructors are not allowed at runtime"
   where
     handle : Choice t c (r, Optional (ContractId Coin)) => ([TransferInput] -> PaymentTransferContext -> Party -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
     handle choiceConstructor resultConstructor cid = do
@@ -162,6 +163,9 @@ data CoinOperation
       trafficRequestCid: ContractId BuyTrafficRequest
   | CO_Tap with
       tapAmount: Decimal
+  | ExtCoinOperation with
+      dummyUnitField :  ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   deriving (Eq, Show)
 
 -- Enum of the possible outcomes of operating on a Canton coin through the wallet.
@@ -177,6 +181,9 @@ data CoinOperationOutcome
   | COO_CompleteBuyTrafficRequest ((ContractId MemberTraffic), BuyTrafficRequestTrackingInfo)
   | COO_Tap (ContractId Coin)
   | COO_Error InvalidTransferReason
+  | ExtCoinOperationOutcome with
+      dummyUnitField : ()
+        -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   deriving (Eq, Show)
 
 data ExecuteBatchResult = ExecuteBatchResult

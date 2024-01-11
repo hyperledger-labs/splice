@@ -10,7 +10,13 @@ import CC.Expiry
 import CC.Round
 import CC.Round.Types
 
-data Currency = USD | CC deriving (Eq, Show, Ord)
+data Currency
+  = USD
+  | CC
+  | ExtCurrency
+      -- ^ Extension constructor to work around the current lack of upgrading for variants in Daml 3.0.
+      -- Will serve as the default value in a containing record in case of an extension.
+  deriving (Eq, Show, Ord)
 
 data PaymentAmount = PaymentAmount
   with
@@ -39,6 +45,7 @@ paymentAmountToCC svc openMiningRound pq =
         pure (pq.amount / openMiningRound.coinPrice)
     CC ->
       pure pq.amount
+    ExtCurrency -> error "ExtCurrency: bare extension constructors are not allowed at runtime"
 
 receiverAmountToCCReceiverAmount : Party -> OpenMiningRound -> ReceiverAmount -> Update ReceiverCCAmount
 receiverAmountToCCReceiverAmount svc openMiningRound rq =
