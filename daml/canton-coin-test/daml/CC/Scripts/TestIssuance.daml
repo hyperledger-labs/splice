@@ -53,7 +53,7 @@ summaryExample1 = OpenMiningRoundSummary with
   totalValidatorRewardCoupons = 10000.0
   totalFeaturedAppRewardCoupons = 400.0
   totalUnfeaturedAppRewardCoupons = 9600.0
-  totalValidatorFaucetCoupons = 50
+  optTotalValidatorFaucetCoupons = Some 50
   totalSvRewardWeight = 100
 
 expectedParameters_E1_0_0p5 : IssuingRoundParameters
@@ -137,7 +137,7 @@ summaryExamplNoActivity = OpenMiningRoundSummary with
   totalValidatorRewardCoupons = 0.0
   totalFeaturedAppRewardCoupons = 0.0
   totalUnfeaturedAppRewardCoupons = 0.0
-  totalValidatorFaucetCoupons = 0
+  optTotalValidatorFaucetCoupons = Some 0
   totalSvRewardWeight = 0
 
 expectedParameters_NoActivity_0_0p5 : IssuingRoundParameters
@@ -167,7 +167,7 @@ summaryExample3 = OpenMiningRoundSummary with
   totalValidatorRewardCoupons = 200.0
   totalFeaturedAppRewardCoupons = 100.0
   totalUnfeaturedAppRewardCoupons = 100.0
-  totalValidatorFaucetCoupons = 50
+  optTotalValidatorFaucetCoupons = Some 50
   totalSvRewardWeight = 2
 
 

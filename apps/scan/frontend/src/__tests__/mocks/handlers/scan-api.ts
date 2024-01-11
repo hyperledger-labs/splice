@@ -125,7 +125,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                       appRewardPercentage: '0.15',
                       featuredAppRewardCap: '100.0',
                       validatorRewardCap: '0.2',
-                      validatorFaucetCap: '2.85',
+                      optValidatorFaucetCap: '2.85',
                     },
                     futureValues: [
                       {
@@ -139,7 +139,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                           appRewardPercentage: '0.4',
                           featuredAppRewardCap: '100.0',
                           validatorRewardCap: '0.2',
-                          validatorFaucetCap: '2.85',
+                          optValidatorFaucetCap: '2.85',
                         },
                       },
                       {
@@ -153,7 +153,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                           appRewardPercentage: '0.62',
                           featuredAppRewardCap: '100.0',
                           validatorRewardCap: '0.2',
-                          validatorFaucetCap: '2.85',
+                          optValidatorFaucetCap: '2.85',
                         },
                       },
                       {
@@ -167,7 +167,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                           appRewardPercentage: '0.69',
                           featuredAppRewardCap: '100.0',
                           validatorRewardCap: '0.2',
-                          validatorFaucetCap: '2.85',
+                          optValidatorFaucetCap: '2.85',
                         },
                       },
                       {
@@ -181,7 +181,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                           appRewardPercentage: '0.75',
                           featuredAppRewardCap: '100.0',
                           validatorRewardCap: '0.2',
-                          validatorFaucetCap: '2.85',
+                          optValidatorFaucetCap: '2.85',
                         },
                       },
                     ],

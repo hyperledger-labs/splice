@@ -1,5 +1,7 @@
 module CC.Round where
 
+import DA.Optional (fromOptional)
+
 import CC.CoinConfig
 import CC.Round.Types
 import CC.Issuance
@@ -52,13 +54,19 @@ template IssuingMiningRound
     issuancePerValidatorRewardCoupon : Decimal
     issuancePerFeaturedAppRewardCoupon : Decimal
     issuancePerUnfeaturedAppRewardCoupon : Decimal
-    issuancePerValidatorFaucetCoupon : Decimal
     issuancePerSvRewardCoupon : Decimal
     opensAt : Time-- ^ Time after which rewards from this mining round can be collected
     targetClosesAt : Time -- ^ Time when the SVC expects to close this round. The round SHOULD NOT be archived before this time.
+    optIssuancePerValidatorFaucetCoupon : Optional Decimal
+      -- ^ Introduced in CIP-3
   where
     signatory svc
     ensure isDefinedRound round
+
+-- | Accessor with defaulting for the optional issuancePerValidatorFaucetCoupon field
+getIssuingMiningRoundIssuancePerValidatorFaucetCoupon : IssuingMiningRound -> Decimal
+getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound =
+  fromOptional 0.0 issuingMiningRound.optIssuancePerValidatorFaucetCoupon
 
 -- | A record that a specific mining round has been closed, which can
 -- be used to archive expired rewards.
@@ -69,8 +77,14 @@ template ClosedMiningRound
     issuancePerValidatorRewardCoupon : Decimal
     issuancePerFeaturedAppRewardCoupon : Decimal
     issuancePerUnfeaturedAppRewardCoupon : Decimal
-    issuancePerValidatorFaucetCoupon : Decimal
     issuancePerSvRewardCoupon : Decimal
+    optIssuancePerValidatorFaucetCoupon : Optional Decimal
+      -- ^ Introduced in CIP-3
   where
     signatory svc
     ensure isDefinedRound round
+
+-- | Accessor with defaulting for the optional issuancePerValidatorFaucetCoupon field
+getClosedMiningRoundIssuancePerValidatorFaucetCoupon : ClosedMiningRound -> Decimal
+getClosedMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound =
+  fromOptional 0.0 issuingMiningRound.optIssuancePerValidatorFaucetCoupon

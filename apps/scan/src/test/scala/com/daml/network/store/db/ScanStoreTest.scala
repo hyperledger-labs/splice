@@ -994,7 +994,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
   ) = new cc.coinrules.TransferSummary(
     new java.math.BigDecimal(inputAppRewardAmount),
     new java.math.BigDecimal(inputValidatorRewardAmount),
-    new java.math.BigDecimal(inputValidatorFaucetAmount),
     new java.math.BigDecimal(inputSvRewardAmount),
     new java.math.BigDecimal(inputCoinAmount),
     balanceChanges.asJava,
@@ -1003,6 +1002,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     new java.math.BigDecimal(0.0),
     new java.math.BigDecimal(0.0),
     new java.math.BigDecimal(coinPrice),
+    java.util.Optional.of(new java.math.BigDecimal(inputValidatorFaucetAmount)),
   )
 
   private def mkTransferResult(

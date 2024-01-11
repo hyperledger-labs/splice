@@ -23,7 +23,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinImport.d
 diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.daml daml/canton-coin-upgrade/daml/CC/CoinRules.daml
 --- daml/canton-coin/daml/CC/CoinRules.daml
 +++ daml/canton-coin-upgrade/daml/CC/CoinRules.daml
-@@ -33,6 +33,7 @@
+@@ -34,6 +34,7 @@
      svc : Party
      configSchedule : Schedule Time (CoinConfig USD)
      isDevNet : Bool
@@ -31,7 +31,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
    where
      ensure validSchedule configSchedule validCoinConfig
  
-@@ -86,6 +87,7 @@
+@@ -87,6 +88,7 @@
                              receiverFeeRatio = 0.0
                              lock = None
                          ]
@@ -39,7 +39,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
          result <- exercisePaymentTransfer context transfer
          let [TransferResultCoin coin] = result.createdCoins
          -- burn the coin created for the SVC
-@@ -153,6 +155,7 @@
+@@ -154,6 +156,7 @@
          coin <- create Coin with
                    owner = receiver
                    amount = expiringAmount
@@ -47,7 +47,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
                    ..
          return CoinCreateSummary with
                    coin
-@@ -536,6 +539,7 @@
+@@ -537,6 +540,7 @@
    return TransferResult with
      round = csum.openRound.round
      summary = summary
@@ -55,7 +55,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
      ..
  
  data TransferContextSummary = TransferContextSummary with
-@@ -854,11 +858,13 @@
+@@ -859,11 +863,13 @@
              svc
              owner = sender
              amount = expiringAmount transferConfigCC.holdingFee summary.senderChangeAmount currentOpenRound.round
@@ -69,7 +69,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
  
        case out.lock of
          None -> TransferResultCoin <$> create coin
-@@ -974,6 +980,7 @@
+@@ -979,6 +985,7 @@
      provider : Party
      inputs : [TransferInput]
      outputs : [TransferOutput]
@@ -77,7 +77,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
    deriving (Eq, Ord, Show)
  
  -- | An individual output for a batch transfer.
-@@ -999,6 +1006,7 @@
+@@ -1004,6 +1011,7 @@
      senderChangeCoin: Optional (ContractId Coin)
        -- ^ Optional reference to the coin for the change returned to the sender.
        -- Only created if there was some change to be returned after deducting the fee for returning change.

@@ -87,11 +87,14 @@ testRewardComputation = do
   issuingMiningRounds <- queryFilter @IssuingMiningRound app.svc (\r -> r.round == Round 0)
   let Some (_, issuingMiningRound0) = head issuingMiningRounds
 
+  let expectedValidatorFaucetAmount = getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound0
   transferResult.summary.inputAppRewardAmount ===
     featuredAppRewardCoupon * issuingMiningRound0.issuancePerFeaturedAppRewardCoupon
     + unfeaturedAppRewardCoupon * issuingMiningRound0.issuancePerUnfeaturedAppRewardCoupon
-  transferResult.summary.inputValidatorRewardAmount === validatorRewardCoupon * issuingMiningRound0.issuancePerValidatorRewardCoupon
-  transferResult.summary.inputValidatorFaucetAmount === issuingMiningRound0.issuancePerValidatorFaucetCoupon
+  transferResult.summary.inputValidatorRewardAmount ===
+    validatorRewardCoupon * issuingMiningRound0.issuancePerValidatorRewardCoupon +
+    expectedValidatorFaucetAmount
+  transferResult.summary.inputValidatorFaucetAmount === Some expectedValidatorFaucetAmount
   transferResult.summary.inputSvRewardAmount ===
     intToDecimal aliceSvWeight * issuingMiningRound0.issuancePerSvRewardCoupon
   transferResult.summary.inputCoinAmount === 0.0
@@ -101,7 +104,7 @@ testRewardComputation = do
     (featuredAppRewardCoupon * issuingMiningRound0.issuancePerFeaturedAppRewardCoupon
     + unfeaturedAppRewardCoupon * issuingMiningRound0.issuancePerUnfeaturedAppRewardCoupon
     + validatorRewardCoupon * issuingMiningRound0.issuancePerValidatorRewardCoupon
-    + issuingMiningRound0.issuancePerValidatorFaucetCoupon
+    + getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound0
     + intToDecimal aliceSvWeight * issuingMiningRound0.issuancePerSvRewardCoupon
     - 8.2) -- 8.0 plus fees
 

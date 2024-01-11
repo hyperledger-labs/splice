@@ -184,7 +184,7 @@ runNextIssuanceD app coinPrice = do
             closedRoundCid = miningRoundCid
             validatorRewardCouponCids = map fst validatorRewards
             appCouponCids = map fst appRewards
-            validatorFaucetCouponCids = map fst validatorFaucetCoupons
+            optValidatorFaucetCouponCids = Some (map fst validatorFaucetCoupons)
 
       -- the closed round
       confirmAWC_MiningRound_Archive app
@@ -223,8 +223,8 @@ runNextIssuanceD app coinPrice = do
           totalValidatorRewardCoupons = sum [ c.amount | (_, c) <- validatorRewardCoupons]
           totalFeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, c.featured]
           totalUnfeaturedAppRewardCoupons = sum [ c.amount | (_, c) <- appRewardCoupons, not (c.featured)]
-          totalValidatorFaucetCoupons = length validatorFaucetCoupons
           totalSvRewardWeight = sum [ c.weight | (_, c) <- svRewardCoupons]
+          optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons)
 
     -- create issuing mining round
     submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with

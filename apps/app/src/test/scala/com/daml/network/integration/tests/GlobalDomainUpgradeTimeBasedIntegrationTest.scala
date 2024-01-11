@@ -40,6 +40,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks.forEvery as tForEvery
 
 import java.time.Instant
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 /** You must `start-canton` with `-g` to run this test locally. */
 class GlobalDomainUpgradeTimeBasedIntegrationTest
@@ -306,9 +307,9 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           dummyDecimal,
           dummyDecimal,
           dummyDecimal,
-          dummyDecimal,
           oldestRound.payload.opensAt,
           newestRound.payload.targetClosesAt,
+          None.toJava,
         )
       )
 
@@ -320,7 +321,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           dummyDecimal,
           dummyDecimal,
           dummyDecimal,
-          dummyDecimal,
+          None.toJava,
         )
       )
 

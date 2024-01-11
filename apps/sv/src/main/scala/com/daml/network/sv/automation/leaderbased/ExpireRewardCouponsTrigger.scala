@@ -17,6 +17,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 class ExpireRewardCouponsTrigger(
     override protected val context: TriggerContext,
@@ -69,7 +70,7 @@ class ExpireRewardCouponsTrigger(
           expiredRewardsTask.closedRound,
           expiredRewardsTask.validatorCoupons.asJava,
           Seq.empty.asJava,
-          Seq.empty.asJava,
+          None.toJava,
         ),
       )
     )
@@ -80,7 +81,7 @@ class ExpireRewardCouponsTrigger(
           expiredRewardsTask.closedRound,
           Seq.empty.asJava,
           expiredRewardsTask.appCoupons.asJava,
-          Seq.empty.asJava,
+          None.toJava,
         ),
       )
     )

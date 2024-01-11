@@ -8,8 +8,8 @@ import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.cc.globaldomain.{
   BaseRateTrafficLimits,
-  DomainFeesConfig,
   CoinGlobalDomainConfig,
+  DomainFeesConfig,
 }
 import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
 import com.daml.network.codegen.java.cc.schedule.Schedule
@@ -35,6 +35,7 @@ import java.time.{Duration, Instant}
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 object CNNodeUtil {
 
@@ -163,7 +164,7 @@ object CNNodeUtil {
     damlDecimal(0.6),
 
     // validatorFaucetCap
-    damlDecimal(2.85),
+    None.toJava, // use the default introduced as part of CIP-3 in the Daml codebase
   )
 
   private def hours(h: Long): RelTime = new RelTime(TimeUnit.HOURS.toMicros(h))

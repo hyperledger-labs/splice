@@ -8,6 +8,8 @@ import com.daml.ledger.javaapi.data.codegen.{Choice, ContractCompanion, ValueDec
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.util.ErrorUtil
+import com.digitalasset.canton.util.ShowUtil.*
+import com.daml.network.util.PrettyInstances.*
 
 import scala.util.{Failure, Success, Try}
 
@@ -47,10 +49,12 @@ object ExerciseNode {
       exercised: ExercisedEvent
   ): Either[ProtoDeserializationError, ExerciseNode[companion.Arg, companion.Res]] = for {
     argument <- decodeValue(companion.argDecoder)(
+      companion,
       "choiceArgument",
       exercised.getChoiceArgument,
     )
     result <- decodeValue(companion.resDecoder)(
+      companion,
       "exerciseResult",
       exercised.getExerciseResult,
     )
@@ -77,6 +81,7 @@ object ExerciseNode {
     Option.when(isChoice(companion)(event))(ExerciseNode.tryFromProtoEvent(companion)(event))
 
   private def decodeValue[A](valueDecoder: ValueDecoder[A])(
+      companion: ExerciseNodeCompanion,
       field: String,
       value: CodegenValue,
   ): Either[ProtoDeserializationError, Value[A]] = {
@@ -85,7 +90,12 @@ object ExerciseNode {
         Left(
           ProtoDeserializationError.ValueConversionError(
             field,
-            s"Unexpectedly couldn't decode LF-value $value. Did you specify the wrong type to decode to?",
+            show"""
+            |Unexpectedly couldn't decode LF-value, did you specify the wrong type to decode to, or is there an upgrade incompatibility?
+            |  specified template: ${companion.template.TEMPLATE_ID}
+            |  specified choice: ${companion.choice.name.unquoted}
+            |  value: $value
+            |""".stripMargin,
           )
         )
       case Success(value) => Right(new Value(value))

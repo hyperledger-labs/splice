@@ -37,6 +37,8 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({ data, time, onChange }) 
         <React.Fragment key={key}>{renderJsonValue(nestedValue, [...keyPath, key])}</React.Fragment>
       ));
     }
+    // TODO(#8819): remove this hack once the JsonEditor supports optional values
+    const cleanedValue = value === null ? 'null' : value;
 
     const nestedKey = keyPath.join('.');
     return (
@@ -48,7 +50,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({ data, time, onChange }) 
           {
             <input
               type="text"
-              value={value}
+              value={cleanedValue}
               id={nestedKey + '-value'}
               style={{ textAlign: 'right' }}
               onChange={e => handleValueChange(nestedKey, e.target.value)}

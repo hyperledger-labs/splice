@@ -8,6 +8,7 @@ import DA.Foldable (forA_)
 import DA.List (dedupSort)
 import DA.Map (Map)
 import qualified DA.Map as Map
+import DA.Optional (fromOptional)
 import DA.Set (Set)
 import qualified DA.Set as Set
 import DA.Traversable (forA)
@@ -314,8 +315,8 @@ template CoinRules
           issuancePerValidatorRewardCoupon = params.issuancePerValidatorRewardCoupon
           issuancePerFeaturedAppRewardCoupon = params.issuancePerFeaturedAppRewardCoupon
           issuancePerUnfeaturedAppRewardCoupon = params.issuancePerUnfeaturedAppRewardCoupon
-          issuancePerValidatorFaucetCoupon = params.issuancePerValidatorFaucetCoupon
           issuancePerSvRewardCoupon = params.issuancePerSvRewardCoupon
+          optIssuancePerValidatorFaucetCoupon = Some params.issuancePerValidatorFaucetCoupon
 
 
     nonconsuming choice CoinRules_MiningRound_Close
@@ -337,8 +338,8 @@ template CoinRules
           issuancePerValidatorRewardCoupon = issuingRound.issuancePerValidatorRewardCoupon
           issuancePerFeaturedAppRewardCoupon = issuingRound.issuancePerFeaturedAppRewardCoupon
           issuancePerUnfeaturedAppRewardCoupon = issuingRound.issuancePerUnfeaturedAppRewardCoupon
-          issuancePerValidatorFaucetCoupon = issuingRound.issuancePerValidatorFaucetCoupon
           issuancePerSvRewardCoupon = issuingRound.issuancePerSvRewardCoupon
+          optIssuancePerValidatorFaucetCoupon = issuingRound.optIssuancePerValidatorFaucetCoupon
           round = issuingRound.round
 
     nonconsuming choice CoinRules_MiningRound_Archive
@@ -359,7 +360,7 @@ template CoinRules
         closedRoundCid : ContractId ClosedMiningRound
         validatorRewardCouponCids : [ContractId ValidatorRewardCoupon]
         appCouponCids : [ContractId AppRewardCoupon]
-        validatorFaucetCouponCids : [ContractId ValidatorFaucetCoupon]
+        optValidatorFaucetCouponCids : Optional [ContractId ValidatorFaucetCoupon]
       controller svc
       do
         -- retrieve round
@@ -373,10 +374,10 @@ template CoinRules
         let validatorRewards = sum expiredValidatorRewards
 
         -- expire validator faucet coupons and compute their unclaimed rewards
-        forA_ validatorFaucetCouponCids $ \validatorFaucetCouponCid -> do
+        forA_ (fromOptional [] optValidatorFaucetCouponCids) $ \validatorFaucetCouponCid -> do
           exercise validatorFaucetCouponCid ValidatorFaucetCoupon_SvcExpire with closedRoundCid
 
-        let numValidatorFaucetCoupons = intToDecimal $ length validatorFaucetCouponCids
+        let numValidatorFaucetCoupons = optional 0.0 (intToDecimal . length) optValidatorFaucetCouponCids
 
         -- expire app rewards and compute their unclaimed rewards
         expiredAppRewards <- forA appCouponCids $ \appCouponCid -> do
@@ -388,7 +389,7 @@ template CoinRules
         -- create unclaimed reward for the total
         let amount =
               validatorRewards * closedRound.issuancePerValidatorRewardCoupon +
-              numValidatorFaucetCoupons * closedRound.issuancePerValidatorFaucetCoupon +
+              numValidatorFaucetCoupons * getClosedMiningRoundIssuancePerValidatorFaucetCoupon closedRound +
               featuredAppRewards * closedRound.issuancePerFeaturedAppRewardCoupon +
               unfeaturedAppRewards * closedRound.issuancePerUnfeaturedAppRewardCoupon
         if (amount <= 0.0)
@@ -551,6 +552,7 @@ data TransferInputsSummary = TransferInputsSummary with
     totalAppRewardAmount : Decimal
     totalValidatorRewardAmount : Decimal
     totalValidatorFaucetAmount : Decimal
+      -- ^ Note that the validator faucet amount does not need to be optional in this type, as it is not stored on the ledger.
     totalSvRewardAmount : Decimal
     totalHoldingFees : Decimal
     amountArchivedAsOfRoundZero : Decimal
@@ -711,7 +713,8 @@ summarizeAndConsumeInputs csum svc sender inps = do
         totalCoinAmount = s.totalCoinAmount
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
-        totalValidatorFaucetAmount = s.totalValidatorFaucetAmount + miningRound.issuancePerValidatorFaucetCoupon
+        totalValidatorFaucetAmount = s.totalValidatorFaucetAmount +
+          getIssuingMiningRoundIssuancePerValidatorFaucetCoupon miningRound
         totalSvRewardAmount = s.totalSvRewardAmount
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
@@ -809,8 +812,10 @@ summarizeTransfer sender openRound transferConfigCC inp preprocessedOutputs = do
       inputCoinAmount = inp.totalCoinAmount
       balanceChanges = balanceChanges
       inputAppRewardAmount = inp.totalAppRewardAmount
-      inputValidatorRewardAmount = inp.totalValidatorRewardAmount
-      inputValidatorFaucetAmount = inp.totalValidatorFaucetAmount
+      -- NOTE: we include the validator faucet amount as part of the validator reward amount, so that clients
+      -- unaware of CIP-3 do not get the impression that coin is created out of thin air.
+      inputValidatorRewardAmount = inp.totalValidatorRewardAmount + inp.totalValidatorFaucetAmount
+      inputValidatorFaucetAmount = Some inp.totalValidatorFaucetAmount
       inputSvRewardAmount = inp.totalSvRewardAmount
       holdingFees = inp.totalHoldingFees
       outputFees
@@ -1010,7 +1015,6 @@ data TransferResult
 data TransferSummary = TransferSummary with
     inputAppRewardAmount : Decimal -- ^ Total amount of app reward coupon issunace input into this transfer.
     inputValidatorRewardAmount : Decimal -- ^ Total amount of validator rewards coupon issuance input into this transfer.
-    inputValidatorFaucetAmount : Decimal -- ^ Total amount of validator faucet coupon issuance input into this transfer.
     inputSvRewardAmount : Decimal -- ^ Total amount of SV reward coupon issuance input into this transfer.
     inputCoinAmount : Decimal -- ^ Total input amount of coin input into this transfer, before deducting holding fees.
     balanceChanges : Map Party BalanceChange -- ^ Balance changes per party
@@ -1030,6 +1034,9 @@ data TransferSummary = TransferSummary with
       -- ^ The final amount of coin returned to the sender after paying for all outputs and fees.
       -- If it is zero, then no coin is created for the sender.
     coinPrice : Decimal -- ^ The coin price at the round this transfer was executed.
+    inputValidatorFaucetAmount : Optional Decimal
+      -- ^ Added in CIP-3. Total amount of validator faucet coupon issuance input into this transfer.
+      -- TODO(#9281): remove this and all other CIP-3 code from the base Daml model
   deriving (Show, Eq)
 
 data BalanceChange = BalanceChange with

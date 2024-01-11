@@ -7,6 +7,7 @@ import Daml.Script
 
 import CC.Coin
 import CC.CoinRules
+import CC.Issuance
 import CC.Round
 import CC.Round.Types
 import CC.ValidatorLicense
@@ -72,7 +73,7 @@ testUnclaimedRewards_withCoupons = do
         5.7 * issuanceConfig_0_0p5.featuredAppRewardCap +
         3.3 * issuanceConfig_0_0p5.unfeaturedAppRewardCap +
         2.3 * issuanceConfig_0_0p5.validatorRewardCap +
-        2.0 * issuanceConfig_0_0p5.validatorFaucetCap
+        2.0 * getValidatorFaucetCap issuanceConfig_0_0p5
   mergeAndCheckUnclaimedRewardAmount app (totalRewardsPerRound - allocatedRewards)
 
   -- run another two issuances
@@ -92,7 +93,7 @@ testUnclaimedRewards_withCoupons = do
         closedRoundCid
         validatorRewardCouponCids = [validatorCoupon1]
         appCouponCids = [appCoupon1, appCoupon2]
-        validatorFaucetCouponCids = [validatorFaucet1, validatorFaucet2]
+        optValidatorFaucetCouponCids = Some [validatorFaucet1, validatorFaucet2]
   submitExerciseCoinRulesByKey app [app.svc] [] collect
 
   -- check that the addition is done correctly

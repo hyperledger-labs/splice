@@ -229,7 +229,7 @@ class SvTimeBasedIssuanceIntegrationTest
           _.message should include(
             // TODO(#8819): also test for validator faucet coupons once they are summarized as well
             // TODO(#9173): also test for SV reward coupons once they are summarized as well
-            s"created confirmation for summarizing mining round with com.daml.network.codegen.java.cc.issuance.OpenMiningRoundSummary(10000.0000000000, 200.0000000000, 9800.0000000000, 0, 0)"
+            s"created confirmation for summarizing mining round with com.daml.network.codegen.java.cc.issuance.OpenMiningRoundSummary(10000.0000000000, 200.0000000000, 9800.0000000000, 0, Optional.empty)"
           )
         ),
     )

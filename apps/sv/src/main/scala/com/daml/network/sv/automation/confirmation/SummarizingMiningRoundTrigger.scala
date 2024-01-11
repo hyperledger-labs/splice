@@ -18,12 +18,13 @@ import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.Limit
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.{Contract, AssignedContract}
+import com.daml.network.util.{AssignedContract, Contract}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.*
 
 class SummarizingMiningRoundTrigger(
     override protected val context: TriggerContext,
@@ -134,10 +135,10 @@ class SummarizingMiningRoundTrigger(
         .collect[BigDecimal] { case c if !c.payload.featured => BigDecimal(c.payload.amount) }
         .sum
         .bigDecimal,
-      // TODO(#8819): total up validator faucet coupons,
-      0,
       // TODO(#9173): total up SV reward coupons weights,
       0,
+      // TODO(#8819): total up validator faucet coupons,
+      None.toJava,
     )
   }
 
