@@ -550,13 +550,13 @@ lazy val `apps-common` =
             ScalaServer(
               new File(s"apps/common/src/main/openapi/common-$scope.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "pekko-http",
+              modules = List("pekko-http-v1.0.0", "circe"),
               customExtraction = true,
             ),
             ScalaClient(
               new File(s"apps/common/src/main/openapi/common-$scope.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "pekko-http",
+              modules = List("pekko-http-v1.0.0", "circe"),
             ),
           )
         },
@@ -597,13 +597,13 @@ lazy val `apps-validator` =
             ScalaServer(
               new File(s"apps/validator/src/main/openapi/${api}.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "pekko-http",
+              modules = List("pekko-http-v1.0.0", "circe"),
               customExtraction = true,
             ),
             ScalaClient(
               new File(s"apps/validator/src/main/openapi/${api}.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "pekko-http",
+              modules = List("pekko-http-v1.0.0", "circe"),
             ),
           )
         ),
@@ -636,13 +636,13 @@ lazy val `apps-sv` =
           ScalaServer(
             new File("apps/sv/src/main/openapi/sv-internal.yaml"),
             pkg = "com.daml.network.http.v0",
-            framework = "pekko-http",
+            modules = List("pekko-http-v1.0.0", "circe"),
             customExtraction = true,
           ),
           ScalaClient(
             new File("apps/sv/src/main/openapi/sv-internal.yaml"),
             pkg = "com.daml.network.http.v0",
-            framework = "pekko-http",
+            modules = List("pekko-http-v1.0.0", "circe"),
           ),
         ),
     )
@@ -673,13 +673,13 @@ lazy val `apps-scan` =
             ScalaServer(
               new File(s"apps/scan/src/main/openapi/scan-$scope.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "pekko-http",
+              modules = List("pekko-http-v1.0.0", "circe"),
               customExtraction = true,
             ),
             ScalaClient(
               new File(s"apps/scan/src/main/openapi/scan-$scope.yaml"),
+              modules = List("pekko-http-v1.0.0", "circe"),
               pkg = "com.daml.network.http.v0",
-              framework = "pekko-http",
             ),
           ),
         },
@@ -956,13 +956,13 @@ lazy val `apps-wallet` =
             ScalaServer(
               new File(s"apps/wallet/src/main/openapi/wallet-$scope.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "pekko-http",
+              modules = List("pekko-http-v1.0.0", "circe"),
               customExtraction = true,
             ),
             ScalaClient(
               new File(s"apps/wallet/src/main/openapi/wallet-$scope.yaml"),
               pkg = "com.daml.network.http.v0",
-              framework = "pekko-http",
+              modules = List("pekko-http-v1.0.0", "circe"),
             ),
           )
         },
@@ -989,13 +989,13 @@ lazy val `apps-splitwell` =
           ScalaServer(
             new File("apps/splitwell/src/main/openapi/splitwell-internal.yaml"),
             pkg = "com.daml.network.http.v0",
-            framework = "pekko-http",
+            modules = List("pekko-http-v1.0.0", "circe"),
             customExtraction = true,
           ),
           ScalaClient(
             new File("apps/splitwell/src/main/openapi/splitwell-internal.yaml"),
             pkg = "com.daml.network.http.v0",
-            framework = "pekko-http",
+            modules = List("pekko-http-v1.0.0", "circe"),
           ),
         ),
       Compile / resourceGenerators += Def.task {

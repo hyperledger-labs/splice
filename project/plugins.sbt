@@ -15,6 +15,8 @@ libraryDependencies += "com.esotericsoftware.yamlbeans" % "yamlbeans" % "1.13"
 
 libraryDependencies += "com.github.pathikrit" %% "better-files" % "3.8.0"
 
+libraryDependencies += "dev.guardrail" %% "guardrail-scala-pekko-http" % "1.0.0-M1"
+
 val circeVersion = "0.14.1"
 libraryDependencies ++= Seq(
   "io.circe" %% "circe-core",
@@ -26,18 +28,6 @@ libraryDependencies ++= Seq(
 // Assembly plugin to build fat-jars
 addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.1.3")
 
-addSbtPlugin("dev.guardrail" % "sbt-guardrail" % "0.75.1")
+addSbtPlugin("dev.guardrail" % "sbt-guardrail" % "1.0.0-M1")
 
 addDependencyTreePlugin
-
-// this loads the sbt classpath of the `project/guardrail-pekko` module which provides a custom SPI implementations supporting pekko.
-lazy val root = project.in(file(".")).dependsOn(guardrailPekkoPlugin)
-
-lazy val guardrailPekkoPlugin = project
-  .in(file("guardrail-pekko"))
-  .settings(
-    libraryDependencies ++= Seq(
-      "org.typelevel" %% "cats-core" % "2.6.1",
-      "dev.guardrail" %% "guardrail-scala-akka-http" % "0.76.0",
-    )
-  )
