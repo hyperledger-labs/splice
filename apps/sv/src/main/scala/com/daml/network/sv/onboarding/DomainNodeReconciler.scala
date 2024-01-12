@@ -12,7 +12,7 @@ import com.daml.network.sv.config.SvScanConfig
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.sv.util.SvUtil.LocalSequencerConfig
+import com.daml.network.sv.util.SvUtil.{LocalMediatorConfig, LocalSequencerConfig}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.Clock
@@ -33,6 +33,8 @@ class DomainNodeReconciler(
     logger: TracedLogger,
 ) {
 
+  private val damlScanConfig = scanConfig.map(c => new ScanConfig(c.publicUrl.toString()))
+
   def reconcileDomainNodeConfigIfRequired(
       localDomainNode: Option[LocalDomainNode],
       domainId: DomainId,
@@ -52,17 +54,24 @@ class DomainNodeReconciler(
       memberInfo = Option(svcRules.payload.members.get(svParty.toProtoPrimitive))
         .getOrElse(throw new IllegalArgumentException(s"SV $svParty is not party of the SVC"))
       domainNodes = memberInfo.domainNodes.asScala
-      sequencerConfig = domainNodes
-        .get(domainId.toProtoPrimitive)
-        .flatMap(_.sequencer.toScala)
-      existingConfig = sequencerConfig.map(c => LocalSequencerConfig(c.sequencerId, c.url))
+      domainNodeConfig = domainNodes.get(domainId.toProtoPrimitive)
+      sequencerConfig = domainNodeConfig.flatMap(_.sequencer.toScala)
+      mediatorConfig = domainNodeConfig.flatMap(_.mediator.toScala)
+      existingScanConfig = domainNodeConfig.flatMap(_.scan.toScala)
+      existingSequencerConfig = sequencerConfig.map(c => LocalSequencerConfig(c.sequencerId, c.url))
+      existingMediatorConfig = mediatorConfig.map(c => LocalMediatorConfig(c.mediatorId))
       shouldMarkSequencerAsOnboarded = state match {
         case DomainNodeState.Onboarded => sequencerConfig.exists(_.availableAfter.isEmpty)
         case DomainNodeState.Onboarding =>
           false
       }
       _ <-
-        if (existingConfig != localSequencerConfig || shouldMarkSequencerAsOnboarded) {
+        if (
+          existingSequencerConfig != localSequencerConfig ||
+          existingMediatorConfig != localMediatorConfig ||
+          existingScanConfig != damlScanConfig ||
+          shouldMarkSequencerAsOnboarded
+        ) {
           val nodeConfig = new DomainNodeConfig(
             domainNodes
               .get(domainId.toProtoPrimitive)
@@ -95,7 +104,7 @@ class DomainNodeReconciler(
                 )
               )
               .toJava,
-            scanConfig.map(c => new ScanConfig(c.publicUrl.toString())).toJava,
+            damlScanConfig.toJava,
           )
           logger.info(show"Setting domain node config to $nodeConfig")
           val cmd = svcRules.exercise(
