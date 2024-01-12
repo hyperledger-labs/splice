@@ -229,8 +229,8 @@ function main() {
     backup_component "$namespace" "validator" "$requested_component"
     backup_component "$namespace" "scan" "$requested_component"
     backup_component "$namespace" "sv-app-0" "$requested_component"
-    backup_component "$namespace" "mediator" "$requested_component"
-    backup_component "$namespace" "sequencer" "$requested_component"
+    backup_component "$namespace" "mediator-0" "$requested_component"
+    backup_component "$namespace" "sequencer-0" "$requested_component"
     backup_component "$namespace" "cometbft-0" "$requested_component"
 
     wait_for_backup "$namespace" "validator" "$requested_component"
@@ -241,8 +241,8 @@ function main() {
     backup_component "$namespace" "participant-0" "$requested_component"
 
     wait_for_backup "$namespace" "participant-0" "$requested_component"
-    wait_for_backup "$namespace" "mediator" "$requested_component"
-    wait_for_backup "$namespace" "sequencer" "$requested_component"
+    wait_for_backup "$namespace" "mediator-0" "$requested_component"
+    wait_for_backup "$namespace" "sequencer-0" "$requested_component"
     wait_for_backup "$namespace" "cometbft-0" "$requested_component"
   else
     usage

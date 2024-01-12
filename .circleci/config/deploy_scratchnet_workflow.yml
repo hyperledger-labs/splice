@@ -103,3 +103,4 @@
             - preflight_check
             - preflight_sv_check
             - preflight_validator_check
+            - backup_cluster

@@ -22,7 +22,6 @@ import { installDocs } from './docs';
 import { configureForwardAll } from './gateway';
 import { DefaultGlobalDomainId, DomainIndex, GlobalDomainUpgradeConfig } from './globalDomainNode';
 import { installClusterIngress } from './ingress';
-import { Postgres } from './postgres';
 import { installSplitwell } from './splitwell';
 import { installSvNode, SvOnboarding } from './sv';
 import { installValidator1 } from './validator1';
@@ -105,16 +104,11 @@ const approvedSvIdentities = singleSv
   ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv234NameSet.has(id.name))
   : allApprovedSvIdentities;
 
-function joinViaSv1(
-  sv1: pulumi.Resource,
-  keys: CnInput<SvIdKey>,
-  sequencerDatabase: Postgres
-): SvOnboarding {
+function joinViaSv1(sv1: pulumi.Resource, keys: CnInput<SvIdKey>): SvOnboarding {
   return {
     type: 'join-with-key',
     sponsorApiUrl: `http://sv-app-${svActiveDomain}.sv-1:5014`,
     sponsorRelease: sv1,
-    sequencerDatabase,
     keys,
   };
 }
@@ -170,7 +164,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     infraStack.requireOutput(InfrastructureOutputs.INGRESS_NAMESPACE) as pulumi.Output<string>
   );
 
-  const { svApp: sv1, sequencerPostgres: postgresDB1 } = await installSvNode(
+  const { svApp: sv1 } = await installSvNode(
     {
       auth0Client,
       nodename: 'sv-1',
@@ -203,7 +197,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         nodename: 'sv-2',
         onboardingName: 'Canton-Foundation-2',
         validatorWalletUser: 'auth0|64afbc353bbc7ca776e27bf4',
-        onboarding: joinViaSv1(sv1, sv2Key, postgresDB1),
+        onboarding: joinViaSv1(sv1, sv2Key),
         approvedSvIdentities,
         expectedValidatorOnboardings: [],
         isDevNet,
@@ -223,7 +217,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         nodename: 'sv-3',
         onboardingName: 'Canton-Foundation-3',
         validatorWalletUser: 'auth0|64afbc4431b562edb8995da6',
-        onboarding: joinViaSv1(sv1, sv3Key, postgresDB1),
+        onboarding: joinViaSv1(sv1, sv3Key),
         approvedSvIdentities,
         expectedValidatorOnboardings: [],
         isDevNet,
@@ -243,7 +237,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
         nodename: 'sv-4',
         onboardingName: 'Canton-Foundation-4',
         validatorWalletUser: 'auth0|64afbc720e20777e46fff490',
-        onboarding: joinViaSv1(sv1, sv4Key, postgresDB1),
+        onboarding: joinViaSv1(sv1, sv4Key),
         approvedSvIdentities,
         expectedValidatorOnboardings: [],
         isDevNet,

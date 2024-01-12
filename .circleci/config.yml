@@ -3555,6 +3555,7 @@ workflows:
             - preflight_check
             - preflight_sv_check
             - preflight_validator_check
+            - backup_cluster
 
   deploy_scratchnetb:
     when:
@@ -3660,6 +3661,7 @@ workflows:
             - preflight_check
             - preflight_sv_check
             - preflight_validator_check
+            - backup_cluster
 
   deploy_scratchnetc:
     when:
@@ -3765,6 +3767,7 @@ workflows:
             - preflight_check
             - preflight_sv_check
             - preflight_validator_check
+            - backup_cluster
 
   deploy_scratchnetd:
     when:
@@ -3870,6 +3873,7 @@ workflows:
             - preflight_check
             - preflight_sv_check
             - preflight_validator_check
+            - backup_cluster
 
   deploy_scratchnete:
     when:
@@ -3975,3 +3979,4 @@ workflows:
             - preflight_check
             - preflight_sv_check
             - preflight_validator_check
+            - backup_cluster
