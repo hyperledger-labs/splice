@@ -3,6 +3,14 @@
 Release Notes
 =============
 
+2024-01-22
+----------
+
+* Deployment:
+
+  * Enabled pruning in sequencers of canton foundation
+
+
 2024-01-15
 ----------
 
