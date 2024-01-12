@@ -150,7 +150,7 @@ spec:
           limits:
             memory: 512Mi
           requests:
-            cpu: "1"
+            cpu: "0.5"
             memory: 512Mi
         volumeMounts:
         - mountPath: /config

@@ -1,11 +1,3 @@
-resources:
-  limits:
-    cpu: "2"
-    memory: 1Gi
-  requests:
-    cpu: "2"
-    memory: 1Gi
-
 persistence:
   host: "postgres"
   port: "5432"

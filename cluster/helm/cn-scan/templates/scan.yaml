@@ -152,9 +152,7 @@ spec:
           protocol: TCP
         resources:
           limits:
-            memory: 1536Mi
-          requests:
-            cpu: 500m
+            cpu: 1
             memory: 1536Mi
 ---
 apiVersion: v1

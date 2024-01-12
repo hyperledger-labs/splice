@@ -9,8 +9,8 @@ resources:
   limits:
     memory: 32Gi
   requests:
-    cpu: "4"
-    memory: 32Gi
+    cpu: "2"
+    memory: 16Gi
 
 auth:
   jwksUrl: "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"

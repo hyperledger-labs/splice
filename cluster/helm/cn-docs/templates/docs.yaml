@@ -31,8 +31,6 @@ spec:
               protocol: TCP
           resources:
             limits:
-              memory: "1536Mi"
-            requests:
               cpu: 1
               memory: "1536Mi"
 ---
@@ -81,8 +79,6 @@ spec:
               protocol: TCP
           resources:
             limits:
-              memory: "512Mi"
-            requests:
               cpu: 1
               memory: "512Mi"
 ---

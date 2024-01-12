@@ -1230,7 +1230,7 @@
           },
           "requests": {
             "cpu": "1",
-            "memory": "8Gi"
+            "memory": "4Gi"
           }
         },
         "sequencer": {
@@ -1420,8 +1420,8 @@
             "memory": "32Gi"
           },
           "requests": {
-            "cpu": "4",
-            "memory": "32Gi"
+            "cpu": "2",
+            "memory": "16Gi"
           }
         }
       }
@@ -1499,16 +1499,6 @@
           "host": "postgres.splitwell.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -1585,16 +1575,6 @@
           "host": "postgres.splitwell.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -1671,16 +1651,6 @@
           "host": "postgres.splitwell.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -1769,16 +1739,6 @@
           "host": "postgres.splitwell.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -2091,7 +2051,7 @@
           },
           "requests": {
             "cpu": 1,
-            "memory": "8Gi"
+            "memory": "4Gi"
           }
         },
         "svSponsorAddress": "http://sv-app-0.sv-1:5014",
@@ -2661,8 +2621,8 @@
             "memory": "32Gi"
           },
           "requests": {
-            "cpu": "4",
-            "memory": "32Gi"
+            "cpu": "2",
+            "memory": "16Gi"
           }
         }
       }
@@ -2740,16 +2700,6 @@
           "host": "postgres.sv-1.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -2826,16 +2776,6 @@
           "host": "postgres.sv-1.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -2912,16 +2852,6 @@
           "host": "postgres.sv-1.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -3010,16 +2940,6 @@
           "host": "postgres.sv-1.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -3096,16 +3016,6 @@
           "host": "postgres.sv-1.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -3182,16 +3092,6 @@
           "host": "postgres.sv-1.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -3693,7 +3593,7 @@
           },
           "requests": {
             "cpu": 1,
-            "memory": "8Gi"
+            "memory": "4Gi"
           }
         },
         "svValidator": true,
@@ -4257,8 +4157,8 @@
             "memory": "32Gi"
           },
           "requests": {
-            "cpu": "4",
-            "memory": "32Gi"
+            "cpu": "2",
+            "memory": "16Gi"
           }
         }
       }
@@ -4336,16 +4236,6 @@
           "host": "postgres.sv-2.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -4422,16 +4312,6 @@
           "host": "postgres.sv-2.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -4508,16 +4388,6 @@
           "host": "postgres.sv-2.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -4606,16 +4476,6 @@
           "host": "postgres.sv-2.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -4692,16 +4552,6 @@
           "host": "postgres.sv-2.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -4778,16 +4628,6 @@
           "host": "postgres.sv-2.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -5261,7 +5101,7 @@
           },
           "requests": {
             "cpu": 1,
-            "memory": "8Gi"
+            "memory": "4Gi"
           }
         },
         "svValidator": true,
@@ -5825,8 +5665,8 @@
             "memory": "32Gi"
           },
           "requests": {
-            "cpu": "4",
-            "memory": "32Gi"
+            "cpu": "2",
+            "memory": "16Gi"
           }
         }
       }
@@ -5904,16 +5744,6 @@
           "host": "postgres.sv-3.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -5990,16 +5820,6 @@
           "host": "postgres.sv-3.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -6076,16 +5896,6 @@
           "host": "postgres.sv-3.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -6174,16 +5984,6 @@
           "host": "postgres.sv-3.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -6260,16 +6060,6 @@
           "host": "postgres.sv-3.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -6346,16 +6136,6 @@
           "host": "postgres.sv-3.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -6829,7 +6609,7 @@
           },
           "requests": {
             "cpu": 1,
-            "memory": "8Gi"
+            "memory": "4Gi"
           }
         },
         "svValidator": true,
@@ -7393,8 +7173,8 @@
             "memory": "32Gi"
           },
           "requests": {
-            "cpu": "4",
-            "memory": "32Gi"
+            "cpu": "2",
+            "memory": "16Gi"
           }
         }
       }
@@ -7472,16 +7252,6 @@
           "host": "postgres.sv-4.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -7558,16 +7328,6 @@
           "host": "postgres.sv-4.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -7644,16 +7404,6 @@
           "host": "postgres.sv-4.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -7742,16 +7492,6 @@
           "host": "postgres.sv-4.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -7828,16 +7568,6 @@
           "host": "postgres.sv-4.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -7914,16 +7644,6 @@
           "host": "postgres.sv-4.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -8397,7 +8117,7 @@
           },
           "requests": {
             "cpu": 1,
-            "memory": "8Gi"
+            "memory": "4Gi"
           }
         },
         "svValidator": true,
@@ -8603,8 +8323,8 @@
             "memory": "32Gi"
           },
           "requests": {
-            "cpu": "4",
-            "memory": "32Gi"
+            "cpu": "2",
+            "memory": "16Gi"
           }
         }
       }
@@ -8682,16 +8402,6 @@
           "host": "postgres.validator1.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -8780,16 +8490,6 @@
           "host": "postgres.validator1.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "1Gi"
-          },
-          "requests": {
-            "cpu": "2",
-            "memory": "1Gi"
-          }
         }
       }
     },
@@ -8960,9 +8660,6 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "resources": {
           "limits": {
-            "memory": "1536Mi"
-          },
-          "requests": {
             "cpu": "1",
             "memory": "1536Mi"
           }
@@ -9081,7 +8778,7 @@
           },
           "requests": {
             "cpu": 1,
-            "memory": "8Gi"
+            "memory": "4Gi"
           }
         },
         "svSponsorAddress": "http://sv-app-0.sv-1:5014",
