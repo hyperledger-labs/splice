@@ -578,15 +578,10 @@ class JoiningNodeInitializer(
     )
 
   private def newSvcStore(key: SvStore.Key) = {
-    val connection = ledgerClient.readOnlyConnection(
-      this.getClass.getSimpleName,
-      loggerFactory,
-    )
     SvSvcStore(
       key,
       storage,
       loggerFactory,
-      connection,
       retryProvider,
     )
   }

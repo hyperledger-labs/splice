@@ -2,7 +2,6 @@ package com.daml.network.sv.store
 
 import cats.implicits.toTraverseOps
 import com.daml.ledger.javaapi.data as javab
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
@@ -28,7 +27,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.environment.{BaseLedgerConnection, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
 import com.daml.network.store.*
@@ -38,16 +37,14 @@ import com.daml.network.store.MultiDomainAcsStore.{
   QueryResult,
   TemplateFilter,
 }
-import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.sv.store.SvSvcStore.ignoredContractsForAcsDump
-import com.daml.network.sv.store.db.DbSvSvcStore
+import com.daml.network.sv.store.db.{DbSvSvcStore, SvcTables}
 import com.daml.network.sv.store.db.SvcTables.SvcAcsStoreRowData
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.*
-import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -63,22 +60,28 @@ import scala.jdk.OptionConverters.*
 
 /* Store used by the SV app for filtering contracts visible to the SVC party. */
 trait SvSvcStore
-    extends CNNodeAppStoreWithHistory[
-      SvcTxLogParser.TxLogIndexRecord,
-      SvcTxLogParser.TxLogEntry,
+    extends CNNodeAppStoreWithNewHistory[
+      SvcTxLogParser.TxLogEntry
     ]
     with PackageIdResolver.HasCoinRulesPayload {
   import SvSvcStore.{coinRulesFollowers, svcRulesFollowers}
 
-  override protected def txLogParser = new SvcTxLogParser(loggerFactory)
-
   protected val outerLoggerFactory: NamedLoggerFactory
+  protected def templateJsonDecoder: TemplateJsonDecoder
 
   override protected lazy val loggerFactory: NamedLoggerFactory =
     outerLoggerFactory.append("store", "svcParty")
 
   override lazy val acsContractFilter =
     SvSvcStore.contractFilter(key.svcParty, key.svParty)
+
+  override lazy val txLogConfig = new TxLogStoreNew.Config[SvcTxLogParser.TxLogEntry] {
+    val codec = SvcTxLogParser.TxLogEntry.Codec(templateJsonDecoder)
+    override val parser = new SvcTxLogParser(loggerFactory)
+    override def entryToRow = SvcTables.SvcTxLogRowData.fromTxLogEntry
+    override def encodeEntry = codec.encode
+    override def decodeEntry = codec.decode
+  }
 
   def key: SvStore.Key
 
@@ -100,39 +103,6 @@ trait SvSvcStore
   )(implicit
       tc: TraceContext
   ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]]
-
-  protected def loadTxLogEntry(
-      txLogReader: TxLogStore.Reader[SvcTxLogParser.TxLogIndexRecord, SvcTxLogParser.TxLogEntry],
-      eventId: String,
-      domainId: DomainId,
-      acsContractId: Option[ContractId[?]],
-      dbType: String3,
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[SvcTxLogParser.TxLogEntry] =
-    txLogReader.loadTxLogEntry(eventId, domainId, acsContractId, filterUnique(dbType))
-
-  protected def filterUnique(dbType: String3)(
-      entries: Seq[SvcTxLogParser.TxLogEntry],
-      eventId: String,
-  ): SvcTxLogParser.TxLogEntry = {
-    val res = entries.filter(e =>
-      e.indexRecord.eventId == eventId && e.indexRecord.companion.dbType == dbType
-    )
-    res match {
-      case entry +: Seq() =>
-        entry
-      case Seq() =>
-        throw new IllegalStateException(
-          s"SvcStore.filterUnique did not return any entry for event $eventId and dbType $dbType. "
-        )
-      case x =>
-        throw new IllegalStateException(
-          s"SvcStore.filterUnique returned ${x.size} entries for event $eventId and dbType $dbType."
-        )
-    }
-  }
 
   def lookupSvcRules()(implicit
       tc: TraceContext
@@ -872,21 +842,18 @@ object SvSvcStore {
       key: SvStore.Key,
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
-      connection: BaseLedgerConnection,
       retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
   ): SvSvcStore = {
-    val treeSource = TransactionTreeSource.LedgerConnection(key.svcParty, connection)
     storage match {
       case _: MemoryStorage =>
         new InMemorySvSvcStore(
           key,
           loggerFactory,
           retryProvider,
-          treeSource,
         )
       case db: DbStorage =>
         new DbSvSvcStore(
@@ -894,7 +861,6 @@ object SvSvcStore {
           db,
           loggerFactory,
           retryProvider,
-          treeSource,
         )
     }
   }

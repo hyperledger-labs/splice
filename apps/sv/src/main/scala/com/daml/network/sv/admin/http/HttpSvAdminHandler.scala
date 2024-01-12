@@ -30,7 +30,6 @@ import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, PageLimit}
 import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.sv.cometbft.CometBftClient
-import com.daml.network.sv.store.SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
@@ -323,15 +322,11 @@ class HttpSvAdminHandler(
                 payloadJsonFromValue(
                   new VoteResult(
                     res.action,
-                    res.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].executed,
+                    res.executed,
                     res.expired,
-                    res.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].requester,
-                    Instant.parse(
-                      res.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].effectiveAt
-                    ),
-                    Instant.parse(
-                      res.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].votedAt
-                    ),
+                    res.requester,
+                    Instant.parse(res.effectiveAt),
+                    Instant.parse(res.votedAt),
                     res.acceptedBy.asJava,
                     res.rejectedBy.asJava,
                   ).toValue

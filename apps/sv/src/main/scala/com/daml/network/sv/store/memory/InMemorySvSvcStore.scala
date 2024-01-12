@@ -27,11 +27,15 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
 import MultiDomainAcsStore.QueryResult
-import TxLogStore.TransactionTreeSource
-import com.daml.network.sv.store.SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.network.util.{AssignedContract, CNNodeUtil, Contract, ContractWithState}
+import com.daml.network.util.{
+  AssignedContract,
+  CNNodeUtil,
+  Contract,
+  ContractWithState,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
@@ -45,11 +49,10 @@ class InMemorySvSvcStore(
     override val key: SvStore.Key,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
-    override protected val transactionTreeSource: TransactionTreeSource,
 )(implicit
-    override protected val
-    ec: ExecutionContext
-) extends InMemoryCNNodeAppStore[SvcTxLogParser.TxLogIndexRecord, SvcTxLogParser.TxLogEntry]
+    override protected val ec: ExecutionContext,
+    override protected val templateJsonDecoder: TemplateJsonDecoder,
+) extends InMemoryCNNodeAppStoreWithNewHistory[SvcTxLogParser.TxLogEntry]
     with SvSvcStore
     with LimitHelpers {
   import InMemorySvSvcStore.*
@@ -65,11 +68,11 @@ class InMemorySvSvcStore(
       tc: TraceContext
   ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]] = {
     for {
-      indexes <- txLog
-        .collectTxLogIndicesType[SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord]
+      entries <- multiDomainAcsStore
+        .collectTxLogIndicesType[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]
       ind = actionName match {
-        case Some(actionName) => indexes.filter(_.actionName.contains(actionName))
-        case None => indexes
+        case Some(actionName) => entries.filter(_.actionName.contains(actionName))
+        case None => entries
       }
       ind2 = executed match {
         case Some(executed) => ind.filter(_.executed == executed)
@@ -79,38 +82,25 @@ class InMemorySvSvcStore(
         case Some(requester) => ind2.filter(_.requester.contains(requester))
         case None => ind2
       }
-      records <- ind3
-        .traverse { index =>
-          loadTxLogEntry(
-            txLogReader,
-            index.eventId,
-            index.domainId,
-            index.acsContractId,
-            index.companion.dbType,
-          )
+      records = ind3.flatMap { entry =>
+        val effectiveAt = Instant.parse(entry.effectiveAt)
+        (effectiveFrom, effectiveTo) match {
+          case (Some(effectiveFromDate), Some(effectiveToDate))
+              if effectiveAt.isAfter(Instant.parse(effectiveFromDate)) && effectiveAt.isBefore(
+                Instant.parse(effectiveToDate)
+              ) =>
+            Some(entry)
+          case (Some(effectiveFromDate), None)
+              if effectiveAt.isAfter(Instant.parse(effectiveFromDate)) =>
+            Some(entry)
+          case (None, Some(effectiveToDate))
+              if effectiveAt.isBefore(Instant.parse(effectiveToDate)) =>
+            Some(entry)
+          case (None, None) =>
+            Some(entry)
+          case _ => None
         }
-        .map {
-          _.collect { case entry: SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry =>
-            val effectiveAt = Instant
-              .parse(entry.indexRecord.asInstanceOf[DefiniteVoteIndexRecord].effectiveAt)
-            (effectiveFrom, effectiveTo) match {
-              case (Some(effectiveFromDate), Some(effectiveToDate))
-                  if effectiveAt.isAfter(Instant.parse(effectiveFromDate)) && effectiveAt.isBefore(
-                    Instant.parse(effectiveToDate)
-                  ) =>
-                Some(entry)
-              case (Some(effectiveFromDate), None)
-                  if effectiveAt.isAfter(Instant.parse(effectiveFromDate)) =>
-                Some(entry)
-              case (None, Some(effectiveToDate))
-                  if effectiveAt.isBefore(Instant.parse(effectiveToDate)) =>
-                Some(entry)
-              case (None, None) =>
-                Some(entry)
-              case _ => None
-            }
-          }.flatten
-        }
+      }
     } yield applyLimit(limit, records)
   }
 

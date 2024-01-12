@@ -52,7 +52,6 @@ import com.daml.network.store.{Limit, PageLimit, StoreTest, TxLogStore}
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.history.SvcRulesExecuteDefiniteVote
 import com.daml.network.sv.store.SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry
-import com.daml.network.sv.store.SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.sv.store.{SvStore, SvSvcStore}
@@ -989,20 +988,15 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             .futureValue
             .toList
             .loneElement shouldBe DefiniteVoteTxLogEntry(
-            new DefiniteVoteIndexRecord(
-              definitiveVoteTx.getOffset,
-              definitiveVoteTx.getRootEventIds.get(0),
-              dummyDomain,
-              "SRARC_AddMember",
-              true,
-              result.requester,
-              result.effectiveAt.toString,
-              result.votedAt.toString,
-            ),
-            result.expired,
-            result.rejectedBy.asScala.toList,
-            result.acceptedBy.asScala.toList,
-            result.action,
+            actionName = "SRARC_AddMember",
+            executed = true,
+            requester = result.requester,
+            effectiveAt = result.effectiveAt.toString,
+            votedAt = result.votedAt.toString,
+            expired = result.expired,
+            rejectedBy = result.rejectedBy.asScala.toList,
+            acceptedBy = result.acceptedBy.asScala.toList,
+            action = result.action,
           )
           store
             .listVoteResults(
@@ -1504,11 +1498,18 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 class InMemorySvSvcStoreTest extends SvSvcStoreTest {
 
   override protected def mkStore(): Future[InMemorySvSvcStore] = {
+    val packageSignatures =
+      ResourceTemplateDecoder.loadPackageSignaturesFromResources(
+        DarResources.cantonCoin.all ++
+          DarResources.validatorLifecycle.all ++
+          DarResources.svcGovernance.all
+      )
+    implicit val templateJsonDecoder: TemplateJsonDecoder =
+      new ResourceTemplateDecoder(packageSignatures, loggerFactory)
     val store = new InMemorySvSvcStore(
       SvStore.Key(storeSvParty, svcParty),
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      transactionTreeSource,
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
@@ -1543,7 +1544,6 @@ class DbSvSvcStoreTest
       storage,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      transactionTreeSource,
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

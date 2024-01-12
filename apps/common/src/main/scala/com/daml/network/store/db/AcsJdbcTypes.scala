@@ -279,4 +279,5 @@ object AcsJdbcTypes {
         .fold(err => throw err, identity)
     )
   }
+
 }

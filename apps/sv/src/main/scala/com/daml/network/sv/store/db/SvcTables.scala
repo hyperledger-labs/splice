@@ -3,12 +3,12 @@ package com.daml.network.sv.store.db
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
-import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue}
+import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
 import com.daml.network.sv.store.SvcTxLogParser
+import com.daml.network.sv.store.SvcTxLogParser.TxLogEntry
 import com.daml.network.util.Contract
-import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.digitalasset.canton.topology.{Member, PartyId}
 import spray.json.JsValue
 
 object SvcTables extends AcsTables with NamedLogging {
@@ -75,56 +75,48 @@ object SvcTables extends AcsTables with NamedLogging {
   }
 
   case class SvcTxLogRowData(
-      eventId: String,
-      offset: Option[String],
-      domainId: DomainId,
-      indexRecordType: String3,
+      entry: TxLogEntry,
       actionName: Option[String],
       executed: Option[Boolean],
       requester: Option[String],
       effectiveAt: Option[String],
       votedAt: Option[String],
-  )
+  ) extends TxLogRowData {
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
+      "action_name" -> actionName.map(lengthLimited),
+      "executed" -> executed,
+      "requester" -> requester.map(lengthLimited),
+      "effective_at" -> effectiveAt.map(lengthLimited),
+      "voted_at" -> votedAt.map(lengthLimited),
+    )
+  }
 
   object SvcTxLogRowData {
 
-    def fromTxLogIndexRecord(record: SvcTxLogParser.TxLogIndexRecord): SvcTxLogRowData = {
+    def fromTxLogEntry(record: SvcTxLogParser.TxLogEntry): SvcTxLogRowData = {
       record match {
-        case err @ SvcTxLogParser.TxLogIndexRecord.ErrorIndexRecord(offset, eventId, domainId) =>
+        case err: SvcTxLogParser.TxLogEntry.ErrorTxLogEntry =>
           SvcTxLogRowData(
-            eventId = eventId,
-            offset = Some(offset),
-            domainId = domainId,
-            indexRecordType = err.companion.dbType,
+            entry = err,
             actionName = None,
             executed = None,
             requester = None,
             effectiveAt = None,
             votedAt = None,
           )
-        case dv @ SvcTxLogParser.TxLogIndexRecord.DefiniteVoteIndexRecord(
-              offset,
-              eventId,
-              domainId,
-              actionName,
-              executed,
-              requester,
-              effectiveAt,
-              votedAt,
-            ) =>
+        case dv: SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry =>
           SvcTxLogRowData(
-            eventId = eventId,
-            offset = Some(offset),
-            domainId = domainId,
-            indexRecordType = dv.companion.dbType,
-            actionName = Some(actionName),
-            executed = Some(executed),
-            requester = Some(requester),
-            effectiveAt = Some(effectiveAt),
-            votedAt = Some(votedAt),
+            entry = dv,
+            actionName = Some(dv.actionName),
+            executed = Some(dv.executed),
+            requester = Some(dv.requester),
+            effectiveAt = Some(dv.effectiveAt),
+            votedAt = Some(dv.votedAt),
           )
       }
     }
   }
 
+  val acsTableName = "svc_acs_store"
+  val txLogTableName = "svc_txlog_store"
 }
