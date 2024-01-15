@@ -128,12 +128,10 @@ export async function installSvNode(
     await installAuth0UISecret(config.auth0Client, xns, 'sv', config.nodename),
   ];
 
-  const backupConfig: BackupConfig | undefined = config.backupConfig
+  config.backupConfig = config.backupConfig
     ? {
         ...config.backupConfig,
-        prefix: config.backupConfig.prefix
-          ? config.backupConfig.prefix
-          : `${CLUSTER_BASENAME}/${xns.logicalName}`,
+        prefix: config.backupConfig.prefix || `${CLUSTER_BASENAME}/${xns.logicalName}`,
       }
     : undefined;
 
@@ -237,9 +235,9 @@ export async function installSvNode(
     auth0AppName: config.auth0ValidatorAppName,
     topupConfig: config.topupConfig,
     backupConfig:
-      backupConfig && backupConfigSecret
+      config.backupConfig && backupConfigSecret
         ? {
-            config: backupConfig,
+            config: config.backupConfig,
             secret: backupConfigSecret,
           }
         : undefined,
