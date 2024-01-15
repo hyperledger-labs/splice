@@ -2,27 +2,25 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.coinrules.CoinRules_AddFutureCoinConfigSchedule
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, TransferConfig, USD}
-import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CoinRules,
   ARC_SvcRules,
 }
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_AddFutureCoinConfigSchedule
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
-  SRARC_SetConfig,
   SRARC_RemoveMember,
+  SRARC_SetConfig,
 }
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRulesConfig,
-  SvcRules_SetConfig,
   SvcRules_RemoveMember,
+  SvcRules_SetConfig,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.sv.automation.leaderbased.ExpireVoteRequestTrigger
 import com.daml.network.util.Codec
-import com.digitalasset.canton.topology.PartyId
 
 import java.time.Instant
 import scala.jdk.OptionConverters.*
@@ -117,43 +115,51 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     }
 
     actAndCheck(
-      "create duplicated vote for sv4", {
-        createCoinPriceVote(svParties("sv4"), Some(BigDecimal(3.0)))
-        createCoinPriceVote(svParties("sv4"), Some(BigDecimal(4.0)))
-      },
-    )(
-      "observed duplicated coin price of sv4",
-      _ =>
-        getCoinPriceVoteMap() shouldBe Map(
-          svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
-          svParties("sv2") -> Seq(Some(BigDecimal(1.0))),
-          svParties("sv3") -> Seq(None),
-          svParties("sv4") -> Seq(None, Some(BigDecimal(3.0)), Some(BigDecimal(4.0))),
-        ),
-    )
-
-    actAndCheck(
-      "execute an action to remove sv3 on svcRules contract to trigger `GarbageCollectCoinPriceVotesTrigger` to remove duplicated and non member votes", {
-        sv1Backend.participantClient.ledger_api_extensions.commands.submitWithResult(
-          sv1Backend.config.ledgerApiUser,
-          actAs = Seq(svcParty),
-          readAs = Seq.empty,
-          update = sv1Backend
-            .getSvcInfo()
-            .svcRules
-            .contractId
-            .exerciseSvcRules_RemoveMember(
+      "remove sv3 on svcRules contract to trigger `GarbageCollectCoinPriceVotesTrigger` to non member votes", {
+        val removeAction = new ARC_SvcRules(
+          new SRARC_RemoveMember(
+            new SvcRules_RemoveMember(
               svParties("sv3").toProtoPrimitive
-            ),
+            )
+          )
         )
+
+        val (_, voteRequest) = actAndCheck(
+          "Creating vote request",
+          eventuallySucceeds() {
+            sv1Backend.createVoteRequest(
+              sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+              removeAction,
+              "url",
+              "remove sv3",
+              sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+            )
+          },
+        )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
+        Seq(sv2Backend, sv4Backend).foreach { sv =>
+          clue(s"${sv.name} accepts vote") {
+            val svVoteRequest = eventually() {
+              sv.listVoteRequests().loneElement
+            }
+            svVoteRequest.contractId shouldBe voteRequest.contractId
+            eventuallySucceeds() {
+              sv.castVote(
+                svVoteRequest.contractId,
+                true,
+                "url",
+                "description",
+              )
+            }
+          }
+        }
       },
     )(
-      "vote of sv3 is removed and the all votes of sv4 are removed except the latest vote",
+      "vote of sv3 is remove",
       _ =>
         getCoinPriceVoteMap() shouldBe Map(
           svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
           svParties("sv2") -> Seq(Some(BigDecimal(1.0))),
-          svParties("sv4") -> Seq(Some(BigDecimal(4.0))),
+          svParties("sv4") -> Seq(None),
         ),
     )
   }
@@ -448,21 +454,5 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
           )
           .toOption
       }
-
-  private def createCoinPriceVote(
-      svParty: PartyId,
-      coinPrice: Option[BigDecimal],
-  )(implicit env: CNNodeTestConsoleEnvironment) =
-    sv1Backend.participantClient.ledger_api_extensions.commands.submitWithResult(
-      sv1Backend.config.ledgerApiUser,
-      actAs = Seq(svcParty),
-      readAs = Seq.empty,
-      update = new cn.svc.coinprice.CoinPriceVote(
-        svcParty.toProtoPrimitive,
-        svParty.toProtoPrimitive,
-        coinPrice.map(_.bigDecimal).toJava,
-        Instant.now(),
-      ).create,
-    )
 
 }

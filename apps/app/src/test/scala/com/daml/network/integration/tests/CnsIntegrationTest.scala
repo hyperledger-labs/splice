@@ -3,7 +3,6 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cn.cns as codegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subCodegen
 import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.console.{ValidatorAppBackendReference, WalletAppClientReference}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -31,7 +30,7 @@ import scala.jdk.CollectionConverters.*
 
 class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with TriggerTestUtil {
 
-  import CnsIntegrationTest.*
+  import WalletTestUtil.*
 
   private val testEntryName = "mycoolentry.unverified.cns"
   private val testEntryUrl = "https://cns-dir-url.com"
@@ -381,58 +380,6 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
     }
   }
 
-  private def requestEntry(
-      refs: DynamicUserRefs,
-      entryName: String,
-      entryUrl: String = "https://cns-dir-url.com",
-      entryDescription: String = "Sample CNS Entry Description",
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
-    val cnsRules = sv1ScanBackend.getCnsRules()
-
-    val cmd = cnsRules.contractId.exerciseCnsRules_RequestEntry(
-      entryName,
-      entryUrl,
-      entryDescription,
-      refs.userParty.toProtoPrimitive,
-    )
-    refs.validator.participantClientWithAdminToken.ledger_api_extensions.commands
-      .submitWithResult(
-        userId = refs.validator.config.ledgerApiUser,
-        actAs = Seq(refs.userParty),
-        readAs = Seq.empty,
-        update = cmd,
-        disclosedContracts = DisclosedContracts(cnsRules).toLedgerApiDisclosedContracts,
-      )
-      .exerciseResult
-      ._2
-  }
-
-  private def requestAndPayForEntry(
-      refs: DynamicUserRefs,
-      entryName: String,
-      entryUrl: String = "https://cns-dir-url.com",
-      entryDescription: String = "Sample CNS Entry Description",
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
-    // for paying the cns entry initial payment.
-    refs.wallet.tap(5.0)
-
-    val subscriptionRequest = requestEntry(refs, entryName, entryUrl, entryDescription)
-
-    actAndCheck(
-      s"Wait for subscription request to be ingested into store and accept it.",
-      eventually() {
-        inside(refs.wallet.listSubscriptionRequests()) { case Seq(storeRequest) =>
-          storeRequest.contractId shouldBe subscriptionRequest
-          refs.wallet.acceptSubscriptionRequest(storeRequest.contractId)
-
-        }
-      },
-    )(
-      s" Wait for the payment to be accepted or rejected.",
-      _ => refs.wallet.listSubscriptionInitialPayments() shouldBe empty,
-    )
-  }
-
   private def lookupEntryByName(
       name: String
   )(implicit env: CNNodeTestConsoleEnvironment): Option[codegen.CnsEntry.Contract] = {
@@ -445,21 +392,4 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       .headOption
   }
 
-  private def setupUser(refs: StaticUserRefs): DynamicUserRefs = {
-    val userParty = onboardWalletUser(refs.wallet, refs.validator)
-    DynamicUserRefs(userParty, refs)
-  }
-}
-
-object CnsIntegrationTest {
-  case class StaticUserRefs(
-      validator: ValidatorAppBackendReference,
-      wallet: WalletAppClientReference,
-  )
-
-  case class DynamicUserRefs(userParty: PartyId, static: StaticUserRefs) {
-    def validator: ValidatorAppBackendReference = static.validator
-
-    def wallet: WalletAppClientReference = static.wallet
-  }
 }

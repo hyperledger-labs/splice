@@ -8,7 +8,10 @@ import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import org.slf4j.event.Level
 import CNNodeTests.BracketSynchronous.*
-import com.daml.network.codegen.java.cn.svcrules.ElectionRequest
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
+import com.daml.network.codegen.java.cn.svcrules.{ElectionRequest, SvcRules_RemoveMember}
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_RemoveMember
+import com.daml.network.sv.automation.leaderbased.ExecuteVoteRequestActionTrigger
 
 import java.time.Duration as JavaDuration
 import scala.jdk.CollectionConverters.*
@@ -144,32 +147,92 @@ class SvcElectionTimeBasedIntegrationTest
       }
     }
 
-    clue("Create an outdated request") {
-      val reason = new cn.svcrules.electionrequestreason.ERR_LeaderUnavailable(
-        com.daml.ledger.javaapi.data.Unit.getInstance()
-      )
-      val ranking = Seq(
-        sv1Backend,
-        sv2Backend,
-        sv3Backend,
-        sv4Backend,
-      ).map(_.getSvcInfo().svParty)
+    actAndCheck(
+      "Create a new election request", {
+        val ranking = Vector(
+          sv1Backend,
+          sv2Backend,
+          sv3Backend,
+          sv4Backend,
+        ).map(_.getSvcInfo().svParty.toProtoPrimitive)
+        sv1Backend.createElectionRequest(sv1Party.toProtoPrimitive, ranking)
+      },
+    )(
+      "Verify that election requests is created",
+      _ => {
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(cn.svcrules.ElectionRequest.COMPANION)(
+            svcParty,
+            { co => co.data.requester == sv1Party.toProtoPrimitive },
+          ) should have size 1
+      },
+    )
 
-      sv1Backend.participantClient.ledger_api_extensions.commands.submitWithResult(
-        userId = sv1Backend.config.ledgerApiUser,
-        actAs = Seq(svcParty),
-        readAs = Seq.empty,
-        update = createElectionRequestUpdate(
-          svcParty,
-          sv1Party,
-          svcRulesBeforeElection.epoch,
-          reason,
-          ranking,
-        ),
+    clue("remove current leader such that svcRules epoch is incremented") {
+      val currentLeader = sv1Backend.getSvcInfo().svcRules.payload.leader
+      val leaderBackend = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+        .find(
+          _.getSvcInfo().svParty.toProtoPrimitive == currentLeader
+        )
+        .value
+      val removeAction = new ARC_SvcRules(
+        new SRARC_RemoveMember(
+          new SvcRules_RemoveMember(
+            currentLeader
+          )
+        )
+      )
+      leaderBackend.leaderBasedAutomation
+        .trigger[ExecuteVoteRequestActionTrigger]
+        .pause()
+        .futureValue
+      val (_, voteRequest) = actAndCheck(
+        "Creating vote request",
+        eventuallySucceeds() {
+          sv1Backend.createVoteRequest(
+            sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+            removeAction,
+            "url",
+            "remove current leader",
+            sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+          )
+        },
+      )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
+      Seq(sv2Backend, sv3Backend, sv4Backend)
+        .filter(
+          // current leader not voting
+          _.getSvcInfo().svParty.toProtoPrimitive != currentLeader
+        )
+        .foreach { sv =>
+          clue(s"${sv.name} accepts vote") {
+            val svVoteRequest = eventually() {
+              sv.listVoteRequests().loneElement
+            }
+            svVoteRequest.contractId shouldBe voteRequest.contractId
+            eventuallySucceeds() {
+              sv.castVote(
+                svVoteRequest.contractId,
+                true,
+                "url",
+                "description",
+              )
+            }
+          }
+        }
+
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+        leaderBackend.leaderBasedAutomation.trigger[ExecuteVoteRequestActionTrigger].resume(),
+        entries => {
+          forExactly(4, entries) { line =>
+            line.message should include(
+              "Noticed an SvcRules epoch change"
+            )
+          }
+        },
       )
     }
 
-    clue("Verify that outdated election requests are expired") {
+    clue("Verify that the election request are outdated and expired") {
       advanceTime(pollingIntervalDuration)
       eventually() {
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs

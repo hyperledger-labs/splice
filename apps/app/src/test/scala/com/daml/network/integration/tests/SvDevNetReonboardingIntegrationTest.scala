@@ -7,6 +7,8 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.topology.ParticipantId
 
+import scala.jdk.CollectionConverters.*
+
 class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
 
   override def environmentDefinition =
@@ -41,29 +43,6 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
           sv3ValidatorBackend,
         )
       }
-      checkPartyToParticipantX(
-        Seq(
-          sv1Backend.participantClient.id,
-          sv2Backend.participantClient.id,
-          sv3Backend.participantClient.id,
-        )
-      )
-      checkDecentralizedNamespace(
-        Seq(sv1Backend, sv2Backend, sv3Backend)
-      )
-
-      sv3Backend.stop()
-      sv3ValidatorBackend.stop()
-      startAllSync(sv4Backend, sv4ValidatorBackend)
-
-      checkPartyToParticipantX(
-        Seq(
-          sv1Backend.participantClient.id,
-          sv2Backend.participantClient.id,
-          sv4Backend.participantClient.id,
-        )
-      )
-      checkDecentralizedNamespace(Seq(sv1Backend, sv2Backend, sv4Backend))
 
       def checkPartyToParticipantX(expected: Seq[ParticipantId]) = {
         eventually() {
@@ -91,5 +70,84 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
           }
         }
       }
+
+      checkPartyToParticipantX(
+        Seq(
+          sv1Backend.participantClient.id,
+          sv2Backend.participantClient.id,
+          sv3Backend.participantClient.id,
+        )
+      )
+      checkDecentralizedNamespace(
+        Seq(sv1Backend, sv2Backend, sv3Backend)
+      )
+
+      val sv3PartyId = eventually() {
+        val members = sv1Backend
+          .getSvcInfo()
+          .svcRules
+          .payload
+          .members
+          .asScala
+          .toMap
+
+        members should have size 3
+        val sv3PartyId = sv3Backend.getSvcInfo().svParty
+        inside(members.get(sv3PartyId.toProtoPrimitive)) { case Some(memberInfo) =>
+          memberInfo.name shouldBe "Canton-Foundation-3"
+        }
+        sv3PartyId
+      }
+
+      sv3Backend.stop()
+      sv3ValidatorBackend.stop()
+      startAllSync(sv4Backend, sv4ValidatorBackend)
+
+      checkPartyToParticipantX(
+        Seq(
+          sv1Backend.participantClient.id,
+          sv2Backend.participantClient.id,
+          sv4Backend.participantClient.id,
+        )
+      )
+      checkDecentralizedNamespace(Seq(sv1Backend, sv2Backend, sv4Backend))
+
+      actAndCheck(
+        "start sv4 with sv3 onboarding config",
+        startAllSync(sv4Backend, sv4ValidatorBackend),
+      )(
+        "old SV from PartyToParticipantX is removed and sv3 is overwritten with different party id",
+        _ => {
+          val mapping = sv1Backend.appState.participantAdminConnection
+            .getPartyToParticipant(globalDomainId, sv1Backend.getSvcInfo().svcParty)
+            .futureValue
+            .mapping
+          mapping.threshold shouldBe PositiveInt.one
+          mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
+            sv1Backend.participantClient.id,
+            sv2Backend.participantClient.id,
+            sv4Backend.participantClient.id,
+          )
+
+          val newSv3PartyId = sv4Backend.getSvcInfo().svParty
+          val newMembers = sv1Backend
+            .getSvcInfo()
+            .svcRules
+            .payload
+            .members
+            .asScala
+            .toMap
+
+          newMembers should have size 3
+          newMembers.get(sv3PartyId.toProtoPrimitive) shouldBe empty
+
+          inside(
+            newMembers
+              .get(newSv3PartyId.toProtoPrimitive)
+          ) { case Some(memberInfo) =>
+            memberInfo.name shouldBe "Canton-Foundation-3"
+          }
+        },
+      )
   }
 }

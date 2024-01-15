@@ -26,5 +26,4 @@ trait SvIntegrationTestBase extends CNNodeIntegrationTest with SvTestUtil {
         sv2Backend.participantClient.upload_dar_unless_exists(svcGovernanceDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(cantonCoinDarPath)
       })
-
 }

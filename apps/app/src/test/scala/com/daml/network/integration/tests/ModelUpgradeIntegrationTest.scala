@@ -1,26 +1,32 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
+import com.daml.network.codegen.java.cc.coinrules.CoinRules_AddFutureCoinConfigSchedule
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
+  ARC_CoinRules,
+  ARC_SvcRules,
+}
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_SetConfig
 import com.daml.network.codegen.java.cn.svcrules.SvcRules_SetConfig
+import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_AddFutureCoinConfigSchedule
 import com.daml.network.environment.{CNNodeEnvironmentImpl, DarResources}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{ConfigScheduleUtil, WalletTestUtil}
+import com.daml.network.util.{ConfigScheduleUtil, SvTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
+import scala.jdk.CollectionConverters.*
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import scala.jdk.CollectionConverters.*
 
 class ModelUpgradeIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with ConfigScheduleUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with SvTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -42,63 +48,76 @@ class ModelUpgradeIntegrationTest
 
       val svcRules = sv1Backend.getSvcInfo().svcRules
       svcRules.identifier.getPackageId shouldBe DarResources.svcGovernance_0_1_0.packageId
+
       val coinRules = sv1ScanBackend.getCoinRules()
-      // We go for a direct archive + recreate of CoinRules to change
-      // the current version instead of having to deal with future
-      // dating and associated sleeps/simtime.
       val coinConfig = coinRules.payload.configSchedule.initialValue
-      val newSchedule = new cc.schedule.Schedule(
-        new cc.coinconfig.CoinConfig(
-          coinConfig.transferConfig,
-          coinConfig.issuanceCurve,
-          coinConfig.globalDomain,
-          coinConfig.tickDuration,
-          new cc.coinconfig.PackageConfig(
-            "0.1.0",
-            "0.1.0",
-            "0.1.0",
-            "0.1.0",
-            "0.1.0",
-            "0.1.0",
-          ),
-        ),
-        Seq(
-          new com.daml.network.codegen.java.da.types.Tuple2(
-            Instant.now().minus(3, ChronoUnit.SECONDS),
-            new cc.coinconfig.CoinConfig(
-              coinConfig.transferConfig,
-              coinConfig.issuanceCurve,
-              coinConfig.globalDomain,
-              coinConfig.tickDuration,
-              new cc.coinconfig.PackageConfig(
-                "0.2.0",
-                "0.2.0",
-                "0.2.0",
-                "0.1.0",
-                "0.2.0",
-                "0.2.0",
+
+      val scheduledTime = Instant.now().plus(12, ChronoUnit.SECONDS)
+      val upgradeAction = new ARC_CoinRules(
+        new CRARC_AddFutureCoinConfigSchedule(
+          new CoinRules_AddFutureCoinConfigSchedule(
+            new com.daml.network.codegen.java.da.types.Tuple2(
+              scheduledTime,
+              new cc.coinconfig.CoinConfig(
+                coinConfig.transferConfig,
+                coinConfig.issuanceCurve,
+                coinConfig.globalDomain,
+                coinConfig.tickDuration,
+                new cc.coinconfig.PackageConfig(
+                  "0.2.0",
+                  "0.2.0",
+                  "0.2.0",
+                  "0.1.0",
+                  "0.2.0",
+                  "0.2.0",
+                ),
               ),
-            ),
+            )
           )
-        ).asJava,
+        )
       )
-      val newCoinRules = new cc.coinrules.CoinRules(
-        coinRules.payload.svc,
-        newSchedule,
-        coinRules.payload.isDevNet,
-        coinRules.payload.upgrade,
+
+      actAndCheck(
+        "Voting on an SvcRules config change for upgraded packages", {
+          val (_, voteRequest) = actAndCheck(
+            "Creating vote request",
+            eventuallySucceeds() {
+              sv1Backend.createVoteRequest(
+                sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+                upgradeAction,
+                "url",
+                "description",
+                sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+              )
+            },
+          )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
+          Seq(sv2Backend, sv3Backend).foreach { sv =>
+            clue(s"${sv.name} accepts vote") {
+              val svVoteRequest = eventually() {
+                sv.listVoteRequests().loneElement
+              }
+              svVoteRequest.contractId shouldBe voteRequest.contractId
+              eventuallySucceeds() {
+                sv.castVote(
+                  svVoteRequest.contractId,
+                  true,
+                  "url",
+                  "description",
+                )
+              }
+            }
+          }
+        },
+      )(
+        "observing CoinRules with upgraded config",
+        _ => {
+          val newCoinRules = sv1Backend.getSvcInfo().coinRules
+          val configs =
+            (newCoinRules.payload.configSchedule.initialValue :: newCoinRules.payload.configSchedule.futureValues.asScala.toList
+              .map(_._2))
+          configs.map(_.packageConfig.cantonCoin) should contain("0.2.0")
+        },
       )
-      clue("Activating new version") {
-        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
-          .submitJava(
-            applicationId = sv1Backend.config.ledgerApiUser,
-            actAs = Seq(svcParty),
-            readAs = Seq.empty,
-            commands = coinRules.contractId.exerciseArchive().commands.asScala.toSeq ++
-              newCoinRules.create.commands.asScala.toSeq,
-            optTimeout = None,
-          )
-      }
 
       // Vote on a dummy change on svc rules to ensure it is archived and recreated
       // which indicates the new choice is being used.

@@ -2,12 +2,19 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_SetConfig
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
+  SRARC_ConfirmSvOnboarding,
+  SRARC_SetConfig,
+}
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRulesConfig,
+  SvcRules_ConfirmSvOnboarding,
   SvcRules_SetConfig,
 }
+import com.daml.network.sv.automation.confirmation.SvOnboardingRequestTrigger
+import cats.syntax.traverse.*
+import com.daml.network.codegen.java.cn.svcrules
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 
 import java.time.Duration as JavaDuration
@@ -18,6 +25,7 @@ class SvTimeBasedOnboardingIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment {
   "expire stale `SvOnboardingRequest`, `SvOnboardingConfirmed`,`ValidatorOnboarding` and `VoteRequest` contracts" in {
     implicit env =>
+      implicit val ec = env.executionContext
       clue("Initialize SVC with 3 SVs") {
         startAllSync(
           sv1ScanBackend,
@@ -34,17 +42,11 @@ class SvTimeBasedOnboardingIntegrationTest
       clue(
         "expire stale `SvOnboardingRequest` contracts."
       ) {
-        // Add a phantom SV and stop SV3 so that SV4 can't gather enough confirmations just yet
-        actAndCheck(
-          "Add phantom Sv and stop sv3", {
-            addPhantomSv()
-            sv3Backend.stop()
-          },
-        )(
-          "there are 4 members",
-          _ => sv1Backend.getSvcInfo().svcRules.payload.members should have size 4,
-        )
-        // We now need 3 confirmations to execute an action, but only sv1 and sv2 are active.
+        val sv2and3OnboardingRequestTriggers =
+          Seq(sv2Backend, sv3Backend).map(_.svcAutomation.trigger[SvOnboardingRequestTrigger])
+
+        sv2and3OnboardingRequestTriggers.traverse(_.pause()).futureValue
+        // We now need 2 confirmations to execute an action, but only sv1 will confirm to onboard sv4.
         clue("SV4 starts") {
           sv4ValidatorBackend.start()
           sv4Backend.start()
@@ -67,7 +69,6 @@ class SvTimeBasedOnboardingIntegrationTest
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
               .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) shouldBe empty,
         )
-
       }
 
       clue(
@@ -75,30 +76,29 @@ class SvTimeBasedOnboardingIntegrationTest
       ) {
         val svYParty = allocateRandomSvParty("svY")
         actAndCheck(
-          "Create a new `SvOnboardingConfirmed` Contract with new party \"svY\"",
-          sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
-            actAs = Seq(svcParty),
-            optTimeout = None,
-            commands = sv1Backend
-              .getSvcInfo()
-              .svcRules
-              .contractId
-              .exerciseSvcRules_ConfirmSvOnboarding(
-                svYParty.toProtoPrimitive,
-                "new random party",
-                dummySvRewardWeight,
-                "create new `SvOnboardingConfirmed` contract",
-              )
-              .commands
-              .asScala
-              .toSeq,
-          ),
+          "Create a new `SvOnboardingConfirmed` Contract with new party \"svY\"", {
+            val confirmingSvs = getConfirmingSvs(Seq(sv1Backend, sv2Backend, sv3Backend))
+            confirmActionByAllMembers(
+              confirmingSvs,
+              new svcrules.actionrequiringconfirmation.ARC_SvcRules(
+                new SRARC_ConfirmSvOnboarding(
+                  new SvcRules_ConfirmSvOnboarding(
+                    svYParty.toProtoPrimitive,
+                    "new random party",
+                    dummySvRewardWeight,
+                    "create new `SvOnboardingConfirmed` contract",
+                  )
+                )
+              ),
+            )
+          },
         )(
           "SvY's `SvOnboardingConfirmed` contract is created'",
           _ =>
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
               .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(
-                svcParty
+                svcParty,
+                _.data.svParty == svYParty.toProtoPrimitive,
               ) should have length 1,
         )
         actAndCheck(
@@ -108,7 +108,10 @@ class SvTimeBasedOnboardingIntegrationTest
           "The `SvOnboardingConfirmed` contract expires and is archived",
           _ =>
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-              .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(svcParty) shouldBe empty,
+              .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(
+                svcParty,
+                _.data.svParty == svYParty.toProtoPrimitive,
+              ) shouldBe empty,
         )
       }
 

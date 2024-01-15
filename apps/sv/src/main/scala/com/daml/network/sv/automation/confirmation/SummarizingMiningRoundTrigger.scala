@@ -70,7 +70,6 @@ class SummarizingMiningRoundTrigger(
         summarizingRound.domain,
       )
       svcRules <- store.getSvcRules()
-      coinRules <- store.getCoinRules()
       action = coinRulesStartIssuingAction(
         summarizingRound.contractId,
         rewards.summary,

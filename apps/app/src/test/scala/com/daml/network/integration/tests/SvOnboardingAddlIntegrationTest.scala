@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.cn.svcrules.SvcRules_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
@@ -8,14 +9,12 @@ import com.daml.network.sv.util.SvOnboardingToken
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
 import scala.jdk.OptionConverters.*
-import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardingStatus
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
 import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
 
 class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase {
 
@@ -247,112 +246,34 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase {
         }
       }
       actAndCheck(
-        "Moving sv2 to confirmed state",
-        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
-          .submitWithResult(
-            userId = "SVC",
-            actAs = Seq(svcParty),
-            readAs = Seq(),
-            update = sv1Backend
-              .getSvcInfo()
-              .svcRules
-              .contractId
-              .exerciseSvcRules_ConfirmSvOnboarding(
-                sv2Party.toProtoPrimitive,
-                "Canton-Foundation-2",
-                dummySvRewardWeight,
-                "no reason",
-              ),
+        "Moving sv2 to confirmed state", {
+          val confirmingSvs = getConfirmingSvs(Seq(sv1Backend))
+          confirmActionByAllMembers(
+            confirmingSvs,
+            new ARC_SvcRules(
+              new SRARC_ConfirmSvOnboarding(
+                new SvcRules_ConfirmSvOnboarding(
+                  sv2Party.toProtoPrimitive,
+                  "Canton-Foundation-2",
+                  dummySvRewardWeight,
+                  "no reason",
+                )
+              )
+            ),
           )
-          .exerciseResult,
+        },
       )(
         "Confirmed SVs get told they are are confirmed",
-        svOnboardingConfirmedCid =>
+        _ =>
           inside(sv1Backend.getSvOnboardingStatus(sv2Party)) {
             case status: SvOnboardingStatus.Confirmed => {
               status.name shouldBe "Canton-Foundation-2"
-              status.svOnboardingConfirmedCid shouldBe svOnboardingConfirmedCid
               sv1Backend.getSvOnboardingStatus("Canton-Foundation-2") shouldBe sv1Backend
                 .getSvOnboardingStatus(
                   sv2Party
                 )
             }
           },
-      )
-  }
-
-  "The new sv with same name can be onboarded and overwrite existing member only in devnet" in {
-    implicit env =>
-      clue("Initialize SVC with 3 SVs") {
-        startAllSync(
-          sv1ScanBackend,
-          sv1Backend,
-          sv2Backend,
-          sv3Backend,
-          sv1ValidatorBackend,
-          sv2ValidatorBackend,
-          sv3ValidatorBackend,
-        )
-        sv1Backend.getSvcInfo().svcRules.payload.members should have size 3
-      }
-
-      val fakeSv4Party = allocateRandomSvParty("sv4")
-      val coinConfig = sv1ScanBackend.getCoinConfigAsOf(env.environment.clock.now)
-      actAndCheck(
-        "Add a fake sv4 Party to SvcRules.members to simulate sv4 is already added to SVC", {
-          sv1Backend.participantClient.ledger_api_extensions.commands.submitWithResult(
-            sv1Backend.config.ledgerApiUser,
-            actAs = Seq(svcParty),
-            readAs = Seq.empty,
-            update = sv1Backend
-              .getSvcInfo()
-              .svcRules
-              .contractId
-              .exerciseSvcRules_AddMember(
-                fakeSv4Party.toProtoPrimitive,
-                "Canton-Foundation-4",
-                dummySvRewardWeight,
-                sv1Backend.participantClient.id.toProtoPrimitive,
-                new Round(3),
-                coinConfig.globalDomain.activeDomain,
-              ),
-          )
-        },
-      )(
-        "sv4 is added as an SVC member with the fake party Id",
-        _ =>
-          inside(
-            sv1Backend
-              .getSvcInfo()
-              .svcRules
-              .payload
-              .members
-              .asScala
-              .get(fakeSv4Party.toProtoPrimitive)
-          ) { case Some(memberInfo) =>
-            memberInfo.name shouldBe "Canton-Foundation-4"
-          },
-      )
-
-      actAndCheck(
-        "start sv4 with a party id different from existing sv4 in SVC", {
-          startAllSync(sv4Backend, sv4ValidatorBackend)
-        },
-      )(
-        "existing member sv4 is overwritten with different party id",
-        _ => {
-          inside(
-            sv1Backend
-              .getSvcInfo()
-              .svcRules
-              .payload
-              .members
-              .asScala
-              .get(sv4Backend.getSvcInfo().svParty.toProtoPrimitive)
-          ) { case Some(memberInfo) =>
-            memberInfo.name shouldBe "Canton-Foundation-4"
-          }
-        },
       )
   }
 

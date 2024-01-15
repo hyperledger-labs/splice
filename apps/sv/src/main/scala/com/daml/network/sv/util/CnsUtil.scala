@@ -1,8 +1,6 @@
 package com.daml.network.sv.util
 
 import org.apache.pekko.http.scaladsl.model.Uri
-import com.daml.network.codegen.java.cn
-import com.daml.network.util.Contract
 
 import scala.util.{Failure, Success, Try}
 
@@ -33,12 +31,4 @@ object CnsUtil {
 
   def isValidEntryDescription(description: String): Boolean =
     description.length <= entryDescriptionLength
-
-  def isValidCnsContent(
-      cnsEntryContext: Contract[cn.cns.CnsEntryContext.ContractId, cn.cns.CnsEntryContext]
-  ): Boolean = {
-    isValidEntryName(cnsEntryContext.payload.name)
-    && isValidEntryUrl(cnsEntryContext.payload.url)
-    && isValidEntryDescription(cnsEntryContext.payload.description)
-  }
 }

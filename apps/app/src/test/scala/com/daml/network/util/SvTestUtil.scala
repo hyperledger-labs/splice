@@ -1,13 +1,15 @@
 package com.daml.network.util
 
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.ledger.javaapi.data.TransactionTree
 import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
+import com.daml.network.console.{CNParticipantClientReference, SvAppBackendReference}
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.daml.network.util.SvTestUtil.ConfirmingSv
+import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
 
@@ -20,12 +22,6 @@ trait SvTestUtil extends CNNodeTestCommon {
   def allocateRandomSvParty(name: String)(implicit env: CNNodeTestConsoleEnvironment) = {
     val id = (new scala.util.Random).nextInt().toHexString
     sv1Backend.participantClient.ledger_api.parties.allocate(s"$name-$id", name).party
-  }
-
-  def addPhantomSv()(implicit env: CNNodeTestConsoleEnvironment) = {
-    // random value for test
-    val svXParty = allocateRandomSvParty("svX")
-    addSvMember(svXParty, "svX, the phantom of the SVC", sv1Backend.participantClient.id)
   }
 
   def median(values: Seq[BigDecimal]): Option[BigDecimal] = {
@@ -42,45 +38,43 @@ trait SvTestUtil extends CNNodeTestCommon {
     }
   }
 
-  def addSvMember(
-      svParty: PartyId,
-      svName: String,
-      svParticipantId: ParticipantId,
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
-    val nextMiningRound = clue("Getting next open round") {
-      val (openRounds, _) = sv1ScanBackend.getOpenAndIssuingMiningRounds()
-      new Round(openRounds.map(_.contract.payload.round.number).max + 1)
+  def confirmActionByAllMembers(
+      confirmingSvs: Seq[ConfirmingSv],
+      action: ActionRequiringConfirmation,
+  )(implicit env: CNNodeTestConsoleEnvironment): Seq[TransactionTree] = {
+    confirmingSvs.map { case ConfirmingSv(participantClient, svPartyId) =>
+      confirmAction(participantClient, svPartyId, action)
     }
-    val coinConfig = sv1ScanBackend.getCoinConfigAsOf(env.environment.clock.now)
-    actAndCheck(
-      s"Add the phantom SV \"$svName\"",
-      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
-        actAs = Seq(svcParty),
-        optTimeout = None,
-        commands = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
-          .head
-          .id
-          .exerciseSvcRules_AddMember(
-            svParty.toProtoPrimitive,
-            svName,
-            dummySvRewardWeight,
-            svParticipantId.toProtoPrimitive,
-            nextMiningRound,
-            coinConfig.globalDomain.activeDomain,
-          )
-          .commands
-          .asScala
-          .toSeq,
-      ),
-    )(
-      s"$svName is a member of the SvcRules",
-      _ =>
-        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
-          .head
-          .data
-          .members should contain key svParty.toProtoPrimitive,
-    )
   }
+
+  private def confirmAction(
+      participantClient: CNParticipantClientReference,
+      svPartyId: PartyId,
+      action: ActionRequiringConfirmation,
+  )(implicit env: CNNodeTestConsoleEnvironment): TransactionTree = {
+    eventuallySucceeds() {
+      val svcRulesCid = participantClient.ledger_api_extensions.acs
+        .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
+        .head
+        .id
+      participantClient.ledger_api_extensions.commands
+        .submitJava(
+          actAs = Seq(svPartyId),
+          readAs = Seq(svcParty),
+          optTimeout = None,
+          commands = svcRulesCid
+            .exerciseSvcRules_ConfirmAction(svPartyId.toProtoPrimitive, action)
+            .commands
+            .asScala
+            .toSeq,
+        )
+    }
+  }
+
+  def getConfirmingSvs(svBackends: Seq[SvAppBackendReference]): Seq[ConfirmingSv] =
+    svBackends.map(sv => ConfirmingSv(sv.participantClientWithAdminToken, sv.getSvcInfo().svParty))
+}
+
+object SvTestUtil {
+  case class ConfirmingSv(svParticipantClient: CNParticipantClientReference, svPartyId: PartyId)
 }
