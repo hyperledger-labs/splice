@@ -400,7 +400,7 @@ class JoiningNodeInitializer(
           )
           _ = logger.info("Adding member to the decentralized namespace.")
           _ <- participantAdminConnection
-            .ensureDecentralizedNamespaceDefinitionProposalAccepted(
+            .ensureDecentralizedNamespaceDefinitionAdditionAccepted(
               domainId,
               svcParty.uid.namespace,
               svParty.uid.namespace,

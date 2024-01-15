@@ -100,7 +100,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     ).parTraverse { connection =>
       val id = connection.getId().futureValue
       connection
-        .ensureDecentralizedNamespaceDefinitionProposalAccepted(
+        .ensureDecentralizedNamespaceDefinitionAdditionProposalAccepted(
           globalDomainId,
           svcParty.uid.namespace,
           sv1SequencerId.uid.namespace,
