@@ -1,9 +1,11 @@
 module CN.SvcRules where
 
 import DA.Action (void, when, unless)
+import DA.Either (partitionEithers)
+import DA.Exception
 import DA.Foldable (forA_)
 import DA.List as List
-import DA.Optional (fromSome, isSome)
+import DA.Optional (fromSome, fromOptional, isSome)
 import qualified DA.Map as Map
 import qualified DA.Set as Set
 import qualified DA.Text as T
@@ -221,6 +223,60 @@ template Confirmation with
       controller svc
       do now <- getTime
          require "Contract has expired" (expiresAt <= now)
+
+-- | A request for the other members to vote on the execution of an action requiring confirmation.
+-- We use this for implementing on-ledger governance actions triggered by SV operators in a uniform way.
+--
+-- See the comments on `ActionRequiringConfirmation` for details.
+--
+-- Version2, which tracks all votes in a single contract.
+-- TODO(#9298): make this the one version for votting (i.e. drop the '2'-suffixes), once we have migrated the apps to the new version
+template VoteRequest2
+  with
+    svc : Party
+    requester : Text
+    -- ^ The SV member that requested to execute the action.
+    action : ActionRequiringConfirmation
+    -- ^ The action whose confirmation is required.
+    reason : Reason
+    -- ^ The reason for requesting the execution of the action. Typically a reference to some off-ledger justification.
+    voteBefore : Time
+    -- ^ The time before which votes are accepted, and SHOULD be submitted.
+    votes : Map.Map Text Vote2
+    -- ^ The votes cast by current (or previous members) of the SVC. These may be previous members in case
+    -- there was a membership change after the vote was requested.
+  where
+    signatory svc
+
+data VoteRequestResult2 = VoteRequestResult2 with
+    request : VoteRequest2 -- ^ The original vote request.
+    completedAt : Time -- ^ When the vote request was completed.
+    offboardedVoters : [Text] -- ^ Members that voted but were offboarded before the vote completed.
+    abstainingMembers : [Text] -- ^ Members that did not vote.
+    outcome : VoteRequestOutcome2  -- ^ The final result of the vote.
+  deriving (Eq, Show)
+
+data VoteRequestOutcome2
+  = VRO_AcceptedButActionFailed with
+      description : Text -- ^ Description of the failure.
+  | VRO_Accepted with -- The action was accepted by a super-majority.
+      effectiveAt : Time -- ^ Time when the action will be effective.
+  | VRO_Rejected  -- The action was rejected by a super-majority.
+  | VRO_Expired   -- The action was neither accepted nor rejected by a super-majority during the voting period.
+  | ExtVoteRequestOutcome with
+      dummyUnitField : ()
+        --  ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
+  deriving (Eq, Show)
+--
+-- | A vote cast by an SVC member.
+data Vote2 = Vote2 with
+    sv : Party -- ^ The SV party used to submit the vote.
+    accept : Bool
+    -- ^ Whether the responder accepted the request to execute the action or not.
+    reason : Reason
+    -- ^ The reason for voting this way.
+  deriving(Eq, Show)
+
 
 -- | A request for the other members to vote on the execution of an action requiring confirmation.
 -- We use this for implementing on-ledger governance actions triggered by SV operators in a uniform way.
@@ -625,6 +681,117 @@ template SvcRules with
         executeActionRequiringConfirmation self coinRulesCid action
 
 
+    -- Voting as part of on-ledger governance (version 2)
+    -----------------------------------------------------
+
+    -- TODO(#9317): rate limit inidiviual SVs wrt requesting votes
+    nonconsuming choice SvcRules_RequestVote2 : ContractId VoteRequest2
+      with
+        requester : Party
+        action : ActionRequiringConfirmation
+        reason : Reason
+        voteRequestTimeout : Optional RelTime
+      controller requester
+      do
+        requesterName <- case requester `Map.lookup` members of
+          None -> fail "Requester is not a collective member"
+          Some info -> pure (info.name)
+        requireWellformedReason config reason
+        now <- getTime
+        let voteBefore = case voteRequestTimeout of
+              Some value ->
+                now `addRelTime` value
+              None ->
+                now `addRelTime` config.voteRequestTimeout
+        require "There is some time to vote" (now < voteBefore)
+        let requesterVote = Vote2 with
+              sv = requester
+              accept = True
+              reason = Reason with url = ""; body = "I accept, as I requested the vote."
+        create VoteRequest2 with
+          svc
+          requester = requesterName
+          action
+          reason
+          voteBefore
+          votes = Map.fromList [(requesterName, requesterVote)]
+
+
+    -- Note that this choice can be used to both cast the initial vote, and update a vote.
+    -- TODO(#9319): rate limit SVs wrt updating their votes
+    nonconsuming choice SvcRules_CastVote2 : ContractId VoteRequest2
+      with
+        requestCid : ContractId VoteRequest2
+        vote : Vote2
+      controller vote.sv
+      do
+        -- validate vote parameters
+        requireWellformedVote config vote
+        voterName <- case Map.lookup vote.sv members of
+          None -> fail "Voter is not a collective member"
+          Some info -> pure info.name
+        -- validate and archive request
+        now <- getTime
+        request <- fetch requestCid
+        archive requestCid
+        require "SVC matches" (request.svc == svc)
+        require "request is open" (now < request.voteBefore)
+        -- store vote
+        create request with
+          votes = Map.insert voterName vote request.votes
+
+    -- We expect the TxHistory log of the SV app to store the choice argument together
+    -- with its result for historical reference.
+    nonconsuming choice SvcRules_CloseVoteRequest2 : VoteRequestResult2
+      with
+        requestCid : ContractId VoteRequest2
+        coinRulesCid : Optional (ContractId CoinRules)
+      controller leader
+      do
+        -- validate and archive request
+        request <- fetch requestCid
+        archive requestCid
+        require "SVC matches" (request.svc == svc)
+        -- check if the request is ready to be closed
+        let activeMembers = map (.name) $ Map.values members
+        now <- getTime
+        when (now < request.voteBefore) $
+          require "All members must have voted to allow early closing" $
+            all (`Map.member` request.votes) activeMembers
+        -- count the votes
+        let activeMemberSet = Set.fromList activeMembers
+        let (validVotes, offboardedVoters) = partitionEithers
+              [ if voterName `Set.member` activeMemberSet then Left vote else Right voterName
+              | (voterName, vote) <- Map.toList request.votes
+              ]
+        let abstainingMembers = [ name | name <- activeMembers, not (name `Map.member` request.votes) ]
+        let (yays, nays) = partition (.accept) validVotes
+        let s = summarizeCollective this
+        outcome <-
+          if length yays >= s.requiredNumVotes
+            then do
+              try do
+                executeActionRequiringConfirmation self coinRulesCid request.action
+                pure $ VRO_Accepted with
+                  effectiveAt = fromOptional now $
+                    actionRequiringConfirmationEffectiveAt request.action
+              catch
+                (ex : AnyException) ->
+                  pure $ VRO_AcceptedButActionFailed with
+                    description = message ex
+            else
+              if length nays >= s.requiredNumVotes
+              then pure VRO_Rejected
+              else pure VRO_Expired
+        -- report the result
+        pure VoteRequestResult2 with
+            request
+            completedAt = now
+            offboardedVoters
+            abstainingMembers
+            outcome
+
+
     -- Voting as part of on-ledger governance
     -----------------------------------------
 
@@ -813,8 +980,6 @@ template SvcRules with
     --
     -- Note: we do not archive the CoinPriceVote of a member on its removal from the collective,
     -- as that would allow that member to block the removal via updating its CoinPriceVote at the right time.
-    -- Actions that require confirmation via ad-hoc voting must not become stale while the voting
-    -- process runs.
     nonconsuming choice SvcRules_GarbageCollectCoinPriceVotes : ()
       with
         nonMemberVoteCids : [ContractId CoinPriceVote]
@@ -1330,7 +1495,30 @@ requireWellformedReason config reason = do
   require "Reason URL is not too long" (T.length reason.url <= config.maxTextLength)
   require "Reason body is not too long" (T.length reason.body <= config.maxTextLength)
 
+requireWellformedVote : SvcRulesConfig -> Vote2 -> Update ()
+requireWellformedVote config vote = do
+  requireWellformedReason config vote.reason
+
 ensureNotExpired : Time -> Update ()
 ensureNotExpired expiresAt = do
   now <- getTime
   require "Contract has not yet expired" (now < expiresAt)
+
+-- Vote Request support functions
+---------------------------------
+
+-- | Get the future-dated effectiveAt of an action requiring confirmation.
+actionRequiringConfirmationEffectiveAt : ActionRequiringConfirmation -> Optional Time
+actionRequiringConfirmationEffectiveAt action =
+  case action of
+    ARC_CoinRules with .. ->
+      case coinRulesAction of
+        CRARC_AddFutureCoinConfigSchedule choiceArg -> Some choiceArg.newScheduleItem._1
+        CRARC_RemoveFutureCoinConfigSchedule choiceArg -> Some choiceArg.scheduleTime
+        CRARC_UpdateFutureCoinConfigSchedule choiceArg -> Some choiceArg.scheduleItem._1
+        CRARC_MiningRound_Archive _ -> None
+        CRARC_MiningRound_StartIssuing _ -> None
+    ARC_SvcRules with .. -> None
+    ARC_CnsEntryContext with .. -> None
+    ExtActionRequiringConformation _dummyUnitField ->
+      error "Encountered unexpected ExtActionRequiringConformation at runtime"

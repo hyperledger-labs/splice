@@ -1,10 +1,11 @@
 module CN.Scripts.SvcTestUtils where
 
 
-import DA.Action (unless, when, void)
+import DA.Action (unless, when, void, foldlA)
 import DA.Foldable (forA_)
 import DA.List
 import qualified DA.Map as Map
+import qualified DA.Set as Set
 import qualified DA.Text as T
 import Daml.Script
 import DA.Time
@@ -310,6 +311,47 @@ initateAndAcceptVote app (initiator::others) action = do
         reason = Reason with url = ""; body = "✓"
 
   executeAllDefinitiveVotes app
+
+-- TODO(#9298): drop the 2 suffix once the old version is gone
+executeAllDefinitiveVotes2 : CCApp -> Script ()
+executeAllDefinitiveVotes2 app = do
+  -- get rules and collective summary
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  [(svcRulesCid, rules)] <- query @SvcRules app.svc
+  let s = summarizeCollective rules
+  -- query all voting requests visible to svc
+  now <- getTime
+  requests <- query @VoteRequest2 app.svc
+  forA_ requests $ \(requestCid, request) -> do
+    let activeMembers = Set.fromList $ map (.name) $ Map.values rules.members
+    let execute = request.voteBefore <= now ||
+          (activeMembers == Set.fromList (Map.keys request.votes))
+    when execute $ do
+      void $ submitMulti [s.leader] [app.svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
+        requestCid
+        coinRulesCid = Some coinRulesCid
+
+-- TODO(#9298): drop the 2 suffix once the old version is gone
+initateAndAcceptVote2 : CCApp -> [Party] -> ActionRequiringConfirmation -> Script ()
+initateAndAcceptVote2 _ [] _ = error "initiateAndAcceptVote: require at least one party"
+initateAndAcceptVote2 app (initiator::others) action = do
+    [(svcRulesCid, _)] <- query @SvcRules app.svc
+    requestCid <- submitMulti [initiator] [app.svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
+      requester = initiator
+      action
+      reason = Reason with url = ""; body = "let's get it done"
+      voteRequestTimeout = None
+    foldlA (castVote svcRulesCid) requestCid others
+    executeAllDefinitiveVotes2 app
+  where
+    castVote svcRulesCid requestCid sv = do
+      submitMulti [sv] [app.svc] $ exerciseCmd svcRulesCid SvcRules_CastVote2 with
+          requestCid
+          vote = Vote2 with
+            sv
+            accept = True
+            reason = Reason with url = ""; body = "✓"
+
 
 expireAllExpiredContracts : Party -> Script ()
 expireAllExpiredContracts actor = do
