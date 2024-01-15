@@ -1270,10 +1270,12 @@ jobs:
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
-            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
-              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
-              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
-                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+            # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
+            if [[ -n "${RESTORE_CLUSTER:-}" ]]; then
+              if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+                export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
+              else
+                echo "RESTORE_CLUSTER set but not BOOTSTRAPPING_CONFIG"
                 exit 1
               fi
             fi
@@ -1420,10 +1422,12 @@ jobs:
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
-            if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
-              export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
-              if [[ -z "${RESTORE_CLUSTER:-}" ]]; then
-                echo "BOOTSTRAPPING_CONFIG set but not RESTORE_CLUSTER"
+            # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
+            if [[ -n "${RESTORE_CLUSTER:-}" ]]; then
+              if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
+                export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
+              else
+                echo "RESTORE_CLUSTER set but not BOOTSTRAPPING_CONFIG"
                 exit 1
               fi
             fi
