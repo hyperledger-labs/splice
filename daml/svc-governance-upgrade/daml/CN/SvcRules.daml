@@ -125,6 +125,7 @@ data MemberInfo = MemberInfo with
 -- | Information about offboarded members
 data OffboardedMemberInfo = OffboardedMemberInfo with
     name : Text -- ^ Human-readable name; must be unique.
+    lastReceivedRewardFor : Round
   deriving (Eq, Show)
 
 data CollectiveSummary = CollectiveSummary with
@@ -399,22 +400,25 @@ template SvcRules with
       controller svc
       do
         require "Member party is new" (not $ newMemberParty `Map.member` members)
-        require "Member party has not already been offboarded" (not $ newMemberParty `Map.member` offboardedMembers)
+        -- Add members with same name as offboarded on devnet
         newOffboardedMembers <-
           if isDevNet
             then
               -- Check if there is an existing member with the same name
               pure $ case find (\(_, info) -> info.name == newMemberName) (Map.toList members) of
                 None -> offboardedMembers
-                Some (prev, _) ->
-                  Map.insert prev (OffboardedMemberInfo $ "SV " <> show newMemberName <> " reonboarded as " <> show newMemberParty) offboardedMembers
+                Some (prev, info) ->
+                  Map.insert prev (OffboardedMemberInfo ("SV " <> show newMemberName <> " reonboarded as " <> show newMemberParty) info.lastReceivedRewardFor) offboardedMembers
             else do
               require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
               pure offboardedMembers
+        -- Remove from offboarded members if the same party id is reonboarded
+        let offboardedMemberInfoO = Map.lookup newMemberParty newOffboardedMembers
+        newOffboardedMembers <- pure $ Map.delete newMemberParty newOffboardedMembers
         let info = MemberInfo with
               name = newMemberName
               joinedAsOfRound
-              lastReceivedRewardFor = Round (joinedAsOfRound.number - 1)
+              lastReceivedRewardFor = max (Round (joinedAsOfRound.number - 1)) (optional (Round (-1)) (.lastReceivedRewardFor) offboardedMemberInfoO)
               -- For simplicity we only count missed coupons for the most recent joining, and not across reonboardings.
               -- TODO(#9175): consider counting missed coupons across reonboardings
               numRewardCouponsMissed = 0
@@ -459,7 +463,9 @@ template SvcRules with
             let (newLeader, newEpoch)
                   | member == leader = (head (Map.keys newMembers), epoch + 1)
                   | otherwise        = (leader, epoch)
-            let offboardedMemberInfo = OffboardedMemberInfo with name = info.name
+            let offboardedMemberInfo = OffboardedMemberInfo with
+                  name = info.name
+                  lastReceivedRewardFor = info.lastReceivedRewardFor
             -- create the new rules contract
             create SvcRules with
               svc
@@ -1132,6 +1138,10 @@ template SvcRules with
         let party = svOnboardingConfirmed.svParty
         let info = OffboardedMemberInfo with
               name = svOnboardingConfirmed.svName
+              lastReceivedRewardFor =
+                max
+                  (fromOptional (Round (-1)) (fmap (.lastReceivedRewardFor) (Map.lookup party members)))
+                  (fromOptional (Round (-1)) (fmap (.lastReceivedRewardFor) (Map.lookup party offboardedMembers)))
         exercise cid SvOnboardingConfirmed_Expire
         create SvcRules with
           svc
@@ -1238,7 +1248,7 @@ template SvcRules with
             openRound <- fetch openRoundCid
             require "SVC matches" (openRound.svc == svc)
             require "OpenRound is open" (openRound.opensAt <= now)
-            require "Not yet received" (info.lastReceivedRewardFor < openRound.round)
+            require ("Round " <> show openRound.round <> " is greater than the last round a reward has been received for " <> show info.lastReceivedRewardFor) (info.lastReceivedRewardFor < openRound.round)
 
             let newInfo = info with
                   lastReceivedRewardFor = openRound.round

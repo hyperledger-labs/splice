@@ -349,7 +349,7 @@ testSvMemberOverwriteInDevNet = do
   submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" 19 "sv2-participant-id" (Round 3) domainId
 
   [(_, svcRules)] <- query @SvcRules app.svc
-  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'")]
+  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" (Round (-1)))]
 
   svX2 <- allocateParty "svX2"
 
@@ -359,7 +359,79 @@ testSvMemberOverwriteInDevNet = do
   submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX2 "sv2" 19 "sv2-participant-id" (Round 3) domainId
 
   [(_, svcRules)] <- query @SvcRules app.svc
-  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'"), (svX, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX2'")]
+  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" (Round (-1))), (svX, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX2'" (Round 2))]
+
+  pure ()
+
+testSvMemberReonboarding = do
+  (app, svc, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
+
+  [(_, svcRules)] <- query @SvcRules svc
+
+  Map.keys svcRules.members === [sv1, sv2, sv3, sv4]
+
+  [(earliestRoundCid, _), (middleRoundCid, _), _] <- getActiveOpenRoundsSorted app
+  -- Receive rewards for all open rounds
+  forA_ [earliestRoundCid, middleRoundCid] $ \roundCid -> do
+    [(rulesCid, _)] <- query @SvcRules svc
+    submitMulti [sv4] [svc] $ exerciseCmd rulesCid SvcRules_ReceiveSvRewardCoupon with
+      openRoundCid = roundCid
+      sv = sv4
+
+  initateAndAcceptVote2 app [sv1, sv2, sv3] $
+    ARC_SvcRules with
+      svcAction = SRARC_RemoveMember SvcRules_RemoveMember with
+        member = sv4
+  passTime (svcRules.config.voteRequestTimeout)
+  executeAllDefinitiveVotes2 app
+
+  [(_, svcRules)] <- query @SvcRules svc
+  Map.keys svcRules.members === [sv1, sv2, sv3]
+  Map.keys svcRules.offboardedMembers === [sv4]
+
+  let token = "mock-token"
+
+  svSubmits app sv1 $ \cid -> exerciseCmd cid $
+    SvcRules_StartSvOnboarding "sv4" sv4 token sv1
+  forA_ [sv1,sv2,sv3] $ \sv ->
+    svSubmits app sv $ \cid -> exerciseCmd cid $ SvcRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_SvcRules with
+        svcAction = SRARC_ConfirmSvOnboarding $ SvcRules_ConfirmSvOnboarding with
+          newMemberParty = sv4
+          newMemberName = "sv4"
+          reason = "because"
+          newMemberRewardWeight = 19 -- we use 19 as a dummy reward weight for testing
+  executeAllConfirmedActions app
+  [(svOnboardingConfirmedCid, _)] <- query @SvOnboardingConfirmed svc
+
+  [(earliestRoundCid, _), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app
+
+  [(coinRulesCid, _)] <- query @CoinRules svc
+  [(svcRulesCid, _)] <- query @SvcRules svc
+
+  submitMulti [sv4] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
+    sv = sv4
+    svOnboardingConfirmedCid
+    earliestRoundCid
+    middleRoundCid
+    latestRoundCid
+    coinRulesCid
+    svParticipantId = "sv4-participant-id"
+
+  [(_, svcRules)] <- query @SvcRules svc
+
+  Map.keys svcRules.members === [sv1, sv2, sv3, sv4]
+  fmap (.lastReceivedRewardFor) (Map.lookup sv4 svcRules.members) === Some (Round 1)
+  -- sv4 is removed from offboarded members again.
+  Map.keys svcRules.offboardedMembers === []
+
+  -- Check that we cannot receive rewards again
+  forA_ [earliestRoundCid, middleRoundCid] $ \roundCid -> do
+    [(rulesCid, _)] <- query @SvcRules svc
+    submitMultiMustFail [sv4] [svc] $ exerciseCmd rulesCid SvcRules_ReceiveSvRewardCoupon with
+      openRoundCid = roundCid
+      sv = sv4
 
   pure ()
 
