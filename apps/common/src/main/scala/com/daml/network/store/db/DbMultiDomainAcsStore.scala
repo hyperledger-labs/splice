@@ -284,7 +284,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
           // array is lesser if bytes are otherwise equal; there's an equivalent
           // soft implementation in
           // InMemoryMultiDomainAcsStore.reassignmentContractOrder
-          orderLimit = sql"""order by digest((contract_id || $participantId)::bytea, 'md5'::text)
+          orderLimit =
+            sql"""order by extensions.digest((contract_id || $participantId)::bytea, 'md5'::text)
               limit ${(limit: PageLimit).limit}""",
         ),
         "listAssignedContractsNotOnDomainN",

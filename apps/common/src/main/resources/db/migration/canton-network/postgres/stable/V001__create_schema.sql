@@ -1,8 +1,29 @@
 -- Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
--- allow digest function
-create extension if not exists "pgcrypto";
+-- Create a schema for extensions.
+-- The Postgres statement `create extension` installs an extension *globally*, and makes it available in the current schema only.
+-- It is therefore not safe to run `create extension` with default parameters if multiple apps are using the same database,
+-- even if they are configured to use different schemas.
+-- To solve this, we create an explicit schema for extensions and require that all CN apps use this schema for extensions.
+-- All statements in this section must be idempotent, as they modify global database state and may be executed
+-- multiple times by different apps.
+-- See for example https://stackoverflow.com/a/43937189
+
+create schema if not exists extensions;
+
+-- make sure everybody can use everything that is already present in the extensions schema
+grant usage on schema extensions to public;
+grant execute on all functions in schema extensions to public;
+
+-- include future extensions
+alter default privileges in schema extensions
+   grant execute on functions to public;
+alter default privileges in schema extensions
+   grant usage on types to public;
+
+-- install extension for the digest function
+create extension if not exists "pgcrypto" schema extensions;
 
 -- We allow many stores to ingest into the same tables to enable:
 --   - fast rollbacks on app upgrades (the new app can start re-ingesting w/o deleting the data ingested by its previous version)
@@ -635,7 +656,7 @@ create table svc_txlog_store
     voted_at                                                 text
 );
 
-create index svc_txlog_store_sid_et_an_e    
+create index svc_txlog_store_sid_et_an_e
     on svc_txlog_store (store_id, entry_type, action_name, executed desc)
     where svc_txlog_store.action_name is not null and executed is not null;
 
