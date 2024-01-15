@@ -66,13 +66,17 @@ case class CNNodeEnvironmentDefinition(
   }
 
   def withAllocatedUsers(
-      extraIgnoredValidatorPrefixes: Seq[String] = Seq.empty
+      extraIgnoredSvPrefixes: Seq[String] = Seq.empty,
+      extraIgnoredValidatorPrefixes: Seq[String] = Seq.empty,
   ): CNNodeEnvironmentDefinition =
     copy(preSetup = env => {
       import env.*
       this.preSetup(env)
       svs.local.foreach(sv => {
-        if (!sv.name.endsWith("Onboarded") && !sv.name.endsWith("Local")) {
+        if (
+          !sv.name.endsWith("Onboarded") && !sv.name.endsWith("Local") && !extraIgnoredSvPrefixes
+            .exists(sv.name.startsWith)
+        ) {
           CNNodeEnvironmentDefinition.withAllocatedAdminUser(
             sv.config.ledgerApiUser,
             sv.participantClientWithAdminToken,

@@ -81,6 +81,7 @@ import scala.concurrent.duration.DurationInt
 import scala.math.Ordered.orderingToOrdered
 import scala.util.Using
 
+// TODO(#9076) Create fresh database instances within the test to support running it multiple times.
 class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with ProcessTestUtil {
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))

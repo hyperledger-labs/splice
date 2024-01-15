@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.console
 
+import com.google.protobuf.ByteString
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.NonNegativeDuration
@@ -33,6 +34,7 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReferenceComm
         darPath: String,
         vetAllPackages: Boolean = true,
         synchronizeVetting: Boolean = true,
+        darDataO: Option[ByteString] = None,
     ): Map[ParticipantReferenceCommon, String] = {
       val res = ConsoleCommandResult.runAll(participants)(
         ParticipantCommands.dars
@@ -42,6 +44,7 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReferenceComm
             vetAllPackages = vetAllPackages,
             synchronizeVetting = synchronizeVetting,
             logger,
+            darDataO,
           )
       )
       if (synchronizeVetting && vetAllPackages) {

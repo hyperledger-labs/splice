@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.console.commands
 
+import com.google.protobuf.ByteString
 import cats.syntax.option.*
 import cats.syntax.traverse.*
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
@@ -107,10 +108,11 @@ private[console] object ParticipantCommands {
         vetAllPackages: Boolean,
         synchronizeVetting: Boolean,
         logger: TracedLogger,
+        darDataO: Option[ByteString] = None,
     ) =
       runner.adminCommand(
         ParticipantAdminCommands.Package
-          .UploadDar(Some(path), vetAllPackages, synchronizeVetting, logger)
+          .UploadDar(Some(path), vetAllPackages, synchronizeVetting, logger, darDataO)
       )
 
   }
@@ -856,11 +858,12 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
+        darDataO: Option[ByteString] = None,
     ): String = {
       val res = consoleEnvironment.runE {
         for {
           hash <- ParticipantCommands.dars
-            .upload(runner, path, vetAllPackages, synchronizeVetting, logger)
+            .upload(runner, path, vetAllPackages, synchronizeVetting, logger, darDataO)
             .toEither
         } yield hash
       }

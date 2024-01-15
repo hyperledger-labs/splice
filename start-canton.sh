@@ -115,6 +115,8 @@ any_time_db_names=(
   "participant_bob"
   "participant_splitwell"
   "sequencer_driver_global_upgrade"
+  "participant_sv4_reonboard"
+  "participant_sv4_reonboard_new"
 )
 
 for (( domain_node = 0; domain_node < 5; domain_node++ )); do
