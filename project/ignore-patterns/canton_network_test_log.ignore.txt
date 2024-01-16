@@ -67,3 +67,6 @@ failed with UNKNOWN/channel closed.*SvAppLedgerApiConnectivityIntegrationTest
 Noticed an SvcRules epoch change.*GlobalDomainMigrationIntegrationTest
 
 # Make sure to have a trailing newline
+
+# Shows up during global domain migration test, when the domain is frozen
+GlobalDomainMigrationIntegrationTest.*io.grpc.StatusRuntimeException: ABORTED: DOMAIN_BACKPRESSURE.*: The domain is overloaded
