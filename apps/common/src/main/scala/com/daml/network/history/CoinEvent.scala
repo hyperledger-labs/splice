@@ -5,7 +5,6 @@ import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coinimport
-import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionIdleState
@@ -173,25 +172,16 @@ object LockedCoinExpireCoin extends ExerciseNodeCompanion {
 object CoinRules_BuyMemberTraffic extends ExerciseNodeCompanion {
   override type Tpl = cc.coinrules.CoinRules
   override type Arg = cc.coinrules.CoinRules_BuyMemberTraffic
-  override type Res =
-    Tuple2[MemberTraffic.ContractId, Optional[cc.coin.Coin.ContractId]]
+  override type Res = cc.coinrules.BuyMemberTrafficResult
   override val choice = cc.coinrules.CoinRules.CHOICE_CoinRules_BuyMemberTraffic
   override val template = cc.coinrules.CoinRules.COMPANION
   override val argDecoder = cc.coinrules.CoinRules_BuyMemberTraffic.valueDecoder()
 
   override def argToValue(arg: Arg): Value = arg.toValue
 
-  override val resDecoder = Tuple2.valueDecoder(
-    cid => new MemberTraffic.ContractId(cid.asContractId().get().getValue),
-    PrimitiveValueDecoders.fromOptional(cid =>
-      new cc.coin.Coin.ContractId(cid.asContractId().get().getValue)
-    ),
-  )
+  override val resDecoder = cc.coinrules.BuyMemberTrafficResult.valueDecoder
 
-  override def resToValue(res: Res): Value = res.toValue(
-    trafficCid => trafficCid.toValue,
-    optionalCoin => DamlOptional.of(optionalCoin.map(_.toValue): Optional[Value]),
-  )
+  override def resToValue(res: Res): Value = res.toValue
 }
 
 object CnsRules_CollectInitialEntryPayment extends ExerciseNodeCompanion {

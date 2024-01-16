@@ -6,6 +6,12 @@ Release Notes
 2024-01-22
 ----------
 
+* Adjust traffic purchase rewards structure to CIP-2:
+
+  * Validator rewards are issued over the full amount of CC spent.
+  * No app rewards are issued for traffic purchases.
+  * Set the minimum traffic purchase amount to 1 USD to ensure coverage of execution cost.
+
 * Deployment:
 
   * Enabled pruning in sequencers of canton foundation

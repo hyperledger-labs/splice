@@ -103,12 +103,12 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
         if (coinRules.isDevNet && isSome topupStateCidO)
           then do
             -- Calculate CC required to buy extra traffic
-            (trafficCostCc, _) <- computeDomainFees validatorP trafficAmount coinRules context
+            (trafficCostCc, _) <- computeDomainFees validatorP trafficAmount coinRules context.context
             -- Calculate transfer fees to be paid
             let outputs = [ TransferOutput with
                             receiver = coinRules.svc
                             amount = trafficCostCc
-                            receiverFeeRatio = 0.0
+                            receiverFeeRatio = 1.0
                             lock = None ]
             [fees] <- exercise context.coinRules (CoinRules_ComputeFees context.context validatorP outputs)
             -- Tap enough CC to cover extra traffic purchase including fees
@@ -117,8 +117,8 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
           else
             pure inputs
       -- purchase extra traffic for given member
-      (trafficCid, changeCoin) <- exercise coinRulesCid
-        (CoinRules_BuyMemberTraffic newInputs context validatorP memberId domainId trafficAmount)
+      result <- exercise coinRulesCid
+        (CoinRules_BuyMemberTraffic newInputs context.context validatorP memberId domainId trafficAmount)
       -- update topupState if provided
       forA_ topupStateO $ \(topupStateCid, topupState) -> do
         archive topupStateCid
@@ -128,7 +128,7 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
           domainId = topupState.domainId
           lastPurchasedAt = now
         pure ()
-      pure (trafficCid, changeCoin)
+      pure (result.purchasedTraffic, result.senderChangeCoin)
 
 executeCoinOperationRec _endUserP _validatorP _context _inputs prevResults [] = do
   return prevResults

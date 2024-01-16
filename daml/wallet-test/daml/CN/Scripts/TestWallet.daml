@@ -584,10 +584,16 @@ testBuyMemberTraffic = script do
   topupStateCid2 =/= topupStateCid
   topupState2.lastPurchasedAt === now
 
-  -- check that the app reward coupons were issued to aliceValidator
-  [(coupon1Cid, coupon1)] <- query @AppRewardCoupon app.svc
-  coupon1.provider === aliceValidator.primaryParty
-  coupon1.round === openRound.round
+  -- check that no app reward coupons were issued to aliceValidator
+  [] <- query @AppRewardCoupon app.svc
+
+  -- check that a single validator reward coupon was issued over the full purchase amount
+  [(_, coupon)] <- query @ValidatorRewardCoupon aliceValidator.primaryParty
+  coupon === ValidatorRewardCoupon with
+    svc = app.svc
+    round = Round 2
+    amount = ccSpent
+    user = aliceValidator.primaryParty
 
   -- topping up too soon fails
   outcome <- executeCoinOperation app aliceValidator $
@@ -601,11 +607,7 @@ testBuyMemberTraffic = script do
   Some traffic2 <- queryContractId @MemberTraffic app.svc trafficCid2
 
   -- check the app reward coupons once more
-  [(coupon2Cid, coupon2), (coupon1Cid_, coupon1_)] <- query @AppRewardCoupon app.svc
-  (coupon1Cid_, coupon1_) === (coupon1Cid, coupon1_)
-  coupon2Cid =/= coupon1Cid
-  coupon2.provider === aliceValidator.primaryParty
-  coupon2.round === openRound.round
+  [] <- query @AppRewardCoupon app.svc
 
   -- Test that third-party top-ups work
 
@@ -636,11 +638,7 @@ testBuyMemberTraffic = script do
   providerTraffic.usdSpent === usdSpent
 
   -- check that the app reward coupons were issued to the provider
-  [(providerCouponCid, providerCoupon)] <- query @AppRewardCoupon provider1Validator.primaryParty
-  providerCouponCid =/= coupon1Cid
-  providerCouponCid =/= coupon2Cid
-  providerCoupon.provider === provider1Validator.primaryParty
-  providerCoupon.round === openRound2.round
+  [] <- query @AppRewardCoupon provider1Validator.primaryParty
 
   -- Test that top-ups by means of BuyTrafficRequest contracts work
 
@@ -685,10 +683,8 @@ testBuyMemberTraffic = script do
   requestedTraffic.domainId === domainId
   trackingInfo.trackingId === "request2"
   trackingInfo.endUserParty === provider2.primaryParty
-  -- check that the app reward coupons were issued to the provider
-  [(_, providerCoupon)] <- query @AppRewardCoupon provider2.primaryParty
-  providerCoupon.provider === provider2.primaryParty
-  providerCoupon.round === openRound3.round
+  -- check that no app reward coupons were issued to the provider
+  [] <- query @AppRewardCoupon provider2.primaryParty
 
   -- check that traffic requests can be cancelled by the requester
   request3 <- createTrafficRequest minTopupAmount testParticipantId domainId "request3" (now `addRelTime` minutes 1)

@@ -11,7 +11,7 @@ import com.daml.network.store.TxLogStoreNew
 import com.daml.network.scan.store.TxLogEntry.*
 import com.daml.network.util.{Codec, ExerciseNode}
 import com.daml.network.util.CNNodeUtil.dollarsToCC
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -68,7 +68,7 @@ class ScanTxLogParser(
           case ImportCrate_Receive(_) =>
             State.empty
           case CoinRules_BuyMemberTraffic(node) =>
-            State.fromBuyMemberTraffic(tree, exercised, domainId, node)
+            State.fromBuyMemberTraffic(exercised, domainId, node)
           case CoinExpire(node) =>
             State.fromCoinExpireSummary(exercised, domainId, node.result.value)
           case LockedCoinExpireCoin(node) =>
@@ -324,23 +324,16 @@ object ScanTxLogParser {
       ).append(activityEntry)
     }
 
-    def fromTransfer(
-        tx: TransactionTree,
+    def rewardsEntriesFromTransferSummary(
+        sender: PartyId,
+        summary: cc.coinrules.TransferSummary,
         event: TreeEvent,
+        round: Long,
         domainId: DomainId,
-        node: ExerciseNode[Transfer.Arg, Transfer.Res],
         rootEventId: Option[String] = None,
     ): State = {
-      val appRewards = node.result.value.summary.inputAppRewardAmount
-      val validatorRewards = node.result.value.summary.inputValidatorRewardAmount
-      val party = Codec
-        .decode(Codec.Party)(node.argument.value.transfer.sender)
-        .getOrElse(
-          throw Status.INTERNAL
-            .withDescription(s"Cannot decode party ID ${node.argument.value.transfer.sender}")
-            .asRuntimeException()
-        )
-      val round = node.result.value.round
+      val appRewards = summary.inputAppRewardAmount
+      val validatorRewards = summary.inputValidatorRewardAmount
 
       val appRewardEntry =
         if (appRewards.compareTo(BigDecimal(0.0)) > 0) {
@@ -348,8 +341,8 @@ object ScanTxLogParser {
             AppRewardLogEntry(
               eventId = rootEventId.getOrElse(event.getEventId()),
               domainId = domainId,
-              round = round.number,
-              party = party,
+              round = round,
+              party = sender,
               amount = appRewards,
             )
           State(entry)
@@ -363,14 +356,42 @@ object ScanTxLogParser {
             ValidatorRewardLogEntry(
               eventId = rootEventId.getOrElse(event.getEventId()),
               domainId = domainId,
-              round = round.number,
-              party = party,
+              round = round,
+              party = sender,
               amount = validatorRewards,
             )
           State(entry)
         } else {
           State.empty
         }
+
+      appRewardEntry.appended(validatorRewardEntry)
+    }
+
+    def fromTransfer(
+        tx: TransactionTree,
+        event: TreeEvent,
+        domainId: DomainId,
+        node: ExerciseNode[Transfer.Arg, Transfer.Res],
+        rootEventId: Option[String] = None,
+    ): State = {
+      val sender = Codec
+        .decode(Codec.Party)(node.argument.value.transfer.sender)
+        .getOrElse(
+          throw Status.INTERNAL
+            .withDescription(s"Cannot decode party ID ${node.argument.value.transfer.sender}")
+            .asRuntimeException()
+        )
+      val round = node.result.value.round
+      val rewardEntries =
+        rewardsEntriesFromTransferSummary(
+          sender,
+          node.result.value.summary,
+          event,
+          round.number,
+          domainId,
+          rootEventId,
+        )
 
       val balanceChangeEntry = State(
         BalanceChangeLogEntry(
@@ -397,9 +418,7 @@ object ScanTxLogParser {
       val activityEntry = State(
         TransferLogEntry(tx, event, domainId, node)
       )
-      State.empty
-        .appended(appRewardEntry)
-        .appended(validatorRewardEntry)
+      rewardEntries
         .appended(balanceChangeEntry)
         .appended(activityEntry)
     }
@@ -427,34 +446,22 @@ object ScanTxLogParser {
     }
 
     def fromBuyMemberTraffic(
-        tx: TransactionTree,
         event: ExercisedEvent,
         domainId: DomainId,
         node: ExerciseNode[CoinRules_BuyMemberTraffic.Arg, CoinRules_BuyMemberTraffic.Res],
-    )(implicit lc: ErrorLoggingContext): State = {
-
-      // second child event is the transfer of CC from validator to SVC to buy extra traffic
-      val transferEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
-      val transferNode = (transferEvent match {
-        case e: ExercisedEvent => Transfer.unapply(e)
-        case _ => None
-      }).getOrElse(
-        throw new RuntimeException(
-          s"Unable to parse event ${transferEvent.getEventId} as Transfer"
-        )
-      )
+    ): State = {
       val validatorParty = Codec
-        .decode(Codec.Party)(transferNode.argument.value.transfer.sender)
+        .decode(Codec.Party)(node.argument.value.provider)
         .getOrElse(
           throw Status.INTERNAL
             .withDescription(
-              s"Cannot decode party ID ${transferNode.argument.value.transfer.sender}"
+              s"Cannot decode party ID ${node.argument.value.provider}"
             )
             .asRuntimeException()
         )
-      val round = transferNode.result.value.round
+      val round = node.result.value.round
       val trafficPurchased = node.argument.value.trafficAmount
-      val ccSpent = transferNode.argument.value.transfer.outputs.get(0).amount
+      val ccSpent = node.result.value.ccPaid
       val buyExtraTrafficEntry = ExtraTrafficPurchaseLogEntry(
         eventId = event.getEventId(),
         domainId = domainId,
@@ -464,29 +471,42 @@ object ScanTxLogParser {
         ccSpent = ccSpent,
       )
 
-      // third child event is the burning of transferred coin by the SVC
-      val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(2))
+      val balanceChangeEntry = State(
+        BalanceChangeLogEntry(
+          eventId = event.getEventId(),
+          domainId = domainId,
+          round = round.number,
+          changeToInitialAmountAsOfRoundZero =
+            node.result.value.summary.balanceChanges.values.asScala
+              .map(bc => BigDecimal(bc.changeToInitialAmountAsOfRoundZero))
+              .sum,
+          changeToHoldingFeesRate = node.result.value.summary.balanceChanges.values.asScala
+            .map(bc => BigDecimal(bc.changeToHoldingFeesRate))
+            .sum,
+          partyBalanceChanges = node.result.value.summary.balanceChanges.asScala.collect {
+            // filter out the change from the transfer to the SVC party
+            case (party, bc) if party == validatorParty.toProtoPrimitive =>
+              validatorParty -> PartyBalanceChange(
+                bc.changeToInitialAmountAsOfRoundZero,
+                bc.changeToHoldingFeesRate,
+              )
+          }.toMap,
+        )
+      )
+
+      val rewardEntries = rewardsEntriesFromTransferSummary(
+        validatorParty,
+        node.result.value.summary,
+        event,
+        round.number,
+        domainId,
+        Some(event.getEventId()),
+      )
 
       State(buyExtraTrafficEntry)
-        // append the entries for rewards
-        .appended(
-          State.fromTransfer(
-            tx,
-            transferEvent,
-            domainId,
-            transferNode,
-            Some(event.getEventId()),
-          )
-        )
+        .appended(rewardEntries)
         // append the balance change entry from burning the transferred coin
-        .appended(
-          State.fromCoinArchiveEvent(
-            tx,
-            coinArchiveEvent,
-            domainId,
-            Some(event.getEventId()),
-          )
-        )
+        .appended(balanceChangeEntry)
     }
 
     def fromCollectEntryPayment(

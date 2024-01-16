@@ -2,7 +2,7 @@ module CC.CoinRules where
 
 import Prelude hiding (forA)
 
-import DA.Action (void, foldlA)
+import DA.Action (when, void, foldlA)
 import DA.Exception
 import DA.Foldable (forA_)
 import DA.List (dedupSort)
@@ -53,18 +53,21 @@ template CoinRules
       with
         transfer : Transfer
         context : TransferContext
-       controller Set.toList (transferControllers transfer)
-       do executeTransfer context svc transfer
+      controller Set.toList (transferControllers transfer)
+      do
+        let rewardsConfig = RewardsIssuanceConfig with
+              issueAppRewards = True
+              issueValidatorRewards = True
+        executeTransfer rewardsConfig context svc transfer
 
     -- Global domain usage
     ----------------------
 
-    -- TODO(#3742): consider also declaring this method in the CoinRules interface
-    nonconsuming choice CoinRules_BuyMemberTraffic
-      : (ContractId MemberTraffic, Optional (ContractId Coin))
+    -- Returns a `TransferResult` to aid parsing the transaction in Scan
+    nonconsuming choice CoinRules_BuyMemberTraffic : BuyMemberTrafficResult
       with
         inputs : [TransferInput]
-        context : PaymentTransferContext
+        context : TransferContext
         provider : Party
         memberId : Text
         domainId : Text
@@ -85,24 +88,41 @@ template CoinRules
               outputs = [ TransferOutput with
                             receiver = svc
                             amount = trafficCostCc
-                            receiverFeeRatio = 0.0
+                            receiverFeeRatio = 1.0 -- ensure the provider pays only the traffic cost
                             lock = None
                         ]
               upgrade = Some ()
-        result <- exercisePaymentTransfer context transfer
-        let [TransferResultCoin coin] = result.createdCoins
+            -- We don't issue any rewards as part of the transfer, as these are only for the burned fees.
+            rewardsConfig = RewardsIssuanceConfig with
+              issueAppRewards = False
+              issueValidatorRewards = False
+        transferResult <- executeTransfer rewardsConfig context svc transfer
+        let [TransferResultCoin coin] = transferResult.createdCoins
         -- burn the coin created for the SVC
         _ <- archive coin
+        -- issue validator rewards over the whole burn
+        create ValidatorRewardCoupon with
+          svc
+          round = transferResult.round
+          user = provider
+          amount = trafficCostCc
         -- create a new MemberTraffic contract for the purchased traffic
-        newTraffic <- create MemberTraffic with
-              svc
-              memberId
-              domainId
-              totalPurchased = trafficAmount
-              numPurchases = 1
-              ccSpent = trafficCostCc
-              usdSpent =  trafficCostUsd
-        return (newTraffic, result.senderChangeCoin)
+        purchasedTraffic <- create MemberTraffic with
+          svc
+          memberId
+          domainId
+          totalPurchased = trafficAmount
+          numPurchases = 1
+          ccSpent = trafficCostCc
+          usdSpent =  trafficCostUsd
+        -- return result
+        return BuyMemberTrafficResult with
+          round = transferResult.round
+          summary = transferResult.summary
+          ccPaid = trafficCostCc
+          purchasedTraffic
+          senderChangeCoin = transferResult.senderChangeCoin
+
 
     nonconsuming choice CoinRules_MergeMemberTrafficContracts : ContractId MemberTraffic
       with
@@ -162,7 +182,6 @@ template CoinRules
                   coin
                   coinPrice = openRound.coinPrice
                   round = openRound.round
-
 
     nonconsuming choice CoinRules_DevNet_Tap: CoinCreateSummary (ContractId Coin)
       with
@@ -526,10 +545,16 @@ checkTransferConstraints transfer summary transferConfigCC
     | summary.senderChangeFee < 0.0 = Left $ ITR_InsufficientFunds with missingAmount = summary.senderChangeFee * (-1.0)
     | otherwise = Right ()
 
+
+-- | An easy way to configure `exucuteTransfer` wrt what rewards to issue.
+-- We currently only use two configurations: but all of the options in here make sense, so we keep them.
+data RewardsIssuanceConfig = RewardsIssuanceConfig with
+    issueAppRewards : Bool
+    issueValidatorRewards : Bool
+
 -- | Execute a transfer.
---
-executeTransfer : TransferContext -> Party -> Transfer -> Update TransferResult
-executeTransfer context svc t = do
+executeTransfer : RewardsIssuanceConfig -> TransferContext -> Party -> Transfer -> Update TransferResult
+executeTransfer config context svc t = do
   -- compute summaries
   csum <- summarizeAndValidateContext context svc t
   isum <- summarizeAndConsumeInputs csum svc t.sender t.inputs
@@ -541,7 +566,7 @@ executeTransfer context svc t = do
     Right _ -> pure ()
 
   -- issue rewards for burns
-  issueRewards csum t.sender t.provider summary
+  issueRewards config csum t.sender t.provider summary
   -- record outputs
   (createdCoins, senderChangeCoin) <-
     createTransferOutputs csum.openRound csum.config svc t.sender summary osum
@@ -551,6 +576,7 @@ executeTransfer context svc t = do
     summary = summary
     upgrade = Some ()
     ..
+
 
 data TransferContextSummary = TransferContextSummary with
     featuredAppProvider : Optional Party
@@ -840,22 +866,24 @@ summarizeTransfer sender openRound transferConfigCC inp preprocessedOutputs = do
       senderChangeAmount
       coinPrice = openRound.coinPrice
 
-issueRewards : TransferContextSummary -> Party -> Party -> TransferSummary -> Update ()
-issueRewards csum sender provider summary
+issueRewards : RewardsIssuanceConfig -> TransferContextSummary -> Party -> Party -> TransferSummary -> Update ()
+issueRewards config csum sender provider summary
   | usageFees <= 0.0 = pure ()
   | otherwise = do
-      void $ create ValidatorRewardCoupon with
-        svc = csum.openRound.svc
-        user = sender
-        amount = usageFees
-        round = csum.openRound.round
+      when (config.issueValidatorRewards) $
+        void $ create ValidatorRewardCoupon with
+          svc = csum.openRound.svc
+          user = sender
+          amount = usageFees
+          round = csum.openRound.round
 
-      void $ create AppRewardCoupon with
-        svc = csum.openRound.svc
-        provider
-        featured
-        amount = usageFees
-        round = csum.openRound.round
+      when (config.issueAppRewards) $
+        void $ create AppRewardCoupon with
+          svc = csum.openRound.svc
+          provider
+          featured
+          amount = usageFees
+          round = csum.openRound.round
   where
     usageFees = sum summary.outputFees
     -- note: we do not create featured app rewards in case the app provider uses their own app
@@ -916,7 +944,7 @@ validateBuyMemberTrafficInputs configUsd domainId trafficAmount
   | otherwise = Right ()
 
 -- | Computing domain fees
-computeDomainFees : Party -> Int -> CoinRules -> PaymentTransferContext -> Update (Decimal, Decimal)
+computeDomainFees : Party -> Int -> CoinRules -> TransferContext -> Update (Decimal, Decimal)
 computeDomainFees validator trafficAmount coinRules context = do
   -- compute traffic cost in USD
   now <- getTime
@@ -924,7 +952,7 @@ computeDomainFees validator trafficAmount coinRules context = do
   let extraTrafficPrice = configUsd.globalDomain.fees.extraTrafficPrice
   let trafficCostUsd = intToDecimal trafficAmount / 1e6 * extraTrafficPrice
   -- compute traffic cost in CC
-  contextMiningRound <- exercise context.context.openMiningRound (OpenMiningRound_Fetch validator)
+  contextMiningRound <- exercise context.openMiningRound (OpenMiningRound_Fetch validator)
   let trafficCostCc = trafficCostUsd / contextMiningRound.coinPrice
   pure (trafficCostCc, trafficCostUsd)
 
@@ -1037,6 +1065,14 @@ data TransferResult
       -- ^ Optional reference to the coin for the change returned to the sender.
       -- Only created if there was some change to be returned after deducting the fee for returning change.
     upgrade : Optional ()
+  deriving (Show, Eq)
+
+data BuyMemberTrafficResult = BuyMemberTrafficResult with
+    round : Round
+    summary : TransferSummary
+    ccPaid : Decimal
+    purchasedTraffic : ContractId MemberTraffic
+    senderChangeCoin : Optional (ContractId Coin)
   deriving (Show, Eq)
 
 -- | Summary of input and output amounts and fees paid.

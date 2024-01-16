@@ -54,7 +54,7 @@ import com.daml.network.util.{Codec, ExerciseNode, ExerciseNodeCompanion}
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.BalanceChange.BalanceChangeTransactionSubtype
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.Notification.NotificationTransactionSubtype
 import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.Transfer.TransferTransactionSubtype
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.{Instant, ZoneOffset}
@@ -674,8 +674,8 @@ class UserWalletTxLogParser(
           // Buying domain traffic
           // ------------------------------------------------------------------
 
-          case CoinRules_BuyMemberTraffic(_) =>
-            now(State.fromBuyMemberTraffic(tree, exercised, domainId))
+          case CoinRules_BuyMemberTraffic(node) =>
+            now(State.fromBuyMemberTraffic(node, tree, exercised, domainId))
 
           // ------------------------------------------------------------------
           // Canton name service subscription payment collection
@@ -1733,39 +1733,41 @@ object UserWalletTxLogParser {
     }
 
     def fromBuyMemberTraffic(
+        node: ExerciseNode[CoinRules_BuyMemberTraffic.Arg, CoinRules_BuyMemberTraffic.Res],
         tx: TransactionTree,
         event: ExercisedEvent,
         domainId: DomainId,
-    )(implicit lc: ErrorLoggingContext): State = {
-      // second child event is the transfer of CC from validator to SVC to buy extra traffic
-      val transferEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
-      // Calculate tx log entries from transfer of CC from validator to SVC
-      val transferNode = (transferEvent match {
-        case e: ExercisedEvent => Transfer.unapply(e)
-        case _ => None
-      }).getOrElse(
-        throw new RuntimeException(
-          s"Unable to parse event ${transferEvent.getEventId} as Transfer"
-        )
-      )
-      val stateFromTransfer =
-        State.fromTransfer(
-          tx,
-          transferEvent,
-          domainId,
-          transferNode,
-          TxLogEntry.Transfer.Transfer,
-        )
+    ): State = {
+      val sender = node.argument.value.provider
+      // Hack to grab the SVC party-id from the balance changes, which list both sender and the SVC
+      val receivers = node.result.value.summary.balanceChanges.keySet().asScala.toSeq.collect {
+        case party if party != sender => (party, BigDecimal(0.0))
+      }
+      val summary = node.result.value.summary
+      val netSenderInput = summary.inputCoinAmount - summary.holdingFees
+      val senderBalanceChange = BigDecimal(summary.senderChangeAmount) - netSenderInput
 
-      // third child event is burning of transferred coin by SVC
-      val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(2))
-      // Adjust tx log entries for SVC since the coin it receives is immediately burnt
-      val burntCoin = getCoinCreateEvent(tx, coinArchiveEvent.getContractId)
-      val stateFromBurntCoin = State.fromBurntCoin(burntCoin, domainId)
-      stateFromTransfer
-        .appended(stateFromBurntCoin)
-        .mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.ExtraTrafficPurchase)
-        .setEventId(event.getEventId)
+      val newEntry = TxLogEntry.Transfer(
+        indexRecord = TransactionHistoryTxLogIndexRecord(
+          optOffset = Some(tx.getOffset),
+          eventId = event.getEventId,
+          domainId = domainId,
+          acsContractId = None,
+        ),
+        transactionSubtype = TxLogEntry.Transfer.ExtraTrafficPurchase,
+        date = tx.getEffectiveAt,
+        provider = sender,
+        sender = (sender, senderBalanceChange),
+        receivers = receivers,
+        senderHoldingFees = node.result.value.summary.holdingFees,
+        coinPrice = node.result.value.summary.coinPrice,
+        appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
+        validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
+      )
+
+      State(
+        entries = immutable.Queue(newEntry)
+      )
     }
 
     def fromCollectEntryPayment(

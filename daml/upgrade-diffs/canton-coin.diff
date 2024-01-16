@@ -31,15 +31,15 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
    where
      ensure validSchedule configSchedule validCoinConfig
  
-@@ -87,6 +88,7 @@
-                             receiverFeeRatio = 0.0
+@@ -90,6 +91,7 @@
+                             receiverFeeRatio = 1.0 -- ensure the provider pays only the traffic cost
                              lock = None
                          ]
 +              upgrade = Some ()
-         result <- exercisePaymentTransfer context transfer
-         let [TransferResultCoin coin] = result.createdCoins
-         -- burn the coin created for the SVC
-@@ -154,6 +156,7 @@
+             -- We don't issue any rewards as part of the transfer, as these are only for the burned fees.
+             rewardsConfig = RewardsIssuanceConfig with
+               issueAppRewards = False
+@@ -174,6 +176,7 @@
          coin <- create Coin with
                    owner = receiver
                    amount = expiringAmount
@@ -47,15 +47,15 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
                    ..
          return CoinCreateSummary with
                    coin
-@@ -546,6 +549,7 @@
+@@ -571,6 +574,7 @@
    return TransferResult with
      round = csum.openRound.round
      summary = summary
 +    upgrade = Some ()
      ..
  
- data TransferContextSummary = TransferContextSummary with
-@@ -872,11 +876,13 @@
+ 
+@@ -900,11 +904,13 @@
              svc
              owner = sender
              amount = expiringAmount transferConfigCC.holdingFee summary.senderChangeAmount currentOpenRound.round
@@ -69,7 +69,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
  
        case out.lock of
          None -> TransferResultCoin <$> create coin
-@@ -1004,6 +1010,7 @@
+@@ -1032,6 +1038,7 @@
      provider : Party
      inputs : [TransferInput]
      outputs : [TransferOutput]
@@ -77,14 +77,14 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
    deriving (Eq, Ord, Show)
  
  -- | An individual output for a batch transfer.
-@@ -1029,6 +1036,7 @@
+@@ -1057,6 +1064,7 @@
      senderChangeCoin: Optional (ContractId Coin)
        -- ^ Optional reference to the coin for the change returned to the sender.
        -- Only created if there was some change to be returned after deducting the fee for returning change.
 +    upgrade : Optional ()
    deriving (Show, Eq)
  
- -- | Summary of input and output amounts and fees paid.
+ data BuyMemberTrafficResult = BuyMemberTrafficResult with
 diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml.yaml daml/canton-coin-upgrade/daml.yaml
 --- daml/canton-coin/daml.yaml
 +++ daml/canton-coin-upgrade/daml.yaml

@@ -5,20 +5,16 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_Coin
-import com.daml.network.codegen.java.cc.coinrules.PaymentTransferContext
+import com.daml.network.codegen.java.cc.coinrules.BuyMemberTrafficResult
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.cns.CnsEntry
 import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, svcrules as svcrulesCodegen}
 import com.daml.network.codegen.java.cn.svc.globaldomain as globaldomainCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{DarResources, RetryProvider}
-import com.daml.network.history.{
-  CoinExpire,
-  CoinRules_BuyMemberTraffic,
-  LockedCoinExpireCoin,
-  Transfer,
-}
+import com.daml.network.history.{CoinExpire, LockedCoinExpireCoin, Transfer}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.TxLogEntry.*
@@ -1031,6 +1027,33 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       Optional.empty(),
     ).toValue
 
+  private def mkBuyMemberTrafficResult(
+      round: Long,
+      inputAppRewardAmount: Double,
+      inputValidatorRewardAmount: Double,
+      inputCoinAmount: Double,
+      balanceChanges: Map[String, cc.coinrules.BalanceChange],
+      coinPrice: Double,
+      memberTrafficCid: MemberTraffic.ContractId,
+  ) =
+    new BuyMemberTrafficResult(
+      new Round(round),
+      mkTransferSummary(
+        inputAppRewardAmount,
+        inputValidatorRewardAmount,
+        // TODO(#8819): also test for validator faucet rewards once the scan store supports them
+        0.0,
+        // TODO (#9173): also test for sv rewards once the scan store supports them
+        0.0,
+        inputCoinAmount,
+        balanceChanges,
+        coinPrice,
+      ),
+      new java.math.BigDecimal(inputCoinAmount),
+      memberTrafficCid,
+      Optional.empty(),
+    ).toValue
+
   private def coinRulesBuyMemberTrafficTransaction(
       provider: PartyId,
       memberId: Member,
@@ -1042,23 +1065,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     val coinRulesCid = nextCid()
 
     val memberTrafficCid = new MemberTraffic.ContractId(validContractId(round.toInt))
-
-    val transfer = exercisedEvent(
-      coinRulesCid,
-      cc.coinrules.CoinRules.TEMPLATE_ID,
-      Some(cc.coinrules.CoinRules.TEMPLATE_ID),
-      Transfer.choice.name,
-      consuming = false,
-      mkCoinRulesTransfer(provider, ccSpent),
-      mkTransferResult(
-        round = round,
-        inputAppRewardAmount = 0,
-        inputValidatorRewardAmount = 0,
-        inputCoinAmount = ccSpent,
-        balanceChanges = Map.empty,
-        coinPrice = 0.0005,
-      ),
-    )
 
     val createdCoin = coin(provider, ccSpent, round, holdingFee)
     val coinCreateEvent = toCreatedEvent(createdCoin, signatories = Seq(provider, svcParty))
@@ -1082,27 +1088,26 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         consuming = false,
         new cc.coinrules.CoinRules_BuyMemberTraffic(
           java.util.List.of(),
-          new PaymentTransferContext(
-            new cc.coinrules.CoinRules.ContractId(coinRulesCid),
-            mkTransferContext(),
-          ),
+          mkTransferContext(),
           provider.toProtoPrimitive,
           memberId.toProtoPrimitive,
           dummyDomain.toProtoPrimitive,
           extraTraffic,
         ).toValue,
-        CoinRules_BuyMemberTraffic.resToValue(
-          new com.daml.network.codegen.java.da.types.Tuple2(
-            memberTrafficCid,
-            Optional.empty[cc.coin.Coin.ContractId](),
-          )
+        mkBuyMemberTrafficResult(
+          round = round,
+          inputAppRewardAmount = 0,
+          inputValidatorRewardAmount = 0,
+          inputCoinAmount = ccSpent,
+          balanceChanges = Map.empty,
+          coinPrice = 0.0005,
+          memberTrafficCid = memberTrafficCid,
         ),
       ),
       Seq(
         // we don't care what the first event is for the store's purposes
         // also, the creation of the burnt coin should occur somewhere in the tx tree
         coinCreateEvent,
-        transfer, // the second event has to be a transfer
         coinArchiveEvent, // the third event has to be a coin burn
       ),
     )
