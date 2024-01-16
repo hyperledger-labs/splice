@@ -166,7 +166,7 @@ class HttpScanHandler(
       body: com.daml.network.http.v0.definitions.GetCoinRulesRequest
   )(extracted: TraceContext): Future[v0.ScanResource.GetCoinRulesResponse] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.getCoinRules") { _ => _ =>
+    withSpan(s"$workflowId.getCoinRulesWithState") { _ => _ =>
       for {
         coinRulesO <- store.lookupCoinRules()
         coinRules = coinRulesO getOrElse {

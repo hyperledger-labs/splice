@@ -6,14 +6,14 @@ import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.config.NetworkAppClientConfig
-import com.daml.network.environment.PackageIdResolver.HasCoinRulesPayload
+import com.daml.network.environment.PackageIdResolver.HasCoinRules
 import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryFor, RetryProvider}
 import com.daml.network.scan.admin.api.client.BftScanConnection.ScanList
 import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.store.AcsStoreDump
-import com.daml.network.util.{ContractWithState, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -46,7 +46,7 @@ class BftScanConnection(
     extends FlagCloseableAsync
     with NamedLogging
     with RetryProvider.Has
-    with HasCoinRulesPayload {
+    with HasCoinRules {
 
   /** Query for the SVC party id, retrying until it succeeds.
     *
@@ -65,16 +65,17 @@ class BftScanConnection(
       _.getSvcPartyId()
     )
 
-  def getCoinRules()(implicit
+  def getCoinRulesWithState()(implicit
       ec: ExecutionContext,
-      mat: Materializer,
       tc: TraceContext,
   ): Future[ContractWithState[CoinRules.ContractId, CoinRules]] = {
-    bftCall(_.getCoinRules())
+    bftCall(_.getCoinRulesWithState())
   }
 
-  override def getCoinRulesPayload()(implicit tc: TraceContext): Future[CoinRules] = {
-    bftCall(_.getCoinRulesPayload())
+  override def getCoinRules()(implicit
+      tc: TraceContext
+  ): Future[Contract[CoinRules.ContractId, CoinRules]] = {
+    bftCall(_.getCoinRules())
   }
 
   def getCoinRulesDomain: GetCoinRulesDomain = { () => implicit tc =>

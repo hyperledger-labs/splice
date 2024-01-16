@@ -422,7 +422,7 @@ class ValidatorApp(
       config.domains.global.trafficReservedForTopupsO
         .fold(Future.successful(Option.empty[NonNegativeLong]))(trafficReservedForTopups => {
           for {
-            coinRules <- scanConnection.getCoinRules()
+            coinRules <- scanConnection.getCoinRulesWithState()
             coinConfig = CoinConfigSchedule(coinRules).getConfigAsOf(clock.now)
             reservedTraffic = Option.when(
               coinConfig.globalDomain.requiredDomains.map.containsKey(domainId.toProtoPrimitive)

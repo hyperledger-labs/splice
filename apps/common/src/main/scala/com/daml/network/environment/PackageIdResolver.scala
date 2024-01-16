@@ -3,10 +3,11 @@ package com.daml.network.environment
 import com.daml.lf.data.Ref.{PackageName, PackageVersion}
 import com.daml.ledger.javaapi.data.{Command, Identifier}
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
-import com.daml.network.util.{CoinConfigSchedule, DarUtil, QualifiedName}
+import com.daml.network.util.{CoinConfigSchedule, Contract, DarUtil, QualifiedName}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -79,8 +80,8 @@ abstract class PackageIdResolver()(implicit ec: ExecutionContext) {
 }
 
 object PackageIdResolver {
-  trait HasCoinRulesPayload {
-    def getCoinRulesPayload()(implicit tc: TraceContext): Future[cc.coinrules.CoinRules]
+  trait HasCoinRules {
+    def getCoinRules()(implicit tc: TraceContext): Future[Contract[CoinRules.ContractId, CoinRules]]
   }
 
   /** Package id resolver for direct command submissions in tests.
@@ -122,7 +123,7 @@ object PackageIdResolver {
     */
   def inferFromCoinRules(
       clock: Clock,
-      coinRulesFetcher: HasCoinRulesPayload,
+      coinRulesFetcher: HasCoinRules,
       loggerFactory0: NamedLoggerFactory,
       extraPackageIdResolver: QualifiedName => Option[String] = _ => None,
   )(implicit ec: ExecutionContext) = new PackageIdResolver with NamedLogging {
@@ -150,8 +151,8 @@ object PackageIdResolver {
     )(implicit tc: TraceContext): Future[String] = {
       val pkgId = extraPackageIdResolver(name) match {
         case None =>
-          coinRulesFetcher.getCoinRulesPayload().map { coinRules =>
-            fromCoinRules(coinRules, name)
+          coinRulesFetcher.getCoinRules().map { coinRules =>
+            fromCoinRules(coinRules.payload, name)
           }
         case Some(pkgId) => Future.successful(pkgId)
       }

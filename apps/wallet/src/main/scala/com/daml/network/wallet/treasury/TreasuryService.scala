@@ -440,7 +440,7 @@ class TreasuryService(
       ec: ExecutionContext,
   ) =
     for {
-      rules <- scanConnection.getCoinRules()
+      rules <- scanConnection.getCoinRulesWithState()
     } yield (rules, rules.contractId)
 
   /** Select transfer inputs and transfer context to satisfy the coin operations.

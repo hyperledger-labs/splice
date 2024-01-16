@@ -28,7 +28,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.traffic.MemberTrafficStatus
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.stream.Materializer
 
 import java.time.Instant
 import java.util.Optional
@@ -46,7 +45,6 @@ class TopupMemberTrafficTrigger(
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
-    mat: Materializer,
 ) extends PollingTrigger {
 
   private val validator = store.key.validatorParty
@@ -55,7 +53,7 @@ class TopupMemberTrafficTrigger(
     // TODO(#7472): Clean up noisy logs
     logger.debug("Executing top-up member traffic trigger")
     for {
-      coinRules <- scanConnection.getCoinRules()
+      coinRules <- scanConnection.getCoinRulesWithState()
       globalDomainConfig = CoinConfigSchedule(coinRules)
         .getConfigAsOf(clock.now)
         .globalDomain

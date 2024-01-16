@@ -16,9 +16,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.Future
 
-abstract class PackageVettingTrigger
-    extends PollingTrigger
-    with PackageIdResolver.HasCoinRulesPayload {
+abstract class PackageVettingTrigger extends PollingTrigger with PackageIdResolver.HasCoinRules {
 
   protected def participantAdminConnection: ParticipantAdminConnection
 
@@ -29,9 +27,11 @@ abstract class PackageVettingTrigger
   // 5 minutes before the switch in CoinConfig.
   protected def prevetDuration: NonNegativeFiniteDuration
 
-  override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
+  override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      coinRules <- getCoinRulesPayload()
+      coinRules <- getCoinRules()
+      // TODO(#9346): remove once flake fix
+      _ = logger.debug(show"Vetting packages based on CoinRules ${coinRules.contractId}")
       schedule = CoinConfigSchedule(coinRules)
       now = context.clock.now.plus(prevetDuration.asJava)
       currentConfig = schedule.getConfigAsOf(now)
@@ -45,6 +45,7 @@ abstract class PackageVettingTrigger
         }
       }
     } yield false
+  }
 
   // The current config must be vetted.
   private def vetCurrentConfig(

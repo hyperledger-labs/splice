@@ -63,7 +63,7 @@ trait SvSvcStore
     extends CNNodeAppStoreWithNewHistory[
       SvcTxLogParser.TxLogEntry
     ]
-    with PackageIdResolver.HasCoinRulesPayload {
+    with PackageIdResolver.HasCoinRules {
   import SvSvcStore.{coinRulesFollowers, svcRulesFollowers}
 
   protected val outerLoggerFactory: NamedLoggerFactory
@@ -142,9 +142,6 @@ trait SvSvcStore
         throw Status.NOT_FOUND.withDescription("No active CoinRules contract").asRuntimeException()
       )
     )
-
-  def getCoinRulesPayload()(implicit tc: TraceContext): Future[cc.coinrules.CoinRules] =
-    getCoinRules().map(_.payload)
 
   def getCoinRulesDomain: GetCoinRulesDomain = { () => implicit tc =>
     lookupCoinRules().map(

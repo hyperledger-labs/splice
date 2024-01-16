@@ -244,7 +244,7 @@ class HttpWalletHandler(
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.selfGrantFeatureAppRight") { implicit traceContext => _ =>
       for {
-        coinRules <- scanConnection.getCoinRules()
+        coinRules <- scanConnection.getCoinRulesWithState()
         result <- exerciseWalletAction((installCid, _) =>
           Future.successful(
             installCid

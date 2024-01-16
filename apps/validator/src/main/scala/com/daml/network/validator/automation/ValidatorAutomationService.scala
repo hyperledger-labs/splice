@@ -110,7 +110,7 @@ class ValidatorAutomationService(
       connection,
       store.key.validatorParty,
       implicit tc =>
-        scanConnection.getCoinRules().flatMap { coinRulesCWS =>
+        scanConnection.getCoinRulesWithState().flatMap { coinRulesCWS =>
           coinRulesCWS.toAssignedContract
             .map { coinRules =>
               store

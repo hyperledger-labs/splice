@@ -16,7 +16,7 @@ import com.daml.network.store.{
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.scan.store.db.{DbScanStore, ScanTables}
 import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
-import com.daml.network.util.{CoinConfigSchedule, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.util.{CoinConfigSchedule, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -40,7 +40,7 @@ trait ScanStore
     extends CNNodeAppStoreWithNewHistory[
       TxLogEntry
     ]
-    with PackageIdResolver.HasCoinRulesPayload {
+    with PackageIdResolver.HasCoinRules {
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
@@ -61,7 +61,7 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ContractWithState[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]]]
 
-  private def getCoinRules()(implicit
+  private def getCoinRulesWithState()(implicit
       tc: TraceContext
   ): Future[ContractWithState[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]] =
     lookupCoinRules().map(
@@ -72,8 +72,10 @@ trait ScanStore
       )
     )
 
-  def getCoinRulesPayload()(implicit tc: TraceContext): Future[cc.coinrules.CoinRules] =
-    getCoinRules().map(_.contract.payload)
+  def getCoinRules()(implicit
+      tc: TraceContext
+  ): Future[Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]] =
+    getCoinRulesWithState().map(_.contract)
 
   def lookupCnsRules()(implicit
       tc: TraceContext
@@ -139,7 +141,7 @@ trait ScanStore
   def getBaseRateTrafficLimitsAsOf(t: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[cc.globaldomain.BaseRateTrafficLimits] =
-    getCoinRulesPayload().map(cr =>
+    getCoinRulesWithState().map(cr =>
       CoinConfigSchedule(cr)
         .getConfigAsOf(t)
         .globalDomain

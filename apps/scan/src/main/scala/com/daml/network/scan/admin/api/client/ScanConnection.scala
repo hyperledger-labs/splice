@@ -57,7 +57,7 @@ class ScanConnection private (
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
 ) extends HttpAppConnection(config.adminApi, "scan", retryProvider, loggerFactory)
-    with PackageIdResolver.HasCoinRulesPayload {
+    with PackageIdResolver.HasCoinRules {
   import ScanConnection.GetCoinRulesDomain
 
   // register the callback to potentially invalidate the CoinRules cache.
@@ -130,11 +130,11 @@ class ScanConnection private (
       openAndIssuingRounds <- getOpenAndIssuingMiningRounds()
       openRounds = openAndIssuingRounds._1
       latestOpenMiningRound = CNNodeUtil.selectLatestOpenMiningRound(clock.now, openRounds)
-      coinRules <- getCoinRules()
+      coinRules <- getCoinRulesWithState()
     } yield TransferContextWithInstances(coinRules, latestOpenMiningRound, openRounds)
   }
 
-  def getCoinRules()(implicit
+  def getCoinRulesWithState()(implicit
       ec: ExecutionContext,
       mat: Materializer,
       tc: TraceContext,
@@ -174,7 +174,7 @@ class ScanConnection private (
       tc: TraceContext,
   ): Future[ContractWithState[CnsRules.ContractId, CnsRules]] = {
     val now = clock.now
-    getCoinRules().flatMap { coinRules =>
+    getCoinRulesWithState().flatMap { coinRules =>
       cnsRulesCache.get() match {
         case Some(ccr @ CachedCnsRules(_, cnsRules)) if ccr.validAsOf(now, coinRules) =>
           Future.successful(cnsRules)
@@ -203,7 +203,7 @@ class ScanConnection private (
   }
 
   def getCoinRulesDomain: GetCoinRulesDomain = { () => implicit tc =>
-    getCoinRules()
+    getCoinRulesWithState()
       .flatMap(
         _.state.fold(
           Future.successful,
@@ -214,8 +214,8 @@ class ScanConnection private (
       )
   }
 
-  def getCoinRulesPayload()(implicit tc: TraceContext): Future[CoinRules] =
-    getCoinRules().map(_.payload)
+  def getCoinRules()(implicit tc: TraceContext): Future[Contract[CoinRules.ContractId, CoinRules]] =
+    getCoinRulesWithState().map(_.contract)
 
   def getLatestOpenMiningRound()(implicit
       ec: ExecutionContext,
@@ -241,7 +241,7 @@ class ScanConnection private (
   ] = {
     val now = clock.now
     val cache = cachedRounds.get()
-    getCoinRules().flatMap { coinRules =>
+    getCoinRulesWithState().flatMap { coinRules =>
       if (cache.validAsOf(now, coinRules)) {
         logger.info(
           s"Using the client-cache (validUntil ${cache.cacheValidUntil}) to load ${cache.describeRounds}."

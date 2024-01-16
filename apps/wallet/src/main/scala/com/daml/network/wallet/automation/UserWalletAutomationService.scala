@@ -92,7 +92,7 @@ class UserWalletAutomationService(
       connection,
       store.key.endUserParty,
       implicit tc =>
-        scanConnection.getCoinRules() flatMap { coinRules =>
+        scanConnection.getCoinRulesWithState() flatMap { coinRules =>
           coinRules.toAssignedContract map { coinRules =>
             store
               .listLaggingCoinRulesFollowers(coinRules.domain, participantAdminConnection)
