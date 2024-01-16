@@ -94,6 +94,9 @@ function backup_cloudsql() {
     _error "No CloudSQL instance $instance found"
   fi
 
+  # Wait for any existing operations to finish (to avoid e.g. conflicting with automated periodic backups)
+  gcloud sql operations list --instance="$db_id" --filter='NOT status:done' --format='value(name)' | xargs -r gcloud sql operations wait
+
   _info "Starting backup of $description db ($db_id)"
   gcloud sql backups create --instance "$db_id" --description "$RUN_ID" --async
 }
