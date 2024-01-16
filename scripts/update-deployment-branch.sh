@@ -17,41 +17,6 @@ set -eou pipefail
 . .envrc.vars
 clusters_root_dir="${REPO_ROOT}/cluster/deployment"
 
-fetch_cluster_git_commit() {
-  cluster=${1}
-  # shellcheck disable=SC1090
-  . "${clusters_root_dir}/${cluster}/.envrc.vars"
-
-  count=0
-  success=42
-  while [ ${count} -lt 10 ]; do
-    if cluster_version=$(curl -sL "http://${GCP_CLUSTER_BASENAME}.network.canton.global/version" --connect-timeout 2); then
-      if [[ -n $cluster_version ]]; then
-        echo "Cluster version: ${cluster_version}"
-        success=0
-        break
-      else
-        echo "Empty cluster version retrieved. Retry count $count"
-      fi
-    else
-      echo "Failed to retrieve cluster version. Check that you are connected to the VPN."
-    fi
-    (( count++ ))
-    sleep 3
-  done
-  if [ ${success} -ne 0 ]; then
-     echo "Could not retrieve cluster version"
-     exit 1
-  fi
-
-  if [[ ${cluster_version} =~ ^[0-9.]*-snapshot[0-9.]*v[0-9a-z]* ]]; then
-    cluster_git_commit="${cluster_version#*v}"
-  else
-    echo "Unexpected cluster version format: ${cluster_version}"
-    exit 1
-  fi
-}
-
 cluster_name=${1-}
 git_revision=${2-}
 
@@ -69,7 +34,8 @@ fi
 if [ -z "${git_revision}" ]; then
   echo "No git revision provided as input"
   echo "Retrieving source code version for cluster ${cluster_name}"
-  fetch_cluster_git_commit "${cluster_name}"
+  cluster_version=$("$REPO_ROOT/scripts/fetch-cluster-version.sh" "${cluster_name}")
+  cluster_git_commit=${cluster_version#*v}
   echo "Cluster Git revision: ${cluster_git_commit}"
   git_revision=${cluster_git_commit}
 else

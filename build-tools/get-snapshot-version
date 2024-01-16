@@ -1,5 +1,29 @@
 #! /usr/bin/env bash
 
+# Overriding the version is useful when patching a deployment branch for an already deployed cluster
+# (see https://github.com/DACH-NY/canton-network-node/blob/main/cluster/README.md#patching-healthchecks-against-a-deployed-cluster)
+# Valid values for OVERRIDE_VERSION are:-
+# - latest_snapshot_tag - use the latest snapshot tag on the current branch (should generally be the default choice for clusters with deployment branches)
+# - deployed_cluster_version - use the version presently deployed on the current cluster (requires VPN access and assumes GCP_CLUSTER_BASENAME is set)
+#     Can be used for preflights on CI but not for SV runbook re-deployments since that workflow does not connect to the VPN.
+# - an explicit snapshot version string eg. 0.1.1-snapshot.20240111.4526.0.v552e1828 (useful for testing)
+if [ -n "${OVERRIDE_VERSION-}" ]; then
+    if [[ "${OVERRIDE_VERSION}" == "latest_snapshot_tag" ]]; then
+        git describe --tags --match "*-snapshot.*" --abbrev=0 HEAD
+    elif [[ "${OVERRIDE_VERSION}" == "deployed_cluster_version" ]]; then
+        # Cache the deployed cluster version so we don't make repeated network requests
+        if [ ! -f "${REPO_ROOT}/deployed_cluster_version" ]; then
+            "${REPO_ROOT}"/scripts/fetch-cluster-version.sh > "${REPO_ROOT}/deployed_cluster_version"
+        fi
+        cat "${REPO_ROOT}/deployed_cluster_version"
+    elif [[ "${OVERRIDE_VERSION}" =~ ^[0-9.]*-snapshot[0-9.]*v[0-9a-z]* ]]; then
+        echo "${OVERRIDE_VERSION}"
+    else
+        >&2 echo "Invalid OVERRIDE_VERSION: ${OVERRIDE_VERSION}"
+    fi
+    exit 0
+fi
+
 prefix=$(<"${REPO_ROOT}"/HELM_CHART_VERSION)
 
 sha=$(git rev-parse HEAD)

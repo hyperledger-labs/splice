@@ -1685,26 +1685,11 @@ When [deploying via CI](#manually-deploying-via-ci), you can use the `bootstrapp
 
 Our periodic healthchecks are triggered by CircleCI on `deployment/<cluster>` branches.
 In case you need to patch the tests without redeploying the cluster, you can cherry-pick the fix onto the corresponding deployment branch.
-You will also need to disable version compatibility enforcement (since the tests will no longer match the version tag of the cluster)
-by pushing another commit that sets `failOnVersionMismatch` to `false` in [NetworkAppClientConfig.scala](https://github.com/DACH-NY/canton-network-node/blob/b08bd36f1eb1c34545921816e863236b7cb2a0cd/apps/common/src/main/scala/com/daml/network/config/NetworkAppClientConfig.scala#L14).
 
-If we're deploying the sv runbook from the cluster branch then the cometbft chain id must be hardcoded to the cluster deployed version as well.
-One example of a given patch here:
-
-```
-diff --git a/cluster/helm/cn-cometbft/templates/partials/_json-configs.tpl b/cluster/helm/cn-cometbft/templates/partials/_json-configs.tpl
---- a/cluster/helm/cn-cometbft/templates/partials/_json-configs.tpl	(revision 541c55596e2d6f8812c6922b43c86ca3204c5235)
-+++ b/cluster/helm/cn-cometbft/templates/partials/_json-configs.tpl	(revision 85cdd0eb5a20562dcf3e5267f5addcc2e1a11b55)
-@@ -3,7 +3,7 @@
- {{- define "genesisJson" }}
- {
-   "genesis_time": "2023-02-27T13:07:44.448442974488Z",
--  "chain_id": "{{ printf "%s-%s" $.Values.genesis.chainId $.Chart.Version | trunc 50 }}",
-+  "chain_id": "{{ printf "%s-%s" $.Values.genesis.chainId "0.1.1-snapshot.20231222.4426.0.vf8927949" | trunc 50 }}",
-   "initial_height": "0",
-   "consensus_params": {
-     "block": {
-```
+After cherry-picking your fixes, set the environment variable `OVERRIDE_VERSION` in the `cluster/deployment/<cluster>/.envrc.vars` file
+for the corresponding cluster to `latest_snapshot_tag` to prevent version mismatch issues between the deployed version and the periodic preflights
+(or SV runbook deployments). While `latest_snapshot_tag` should be what you want in most cases, `OVERRIDE_VERSION` also takes an explicit version string.
+See [`get-snapshot-version`](https://github.com/DACH-NY/canton-network-node/blob/main/build-tools/get-snapshot-version) for usage and caveats.
 
 ## Backup and Recovery
 
