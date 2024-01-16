@@ -1,7 +1,6 @@
 module CC.Scripts.TestCoinBurn where
 
 import DA.Assert
-import DA.Time
 import Daml.Script
 
 import CC.ValidatorLicense
@@ -15,7 +14,7 @@ testCoinBurn = do
   -- bootstrap app
   app <- setupApp
 
-  passTime (minutes 10)
+  advanceToNextRoundChange app
 
   -- -- start issuing so the SVC has some coins to invite users
   runNextIssuance app

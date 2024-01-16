@@ -7,6 +7,7 @@ import cats.implicits.{
 }
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.*
 import com.daml.network.http.v0.definitions as http
@@ -64,6 +65,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
 
@@ -527,6 +529,14 @@ class FoundingNodeInitializer(
                         participantId.toProtoPrimitive,
                         founderDomainNodes,
                         initialRoundNumber,
+                        new RelTime(
+                          TimeUnit.NANOSECONDS.toMicros(
+                            foundingConfig.roundZeroDuration
+                              .getOrElse(foundingConfig.initialTickDuration)
+                              .duration
+                              .toNanos
+                          )
+                        ),
                         defaultCoinConfig(
                           foundingConfig.initialTickDuration,
                           foundingConfig.initialMaxNumInputs,

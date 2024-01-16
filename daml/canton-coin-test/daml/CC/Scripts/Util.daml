@@ -70,6 +70,7 @@ genericSetupApp svcPrefix = do
   submitExerciseCoinRulesByKey app [svc] [] CoinRules_Bootstrap_Rounds with
       coinPrice = 1.0
       initialRoundNumber = 0
+      round0Duration = hours 24 -- extra time for all initial members to join
 
   -- return the off-ledger reference to the app for later script steps
   return app
@@ -184,12 +185,21 @@ runNextIssuance : CCApp -> Script ()
 runNextIssuance app = do
   runNextIssuanceInternal app 1.0
 
+-- | Advance time to next round change
+advanceToNextRoundChange : CCApp -> Script ()
+advanceToNextRoundChange app = do
+  [(_, oldest), _, (_, newest)] <- getActiveOpenRoundsSorted app
+  now <- getTime
+  let roundChangePossibleAt = max oldest.targetClosesAt newest.opensAt
+  when (now < roundChangePossibleAt) $ setTime roundChangePossibleAt
+
 -- Only directly call this function if you know what you are doing.
 -- Due to effective-dating, the price you give here is not the coin price that can be used immediately
 runNextIssuanceInternal : CCApp -> Decimal -> Script ()
 runNextIssuanceInternal app coinPrice = do
-    now <- getTime
-    setTime (addRelTime now defaultCoinConfig.tickDuration)
+    -- now <- getTime
+    -- passTime (minutes 10)
+    advanceToNextRoundChange app
     -- expire rewards for closed rounds
     closedRounds <- query @ClosedMiningRound app.svc
     forA_ closedRounds $ \(closedRoundCid, miningRound) -> do
@@ -205,8 +215,8 @@ runNextIssuanceInternal app coinPrice = do
       submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Archive with
         closedRoundCid
 
-
     -- close issuing rounds that are ready for close
+    now <- getTime
     imcs <- queryFilter @IssuingMiningRound app.svc (\r -> r.targetClosesAt <= now)
     forA_ imcs $ \(issuingRoundCid, _) ->
       submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Close with

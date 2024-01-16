@@ -21,6 +21,7 @@ import DA.Time
 test : Script ()
 test = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  advanceToNextRoundChange app -- advance time so we're out of the initial mining round
   currentTime <- getTime
   let coinPrice = 2.5
       config = scaleCoinConfig coinPrice defaultCoinConfig
@@ -111,14 +112,14 @@ testLargeCoinExpiry = script do
 testExpireLockedCoin : Script ()
 testExpireLockedCoin = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
-  passTime (minutes 20) -- pass enough time so that round 2 expires in 10 minutes
+  advanceToNextRoundChange app -- advance time so we're out of the initial mining round
+  passTime (minutes 10) -- pass enough time so that round 2 expires in 10 minutes
 
   -- Locking the coin with with initialAmount 0.000005 and created at round 2 but with a
   -- lock for 10 minutes should fail, as round 2 ends in 10 minutes
   getLockedCoinMustFail app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (minutes 10)
-
   -- Lock the coin with initialAmount 0.000005 and created at round 2
-  -- As the holding fee is 0.000005 so the coin will be expired at round 3
+  -- As the coin amount is equal to one round's holding fee, it will be expired at round 3
   cid <- getLockedCoin app alice bob.primaryParty defaultTransferConfig.holdingFee.rate (seconds 90 - convertMicrosecondsToRelTime 1)
   Some(lockedCoin) <- queryContractId @LockedCoin alice.primaryParty cid
 
@@ -168,7 +169,7 @@ testExpireCoin = do
 
   cid <- tap app alice 0.0000200001
   -- Lock the coin with initialAmount 0.0000200001 and created at round 1
-  -- As the holding fee is 0.000005 so the coin will be expired at round 3
+  -- As the holding fee is 0.00002 so the coin will be expired at round 3
   Some(coin) <- queryContractId @Coin alice.primaryParty cid
 
   coin.amount.initialAmount === 0.0000200001
@@ -184,7 +185,6 @@ testExpireCoin = do
 
   -- current latest active round is 4
   latestActiveRoundCid <- advanceRound app (Round 4)
-
 
   -- 2 rounds before current latest active round => 4 - 2 = 2 which is before round 3 when the coin expires
   -- svc fails to expire the coin

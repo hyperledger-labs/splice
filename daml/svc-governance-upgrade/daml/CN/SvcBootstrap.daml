@@ -1,6 +1,7 @@
 module CN.SvcBootstrap where
 
 import qualified DA.Map as Map
+import DA.Time
 
 import CC.CoinConfig
 import CC.CoinRules
@@ -22,6 +23,7 @@ template SvcBootstrap with
     founderParticipantId : Text -- ^ the id of the participant of the founding SV
     founderDomainNodes : DomainNodeConfigMap -- ^ Domain nodes on which this workflow runs
     initialRoundNumber : Int
+    round0Duration : RelTime
     coinConfig : CoinConfig USD
     coinPrice : Decimal
     cnsRulesConfig: CnsRulesConfig
@@ -49,6 +51,7 @@ template SvcBootstrap with
         -- bootstrap rounds
         exercise coinRulesCid CoinRules_Bootstrap_Rounds with
           initialRoundNumber
+          round0Duration
           coinPrice
       -- create initial coin price vote of founder
         now <- getTime

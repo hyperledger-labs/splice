@@ -51,7 +51,7 @@ testUsageFees = do
                     receiverFeeRatio = 0.0
                     amount = outputAmount2
                     lock = Some TimeLock with
-                      expiresAt = addRelTime now (days 1)
+                      expiresAt = addRelTime now (days 2)
                       holders = []
                 -- normal receiver coin
                 , TransferOutput with
@@ -65,7 +65,7 @@ testUsageFees = do
                     receiverFeeRatio = 0.75
                     amount = outputAmount3
                     lock = Some TimeLock with
-                      expiresAt = addRelTime now (days 1)
+                      expiresAt = addRelTime now (days 2)
                       holders = [alice.primaryParty, bob.primaryParty, bob.primaryParty] -- duplicates get removed
 
                 ]

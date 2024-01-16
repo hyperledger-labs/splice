@@ -97,6 +97,8 @@ initCollective initialRoundNumber isDevNet = do
       coinConfig
       coinPrice = 1.0
       initialRoundNumber
+      round0Duration =
+        if initialRoundNumber == 0 then hours 24 else defaultCoinConfig.tickDuration
       cnsRulesConfig
       config
       initialTrafficState = Map.empty
@@ -167,8 +169,7 @@ onboardValidator app sponsor validator = do
 -- | Run the next issuance.
 runNextIssuanceD : CCApp -> Decimal -> Script ()
 runNextIssuanceD app coinPrice = do
-    now <- getTime
-    setTime (addRelTime now defaultCoinConfig.tickDuration)
+    advanceToNextRoundChange app
     -- expire rewards for closed rounds
     closedRounds <- query @ClosedMiningRound app.svc
     [(coinRulesCid, _)] <- query @CoinRules app.svc
@@ -194,6 +195,7 @@ runNextIssuanceD app coinPrice = do
     -- TODO(#8101): collect SvcRewards via SvRewards into per-SV coins
 
     -- close current issuing rounds if there are any
+    now <- getTime
     imcs <- queryFilter @IssuingMiningRound app.svc (\r -> r.targetClosesAt <= now)
     forA_ imcs $ \(issuingRoundCid, _) ->
       submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Close with

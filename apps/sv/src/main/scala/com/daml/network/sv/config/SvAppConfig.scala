@@ -70,6 +70,8 @@ object SvOnboardingConfig {
       founderSvRewardWeight: Long = 10,
       svcPartyHint: String = "SVC",
       initialTickDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(150),
+      // We use the tickDuration as the default bootstrapping duration to ensure our tests focus on the steady state.
+      roundZeroDuration: Option[NonNegativeFiniteDuration] = None,
       initialMaxNumInputs: Int = 100,
       initialCoinPrice: BigDecimal = 1.0,
       initialCnsConfig: InitialCnsConfig = InitialCnsConfig(),

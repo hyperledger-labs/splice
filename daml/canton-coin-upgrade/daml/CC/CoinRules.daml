@@ -192,6 +192,8 @@ template CoinRules
       with
         coinPrice : Decimal
         initialRoundNumber : Int
+        round0Duration : RelTime
+        -- Duration of the very first round, typically set to a number large enough for all initial members to complete joining and grab their SvReward coupon.
       controller svc
       do
         now <- getTime
@@ -200,16 +202,20 @@ template CoinRules
         let nr0 = initialRoundNumber
         let nr1 = nr0 + 1
         let nr2 = nr1 + 1
-        let opensAt0 = now
-        let opensAt1 = now
-        let opensAt2 = addRelTime now tickDuration
 
-        let targetClosesAt0 = addRelTime now tickDuration
+        -- Round0 is essentially a round that happens to not get closed for 24h by the SVC, which is
+        -- why we keep it's tick-duration at the normal tickDuration, and check that it is not too short.
+        -- Thereby we can keep the expiry logic for locked coins simple.
+        require "Round0 duration is larger or equal to tick duration" (tickDuration <= round0Duration)
+
+        let targetClosesAt0 = addRelTime now round0Duration
         let targetClosesAt1 = addRelTime targetClosesAt0 tickDuration
         let targetClosesAt2 = addRelTime targetClosesAt1 tickDuration
 
-        -- We accept that round 0 will only be open for one tickDuration in contrast to all other ones.
-        -- Its SVC rewards are compensation for the extra effort of bootstrapping.
+        let opensAt0 = now
+        let opensAt1 = now -- opens at the same time as round0, so there are always two rounds open at the same time
+        let opensAt2 = targetClosesAt0 -- by default, at most two rounds are open at the same time, so round 2 opens when round 0 closes
+
         let issuingFor0 = days 0
         let issuingFor1 = issuingFor0 + tickDuration
         let issuingFor2 = issuingFor1 + tickDuration

@@ -164,7 +164,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts
      ..
  
    submitExerciseCoinRulesByKey app [svc] [] CoinRules_Bootstrap_Rounds with
-@@ -326,6 +327,7 @@
+@@ -336,6 +337,7 @@
                receiverFeeRatio = transferFeeRatio
                lock = None
            ]
@@ -172,7 +172,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts
    (openRound, _) <- getLatestOpenRound app
    featuredAppRight <- getFeaturedAppRight app sender.primaryParty
    void $ submitExerciseCoinRulesByKey app [sender.primaryParty, recipient] readAs
-@@ -354,6 +356,7 @@
+@@ -364,6 +366,7 @@
                  expiresAt = now `addRelTime` lockDuration
                receiverFeeRatio = 0.0
            ]
@@ -180,7 +180,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts
    (openRound, _) <- getLatestOpenRound app
    featuredAppRight <- getFeaturedAppRight app sender.primaryParty
    void $ submitExerciseCoinRulesByKey app [sender.primaryParty, lockHolder] readAs
-@@ -419,6 +422,7 @@
+@@ -429,6 +432,7 @@
                map (InputSvRewardCoupon . fst) svRewardCoupons ++
                coins
            outputs = []
