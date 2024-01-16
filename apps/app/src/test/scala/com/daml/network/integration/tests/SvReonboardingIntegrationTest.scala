@@ -25,6 +25,7 @@ import scala.jdk.CollectionConverters.*
 import org.scalatest.time.{Minute, Span}
 import com.google.protobuf.ByteString
 import scala.util.Using
+import java.nio.file.Files
 
 // TODO(#9076) Create fresh database instances within the test to support running it multiple times.
 class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTestUtil {
@@ -85,6 +86,7 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
       "sv reonboarding",
       "ADMIN_USER" -> sv4Backend.config.ledgerApiUser,
     ) {
+
       startAllSync(
         sv1ScanBackend,
         sv1Backend,
@@ -160,8 +162,6 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
         sv.svcAutomation.trigger[SvOffboardingPartyToParticipantProposalTrigger].pause().futureValue
       }
 
-      // TODO(#9284) Read the ACS from sv1 for the svc party and filter to sv4 contracts.
-      sv4Backend.participantClientWithAdminToken.repair.export_acs(Set(sv4Party))
       val dump = sv4ValidatorBackend.dumpParticipantIdentities()
 
       // Stop SV4
@@ -270,7 +270,15 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
             sv4Backend.participantClientWithAdminToken.dars
               .upload(dar.path, darDataO = Some(darData))
           }
-        sv4Backend.participantClientWithAdminToken.repair.import_acs()
+        val acsExport = sv1ScanBackend.getAcsSnapshot(sv4Party)
+        val acsExportFile = Files.createTempFile("acs-export", ".gz")
+        try {
+          Using.resource(Files.newOutputStream(acsExportFile))(acsExport.writeTo(_))
+          sv4Backend.participantClientWithAdminToken.repair
+            .import_acs(inputFile = acsExportFile.toString)
+        } finally {
+          Files.delete(acsExportFile)
+        }
         sv4Backend.participantClientWithAdminToken.domains.reconnect_all()
       }
       sv4Backend.startSync()

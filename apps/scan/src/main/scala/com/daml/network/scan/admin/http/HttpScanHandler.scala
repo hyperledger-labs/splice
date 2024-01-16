@@ -1,5 +1,6 @@
 package com.daml.network.scan.admin.http
 
+import cats.syntax.either.*
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
@@ -11,6 +12,7 @@ import com.daml.network.codegen.java.cc.round.{
   SummarizingMiningRound,
 }
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
+import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
 import com.daml.network.http.v0.scan.ScanResource
@@ -19,14 +21,20 @@ import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{Codec, Contract, ContractWithState}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.admin.data.ActiveContract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
+import com.google.protobuf.ByteString
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+import scala.util.Using
+import java.util.Base64
+import java.util.zip.GZIPOutputStream
 import java.time.{OffsetDateTime, ZoneOffset}
 import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
   DevnetTap,
@@ -39,6 +47,7 @@ import com.daml.network.store.PageLimit
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 class HttpScanHandler(
+    participantAdminConnection: ParticipantAdminConnection,
     store: ScanStore,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     protected val loggerFactory: NamedLoggerFactory,
@@ -619,6 +628,59 @@ class HttpScanHandler(
               HttpErrorHandler.notFound(s"No cns entry found for party: ${party}")
             )
         }
+    }
+  }
+
+  /** Filter the given ACS snapshot to contracts the given party is a stakeholder on */
+  // TODO(#9340) Move this logic inside a Canton gRPC API.
+  private def filterAcsSnapshot(input: ByteString, stakeholder: PartyId): ByteString = {
+    val contracts = ActiveContract
+      .loadFromByteString(input)
+      .valueOr(error =>
+        throw Status.INTERNAL
+          .withDescription(s"Failed to read ACS snapshot: ${error}")
+          .asRuntimeException()
+      )
+    val output = ByteString.newOutput
+    Using.resource(new GZIPOutputStream(output)) { outputStream =>
+      contracts.filter(c => c.contract.metadata.stakeholders.contains(stakeholder.toLf)).foreach {
+        c =>
+          c.writeDelimitedTo(outputStream) match {
+            case Left(error) =>
+              throw Status.INTERNAL
+                .withDescription(s"Failed to write ACS snapshot: ${error}")
+                .asRuntimeException()
+            case Right(_) => outputStream.flush()
+          }
+      }
+    }
+    output.toByteString
+  }
+
+  override def getAcsSnapshot(respond: ScanResource.GetAcsSnapshotResponse.type)(party: String)(
+      extracted: com.digitalasset.canton.tracing.TraceContext
+  ): Future[ScanResource.GetAcsSnapshotResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getAcsSnapshot") { _ => _ =>
+      val partyId = PartyId.tryFromProtoPrimitive(party)
+      for {
+        // The SVC party is a stakeholder on all "important" contracts, in particular, all coin holdings and CNS entries
+        // so filtering an SVC snapshot to contracts another party is also a stakeholder on provides a sufficient snapshot
+        // for that party to recover.
+        // It does however lose third-party application data that the SVC party is not a stakeholder on. Supporting that requires
+        // that users backup their own ACS.
+        // As the SVC party is hosted on all SVs, an arbitrary scan instance can be chosen for the ACS snapshot.
+        // BFT reads are usually not required since ACS commitments act as a check that the ACS was correct.
+        acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(Set(store.svcParty))
+      } yield {
+        val filteredAcsSnapshot =
+          filterAcsSnapshot(acsSnapshot, partyId)
+        v0.ScanResource.GetAcsSnapshotResponse.OK(
+          definitions.GetAcsSnapshotResponse(
+            Base64.getEncoder.encodeToString(filteredAcsSnapshot.toByteArray)
+          )
+        )
+      }
     }
   }
 }

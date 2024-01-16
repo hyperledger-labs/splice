@@ -23,7 +23,9 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
 
+import java.util.Base64
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
@@ -669,6 +671,25 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.ListTransactionHistoryResponse.OK(response) =>
         Right(response.transactions)
+    }
+  }
+
+  case class GetAcsSnapshot(
+      party: PartyId
+  ) extends InternalBaseCommand[http.GetAcsSnapshotResponse, ByteString] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetAcsSnapshotResponse] = {
+      client.getAcsSnapshot(party.toProtoPrimitive, headers)
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetAcsSnapshotResponse.OK(response) =>
+        Right(ByteString.copyFrom(Base64.getDecoder.decode(response.acsSnapshot)))
     }
   }
 }

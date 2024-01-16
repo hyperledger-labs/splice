@@ -23,6 +23,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * `DynamicDomainParameters` made public
 * `nonNegativeFiniteDurationWriter` made public
 * `CantonConfig.sequencerNodeParametersByStringX` made public
+* `ActiveContract.loadFromByteString` made public
 ## Misc
 * Generalization of `Environment`
 * Generalization of `MetricsFactory`

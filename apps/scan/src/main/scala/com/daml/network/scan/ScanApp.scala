@@ -13,6 +13,7 @@ import com.daml.network.environment.{
   CNNode,
   CNNodeStatus,
   DarResources,
+  ParticipantAdminConnection,
   RetryFor,
   SequencerAdminConnection,
 }
@@ -99,6 +100,12 @@ class ScanApp(
         loggerFactory,
         retryProvider,
       )
+      participantAdminConnection = new ParticipantAdminConnection(
+        config.participantClient.adminApi,
+        loggerFactory,
+        retryProvider,
+        clock,
+      )
       sequencerAdminConnection = new SequencerAdminConnection(
         config.sequencerAdminClient,
         loggerFactory,
@@ -132,6 +139,7 @@ class ScanApp(
       }
 
       internalHandler = new HttpScanHandler(
+        participantAdminConnection,
         store,
         config.miningRoundsCacheTimeToLiveOverride,
         loggerFactory,
@@ -183,6 +191,7 @@ class ScanApp(
       }
     } yield {
       ScanApp.State(
+        participantAdminConnection,
         sequencerAdminConnection,
         storage,
         store,
@@ -201,6 +210,7 @@ class ScanApp(
 object ScanApp {
 
   case class State(
+      participantAdminConnection: ParticipantAdminConnection,
       sequencerAdminConnection: SequencerAdminConnection,
       storage: Storage,
       store: ScanStore,
@@ -224,6 +234,7 @@ object ScanApp {
         store,
         storage,
         sequencerAdminConnection,
+        participantAdminConnection,
       )(logger)
   }
 }

@@ -45,7 +45,7 @@ final case class ActiveContract private (
 
 }
 
-private[canton] object ActiveContract extends HasProtocolVersionedCompanion[ActiveContract] {
+object ActiveContract extends HasProtocolVersionedCompanion[ActiveContract] {
 
   override def name: String = "ActiveContract"
 
@@ -103,7 +103,7 @@ private[canton] object ActiveContract extends HasProtocolVersionedCompanion[Acti
     }
   }
 
-  private[admin] def loadFromByteString(
+  def loadFromByteString(
       bytes: ByteString
   ): Either[String, List[ActiveContract]] = {
     for {

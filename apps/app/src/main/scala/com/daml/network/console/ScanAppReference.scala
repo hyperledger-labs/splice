@@ -22,6 +22,7 @@ import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
+import com.google.protobuf.ByteString
 
 import java.time.Instant
 
@@ -295,6 +296,13 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.ListTransactions(pageEndEventId, SortOrder.Desc, pageSize)
+      )
+    }
+
+  def getAcsSnapshot(party: PartyId): ByteString =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetAcsSnapshot(party)
       )
     }
 }

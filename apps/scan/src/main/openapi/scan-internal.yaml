@@ -452,6 +452,24 @@ paths:
                 "$ref": "#/components/schemas/LookupEntryByNameResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/acs/{party}:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getAcsSnapshot"
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAcsSnapshotResponse"
 components:
   schemas:
     GetSvcPartyIdResponse:
@@ -1033,3 +1051,10 @@ components:
       properties:
         entry:
           "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+    GetAcsSnapshotResponse:
+      type: object
+      required: [ "acs_snapshot" ]
+      properties:
+        acs_snapshot:
+          description: base64-encoded ACS snapshot for the intersection of the SVC party and the requested party’s ACS
+          type: string
