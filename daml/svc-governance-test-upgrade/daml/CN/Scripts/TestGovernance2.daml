@@ -202,15 +202,7 @@ testRacingMembershipRemoval = do
         reason = Reason with url = ""; body = "OK, let them go"
     pure requestCid
 
-  -- sv1 attempts to immediatly accept the request to remove sv2, which fails as sv2 didn't vote and the voting period is not over
-  submitMultiMustFail [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
-    requestCid = req1
-    coinRulesCid = None
-
-  -- time passes, and the whole world is excited as to who wins the race
-  passTime (days 7)
-
-  -- well it is SV1, which held on to its leadership right
+  -- sv1 attempts to immediatly accept the request to remove sv2, which succeeds as SV2 is not required to vote for its own offboarding
   now <- getTime
   result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
     requestCid = req1
@@ -258,13 +250,48 @@ testRacingMembershipRemoval = do
     reason = Reason with url = ""; body = "they are not good for us!"
     voteRequestTimeout = Some (seconds 1) -- attempt to not give sv4 enough time to vote
 
+  -- early closing is not possible, as the outcome of the vote is not determined, and we thus leave
+  -- time for some of the SV's to change their vote
+  submitMultiMustFail [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
+    requestCid = req4
+    coinRulesCid = None
+
+  -- after enough time has passed the closing works
   passTime (seconds 1)
   result <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
     requestCid = req4
     coinRulesCid = None
 
-  -- not so fast sv3, sv4 is still here, as at least numMembers / 2 + 1 members need to vote
+  -- however sv4 is still here, as at least `numMembers / 2 + 1` members need to accept the offboarding
   result.outcome === VRO_Expired
+
+  -- Let's see if sv3 and sv4 can work together to also remove sv4
+  req5 <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
+    requester = sv3
+    action = ARC_SvcRules with
+      svcAction = SRARC_RemoveMember SvcRules_RemoveMember with
+        member = sv4
+    reason = Reason with url = ""; body = "they want to leave!"
+    voteRequestTimeout = Some (days 1)
+
+  req5 <- submitMulti [sv4] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote2 with
+    requestCid = req5
+    vote = Vote2 with
+      sv = sv4
+      accept = True
+      reason = Reason with url = ""; body = "yes, let me go please!"
+
+  -- and actually early closing is possible, as everybody has voted and the outcome is definite
+  now <- getTime
+  result <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
+    requestCid = req5
+    coinRulesCid = None
+
+  result.outcome === VRO_Accepted with effectiveAt = now
+
+  -- check the SV's are gone
+  [(_, svcRules)] <- query @SvcRules svc
+  Map.keys svcRules.members === [sv3]
 
   pure ()
 

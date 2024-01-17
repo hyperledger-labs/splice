@@ -758,13 +758,9 @@ template SvcRules with
         request <- fetch requestCid
         archive requestCid
         require "SVC matches" (request.svc == svc)
-        -- check if the request is ready to be closed
-        let activeMembers = map (.name) $ Map.values members
-        now <- getTime
-        when (now < request.voteBefore) $
-          require "All members must have voted to allow early closing" $
-            all (`Map.member` request.votes) activeMembers
         -- count the votes
+        now <- getTime
+        let activeMembers = map (.name) $ Map.values members
         let activeMemberSet = Set.fromList activeMembers
         let (validVotes, offboardedVoters) = partitionEithers
               [ if voterName `Set.member` activeMemberSet then Left vote else Right voterName
@@ -789,6 +785,15 @@ template SvcRules with
               if length nays >= s.requiredNumVotes
               then pure VRO_Rejected
               else pure VRO_Expired
+        -- check if the request is ready to be closed
+        when (now < request.voteBefore) $ do
+          let memberBeingOffboarded = case request.action of
+                ARC_SvcRules (SRARC_RemoveMember (SvcRules_RemoveMember with member)) ->
+                  fmap (.name) (Map.lookup member members)
+                _ -> None
+          require "All members (except one being offboarded) must have voted to allow early closing" $
+            all (\m -> Some m == memberBeingOffboarded || m `Map.member` request.votes) activeMembers
+          require "The outcome must be determined allow early closing" (outcome /= VRO_Expired)
         -- report the result
         pure VoteRequestResult2 with
             request
@@ -1140,8 +1145,8 @@ template SvcRules with
               name = svOnboardingConfirmed.svName
               lastReceivedRewardFor =
                 max
-                  (fromOptional (Round (-1)) (fmap (.lastReceivedRewardFor) (Map.lookup party members)))
-                  (fromOptional (Round (-1)) (fmap (.lastReceivedRewardFor) (Map.lookup party offboardedMembers)))
+                  (optional (Round (-1)) (.lastReceivedRewardFor) (Map.lookup party members))
+                  (optional (Round (-1)) (.lastReceivedRewardFor) (Map.lookup party offboardedMembers))
         exercise cid SvOnboardingConfirmed_Expire
         create SvcRules with
           svc
