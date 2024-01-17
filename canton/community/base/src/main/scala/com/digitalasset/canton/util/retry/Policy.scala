@@ -252,7 +252,10 @@ abstract class RetryWithDelay(
                   }
                   LoggerUtil.logAtLevel(
                     level,
-                    messageOfOutcome(outcome, show"${change}Retrying after $delay."),
+                    messageOfOutcome(
+                      outcome,
+                      show"${change}Retrying after a number of $retriesOfErrorKind failures, and after $delay.",
+                    ),
                     // No need to log the exception in the outcome, as this has been logged by retryable.retryOk.
                   )
 
