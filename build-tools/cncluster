@@ -710,7 +710,7 @@ function subcmd_auth0_up() {
     clusters=$(grep -h -R "export GCP_CLUSTER_BASENAME" "$REPO_ROOT/cluster/deployment/" | sed 's/export GCP_CLUSTER_BASENAME=//g' | sort | jq -s .)
 
     subcmd_pulumi auth0 config set clusterBasenames "$clusters"
-    subcmd_pulumi auth0 up
+    subcmd_pulumi auth0 up --yes --skip-preview
 }
 
 ###
