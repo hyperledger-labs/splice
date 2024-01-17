@@ -1,4 +1,0 @@
----
-name: auth0
-description: "Manage Auth0 applications used by CN deployments"
-runtime: nodejs

@@ -284,16 +284,6 @@
   },
   {
     "custom": false,
-    "id": "organization/auth0/auth0",
-    "inputs": {
-      "name": "organization/auth0/auth0"
-    },
-    "name": "organization/auth0/auth0",
-    "provider": "",
-    "type": "pulumi:pulumi:StackReference"
-  },
-  {
-    "custom": false,
     "id": "organization/infra/infra.svrun",
     "inputs": {
       "name": "organization/infra/infra.svrun"

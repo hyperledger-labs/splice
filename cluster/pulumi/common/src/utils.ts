@@ -73,7 +73,6 @@ export const sequencerPruningConfig = enableSequencerPruning
 
 // Refrence to upstream infrastructure stack.
 export const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);
-export const auth0Stack = new pulumi.StackReference('organization/auth0/auth0');
 
 /// Kubernetes Namespace
 
