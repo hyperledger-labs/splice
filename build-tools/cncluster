@@ -138,6 +138,15 @@ function _cluster_show() {
     _log ""
 }
 
+function _pulumi_stack_flag() {
+    pulumi_project=$1
+    if [ "$pulumi_project" == "auth0" ]; then
+        echo "--stack organization/${pulumi_project}"
+    else
+        echo "--stack organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}"
+    fi
+}
+
 function _pulumi() {
     if ! [ -v PULUMI_BACKEND_URL ]; then
         # shellcheck disable=SC2016
@@ -159,19 +168,31 @@ function _uses_pulumi_stack() {
 
     pulumi_project=$1
 
-    _pulumi --stack "organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
+    if [ "$pulumi_project" == "auth0" ]; then
+        # auth0 is a singleton stack (not one per cluster), so we omit the cluster name from its stack name,
+        # and also use a single kms keychain, arbitrarily residing in the devnet GCP project.
+        stack_file="${REPO_ROOT}/cluster/pulumi/${pulumi_project}/Pulumi.${pulumi_project}.yaml"
+        kms_project="da-cn-devnet"
+    else
+        stack_file="${REPO_ROOT}/cluster/pulumi/${pulumi_project}/Pulumi.${pulumi_project}.${GCP_CLUSTER_BASENAME}.yaml"
+        kms_project="${CLOUDSDK_CORE_PROJECT}"
+    fi
+
+    # shellcheck disable=SC2086,SC2046
+    _pulumi $(_pulumi_stack_flag "${pulumi_project}") \
             --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
             stack init \
-            --secrets-provider="gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}" \
+            --secrets-provider="gcpkms://projects/${kms_project}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}" \
             2> /dev/null || true
 
-    if [ ! -f "${REPO_ROOT}/cluster/pulumi/${pulumi_project}/Pulumi.${pulumi_project}.${GCP_CLUSTER_BASENAME}.yaml" ]; then
+    if [ ! -f "${stack_file}" ]; then
         # Even though we do not use pulumi configs, pulumi insists on creating a local settings file, and on having a secrets-provider for it. We therefore create it here if it doesn't exist.
-        _info "Creating Pulumi stack for ${pulumi_project} project (file ${REPO_ROOT}/cluster/pulumi/${pulumi_project}/Pulumi.${pulumi_project}.${GCP_CLUSTER_BASENAME}.yaml does not exist)"
+        _info "Creating Pulumi stack for ${pulumi_project} project (file ${stack_file} does not exist)"
         local -x PULUMI_CONFIG_PASSPHRASE=''
-        _pulumi --stack "organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
+        # shellcheck disable=SC2086,SC2046
+        _pulumi $(_pulumi_stack_flag "${pulumi_project}") \
                 --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
-                stack change-secrets-provider "gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}"
+                stack change-secrets-provider "gcpkms://projects/${kms_project}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}"
     fi
 }
 
@@ -683,6 +704,17 @@ function subcmd_infra_up() {
 
 ###
 
+subcommand_whitelist[auth0_up]='Apply the (singleton) autho0 stack.'
+
+function subcmd_auth0_up() {
+    clusters=$(grep -h -R "export GCP_CLUSTER_BASENAME" "$REPO_ROOT/cluster/deployment/" | sed 's/export GCP_CLUSTER_BASENAME=//g' | sort | jq -s .)
+
+    subcmd_pulumi auth0 config set clusterBasenames "$clusters"
+    subcmd_pulumi auth0 up
+}
+
+###
+
 subcommand_whitelist[infra_down]='Take the current Pulumi infra stack down.'
 
 function subcmd_infra_down() {
@@ -771,9 +803,10 @@ function subcmd_create() {
       fi
     fi
 
-    _log "Cluster at IP ${IPADDR} ready"
+    # Update auth0 pulumi stack to include the cluster in the redirect URLs
+    subcmd_pulumi auth0_up
 
-    _warning "Please note that Auth0 applications are not automatically updated at the moment. Make sure to add URLs for your new cluster as allowed callback URLs, allowed logout URLs, etc. in the relevant Auth0 UI applications."
+    _log "Cluster at IP ${IPADDR} ready"
 }
 
 ###
@@ -1242,7 +1275,9 @@ function subcmd_pulumi() {
             ;;
 
         *)
-            args+=(--stack "organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}")
+            stack_flag=$(_pulumi_stack_flag "${pulumi_project}")
+            # shellcheck disable=SC2086,SC2206
+            args+=(${stack_flag})
             ;;
     esac
 

@@ -10,8 +10,9 @@ import type {
   Auth0ClientSecret,
   ClientIdMap,
   Auth0Config,
+  Auth0ClusterConfig,
 } from './auth0types';
-import { ExactNamespace, fixedTokens } from './utils';
+import { CLUSTER_BASENAME, ExactNamespace, auth0Stack, fixedTokens } from './utils';
 
 type Auth0CacheMap = Record<string, Auth0ClientAccessToken>;
 
@@ -373,4 +374,19 @@ export function auth0UserNameEnvVarSource(
       optional: false,
     },
   };
+}
+
+export function getAuth0Cfg(): pulumi.Output<Auth0ClusterConfig> {
+  const clusters = auth0Stack.requireOutput('clusterBasenames') as pulumi.Output<string[]>;
+  clusters.apply(c => {
+    if (!c.includes(CLUSTER_BASENAME)) {
+      console.error(
+        `Cluster ${CLUSTER_BASENAME} not included in the clusters list in auth0 Pulumi stack, so will not work correctly.`
+      );
+      console.error(`Please reapply the auth0 Pulumi stack`);
+      process.exit(1);
+    }
+  });
+
+  return auth0Stack.requireOutput('auth0Cfg') as pulumi.Output<Auth0ClusterConfig>;
 }

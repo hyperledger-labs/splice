@@ -20,6 +20,7 @@
         "@pulumi/gcp": "6.67.0",
         "@pulumi/pulumi": "^3.92.0",
         "@pulumi/kubernetes": "4.5.4",
+        "@pulumi/auth0": "3.1.0",
         "js-yaml": "^4.1.0",
         "lodash": "^4.17.21",
         "node-fetch": "^2.6.1"
@@ -38,6 +39,7 @@
         "infra",
         "sv-runbook",
         "observability",
-        "validator-runbook"
+        "validator-runbook",
+        "auth0"
     ]
 }

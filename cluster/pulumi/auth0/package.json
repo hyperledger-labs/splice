@@ -1,15 +1,14 @@
 {
-  "name": "validator-runbook",
+  "name": "auth0-pulumi-deployment",
+  "version": "1.0.0",
   "main": "src/index.ts",
-  "devDependencies": {
-    "@types/node": "^16",
-    "@types/sinon": "^10.0.15",
-    "sinon": "^15.0.4"
-  },
   "dependencies": {
-    "@pulumi/pulumi": "^3.0.0",
+    "@kubernetes/client-node": "^0.18.1",
+    "@pulumi/random": "4.14.0",
     "cn-pulumi-common": "1.0.0",
-    "@pulumi/random": "4.14.0"
+    "@types/auth0": "^3.3.2",
+    "auth0": "^3.4.0",
+    "@pulumi/auth0": "3.1.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",
@@ -20,5 +19,6 @@
     "lint:fix": "eslint --fix --max-warnings=0 -- src",
     "lint:check": "eslint --max-warnings=0 -- src",
     "dump-config": "env -u KUBECONFIG -u GCP_CLUSTER_BASENAME ts-node ./dump-config.ts"
-  }
+  },
+  "devDependencies": {}
 }

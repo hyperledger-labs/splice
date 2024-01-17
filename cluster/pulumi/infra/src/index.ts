@@ -1,4 +1,3 @@
-import { configureAuth0 } from './auth0';
 import { clusterBasename } from './config';
 import { configureIstio } from './istio';
 import { configureNetwork } from './network';
@@ -18,5 +17,3 @@ const observabilityDependsOn = [network];
 configureObservability(observabilityDependsOn);
 
 configureStorage();
-
-export const auth0 = configureAuth0();

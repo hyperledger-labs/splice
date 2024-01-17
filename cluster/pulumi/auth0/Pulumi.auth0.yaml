@@ -1,0 +1,18 @@
+secretsprovider: gcpkms://projects/da-cn-scratchnet/locations/us-central1/keyRings/pulumi/cryptoKeys/scratchb
+encryptedkey: CiQAqRIZ7H1F2iaiFSOxPlb/G3G9cIPrLQZ8hSbw0GYOdMRe23USSQDw67rmThZ6wj5HJnj/yrgBT0Zbjj3H/W/fSMrUdj4kqvP/GXxQaaOAl9DOEOHrtohaw09IXo8chzLWczsVWygjxVdThMKi6yI=
+config:
+  auth0:clusterBasenames: |-
+    [
+      "cidaily",
+      "cidaily-testnet",
+      "cilr",
+      "cimain",
+      "dev",
+      "observability",
+      "scratcha",
+      "scratchb",
+      "scratchc",
+      "scratchd",
+      "scratche",
+      "test"
+    ]
