@@ -15,9 +15,6 @@ jobs:
       wait_for_sv:
         type: boolean
         default: true
-      wait_for_cluster_version:
-        type: boolean
-        default: true
       cluster_version:
         type: string
         default: ""
@@ -74,10 +71,8 @@ jobs:
           cmd_name: wait for deployment to finish
           cluster: << parameters.cluster >>
           cmd: |
-            if [[ << parameters.wait_for_cluster_version >> == true ]]; then
-              VERSION=$(get-snapshot-version)
-              cncluster wait_version $VERSION
-            fi
+            VERSION=$(get-snapshot-version)
+            cncluster wait_version $VERSION
             # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
             cncluster wait validator1 validator-app
             cncluster wait splitwell validator-app
@@ -147,9 +142,6 @@ jobs:
         type: string
         # #team-canton-network-internal-ci
         default: C05DT77QF5M
-      wait_for_cluster_version:
-        type: boolean
-        default: true
       cluster_version:
         type: string
         default: ""
@@ -190,10 +182,8 @@ jobs:
           cmd_name: wait for sv-runbook deployment to finish
           cluster: << parameters.cluster >>
           cmd: |
-            if [[ << parameters.wait_for_cluster_version >> == true ]]; then
-              VERSION=$(get-snapshot-version)
-              cncluster wait_version $VERSION
-            fi
+            VERSION=$(get-snapshot-version)
+            cncluster wait_version $VERSION
             # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
             cncluster wait sv validator-app
             echo "Done waiting. All pods in the cluster are:"
@@ -248,9 +238,6 @@ jobs:
         type: string
         # #team-canton-network-internal-ci
         default: C05DT77QF5M
-      wait_for_cluster_version:
-        type: boolean
-        default: true
       cluster_version:
         type: string
         default: ""
@@ -291,10 +278,8 @@ jobs:
           cmd_name: wait for validator-runbook deployment to finish
           cluster: << parameters.cluster >>
           cmd: |
-            if [[ << parameters.wait_for_cluster_version >> == true ]]; then
-              VERSION=$(get-snapshot-version)
-              cncluster wait_version $VERSION
-            fi
+            VERSION=$(get-snapshot-version)
+            cncluster wait_version $VERSION
             # We use readiness of validator-app in the validator namespace as an approximation to the validator's readiness
             cncluster wait validator validator-app
             echo "Done waiting. All pods in the cluster are:"
