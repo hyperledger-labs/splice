@@ -3,7 +3,7 @@ package com.daml.network.store
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTreeV2}
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.environment.ledger.api.*
@@ -714,7 +714,7 @@ object InMemoryMultiDomainAcsStore {
     /** Ingest a transaction while filtering out create events that do not satisfy the given predicate. */
     def ingestTransaction(
         domain: DomainId,
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
         txLogParser: TxLogStore.Parser[TXI, TXE],
         logger: TracedLogger,
@@ -760,7 +760,7 @@ object InMemoryMultiDomainAcsStore {
       val newOffset = tx.getOffset
 
       val newSummary = summary.copy(
-        txId = Some(tx.getTransactionId),
+        updateId = Some(tx.getUpdateId),
         offset = Some(newOffset),
         newAcsSize = stNew.createEvents.size,
         ingestedTxLogEntries = ingestedTxLogEntries,

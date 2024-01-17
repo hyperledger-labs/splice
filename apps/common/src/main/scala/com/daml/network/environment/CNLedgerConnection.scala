@@ -15,6 +15,7 @@ import com.daml.ledger.javaapi.data.{
   LedgerOffset,
   Transaction,
   TransactionTree,
+  TransactionTreeV2,
   User,
 }
 import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
@@ -140,7 +141,7 @@ class BaseLedgerConnection(
   def tryGetTransactionTreeByEventId(
       parties: Seq[PartyId],
       id: String,
-  ): Future[TransactionTree] =
+  ): Future[TransactionTreeV2] =
     client.tryGetTransactionTreeByEventId(parties.map(_.toProtoPrimitive), id)
 
   def getOptionalPrimaryParty(

@@ -32,7 +32,7 @@ class ScanTxLogParser(
 
   import ScanTxLogParser.*
 
-  private def parseTree(tree: TransactionTree, domainId: DomainId, root: TreeEvent)(implicit
+  private def parseTree(tree: TransactionTreeV2, domainId: DomainId, root: TreeEvent)(implicit
       tc: TraceContext
   ): State = {
     // TODO(#2930) add more checks on the nodes, at least that the SVC party is correct
@@ -81,7 +81,7 @@ class ScanTxLogParser(
             fromCnsEntryPaymentCollection(tree, exercised, domainId)
           case CoinArchive(_) =>
             throw new RuntimeException(
-              s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getTransactionId}"
+              s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getUpdateId}"
             )
           case _ => parseTrees(tree, domainId, exercised.getChildEventIds.asScala.toList)
         }
@@ -96,7 +96,7 @@ class ScanTxLogParser(
             State.fromClosedMiningRoundCreate(tree, root, domainId, round)
           case CoinCreate(coin) =>
             throw new RuntimeException(
-              s"Unexpected coin create event for coin ${coin.contractId.contractId} in transaction ${tree.getTransactionId}"
+              s"Unexpected coin create event for coin ${coin.contractId.contractId} in transaction ${tree.getUpdateId}"
             )
           case _ => State.empty
         }
@@ -106,7 +106,7 @@ class ScanTxLogParser(
     }
   }
 
-  private def parseTrees(tree: TransactionTree, domainId: DomainId, rootsEventIds: List[String])(
+  private def parseTrees(tree: TransactionTreeV2, domainId: DomainId, rootsEventIds: List[String])(
       implicit tc: TraceContext
   ): State = {
     val roots = rootsEventIds.map(tree.getEventsById.get(_))
@@ -159,7 +159,7 @@ class ScanTxLogParser(
     }
   }
 
-  override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
+  override def tryParse(tx: TransactionTreeV2, domain: DomainId)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
     val ret = parseTrees(tx, domain, tx.getRootEventIds.asScala.toList).entries
@@ -174,7 +174,7 @@ class ScanTxLogParser(
     )
 
   private def fromCnsEntryPaymentCollection(
-      tree: TransactionTree,
+      tree: TransactionTreeV2,
       exercised: ExercisedEvent,
       domainId: DomainId,
   )(implicit tc: TraceContext) = {
@@ -249,7 +249,7 @@ object ScanTxLogParser {
     }
 
     private def getCoinFromSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         ccsum: CoinCreateSummary[T],
     ) = {
       val coinCid = ccsum.coin.contractId
@@ -262,13 +262,13 @@ object ScanTxLogParser {
         .flatten
         .getOrElse {
           throw new RuntimeException(
-            s"The coin contract $coinCid referenced by CoinCreateSummary was not found in transaction ${tx.getTransactionId}"
+            s"The coin contract $coinCid referenced by CoinCreateSummary was not found in transaction ${tx.getUpdateId}"
           )
         }
     }
 
     def fromCoinCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: TreeEvent,
         domainId: DomainId,
         ccsum: CoinCreateSummary[T],
@@ -369,7 +369,7 @@ object ScanTxLogParser {
     }
 
     def fromTransfer(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: TreeEvent,
         domainId: DomainId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
@@ -510,7 +510,7 @@ object ScanTxLogParser {
     }
 
     def fromCollectEntryPayment(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: ExercisedEvent,
         domainId: DomainId,
         stateFromPaymentCollection: State,
@@ -524,7 +524,7 @@ object ScanTxLogParser {
     }
 
     def fromCoinArchiveEvent(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: TreeEvent,
         domainId: DomainId,
         rootEventId: Option[String] = None,
@@ -539,7 +539,7 @@ object ScanTxLogParser {
           throw new RuntimeException(
             s"The coin contract ${event.getContractId} " +
               s"referenced by the coin archive event ${event.getEventId} " +
-              s"was not found in transaction ${tx.getTransactionId}"
+              s"was not found in transaction ${tx.getUpdateId}"
           )
         )
       // negative value for both initial amount and holding fee so that the total balance can be calculated correctly
@@ -586,7 +586,7 @@ object ScanTxLogParser {
     }
 
     def fromClosedMiningRoundCreate(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: TreeEvent,
         domainId: DomainId,
         round: ClosedMiningRoundCreate.ContractType,

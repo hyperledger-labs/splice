@@ -78,7 +78,7 @@ class UserWalletTxLogParser(
     with NamedLogging {
   import UserWalletTxLogParser.*
 
-  private def parseTree(tree: TransactionTree, root: TreeEvent, domainId: DomainId)(implicit
+  private def parseTree(tree: TransactionTreeV2, root: TreeEvent, domainId: DomainId)(implicit
       tc: TraceContext
   ): Eval[State] = {
     import Eval.{now, defer}
@@ -705,7 +705,7 @@ class UserWalletTxLogParser(
           // all possible exercise events that archive coins.
           case CoinArchive(_) =>
             throw new RuntimeException(
-              s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getTransactionId}"
+              s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getUpdateId}"
             )
 
           case _ =>
@@ -718,7 +718,7 @@ class UserWalletTxLogParser(
           // all possible exercise events that produce new coins.
           case CoinCreate(coin) =>
             throw new RuntimeException(
-              s"Unexpected coin create event for coin ${coin.contractId.contractId} in transaction ${tree.getTransactionId}"
+              s"Unexpected coin create event for coin ${coin.contractId.contractId} in transaction ${tree.getUpdateId}"
             )
 
           case _ =>
@@ -729,7 +729,7 @@ class UserWalletTxLogParser(
         sys.error("The above match should be exhaustive")
     }
   }
-  private def parseTrees(tree: TransactionTree, rootsEventIds: List[String], domainId: DomainId)(
+  private def parseTrees(tree: TransactionTreeV2, rootsEventIds: List[String], domainId: DomainId)(
       implicit tc: TraceContext
   ): Eval[State] = {
     val roots = rootsEventIds.map(tree.getEventsById.get(_))
@@ -748,7 +748,7 @@ class UserWalletTxLogParser(
     acs.collect(ac => ac.createdEvent match { case CoinCreate(c) => State.fromAcsCoin(ac, c) })
   }
 
-  override def tryParse(tx: TransactionTree, domainId: DomainId)(implicit
+  override def tryParse(tx: TransactionTreeV2, domainId: DomainId)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
     parseTrees(tx, tx.getRootEventIds.asScala.toList, domainId).value
@@ -764,7 +764,7 @@ class UserWalletTxLogParser(
     )
 
   private def fromCnsEntryPaymentCollection(
-      tree: TransactionTree,
+      tree: TransactionTreeV2,
       exercised: ExercisedEvent,
       domainId: DomainId,
       transactionSubtype: TransferTransactionSubtype,
@@ -1464,7 +1464,7 @@ object UserWalletTxLogParser {
         a.appended(b)
     }
     def fromCoinExpire(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: TreeEvent,
         domainId: DomainId,
         owner: String,
@@ -1488,7 +1488,7 @@ object UserWalletTxLogParser {
       )
     }
     def fromCreateTransferOffer(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: ExercisedEvent,
         domainId: DomainId,
     ): State = {
@@ -1509,7 +1509,7 @@ object UserWalletTxLogParser {
         transferOffer.trackingId,
         TxLogEntry.TransferOfferStatus.Created(
           new transferCodegen.TransferOffer.ContractId(offerCid),
-          tx.getTransactionId,
+          tx.getUpdateId,
         ),
         transferOffer.sender,
         transferOffer.receiver,
@@ -1517,7 +1517,7 @@ object UserWalletTxLogParser {
     }
 
     def fromTransferOfferAccept(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: ExercisedEvent,
         domainId: DomainId,
     ): State = {
@@ -1539,7 +1539,7 @@ object UserWalletTxLogParser {
         acceptedTransferOffer.trackingId,
         TxLogEntry.TransferOfferStatus.Accepted(
           new transferCodegen.AcceptedTransferOffer.ContractId(acceptedCid),
-          tx.getTransactionId,
+          tx.getUpdateId,
         ),
         acceptedTransferOffer.sender,
         acceptedTransferOffer.receiver,
@@ -1548,7 +1548,7 @@ object UserWalletTxLogParser {
 
     def fromTransferOfferFailure(
         failureReason: TxLogEntry.TransferOfferStatus.Failed,
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: ExercisedEvent,
         domainId: DomainId,
         node: ExerciseNode[?, transferCodegen.TransferOfferTrackingInfo],
@@ -1566,7 +1566,7 @@ object UserWalletTxLogParser {
     }
 
     def fromTransferOfferComplete(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: ExercisedEvent,
         domainId: DomainId,
         node: ExerciseNode[?, AcceptedTransferOffer_Complete.Res],
@@ -1587,7 +1587,7 @@ object UserWalletTxLogParser {
         trackingInfo.trackingId,
         TxLogEntry.TransferOfferStatus.Completed(
           receiverCoinContractId,
-          tx.getTransactionId,
+          tx.getUpdateId,
         ),
         trackingInfo.sender,
         trackingInfo.receiver,
@@ -1595,7 +1595,7 @@ object UserWalletTxLogParser {
     }
 
     private def fromTransferOfferOperation(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: ExercisedEvent,
         domainId: DomainId,
         trackingId: String,
@@ -1619,7 +1619,7 @@ object UserWalletTxLogParser {
     }
 
     def fromTransfer(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: TreeEvent,
         domainId: DomainId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
@@ -1649,7 +1649,7 @@ object UserWalletTxLogParser {
     }
 
     def fromCreateBuyTrafficRequest(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: ExercisedEvent,
         domainId: DomainId,
     ): State = {
@@ -1674,7 +1674,7 @@ object UserWalletTxLogParser {
     }
 
     def fromBuyTrafficRequestComplete(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: ExercisedEvent,
         domainId: DomainId,
         node: ExerciseNode[?, BuyTrafficRequest_Complete.Res],
@@ -1686,7 +1686,7 @@ object UserWalletTxLogParser {
         domainId,
         trackingInfo.trackingId,
         TxLogEntry.BuyTrafficRequestStatus.Completed(
-          tx.getTransactionId
+          tx.getUpdateId
         ),
         trackingInfo.endUserParty,
       )
@@ -1694,7 +1694,7 @@ object UserWalletTxLogParser {
 
     def fromBuyTrafficRequestFailure(
         failureReason: TxLogEntry.BuyTrafficRequestStatus.Failed,
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: ExercisedEvent,
         domainId: DomainId,
         node: ExerciseNode[?, trafficRequestCodegen.BuyTrafficRequestTrackingInfo],
@@ -1711,7 +1711,7 @@ object UserWalletTxLogParser {
     }
 
     private def fromBuyTrafficRequestOperation(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: ExercisedEvent,
         domainId: DomainId,
         trackingId: String,
@@ -1734,7 +1734,7 @@ object UserWalletTxLogParser {
 
     def fromBuyMemberTraffic(
         node: ExerciseNode[CoinRules_BuyMemberTraffic.Arg, CoinRules_BuyMemberTraffic.Res],
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: ExercisedEvent,
         domainId: DomainId,
     ): State = {
@@ -1771,7 +1771,7 @@ object UserWalletTxLogParser {
     }
 
     def fromCollectEntryPayment(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: ExercisedEvent,
         domainId: DomainId,
         stateFromPaymentCollection: State,
@@ -1793,7 +1793,7 @@ object UserWalletTxLogParser {
       * These are choices that create exactly one new coin in their transaction subtree.
       */
     def fromCoinCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: TreeEvent,
         domainId: DomainId,
         ccsum: CoinCreateSummary[T],
@@ -1824,7 +1824,7 @@ object UserWalletTxLogParser {
     }
 
     def fromNotification(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         domainId: DomainId,
         event: TreeEvent,
         transactionSubtype: NotificationTransactionSubtype,
@@ -1893,7 +1893,7 @@ object UserWalletTxLogParser {
       )
     )
 
-    private def getCoinCreateEvent(tx: TransactionTree, cid: String) = {
+    private def getCoinCreateEvent(tx: TransactionTreeV2, cid: String) = {
       tx.getEventsById.asScala
         .collectFirst {
           case (_, c: CreatedEvent) if c.getContractId == cid =>
@@ -1901,7 +1901,7 @@ object UserWalletTxLogParser {
         }
     }.flatten.getOrElse(
       throw new RuntimeException(
-        s"The coin contract $cid was not found in transaction ${tx.getTransactionId}"
+        s"The coin contract $cid was not found in transaction ${tx.getUpdateId}"
       )
     )
   }

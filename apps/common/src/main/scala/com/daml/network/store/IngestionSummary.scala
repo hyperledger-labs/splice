@@ -6,7 +6,7 @@ import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, Reassignm
 import com.digitalasset.canton.logging.pretty.Pretty
 
 private[store] final case class IngestionSummary[+TXE](
-    txId: Option[String],
+    updateId: Option[String],
     offset: Option[String],
     newAcsSize: Int,
     ingestedCreatedEvents: Vector[CreatedEvent],
@@ -28,7 +28,7 @@ private[store] object IngestionSummary {
   def empty[TXE]: IngestionSummary[TXE] = Empty
 
   private val Empty: IngestionSummary[Nothing] = IngestionSummary(
-    txId = None,
+    updateId = None,
     offset = None,
     newAcsSize = 0,
     ingestedCreatedEvents = Vector.empty,
@@ -55,7 +55,7 @@ private[store] object IngestionSummary {
 
     prettyNode(
       "", // intentionally left empty, as that worked better in the log messages above
-      paramIfDefined("txId", _.txId.map(_.unquoted)),
+      paramIfDefined("updateId", _.updateId.map(_.unquoted)),
       paramIfDefined("offset", _.offset.map(_.unquoted)),
       param("newAcsSize", _.newAcsSize),
       paramIfNonEmpty("ingestedCreatedEvents", _.ingestedCreatedEvents),

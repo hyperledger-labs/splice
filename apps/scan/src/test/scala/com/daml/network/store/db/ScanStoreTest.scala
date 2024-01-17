@@ -1110,6 +1110,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         coinCreateEvent,
         coinArchiveEvent, // the third event has to be a coin burn
       ),
+      dummyDomain,
     )
   }
 
@@ -1150,6 +1151,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           .toValue(_.toValue),
       ),
       Seq(toCreatedEvent(coinContract, signatories = Seq(receiver, svcParty))),
+      dummyDomain,
     )
   }
 

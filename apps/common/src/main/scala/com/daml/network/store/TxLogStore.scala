@@ -1,7 +1,7 @@
 package com.daml.network.store
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.ledger.javaapi.data.{CreatedEvent, TransactionTree}
+import com.daml.ledger.javaapi.data.{CreatedEvent, TransactionTreeV2}
 import com.daml.network.environment.BaseLedgerConnection
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.topology.PartyId
@@ -102,14 +102,14 @@ object TxLogStore {
     ): Seq[(DomainId, TXE)]
 
     /** Extract application-specific TxLog entries from the given daml transaction */
-    def tryParse(tx: TransactionTree, domain: DomainId)(implicit tc: TraceContext): Seq[TXE]
+    def tryParse(tx: TransactionTreeV2, domain: DomainId)(implicit tc: TraceContext): Seq[TXE]
 
     /** Returns a TxLog entry to be stored in case this parser failed to parse the given daml transaction.
       * Must not throw an error.
       */
     def error(offset: String, eventId: String, domainId: DomainId): Option[TXE]
 
-    final def parse(tx: TransactionTree, domain: DomainId, logger: TracedLogger)(implicit
+    final def parse(tx: TransactionTreeV2, domain: DomainId, logger: TracedLogger)(implicit
         tc: TraceContext
     ): Seq[TXE] =
       Try(tryParse(tx, domain))
@@ -137,7 +137,7 @@ object TxLogStore {
       )(implicit
           tc: TraceContext
       ): Seq[(DomainId, TXE)] = Seq.empty
-      override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
+      override def tryParse(tx: TransactionTreeV2, domain: DomainId)(implicit
           tc: TraceContext
       ): Seq[TXE] = Seq.empty
       override def error(offset: String, eventId: String, domainId: DomainId): Option[TXE] = None
@@ -146,40 +146,40 @@ object TxLogStore {
 
   // To reconstruct tx log entries, we need to load transaction trees from the ledger
   trait TransactionTreeSource {
-    def getTransactionTreeByEventId(eventId: String): Future[TransactionTree]
+    def getTransactionTreeByEventId(eventId: String): Future[TransactionTreeV2]
   }
 
   object TransactionTreeSource {
     case class LedgerConnection(party: PartyId, connection: BaseLedgerConnection)
         extends TransactionTreeSource {
-      override def getTransactionTreeByEventId(eventId: String): Future[TransactionTree] =
+      override def getTransactionTreeByEventId(eventId: String): Future[TransactionTreeV2] =
         connection.tryGetTransactionTreeByEventId(parties = Seq(party), id = eventId)
     }
 
-    case class ForTesting(initialTransactionTrees: Seq[TransactionTree] = Seq.empty)
+    case class ForTesting(initialTransactionTrees: Seq[TransactionTreeV2] = Seq.empty)
         extends TransactionTreeSource {
       @volatile
       @SuppressWarnings(Array("org.wartremover.warts.Var"))
-      private var transactionTrees: Seq[TransactionTree] = initialTransactionTrees
+      private var transactionTrees: Seq[TransactionTreeV2] = initialTransactionTrees
 
-      def addTree(tree: TransactionTree): Unit = blocking {
+      def addTree(tree: TransactionTreeV2): Unit = blocking {
         synchronized {
           transactionTrees = tree +: transactionTrees
         }
       }
 
-      override def getTransactionTreeByEventId(eventId: String): Future[TransactionTree] =
+      override def getTransactionTreeByEventId(eventId: String): Future[TransactionTreeV2] =
         transactionTrees
           .find(_.getEventsById.containsKey(eventId))
           .fold(
-            Future.failed[TransactionTree](
+            Future.failed[TransactionTreeV2](
               new RuntimeException(s"No transaction with event id $eventId")
             )
           )(tx => Future.successful(tx))
     }
 
     case object Unused extends TransactionTreeSource {
-      override def getTransactionTreeByEventId(eventId: String): Future[TransactionTree] =
+      override def getTransactionTreeByEventId(eventId: String): Future[TransactionTreeV2] =
         Future.failed(
           new RuntimeException(
             "This class should only be used for tests where you never read TxLog entries"
@@ -236,7 +236,7 @@ object TxLogStore {
 
     private def loadTxLogEntryFromTree(
         eventId: String,
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         domainId: DomainId,
         filterUnique: (Seq[TXE], String) => TXE,
     )(implicit
@@ -251,7 +251,7 @@ object TxLogStore {
 
     private def loadTxLogEntryFromAcs(
         contractId: ContractId[?],
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         domainId: DomainId,
     )(implicit
         tc: TraceContext

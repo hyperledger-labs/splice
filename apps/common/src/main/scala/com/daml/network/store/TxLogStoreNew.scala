@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import com.daml.ledger.javaapi.data.TransactionTree
+import com.daml.ledger.javaapi.data.TransactionTreeV2
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.TraceContext
@@ -72,14 +72,14 @@ object TxLogStoreNew {
     ): Seq[(DomainId, Option[ContractId[?]], TXE)]
 
     /** Extract application-specific TxLog entries from the given daml transaction */
-    def tryParse(tx: TransactionTree, domain: DomainId)(implicit tc: TraceContext): Seq[TXE]
+    def tryParse(tx: TransactionTreeV2, domain: DomainId)(implicit tc: TraceContext): Seq[TXE]
 
     /** Returns a TxLog entry to be stored in case this parser failed to parse the given daml transaction.
       * Must not throw an error.
       */
     def error(offset: String, eventId: String, domainId: DomainId): Option[TXE]
 
-    final def parse(tx: TransactionTree, domain: DomainId, logger: TracedLogger)(implicit
+    final def parse(tx: TransactionTreeV2, domain: DomainId, logger: TracedLogger)(implicit
         tc: TraceContext
     ): Seq[TXE] =
       Try(tryParse(tx, domain))
@@ -106,7 +106,7 @@ object TxLogStoreNew {
       )(implicit
           tc: TraceContext
       ) = Seq.empty
-      override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
+      override def tryParse(tx: TransactionTreeV2, domain: DomainId)(implicit
           tc: TraceContext
       ) = Seq.empty
       override def error(offset: String, eventId: String, domainId: DomainId) = None

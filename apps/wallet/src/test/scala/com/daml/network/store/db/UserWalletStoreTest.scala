@@ -241,7 +241,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
                 new transferOffersCodegen.AcceptedTransferOffer.ContractId(
                   goodAcceptedTransferOfferCid
                 ),
-                acceptedTree.getTransactionId,
+                acceptedTree.getUpdateId,
               )
             )
           )
@@ -1261,6 +1261,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           .toValue(_.toValue),
       ),
       Seq(toCreatedEvent(coinContract, Seq(receiver))),
+      dummyDomain,
     )
   }
 
@@ -1303,6 +1304,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           Seq(sender, receiver),
         )
       ),
+      dummyDomain,
     )
   }
 
@@ -1340,6 +1342,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           Seq(sender, receiver),
         )
       ),
+      dummyDomain,
     )
   }
 
@@ -1384,6 +1387,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           Seq(buyer),
         )
       ),
+      domainId,
     )
   }
 
@@ -1409,6 +1413,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         ).toValue,
       ),
       Seq(),
+      dummyDomain,
     )
   }
 

@@ -4,7 +4,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import cats.data.OptionT
 import cats.implicits.*
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTreeV2}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
@@ -645,7 +645,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       } yield {
         val newAcsSize = summaryState.acsSizeDiff
         val summary = summaryState.toIngestionSummary(
-          txId = None,
+          updateId = None,
           offset = offset,
           newAcsSize = newAcsSize,
         )
@@ -680,7 +680,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
               .signalOffsetChanged(reassignment.offset.getOffset)
             val summary =
               summaryState.toIngestionSummary(
-                txId = None,
+                updateId = None,
                 offset = reassignment.offset.getOffset,
                 newAcsSize = state.get().acsSize,
               )
@@ -698,7 +698,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
               .signalOffsetChanged(tree.getOffset)
             val summary =
               summaryState.toIngestionSummary(
-                txId = Some(tree.getTransactionId),
+                updateId = Some(tree.getUpdateId),
                 offset = tree.getOffset,
                 newAcsSize = state.get().acsSize,
               )
@@ -825,7 +825,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
 
     private def ingestTransactionTree(
         domainId: DomainId,
-        tree: TransactionTree,
+        tree: TransactionTreeV2,
     )(implicit tc: TraceContext): Future[MutableIngestionSummary[TXE]] = {
       val summary = MutableIngestionSummary.empty[TXE]
 
@@ -894,7 +894,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
                     ++ txLogEntries.map(txe => doIngestTxLogInsert(tree.getOffset, txe, summary))
                 ),
             ),
-            "ingestTransactionTree",
+            "ingestTransactionTreeV2",
           )
       } yield summary
     }
@@ -1361,11 +1361,11 @@ object DbMultiDomainAcsStore {
     def acsSizeDiff: Int = ingestedCreatedEvents.size - ingestedArchivedEvents.size
 
     def toIngestionSummary(
-        txId: Option[String],
+        updateId: Option[String],
         offset: String,
         newAcsSize: Int,
     ): IngestionSummary[TXE] = IngestionSummary(
-      txId = txId,
+      updateId = updateId,
       offset = Some(offset),
       newAcsSize = newAcsSize,
       ingestedCreatedEvents = this.ingestedCreatedEvents.toVector,

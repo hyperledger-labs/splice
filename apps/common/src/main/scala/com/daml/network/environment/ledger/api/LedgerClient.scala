@@ -11,7 +11,7 @@ import com.daml.ledger.javaapi.data.{
   CreateUserResponse,
   LedgerOffset,
   ListUserRightsResponse,
-  TransactionTree,
+  TransactionTreeV2,
   User,
 }
 import com.daml.ledger.javaapi.data.codegen.ContractId
@@ -39,12 +39,7 @@ import com.daml.ledger.api.v1.admin.user_management_service as v1User
 import com.daml.ledger.api.v1.command_service.CommandServiceGrpc
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset as V1LedgerOffset
 import com.daml.ledger.api.v1.package_service.{ListPackagesRequest, PackageServiceGrpc}
-import com.daml.ledger.api.v1.transaction.TransactionTree as V1TransactionTree
-import com.daml.ledger.api.v1.transaction_service.{
-  GetLedgerEndRequest,
-  GetTransactionByEventIdRequest,
-  TransactionServiceGrpc,
-}
+import com.daml.ledger.api.v1.transaction_service.{GetLedgerEndRequest, TransactionServiceGrpc}
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.javaapi.data.User.Right
@@ -166,12 +161,13 @@ private[environment] class LedgerClient(
   def tryGetTransactionTreeByEventId(
       parties: Seq[String],
       id: String,
-  ): Future[TransactionTree] = {
-    val req = GetTransactionByEventIdRequest(eventId = id, requestingParties = parties)
+  ): Future[TransactionTreeV2] = {
+    val req =
+      lapi.update_service.GetTransactionByEventIdRequest(eventId = id, requestingParties = parties)
     for {
-      stub <- withCredentials(transactionServiceStub)
-      res <- stub.getTransactionByEventId(req).map { resp =>
-        TransactionTree.fromProto(V1TransactionTree.toJavaProto(resp.getTransaction))
+      stub <- withCredentials(updateServiceStub)
+      res <- stub.getTransactionTreeByEventId(req).map { resp =>
+        LedgerClient.lapiTreeToJavaTree(resp.getTransaction)
       }
     } yield res
   }
@@ -616,6 +612,10 @@ object LedgerClient {
       update: TreeUpdate,
       domainId: DomainId,
   )
+  def lapiTreeToJavaTree(tree: lapi.transaction.TransactionTree): TransactionTreeV2 = {
+    val treeProto = scalapbToJava(tree)(_.companion)
+    TransactionTreeV2.fromProto(treeProto)
+  }
 
   object GetTreeUpdatesResponse {
 
@@ -626,13 +626,8 @@ object LedgerClient {
     ): GetTreeUpdatesResponse = {
       proto.update match {
         case TU.TransactionTree(tree) =>
-          // TODO(#5713) Avoid having to convert to the old Java bindings type.
-          import io.scalaland.chimney.dsl.*
-          val treeV1 = tree.into[com.daml.ledger.api.v1.transaction.TransactionTree].transform
-          val treeProto = scalapbToJava(treeV1)(_.companion)
-          val update = TransactionTreeUpdate(
-            TransactionTree.fromProto(treeProto)
-          )
+          val javaTree = lapiTreeToJavaTree(tree)
+          val update = TransactionTreeUpdate(javaTree)
           GetTreeUpdatesResponse(update, DomainId.tryFromString(tree.domainId))
 
         case TU.Reassignment(x) =>

@@ -4,7 +4,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import cats.data.OptionT
 import cats.implicits.*
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTreeV2}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
@@ -646,7 +646,7 @@ class DbMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
       } yield {
         val newAcsSize = summaryState.acsSizeDiff
         val summary = summaryState.toIngestionSummary(
-          txId = None,
+          updateId = None,
           offset = offset,
           newAcsSize = newAcsSize,
         )
@@ -681,14 +681,14 @@ class DbMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
               .signalOffsetChanged(reassignment.offset.getOffset)
             val summary =
               summaryState.toIngestionSummary(
-                txId = None,
+                updateId = None,
                 offset = reassignment.offset.getOffset,
                 newAcsSize = state.get().acsSize,
               )
             logger.debug(show"Ingested reassignment $summary")
           }
         case TransactionTreeUpdate(tree) =>
-          ingestTransactionTree(domain, tree).map { summaryState =>
+          ingestTransactionTreeV2(domain, tree).map { summaryState =>
             state
               .getAndUpdate(s =>
                 s.withUpdate(
@@ -699,7 +699,7 @@ class DbMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
               .signalOffsetChanged(tree.getOffset)
             val summary =
               summaryState.toIngestionSummary(
-                txId = Some(tree.getTransactionId),
+                updateId = Some(tree.getUpdateId),
                 offset = tree.getOffset,
                 newAcsSize = state.get().acsSize,
               )
@@ -824,9 +824,9 @@ class DbMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
       } yield summary
     }
 
-    private def ingestTransactionTree(
+    private def ingestTransactionTreeV2(
         domainId: DomainId,
-        tree: TransactionTree,
+        tree: TransactionTreeV2,
     )(implicit tc: TraceContext): Future[MutableIngestionSummary[TXE]] = {
       val summary = MutableIngestionSummary.empty[TXE]
 
@@ -897,7 +897,7 @@ class DbMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
                     )
                 ),
             ),
-            "ingestTransactionTree",
+            "ingestTransactionTreeV2",
           )
       } yield summary
     }
@@ -1371,11 +1371,11 @@ object DbMultiDomainAcsStoreNew {
     def acsSizeDiff: Int = ingestedCreatedEvents.size - ingestedArchivedEvents.size
 
     def toIngestionSummary(
-        txId: Option[String],
+        updateId: Option[String],
         offset: String,
         newAcsSize: Int,
     ): IngestionSummary[TXE] = IngestionSummary(
-      txId = txId,
+      updateId = updateId,
       offset = Some(offset),
       newAcsSize = newAcsSize,
       ingestedCreatedEvents = this.ingestedCreatedEvents.toVector,

@@ -1,12 +1,13 @@
 package com.daml.network.store
 
+import com.daml.ledger.api.v1.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord as CodegenDamlRecord}
 import com.daml.ledger.javaapi.data.{
   CreatedEvent,
   ExercisedEvent,
   Identifier,
   LedgerOffset,
-  TransactionTree,
+  TransactionTreeV2,
   TreeEvent,
   Unit as damlUnit,
   Value as damlValue,
@@ -529,9 +530,11 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       createRequests: Seq[Contract[TCid, T]],
       effectiveAt: Instant,
       createdEventSignatories: Seq[PartyId],
+      domainId: DomainId,
   ) = mkTx(
     offset,
     createRequests.map[TreeEvent](toCreatedEvent(_, createdEventSignatories)),
+    domainId,
     effectiveAt,
   )
 
@@ -580,12 +583,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         offset: String = nextOffset,
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(svcParty),
-    )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
+    )(implicit store: MultiDomainAcsStore): Future[TransactionTreeV2] = {
       val tx = mkCreateTx(
         offset,
         Seq(c),
         txEffectiveAt,
         createdEventSignatories,
+        domain,
       )
 
       store.ingestionSink
@@ -601,12 +605,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         offset: String = nextOffset,
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(svcParty),
-    )(implicit stores: Seq[MultiDomainAcsStore]): Future[TransactionTree] = {
+    )(implicit stores: Seq[MultiDomainAcsStore]): Future[TransactionTreeV2] = {
       val tx = mkCreateTx(
         offset,
         Seq(c),
         txEffectiveAt,
         createdEventSignatories,
+        domain,
       )
       val txUpdate = TransactionTreeUpdate(tx)
       // Note: runs the futures sequentially in order to get deterministic tests
@@ -623,8 +628,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     def archive[TCid <: ContractId[T], T](
         c: Contract[TCid, T],
         txEffectiveAt: Instant = defaultEffectiveAt,
-    )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
-      val tx = mkTx(nextOffset, Seq(toArchivedEvent(c)), txEffectiveAt)
+    )(implicit store: MultiDomainAcsStore): Future[TransactionTreeV2] = {
+      val tx = mkTx(nextOffset, Seq(toArchivedEvent(c)), domain, txEffectiveAt)
       store.ingestionSink
         .ingestUpdate(
           domain,
@@ -636,8 +641,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     }
 
     def ingest(
-        makeTx: String => TransactionTree
-    )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
+        makeTx: String => TransactionTreeV2
+    )(implicit store: MultiDomainAcsStore): Future[TransactionTreeV2] = {
       val tx = makeTx(nextOffset)
       store.ingestionSink
         .ingestUpdate(
@@ -650,8 +655,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     }
 
     def ingestMulti(
-        makeTx: String => TransactionTree
-    )(implicit stores: Seq[MultiDomainAcsStore]): Future[TransactionTree] = {
+        makeTx: String => TransactionTreeV2
+    )(implicit stores: Seq[MultiDomainAcsStore]): Future[TransactionTreeV2] = {
       val tx = makeTx(nextOffset)
       val txUpdate = TransactionTreeUpdate(tx)
       // Note: runs the futures sequentially in order to get deterministic tests
@@ -721,10 +726,11 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         exerciseResult: damlValue,
         offset: String = nextOffset,
         txEffectiveAt: Instant = defaultEffectiveAt,
-    )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
+    )(implicit store: MultiDomainAcsStore): Future[TransactionTreeV2] = {
       val tx = mkTx(
         offset,
         Seq(mkExercise(contract, interfaceId, choiceName, choiceArgument, exerciseResult)),
+        domain,
         txEffectiveAt,
       )
       store.ingestionSink
@@ -736,27 +742,30 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     }
   }
 
-  private def nextTransactionId(): String = java.util.UUID.randomUUID().toString.replace("-", "")
+  private def nextUpdateId(): String = java.util.UUID.randomUUID().toString.replace("-", "")
 
   protected def mkTx(
       offset: String,
       events: Seq[TreeEvent],
+      domainId: DomainId,
       effectiveAt: Instant = defaultEffectiveAt,
-  ): TransactionTree = {
-    val transactionId = nextTransactionId()
+  ): TransactionTreeV2 = {
+    val updateId = nextUpdateId()
     val eventsWithId = events.zipWithIndex.map { case (e, i) =>
-      withEventId(e, s"$transactionId:$i")
+      withEventId(e, s"$updateId:$i")
     }
     val eventsById = eventsWithId.map(e => e.getEventId -> e).toMap
     val rootEventIds = eventsWithId.map(_.getEventId)
-    new TransactionTree(
-      transactionId,
+    new TransactionTreeV2(
+      updateId,
       "",
       "",
       effectiveAt,
+      offset,
       eventsById.asJava,
       rootEventIds.asJava,
-      offset,
+      domainId.toProtoPrimitive,
+      TraceContextOuterClass.TraceContext.getDefaultInstance,
     )
   }
 
@@ -764,24 +773,27 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       offset: String,
       root: ExercisedEvent,
       children: Seq[TreeEvent],
+      domainId: DomainId,
       effectiveAt: Instant = defaultEffectiveAt,
-  ): TransactionTree = {
-    val transactionId = nextTransactionId()
+  ): TransactionTreeV2 = {
+    val updateId = nextUpdateId()
     val childrenWithId = children.zipWithIndex.map { case (e, i) =>
-      withEventId(e, s"$transactionId:${i + 1}")
+      withEventId(e, s"$updateId:${i + 1}")
     }
     val rootWithId =
-      withEventId(withChildren(root, childrenWithId.map(_.getEventId)), s"$transactionId:0")
+      withEventId(withChildren(root, childrenWithId.map(_.getEventId)), s"$updateId:0")
     val eventsById = (rootWithId +: childrenWithId).map(e => e.getEventId -> e).toMap
     val rootEventIds = Seq(rootWithId.getEventId)
-    new TransactionTree(
-      transactionId,
+    new TransactionTreeV2(
+      updateId,
       "",
       "",
       effectiveAt,
+      offset,
       eventsById.asJava,
       rootEventIds.asJava,
-      offset,
+      domainId.toProtoPrimitive,
+      TraceContextOuterClass.TraceContext.getDefaultInstance,
     )
   }
 
@@ -855,7 +867,7 @@ object StoreTest {
         tc: TraceContext
     ): Seq[(DomainId, TestTxLogEntry)] = Seq.empty
 
-    override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
+    override def tryParse(tx: TransactionTreeV2, domain: DomainId)(implicit
         tc: TraceContext
     ): Seq[TestTxLogEntry] = {
       Trees.foldTree(tx, Seq.empty[TestTxLogEntry])(

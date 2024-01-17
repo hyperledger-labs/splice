@@ -315,7 +315,7 @@ object TxLogEntry {
     val dbType: String3 = String3.tryCreate("tra")
 
     def apply(
-        tx: TransactionTree,
+        tx: TransactionTreeV2,
         event: TreeEvent,
         domainId: DomainId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
