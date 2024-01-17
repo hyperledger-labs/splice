@@ -47,7 +47,9 @@ parameters:
         redeploy-sv-runbook-cilr,
         redeploy-sv-runbook-devnet,
         backup-cidaily,
+        restore-sv-cidaily,
         backup-cidaily-testnet,
+        restore-validator-cidaily-testnet,
         publish-public-artifacts,
         auth0-user-cleanup,
         cluster-lock-reaper,
@@ -2713,7 +2715,7 @@ workflows:
         context:
           - artifactory
           - slack-context
-        workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_health_check cidaily_testnet_health_check redeploy_sv_runbook_cidaily"
+        workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_health_check cidaily_testnet_health_check redeploy_sv_runbook_cidaily backup_cidaily restore_sv_cidaily backup_cidaily_testnet restore_validator_cidaily_testnet"
     - deploy_cluster:
         name: deploy_cluster_cidaily
         <<: *main-branch-only
@@ -3134,8 +3136,8 @@ workflows:
           context:
             - artifactory
             - slack-context
-          # Only wait for sv runbook deployments, concurrent preflight checks are fine.
-          workflow_names: "redeploy_sv_runbook_cidaily"
+          # Only wait for sv runbook deployments and for backup-recovery, concurrent preflight checks are fine.
+          workflow_names: "redeploy_sv_runbook_cidaily restore_sv_cidaily"
       - cancel_if_previous_pipeline:
           <<: *notify-fail
           filters:
@@ -3167,6 +3169,17 @@ workflows:
     when:
       equal: [ healthcheck-cidaily-testnet, << pipeline.parameters.run-job >> ]
     jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for backup-recovery, concurrent preflight checks are fine.
+          workflow_names: "restore_validator_cidaily_testnet"
       - cancel_if_previous_pipeline:
           <<: *notify-fail
           filters:
@@ -3192,6 +3205,7 @@ workflows:
             - datadog
             - slack-context
           requires:
+            - wait_for_previous_pipeline
             - cancel_if_previous_pipeline
 
   cilr_health_check:
@@ -3411,6 +3425,37 @@ workflows:
           requires:
             - wait_for_previous_pipeline
 
+  restore_sv_cidaily:
+    when:
+      equal: [ restore-sv-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_health_check"
+      - restore_node:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          cluster: "cidaily"
+          # sv-3 chosen quite arbitrarily as one SV to restore from backup
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+
+  # on cidaily-testnet we have only one SV, so restoring validator1 instead
   backup_cidaily_testnet:
     when:
       equal: [ backup-cidaily-testnet, << pipeline.parameters.run-job >> ]
@@ -3432,6 +3477,35 @@ workflows:
               only:
                 - deployment/cidaily-testnet
           cluster: "cidaily-testnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+
+  restore_validator_cidaily_testnet:
+    when:
+      equal: [ restore-validator-cidaily-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_testnet_health_check"
+      - restore_node:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          cluster: "cidaily-testnet"
+          namespace_name: "validator1"
           context:
             - artifactory
             - canton-network-vpn

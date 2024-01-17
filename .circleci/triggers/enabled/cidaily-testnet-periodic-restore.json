@@ -1,0 +1,16 @@
+{
+    "name": "CIDaily-TestNet Backup",
+    "description": "Periodic backup of CIDaily-TestNet",
+    "attribution-actor": "system",
+    "parameters": {
+      "branch": "deployment/cidaily-testnet",
+      "run-job": "backup-cidaily-testnet"
+    },
+    "timetable": {
+      "per-hour": 1,
+      "hours-of-day": [2, 6, 10, 14, 18, 22],
+      "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
+      "days-of-month" : [ ],
+      "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
+    }
+}
