@@ -93,6 +93,17 @@
             - slack-context
           requires:
             - deploy_cluster
+      - restore_node:
+          <<: *main-branch-never
+          cluster: "_CLUSTERNAME_"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - backup_cluster
+            - preflight_check
       - reset_cluster:
           <<: *main-branch-never
           cluster: "_CLUSTERNAME_"
@@ -103,4 +114,4 @@
             - preflight_check
             - preflight_sv_check
             - preflight_validator_check
-            - backup_cluster
+            - restore_node

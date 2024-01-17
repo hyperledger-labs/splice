@@ -283,6 +283,18 @@ workflows:
           - slack-context
         requires:
           - deploy_cluster
+    - restore_node:
+        <<: *main-branch-only
+        cluster: "cimain"
+        namespace_name: "sv-3"
+        context:
+          - artifactory
+          - canton-network-vpn
+          - slack-context
+        requires:
+          - backup_cluster
+          - preflight_check
+
 
   deploy_cidaily_and_cidaily_testnet:
     when:

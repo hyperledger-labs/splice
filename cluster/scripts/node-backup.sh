@@ -17,8 +17,6 @@ function get_cloudsql_id() {
   local instance=$1
 
   cncluster pulumi canton-network stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*DatabaseInstance::${instance}\")) | .id"
-  # TODO(#8920): the component might actually be using a different database from that deployed in pulumi, e.g. if already recovered from backup once.
-  # Or maybe we will actually import that restored DB into pulumi?
 }
 
 ##### PVC Backup & Restore
@@ -175,8 +173,6 @@ function backup_component() {
 
   if [ "$component" == "$requested_component" ] || [ -z "$requested_component" ]; then
     if [ "$component" == "cometbft-0" ]; then
-      # TODO(#8920): replace the hard-coded "cometbft-data" with the actual pvc currently in use by the pod
-      # (it might have been changed manually, e.g. if already recovered from backup)
       backup_pvc "cometBFT" "$namespace" "global-domain-0-cometbft-cometbft-data"
     else
       backup_postgres "$component" "$namespace" "$component-pg"
@@ -193,8 +189,6 @@ function wait_for_backup() {
 
   if [ "$component" == "$requested_component" ] || [ -z "$requested_component" ]; then
     if [ "$component" == "cometbft-0" ]; then
-      # TODO(#8920): replace the hard-coded "cometbft-data" with the actual pvc currently in use by the pod
-      # (it might have been changed manually, e.g. if already recovered from backup)
       wait_for_pvc_backup "cometBFT" "$namespace" "global-domain-0-cometbft-cometbft-data"
     else
       wait_for_postgres_backup "$component" "$namespace" "$component-pg"
@@ -217,7 +211,7 @@ function main() {
   local namespace=$2
   local requested_component="${3:-}"
 
-  # TODO(#8920): support multiple domains / non-default-ID'd ones
+  # TODO(#9361): support multiple domains / non-default-ID'd ones
 
   if [ "$1" == "validator" ]; then
     _info "Backing up validator $namespace"

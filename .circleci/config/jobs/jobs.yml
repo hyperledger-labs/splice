@@ -547,3 +547,35 @@ jobs:
               cncluster wait $ns validator-app
             done
             cncluster backup_nodes $(cat tests-to-run.txt)
+
+  restore_node:
+    parameters:
+      <<: *cluster-parameter
+      namespace_name:
+        type: string
+    machine:
+      image: ubuntu-2004:2023.04.2
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    steps:
+      - checkout
+      - setup_vpn
+      - setup_nix
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Restoring node
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            cncluster restore_node --force << parameters.namespace_name >>
+
+            cncluster wait << parameters.namespace_name >> validator-app
+            case "<< parameters.namespace_name >>" in
+              "sv-1"|"sv-2"|"sv-3"|"sv-4")
+                cncluster wait << parameters.namespace_name >> scan-app
+                cncluster wait << parameters.namespace_name >> sv-app-0
+            esac

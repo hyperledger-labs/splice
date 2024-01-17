@@ -1874,6 +1874,67 @@ function subcmd_backup_nodes() {
     done
 }
 
+###
+
+subcommand_whitelist[restore_node]='Restore a full CN node from backup'
+
+function subcmd_restore_node() {
+    _cluster_must_exist
+
+    local force=""
+    POSITIONAL_ARGS=()
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --force)
+                force="--force"
+                shift
+                ;;
+            -*)
+                _error "Unknown option $1"
+                ;;
+            *)
+                POSITIONAL_ARGS+=("$1")
+                shift
+                ;;
+        esac
+    done
+    set -- "${POSITIONAL_ARGS[@]}"
+
+    node="${1-}"
+    backup_run_id="${2-}"
+
+    if [ -z "$node" ]; then
+        _error "Usage: $SCRIPTNAME restore_node <namespace_name> [<backup_run_id>]"
+    fi
+
+    if [ -z "$backup_run_id" ]; then
+        _info "No backup run_id given, looking for the latest backup"
+        # ATM, we assume the latest backup was a full one, so we take the last created volumeSnapshot,
+        # and extract the runID from its name.
+        # TODO(#9361) make this more robust
+        # TODO(#9361) this will not work for validators with CloudSQL storage (for SVs, cometBFT backup is always a pvc snapshot, so this works for SVs)
+        backup_run_id=$(kubectl get volumesnapshot -n "$node" --sort-by=.metadata.creationTimestamp -o json | jq -r '.items[-1].metadata.name' | grep -o '[^-]*$')
+        if [ "$backup_run_id" == "null" ]; then
+            _error "No volume snapshots found in namespace $node. Was this node backed up? Is it an SV, or a validator that uses k8s-hosted postgres?"
+        fi
+        _info "Found latest backup run ID: $backup_run_id"
+    fi
+
+    case "$node" in
+        sv-1|sv-2|sv-3|sv-4)
+            _info "Restoring sv node $node"
+            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$backup_run_id" cometbft-0 sequencer-0 participant-0 mediator-0 sv-app-0 scan validator
+            ;;
+        validator1|splitwell)
+            _info "Restoring validator node $node"
+            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$backup_run_id" participant validator
+            ;;
+        *)
+            _error "Unknown node $node"
+            ;;
+    esac
+}
+
 ################################
 ### Main
 ################################
