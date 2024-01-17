@@ -65,14 +65,13 @@ class SvOnboardingNamespaceProposalTrigger(
             logger.info(
               s"Proposing $svcMemberParty as member of the decentralized namespace, will wait for it to take effect."
             )
-            participantAdminConnection
-              .ensureDecentralizedNamespaceDefinitionAdditionProposalAccepted(
-                task.domain,
-                svcParty.uid.namespace,
-                svcMemberParty.uid.namespace,
-                svParty.uid.namespace.fingerprint,
-                RetryFor.Automation,
-              )
+            participantAdminConnection.ensureDecentralizedNamespaceDefinitionProposalAccepted(
+              task.domain,
+              svcParty.uid.namespace,
+              svcMemberParty.uid.namespace,
+              svParty.uid.namespace.fingerprint,
+              RetryFor.Automation,
+            )
           }
 
         // TODO(#9256): enforce the following statement during onboarding

@@ -805,7 +805,7 @@ abstract class TopologyAdminConnection(
       isProposal = false,
     )
 
-  def ensureDecentralizedNamespaceDefinitionAdditionAccepted(
+  def ensureDecentralizedNamespaceDefinitionProposalAccepted(
       domainId: DomainId,
       decentralizedNamespace: Namespace,
       newOwner: Namespace,
@@ -814,33 +814,13 @@ abstract class TopologyAdminConnection(
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[DecentralizedNamespaceDefinitionX]] =
-    ensureDecentralizedNamespaceDefinitionOwnerChangeAccepted(
+    ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
       show"Namespace $newOwner is in owners of DecentralizedNamespaceDefinition",
       domainId,
       decentralizedNamespace,
       _.incl(newOwner),
       signedBy,
       retryFor,
-      isProposal = false,
-    )
-
-  def ensureDecentralizedNamespaceDefinitionAdditionProposalAccepted(
-      domainId: DomainId,
-      decentralizedNamespace: Namespace,
-      newOwner: Namespace,
-      signedBy: Fingerprint,
-      retryFor: RetryFor,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[TopologyResult[DecentralizedNamespaceDefinitionX]] =
-    ensureDecentralizedNamespaceDefinitionOwnerChangeAccepted(
-      show"Namespace $newOwner is proposed in owners of DecentralizedNamespaceDefinition",
-      domainId,
-      decentralizedNamespace,
-      _.incl(newOwner),
-      signedBy,
-      retryFor,
-      isProposal = true,
     )
 
   def ensureDecentralizedNamespaceDefinitionRemovalProposal(
@@ -852,7 +832,7 @@ abstract class TopologyAdminConnection(
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[DecentralizedNamespaceDefinitionX]] =
-    ensureDecentralizedNamespaceDefinitionOwnerChangeAccepted(
+    ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
       show"Namespace $ownerToRemove was removed from the decentralized namespace definition",
       domainId,
       decentralizedNamespace,
@@ -868,17 +848,15 @@ abstract class TopologyAdminConnection(
           ),
       signedBy,
       retryFor,
-      isProposal = true,
     )
 
-  def ensureDecentralizedNamespaceDefinitionOwnerChangeAccepted(
+  def ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
       description: String,
       domainId: DomainId,
       decentralizedNamespace: Namespace,
       ownerChange: NonEmpty[Set[Namespace]] => NonEmpty[Set[Namespace]],
       signedBy: Fingerprint,
       retryFor: RetryFor,
-      isProposal: Boolean,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[DecentralizedNamespaceDefinitionX]] =
@@ -899,7 +877,7 @@ abstract class TopologyAdminConnection(
       },
       retryFor,
       signedBy,
-      isProposal = isProposal,
+      isProposal = true,
     )
 
   private def decentralizedNamespaceDefinitionForNamespace(

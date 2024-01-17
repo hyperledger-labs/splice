@@ -307,14 +307,13 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
                 val connection = upgradeNode.newParticipantConnection
                 for {
                   id <- connection.getId()
-                  _ <- connection.ensureDecentralizedNamespaceDefinitionOwnerChangeAccepted(
+                  _ <- connection.ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
                     "keep just sv1",
                     globalDomainId,
                     svcPartyDecentralizedNamespace,
                     _ => NonEmpty(Set, sv1Party.uid.namespace),
                     id.namespace.fingerprint,
                     RetryFor.WaitingOnInitDependency,
-                    isProposal = true,
                   )
                 } yield {}
               }
