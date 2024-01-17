@@ -128,11 +128,19 @@ class SvTimeBasedIssuanceIntegrationTest
   }
 
   "calculation of issuance per coin" in { implicit env =>
-    val latestIssueRoundOpt = getSortedIssuingRounds(
-      sv1Backend.participantClientWithAdminToken,
-      svcParty,
-    ).lastOption
-    val currentRoundNum = latestIssueRoundOpt.map(_.data.round.number.toLong).getOrElse(0L) + 1L
+    val latestIssueRound = clue("Ensure there is at least one issuing round") {
+      eventually() {
+        getSortedIssuingRounds(
+          sv1Backend.participantClientWithAdminToken,
+          svcParty,
+        ).lastOption.getOrElse {
+          logger.info("No issuing round found -- advancing rounds by one tick")
+          advanceRoundsByOneTick
+          fail("No issuing round found")
+        }
+      }
+    }
+    val currentRoundNum = latestIssueRound.data.round.number.toLong + 1L
 
     // 3 unfeatured app rewards & 3 featured app rewards & 3 validator rewards, 2 of each for round 0 and one for round 1
     // to check we sum up but only for the right round.
@@ -216,11 +224,7 @@ class SvTimeBasedIssuanceIntegrationTest
             sv1Backend.participantClientWithAdminToken,
             svcParty,
           ).lastOption.value
-          latestIssueRoundOpt.fold {
-            latestIssueRoundAfter1Tick.data.round.number shouldBe 0
-          } { latestIssueRound =>
-            latestIssueRoundAfter1Tick.data.round.number shouldBe latestIssueRound.data.round.number + 1L
-          }
+          latestIssueRoundAfter1Tick.data.round.number shouldBe currentRoundNum
         }
       },
       entries =>
