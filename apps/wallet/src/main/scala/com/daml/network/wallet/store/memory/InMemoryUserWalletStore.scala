@@ -1,15 +1,13 @@
 package com.daml.network.wallet.store.memory
 
-import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.{InMemoryCNNodeAppStore, Limit, LimitHelpers, PageLimit}
+import com.daml.network.store.{InMemoryCNNodeAppStoreWithNewHistory, Limit, LimitHelpers, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.store.TxLogStore.TransactionTreeSource
 import com.daml.network.util.Contract
-import com.daml.network.wallet.store.{UserWalletStore, UserWalletTxLogParser}
+import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -19,14 +17,10 @@ import scala.concurrent.*
 class InMemoryUserWalletStore(
     override val key: UserWalletStore.Key,
     override protected val loggerFactory: NamedLoggerFactory,
-    override protected val transactionTreeSource: TransactionTreeSource,
     override protected val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext
-) extends InMemoryCNNodeAppStore[
-      UserWalletStore.TxLogIndexRecord,
-      UserWalletStore.TxLogEntry,
-    ]
+) extends InMemoryCNNodeAppStoreWithNewHistory[TxLogEntry]
     with UserWalletStore
     with LimitHelpers {
 
@@ -104,45 +98,31 @@ class InMemoryUserWalletStore(
       limit: PageLimit,
   )(implicit
       lc: TraceContext
-  ): Future[Seq[UserWalletTxLogParser.TransactionHistoryTxLogEntry]] = {
-    def filter(txi: UserWalletTxLogParser.WalletTxLogIndexRecord) = txi match {
-      case _: UserWalletTxLogParser.TransactionHistoryTxLogIndexRecord =>
-        true
-      case _: UserWalletTxLogParser.TransferOfferStatusTxLogIndexRecord |
-          _: UserWalletTxLogParser.BuyTrafficRequestStatusTxLogIndexRecord =>
-        false
-    }
-    val indices = beginAfterEventId.fold(
-      txLog.filterTxLogIndicesByOffset(limit)(filter)
-    )(
-      txLog.filterTxLogIndicesAfterEventId(_, limit)(filter)
-    )
-    for {
-      entries <- Future.traverse(indices)(i =>
-        txLogReader.loadTxLogEntry(i.eventId, i.domainId, i.acsContractId)
+  ): Future[Seq[TxLogEntry.TransactionHistoryTxLogEntry]] =
+    Future.successful {
+      beginAfterEventId.fold(
+        multiDomainAcsStore.filterTxLogEntriesByOffset[TxLogEntry.TransactionHistoryTxLogEntry](
+          limit
+        )
+      )(
+        multiDomainAcsStore.filterTxLogEntriesAfterEventId[TxLogEntry.TransactionHistoryTxLogEntry](
+          _,
+          limit,
+        )(_.eventId)
       )
-    } yield entries.map {
-      case entry: UserWalletTxLogParser.TransactionHistoryTxLogEntry => entry
-      case _: UserWalletTxLogParser.NonTxnHistoryTxLogEntry => throw txLogIsOfWrongType()
     }
-  }
 
   override def getLatestTransferOfferEventByTrackingId(
       trackingId: String
   )(implicit
       tc: TraceContext
-  ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]]] = {
+  ): Future[QueryResult[Option[TxLogEntry.TransferOffer]]] = {
     for {
-      (offset, indexOpt) <- txLog.collectLatestTxLogIndexWithOffset {
-        case to: UserWalletTxLogParser.TransferOfferStatusTxLogIndexRecord
-            if to.trackingId == trackingId =>
-          to
+      (offset, entryOpt) <- multiDomainAcsStore.collectLatestTxLogEntryWithOffset {
+        case to: TxLogEntry.TransferOffer if to.trackingId == trackingId => to
       }
-      entry <- indexOpt.traverse(index =>
-        txLogReader.loadTxLogEntry(index.eventId, index.domainId, index.acsContractId)
-      )
-    } yield entry match {
-      case Some(offer: UserWalletTxLogParser.TxLogEntry.TransferOffer) =>
+    } yield entryOpt match {
+      case Some(offer: TxLogEntry.TransferOffer) =>
         QueryResult(offset, Some(offer))
       case None =>
         QueryResult(offset, None)
@@ -154,18 +134,13 @@ class InMemoryUserWalletStore(
       trackingId: String
   )(implicit
       tc: TraceContext
-  ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.BuyTrafficRequest]]] = {
+  ): Future[QueryResult[Option[TxLogEntry.BuyTrafficRequest]]] = {
     for {
-      (offset, indexOpt) <- txLog.collectLatestTxLogIndexWithOffset {
-        case btr: UserWalletTxLogParser.BuyTrafficRequestStatusTxLogIndexRecord
-            if btr.trackingId == trackingId =>
-          btr
+      (offset, entryOpt) <- multiDomainAcsStore.collectLatestTxLogEntryWithOffset {
+        case btr: TxLogEntry.BuyTrafficRequest if btr.trackingId == trackingId => btr
       }
-      entry <- indexOpt.traverse(index =>
-        txLogReader.loadTxLogEntry(index.eventId, index.domainId, index.acsContractId)
-      )
-    } yield entry match {
-      case Some(request: UserWalletTxLogParser.TxLogEntry.BuyTrafficRequest) =>
+    } yield entryOpt match {
+      case Some(request: TxLogEntry.BuyTrafficRequest) =>
         QueryResult(offset, Some(request))
       case None =>
         QueryResult(offset, None)

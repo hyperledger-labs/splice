@@ -9,7 +9,6 @@ import com.daml.network.store.db.AcsQueries.{
   SelectFromAcsTableWithStateResult,
   SelectFromContractStateResult,
 }
-import com.daml.network.store.db.AcsTables.TxLogStoreRowTemplate
 import com.daml.network.util.{
   AssignedContract,
   Contract,
@@ -207,53 +206,6 @@ trait AcsQueries extends AcsJdbcTypes {
           )
         },
       )
-  }
-
-  /** Same as [[selectFromAcsTableWithOffset]], but for tx log tables.
-    */
-  protected def selectFromTxLogTableWithOffset(
-      tableName: String,
-      storeId: Int,
-      where: SQLActionBuilder,
-      orderLimit: SQLActionBuilder = sql"",
-  ): SQLActionBuilder =
-    (sql"""
-       select
-         store_id,
-         last_ingested_offset,
-         entry_number,
-         event_id,
-         domain_id,
-         acs_contract_id
-       from store_descriptors sd
-           left join #$tableName
-               on sd.id = store_id
-               and """ ++ where ++ sql"""
-       where sd.id = $storeId
-       """ ++ orderLimit).toActionBuilder
-
-  case class TxLogStoreRowTemplateWithOffset(
-      offset: String,
-      row: Option[TxLogStoreRowTemplate],
-  )
-
-  object TxLogStoreRowTemplateWithOffset {
-    implicit val GetResultTxLogStoreRowTemplateWithOffset
-        : GetResult[TxLogStoreRowTemplateWithOffset] = { (pp: PositionedResult) =>
-      val storeIdFromTxLogRow = pp.<<[Option[Int]]
-      TxLogStoreRowTemplateWithOffset(
-        pp.<<,
-        storeIdFromTxLogRow.map { storeId =>
-          TxLogStoreRowTemplate(
-            storeId,
-            pp.<<,
-            pp.<<,
-            pp.<<,
-            pp.<<,
-          )
-        },
-      )
-    }
   }
 
   protected def contractFromRow[C, TCId <: ContractId[_], T](companion: C)(

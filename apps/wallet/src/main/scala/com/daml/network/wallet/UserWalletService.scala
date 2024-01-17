@@ -52,11 +52,6 @@ class UserWalletService(
       key,
       storage,
       loggerFactory,
-      // The store needs its own connection to expand tx-history entries
-      ledgerClient.readOnlyConnection(
-        this.getClass.getSimpleName,
-        loggerFactory,
-      ),
       retryProvider,
     )
 

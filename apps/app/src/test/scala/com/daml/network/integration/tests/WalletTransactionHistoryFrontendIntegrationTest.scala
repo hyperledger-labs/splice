@@ -12,7 +12,7 @@ import com.daml.network.util.{
 }
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
+import com.daml.network.wallet.store.TxLogEntry as walletLogEntry
 import org.scalatest.Assertion
 
 import java.time.Duration

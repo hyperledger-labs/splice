@@ -11,21 +11,20 @@ import com.daml.network.codegen.java.cc.{
 }
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.{
+  buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
-  buytrafficrequest as trafficRequestCodegen,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.{BaseLedgerConnection, RetryProvider}
+import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.store.MultiDomainAcsStore.*
-import com.daml.network.store.TxLogStore.TransactionTreeSource
-import com.daml.network.store.{CNNodeAppStoreWithHistory, Limit, PageLimit}
+import com.daml.network.store.{CNNodeAppStoreWithNewHistory, Limit, PageLimit, TxLogStoreNew}
 import com.daml.network.util.*
 import com.daml.network.wallet.store.UserWalletStore.*
-import com.daml.network.wallet.store.db.DbUserWalletStore
+import com.daml.network.wallet.store.db.{DbUserWalletStore, WalletTables}
 import com.daml.network.wallet.store.db.WalletTables.UserWalletAcsStoreRowData
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.data.CantonTimestamp
@@ -41,12 +40,7 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A store for serving all queries for a specific wallet end-user. */
-trait UserWalletStore
-    extends CNNodeAppStoreWithHistory[
-      UserWalletTxLogParser.WalletTxLogIndexRecord,
-      UserWalletTxLogParser.TxLogEntry,
-    ]
-    with NamedLogging {
+trait UserWalletStore extends CNNodeAppStoreWithNewHistory[TxLogEntry] with NamedLogging {
 
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
@@ -91,7 +85,7 @@ trait UserWalletStore
       trackingId: String
   )(implicit
       tc: TraceContext
-  ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.TransferOffer]]]
+  ): Future[QueryResult[Option[TxLogEntry.TransferOffer]]]
 
   def listExpiredBuyTrafficRequests: ListExpiredContracts[
     trafficRequestCodegen.BuyTrafficRequest.ContractId,
@@ -106,7 +100,7 @@ trait UserWalletStore
       trackingId: String
   )(implicit
       tc: TraceContext
-  ): Future[QueryResult[Option[UserWalletTxLogParser.TxLogEntry.BuyTrafficRequest]]]
+  ): Future[QueryResult[Option[TxLogEntry.BuyTrafficRequest]]]
 
   final def listAppPaymentRequests(
       limit: Limit = Limit.DefaultLimit
@@ -283,7 +277,7 @@ trait UserWalletStore
   def listTransactions(
       beginAfterEventId: Option[String],
       limit: PageLimit,
-  )(implicit lc: TraceContext): Future[Seq[UserWalletTxLogParser.TransactionHistoryTxLogEntry]]
+  )(implicit lc: TraceContext): Future[Seq[TxLogEntry.TransactionHistoryTxLogEntry]]
 
   def listCnsEntries(limit: Limit = Limit.DefaultLimit)(implicit tc: TraceContext): Future[
     Seq[UserWalletStore.CnsEntryWithPayData]
@@ -367,13 +361,6 @@ trait UserWalletStore
       templatesMovedByMyAutomation,
     )
 
-  override protected def txLogParser =
-    new UserWalletTxLogParser(
-      loggerFactory,
-      key.endUserParty.toProtoPrimitive,
-      key.endUserName,
-    )
-
   // For cases where `companion` can have multiple contracts, but we just need
   // an arbitrary one; prefer an Assigned contract if available but accept an
   // in-flight contract as fallback.
@@ -408,6 +395,14 @@ trait UserWalletStore
         .withDescription(s"${companion.TEMPLATE_ID.getEntityName} contract not found")
         .asRuntimeException()
     }
+
+  override lazy val txLogConfig = new TxLogStoreNew.Config[TxLogEntry] {
+    override val parser =
+      new UserWalletTxLogParser(loggerFactory, key.endUserParty, key.endUserName)
+    override def entryToRow = WalletTables.UserWalletTxLogStoreRowData.fromTxLogEntry
+    override def encodeEntry = TxLogEntry.encode
+    override def decodeEntry = TxLogEntry.decode
+  }
 }
 
 object UserWalletStore {
@@ -453,27 +448,21 @@ object UserWalletStore {
       subscriptionReference: subsCodegen.SubscriptionRequest.ContractId,
   )
 
-  type TxLogIndexRecord = UserWalletTxLogParser.WalletTxLogIndexRecord
-  type TxLogEntry = UserWalletTxLogParser.TxLogEntry
-
   def apply(
       key: Key,
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
-      connection: BaseLedgerConnection,
       retryProvider: RetryProvider,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
       close: CloseContext,
   ): UserWalletStore = {
-    val treeSource = TransactionTreeSource.LedgerConnection(key.endUserParty, connection)
     storage match {
       case _: MemoryStorage =>
         new InMemoryUserWalletStore(
           key,
           loggerFactory,
-          treeSource,
           retryProvider,
         )
       case dbStorage: DbStorage =>
@@ -481,7 +470,6 @@ object UserWalletStore {
           key,
           dbStorage,
           loggerFactory,
-          treeSource,
           retryProvider,
         )
     }

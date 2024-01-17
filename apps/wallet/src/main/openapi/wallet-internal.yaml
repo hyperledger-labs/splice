@@ -756,7 +756,6 @@ components:
         - transaction_subtype
         - event_id
         - date
-        - domain_id
       properties:
         # Note: our codegen does not support oneOf. The property transaction_type should be a discriminator for a sum type.
         # Supported transaction types:
@@ -768,10 +767,6 @@ components:
         transaction_subtype:
           $ref: "#/components/schemas/TransactionSubtype"
         event_id:
-          type: string
-        offset:
-          type: string
-        domain_id:
           type: string
         date:
           type: string

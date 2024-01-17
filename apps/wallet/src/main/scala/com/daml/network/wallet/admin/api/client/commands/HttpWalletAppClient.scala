@@ -20,7 +20,7 @@ import com.daml.network.http.v0.wallet.{
   GetSubscriptionRequestResponse,
 }
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
-import com.daml.network.wallet.store.UserWalletTxLogParser
+import com.daml.network.wallet.store.TxLogEntry
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -826,7 +826,7 @@ object HttpWalletAppClient {
       beginAfterId: Option[String],
       pageSize: Int,
   ) extends InternalBaseCommand[http.ListTransactionsResponse, Seq[
-        UserWalletTxLogParser.TxLogEntry
+        TxLogEntry.TransactionHistoryTxLogEntry
       ]] {
     override def submitRequest(
         client: Client,
@@ -843,7 +843,7 @@ object HttpWalletAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.ListTransactionsResponse.OK(response) =>
-      response.items.traverse(UserWalletTxLogParser.TxLogEntry.fromResponseItem)
+      response.items.traverse(TxLogEntry.fromResponseItem)
     }
   }
 }

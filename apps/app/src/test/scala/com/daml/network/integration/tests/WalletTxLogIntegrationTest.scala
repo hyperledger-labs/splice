@@ -10,8 +10,8 @@ import com.daml.network.store.Limit
 import com.daml.network.sv.config.InitialCnsConfig
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
-import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
-import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.TransactionSubtype
+import com.daml.network.wallet.store.TxLogEntry as walletLogEntry
+import com.daml.network.wallet.store.TxLogEntry.TransactionSubtype
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.console.CommandFailure
@@ -1382,7 +1382,7 @@ class WalletTxLogIntegrationTest
       val previousEventId = sv1WalletClient
         .listTransactions(None, Limit.MaxPageSize)
         .headOption
-        .map(_.indexRecord.eventId)
+        .map(_.eventId)
 
       val coinAmount = BigDecimal(42)
       val coin = loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(

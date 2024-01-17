@@ -5,7 +5,7 @@ import com.daml.network.console.WalletAppClientReference
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.store.Limit
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
-import com.daml.network.wallet.store.UserWalletTxLogParser
+import com.daml.network.wallet.store.TxLogEntry
 import org.scalatest.Assertion
 
 trait WalletTxLogTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTestUtil {
@@ -15,19 +15,19 @@ trait WalletTxLogTestUtil extends CNNodeTestCommon with WalletTestUtil with Time
 
   val scale = Numeric.Scale.assertFromInt(10)
 
-  type CheckTxHistoryFn = PartialFunction[UserWalletTxLogParser.TxLogEntry, Assertion]
+  type CheckTxHistoryFn = PartialFunction[TxLogEntry, Assertion]
 
   def checkTxHistory(
       wallet: WalletAppClientReference,
       expected: Seq[CheckTxHistoryFn],
       previousEventId: Option[String] = None,
-      ignore: UserWalletTxLogParser.TxLogEntry => Boolean = _ => false,
+      ignore: TxLogEntry => Boolean = _ => false,
   ): Unit = {
 
     val (actual, toCompare) = eventually() {
       val actual = wallet.listTransactions(None, pageSize = Limit.MaxPageSize)
       val toCompare = actual
-        .takeWhile(e => !previousEventId.contains(e.indexRecord.eventId))
+        .takeWhile(e => !previousEventId.contains(e.eventId))
         .filter(!ignore(_))
 
       toCompare should have length expected.size.toLong
@@ -45,12 +45,12 @@ trait WalletTxLogTestUtil extends CNNodeTestCommon with WalletTestUtil with Time
 
     clue("Paginated result should be equal to non-paginated result") {
       val paginatedResult = Iterator
-        .unfold[Seq[UserWalletTxLogParser.TxLogEntry], Option[String]](None)(beginAfterId => {
+        .unfold[Seq[TxLogEntry], Option[String]](None)(beginAfterId => {
           val page = wallet.listTransactions(beginAfterId, pageSize = 2)
           if (page.isEmpty)
             None
           else
-            Some(page -> Some(page.last.indexRecord.eventId))
+            Some(page -> Some(page.last.eventId))
         })
         .toSeq
         .flatten

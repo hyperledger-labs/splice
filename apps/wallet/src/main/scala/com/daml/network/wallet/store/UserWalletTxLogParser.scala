@@ -2,9 +2,8 @@ package com.daml.network.wallet.store
 
 import cats.{Eval, Monoid}
 import cats.syntax.foldable.*
-import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.*
-import com.daml.ledger.javaapi.data.codegen.Choice
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.CoinCreateSummary
 import com.daml.network.codegen.java.cc.coinrules.InvalidTransferReason
@@ -48,33 +47,24 @@ import com.daml.network.history.{
   Tap,
   Transfer,
 }
-import com.daml.network.http.v0.definitions as httpDef
-import com.daml.network.store.TxLogStore
-import com.daml.network.util.{Codec, ExerciseNode, ExerciseNodeCompanion}
-import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.BalanceChange.BalanceChangeTransactionSubtype
-import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.Notification.NotificationTransactionSubtype
-import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry.Transfer.TransferTransactionSubtype
+import com.daml.network.store.TxLogStoreNew
+import com.daml.network.util.ExerciseNode
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
-import java.time.{Instant, ZoneOffset}
+import java.time.Instant
 import scala.collection.immutable
 import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
 import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
-import com.daml.network.http.v0.definitions.GetTransferOfferStatusResponse
-import com.digitalasset.canton.config.CantonRequireTypes.String3
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 class UserWalletTxLogParser(
     override val loggerFactory: NamedLoggerFactory,
-    endUserParty: String,
+    endUserParty: PartyId,
     endUserName: String,
-) extends TxLogStore.Parser[
-      UserWalletTxLogParser.WalletTxLogIndexRecord,
-      UserWalletTxLogParser.TxLogEntry,
-    ]
+) extends TxLogStoreNew.Parser[TxLogEntry]
     with NamedLogging {
   import UserWalletTxLogParser.*
 
@@ -230,7 +220,6 @@ class UserWalletTxLogParser(
                     case _: CO_CompleteAcceptedTransfer =>
                       State.fromNotification(
                         tree,
-                        domainId,
                         root,
                         TxLogEntry.Notification.DirectTransferFailed,
                         details,
@@ -238,7 +227,6 @@ class UserWalletTxLogParser(
                     case _: CO_SubscriptionMakePayment =>
                       State.fromNotification(
                         tree,
-                        domainId,
                         root,
                         TxLogEntry.Notification.SubscriptionPaymentFailed,
                         details,
@@ -274,18 +262,15 @@ class UserWalletTxLogParser(
           // ------------------------------------------------------------------
 
           case WalletAppInstall_CreateTransferOffer(_) =>
-            now(State.fromCreateTransferOffer(tree, exercised, domainId))
+            now(State.fromCreateTransferOffer(tree, exercised))
 
           case TransferOffer_Accept(_) =>
-            now(State.fromTransferOfferAccept(tree, exercised, domainId))
+            now(State.fromTransferOfferAccept(tree, exercised))
 
           case TransferOffer_Reject(node) =>
             now(
               State.fromTransferOfferFailure(
                 TxLogEntry.TransferOfferStatus.Rejected,
-                tree,
-                exercised,
-                domainId,
                 node,
               )
             )
@@ -294,9 +279,6 @@ class UserWalletTxLogParser(
             now(
               State.fromTransferOfferFailure(
                 TxLogEntry.TransferOfferStatus.Withdrawn(node.argument.value.reason),
-                tree,
-                exercised,
-                domainId,
                 node,
               )
             )
@@ -305,9 +287,6 @@ class UserWalletTxLogParser(
             now(
               State.fromTransferOfferFailure(
                 TxLogEntry.TransferOfferStatus.Expired,
-                tree,
-                exercised,
-                domainId,
                 node,
               )
             )
@@ -321,7 +300,7 @@ class UserWalletTxLogParser(
             // one is from parsing the AcceptedTransferOffer_Complete itself, the others are from parsing the children
             for {
               stateFromOfferCompletion <- now(
-                State.fromTransferOfferComplete(tree, exercised, domainId, node)
+                State.fromTransferOfferComplete(tree, node)
               )
               stateFromChildren <- defer {
                 parseTrees(
@@ -336,9 +315,6 @@ class UserWalletTxLogParser(
             now(
               State.fromTransferOfferFailure(
                 TxLogEntry.TransferOfferStatus.Withdrawn(node.argument.value.reason),
-                tree,
-                exercised,
-                domainId,
                 node,
               )
             )
@@ -347,9 +323,6 @@ class UserWalletTxLogParser(
             now(
               State.fromTransferOfferFailure(
                 TxLogEntry.TransferOfferStatus.Expired,
-                tree,
-                exercised,
-                domainId,
                 node,
               )
             )
@@ -358,9 +331,6 @@ class UserWalletTxLogParser(
             now(
               State.fromTransferOfferFailure(
                 TxLogEntry.TransferOfferStatus.Withdrawn(node.argument.value.reason),
-                tree,
-                exercised,
-                domainId,
                 node,
               )
             )
@@ -370,14 +340,14 @@ class UserWalletTxLogParser(
           // ------------------------------------------------------------------
 
           case WalletAppInstall_CreateBuyTrafficRequest(_) =>
-            now(State.fromCreateBuyTrafficRequest(tree, exercised, domainId))
+            now(State.fromCreateBuyTrafficRequest(tree, exercised))
 
           case BuyTrafficRequest_Complete(node) =>
             // this creates different entries with different event ids:
             // one is from parsing the BuyTrafficRequest_Complete itself, the others are from parsing the children
             for {
               stateFromRequestCompletion <- now(
-                State.fromBuyTrafficRequestComplete(tree, exercised, domainId, node)
+                State.fromBuyTrafficRequestComplete(tree, node)
               )
               stateFromChildren <- defer {
                 parseTrees(
@@ -392,9 +362,6 @@ class UserWalletTxLogParser(
             now(
               State.fromBuyTrafficRequestFailure(
                 TxLogEntry.BuyTrafficRequestStatus.Rejected(node.argument.value.reason),
-                tree,
-                exercised,
-                domainId,
                 node,
               )
             )
@@ -403,9 +370,6 @@ class UserWalletTxLogParser(
             now(
               State.fromBuyTrafficRequestFailure(
                 TxLogEntry.BuyTrafficRequestStatus.Expired,
-                tree,
-                exercised,
-                domainId,
                 node,
               )
             )
@@ -439,7 +403,6 @@ class UserWalletTxLogParser(
               State.fromCoinCreateSummary(
                 tree,
                 root,
-                domainId,
                 node.result.value,
                 TxLogEntry.BalanceChange.AppPaymentRejected,
               )
@@ -450,7 +413,6 @@ class UserWalletTxLogParser(
               State.fromCoinCreateSummary(
                 tree,
                 root,
-                domainId,
                 node.result.value,
                 TxLogEntry.BalanceChange.AppPaymentExpired,
               )
@@ -489,7 +451,6 @@ class UserWalletTxLogParser(
               State.fromCoinCreateSummary(
                 tree,
                 root,
-                domainId,
                 node.result.value,
                 TxLogEntry.BalanceChange.SubscriptionInitialPaymentRejected,
               )
@@ -500,7 +461,6 @@ class UserWalletTxLogParser(
               State.fromCoinCreateSummary(
                 tree,
                 root,
-                domainId,
                 node.result.value,
                 TxLogEntry.BalanceChange.SubscriptionInitialPaymentExpired,
               )
@@ -520,7 +480,6 @@ class UserWalletTxLogParser(
             now(
               State.fromNotification(
                 tree,
-                domainId,
                 exercised,
                 TxLogEntry.Notification.SubscriptionExpired,
                 s"Expired by ${node.argument.value.actor} because the last subscription payment was missed",
@@ -544,7 +503,6 @@ class UserWalletTxLogParser(
               State.fromCoinCreateSummary(
                 tree,
                 root,
-                domainId,
                 node.result.value._2,
                 TxLogEntry.BalanceChange.SubscriptionPaymentRejected,
               )
@@ -555,7 +513,6 @@ class UserWalletTxLogParser(
               State.fromCoinCreateSummary(
                 tree,
                 root,
-                domainId,
                 node.result.value._2,
                 TxLogEntry.BalanceChange.SubscriptionPaymentExpired,
               )
@@ -567,7 +524,7 @@ class UserWalletTxLogParser(
 
           case Transfer(node) =>
             // Note: we do not parse the child events, as we can extract all information about the transfer from this node
-            now(State.fromTransfer(tree, root, domainId, node, TxLogEntry.Transfer.Transfer))
+            now(State.fromTransfer(tree, root, node, TxLogEntry.Transfer.Transfer))
 
           // ------------------------------------------------------------------
           // Minting new coins
@@ -578,7 +535,6 @@ class UserWalletTxLogParser(
               State.fromCoinCreateSummary(
                 tree,
                 root,
-                domainId,
                 node.result.value,
                 TxLogEntry.BalanceChange.Tap,
               )
@@ -589,7 +545,6 @@ class UserWalletTxLogParser(
               State.fromCoinCreateSummary(
                 tree,
                 root,
-                domainId,
                 node.result.value,
                 TxLogEntry.BalanceChange.SvRewardCollected,
               )
@@ -600,7 +555,6 @@ class UserWalletTxLogParser(
               State.fromCoinCreateSummary(
                 tree,
                 root,
-                domainId,
                 node.result.value,
                 TxLogEntry.BalanceChange.Mint,
               )
@@ -611,7 +565,6 @@ class UserWalletTxLogParser(
               State.fromCoinCreateSummary(
                 tree,
                 root,
-                domainId,
                 node.result.value,
                 // We show imports as minted coins.
                 TxLogEntry.BalanceChange.Mint,
@@ -627,7 +580,6 @@ class UserWalletTxLogParser(
               State.fromCoinCreateSummary(
                 tree,
                 root,
-                domainId,
                 node.result.value,
                 TxLogEntry.BalanceChange.LockedCoinUnlocked,
               )
@@ -638,7 +590,6 @@ class UserWalletTxLogParser(
               State.fromCoinCreateSummary(
                 tree,
                 root,
-                domainId,
                 node.result.value,
                 TxLogEntry.BalanceChange.LockedCoinOwnerExpired,
               )
@@ -653,7 +604,6 @@ class UserWalletTxLogParser(
               State.fromCoinExpire(
                 tree,
                 exercised,
-                domainId,
                 node.result.value.owner,
                 TxLogEntry.BalanceChange.CoinExpired,
               )
@@ -664,7 +614,6 @@ class UserWalletTxLogParser(
               State.fromCoinExpire(
                 tree,
                 exercised,
-                domainId,
                 node.result.value.owner,
                 TxLogEntry.BalanceChange.LockedCoinExpired,
               )
@@ -675,7 +624,7 @@ class UserWalletTxLogParser(
           // ------------------------------------------------------------------
 
           case CoinRules_BuyMemberTraffic(node) =>
-            now(State.fromBuyMemberTraffic(node, tree, exercised, domainId))
+            now(State.fromBuyMemberTraffic(node, tree, exercised))
 
           // ------------------------------------------------------------------
           // Canton name service subscription payment collection
@@ -742,7 +691,7 @@ class UserWalletTxLogParser(
       incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
   )(implicit
       tc: TraceContext
-  ): Seq[(DomainId, TxLogEntry)] = {
+  ): Seq[(DomainId, Option[ContractId[?]], TxLogEntry)] = {
     // Note: entries may appear in a random order, but it's unlikely that a user has many coins,
     // due to the wallet automation automatically merging coins.
     acs.collect(ac => ac.createdEvent match { case CoinCreate(c) => State.fromAcsCoin(ac, c) })
@@ -757,17 +706,13 @@ class UserWalletTxLogParser(
   }
 
   override def error(offset: String, eventId: String, domainId: DomainId): Option[TxLogEntry] =
-    Some(
-      TxLogEntry.Unknown(
-        TransactionHistoryTxLogIndexRecord(Some(offset), eventId, domainId, None)
-      )
-    )
+    Some(TxLogEntry.Unknown(eventId))
 
   private def fromCnsEntryPaymentCollection(
       tree: TransactionTreeV2,
       exercised: ExercisedEvent,
       domainId: DomainId,
-      transactionSubtype: TransferTransactionSubtype,
+      transactionSubtype: TxLogEntry.Transfer.TransferTransactionSubtype,
   )(implicit tc: TraceContext): Eval[State] = {
     import Eval.defer
     // first child event is the subscription payment collected by SVC
@@ -784,7 +729,6 @@ class UserWalletTxLogParser(
         State.fromCollectEntryPayment(
           tree,
           exercised,
-          domainId,
           stateFromPaymentCollection,
           transactionSubtype,
         )
@@ -794,572 +738,6 @@ class UserWalletTxLogParser(
 }
 
 object UserWalletTxLogParser {
-  // Note: the UI currently doesn't support any kind of filtering,
-  // there's no need to add any data to the index.
-  sealed trait WalletTxLogIndexRecord extends TxLogStore.IndexRecord {
-    val companion: WalletTxLogIndexRecordCompanion
-    def txLogId: String3 = companion.txLogId
-  }
-
-  trait WalletTxLogIndexRecordCompanion {
-    val txLogId: String3
-  }
-
-  final case class TransactionHistoryTxLogIndexRecord(
-      optOffset: Option[String],
-      eventId: String,
-      domainId: DomainId,
-      acsContractId: Option[codegen.ContractId[?]],
-  ) extends WalletTxLogIndexRecord {
-    override val companion: WalletTxLogIndexRecordCompanion = TransactionHistoryTxLogIndexRecord
-  }
-
-  object TransactionHistoryTxLogIndexRecord extends WalletTxLogIndexRecordCompanion {
-    override val txLogId: String3 = String3.tryCreate("txh")
-  }
-
-  final case class TransferOfferStatusTxLogIndexRecord(
-      optOffset: Option[String],
-      eventId: String,
-      domainId: DomainId,
-      acsContractId: Option[codegen.ContractId[?]],
-      trackingId: String,
-  ) extends WalletTxLogIndexRecord {
-    override val companion: WalletTxLogIndexRecordCompanion = TransferOfferStatusTxLogIndexRecord
-  }
-
-  object TransferOfferStatusTxLogIndexRecord extends WalletTxLogIndexRecordCompanion {
-    override val txLogId: String3 = String3.tryCreate("tos")
-  }
-
-  final case class BuyTrafficRequestStatusTxLogIndexRecord(
-      optOffset: Option[String],
-      eventId: String,
-      domainId: DomainId,
-      acsContractId: Option[codegen.ContractId[?]],
-      trackingId: String,
-  ) extends WalletTxLogIndexRecord {
-    override val companion: WalletTxLogIndexRecordCompanion =
-      BuyTrafficRequestStatusTxLogIndexRecord
-  }
-
-  object BuyTrafficRequestStatusTxLogIndexRecord extends WalletTxLogIndexRecordCompanion {
-    override val txLogId: String3 = String3.tryCreate("btr")
-  }
-
-  sealed trait TxLogEntry extends TxLogStore.Entry[WalletTxLogIndexRecord] {
-    def setEventId(eventId: String): TxLogEntry
-  }
-  sealed trait TransactionHistoryTxLogEntry extends TxLogEntry {
-    def toResponseItem: httpDef.ListTransactionsResponseItem
-  }
-  // base trait for tx log entries that are not listed in the tx history
-  sealed trait NonTxnHistoryTxLogEntry extends TxLogEntry
-  sealed trait TransferOfferTxLogEntry extends NonTxnHistoryTxLogEntry
-  sealed trait BuyTrafficRequestTxLogEntry extends NonTxnHistoryTxLogEntry
-
-  object TxLogEntry {
-
-    sealed abstract class TransactionSubtype(
-        val companion: ExerciseNodeCompanion,
-        coinOperation: Option[String],
-    ) {
-      val templateId: Identifier = companion.template.TEMPLATE_ID
-      val choice: Choice[companion.Tpl, companion.Arg, companion.Res] = companion.choice
-
-      def toResponseItem: httpDef.TransactionSubtype = httpDef.TransactionSubtype(
-        templateId =
-          s"${templateId.getPackageId}:${templateId.getModuleName}:${templateId.getEntityName}",
-        choice = choice.name,
-        coinOperation = coinOperation,
-      )
-    }
-
-    /* Unknown event, caused the parser failing to parse a transaction tree */
-    final case class Unknown(
-        indexRecord: TransactionHistoryTxLogIndexRecord
-    ) extends TransactionHistoryTxLogEntry {
-      override def toResponseItem: httpDef.ListTransactionsResponseItem =
-        httpDef.ListTransactionsResponseItem(
-          transactionType = Unknown.TransactionType,
-          transactionSubtype = httpDef.TransactionSubtype("unknown", "unknown"),
-          eventId = indexRecord.eventId,
-          offset = indexRecord.optOffset,
-          domainId = indexRecord.domainId.toProtoPrimitive,
-          date = java.time.OffsetDateTime.ofInstant(Instant.now(), ZoneOffset.UTC),
-        )
-
-      override def setEventId(eventId: String): TxLogEntry = {
-        copy(indexRecord = indexRecord.copy(eventId = eventId))
-      }
-    }
-    object Unknown {
-      val TransactionType = "unknown"
-    }
-
-    sealed trait TransferOfferStatus {
-      def toStatusResponse: httpDef.GetTransferOfferStatusResponse
-    }
-    object TransferOfferStatus {
-      case class Created(
-          contractId: transferCodegen.TransferOffer.ContractId,
-          transactionId: String,
-      ) extends TransferOfferStatus {
-        override def toStatusResponse: GetTransferOfferStatusResponse =
-          httpDef.GetTransferOfferStatusResponse(
-            status = httpDef.GetTransferOfferStatusResponse.Status.Created,
-            transactionId = Some(transactionId),
-            contractId = Some(contractId.contractId),
-          )
-      }
-      case class Accepted(
-          contractId: transferCodegen.AcceptedTransferOffer.ContractId,
-          transactionId: String,
-      ) extends TransferOfferStatus {
-        override def toStatusResponse: GetTransferOfferStatusResponse =
-          httpDef.GetTransferOfferStatusResponse(
-            status = httpDef.GetTransferOfferStatusResponse.Status.Accepted,
-            transactionId = Some(transactionId),
-            contractId = Some(contractId.contractId),
-          )
-      }
-      case class Completed(
-          contractId: cc.coin.Coin.ContractId,
-          transactionId: String,
-      ) extends TransferOfferStatus {
-        override def toStatusResponse: GetTransferOfferStatusResponse =
-          httpDef.GetTransferOfferStatusResponse(
-            status = httpDef.GetTransferOfferStatusResponse.Status.Completed,
-            transactionId = Some(transactionId),
-            contractId = Some(contractId.contractId),
-          )
-      }
-      sealed trait Failed extends TransferOfferStatus
-      case object Rejected extends Failed {
-        override def toStatusResponse: GetTransferOfferStatusResponse =
-          httpDef.GetTransferOfferStatusResponse(
-            status = httpDef.GetTransferOfferStatusResponse.Status.Failed,
-            failureKind = Some(httpDef.GetTransferOfferStatusResponse.FailureKind.Rejected),
-          )
-      }
-      case class Withdrawn(reason: String) extends Failed {
-        override def toStatusResponse: GetTransferOfferStatusResponse =
-          httpDef.GetTransferOfferStatusResponse(
-            status = httpDef.GetTransferOfferStatusResponse.Status.Failed,
-            failureKind = Some(httpDef.GetTransferOfferStatusResponse.FailureKind.Withdrawn),
-            withdrawnReason = Some(reason),
-          )
-      }
-      case object Expired extends Failed {
-        override def toStatusResponse: GetTransferOfferStatusResponse =
-          httpDef.GetTransferOfferStatusResponse(
-            status = httpDef.GetTransferOfferStatusResponse.Status.Failed,
-            failureKind = Some(httpDef.GetTransferOfferStatusResponse.FailureKind.Expired),
-          )
-      }
-
-    }
-    final case class TransferOffer(
-        indexRecord: TransferOfferStatusTxLogIndexRecord,
-        status: TransferOfferStatus,
-        sender: String,
-        receiver: String,
-    ) extends TransferOfferTxLogEntry {
-      override def setEventId(eventId: String): TxLogEntry =
-        copy(indexRecord = indexRecord.copy(eventId = eventId))
-    }
-
-    sealed trait BuyTrafficRequestStatus {
-      def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse
-    }
-    object BuyTrafficRequestStatus {
-      case object Created extends BuyTrafficRequestStatus {
-        override def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse =
-          httpDef.GetBuyTrafficRequestStatusResponse(
-            status = httpDef.GetBuyTrafficRequestStatusResponse.Status.Created
-          )
-      }
-      case class Completed(
-          transactionId: String
-      ) extends BuyTrafficRequestStatus {
-        override def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse =
-          httpDef.GetBuyTrafficRequestStatusResponse(
-            status = httpDef.GetBuyTrafficRequestStatusResponse.Status.Completed,
-            transactionId = Some(transactionId),
-          )
-      }
-      sealed trait Failed extends BuyTrafficRequestStatus
-      case class Rejected(reason: String) extends Failed {
-        override def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse =
-          httpDef.GetBuyTrafficRequestStatusResponse(
-            status = httpDef.GetBuyTrafficRequestStatusResponse.Status.Failed,
-            failureReason = Some(httpDef.GetBuyTrafficRequestStatusResponse.FailureReason.Rejected),
-            rejectionReason = Some(reason),
-          )
-      }
-      case object Expired extends Failed {
-        override def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse =
-          httpDef.GetBuyTrafficRequestStatusResponse(
-            status = httpDef.GetBuyTrafficRequestStatusResponse.Status.Failed,
-            failureReason = Some(httpDef.GetBuyTrafficRequestStatusResponse.FailureReason.Expired),
-          )
-      }
-    }
-
-    final case class BuyTrafficRequest(
-        indexRecord: BuyTrafficRequestStatusTxLogIndexRecord,
-        status: BuyTrafficRequestStatus,
-        buyer: String,
-    ) extends BuyTrafficRequestTxLogEntry {
-      override def setEventId(eventId: String): TxLogEntry =
-        copy(indexRecord = indexRecord.copy(eventId = eventId))
-    }
-
-    /** Balance change due to a transfer */
-    final case class Transfer(
-        indexRecord: TransactionHistoryTxLogIndexRecord,
-        transactionSubtype: TransferTransactionSubtype,
-        date: Instant,
-        provider: String,
-        sender: (String, BigDecimal),
-        receivers: Seq[(String, BigDecimal)],
-        senderHoldingFees: BigDecimal,
-        coinPrice: BigDecimal,
-        appRewardsUsed: BigDecimal,
-        validatorRewardsUsed: BigDecimal,
-    ) extends TransactionHistoryTxLogEntry {
-      override def toResponseItem: httpDef.ListTransactionsResponseItem =
-        httpDef.ListTransactionsResponseItem(
-          transactionType = Transfer.TransactionType,
-          transactionSubtype = transactionSubtype.toResponseItem,
-          eventId = indexRecord.eventId,
-          offset = indexRecord.optOffset,
-          domainId = indexRecord.domainId.toProtoPrimitive,
-          date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
-          provider = Some(provider),
-          sender = Some(httpDef.PartyAndAmount(sender._1, Codec.encode(sender._2))),
-          receivers =
-            Some(receivers.map(r => httpDef.PartyAndAmount(r._1, Codec.encode(r._2))).toVector),
-          holdingFees = Some(Codec.encode(senderHoldingFees)),
-          coinPrice = Some(Codec.encode(coinPrice)),
-          appRewardsUsed = Some(Codec.encode(appRewardsUsed)),
-          validatorRewardsUsed = Some(Codec.encode(validatorRewardsUsed)),
-        )
-
-      override def setEventId(eventId: String): TxLogEntry = {
-        copy(indexRecord = indexRecord.copy(eventId = eventId))
-      }
-    }
-    object Transfer {
-      val TransactionType = "transfer"
-      sealed abstract class TransferTransactionSubtype(
-          companion: ExerciseNodeCompanion
-      ) extends TransactionSubtype(companion, None)
-
-      object TransferTransactionSubtype {
-        val values: Map[String, TransferTransactionSubtype] = Set[TransferTransactionSubtype](
-          P2PPaymentCompleted,
-          AppPaymentAccepted,
-          AppPaymentCollected,
-          SubscriptionInitialPaymentAccepted,
-          SubscriptionInitialPaymentCollected,
-          SubscriptionPaymentAccepted,
-          SubscriptionPaymentCollected,
-          WalletAutomation,
-          ExtraTrafficPurchase,
-          InitialEntryPaymentCollection,
-          EntryRenewalPaymentCollection,
-          Transfer,
-        ).map(txSubtype => txSubtype.choice.name -> txSubtype).toMap
-
-        def find(choiceName: String): Option[TransferTransactionSubtype] =
-          values.get(choiceName)
-      }
-      case object P2PPaymentCompleted
-          extends TransferTransactionSubtype(AcceptedTransferOffer_Complete)
-      case object AppPaymentAccepted extends TransferTransactionSubtype(AppPaymentRequest_Accept)
-      case object AppPaymentCollected extends TransferTransactionSubtype(AcceptedAppPayment_Collect)
-      case object SubscriptionInitialPaymentAccepted
-          extends TransferTransactionSubtype(SubscriptionRequest_AcceptAndMakePayment)
-      case object SubscriptionInitialPaymentCollected
-          extends TransferTransactionSubtype(SubscriptionInitialPayment_Collect)
-      case object SubscriptionPaymentAccepted
-          extends TransferTransactionSubtype(SubscriptionIdleState_MakePayment)
-      case object SubscriptionPaymentCollected
-          extends TransferTransactionSubtype(SubscriptionPayment_Collect)
-      case object WalletAutomation extends TransferTransactionSubtype(WalletAppInstall_ExecuteBatch)
-      case object ExtraTrafficPurchase
-          extends TransferTransactionSubtype(CoinRules_BuyMemberTraffic)
-      case object InitialEntryPaymentCollection
-          extends TransferTransactionSubtype(CnsRules_CollectInitialEntryPayment)
-      case object EntryRenewalPaymentCollection
-          extends TransferTransactionSubtype(CnsRules_CollectEntryRenewalPayment)
-      case object Transfer extends TransferTransactionSubtype(com.daml.network.history.Transfer)
-    }
-
-    /** Balance change not due to a transfer, for example a tap or returning a locked coin to the owner. */
-    final case class BalanceChange(
-        indexRecord: TransactionHistoryTxLogIndexRecord,
-        transactionSubtype: BalanceChangeTransactionSubtype,
-        date: Instant,
-        receiver: String,
-        amount: BigDecimal,
-        coinPrice: BigDecimal,
-    ) extends TransactionHistoryTxLogEntry {
-      override def toResponseItem: httpDef.ListTransactionsResponseItem =
-        httpDef.ListTransactionsResponseItem(
-          transactionType = BalanceChange.TransactionType,
-          transactionSubtype = transactionSubtype.toResponseItem,
-          eventId = indexRecord.eventId,
-          offset = indexRecord.optOffset,
-          domainId = indexRecord.domainId.toProtoPrimitive,
-          date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
-          provider = None,
-          sender = None,
-          receivers = Some(Vector(httpDef.PartyAndAmount(receiver, Codec.encode(amount)))),
-          holdingFees = None,
-          coinPrice = Some(Codec.encode(coinPrice)),
-        )
-
-      override def setEventId(eventId: String): TxLogEntry = {
-        copy(indexRecord = indexRecord.copy(eventId = eventId))
-      }
-    }
-
-    object BalanceChange {
-      val TransactionType = "balance_change"
-
-      sealed abstract class BalanceChangeTransactionSubtype(companion: ExerciseNodeCompanion)
-          extends TransactionSubtype(companion, None)
-
-      object BalanceChangeTransactionSubtype {
-        val values: Map[String, BalanceChangeTransactionSubtype] =
-          Set[BalanceChangeTransactionSubtype](
-            Tap,
-            Mint,
-            SvRewardCollected,
-            AppPaymentRejected,
-            AppPaymentExpired,
-            SubscriptionInitialPaymentRejected,
-            SubscriptionInitialPaymentExpired,
-            SubscriptionPaymentRejected,
-            SubscriptionPaymentExpired,
-            LockedCoinUnlocked,
-            LockedCoinOwnerExpired,
-            LockedCoinExpired,
-            CoinExpired,
-          ).map(txSubtype => txSubtype.choice.name -> txSubtype).toMap
-
-        def find(choiceName: String): Option[BalanceChangeTransactionSubtype] =
-          values.get(choiceName)
-      }
-      case object Tap extends BalanceChangeTransactionSubtype(com.daml.network.history.Tap)
-      case object Mint extends BalanceChangeTransactionSubtype(com.daml.network.history.Mint)
-      case object SvRewardCollected
-          extends BalanceChangeTransactionSubtype(SvcRules_CollectSvReward)
-      case object AppPaymentRejected
-          extends BalanceChangeTransactionSubtype(AcceptedAppPayment_Reject)
-      case object AppPaymentExpired
-          extends BalanceChangeTransactionSubtype(AcceptedAppPayment_Expire)
-      case object SubscriptionInitialPaymentRejected
-          extends BalanceChangeTransactionSubtype(SubscriptionInitialPayment_Reject)
-      case object SubscriptionInitialPaymentExpired
-          extends BalanceChangeTransactionSubtype(SubscriptionInitialPayment_Expire)
-      case object SubscriptionPaymentRejected
-          extends BalanceChangeTransactionSubtype(SubscriptionPayment_Reject)
-      case object SubscriptionPaymentExpired
-          extends BalanceChangeTransactionSubtype(SubscriptionPayment_Expire)
-      case object LockedCoinUnlocked extends BalanceChangeTransactionSubtype(LockedCoinUnlock)
-      case object LockedCoinOwnerExpired
-          extends BalanceChangeTransactionSubtype(LockedCoinOwnerExpireLock)
-      case object LockedCoinExpired extends BalanceChangeTransactionSubtype(LockedCoinExpireCoin)
-      case object CoinExpired extends BalanceChangeTransactionSubtype(CoinExpire)
-    }
-
-    /** An event that does not change anyone's coin balance. */
-    final case class Notification(
-        indexRecord: TransactionHistoryTxLogIndexRecord,
-        transactionSubtype: NotificationTransactionSubtype,
-        date: Instant,
-        details: String,
-    ) extends TransactionHistoryTxLogEntry {
-      override def toResponseItem: httpDef.ListTransactionsResponseItem =
-        httpDef.ListTransactionsResponseItem(
-          transactionType = Notification.TransactionType,
-          transactionSubtype = transactionSubtype.toResponseItem,
-          eventId = indexRecord.eventId,
-          offset = indexRecord.optOffset,
-          domainId = indexRecord.domainId.toProtoPrimitive,
-          date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
-          details = Some(details),
-        )
-
-      override def setEventId(eventId: String): TxLogEntry = {
-        copy(indexRecord = indexRecord.copy(eventId = eventId))
-      }
-    }
-
-    object Notification {
-      val TransactionType = "notification"
-
-      /** @param coinOperation the constructor name of the CoinOperation. Only relevant for WalletAppInstall_ExecuteBatch
-        */
-      sealed abstract class NotificationTransactionSubtype(
-          companion: ExerciseNodeCompanion,
-          val coinOperation: Option[String],
-      ) extends TransactionSubtype(companion, coinOperation)
-      object NotificationTransactionSubtype {
-        val values: Map[(String, Option[String]), NotificationTransactionSubtype] =
-          Set[NotificationTransactionSubtype](
-            DirectTransferFailed,
-            SubscriptionPaymentFailed,
-            SubscriptionExpired,
-          ).map(txSubtype =>
-            (
-              txSubtype.choice.name,
-              txSubtype.coinOperation,
-            ) -> txSubtype
-          ).toMap
-        def find(
-            choiceName: String,
-            coinOperationConstructor: Option[String],
-        ): Option[NotificationTransactionSubtype] =
-          values.get((choiceName, coinOperationConstructor))
-      }
-      case object DirectTransferFailed
-          extends NotificationTransactionSubtype(
-            WalletAppInstall_ExecuteBatch,
-            Some("CO_CompleteAcceptedTransfer"),
-          )
-      case object SubscriptionPaymentFailed
-          extends NotificationTransactionSubtype(
-            WalletAppInstall_ExecuteBatch,
-            Some("CO_SubscriptionMakePayment"),
-          )
-      case object SubscriptionExpired
-          extends NotificationTransactionSubtype(SubscriptionIdleState_ExpireSubscription, None)
-    }
-
-    private def transferFromResponseItem(
-        item: httpDef.ListTransactionsResponseItem
-    ): Either[String, TxLogEntry.Transfer] = {
-      val indexRecord = TransactionHistoryTxLogIndexRecord(
-        optOffset = item.offset,
-        eventId = item.eventId,
-        domainId = DomainId.tryFromString(item.domainId),
-        acsContractId = None,
-      )
-      for {
-        transactionSubtype <- TransferTransactionSubtype
-          .find(item.transactionSubtype.choice)
-          .toRight("TransactionSubtype not found")
-        provider <- item.provider.toRight("Provider missing")
-        sender <- item.sender.toRight("Sender missing")
-        senderAmount <- Codec.decode(Codec.BigDecimal)(sender.amount)
-        receivers <- item.receivers.toRight("Receivers missing")
-        receivers <- receivers.traverse(r =>
-          Codec.decode(Codec.BigDecimal)(r.amount).map(amount => r.party -> amount)
-        )
-        holdingFees <- item.holdingFees.toRight("Holding fees missing")
-        senderHoldingFees <- Codec.decode(Codec.BigDecimal)(holdingFees)
-        coinPriceStr <- item.coinPrice.toRight("Coin price missing")
-        coinPrice <- Codec.decode(Codec.BigDecimal)(coinPriceStr)
-        appRewardsUsedStr <- item.appRewardsUsed.toRight("App rewards missing")
-        appRewardsUsed <- Codec.decode(Codec.BigDecimal)(appRewardsUsedStr)
-        validatorRewardsUsedStr <- item.validatorRewardsUsed.toRight("Validator rewards missing")
-        validatorRewardsUsed <- Codec.decode(Codec.BigDecimal)(validatorRewardsUsedStr)
-      } yield TxLogEntry.Transfer(
-        indexRecord = indexRecord,
-        transactionSubtype = transactionSubtype,
-        date = item.date.toInstant,
-        provider = provider,
-        sender = sender.party -> senderAmount,
-        receivers = receivers,
-        senderHoldingFees = senderHoldingFees,
-        coinPrice = coinPrice,
-        appRewardsUsed = appRewardsUsed,
-        validatorRewardsUsed = validatorRewardsUsed,
-      )
-    }
-
-    private def balanceChangeFromResponseItem(
-        item: httpDef.ListTransactionsResponseItem
-    ): Either[String, TxLogEntry.BalanceChange] = {
-      val indexRecord = TransactionHistoryTxLogIndexRecord(
-        optOffset = item.offset,
-        eventId = item.eventId,
-        domainId = DomainId.tryFromString(item.domainId),
-        acsContractId = None,
-      )
-      for {
-        transactionSubtype <- BalanceChangeTransactionSubtype
-          .find(item.transactionSubtype.choice)
-          .toRight("TransactionSubtype not found")
-        receiverAndAmount <- item.receivers.flatMap(_.headOption).toRight("No receivers")
-        coinPriceStr <- item.coinPrice.toRight("Coin price missing")
-        coinPrice <- Codec.decode(Codec.BigDecimal)(coinPriceStr)
-      } yield TxLogEntry.BalanceChange(
-        transactionSubtype = transactionSubtype,
-        indexRecord = indexRecord,
-        date = item.date.toInstant,
-        receiver = receiverAndAmount.party,
-        amount = Codec.tryDecode(Codec.BigDecimal)(receiverAndAmount.amount),
-        coinPrice = coinPrice,
-      )
-    }
-
-    private def notificationFromResponseItem(
-        item: httpDef.ListTransactionsResponseItem
-    ): Either[String, TxLogEntry.Notification] = {
-      val indexRecord = TransactionHistoryTxLogIndexRecord(
-        optOffset = item.offset,
-        eventId = item.eventId,
-        domainId = DomainId.tryFromString(item.domainId),
-        acsContractId = None,
-      )
-      for {
-        transactionSubtype <- NotificationTransactionSubtype
-          .find(item.transactionSubtype.choice, item.transactionSubtype.coinOperation)
-          .toRight("TransactionSubtype not found")
-        details <- item.details.toRight("Details missing")
-      } yield TxLogEntry.Notification(
-        transactionSubtype = transactionSubtype,
-        indexRecord = indexRecord,
-        date = item.date.toInstant,
-        details = details,
-      )
-    }
-
-    private def unknownFromResponseItem(
-        item: httpDef.ListTransactionsResponseItem
-    ): Either[String, TxLogEntry.Unknown] = {
-      val indexRecord = TransactionHistoryTxLogIndexRecord(
-        optOffset = item.offset,
-        eventId = item.eventId,
-        domainId = DomainId.tryFromString(item.domainId),
-        acsContractId = None,
-      )
-      Right(
-        TxLogEntry.Unknown(
-          indexRecord = indexRecord
-        )
-      )
-    }
-
-    // Note: deserialization is only needed for the Canton console
-    def fromResponseItem(
-        item: httpDef.ListTransactionsResponseItem
-    ): Either[String, TxLogEntry] = {
-      item.transactionType match {
-        case TxLogEntry.Transfer.TransactionType => transferFromResponseItem(item)
-        case TxLogEntry.BalanceChange.TransactionType =>
-          balanceChangeFromResponseItem(item)
-        case TxLogEntry.Notification.TransactionType => notificationFromResponseItem(item)
-        case TxLogEntry.Unknown.TransactionType => unknownFromResponseItem(item)
-        case _ => Left(s"Unknown item $item")
-      }
-    }
-  }
 
   /** Intermediate state for parsing TransactionTrees into TxLogStore entries.
     *
@@ -1368,25 +746,32 @@ object UserWalletTxLogParser {
   case class State(
       entries: immutable.Queue[TxLogEntry]
   ) {
+
     def appended(other: State): State = State(
       entries = entries.appendedAll(other.entries)
     )
 
     /** Removes all entries that are not relevant to the given user. */
-    def filterByParty(party: String): State = State(
-      entries = entries.filter {
-        case t: TxLogEntry.Transfer => t.sender._1 == party || t.receivers.exists(_._1 == party)
-        case to: TxLogEntry.TransferOffer => to.sender == party || to.receiver == party
-        case btr: TxLogEntry.BuyTrafficRequest => btr.buyer == party
-        case b: TxLogEntry.BalanceChange => b.receiver == party
-        // Only relevant notifications are added to parsing state
-        case _: TxLogEntry.Notification => true
-        case _: TxLogEntry.Unknown => true
-      }
-    )
+    def filterByParty(party: PartyId): State = {
+      val partyStr = party.toProtoPrimitive
+      State(
+        entries = entries.filter {
+          case t: TxLogEntry.Transfer =>
+            t.sender._1 == partyStr || t.receivers.exists(_._1 == partyStr)
+          case to: TxLogEntry.TransferOffer => to.sender == partyStr || to.receiver == partyStr
+          case btr: TxLogEntry.BuyTrafficRequest => btr.buyer == partyStr
+          case b: TxLogEntry.BalanceChange => b.receiver == partyStr
+          // Only relevant notifications are added to parsing state
+          case _: TxLogEntry.Notification => true
+          case _: TxLogEntry.Unknown => true
+        }
+      )
+    }
 
     /** Sets the transaction type of all transfer events to the given type */
-    def setTransferSubtype(transactionSubtype: TransferTransactionSubtype): State = {
+    def setTransferSubtype(
+        transactionSubtype: TxLogEntry.Transfer.TransferTransactionSubtype
+    ): State = {
       State(
         entries = entries.map {
           case b: TxLogEntry.Transfer =>
@@ -1396,15 +781,18 @@ object UserWalletTxLogParser {
       )
     }
 
-    /** Sets the index record eventId for all entries to the given eventId.
+    /** Sets the eventId for all entries that store eventIds to the given eventId.
       *
       * This is useful when you want to re-use the parsing logic of existing methods
-      * like State.fromTransfer for some new event but want the index record to reflect
+      * like State.fromTransfer for some new event but want the TxLogEntry to reflect
       * the eventId of the new event.
       */
     def setEventId(eventId: String): State = {
       State(
-        entries = entries.map(_.setEventId(eventId))
+        entries = entries.map {
+          case e: TxLogEntry.TransactionHistoryTxLogEntry => e.setEventId(eventId)
+          case e => e
+        }
       )
     }
 
@@ -1414,7 +802,9 @@ object UserWalletTxLogParser {
       * This is useful for app payments where the payment collection first unlocks locked coins and immediately uses
       * them for a transfer. In this case, we only want to display one balance change for the user.
       */
-    def mergeBalanceChangesIntoTransfer(transactionSubtype: TransferTransactionSubtype): State = {
+    def mergeBalanceChangesIntoTransfer(
+        transactionSubtype: TxLogEntry.Transfer.TransferTransactionSubtype
+    ): State = {
       val balanceChanges = entries.foldLeft(Map[String, BigDecimal]())((changes, entry) =>
         entry match {
           case b: TxLogEntry.BalanceChange =>
@@ -1466,17 +856,11 @@ object UserWalletTxLogParser {
     def fromCoinExpire(
         tx: TransactionTreeV2,
         event: TreeEvent,
-        domainId: DomainId,
         owner: String,
-        transactionSubtype: BalanceChangeTransactionSubtype,
+        transactionSubtype: TxLogEntry.BalanceChange.BalanceChangeTransactionSubtype,
     ): State = {
       val newEntry = TxLogEntry.BalanceChange(
-        indexRecord = TransactionHistoryTxLogIndexRecord(
-          optOffset = Some(tx.getOffset),
-          eventId = event.getEventId,
-          domainId = domainId,
-          acsContractId = None,
-        ),
+        eventId = event.getEventId,
         transactionSubtype = transactionSubtype,
         date = tx.getEffectiveAt,
         amount = BigDecimal(0),
@@ -1490,7 +874,6 @@ object UserWalletTxLogParser {
     def fromCreateTransferOffer(
         tx: TransactionTreeV2,
         event: ExercisedEvent,
-        domainId: DomainId,
     ): State = {
       val (offerCid, transferOffer) = tx.getEventsById.get(event.getChildEventIds.get(0)) match {
         case event: CreatedEvent =>
@@ -1503,9 +886,6 @@ object UserWalletTxLogParser {
           )
       }
       fromTransferOfferOperation(
-        tx,
-        event,
-        domainId,
         transferOffer.trackingId,
         TxLogEntry.TransferOfferStatus.Created(
           new transferCodegen.TransferOffer.ContractId(offerCid),
@@ -1519,7 +899,6 @@ object UserWalletTxLogParser {
     def fromTransferOfferAccept(
         tx: TransactionTreeV2,
         event: ExercisedEvent,
-        domainId: DomainId,
     ): State = {
       val (acceptedCid, acceptedTransferOffer) =
         tx.getEventsById.get(event.getChildEventIds.get(0)) match {
@@ -1533,9 +912,6 @@ object UserWalletTxLogParser {
             )
         }
       fromTransferOfferOperation(
-        tx,
-        event,
-        domainId,
         acceptedTransferOffer.trackingId,
         TxLogEntry.TransferOfferStatus.Accepted(
           new transferCodegen.AcceptedTransferOffer.ContractId(acceptedCid),
@@ -1548,16 +924,10 @@ object UserWalletTxLogParser {
 
     def fromTransferOfferFailure(
         failureReason: TxLogEntry.TransferOfferStatus.Failed,
-        tx: TransactionTreeV2,
-        event: ExercisedEvent,
-        domainId: DomainId,
         node: ExerciseNode[?, transferCodegen.TransferOfferTrackingInfo],
     ): State = {
       val trackingInfo = node.result.value
       fromTransferOfferOperation(
-        tx,
-        event,
-        domainId,
         trackingInfo.trackingId,
         failureReason,
         trackingInfo.sender,
@@ -1567,8 +937,6 @@ object UserWalletTxLogParser {
 
     def fromTransferOfferComplete(
         tx: TransactionTreeV2,
-        event: ExercisedEvent,
-        domainId: DomainId,
         node: ExerciseNode[?, AcceptedTransferOffer_Complete.Res],
     ): State = {
       val trackingInfo = node.result.value._1._2
@@ -1581,9 +949,6 @@ object UserWalletTxLogParser {
           )
       }
       fromTransferOfferOperation(
-        tx,
-        event,
-        domainId,
         trackingInfo.trackingId,
         TxLogEntry.TransferOfferStatus.Completed(
           receiverCoinContractId,
@@ -1595,22 +960,13 @@ object UserWalletTxLogParser {
     }
 
     private def fromTransferOfferOperation(
-        tx: TransactionTreeV2,
-        event: ExercisedEvent,
-        domainId: DomainId,
         trackingId: String,
         status: TxLogEntry.TransferOfferStatus,
         sender: String,
         receiver: String,
     ) = {
       val newEntry = TxLogEntry.TransferOffer(
-        indexRecord = TransferOfferStatusTxLogIndexRecord(
-          optOffset = Some(tx.getOffset),
-          eventId = event.getEventId,
-          domainId = domainId,
-          acsContractId = None,
-          trackingId = trackingId,
-        ),
+        trackingId = trackingId,
         status,
         sender,
         receiver,
@@ -1621,17 +977,11 @@ object UserWalletTxLogParser {
     def fromTransfer(
         tx: TransactionTreeV2,
         event: TreeEvent,
-        domainId: DomainId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
-        transactionSubtype: TransferTransactionSubtype,
+        transactionSubtype: TxLogEntry.Transfer.TransferTransactionSubtype,
     ): State = {
       val newEntry = TxLogEntry.Transfer(
-        indexRecord = TransactionHistoryTxLogIndexRecord(
-          optOffset = Some(tx.getOffset),
-          eventId = event.getEventId,
-          domainId = domainId,
-          acsContractId = None,
-        ),
+        eventId = event.getEventId,
         transactionSubtype = transactionSubtype,
         date = tx.getEffectiveAt,
         provider = node.argument.value.transfer.provider,
@@ -1651,7 +1001,6 @@ object UserWalletTxLogParser {
     def fromCreateBuyTrafficRequest(
         tx: TransactionTreeV2,
         event: ExercisedEvent,
-        domainId: DomainId,
     ): State = {
       val buyTrafficRequest = tx.getEventsById.get(event.getChildEventIds.get(0)) match {
         case event: CreatedEvent =>
@@ -1664,9 +1013,6 @@ object UserWalletTxLogParser {
           )
       }
       fromBuyTrafficRequestOperation(
-        tx,
-        event,
-        domainId,
         buyTrafficRequest.trackingId,
         TxLogEntry.BuyTrafficRequestStatus.Created,
         buyTrafficRequest.endUserParty,
@@ -1675,15 +1021,10 @@ object UserWalletTxLogParser {
 
     def fromBuyTrafficRequestComplete(
         tx: TransactionTreeV2,
-        event: ExercisedEvent,
-        domainId: DomainId,
         node: ExerciseNode[?, BuyTrafficRequest_Complete.Res],
     ): State = {
       val trackingInfo = node.result.value._1._2
       fromBuyTrafficRequestOperation(
-        tx,
-        event,
-        domainId,
         trackingInfo.trackingId,
         TxLogEntry.BuyTrafficRequestStatus.Completed(
           tx.getUpdateId
@@ -1694,16 +1035,10 @@ object UserWalletTxLogParser {
 
     def fromBuyTrafficRequestFailure(
         failureReason: TxLogEntry.BuyTrafficRequestStatus.Failed,
-        tx: TransactionTreeV2,
-        event: ExercisedEvent,
-        domainId: DomainId,
         node: ExerciseNode[?, trafficRequestCodegen.BuyTrafficRequestTrackingInfo],
     ): State = {
       val trackingInfo = node.result.value
       fromBuyTrafficRequestOperation(
-        tx,
-        event,
-        domainId,
         trackingInfo.trackingId,
         failureReason,
         trackingInfo.endUserParty,
@@ -1711,21 +1046,12 @@ object UserWalletTxLogParser {
     }
 
     private def fromBuyTrafficRequestOperation(
-        tx: TransactionTreeV2,
-        event: ExercisedEvent,
-        domainId: DomainId,
         trackingId: String,
         status: TxLogEntry.BuyTrafficRequestStatus,
         buyer: String,
     ) = {
       val newEntry = TxLogEntry.BuyTrafficRequest(
-        indexRecord = BuyTrafficRequestStatusTxLogIndexRecord(
-          optOffset = Some(tx.getOffset),
-          eventId = event.getEventId,
-          domainId = domainId,
-          acsContractId = None,
-          trackingId = trackingId,
-        ),
+        trackingId = trackingId,
         status,
         buyer,
       )
@@ -1736,7 +1062,6 @@ object UserWalletTxLogParser {
         node: ExerciseNode[CoinRules_BuyMemberTraffic.Arg, CoinRules_BuyMemberTraffic.Res],
         tx: TransactionTreeV2,
         event: ExercisedEvent,
-        domainId: DomainId,
     ): State = {
       val sender = node.argument.value.provider
       // Hack to grab the SVC party-id from the balance changes, which list both sender and the SVC
@@ -1748,12 +1073,7 @@ object UserWalletTxLogParser {
       val senderBalanceChange = BigDecimal(summary.senderChangeAmount) - netSenderInput
 
       val newEntry = TxLogEntry.Transfer(
-        indexRecord = TransactionHistoryTxLogIndexRecord(
-          optOffset = Some(tx.getOffset),
-          eventId = event.getEventId,
-          domainId = domainId,
-          acsContractId = None,
-        ),
+        eventId = event.getEventId,
         transactionSubtype = TxLogEntry.Transfer.ExtraTrafficPurchase,
         date = tx.getEffectiveAt,
         provider = sender,
@@ -1773,15 +1093,14 @@ object UserWalletTxLogParser {
     def fromCollectEntryPayment(
         tx: TransactionTreeV2,
         event: ExercisedEvent,
-        domainId: DomainId,
         stateFromPaymentCollection: State,
-        transactionSubtype: TransferTransactionSubtype,
+        transactionSubtype: TxLogEntry.Transfer.TransferTransactionSubtype,
     ): State = {
       // second child event is burning of transferred coin by SVC
       val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
       // Adjust tx log entries for SVC since the coin it receives is immediately burnt
       val burntCoin = getCoinCreateEvent(tx, coinArchiveEvent.getContractId)
-      val stateFromBurntCoin = State.fromBurntCoin(burntCoin, domainId)
+      val stateFromBurntCoin = State.fromBurntCoin(burntCoin)
 
       stateFromPaymentCollection
         .appended(stateFromBurntCoin)
@@ -1795,9 +1114,8 @@ object UserWalletTxLogParser {
     def fromCoinCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
         tx: TransactionTreeV2,
         event: TreeEvent,
-        domainId: DomainId,
         ccsum: CoinCreateSummary[T],
-        transactionSubtype: BalanceChangeTransactionSubtype,
+        transactionSubtype: TxLogEntry.BalanceChange.BalanceChangeTransactionSubtype,
     ): State = {
       // Note: CoinCreateSummary only contains the contract id of the new coin, but not the coin payload.
       // However, the new coin is always created in the same transaction.
@@ -1806,12 +1124,7 @@ object UserWalletTxLogParser {
       val coinCid = ccsum.coin.contractId
       val coin = getCoinCreateEvent(tx, coinCid)
       val newEntry = TxLogEntry.BalanceChange(
-        indexRecord = TransactionHistoryTxLogIndexRecord(
-          optOffset = Some(tx.getOffset),
-          eventId = event.getEventId,
-          domainId = domainId,
-          acsContractId = None,
-        ),
+        eventId = event.getEventId,
         transactionSubtype = transactionSubtype,
         date = tx.getEffectiveAt,
         amount = coin.amount.initialAmount,
@@ -1825,18 +1138,12 @@ object UserWalletTxLogParser {
 
     def fromNotification(
         tx: TransactionTreeV2,
-        domainId: DomainId,
         event: TreeEvent,
-        transactionSubtype: NotificationTransactionSubtype,
+        transactionSubtype: TxLogEntry.Notification.NotificationTransactionSubtype,
         details: String,
     ): State = {
       val newEntry = TxLogEntry.Notification(
-        indexRecord = TransactionHistoryTxLogIndexRecord(
-          optOffset = Some(tx.getOffset),
-          eventId = event.getEventId,
-          domainId = domainId,
-          acsContractId = None,
-        ),
+        eventId = event.getEventId,
         transactionSubtype = transactionSubtype,
         date = tx.getEffectiveAt,
         details = details,
@@ -1849,16 +1156,12 @@ object UserWalletTxLogParser {
     def fromAcsCoin(
         ac: ActiveContract,
         activeCoin: CoinCreate.ContractType,
-    ): (DomainId, TxLogEntry) = {
+    ): (DomainId, Option[ContractId[?]], TxLogEntry) = {
       (
         ac.domainId,
+        Some(new codegen.ContractId(ac.createdEvent.getContractId)),
         TxLogEntry.BalanceChange(
-          indexRecord = TransactionHistoryTxLogIndexRecord(
-            optOffset = None,
-            eventId = ac.createdEvent.getEventId,
-            ac.domainId,
-            acsContractId = Some(new codegen.ContractId(ac.createdEvent.getContractId)),
-          ),
+          eventId = ac.createdEvent.getEventId,
           transactionSubtype = TxLogEntry.BalanceChange.Mint,
           receiver = activeCoin.payload.owner,
           amount = activeCoin.payload.amount.initialAmount,
@@ -1872,20 +1175,14 @@ object UserWalletTxLogParser {
     }
 
     private def fromBurntCoin(
-        burntCoin: CoinCreate.T,
-        domainId: DomainId,
+        burntCoin: CoinCreate.T
     ) = State(entries =
       immutable.Queue(
         TxLogEntry.BalanceChange(
           receiver = burntCoin.owner,
           amount = -burntCoin.amount.initialAmount,
-          // all fields below doesn't matter - it'll be removed by mergeBalanceChangesIntoTransfer
-          indexRecord = TransactionHistoryTxLogIndexRecord(
-            optOffset = None,
-            eventId = "",
-            domainId = domainId,
-            acsContractId = None,
-          ),
+          // all values below don't matter - they will be removed by mergeBalanceChangesIntoTransfer
+          eventId = "",
           transactionSubtype = TxLogEntry.BalanceChange.Tap,
           date = Instant.now(),
           coinPrice = BigDecimal(0),

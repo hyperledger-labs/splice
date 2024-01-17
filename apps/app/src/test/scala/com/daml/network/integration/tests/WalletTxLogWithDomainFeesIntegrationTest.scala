@@ -5,7 +5,7 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
-import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
+import com.daml.network.wallet.store.TxLogEntry as walletLogEntry
 import com.digitalasset.canton.HasExecutionContext
 
 class WalletTxLogWithDomainFeesIntegrationTest

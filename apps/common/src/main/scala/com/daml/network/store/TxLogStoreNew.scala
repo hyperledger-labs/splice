@@ -13,6 +13,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.topology.DomainId
 
 import scala.collection.SeqView
+import scala.reflect.ClassTag
 
 /** Stores historical information that can be used to construct application-specific historical events,
   * such as a user notification or an item from a bank statement.
@@ -26,24 +27,27 @@ import scala.collection.SeqView
   * - Each transaction tree can produce any number of tx log entries.
   */
 object TxLogStoreNew {
-  def firstPage[TXE](log: SeqView[TXE], limit: PageLimit)(
-      filter: TXE => Boolean
-  ) =
+  def firstPage[TXE, TXER <: TXE](log: SeqView[TXE], limit: PageLimit)(implicit
+      tag: ClassTag[TXER]
+  ): Seq[TXER] =
     log
-      .filter(filter)
+      .collect { case txi: TXER =>
+        txi
+      }
       .take(limit.limit)
       .toSeq
 
-  def nextPage[TXE](
+  def nextPage[TXE, TXER <: TXE](
       log: SeqView[TXE],
       pageEnd: String,
       limit: PageLimit,
   )(
-      project: TXE => String,
-      filter: TXE => Boolean,
-  ) =
+      project: TXER => String
+  )(implicit tag: ClassTag[TXER]): Seq[TXER] =
     log
-      .filter(txi => filter(txi))
+      .collect { case txi: TXER =>
+        txi
+      }
       .dropWhile(e => project(e) != pageEnd)
       .slice(1, 1 + limit.limit)
       .toSeq

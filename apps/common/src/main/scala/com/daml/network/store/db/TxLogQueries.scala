@@ -2,7 +2,10 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.{StoreErrors, TxLogStoreNew}
-import com.daml.network.store.db.TxLogQueries.SelectFromTxLogTableResult
+import com.daml.network.store.db.TxLogQueries.{
+  SelectFromTxLogTableResult,
+  SelectFromTxLogTableResultWithOffset,
+}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import slick.jdbc.{GetResult, PositionedResult}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -54,7 +57,7 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
       where: SQLActionBuilder,
       orderLimit: SQLActionBuilder = sql"",
   ) =
-    (sql"""select store_id, #${SelectFromTxLogTableResult.sqlColumnsCommaSeparated()}
+    (sql"""select #${SelectFromTxLogTableResultWithOffset.sqlColumnsCommaSeparated()}
        from store_descriptors sd
            left join #$tableName
                on sd.id = store_id
@@ -117,5 +120,17 @@ object TxLogQueries {
       offset: String,
       row: Option[SelectFromTxLogTableResult],
   )
+
+  object SelectFromTxLogTableResultWithOffset {
+    def sqlColumnsCommaSeparated(qualifier: String = "") =
+      s"""${qualifier}store_id,
+          ${qualifier}last_ingested_offset,
+          ${qualifier}entry_number,
+          ${qualifier}transaction_offset,
+          ${qualifier}domain_id,
+          ${qualifier}acs_contract_id,
+          ${qualifier}entry_type,
+          ${qualifier}entry_data"""
+  }
 
 }

@@ -246,27 +246,29 @@ class InMemoryScanStore(
   )(implicit
       tc: TraceContext
   ): Future[Seq[TxLogEntry.TransactionLogEntry]] = Future.successful {
-    def filter(txi: TxLogEntry) = txi match {
-      case _: TxLogEntry.TransactionLogEntry => true
-      case _ => false
-    }
     val fromEnd = multiDomainAcsStore.getQueue.view
     val fromBeginning = multiDomainAcsStore.getQueue.view.reverse
     val entries = sortOrder match {
       case Descending =>
         pageEndEventId.fold(
-          TxLogStoreNew.firstPage(fromEnd, limit)(filter)
-        )(endId => TxLogStoreNew.nextPage(fromEnd, endId, limit)(_.eventId, filter))
+          TxLogStoreNew.firstPage[TxLogEntry, TxLogEntry.TransactionLogEntry](fromEnd, limit)
+        )(endId =>
+          TxLogStoreNew.nextPage[TxLogEntry, TxLogEntry.TransactionLogEntry](fromEnd, endId, limit)(
+            _.eventId
+          )
+        )
       case Ascending =>
         pageEndEventId.fold(
-          TxLogStoreNew.firstPage(fromBeginning, limit)(filter)
-        )(endId => TxLogStoreNew.nextPage(fromBeginning, endId, limit)(_.eventId, filter))
+          TxLogStoreNew.firstPage[TxLogEntry, TxLogEntry.TransactionLogEntry](fromBeginning, limit)
+        )(endId =>
+          TxLogStoreNew.nextPage[TxLogEntry, TxLogEntry.TransactionLogEntry](
+            fromBeginning,
+            endId,
+            limit,
+          )(_.eventId)
+        )
     }
-    entries
-      .collect { case entry: TxLogEntry.TransactionLogEntry =>
-        entry
-      }
-      .take(limit.limit)
+    entries.take(limit.limit)
 
   }
 

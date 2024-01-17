@@ -479,14 +479,17 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
 
   def getQueue: Queue[TXE] = stateVar.txLog
 
-  def filterTxLogEntriesByOffset(limit: PageLimit)(filter: TXE => Boolean): Seq[TXE] =
-    TxLogStoreNew.firstPage(stateVar.txLog.view, limit)(filter)
+  def filterTxLogEntriesByOffset[TXER <: TXE](limit: PageLimit)(implicit
+      tag: ClassTag[TXER]
+  ): Seq[TXER] =
+    TxLogStoreNew.firstPage[TXE, TXER](stateVar.txLog.view, limit)
 
-  def filterTxLogEntriesAfterEventId(pageEndEventId: String, limit: PageLimit)(
-      project: TXE => String,
-      filter: TXE => Boolean,
-  ): Seq[TXE] =
-    TxLogStoreNew.nextPage(stateVar.txLog.view, pageEndEventId, limit)(project, filter)
+  def filterTxLogEntriesAfterEventId[TXER <: TXE](pageEndEventId: String, limit: PageLimit)(
+      project: TXER => String
+  )(implicit
+      tag: ClassTag[TXER]
+  ): Seq[TXER] =
+    TxLogStoreNew.nextPage[TXE, TXER](stateVar.txLog.view, pageEndEventId, limit)(project)
 
   def findLatestTxLogEntry[A, Z](init: Z)(p: (Z, TXE) => Either[A, Z])(implicit
       ec: ExecutionContext

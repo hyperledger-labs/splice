@@ -6,7 +6,7 @@ import com.daml.network.console.ValidatorAppBackendReference
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
-import com.daml.network.wallet.store.UserWalletTxLogParser.TxLogEntry as walletLogEntry
+import com.daml.network.wallet.store.TxLogEntry as walletLogEntry
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.topology.PartyId
 

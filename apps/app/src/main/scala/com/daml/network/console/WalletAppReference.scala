@@ -20,7 +20,7 @@ import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.{
   UserStatusData,
 }
 import com.daml.network.wallet.config.WalletAppClientConfig
-import com.daml.network.wallet.store.UserWalletTxLogParser
+import com.daml.network.wallet.store.TxLogEntry
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
@@ -402,7 +402,7 @@ abstract class WalletAppReference(
   def listTransactions(
       beginAfterId: Option[String],
       pageSize: Int,
-  ): Seq[UserWalletTxLogParser.TxLogEntry] = {
+  ): Seq[TxLogEntry.TransactionHistoryTxLogEntry] = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.ListTransactions(beginAfterId, pageSize))
     }

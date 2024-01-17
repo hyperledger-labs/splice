@@ -274,7 +274,7 @@ create table user_wallet_acs_store(
 );
 
 create table user_wallet_txlog_store(
-    like txlog_store_template including all,
+    like txlog_store_template_new including all,
 
     -- reestablish foreign key constraint as that one is not copied by the LIKE statement above
     foreign key (store_id) references store_descriptors (id),
@@ -285,6 +285,9 @@ create table user_wallet_txlog_store(
     ----------------
     -- which txlog this entry belongs to TODO (#7153): this might be separate tables, so this column would be unnecessary
     tx_log_id text not null,
+
+    -- used for pagination of transaction history
+    event_id text,
 
     -- the tracking_id for transfer offer or buy traffic request tx log entries
     tracking_id text
