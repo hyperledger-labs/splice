@@ -184,7 +184,7 @@ function _retry_until_success() {
         exit 1
     fi
 
-    local -i -r max_retries=$((12*30)) # with 5 second sleep, this is roughly 30 minutes
+    local -i -r max_retries=$((100)) # with 5 second sleep + 1 second kubectl timeout, this is roughly 10 minutes
     local -i num_retries=0
 
     _log "Running command with retry: $cmd"
@@ -208,7 +208,7 @@ function _retry_until_value() {
         exit 1
     fi
 
-    local -i -r max_retries=$((12*30)) # with 5 second sleep, this is roughly 30 minutes
+    local -i -r max_retries=$((12*30)) # with 5 second sleep, this takes roughly 30 minutes + 360*N, where N is time it takes to run `cmd` in minutes. Usually this is negligible, but beware if `cmd` is resource heavy or does retries of its own.
     local -i num_retries=0
 
     _log "Running command with retry (until $expected): $cmd"
@@ -1159,13 +1159,13 @@ function subcmd_wait() {
         _retry_until_value "kubectl get ns $namespace -o jsonpath='{.status.phase}'" "namespace $namespace to be active" "'Active'"
         if [ -z "$app" ]; then
             _log "Namespace $namespace ready, waiting for all pods"
-            _retry_until_success "kubectl wait --for=condition=Ready --all pod --timeout=5m --namespace $namespace"
+            _retry_until_success "kubectl wait --for=condition=Ready --all pod --timeout=1s --namespace $namespace"
         else
             _log "Namespace $namespace ready, waiting for $app"
             _retry_until_value "kubectl get pods --selector=app=$app -n $namespace -o name" "pod for app $app" ^"pod" 1
             pod=$ret
             _log "Pod $pod found, waiting for ready state"
-            _retry_until_success "kubectl wait --for=condition=Ready --timeout=5m --namespace $namespace $pod"
+            _retry_until_success "kubectl wait --for=condition=Ready --timeout=1s --namespace $namespace $pod"
             _log "Pod $pod ready"
         fi
     fi
