@@ -104,6 +104,22 @@ the specific flake, there are a few common things to look out for:
    label. It the issue does not occur within the next 2 weeks it can
    be closed.
 
+
+## Documenting Issue Investigations
+
+In addition to identifying and possibly fixing the issue, you should
+also document how you debugged it, e.g., include log filters that were
+useful, `kubectl` commands or other tools you used. This is useful to
+share knowledge in the team and get an overview over common patterns
+that we might be able to simplify.
+
+An example writeup can be found
+[here](https://github.com/DACH-NY/canton-network-node/issues/9374#issuecomment-1896157364).
+
+If you find yourself repeatedly using the same queries in log
+explorer, add them to the
+[documentation](https://github.com/DACH-NY/canton-network-node/blob/main/cluster/README.md#gce-log-explorer).
+
 ## Investigating Canton-related errors
 
 We are using development versions of Canton and are frequently among the first users of new Canton features.
