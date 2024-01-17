@@ -2,7 +2,7 @@ import BigNumber from 'bignumber.js';
 
 /* @ts-expect-error typings unavailable */
 import { randomItem } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
-import { Counter, Gauge, Trend } from 'k6/metrics';
+import { Gauge } from 'k6/metrics';
 
 import { Auth0Manager } from '../client/auth0/auth0';
 import { logInUser } from '../client/auth0/helpers';
@@ -17,9 +17,6 @@ import { pickTwoRandom, syncRetryUndefined } from '../utils';
 
 export const options = { ...settings.options };
 
-const transactionsStarted = new Counter('transactions_started');
-const transactionsCompleted = new Counter('transactions_completed');
-const transactionLatency = new Trend('transaction_latency', true);
 const validatorOperatorBalance = new Gauge('validator_operator_balance');
 
 type ValidatorConf = {
@@ -81,17 +78,10 @@ export default function (data: ValidatorConf[]): void {
     }
   }
 
-  const metrics = {
-    validatorOperatorBalance,
-    started: transactionsStarted,
-    completed: transactionsCompleted,
-    latency: transactionLatency,
-  };
-
   doIfOnboarded(receipientClient, () => {
     doIfOnboarded(senderClient, () => {
-      waitForBalance(senderClient, 10, '1000.0', adminClient, settings.isDevNet, metrics);
-      sendAndWaitForTransferOffer(senderClient, receipientClient, '1.00', metrics);
+      waitForBalance(senderClient, 10, '1000.0', adminClient, settings.isDevNet);
+      sendAndWaitForTransferOffer(senderClient, receipientClient, '1.00');
     });
   });
 }

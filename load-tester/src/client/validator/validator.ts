@@ -7,12 +7,14 @@ import {
   AcceptTransferOfferResponse,
   CreateTransferOfferResponse,
   GetBalanceResponse,
+  GetTransferOfferStatusResponse,
   ListTransactionsResponse,
   ListTransferOffersResponse,
   UserStatusResponse,
   acceptTransferOfferResponse,
   createTransferOfferResponse,
   getBalanceResponse,
+  getTransferOfferStatusResponse,
   listTransactionsResponse,
   listTransferOffersResponse,
   userStatusResponse,
@@ -96,6 +98,15 @@ export class ValidatorClient {
             { headers: this.headers() },
           )
           .then(resp => jsonStringDecoder(createTransferOfferResponse, resp.body));
+      },
+      getTransferOfferStatus: (tracking_id: string): GetTransferOfferStatusResponse | undefined => {
+        return this.http.post
+          .success(
+            `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers/${tracking_id}/status`,
+            undefined,
+            { headers: this.headers() },
+          )
+          .then(resp => jsonStringDecoder(getTransferOfferStatusResponse, resp.body));
       },
       listTransactions: (): ListTransactionsResponse | undefined => {
         return this.http.post

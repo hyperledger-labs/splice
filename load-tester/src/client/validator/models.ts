@@ -65,6 +65,16 @@ export const getBalanceResponse = z.object({
 
 export type GetBalanceResponse = z.infer<typeof getBalanceResponse>;
 
+export const getTransferOfferStatusResponse = z.object({
+  status: z.enum(['created', 'accepted', 'completed', 'failed']),
+  transaction_id: z.optional(z.string()).nullable(),
+  contract_id: z.optional(z.string()),
+  failure_kind: z.optional(z.string()).nullable(),
+  withdrawn_reason: z.optional(z.string()).nullable(),
+});
+
+export type GetTransferOfferStatusResponse = z.infer<typeof getTransferOfferStatusResponse>;
+
 export const listTransactionsResponse = z.object({
   items: z.array(listTransactionsItem),
 });

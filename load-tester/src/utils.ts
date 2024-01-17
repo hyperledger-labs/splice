@@ -11,6 +11,7 @@ export function jsonStringDecoder<Z extends z.ZodTypeAny = z.ZodNever>(
   if (result.success) {
     return result.data;
   } else {
+    console.warn(`Failed to decode schema: ${result.error}`);
     return undefined;
   }
 }
@@ -31,19 +32,26 @@ export function pickTwoRandom(nums: number): [number, number] {
   return [first, second];
 }
 
-export function syncRetryUndefined<A>(action: () => A | undefined): A | undefined {
+export function syncRetryUntil<A>(
+  action: () => A | undefined,
+  condition: (result: A | undefined) => boolean,
+): A | undefined {
   let retries = 5;
   let final = undefined;
   while (retries >= 0) {
     const result = action();
-    if (typeof result === 'undefined') {
-      sleep(1);
-    } else {
+    if (condition(result)) {
       final = result;
       break;
+    } else {
+      sleep(0.2);
     }
     retries = retries - 1;
   }
 
   return final;
+}
+
+export function syncRetryUndefined<A>(action: () => A | undefined): A | undefined {
+  return syncRetryUntil(action, result => typeof result !== 'undefined');
 }

@@ -18,7 +18,7 @@ const validatorSchema = z.object({
 });
 
 export const configSchema = z.object({
-  isDevNet: z.boolean(),
+  isDevNet: z.boolean().or(z.enum(['true', 'false']).transform(val => val === 'true')),
   usersPerValidator: z.number().min(1),
   validators: z.array(validatorSchema).min(1),
   test: z.object({

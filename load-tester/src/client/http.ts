@@ -60,6 +60,8 @@ export class HttpClient {
       redirects: 0,
     });
 
+    console.debug(`Response data: ${JSON.stringify(resp)}`);
+
     if (resp.status !== expectedStatus) {
       if (retries > 0) {
         console.debug(`Received an unexpected status code ${resp.status} for ${method} ${url}`);
