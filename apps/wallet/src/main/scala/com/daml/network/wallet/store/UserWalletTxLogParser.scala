@@ -820,7 +820,7 @@ object UserWalletTxLogParser {
       // Otherwise the balance changes are lost or duplicated by adding them to multiple transfers.
       assert(entries.collect { case t: TxLogEntry.Transfer => t }.length == 1)
 
-      val newEntries = entries.flatMap {
+      val newEntries: Queue[TxLogEntry] = entries.flatMap {
         case t: TxLogEntry.Transfer =>
           Some(
             t.copy(

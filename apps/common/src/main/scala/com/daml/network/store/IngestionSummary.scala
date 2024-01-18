@@ -5,7 +5,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
 import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, ReassignmentId}
 import com.digitalasset.canton.logging.pretty.Pretty
 
-private[store] final case class IngestionSummary[+TXE](
+private[store] final case class IngestionSummary(
     updateId: Option[String],
     offset: Option[String],
     newAcsSize: Int,
@@ -21,13 +21,13 @@ private[store] final case class IngestionSummary[+TXE](
     numFilteredUnassignEvents: Int,
     removedUnassignEvents: Vector[(ContractId[?], ReassignmentId)],
     prunedContracts: Vector[ContractId[_]],
-    ingestedTxLogEntries: Seq[TXE],
+    ingestedTxLogEntries: Seq[String],
 )
 
 private[store] object IngestionSummary {
-  def empty[TXE]: IngestionSummary[TXE] = Empty
+  def empty[TXE]: IngestionSummary = Empty
 
-  private val Empty: IngestionSummary[Nothing] = IngestionSummary(
+  private val Empty: IngestionSummary = IngestionSummary(
     updateId = None,
     offset = None,
     newAcsSize = 0,
@@ -49,7 +49,7 @@ private[store] object IngestionSummary {
   import Pretty.{prettyString as _, *}
   import com.daml.network.util.PrettyInstances.*
 
-  implicit def pretty[TXE: Pretty]: Pretty[IngestionSummary[TXE]] = {
+  implicit def pretty: Pretty[IngestionSummary] = {
     def paramIfNonZero[T](name: String, getValue: T => Int) =
       param(name, getValue(_), (x: T) => getValue(x) != 0)
 
@@ -72,7 +72,7 @@ private[store] object IngestionSummary {
       paramIfNonEmpty("prunedContracts", _.prunedContracts),
       paramIfNonEmpty(
         "ingestedTxLogEntries",
-        _.ingestedTxLogEntries,
+        _.ingestedTxLogEntries.map(_.unquoted),
       ),
     )
   }

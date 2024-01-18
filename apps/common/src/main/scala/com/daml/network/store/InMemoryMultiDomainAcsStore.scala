@@ -22,7 +22,7 @@ import scala.collection.immutable.{Queue, SortedMap}
 import scala.concurrent.*
 import scala.reflect.ClassTag
 
-class InMemoryMultiDomainAcsStore[TXE <: TxLogStore.Entry](
+class InMemoryMultiDomainAcsStore[TXE](
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
     txLogConfig: TxLogStore.Config[TXE],
@@ -98,7 +98,7 @@ class InMemoryMultiDomainAcsStore[TXE <: TxLogStore.Entry](
           incompleteOut,
           incompleteIn,
           offset,
-          txLogConfig.parser,
+          txLogConfig,
           contractFilter,
         )
       ).map { case (summary, offsetChanged, offsetIngestionsToSignal) =>
@@ -117,7 +117,7 @@ class InMemoryMultiDomainAcsStore[TXE <: TxLogStore.Entry](
       update match {
         case TransactionTreeUpdate(tree) =>
           updateState(
-            _.ingestTransaction(domain, tree, contractFilter, txLogConfig.parser, logger)
+            _.ingestTransaction(domain, tree, contractFilter, txLogConfig, logger)
           ).map { case (summary, offsetChanged, offsetIngestionsToSignal) =>
             logger.debug(show"Ingested transaction $summary")
             offsetIngestionsToSignal.foreach(_.success(()))
@@ -622,7 +622,7 @@ object InMemoryMultiDomainAcsStore {
     *   - removed on matching unassign
     * - incompleteReassignmentsById: index on top of incomplete assign/incomplete unassign, always updated together
     */
-  private case class State[TXE <: TxLogStore.Entry](
+  private case class State[TXE](
       offset: Option[String],
       nextCreateEventNumber: Long,
       // All active contracts across all domains that match our contract filter. Contracts are inserted
@@ -676,11 +676,11 @@ object InMemoryMultiDomainAcsStore {
         incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
         acsOffset: String,
-        txLogParser: TxLogStore.Parser[TXE],
+        txLogConfig: TxLogStore.Config[TXE],
         contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
     )(implicit
         tc: TraceContext
-    ): (State[TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
+    ): (State[TXE], (IngestionSummary, Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(offset.isEmpty, "state was not switched to update ingestion yet")
       val (stAcs, summaryAcs) = ingestActiveContracts(evs, contractFilter)
       val (stInFlightOut, summaryUnassign) =
@@ -692,7 +692,7 @@ object InMemoryMultiDomainAcsStore {
           contractFilter.contains,
         )
       val (stFinal, offsetsToRemove) = stInFlightIn.removeOffsetSignalsBefore(acsOffset)
-      val parsedTxLogEntries = txLogParser.parseAcs(evs, incompleteOut, incompleteIn)
+      val parsedTxLogEntries = txLogConfig.parser.parseAcs(evs, incompleteOut, incompleteIn)
       (
         stFinal.copy(
           offset = Some(acsOffset),
@@ -706,7 +706,12 @@ object InMemoryMultiDomainAcsStore {
         (
           summaryAssign.copy(
             newAcsSize = stFinal.createEvents.size,
-            ingestedTxLogEntries = parsedTxLogEntries.map(_._3),
+            ingestedTxLogEntries = parsedTxLogEntries
+              .map(_._3)
+              .map(txe => {
+                val (_, data) = txLogConfig.encodeEntry(txe)
+                data.compactPrint
+              }),
           ),
           offsetChanged,
           offsetsToRemove.values,
@@ -719,11 +724,11 @@ object InMemoryMultiDomainAcsStore {
         domain: DomainId,
         tx: TransactionTreeV2,
         contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
-        txLogParser: TxLogStore.Parser[TXE],
+        txLogConfig: TxLogStore.Config[TXE],
         logger: TracedLogger,
     )(implicit
         traceContext: TraceContext
-    ): (State[TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
+    ): (State[TXE], (IngestionSummary, Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(offset.isDefined, "state was switched to update ingestion")
 
       val (stNew, summary) = Trees.foldTree(tx, (this, IngestionSummary.empty[TXE]))(
@@ -758,7 +763,7 @@ object InMemoryMultiDomainAcsStore {
         },
       )
 
-      val ingestedTxLogEntries = txLogParser.parse(tx, domain, logger)
+      val ingestedTxLogEntries = txLogConfig.parser.parse(tx, domain, logger)
 
       val newOffset = tx.getOffset
 
@@ -766,7 +771,10 @@ object InMemoryMultiDomainAcsStore {
         updateId = Some(tx.getUpdateId),
         offset = Some(newOffset),
         newAcsSize = stNew.createEvents.size,
-        ingestedTxLogEntries = ingestedTxLogEntries,
+        ingestedTxLogEntries = ingestedTxLogEntries.map(txe => {
+          val (_, data) = txLogConfig.encodeEntry(txe)
+          data.compactPrint
+        }),
       )
 
       val (stNewWithoutOffsets, offsetsToRemove) =
@@ -787,7 +795,7 @@ object InMemoryMultiDomainAcsStore {
     def ingestTransfer(
         transfer: Reassignment[ReassignmentEvent],
         p: CreatedEvent => Boolean,
-    ): (State[TXE], (IngestionSummary[TXE], Promise[Unit], Iterable[Promise[Unit]])) = {
+    ): (State[TXE], (IngestionSummary, Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(offset.isDefined, "state was switched to update ingestion")
       val (newSt, summary) = ingestReassignmentEvent(transfer.event, p)
       val newOffset = transfer.offset.getOffset
@@ -813,15 +821,15 @@ object InMemoryMultiDomainAcsStore {
         cid: ContractId[_],
         transferCounter: Long,
         state: StoreContractState,
-        summary: IngestionSummary[TXE],
-    ): (State[TXE], IngestionSummary[TXE]) = {
+        summary: IngestionSummary,
+    ): (State[TXE], IngestionSummary) = {
       val evNum = contractStateEventsById.get(cid)
       val stateEvent = ContractStateEvent(
         cid,
         transferCounter,
         state,
       )
-      lazy val updatedState: (State[TXE], IngestionSummary[TXE]) =
+      lazy val updatedState: (State[TXE], IngestionSummary) =
         (
           copy(
             contractStateEvents = contractStateEvents -- evNum + (
@@ -855,8 +863,8 @@ object InMemoryMultiDomainAcsStore {
     // transfers for it. Noop if the contract cannot be pruned.
     private def pruneContractState(
         cid: ContractId[_],
-        summary: IngestionSummary[TXE],
-    ): (State[TXE], IngestionSummary[TXE]) = {
+        summary: IngestionSummary,
+    ): (State[TXE], IngestionSummary) = {
       val evNum = contractStateEventsById(cid)
       val ev = contractStateEvents(evNum)
       ev.state match {
@@ -886,7 +894,7 @@ object InMemoryMultiDomainAcsStore {
     private def ingestActiveContracts(
         contracts: Seq[ActiveContract],
         contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
-    ): (State[TXE], IngestionSummary[TXE]) = {
+    ): (State[TXE], IngestionSummary) = {
       assert(offset.isEmpty, "state was not switched to update ingestion yet")
       contracts.foldLeft((this, IngestionSummary.empty[TXE])) { case ((st, summary), contract) =>
         val ev = contract.createdEvent
@@ -907,9 +915,9 @@ object InMemoryMultiDomainAcsStore {
     // Used during bootstrapping to ingest in-flight unassigns
     private def ingestIncompleteUnssigns(
         evs: Seq[IncompleteReassignmentEvent.Unassign],
-        summary: IngestionSummary[TXE],
+        summary: IngestionSummary,
         p: CreatedEvent => Boolean,
-    ): (State[TXE], IngestionSummary[TXE]) = {
+    ): (State[TXE], IngestionSummary) = {
       evs
         .foldLeft((this, summary)) { case ((st, summary), ev) =>
           if (p(ev.createdEvent)) {
@@ -932,9 +940,9 @@ object InMemoryMultiDomainAcsStore {
 
     private def ingestIncompleteAssigns(
         evs: Seq[IncompleteReassignmentEvent.Assign],
-        summary: IngestionSummary[TXE],
+        summary: IngestionSummary,
         p: CreatedEvent => Boolean,
-    ): (State[TXE], IngestionSummary[TXE]) = {
+    ): (State[TXE], IngestionSummary) = {
       evs
         .foldLeft((this, summary)) { case ((st, summary), ev) =>
           if (p(ev.reassignmentEvent.createdEvent)) {
@@ -952,8 +960,8 @@ object InMemoryMultiDomainAcsStore {
         ev: CreatedEvent,
         domain: DomainId,
         counter: Long,
-        summary: IngestionSummary[TXE],
-    ): (State[TXE], IngestionSummary[TXE]) = {
+        summary: IngestionSummary,
+    ): (State[TXE], IngestionSummary) = {
       val cid = new ContractId(ev.getContractId)
       val (newSt, newSummary) = createEventsById.get(cid) match {
         case None =>
@@ -974,8 +982,8 @@ object InMemoryMultiDomainAcsStore {
 
     private def ingestArchivedEvent(
         ev: ExercisedEvent,
-        summary: IngestionSummary[TXE],
-    ): (State[TXE], IngestionSummary[TXE]) = {
+        summary: IngestionSummary,
+    ): (State[TXE], IngestionSummary) = {
       val contractId = new ContractId(ev.getContractId)
       createEventsById.get(contractId) match {
         case None =>
@@ -1005,7 +1013,7 @@ object InMemoryMultiDomainAcsStore {
     private def ingestReassignmentEvent(
         event: ReassignmentEvent,
         p: CreatedEvent => Boolean,
-    ): (State[TXE], IngestionSummary[TXE]) =
+    ): (State[TXE], IngestionSummary) =
       event match {
         case unassign: ReassignmentEvent.Unassign =>
           ingestUnassignEvent(unassign, IngestionSummary.empty[TXE])
@@ -1026,8 +1034,8 @@ object InMemoryMultiDomainAcsStore {
 
     private def ingestAssignEvent(
         assign: ReassignmentEvent.Assign,
-        summary: IngestionSummary[TXE],
-    ): (State[TXE], IngestionSummary[TXE]) = {
+        summary: IngestionSummary,
+    ): (State[TXE], IngestionSummary) = {
       val reassignmentId = ReassignmentId.fromAssign(assign)
       val cid = new ContractId(assign.createdEvent.getContractId)
       // First update create events and contract locations by only looking at the create event.
@@ -1067,8 +1075,8 @@ object InMemoryMultiDomainAcsStore {
 
     private def ingestUnassignEvent(
         out: ReassignmentEvent.Unassign,
-        summary: IngestionSummary[TXE],
-    ): (State[TXE], IngestionSummary[TXE]) = {
+        summary: IngestionSummary,
+    ): (State[TXE], IngestionSummary) = {
       val reassignmentId = ReassignmentId.fromUnassign(out)
       val cid = out.contractId
       if (!createEventsById.contains(out.contractId)) {
@@ -1077,7 +1085,7 @@ object InMemoryMultiDomainAcsStore {
           summary.copy(numFilteredUnassignEvents = summary.numFilteredUnassignEvents + 1),
         )
       } else {
-        val (newSt, tfSummary): (State[TXE], IngestionSummary[TXE]) =
+        val (newSt, tfSummary): (State[TXE], IngestionSummary) =
           if (incompleteAssign.contains(reassignmentId)) {
             val newincompleteReassignmentsById =
               incompleteReassignmentsById.updatedWith(cid)(

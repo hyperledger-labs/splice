@@ -7,10 +7,7 @@ import scala.concurrent.ExecutionContext
 
 /** Store setup shared by all of our apps
   */
-trait CNNodeAppStore[TXE <: TxLogStore.Entry]
-    extends NamedLogging
-    with AutoCloseable
-    with StoreErrors {
+trait CNNodeAppStore[TXE] extends NamedLogging with AutoCloseable with StoreErrors {
 
   implicit protected def ec: ExecutionContext
 
@@ -28,6 +25,6 @@ trait CNNodeAppStore[TXE <: TxLogStore.Entry]
 
 /** A coin app store whose TxLog is always empty.
   */
-trait CNNodeAppStoreWithoutHistory extends CNNodeAppStore[TxLogStore.Entry] {
+trait CNNodeAppStoreWithoutHistory extends CNNodeAppStore[Nothing] {
   override final def txLogConfig = TxLogStore.Config.empty
 }

@@ -7,9 +7,7 @@ import scala.concurrent.ExecutionContext
 
 /** In memory store setup shared by all of our apps
   */
-abstract class InMemoryCNNodeAppStore[
-    TXE <: TxLogStore.Entry
-](implicit protected val ec: ExecutionContext)
+abstract class InMemoryCNNodeAppStore[TXE](implicit protected val ec: ExecutionContext)
     extends CNNodeAppStore[TXE] {
 
   protected def retryProvider: RetryProvider
@@ -35,6 +33,4 @@ abstract class InMemoryCNNodeAppStore[
 
 abstract class InMemoryCNNodeAppStoreWithoutHistory(implicit
     override protected val ec: ExecutionContext
-) extends InMemoryCNNodeAppStore[
-      TxLogStore.Entry
-    ] {}
+) extends InMemoryCNNodeAppStore[Nothing] {}

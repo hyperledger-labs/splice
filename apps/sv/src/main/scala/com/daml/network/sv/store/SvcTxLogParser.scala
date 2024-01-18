@@ -97,7 +97,7 @@ class SvcTxLogParser(
 
 object SvcTxLogParser {
 
-  sealed trait TxLogEntry extends TxLogStore.Entry {}
+  sealed trait TxLogEntry
 
   object TxLogEntry {
 

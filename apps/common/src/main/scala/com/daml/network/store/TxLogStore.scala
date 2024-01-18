@@ -52,17 +52,6 @@ object TxLogStore {
       .slice(1, 1 + limit.limit)
       .toSeq
 
-  // TODO(#8943): Remove this type, it's not needed once we remove the inheritance from Product
-  /** Stores all information about a historical event */
-  trait Entry extends Product with Serializable {}
-
-  object Entry {
-    import com.digitalasset.canton.logging.pretty.Pretty
-
-    implicit val txLogPretty: Pretty[Entry] =
-      Pretty.adHocPrettyInstance
-  }
-
   /** Extracts tx log entries from transaction tree events */
   trait Parser[+TXE] {
 
@@ -133,7 +122,7 @@ object TxLogStore {
   }
 
   object Config {
-    def empty[TXE]: Config[TXE] = new Config[TXE] {
+    def empty: Config[Nothing] = new Config[Nothing] {
       override def parser = Parser.empty
       override def entryToRow = throw new RuntimeException(
         "This app does not serialize any TxLog entries"

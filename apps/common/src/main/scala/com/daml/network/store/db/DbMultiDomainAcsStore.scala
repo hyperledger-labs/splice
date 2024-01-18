@@ -52,7 +52,7 @@ import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
 
 import scala.collection.mutable
 
-class DbMultiDomainAcsStore[TXE <: TxLogStore.Entry](
+class DbMultiDomainAcsStore[TXE](
     storage: DbStorage,
     acsTableName: String,
     txLogTableName: String,
@@ -586,7 +586,7 @@ class DbMultiDomainAcsStore[TXE <: TxLogStore.Entry](
         contractFilter.ensureStakeholderOf(event.reassignmentEvent.createdEvent)
       }
 
-      val summaryState = MutableIngestionSummary.empty[TXE]
+      val summaryState = MutableIngestionSummary.empty
       for {
         _ <- storage
           .queryAndUpdate(
@@ -714,8 +714,8 @@ class DbMultiDomainAcsStore[TXE <: TxLogStore.Entry](
     private def ingestReassignment(
         offset: String,
         reassignment: Reassignment[ReassignmentEvent],
-    )(implicit tc: TraceContext): Future[MutableIngestionSummary[TXE]] = {
-      val summary = MutableIngestionSummary.empty[TXE]
+    )(implicit tc: TraceContext): Future[MutableIngestionSummary] = {
+      val summary = MutableIngestionSummary.empty
       for {
         _ <- storage
           .queryAndUpdate(
@@ -830,8 +830,8 @@ class DbMultiDomainAcsStore[TXE <: TxLogStore.Entry](
     private def ingestTransactionTreeV2(
         domainId: DomainId,
         tree: TransactionTreeV2,
-    )(implicit tc: TraceContext): Future[MutableIngestionSummary[TXE]] = {
-      val summary = MutableIngestionSummary.empty[TXE]
+    )(implicit tc: TraceContext): Future[MutableIngestionSummary] = {
+      val summary = MutableIngestionSummary.empty
 
       val workTodo = Trees
         .foldTree(
@@ -968,7 +968,7 @@ class DbMultiDomainAcsStore[TXE <: TxLogStore.Entry](
         offset: String,
         createdEvent: CreatedEvent,
         stateData: ContractStateRowData,
-        summary: MutableIngestionSummary[TXE],
+        summary: MutableIngestionSummary,
     )(implicit
         tc: TraceContext
     ) = {
@@ -1021,15 +1021,15 @@ class DbMultiDomainAcsStore[TXE <: TxLogStore.Entry](
         offset: String,
         acsContractId: Option[ContractId[?]],
         txe: TXE,
-        summary: MutableIngestionSummary[TXE],
+        summary: MutableIngestionSummary,
     ) = {
-      summary.ingestedTxLogEntries.addOne(txe)
-
       val safeOffset = lengthLimited(offset)
       val (entryType, entryData) = txLogConfig.encodeEntry(txe)
       val rowData = txLogConfig.entryToRow(txe)
       val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
       val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
+
+      summary.ingestedTxLogEntries.addOne(entryData.compactPrint)
       (sql"""
       insert into #$txLogTableName(store_id, transaction_offset, domain_id, acs_contract_id,
       entry_type, entry_data #$indexColumnNames)
@@ -1038,7 +1038,7 @@ class DbMultiDomainAcsStore[TXE <: TxLogStore.Entry](
     """).toActionBuilder.asUpdate
     }
 
-    private def doDeleteContract(event: ExercisedEvent, summary: MutableIngestionSummary[TXE]) = {
+    private def doDeleteContract(event: ExercisedEvent, summary: MutableIngestionSummary) = {
       sqlu"""
         delete from #$acsTableName
         where store_id = $storeId
@@ -1056,7 +1056,7 @@ class DbMultiDomainAcsStore[TXE <: TxLogStore.Entry](
 
     private def doSetContractStateInFlight(
         event: ReassignmentEvent.Unassign,
-        summary: MutableIngestionSummary[TXE],
+        summary: MutableIngestionSummary,
     ) = {
       val safeUnassignId = lengthLimited(event.unassignId)
       summary.updatedContractStates.addOne(
@@ -1090,7 +1090,7 @@ class DbMultiDomainAcsStore[TXE <: TxLogStore.Entry](
         contractId: String,
         domainId: DomainId,
         reassignmentCounter: Long,
-        summary: MutableIngestionSummary[TXE],
+        summary: MutableIngestionSummary,
     ) = {
       val safeContractId = lengthLimited(contractId)
       summary.updatedContractStates.addOne(
@@ -1125,7 +1125,7 @@ class DbMultiDomainAcsStore[TXE <: TxLogStore.Entry](
         source: DomainId,
         unassignId: String,
         isAssignment: Boolean,
-        summary: MutableIngestionSummary[TXE],
+        summary: MutableIngestionSummary,
     ) = {
       val safeContractId = lengthLimited(contractId)
       val safeUnassignId = lengthLimited(unassignId)
@@ -1356,7 +1356,7 @@ object DbMultiDomainAcsStore {
 
   /** Like [[IngestionSummary]], but with all fields mutable to simplify collecting the content from helper methods */
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  case class MutableIngestionSummary[TXE <: TxLogStore.Entry](
+  case class MutableIngestionSummary(
       ingestedCreatedEvents: mutable.ArrayBuffer[CreatedEvent],
       var numFilteredCreatedEvents: Int,
       ingestedArchivedEvents: mutable.ArrayBuffer[ExercisedEvent],
@@ -1369,7 +1369,7 @@ object DbMultiDomainAcsStore {
       var numFilteredUnassignEvents: Int,
       removedUnassignEvents: mutable.ArrayBuffer[(ContractId[?], ReassignmentId)],
       prunedContracts: mutable.ArrayBuffer[ContractId[?]],
-      ingestedTxLogEntries: mutable.ArrayBuffer[TXE],
+      ingestedTxLogEntries: mutable.ArrayBuffer[String],
   ) {
     def acsSizeDiff: Int = ingestedCreatedEvents.size - ingestedArchivedEvents.size
 
@@ -1377,7 +1377,7 @@ object DbMultiDomainAcsStore {
         updateId: Option[String],
         offset: String,
         newAcsSize: Int,
-    ): IngestionSummary[TXE] = IngestionSummary(
+    ): IngestionSummary = IngestionSummary(
       updateId = updateId,
       offset = Some(offset),
       newAcsSize = newAcsSize,
@@ -1398,7 +1398,7 @@ object DbMultiDomainAcsStore {
   }
 
   object MutableIngestionSummary {
-    def empty[TXE <: TxLogStore.Entry]: MutableIngestionSummary[TXE] = MutableIngestionSummary(
+    def empty: MutableIngestionSummary = MutableIngestionSummary(
       mutable.ArrayBuffer.empty,
       0,
       mutable.ArrayBuffer.empty,

@@ -9,9 +9,7 @@ import com.digitalasset.canton.resource.DbStorage
 
 import scala.concurrent.ExecutionContext
 
-abstract class DbCNNodeAppStore[
-    TXE <: TxLogStore.Entry
-](
+abstract class DbCNNodeAppStore[TXE](
     storage: DbStorage,
     acsTableName: String,
     txLogTableName: String,
@@ -60,8 +58,8 @@ abstract class DbCNNodeAppStoreWithoutHistory(
   protected def retryProvider: RetryProvider
   final protected def futureSupervisor: FutureSupervisor = retryProvider.futureSupervisor
 
-  override val multiDomainAcsStore: DbMultiDomainAcsStore[TxLogStore.Entry] =
-    new DbMultiDomainAcsStore(
+  override val multiDomainAcsStore: DbMultiDomainAcsStore[Nothing] =
+    new DbMultiDomainAcsStore[Nothing](
       storage,
       acsTableName,
       "THIS_STORE_DOES_NOT_HAVE_A_TXLOG",

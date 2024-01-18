@@ -275,7 +275,7 @@ object ScanTxLogParser {
         activityType: TransactionType,
     ): State = {
       val coin = getCoinFromSummary(tx, ccsum)
-      val activityEntry = activityType match {
+      val activityEntry: TransactionLogEntry = activityType match {
         case TransactionType.Tap =>
           TapLogEntry(
             offset = tx.getOffset,

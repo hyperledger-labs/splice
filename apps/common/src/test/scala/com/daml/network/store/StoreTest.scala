@@ -43,7 +43,7 @@ import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.store.db.TxLogRowData.TxLogRowDataWithoutIndices
+import com.daml.network.store.db.TxLogRowData
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.protocol.LfContractId
@@ -850,7 +850,7 @@ object StoreTest {
 
   case class TestTxLogEntry(
       payload: String
-  ) extends TxLogStore.Entry
+  )
 
   object TestTxLogEntry extends StoreErrors {
 
@@ -910,7 +910,7 @@ object StoreTest {
 
   val testTxLogConfig = new TxLogStore.Config[TestTxLogEntry] {
     override def parser = TestTxLogStoreParser
-    override def entryToRow = e => TxLogRowDataWithoutIndices(e)
+    override def entryToRow = _ => TxLogRowData.noIndices
     override def encodeEntry = TestTxLogEntry.encode
     override def decodeEntry = TestTxLogEntry.decode
   }
