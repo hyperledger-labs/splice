@@ -22,7 +22,6 @@ import com.daml.network.sv.automation.confirmation.{
   SvOnboardingRequestTrigger,
 }
 import com.daml.network.sv.automation.singlesv.*
-import com.daml.network.sv.automation.singlesv.membership.SvOnboardingNamespaceProposalTrigger
 import com.daml.network.sv.automation.singlesv.membership.offboarding.SvOffboardingPartyToParticipantProposalTrigger
 import com.daml.network.sv.automation.singlesv.membership.onboarding.{
   SvOnboardingMediatorProposalTrigger,
@@ -30,9 +29,10 @@ import com.daml.network.sv.automation.singlesv.membership.onboarding.{
   SvOnboardingPromoteParticipantToSubmitterTrigger,
   SvOnboardingSequencerProposalTrigger,
 }
+import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipTrigger
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
 import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.ClientConfig
@@ -199,7 +199,11 @@ class SvSvcAutomationService(
       )
     )
     registerTrigger(
-      new SvOnboardingNamespaceProposalTrigger(triggerContext, svcStore, participantAdminConnection)
+      new SvNamespaceMembershipTrigger(
+        wallClockTriggerContext,
+        svcStore,
+        participantAdminConnection,
+      )
     )
     registerTrigger(
       new SvOnboardingPromoteParticipantToSubmitterTrigger(
