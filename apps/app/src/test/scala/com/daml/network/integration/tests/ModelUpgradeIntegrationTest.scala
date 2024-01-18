@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coinrules.CoinRules_AddFutureCoinConfigSchedule
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
@@ -52,6 +53,11 @@ class ModelUpgradeIntegrationTest
       val coinRules = sv1ScanBackend.getCoinRules()
       val coinConfig = coinRules.payload.configSchedule.initialValue
 
+      // Ideally we'd like the config to take effect immediately. However, we
+      // can only schedule configs in the future and this is enforced at the Daml level.
+      // So we pick a date that is far enough in the future that we can complete the voting process
+      // before it is reached but close enough that we don't need to wait for long.
+      // 12 seconds seems to work well empirically.
       val scheduledTime = Instant.now().plus(12, ChronoUnit.SECONDS)
       val upgradeAction = new ARC_CoinRules(
         new CRARC_AddFutureCoinConfigSchedule(
@@ -118,6 +124,16 @@ class ModelUpgradeIntegrationTest
           configs.map(_.packageConfig.cantonCoin) should contain("0.2.0")
         },
       )
+
+      // Ensure that the code below really uses the new version. Locally things can be sufficiently
+      // fast that you otherwise still end up using the old version.
+      env.environment.clock
+        .scheduleAt(
+          _ => (),
+          CantonTimestamp.assertFromInstant(scheduledTime.plus(500, ChronoUnit.MILLIS)),
+        )
+        .unwrap
+        .futureValue
 
       // Vote on a dummy change on svc rules to ensure it is archived and recreated
       // which indicates the new choice is being used.
