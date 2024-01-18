@@ -146,9 +146,9 @@ class WalletTxLogTimeBasedIntegrationTest
       val aliceValidatorUserParty = aliceValidatorBackend.getValidatorPartyId()
 
       // Advance time to make sure we capture at least one round change in the tx history.
-      val (latestRound, _) = eventuallySucceeds() {
+      val latestRound = eventuallySucceeds() {
         advanceRoundsByOneTick
-        sv1ScanBackend.getRoundOfLatestData()
+        sv1ScanBackend.getOpenAndIssuingMiningRounds()._1.last.contract.payload.round.number
       }
 
       val coinConfig = clue("Get coin config") {
