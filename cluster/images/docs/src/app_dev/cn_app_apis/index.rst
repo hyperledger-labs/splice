@@ -16,6 +16,8 @@ this config file would expose the validator API on port 5003:
      }
    }
 
+OpenAPI Specifications
+----------------------
 
 The APIs are documented using `OpenAPI specifications <https://www.openapis.org/>`_. You can download the OpenAPI specification for Canton Networks applications here: |openapi_download_link|.
 
