@@ -21,7 +21,6 @@ println("Running canton bootstrap script...")
 val domainParametersConfig = DomainParametersConfig(
   protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
   devVersionSupport = true,
-  uniqueContractKeys = false,
 )
 
 def staticParameters(sequencer: LocalInstanceReferenceX) =

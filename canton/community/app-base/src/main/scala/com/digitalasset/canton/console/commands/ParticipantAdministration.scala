@@ -1063,29 +1063,6 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     def is_connected(domainId: DomainId): Boolean =
       list_connected().exists(_.domainId == domainId)
 
-    private def confirm_agreement(domainAlias: DomainAlias): Unit = {
-
-      val response = get_agreement(domainAlias)
-
-      val autoApprove =
-        sys.env.getOrElse("CANTON_AUTO_APPROVE_AGREEMENTS", "no").toLowerCase == "yes"
-      response.foreach {
-        case (agreement, accepted) if !accepted =>
-          if (autoApprove) {
-            accept_agreement(domainAlias.unwrap, agreement.id)
-          } else {
-            println(s"Service Agreement for `$domainAlias`:")
-            println(agreement.text)
-            println("Do you accept the license? yes/no")
-            print("> ")
-            val answer = Option(scala.io.StdIn.readLine())
-            if (answer.exists(_.toLowerCase == "yes"))
-              accept_agreement(domainAlias.unwrap, agreement.id)
-          }
-        case _ => () // Don't do anything if the license has already been accepted
-      }
-    }
-
     @Help.Summary(
       "Macro to connect a participant to a locally configured domain given by reference"
     )
@@ -1186,10 +1163,6 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         // register the domain configuration
         register(config.copy(manualConnect = true))
         if (!config.manualConnect) {
-          // fetch and confirm domain agreement
-          if (config.sequencerConnections.nonBftSetup) { // agreement is removed with the introduction of BFT domain.
-            confirm_agreement(config.domain.unwrap)
-          }
           reconnect(config.domain.unwrap, retry = false).discard
           // now update the domain settings to auto-connect
           modify(config.domain.unwrap, _.copy(manualConnect = false))
@@ -1444,22 +1417,6 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         } yield ()
       }
     }
-
-    @Help.Summary(
-      "Get the service agreement of the given domain alias and if it has been accepted already."
-    )
-    def get_agreement(domainAlias: DomainAlias): Option[(v0.Agreement, Boolean)] =
-      consoleEnvironment.run {
-        adminCommand(ParticipantAdminCommands.DomainConnectivity.GetAgreement(domainAlias))
-      }
-    @Help.Summary("Accept the service agreement of the given domain alias")
-    def accept_agreement(domainAlias: DomainAlias, agreementId: String): Unit =
-      consoleEnvironment.run {
-        adminCommand(
-          ParticipantAdminCommands.DomainConnectivity.AcceptAgreement(domainAlias, agreementId)
-        )
-      }
-
   }
 
   @Help.Summary("Composability related functionality", FeatureFlag.Preview)
