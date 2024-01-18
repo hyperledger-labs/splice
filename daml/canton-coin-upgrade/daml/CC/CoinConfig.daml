@@ -18,6 +18,7 @@ data TransferConfig currency = TransferConfig with
     holdingFee : RatePerRound -- ^ Fee for keeping a coin around
     transferFee : SteppedRate -- ^ Fee for transferring some amount of coin to a new owner.
     lockHolderFee : FixedFee -- ^ Fee per lock holder of a locked coin.
+    extraFeaturedAppRewardAmount : Decimal -- ^ Extra $-amount of reward for featured apps.
     maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
     maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
     maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked coin.

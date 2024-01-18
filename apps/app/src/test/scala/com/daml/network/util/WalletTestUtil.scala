@@ -928,34 +928,42 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       featured: Boolean,
   )(implicit
       env: CNNodeTestConsoleEnvironment
-  ): (BigDecimal, BigDecimal) = {
-    val issuanceConfig = sv1ScanBackend
-      .getOpenAndIssuingMiningRounds()
-      ._2
-      .lastOption
-      .getOrElse(throw new RuntimeException("No issuing round found"))
-      .contract
-      .payload
+  ): (BigDecimal, BigDecimal) =
+    // use eventually so that round advancement has some time to propagate to scan
+    eventually() {
+      val issuingRounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._2
+      def getIssuanceConfig(roundNumber: Long) =
+        issuingRounds
+          .collectFirst {
+            case round if round.contract.payload.round.number == roundNumber =>
+              round.contract.payload
+          }
+          .getOrElse(
+            fail(s"Could not find issuing round for round number $roundNumber")
+          )
 
-    val issuancePerARC = if (featured) {
-      BigDecimal(issuanceConfig.issuancePerFeaturedAppRewardCoupon)
-    } else {
-      BigDecimal(issuanceConfig.issuancePerUnfeaturedAppRewardCoupon)
+      val appRewardBalance = appRewards
+        .foldLeft(BigDecimal(0))((total, coupon) => {
+          val issuanceConfig = getIssuanceConfig(coupon.payload.round.number)
+          val issuancePerARC = if (featured) {
+            BigDecimal(issuanceConfig.issuancePerFeaturedAppRewardCoupon)
+          } else {
+            BigDecimal(issuanceConfig.issuancePerUnfeaturedAppRewardCoupon)
+          }
+          total + BigDecimal(coupon.payload.amount) * issuancePerARC
+        })
+        .setScale(10, BigDecimal.RoundingMode.HALF_EVEN)
+
+      val validatorRewardBalance = validatorRewards
+        .foldLeft(BigDecimal(0))((total, coupon) => {
+          val issuanceConfig = getIssuanceConfig(coupon.payload.round.number)
+          val issuancePerVRC = BigDecimal(issuanceConfig.issuancePerValidatorRewardCoupon)
+          total + BigDecimal(coupon.payload.amount) * issuancePerVRC
+        })
+        .setScale(10, BigDecimal.RoundingMode.HALF_EVEN)
+
+      appRewardBalance -> validatorRewardBalance
     }
-    val issuancePerVRC = BigDecimal(issuanceConfig.issuancePerValidatorRewardCoupon)
-
-    val appRewardBalance = appRewards
-      .foldLeft(BigDecimal(0))((total, coupon) =>
-        total + BigDecimal(coupon.payload.amount) * issuancePerARC
-      )
-      .setScale(10, BigDecimal.RoundingMode.HALF_EVEN)
-    val validatorRewardBalance = validatorRewards
-      .foldLeft(BigDecimal(0))((total, coupon) =>
-        total + BigDecimal(coupon.payload.amount) * issuancePerVRC
-      )
-      .setScale(10, BigDecimal.RoundingMode.HALF_EVEN)
-    appRewardBalance -> validatorRewardBalance
-  }
 
   protected def retryCommandSubmission[T](f: => T) = {
     eventually() {

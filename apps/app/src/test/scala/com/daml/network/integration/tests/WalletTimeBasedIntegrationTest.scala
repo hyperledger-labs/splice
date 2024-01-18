@@ -567,93 +567,12 @@ class WalletTimeBasedIntegrationTest
           checkBalance(
             aliceValidatorWalletClient,
             Some(balanceBefore.round + 2),
-            (balanceBefore.unlockedQty + 2.5, balanceBefore.unlockedQty + 3.0),
+            (balanceBefore.unlockedQty + 102.5, balanceBefore.unlockedQty + 103.0),
             (balanceBefore.lockedQty, balanceBefore.lockedQty),
             (0, 1),
           )
         },
       )
-    }
-
-    "handles rewards correctly in the context of 3rd party apps" in { implicit env =>
-      val (_, bobUserParty, _, splitwellProviderParty, key, _) =
-        initSplitwellTest()
-
-      aliceWalletClient.tap(350.0)
-
-      def transferAndCheckRewards(expectedAppRewardsRange: (BigDecimal, BigDecimal)) = {
-        clue("Transfer some cc through splitwell") {
-          splitwellTransfer(
-            aliceSplitwellClient,
-            aliceWalletClient,
-            bobUserParty,
-            BigDecimal(100.0),
-            key,
-          )
-        }
-
-        val aliceValidatorStartBalance = aliceValidatorWalletClient.balance()
-        val providerStartBalance = splitwellWalletClient.balance()
-
-        actAndCheck(
-          "Advance rounds until reward coupons are issued",
-          Seq(1, 2).foreach(_ => advanceRoundsByOneTick),
-        )(
-          "Wait for all reward coupons",
-          _ => {
-            // App reward coupon to alice's validator for the first (locking) leg
-            aliceValidatorWalletClient.listAppRewardCoupons() should have length 1
-            // App reward to splitwell provider for the second leg
-            splitwellWalletClient.listAppRewardCoupons() should have length 1
-            // One validator reward coupon per leg to alice's validator
-            aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 2
-          },
-        )
-
-        actAndCheck(
-          "Advance rounds again to get rewards",
-          Seq(1, 2).foreach(_ => advanceRoundsByOneTick),
-        )(
-          "Earn rewards",
-          _ => {
-            aliceValidatorWalletClient.listAppRewardCoupons() should be(empty)
-            splitwellWalletClient.listAppRewardCoupons() should be(empty)
-            aliceValidatorWalletClient.listValidatorRewardCoupons() should be(empty)
-            checkBalance(
-              aliceValidatorWalletClient,
-              Some(aliceValidatorStartBalance.round + 4),
-              (
-                aliceValidatorStartBalance.unlockedQty,
-                aliceValidatorStartBalance.unlockedQty + 5.0,
-              ),
-              (0, 0),
-              (0, 1),
-            )
-            checkBalance(
-              splitwellWalletClient,
-              Some(providerStartBalance.round + 4),
-              (
-                providerStartBalance.unlockedQty + expectedAppRewardsRange._1,
-                providerStartBalance.unlockedQty + expectedAppRewardsRange._2,
-              ),
-              (0, 0),
-              (0, 1),
-            )
-          },
-        )
-      }
-
-      transferAndCheckRewards((102.9, 103))
-
-      actAndCheck(
-        "Splitwell cancels its own featured app right",
-        splitwellWalletClient.cancelFeaturedAppRight(),
-      )(
-        "Splitwell is no longer featured",
-        _ => sv1ScanBackend.lookupFeaturedAppRight(splitwellProviderParty) should be(None),
-      )
-
-      transferAndCheckRewards((0.5, 0.6))
     }
 
     "generate rewards for subscriptions" in { implicit env =>

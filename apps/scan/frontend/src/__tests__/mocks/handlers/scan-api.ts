@@ -97,6 +97,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                     createFee: {
                       fee: '0.03',
                     },
+                    extraFeaturedAppRewardAmount: '1.0',
                     maxNumLockHolders: '50',
                     transferFee: {
                       initialRate: '0.01',

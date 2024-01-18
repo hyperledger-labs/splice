@@ -882,12 +882,13 @@ issueRewards config csum sender provider summary
           svc = csum.openRound.svc
           provider
           featured
-          amount = usageFees
+          amount = usageFees + extraAppReward
           round = csum.openRound.round
   where
     usageFees = sum summary.outputFees
     -- note: we do not create featured app rewards in case the app provider uses their own app
     featured = Some provider == csum.featuredAppProvider && sender /= provider
+    extraAppReward = if featured then csum.config.extraFeaturedAppRewardAmount else 0.0
 
 createTransferOutputs
   : OpenMiningRound -> TransferConfig CC -> Party -> Party -> TransferSummary -> TransferOutputsSummary
@@ -928,6 +929,7 @@ scaleFees s c = TransferConfig with
     holdingFee = scaleRatePerRound s c.holdingFee
     lockHolderFee = scaleFixedFee s c.lockHolderFee
     transferFee = scaleSteppedRate s c.transferFee
+    extraFeaturedAppRewardAmount = s * c.extraFeaturedAppRewardAmount
     maxNumInputs = c.maxNumInputs
     maxNumOutputs = c.maxNumOutputs
     maxNumLockHolders = c.maxNumLockHolders

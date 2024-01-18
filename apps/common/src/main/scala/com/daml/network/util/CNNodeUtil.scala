@@ -329,6 +329,9 @@ object CNNodeUtil {
     // actions on the locked coin.
     defaultLockHolderFee,
 
+    // Extra featured app reward amount, chosen to be equal to the domain fee cost of a single CC transfer
+    damlDecimal(1.0),
+
     // These should be large enough to ensure efficient batching, but not too large
     // to avoid creating very large transactions.
     initialMaxNumInputs.toLong,

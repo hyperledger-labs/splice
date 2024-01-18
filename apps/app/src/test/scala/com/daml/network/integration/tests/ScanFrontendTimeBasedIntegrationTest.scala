@@ -75,7 +75,7 @@ class ScanFrontendTimeBasedIntegrationTest
         clue("Compare app leaderboard values") {
           compareLeaderboardTable(
             "app-leaderboard-row",
-            Seq(s"${aliceValidatorWalletParty} 41.5 CC"),
+            Seq(s"${aliceValidatorWalletParty} 91.5 CC"),
           )
         }
 

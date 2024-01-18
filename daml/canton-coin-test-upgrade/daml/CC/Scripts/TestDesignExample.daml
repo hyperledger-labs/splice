@@ -216,7 +216,8 @@ test = do
     featured = True
     amount =
       -- rewards are issued for all output fees, but not the senderChangeFee
-      sum outputFees
+      sum outputFees +
+      transferConfig.extraFeaturedAppRewardAmount
     round = Round 50002
 
   -- check that the 'arbiter' does not receive featured app rewards when he's the provider

@@ -248,7 +248,8 @@ testCCPaymentRequest = script do
   [(_, coupon)] <- query @AppRewardCoupon aliceValidator.primaryParty
   coupon.amount ===
     transferConfigCC.createFee.fee + -- for one locked coin
-    transferConfigCC.lockHolderFee.fee * 3.0
+    transferConfigCC.lockHolderFee.fee * 3.0 +
+    transferConfigCC.extraFeaturedAppRewardAmount
   coupon.provider === aliceValidator.primaryParty
   coupon.featured === True
 

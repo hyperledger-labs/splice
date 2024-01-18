@@ -219,7 +219,7 @@ class ScanTimeBasedIntegrationTest
           compareLeaderboard(
             sv1ScanBackend.getTopProvidersByAppRewards(baseRoundWithLatestData + 4, 10),
             Seq(
-              (aliceValidatorWalletClient, BigDecimal(44.2580000000)),
+              (aliceValidatorWalletClient, BigDecimal(144.2580000000)),
               (bobValidatorWalletClient, BigDecimal(1.2366000000)),
             ),
           )

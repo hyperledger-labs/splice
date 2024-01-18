@@ -36,6 +36,9 @@ defaultTransferConfig = TransferConfig with
       initialRate = 0.01
       steps = [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
 
+    -- Extra reward amount for featured apps in USD
+    extraFeaturedAppRewardAmount = 1.0
+
     -- These should be large enough to ensure efficient batching, but not too large
     -- to avoid creating very large transactions.
     maxNumInputs = 100
@@ -114,6 +117,7 @@ issuanceConfig_10plus = IssuanceConfig with
   coinToIssuePerYear = 2.5e9
   validatorRewardPercentage = 0.2
   appRewardPercentage = 0.75
+  -- TODO(#9350): move these params out of the `IssuanceConfig` to save space and bandwidth for txs referencing `CoinRules`
   validatorRewardCap = 0.2
   featuredAppRewardCap = 100.0
   unfeaturedAppRewardCap = 0.6

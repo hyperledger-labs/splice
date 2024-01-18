@@ -279,6 +279,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
           transferConfig.holdingFee,
           transferConfig.transferFee,
           transferConfig.lockHolderFee,
+          transferConfig.extraFeaturedAppRewardAmount,
           42,
           42,
           42,

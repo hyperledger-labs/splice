@@ -161,31 +161,29 @@ testUSDSubscription = script do
   (_, round) <- getLatestOpenRound app
 
   let transferConfigCC = transferConfigCCFromOpenRound round
-      expectedFeeInLockLeg =
-        (
-          (transferConfigCC.lockHolderFee.fee * 2.0) +
-          (transferConfigCC.createFee.fee)
-        )
-      expectedFeeInUnlockLeg =
-        (
+      expectedValidatorRewardInLockLeg =
+          2.0 * transferConfigCC.lockHolderFee.fee +
+          transferConfigCC.createFee.fee
+      expectedAppRewardInLockLeg = expectedValidatorRewardInLockLeg + transferConfigCC.extraFeaturedAppRewardAmount
+      expectedValidatorRewardInUnlockLeg =
           transferConfigCC.createFee.fee +
           transferConfigCC.transferFee.initialRate * payData.paymentAmount.amount * (1.0 / round.coinPrice)
-        )
-
+      expectedAppRewardInUnlockLeg = expectedValidatorRewardInUnlockLeg + transferConfigCC.extraFeaturedAppRewardAmount
   [(_, reward)] <- query @CC.Coin.AppRewardCoupon validator
-  reward.amount === expectedFeeInLockLeg
+  reward.amount === expectedAppRewardInLockLeg
   reward.featured === True
 
   coins0 <- query @Coin pizzeria.primaryParty
   (_subscriptionCid, subscriptionStateCid, _pizzeriasCoin) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
 
   [(_, reward)] <- query @CC.Coin.AppRewardCoupon provider.primaryParty
-  reward.amount === expectedFeeInUnlockLeg
+  reward.amount === expectedAppRewardInUnlockLeg
+
   reward.featured === True
 
   rewards <- query @CC.Coin.ValidatorRewardCoupon alice.primaryParty
   let amounts = map (._2.amount) rewards
-  sort amounts === sort ([expectedFeeInLockLeg, expectedFeeInUnlockLeg])
+  sort amounts === sort ([expectedValidatorRewardInLockLeg, expectedValidatorRewardInUnlockLeg])
 
   coins1 <- query @Coin pizzeria.primaryParty
 
@@ -198,27 +196,25 @@ testUSDSubscription = script do
   (_, round2) <- getLatestOpenRound app
 
   let transferConfigCC2 = transferConfigCCFromOpenRound round2
-      expectedFeeInLockLeg2 =
-        (
-          (transferConfigCC2.lockHolderFee.fee * 2.0) +
-          (transferConfigCC2.createFee.fee)
-        )
-      expectedFeeInUnlockLeg2 =
-        (
+      expectedAppRewardInLockLeg2 =
+          2.0 * transferConfigCC2.lockHolderFee.fee +
+          transferConfigCC2.createFee.fee
+          -- no extra app reward when locking as the transfer below does not pass in the featured app right
+      expectedAppRewardInUnlockLeg2 =
           transferConfigCC2.createFee.fee +
-          transferConfigCC2.transferFee.initialRate * payData.paymentAmount.amount * (1.0 / round2.coinPrice)
-        )
+          transferConfigCC2.transferFee.initialRate * payData.paymentAmount.amount * (1.0 / round2.coinPrice) +
+          transferConfigCC2.extraFeaturedAppRewardAmount
 
   payment2Cid <- makeSubscriptionPayment app alice validator None subscriptionStateCid
   (subscriptionState2Cid, _pizzeriasCoin2) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment2Cid
 
   rewards <- query @CC.Coin.AppRewardCoupon validator
   let amounts = map (._2.amount) rewards
-  sort amounts === sort ([expectedFeeInLockLeg, expectedFeeInLockLeg2])
+  sort amounts === sort ([expectedAppRewardInLockLeg, expectedAppRewardInLockLeg2])
 
   rewards <- query @CC.Coin.AppRewardCoupon provider.primaryParty
   let amounts = map (._2.amount) rewards
-  sort amounts === sort ([expectedFeeInUnlockLeg, expectedFeeInUnlockLeg2])
+  sort amounts === sort ([expectedAppRewardInUnlockLeg, expectedAppRewardInUnlockLeg2])
 
   coins2 <- query @Coin pizzeria.primaryParty
   map (\(_, c) -> c.amount.initialAmount) (coins2 `diffContracts` coins1) === [1.0]

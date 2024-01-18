@@ -11,6 +11,7 @@ Release Notes
   * Validator rewards are issued over the full amount of CC spent.
   * No app rewards are issued for traffic purchases.
   * Set the minimum traffic purchase amount to 1 USD to ensure coverage of execution cost.
+  * Issue an extra app reward over $1 for CC transfers facilitated by featured apps.
 
 * Deployment:
 
