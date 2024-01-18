@@ -27,6 +27,7 @@ import com.daml.network.util.{CNNodeUtil, Codec, Contract, DisclosedContracts}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
+import com.digitalasset.canton.error.MediatorError.Timeout
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.ConfigurationErrors.SubmissionDomainNotReady
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors.UnknownInformees
@@ -697,6 +698,11 @@ object HttpWalletHandler {
           s"The operation $operationName failed due to the domain is not connected $ex."
         )
         TransientErrorKind
+      case Failure(ex: io.grpc.StatusRuntimeException) if isMediatorTimeout(ex) =>
+        logger.info(
+          s"The operation $operationName failed because the mediator did not receive enough confirmations in time $ex."
+        )
+        TransientErrorKind
       case Failure(ex) =>
         logThrowable(ex, logger)
         FatalErrorKind
@@ -732,6 +738,14 @@ object HttpWalletHandler {
         case ErrorInfoDetail(UnknownInformees.id, _) => true
         case _ => false
       })
+  }
+
+  private def isMediatorTimeout(ex: io.grpc.StatusRuntimeException): Boolean = {
+    (ex.getStatus.getCode == Status.Code.ABORTED) &&
+    ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
+      case ErrorInfoDetail(Timeout.id, _) => true
+      case _ => false
+    }
   }
 
   private def isNonspecificInvalidArgument(ex: io.grpc.StatusRuntimeException): Boolean = {
