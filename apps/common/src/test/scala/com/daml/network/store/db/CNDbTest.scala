@@ -52,7 +52,9 @@ trait CNDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 user_wallet_acs_store,
                 user_wallet_txlog_store,
                 acs_store_template,
-                store_descriptors
+                store_descriptors,
+                round_totals,
+                round_party_totals
             RESTART IDENTITY CASCADE""".asUpdate,
         "resetAllCnAppTables",
       )

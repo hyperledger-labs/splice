@@ -55,7 +55,7 @@ class ScanFrontendTimeBasedIntegrationTest
       })
 
       clue("Advance rounds to collect rewards") {
-        Range(0, 5).foreach(_ => advanceRoundsByOneTick)
+        Range(0, 6).foreach(_ => advanceRoundsByOneTick)
       }
 
       val aliceValidatorWalletParty = aliceValidatorWalletClient.userStatus().party
@@ -245,7 +245,7 @@ class ScanFrontendTimeBasedIntegrationTest
             trafficAmount,
             env.environment.clock.now,
           )
-          (0 to 4).foreach(_ => advanceRoundsByOneTick)
+          (0 to 5).foreach(_ => advanceRoundsByOneTick)
         },
       )(
         "Wait for round to close in scan",
@@ -290,7 +290,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
       actAndCheck(
         "Advance rounds",
-        (0 to 4).foreach(_ => advanceRoundsByOneTick),
+        (0 to 5).foreach(_ => advanceRoundsByOneTick),
       )(
         "Wait for round to close in scan",
         _ => sv1ScanBackend.getRoundOfLatestData()._1 shouldBe (firstRound + 1),

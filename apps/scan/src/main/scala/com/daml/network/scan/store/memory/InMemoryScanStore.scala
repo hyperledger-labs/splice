@@ -41,6 +41,10 @@ class InMemoryScanStore(
     with ScanStore
     with LimitHelpers {
 
+  def aggregate()(implicit
+      tc: TraceContext
+  ): Future[Unit] = Future.successful(())
+
   override def lookupCoinRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[CoinRules.ContractId, CoinRules]]] =
@@ -114,24 +118,15 @@ class InMemoryScanStore(
   }
 
   override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] = {
-    // TODO(#2930): For now, this is the latest closed mining round which has a corresponding open mining round in the log, since we are computing everything on-demand
-    // Note that for all existing (and currently planned) queries, we could make this also the latest open mining round
-    // that has been archived, but for now we're going for the later event of the round closing, to be a bit more future-proof.
-
     type Closed = TxLogEntry.ClosedMiningRoundLogEntry
-    type Open = TxLogEntry.OpenMiningRoundLogEntry
 
     multiDomainAcsStore
-      .findLatestTxLogEntry[Closed, Map[Long, Closed]](Map.empty) {
-        case (closed, r: Closed) =>
-          (closed + (r.round -> r)).asRight
-        case (closed, r: Open) =>
-          closed.get(r.round).fold(closed.asRight[Closed]) { (c: Closed) =>
-            c.asLeft[Map[Long, Closed]]
-          }
-        case (z, _) => z.asRight
+      .getLatestTxLogEntry {
+        case _: Closed =>
+          true
+        case _ => false
       }
-      .map(r => r.round -> r.effectiveAt)
+      .collect { case r: Closed => r.round -> r.effectiveAt }
   }
 
   override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =

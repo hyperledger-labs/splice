@@ -418,12 +418,109 @@ create table scan_txlog_store
     recent_activity_amount                                   numeric,
 
     -- coin_price of RecentActivityIndexRecord
-    recent_activity_coin_price                               numeric
+    recent_activity_coin_price                               numeric,
+
+    -- effective_at of closed mining round
+    closed_round_effective_at                                bigint
 );
 
 create index scan_txlog_store_sid_irt_r_en
     on scan_txlog_store (store_id, entry_type, round, entry_number desc)
     where round is not null;
+
+create table round_totals
+(
+    -- the store id of the scan store for which the totals are calculated
+    store_id int not null,
+
+    -- the closed round 
+    closed_round bigint not null,
+    
+    -- the effective_at of the closed round
+    closed_round_effective_at bigint not null,
+
+    -- the total app rewards in the round
+    app_rewards numeric,
+
+    -- the total validator rewards in the round
+    validator_rewards numeric,
+
+    -- the sum of change_to_initial_amount_as_of_round_zero in the round
+    change_to_initial_amount_as_of_round_zero numeric,
+
+    -- the sum of the changes to change_to_holding_fees_rate in the round
+    change_to_holding_fees_rate numeric,
+
+    -- the cumulative app rewards from round zero up to and including the round
+    cumulative_app_rewards numeric,
+
+    -- the cumulative validator rewards from round zero up to and including the round
+    cumulative_validator_rewards numeric,
+    
+    -- the cumulative change_to_initial_amount_as_of_round_zero from round zero up to and including the round
+    cumulative_change_to_initial_amount_as_of_round_zero numeric,
+
+    -- the cumulative change_to_holding_fees_rate from round zero up to and including the round
+    cumulative_change_to_holding_fees_rate numeric,
+    
+    -- the total coin balance as of end of round
+    total_coin_balance numeric,
+
+    primary key (store_id, closed_round)
+);
+
+create table round_party_totals
+(
+    -- the store id of the scan store for which the totals are calculated
+    store_id int not null,
+
+    -- the closed round
+    closed_round bigint not null,
+
+    -- the party for which the totals are calculated (validators, app operators)
+    party text not null,
+
+    -- the total app rewards for the party in the round
+    app_rewards numeric,
+
+    -- the total validator rewards for the party in the round
+    validator_rewards numeric,
+    
+    -- the traffic purchased for the party in the round
+    traffic_purchased bigint,
+
+    -- the traffic purchased cc spent for the party in the round
+    traffic_purchased_cc_spent numeric,
+
+    -- the traffic purchased number of purchases for the party in the round
+    traffic_num_purchases bigint,
+    
+    -- the cumulative app rewards for the party from round zero up to and including the round
+    cumulative_app_rewards numeric,
+
+    -- the cumulative validator rewards for the party from round zero up to and including the round
+    cumulative_validator_rewards numeric,
+
+    -- the cumulative change_to_initial_amount_as_of_round_zero for the party from round zero up to and including the round
+    cumulative_change_to_initial_amount_as_of_round_zero numeric,
+
+    -- the cumulative change_to_holding_fees_rate for the party from round zero up to and including the round
+    cumulative_change_to_holding_fees_rate numeric,
+
+    -- the total coin balance for the party as of end of round
+    total_coin_balance numeric,
+    
+    -- the cumulative traffic purchased for the party from round zero up to and including the round
+    cumulative_traffic_purchased bigint,
+
+    -- the cumulative traffic purchase cc spent for the party from round zero up to and including the round
+    cumulative_traffic_purchased_cc_spent numeric,
+
+    -- the cumulative traffic number of purchases for the party from round zero up to and including the round
+    cumulative_traffic_num_purchases numeric,
+    
+    primary key (store_id, closed_round, party)
+);
 
 -- SV store
 ------------------

@@ -42,6 +42,10 @@ trait ScanStore
     ]
     with PackageIdResolver.HasCoinRules {
 
+  def aggregate()(implicit
+      tc: TraceContext
+  ): Future[Unit]
+
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 

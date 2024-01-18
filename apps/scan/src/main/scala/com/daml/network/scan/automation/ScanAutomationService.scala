@@ -18,7 +18,7 @@ class ScanAutomationService(
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
-    store: ScanStore,
+    override val store: ScanStore,
     ingestFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -32,4 +32,6 @@ class ScanAutomationService(
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,
-    ) {}
+    ) {
+  registerTrigger(new ScanAggregationTrigger(store, triggerContext))
+}

@@ -14,6 +14,8 @@ import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.http.v0.definitions
+import com.daml.network.scan.ScanApp
+import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
@@ -23,7 +25,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.google.protobuf.ByteString
-
 import java.time.Instant
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
@@ -341,6 +342,17 @@ final class ScanAppBackendReference(
       s"remote participant for `$name`, with admin token",
       config.participantClient.participantClientConfigWithAdminToken,
     )
+  @Help.Summary(
+    "Returns the state of this app. May only be called while the app is running."
+  )
+  def appState: ScanApp.State = _appState[ScanApp.State, ScanApp]
+
+  @Help.Summary(
+    "Returns the current Scan automation."
+  )
+  def automation: ScanAutomationService = {
+    appState.automation
+  }
 }
 
 /** Remote reference to a scan app in the style of CNParticipantClientReference, i.e.,

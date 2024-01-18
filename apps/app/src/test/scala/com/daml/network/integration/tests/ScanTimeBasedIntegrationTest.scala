@@ -153,23 +153,19 @@ class ScanTimeBasedIntegrationTest
       "Advance 1 more tick to make sure we capture at least one round change in the tx history"
     ) {
       advanceRoundsByOneTick
+      sv1ScanBackend.automation.store.aggregate().futureValue
       sv1ScanBackend.getRoundOfLatestData()._1
     }
     clue("Advance one more tick to get to the next closed round") {
       advanceRoundsByOneTick
       val ledgerTime = getLedgerTime.toInstant
+      sv1ScanBackend.automation.store.aggregate().futureValue
       sv1ScanBackend.getRoundOfLatestData() should be((baseRoundWithLatestData + 1, ledgerTime))
     }
     clue("Data for a later round does not yet exist")({
       val laterRound = baseRoundWithLatestData + 2
-      assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.getTopProvidersByAppRewards(laterRound, 10),
-        _.errorMessage should include(s"Data for round $laterRound not yet computed"),
-      )
-      assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.getTopValidatorsByValidatorRewards(laterRound, 10),
-        _.errorMessage should include(s"Data for round $laterRound not yet computed"),
-      )
+      sv1ScanBackend.getTopProvidersByAppRewards(laterRound, 10) shouldBe empty
+      sv1ScanBackend.getTopValidatorsByValidatorRewards(laterRound, 10) shouldBe empty
     })
 
     def compareLeaderboard(
@@ -188,37 +184,55 @@ class ScanTimeBasedIntegrationTest
       "Test leaderboards for ends of rounds 4 and 5",
       _ => {
         val ledgerTime = getLedgerTime.toInstant
+        sv1ScanBackend.automation.store.aggregate().futureValue
         sv1ScanBackend.getRoundOfLatestData() should be((baseRoundWithLatestData + 5, ledgerTime))
 
         // TODO(#2930): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
-        compareLeaderboard(
-          sv1ScanBackend.getTopProvidersByAppRewards(baseRoundWithLatestData + 3, 10),
-          Seq(
-            (bobValidatorWalletClient, BigDecimal(0.6180000000)),
-            (aliceValidatorWalletClient, BigDecimal(0.2580000000)),
-          ),
-        )
-        compareLeaderboard(
-          sv1ScanBackend.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 3, 10),
-          Seq(
-            (bobValidatorWalletClient, BigDecimal(0.2060000000)),
-            (aliceValidatorWalletClient, BigDecimal(0.0860000000)),
-          ),
-        )
-        compareLeaderboard(
-          sv1ScanBackend.getTopProvidersByAppRewards(baseRoundWithLatestData + 4, 10),
-          Seq(
-            (aliceValidatorWalletClient, BigDecimal(44.2580000000)),
-            (bobValidatorWalletClient, BigDecimal(1.2366000000)),
-          ),
-        )
-        compareLeaderboard(
-          sv1ScanBackend.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 4, 10),
-          Seq(
-            (bobValidatorWalletClient, BigDecimal(0.4122000000)),
-            (aliceValidatorWalletClient, BigDecimal(0.1740000000)),
-          ),
-        )
+        val appRewardsBobR3 = BigDecimal(0.6180000000)
+        val appRewardsAliceR3 = BigDecimal(0.2580000000)
+        val validatorRewardsBobR3 = BigDecimal(0.2060000000)
+        val validatorRewardsAliceR3 = BigDecimal(0.0860000000)
+
+        (0 to baseRoundWithLatestData.toInt + 3).map { round =>
+          sv1ScanBackend.getRewardsCollectedInRound(round.toLong)
+        }.sum shouldBe appRewardsAliceR3 + appRewardsBobR3 + validatorRewardsAliceR3 + validatorRewardsBobR3
+
+        clue("Compare leaderboard getTopProvidersByAppRewards + 3") {
+          compareLeaderboard(
+            sv1ScanBackend.getTopProvidersByAppRewards(baseRoundWithLatestData + 3, 10),
+            Seq(
+              (bobValidatorWalletClient, appRewardsBobR3),
+              (aliceValidatorWalletClient, appRewardsAliceR3),
+            ),
+          )
+        }
+        clue("Compare leaderboard getTopValidatorsByValidatorRewards + 3") {
+          compareLeaderboard(
+            sv1ScanBackend.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 3, 10),
+            Seq(
+              (bobValidatorWalletClient, validatorRewardsBobR3),
+              (aliceValidatorWalletClient, validatorRewardsAliceR3),
+            ),
+          )
+        }
+        clue("Compare leaderboard getTopProvidersByAppRewards + 4") {
+          compareLeaderboard(
+            sv1ScanBackend.getTopProvidersByAppRewards(baseRoundWithLatestData + 4, 10),
+            Seq(
+              (aliceValidatorWalletClient, BigDecimal(44.2580000000)),
+              (bobValidatorWalletClient, BigDecimal(1.2366000000)),
+            ),
+          )
+        }
+        clue("Compare leaderboard getTopValidatorsByValidatorRewards + 4") {
+          compareLeaderboard(
+            sv1ScanBackend.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 4, 10),
+            Seq(
+              (bobValidatorWalletClient, BigDecimal(0.4122000000)),
+              (aliceValidatorWalletClient, BigDecimal(0.1740000000)),
+            ),
+          )
+        }
       },
     )
   }
@@ -246,16 +260,13 @@ class ScanTimeBasedIntegrationTest
 
     actAndCheck(
       "advance to close round 2",
-      (0 to 4).foreach(_ => advanceRoundsByOneTick),
+      (0 to 5).foreach(_ => advanceRoundsByOneTick),
     )(
       "check round 2 is closed",
       _ => {
         sv1ScanBackend.getRoundOfLatestData()._1 shouldBe 2
       },
     )
-
-    // advance to close round 2
-    (0 to 4).foreach(_ => advanceRoundsByOneTick)
 
     clue("Get total balances for round 0, 1 and 2") {
       val holdingFee = BigDecimal(CNNodeUtil.defaultHoldingFee.rate)

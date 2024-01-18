@@ -5,6 +5,7 @@ import com.daml.network.scan.store.TxLogEntry
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.{Member, PartyId}
+import com.digitalasset.canton.data.CantonTimestamp
 
 object ScanTables extends AcsTables {
 
@@ -44,6 +45,7 @@ object ScanTables extends AcsTables {
       extraTrafficValidator: Option[PartyId] = None,
       extraTrafficPurchaseTrafficPurchase: Option[Long] = None,
       extraTrafficPurchaseCcSpent: Option[BigDecimal] = None,
+      closedRoundEffectiveAt: Option[CantonTimestamp] = None,
   ) extends TxLogRowData {
 
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
@@ -56,6 +58,7 @@ object ScanTables extends AcsTables {
       "extra_traffic_validator" -> extraTrafficValidator,
       "extra_traffic_purchase_traffic_purchased" -> extraTrafficPurchaseTrafficPurchase,
       "extra_traffic_purchase_cc_spent" -> extraTrafficPurchaseCcSpent,
+      "closed_round_effective_at" -> closedRoundEffectiveAt,
     )
   }
 
@@ -76,6 +79,7 @@ object ScanTables extends AcsTables {
           ScanTxLogRowData(
             entry = cmr,
             round = Some(cmr.round),
+            closedRoundEffectiveAt = Some(CantonTimestamp.assertFromInstant(cmr.effectiveAt)),
           )
         case are: TxLogEntry.AppRewardLogEntry =>
           ScanTxLogRowData(

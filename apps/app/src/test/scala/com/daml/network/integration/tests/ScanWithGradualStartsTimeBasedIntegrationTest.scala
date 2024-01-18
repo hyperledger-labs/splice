@@ -59,7 +59,6 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
     clue("Tap some more coin now that sv2 scan is up") {
       aliceWalletClient.tap(3)
     }
-
     actAndCheck(
       "Advancing time to close rounds",
       // TODO(#2930): Since we are reporting in getRoundOfLatestData() only the latest round for which the log contains both the open and close,
@@ -68,8 +67,8 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
     )(
       "Waiting for scan apps to report rounds as closed",
       _ => {
-        Try(sv1ScanBackend.getRoundOfLatestData()._1).success.value shouldBe 4
-        Try(sv2ScanBackend.getRoundOfLatestData()._1).success.value shouldBe 4
+        Try(sv1ScanBackend.getRoundOfLatestData()._1).success.value shouldBe 3
+        Try(sv2ScanBackend.getRoundOfLatestData()._1).success.value shouldBe 3
       },
     )
 

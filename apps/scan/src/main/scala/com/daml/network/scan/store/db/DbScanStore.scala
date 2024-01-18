@@ -31,6 +31,7 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
+import com.digitalasset.canton.data.CantonTimestamp
 
 class DbScanStore(
     override val serviceUserPrimaryParty: PartyId,
@@ -61,6 +62,16 @@ class DbScanStore(
     with LimitHelpers {
 
   import multiDomainAcsStore.waitUntilAcsIngested
+
+  val aggregator: Future[ScanAggregator] =
+    waitUntilAcsIngested().map(_ => new ScanAggregator(storage, storeId, loggerFactory))
+
+  def aggregate()(implicit
+      tc: TraceContext
+  ): Future[Unit] = for {
+    a <- aggregator
+    _ <- a.aggregate()
+  } yield ()
 
   def storeId: Int = multiDomainAcsStore.storeId
 
@@ -134,16 +145,15 @@ class DbScanStore(
       tc: TraceContext
   ): Future[BigDecimal] =
     waitUntilAcsIngested {
+
       for {
         result <- storage.query(
           sql"""
-               select sum(balance_change_change_to_initial_amount_as_of_round_zero) -
-                     ($asOfEndOfRound + 1) * sum(balance_change_change_to_holding_fees_rate)
-               from scan_txlog_store
-               where store_id = $storeId
-                 and entry_type = ${TxLogEntry.BalanceChangeLogEntry.dbType}
-                 and round <= $asOfEndOfRound;
-             """.as[Option[BigDecimal]].headOption,
+          select total_coin_balance
+          from   round_totals
+          where  store_id = $storeId
+          and    closed_round = $asOfEndOfRound;
+          """.as[Option[BigDecimal]].headOption,
           "getTotalCoinBalance",
         )
       } yield result.flatten.getOrElse(0)
@@ -154,15 +164,16 @@ class DbScanStore(
       for {
         result <- storage.query(
           sql"""
-                  select sum(reward_amount)
-                  from scan_txlog_store
-                  where store_id = $storeId
-                    and entry_type in (
-                      ${TxLogEntry.ValidatorRewardLogEntry.dbType},
-                      ${TxLogEntry.AppRewardLogEntry.dbType}
-                    );
-               """.as[BigDecimal].headOption,
-          "getRewardsCollectedInRound",
+          select coalesce(cumulative_app_rewards, 0) + coalesce(cumulative_validator_rewards, 0)
+          from   round_totals
+          where  store_id = $storeId
+          and    closed_round = (
+                    select max(closed_round)
+                    from round_totals
+                    where store_id = $storeId
+                 );
+          """.as[BigDecimal].headOption,
+          "getTotalRewardsCollectedEver",
         )
       } yield result.getOrElse(0)
     }
@@ -305,15 +316,11 @@ class DbScanStore(
     for {
       result <- storage.query(
         sql"""
-              select sum(reward_amount)
-              from scan_txlog_store
-              where store_id = $storeId
-                and entry_type in (
-                  ${TxLogEntry.ValidatorRewardLogEntry.dbType},
-                  ${TxLogEntry.AppRewardLogEntry.dbType}
-                )
-                and round = $round;
-           """.as[BigDecimal].headOption,
+        select coalesce(app_rewards, 0) + coalesce(validator_rewards, 0)
+        from   round_totals
+        where  store_id = $storeId 
+        and    closed_round = $round;
+        """.as[BigDecimal].headOption,
         "getRewardsCollectedInRound",
       )
     } yield result.getOrElse(0)
@@ -372,59 +379,51 @@ class DbScanStore(
   override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] =
     waitUntilAcsIngested {
       for {
-        latestClosedRoundRow <- storage
-          .querySingle(
-            selectFromTxLogTable(
-              txLogTableName,
-              storeId,
-              where = sql"""entry_type = ${TxLogEntry.ClosedMiningRoundLogEntry.dbType}""",
-              orderLimit = sql"order by round desc limit 1",
-            ).headOption,
-            "getRoundOfLatestData.latestClosedRound",
-          )
-          .value
-        latestClosedRound = latestClosedRoundRow.map(
-          txLogEntryFromRow[TxLogEntry.ClosedMiningRoundLogEntry](txLogConfig)
-        )
-        earliestOpenRound <- storage
+        row <- storage
           .querySingle(
             sql"""
-               select min(open.round)
-               from scan_txlog_store open
-               where open.store_id = $storeId
-                and open.entry_type = ${TxLogEntry.OpenMiningRoundLogEntry.dbType};
-             """.as[Long].headOption,
-            "getRoundOfLatestData.earliestOpenRound",
+            select   closed_round, 
+                     closed_round_effective_at
+            from     round_totals
+            where    store_id = $storeId
+            order by closed_round desc
+            limit    1;
+            """.as[(Long, Long)].headOption,
+            "getRoundOfLatestData",
           )
           .value
-        result <- (latestClosedRound, earliestOpenRound) match {
-          case (
-                Some(closedRound),
-                Some(openRound),
-              ) if openRound <= closedRound.round =>
-            Future.successful(closedRound)
-          case _ =>
+        result <- row match {
+          case Some((closedRound, effectiveAt)) =>
+            Future.successful(
+              (closedRound, CantonTimestamp.assertFromLong(micros = effectiveAt).toInstant)
+            )
+          case None =>
             Future.failed(txLogNotFound())
         }
-      } yield result.round -> result.effectiveAt
+      } yield result
     }
 
   override def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
     for {
-      _ <- verifyDataExistsForEndOfRound(asOfEndOfRound)
       rows <- storage.query(
         sql"""
-              select rewarded_party, sum(reward_amount) as total_app_rewards
-              from scan_txlog_store
-              where store_id = $storeId
-                and entry_type = ${TxLogEntry.AppRewardLogEntry.dbType}
-                and round <= $asOfEndOfRound
-              group by rewarded_party
-              order by total_app_rewards desc
-              limit $limit;
-           """.as[(PartyId, BigDecimal)],
+              with ranked_providers_by_app_rewards as (
+                select   party as provider,
+                         max(cumulative_app_rewards) as cumulative_app_rewards,
+                         rank() over (order by max(cumulative_app_rewards) desc) as rank_nr
+                from     round_party_totals
+                where    store_id = $storeId
+                and      closed_round <= $asOfEndOfRound
+                group by party
+              )
+              select   provider,
+                       cumulative_app_rewards
+              from     ranked_providers_by_app_rewards
+              where    rank_nr <= $limit
+              order by rank_nr;       
+        """.as[(PartyId, BigDecimal)],
         "getTopProvidersByAppRewards",
       )
     } yield rows
@@ -434,17 +433,22 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
     for {
-      _ <- verifyDataExistsForEndOfRound(asOfEndOfRound)
       rows <- storage.query(
         sql"""
-              select rewarded_party, sum(reward_amount) as total_app_rewards
-              from scan_txlog_store
-              where store_id = $storeId
-                and entry_type = ${TxLogEntry.ValidatorRewardLogEntry.dbType}
-                and round <= $asOfEndOfRound
-              group by rewarded_party
-              order by total_app_rewards desc
-              limit $limit;
+              with ranked_validators_by_validator_rewards as (
+                select   party as validator,
+                         max(cumulative_validator_rewards) as cumulative_validator_rewards,
+                         rank() over (order by max(cumulative_validator_rewards) desc) as rank_nr
+                from     round_party_totals
+                where    store_id = $storeId
+                and      closed_round <= $asOfEndOfRound
+                group by party
+              )
+              select   validator,
+                       cumulative_validator_rewards
+              from     ranked_validators_by_validator_rewards
+              where    rank_nr <= $limit
+              order by rank_nr;       
            """.as[(PartyId, BigDecimal)],
         "getTopValidatorsByValidatorRewards",
       )
@@ -455,20 +459,41 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.ValidatorPurchasedTraffic]] = waitUntilAcsIngested {
     for {
+      // There might not be a row for a party where closed_round = asOfEndOfRound, so we need to use the
+      // max cumulatives for each party up to including asOfEndOfRound
+      // and separately get the last purchased round for each party in the leaderboard
       rows <- storage.query(
         sql"""
-              select extra_traffic_validator                       as validator,
-                     count(*)                                      as num_purchases,
-                     sum(extra_traffic_purchase_traffic_purchased) as total_traffic_purchased,
-                     sum(extra_traffic_purchase_cc_spent)          as total_cc_spent,
-                     max(round)                                    as last_purchased_in_round
-              from scan_txlog_store
-              where store_id = $storeId
-                and entry_type = ${TxLogEntry.ExtraTrafficPurchaseLogEntry.dbType}
-                and round <= $asOfEndOfRound
-              group by extra_traffic_validator
-              order by total_traffic_purchased desc
-              limit $limit;
+              with ranked_validators_by_purchased_traffic as (
+                select   party as validator,
+                         max(cumulative_traffic_num_purchases) as cumulative_traffic_num_purchases,
+                         max(cumulative_traffic_purchased) as cumulative_traffic_purchased,
+                         max(cumulative_traffic_purchased_cc_spent) as cumulative_traffic_purchased_cc_spent,
+                         rank() over (order by max(cumulative_traffic_purchased) desc) as rank_nr
+                from     round_party_totals
+                where    store_id = $storeId
+                and      closed_round <= $asOfEndOfRound
+                group by party
+              ),
+              last_purchases as (
+                select   party as validator,
+                         max(closed_round) as last_purchased_in_round
+                from     round_party_totals
+                where    store_id = $storeId
+                and      closed_round <= $asOfEndOfRound
+                and      traffic_purchased > 0
+                group by party
+              )
+              select    rv.validator,
+                        rv.cumulative_traffic_num_purchases, 
+                        rv.cumulative_traffic_purchased,
+                        rv.cumulative_traffic_purchased_cc_spent,
+                        coalesce(lp.last_purchased_in_round, 0)
+              from      ranked_validators_by_purchased_traffic rv
+              left join last_purchases lp
+              on        rv.validator = lp.validator
+              where     rv.rank_nr <= $limit
+              order by  rv.rank_nr;       
            """.as[(PartyId, Long, Long, BigDecimal, Long)],
         "getTopValidatorsByPurchasedTraffic",
       )

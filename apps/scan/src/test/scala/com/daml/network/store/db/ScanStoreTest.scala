@@ -53,6 +53,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 
       "return correct total coin balance for the round where the transfer happened and for the rounds before and after" in {
         val coinAmount = 100.0
+        // For aggregation to work correctly, all closed mining rounds for totals have to exist.
+        val closedRounds = (0 to 3).map { round =>
+          closedMiningRound(svcParty, round = round.toLong)
+        }
         for {
           store <- mkStore()
           coinRulesContract = coinRules()
@@ -78,6 +82,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           )(
             store.multiDomainAcsStore
           )
+          _ = closedRounds.map(closed =>
+            dummyDomain.create(closed)(store.multiDomainAcsStore).futureValue
+          )
+          _ <- store.aggregate()
         } yield {
           store.getTotalCoinBalance(1).futureValue shouldBe (0.0)
           // 100.0 is the initial amount as of round 0, so at the end of round 2 the holding fee was applied three times
@@ -89,6 +97,11 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       "return correct total coin balance for the round where the coin expired and for the rounds before and after" in {
         val coinRound1 = 100.0
         val changeToInitialAmountAsOfRoundZero = -50.0
+        // For aggregation to work correctly, all closed mining rounds for totals have to exist.
+        val closedRounds = (0 to 3).map { round =>
+          closedMiningRound(svcParty, round = round.toLong)
+        }
+
         for {
           store <- mkStore()
           _ <- dummyDomain.ingest(mintTransaction(user1, coinRound1, 1, holdingFee))(
@@ -110,6 +123,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           )(
             store.multiDomainAcsStore
           )
+          _ = closedRounds.map(closed =>
+            dummyDomain.create(closed)(store.multiDomainAcsStore).futureValue
+          )
+          _ <- store.aggregate()
         } yield {
           store.getTotalCoinBalance(1).futureValue shouldBe (coinRound1 - 1 * holdingFee)
           store
@@ -124,6 +141,11 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       "return correct total coin balance for the round where the locked coin expired and for the rounds before and after" in {
         val coinRound1 = 100.0
         val changeToInitialAmountAsOfRoundZero = -50.0
+        // For aggregation to work correctly, all closed mining rounds for totals have to exist.
+        val closedRounds = (0 to 3).map { round =>
+          closedMiningRound(svcParty, round = round.toLong)
+        }
+
         for {
           store <- mkStore()
           _ <- dummyDomain.ingest(mintTransaction(user1, coinRound1, 1, holdingFee))(
@@ -145,6 +167,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           )(
             store.multiDomainAcsStore
           )
+          _ = closedRounds.map(closed =>
+            dummyDomain.create(closed)(store.multiDomainAcsStore).futureValue
+          )
+          _ <- store.aggregate()
         } yield {
           store.getTotalCoinBalance(1).futureValue shouldBe (coinRound1 - 1 * holdingFee)
           store
@@ -158,11 +184,20 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 
       "return correct total coin balance for the round where the mint happened and for the rounds before and after" in {
         val mintAmount = 100.0
+        // For aggregation to work correctly, all closed mining rounds for totals have to exist.
+        val closedRounds = (0 to 3).map { round =>
+          closedMiningRound(svcParty, round = round.toLong)
+        }
+
         for {
           store <- mkStore()
           _ <- dummyDomain.ingest(mintTransaction(user1, mintAmount, 2, holdingFee))(
             store.multiDomainAcsStore
           )
+          _ = closedRounds.map(closed =>
+            dummyDomain.create(closed)(store.multiDomainAcsStore).futureValue
+          )
+          _ <- store.aggregate()
         } yield {
           store.getTotalCoinBalance(1).futureValue shouldBe (0.0)
           // The coin is minted at round 2, so at the end of that round it's already incurring 1 x holding fee
@@ -241,6 +276,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           11.25,
           9.75,
         )
+        val closedRounds = (0 to 1).map { round =>
+          closedMiningRound(svcParty, round = round.toLong)
+        }
+
         for {
           store <- mkStore()
           _ <- MonadUtil.sequentialTraverse(appRewards.zip(validatorRewards).zipWithIndex) {
@@ -260,6 +299,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
                 ),
               )(store.multiDomainAcsStore)
           }
+          _ = closedRounds.map(closed =>
+            dummyDomain.create(closed)(store.multiDomainAcsStore).futureValue
+          )
+          _ <- store.aggregate()
         } yield {
           store
             .getTotalRewardsCollectedEver()
@@ -282,6 +325,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           9.75,
           33.3,
         )
+        val closedRounds = (0 to 2).map { round =>
+          closedMiningRound(svcParty, round = round.toLong)
+        }
+
         for {
           store <- mkStore()
           _ <- MonadUtil.sequentialTraverse(appRewards.zipWithIndex) { case (amount, round) =>
@@ -316,6 +363,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               ),
             )(store.multiDomainAcsStore)
           }
+          _ = closedRounds.map(closed =>
+            dummyDomain.create(closed)(store.multiDomainAcsStore).futureValue
+          )
+          _ <- store.aggregate()
         } yield {
           store.getRewardsCollectedInRound(1).futureValue shouldBe validatorRewards(
             1
@@ -355,25 +406,27 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     "getRoundOfLatestData" should {
 
       "return the latest closed round" in {
-        val wantedOpen = openMiningRound(svcParty, round = 2, coinPrice = 2.0)
+        val closedBefore = (0 until 2).map { round =>
+          closedMiningRound(svcParty, round = round.toLong)
+        }
         val closed = closedMiningRound(svcParty, round = 2)
         val unwantedOpen = openMiningRound(svcParty, round = 3, coinPrice = 3.0)
         for {
           store <- mkStore()
           _ <- dummyDomain.create(
-            wantedOpen,
-            txEffectiveAt = Instant.ofEpochSecond(1000),
-          )(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(
             unwantedOpen,
             txEffectiveAt = Instant.ofEpochSecond(2000),
           )(store.multiDomainAcsStore)
           closeTime = Instant.ofEpochSecond(1500)
+          _ <- MonadUtil.sequentialTraverse(closedBefore) { closed =>
+            dummyDomain.create(closed, txEffectiveAt = closeTime)(
+              store.multiDomainAcsStore
+            )
+          }
           _ <- dummyDomain.create(closed, txEffectiveAt = closeTime)(
             store.multiDomainAcsStore
           )
+          _ <- store.aggregate()
         } yield {
           val (round, effectiveAt) = store.getRoundOfLatestData().futureValue
           round should be(2)
@@ -391,26 +444,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           failure.getMessage should be(txLogNotFound().getMessage)
         }
       }
-
-      "fail if there's a closed round but no corresponding open round" in {
-        val closed = closedMiningRound(svcParty, round = 2)
-        val openAfter = openMiningRound(svcParty, round = 3, coinPrice = 3.0)
-        for {
-          store <- mkStore()
-          openAfterTx <- dummyDomain.create(
-            openAfter,
-            txEffectiveAt = Instant.ofEpochSecond(2000),
-          )(store.multiDomainAcsStore)
-          closeTime = Instant.ofEpochSecond(1500)
-          _ <- dummyDomain.create(closed, txEffectiveAt = closeTime)(
-            store.multiDomainAcsStore
-          )
-        } yield {
-          val failure = store.getRoundOfLatestData().failed.futureValue
-          failure.getMessage should be(txLogNotFound().getMessage)
-        }
-      }
-
     }
 
     // tests look the same for both getTopProvidersByAppRewards & getTopValidatorsByValidatorRewards
@@ -439,9 +472,15 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       )
       val open = openMiningRound(svcParty, round = asOfEndOfRound, coinPrice = 2.0)
       val closed = closedMiningRound(svcParty, round = asOfEndOfRound)
+      val closedBefore = (0 until asOfEndOfRound.toInt).map { round =>
+        closedMiningRound(svcParty, round = round.toLong)
+      }
       for {
         store <- mkStore()
         _ <- dummyDomain.create(open)(store.multiDomainAcsStore)
+        _ <- MonadUtil.sequentialTraverse(closedBefore) { closed =>
+          dummyDomain.create(closed)(store.multiDomainAcsStore)
+        }
         _ <- dummyDomain.create(closed)(store.multiDomainAcsStore)
         _ <- MonadUtil.sequentialTraverse(providerRewardRounds) { case (provider, amount, round) =>
           dummyDomain.exercise(
@@ -455,6 +494,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             ),
           )(store.multiDomainAcsStore)
         }
+        _ <- store.aggregate()
       } yield {
         getTopProviders(store, asOfEndOfRound, 2).futureValue shouldBe Seq(
           userParty(3) -> BigDecimal(4.0 * 3),
@@ -497,7 +537,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             ),
         )
       }
-
     }
 
     "getTopValidatorsByPurchasedTraffic" should {
@@ -560,14 +599,21 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           )(_),
         )
         val open = openMiningRound(svcParty, round = asOfEndOfRound, coinPrice = 2.0)
+        val closedBefore = (0 until asOfEndOfRound.toInt).map { round =>
+          closedMiningRound(svcParty, round = round.toLong)
+        }
         val closed = closedMiningRound(svcParty, round = asOfEndOfRound)
         for {
           store <- mkStore()
           _ <- dummyDomain.create(open)(store.multiDomainAcsStore)
+          _ <- MonadUtil.sequentialTraverse(closedBefore) { closed =>
+            dummyDomain.create(closed)(store.multiDomainAcsStore)
+          }
           _ <- dummyDomain.create(closed)(store.multiDomainAcsStore)
           _ <- MonadUtil.sequentialTraverse(trafficPurchaseTrees)(
             dummyDomain.ingest(_)(store.multiDomainAcsStore)
           )
+          _ <- store.aggregate()
         } yield {
           store
             .getTopValidatorsByPurchasedTraffic(asOfEndOfRound, limit = 2)
@@ -1336,6 +1382,7 @@ class DbScanStoreTest
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )(parallelExecutionContext, implicitly, implicitly)
+
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
       _ <- store.multiDomainAcsStore.ingestionSink
