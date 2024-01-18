@@ -1,10 +1,10 @@
 {
-    "name": "CIDaily-TestNet Backup",
-    "description": "Periodic backup of CIDaily-TestNet",
+    "name": "CIDaily-TestNet Validator Restore",
+    "description": "Periodic restore of validator1 on CIDaily-TestNet",
     "attribution-actor": "system",
     "parameters": {
       "branch": "deployment/cidaily-testnet",
-      "run-job": "backup-cidaily-testnet"
+      "run-job": "restore-validator-cidaily-testnet"
     },
     "timetable": {
       "per-hour": 1,

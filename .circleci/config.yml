@@ -3493,7 +3493,7 @@ workflows:
           filters:
             branches:
               only:
-                - deployment/cidaily
+                - deployment/cidaily-testnet
           context:
             - artifactory
             - slack-context
@@ -3503,7 +3503,7 @@ workflows:
           filters:
             branches:
               only:
-                - deployment/cidaily
+                - deployment/cidaily-testnet
           cluster: "cidaily-testnet"
           namespace_name: "validator1"
           context:
