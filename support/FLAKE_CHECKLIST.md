@@ -189,13 +189,17 @@ In order to use their time effectively, create an GitHub issue for your problem 
       Have a look at `version` in `nix/canton-sources.json` - the `9d36b99f`
       in `2.7.0-snapshot.20230726.10871.0.v9d36b99f` is what the Canton team is typically interested in.
 
-If the issue is critical, contact the Canton team via the `#team-canton` Slack channel.
+If you create the issue in the Canton repository, make sure that it is
+assigned to the [Canton Ledgers Support Issues](https://github.com/orgs/DACH-NY/projects/30/views/1)
+board. Note that it is also fine to just create an issue in the
+`canton-network-node` repo and leave it up to the Canton team to
+create corresponding issues on their side.
+
+After documenting as much information as you can about the issue, ping
+the corresponding Canton team member that is on the support rotation
+this week. This can be found in the description of the
+[#team-canton](https://daholdings.slack.com/archives/C044LUG7CKT)
+channel:
 
 - Reference your GH issue.
-- Note the severity of the issue for us.
-- Tag someone from the Canton team.
-  Unless you already know who a good candidate might be (based on what is failing, Git blame, ...),
-  you can tag the person that is currently on support rotation.
-  The person is typically pinned at the top of the Slack channel.
-
-If the issue is not critical, send the above information directly to the Canton Protocol team lead (Rafael)
+- Note the severity of the issue for us (e.g., it is blocking us from consuming new Canton upgrades, it makes our current CI very flaky, it has only occured once so far, …)
