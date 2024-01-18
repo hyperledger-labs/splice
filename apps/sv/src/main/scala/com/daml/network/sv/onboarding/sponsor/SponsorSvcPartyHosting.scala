@@ -100,16 +100,14 @@ class SponsorSvcPartyHosting(
                 val newHostingParticipants = previous.participants.appended(
                   HostingParticipant(
                     newParticipant,
-                    ParticipantPermissionX.Submission,
+                    ParticipantPermissionX.Observation,
                   )
                 )
                 Right(
                   previous.copy(
                     participants = newHostingParticipants,
                     threshold = CNThresholds
-                      .partyToParticipantThreshold(
-                        newHostingParticipants.length
-                      ),
+                      .partyToParticipantThreshold(newHostingParticipants),
                   )
                 )
               },

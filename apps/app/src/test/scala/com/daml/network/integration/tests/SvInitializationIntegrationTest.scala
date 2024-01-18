@@ -8,6 +8,7 @@ import com.daml.network.console.{
 }
 import com.daml.network.environment.RetryFor
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.topology.transaction.ParticipantPermissionX
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 
 import scala.jdk.CollectionConverters.*
@@ -112,16 +113,6 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       .value
     newDecentralizedNamespace.mapping.threshold shouldBe PositiveInt.tryCreate(3)
     startSv(4, sv4Backend, sv4ValidatorBackend)
-    withClue("validate party to participant threshold") {
-      // validate here as well when onboarding is sequential
-      /// as this onboarding happens before the member is added to the svc members
-      sv1Backend.appState.participantAdminConnection
-        .getPartyToParticipant(globalDomainId, svcParty)
-        .futureValue
-        .mapping
-        .threshold
-        .value shouldBe 2
-    }
 
     clue("All SVs have reported their Scan URLs in SVC rules") {
       eventually() {
@@ -186,7 +177,19 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
           .futureValue
           .mapping
           .threshold
-          .value should (be >= 1 and be <= 2)
+          .value shouldBe 3
+      }
+    }
+    clue("SV participants have submission rights on behalf of the SVC party") {
+      eventually() {
+        val participantAdminConnection = sv1Backend.appState.participantAdminConnection
+        val svcHostingParticipants = participantAdminConnection
+          .getPartyToParticipant(globalDomainId, svcParty)
+          .futureValue
+          .mapping
+          .participants
+        svcHostingParticipants should have length 4
+        svcHostingParticipants.foreach(_.permission shouldBe ParticipantPermissionX.Submission)
       }
     }
   }

@@ -292,7 +292,7 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
         sv3Backend.participantClient.id,
         sv4Backend.participantClient.id,
       )
-      mapping.threshold shouldBe PositiveInt.two
+      mapping.threshold shouldBe PositiveInt.tryCreate(3)
       // Test that SV4 can submit transactions and they're observed by others.
       val action: ActionRequiringConfirmation =
         new ARC_SvcRules(

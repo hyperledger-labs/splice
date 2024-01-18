@@ -34,6 +34,7 @@ import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermissionX}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -404,6 +405,7 @@ class JoiningNodeInitializer(
               svParty.uid.namespace.fingerprint,
               RetryFor.WaitingOnInitDependency,
             )
+          _ <- waitForSvParticipantToHaveSubmissionRights()
         } yield ()
       }
 
@@ -481,6 +483,34 @@ class JoiningNodeInitializer(
               throw Status.NOT_FOUND.withDescription(description).asRuntimeException()
           }
         } yield svOnboardingConfirmed,
+        logger,
+      )
+    }
+
+    private def waitForSvParticipantToHaveSubmissionRights() = {
+      val description =
+        show"SV participant ${participantId} has Submission rights for party ${svcParty}"
+      retryProvider.getValueWithRetries(
+        RetryFor.WaitingOnInitDependency,
+        description,
+        for {
+          svcPartyHosting <- participantAdminConnection
+            .getPartyToParticipant(domainId, svcParty)
+        } yield {
+          svcPartyHosting.mapping.participants.find(_.participantId == participantId) match {
+            case None =>
+              throw Status.NOT_FOUND
+                .withDescription(
+                  show"Party ${svcParty} is not hosted on participant ${participantId}"
+                )
+                .asRuntimeException()
+            case Some(HostingParticipant(_, permission)) =>
+              if (permission == ParticipantPermissionX.Submission)
+                svcPartyHosting
+              else
+                throw Status.FAILED_PRECONDITION.withDescription(description).asRuntimeException()
+          }
+        },
         logger,
       )
     }

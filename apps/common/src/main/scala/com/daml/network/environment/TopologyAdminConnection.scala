@@ -538,9 +538,11 @@ abstract class TopologyAdminConnection(
       signedBy: Fingerprint,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] = {
     def addParticipant(participants: Seq[HostingParticipant]): Seq[HostingParticipant] = {
+      // New participants are only given Observation rights. We explicitly promote them to Submission rights later.
+      // See SvOnboardingPromoteToSubmitterTrigger.
       val newHostingParticipant =
-        HostingParticipant(newParticipant, ParticipantPermissionX.Submission)
-      if (participants.contains(newHostingParticipant)) {
+        HostingParticipant(newParticipant, ParticipantPermissionX.Observation)
+      if (participants.map(_.participantId).contains(newHostingParticipant.participantId)) {
         participants
       } else {
         participants.appended(newHostingParticipant)
@@ -581,10 +583,9 @@ abstract class TopologyAdminConnection(
                 )
                 proposal.mapping.participantIds ==
                   newHostingParticipants.map(_.participantId)
-                  && proposal.mapping.threshold == CNThresholds
-                    .partyToParticipantThreshold(
-                      newHostingParticipants.size
-                    )
+                  && proposal.mapping.threshold == CNThresholds.partyToParticipantThreshold(
+                    newHostingParticipants
+                  )
               })
               .getOrElse(
                 throw Status.NOT_FOUND
@@ -619,14 +620,54 @@ abstract class TopologyAdminConnection(
         Right(
           previous.copy(
             participants = newHostingParticipants,
-            threshold = CNThresholds
-              .partyToParticipantThreshold(
-                newHostingParticipants.size
-              ),
+            threshold = CNThresholds.partyToParticipantThreshold(newHostingParticipants),
           )
         )
       },
       RetryFor.WaitingOnInitDependency,
+      signedBy,
+    )
+  }
+
+  def ensureHostingParticipantIsPromotedToSubmitter(
+      domainId: DomainId,
+      party: PartyId,
+      participantId: ParticipantId,
+      signedBy: Fingerprint,
+      retryFor: RetryFor,
+  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] = {
+    def promoteParticipantToSubmitter(
+        participants: Seq[HostingParticipant]
+    ): Seq[HostingParticipant] = {
+      val newValue = HostingParticipant(participantId, ParticipantPermissionX.Submission)
+      val oldIndex = participants.indexWhere(_.participantId == newValue.participantId)
+      participants.updated(oldIndex, newValue)
+    }
+
+    ensureTopologyMapping[PartyToParticipantX](
+      TopologyStoreId.DomainStore(domainId),
+      s"Participant $participantId is promoted to have Submission permission for party $party",
+      EitherT(getPartyToParticipant(domainId, party).map(result => {
+        Either.cond(
+          result.mapping.participants
+            .contains(HostingParticipant(participantId, ParticipantPermissionX.Submission)),
+          result,
+          result,
+        )
+      })),
+      previous => {
+        Either.cond(
+          previous.participants.exists(_.participantId == participantId), {
+            val newHostingParticipants = promoteParticipantToSubmitter(previous.participants)
+            previous.copy(
+              participants = newHostingParticipants,
+              threshold = CNThresholds.partyToParticipantThreshold(newHostingParticipants),
+            )
+          },
+          show"Participant $participantId does not host party $party",
+        )
+      },
+      retryFor,
       signedBy,
     )
   }

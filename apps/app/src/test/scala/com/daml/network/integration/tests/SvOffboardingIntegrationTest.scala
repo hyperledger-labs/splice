@@ -69,7 +69,7 @@ class SvOffboardingIntegrationTest extends SvIntegrationTestBase {
               .getPartyToParticipant(globalDomainId, sv3Backend.getSvcInfo().svcParty)
               .futureValue
               .mapping
-            mapping.threshold shouldBe PositiveInt.tryCreate(1)
+            mapping.threshold shouldBe PositiveInt.tryCreate(2)
             mapping.participants.map(_.participantId.uid.namespace) should not contain sv4Backend
               .getSvcInfo()
               .svParty

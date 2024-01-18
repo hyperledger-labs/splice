@@ -3,6 +3,7 @@ package com.daml.network.config
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.util.Contract
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermissionX}
 
 import scala.math.{ceil, floor}
 
@@ -29,9 +30,11 @@ object CNThresholds {
   }
 
   def partyToParticipantThreshold(
-      participantsHostingTheParty: Int
+      hostingParticipants: Seq[HostingParticipant]
   ): PositiveInt = {
-    FPlus1Threshold(participantsHostingTheParty)
+    governanceThreshold(
+      hostingParticipants.count(_.permission == ParticipantPermissionX.Submission)
+    )
   }
 
   def sequencerConnectionsSizeThreshold(sequencersSize: Int): PositiveInt =
@@ -40,17 +43,17 @@ object CNThresholds {
     )
 
   def decentralizedNamespaceThreshold(decentralizedNamespaceSize: Int): PositiveInt = {
-    svcRulesThreshold(decentralizedNamespaceSize)
+    governanceThreshold(decentralizedNamespaceSize)
   }
 
   def requiredNumVotes(
       svcRules: Contract.Has[SvcRules.ContractId, SvcRules]
   ): Int = {
     val memberNum = svcRules.payload.members.size
-    svcRulesThreshold(memberNum).value
+    governanceThreshold(memberNum).value
   }
 
-  private def svcRulesThreshold(memberNum: Int) = {
+  private def governanceThreshold(memberNum: Int) = {
     // as per `SvcRules` / `summarizeCollective`
     val f = floor((memberNum - 1) / 3.0).toInt
     PositiveInt.tryCreate(ceil((memberNum + f + 1) / 2.0).toInt)

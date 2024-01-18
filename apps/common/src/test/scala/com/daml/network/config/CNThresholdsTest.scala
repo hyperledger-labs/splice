@@ -2,6 +2,8 @@ package com.daml.network.config
 
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermissionX}
 import org.scalatest.wordspec.AnyWordSpecLike
 
 class CNThresholdsTest extends AnyWordSpecLike with BaseTest {
@@ -51,18 +53,28 @@ class CNThresholdsTest extends AnyWordSpecLike with BaseTest {
         Table(
           ("mapping specific size", "threshold"),
           (1, 1),
-          (2, 1),
-          (3, 1),
-          (4, 2),
-          (5, 2),
-          (6, 2),
-          (7, 3),
+          (2, 2),
+          (3, 2),
+          (4, 3),
+          (5, 4),
+          (6, 4),
+          (7, 5),
         )
       ) { (mappingSpecificSize: Int, threshold: Int) =>
-        CNThresholds.partyToParticipantThreshold(mappingSpecificSize) shouldBe PositiveInt
+        CNThresholds.partyToParticipantThreshold(
+          mkHostingParticipantsOfSize(mappingSpecificSize)
+        ) shouldBe PositiveInt
           .tryCreate(threshold)
       }
     }
   }
 
+  private def mkHostingParticipantsOfSize(size: Int): Seq[HostingParticipant] = {
+    (1 to size).map(i =>
+      HostingParticipant(
+        ParticipantId.tryFromProtoPrimitive(s"PAR::participant$i::dummy"),
+        ParticipantPermissionX.Submission,
+      )
+    )
+  }
 }

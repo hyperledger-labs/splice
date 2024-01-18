@@ -50,7 +50,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
             .getPartyToParticipant(globalDomainId, sv1Backend.getSvcInfo().svcParty)
             .futureValue
             .mapping
-          mapping.threshold shouldBe PositiveInt.one
+          mapping.threshold shouldBe PositiveInt.tryCreate(2)
           mapping.participants.map(_.participantId) should contain theSameElementsAs expected
         }
       }
@@ -122,7 +122,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
             .getPartyToParticipant(globalDomainId, sv1Backend.getSvcInfo().svcParty)
             .futureValue
             .mapping
-          mapping.threshold shouldBe PositiveInt.one
+          mapping.threshold shouldBe PositiveInt.tryCreate(2)
           mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
             sv1Backend.participantClient.id,
             sv2Backend.participantClient.id,
