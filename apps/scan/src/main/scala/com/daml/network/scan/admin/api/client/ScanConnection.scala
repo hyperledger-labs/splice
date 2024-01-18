@@ -370,6 +370,20 @@ class ScanConnection private (
       HttpScanAppClient.ListSvcSequencers(),
     )
   }
+
+  def listSvcScans(): Future[Seq[HttpScanAppClient.DomainScans]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListSvcScans(),
+    ).map(_.map { scans =>
+      if (scans.malformed.nonEmpty) {
+        logger.warn(
+          s"Malformed scans found for domain ${scans.domainId}: ${scans.malformed.keys}. This likely indicates malicious SVs."
+        )
+      }
+      scans
+    })
+  }
 }
 
 object ScanConnection {

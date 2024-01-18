@@ -1,6 +1,6 @@
 package com.daml.network.scan.admin.api.client.commands
 
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.either.*
@@ -29,6 +29,7 @@ import java.util.Base64
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
+import scala.util.Try
 
 object HttpScanAppClient {
 
@@ -623,6 +624,7 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.ListSvcSequencersResponse.OK(response) =>
         response.domainSequencers.traverse { domain =>
+          // TODO (#9309): malicious scans can make these decoding fail
           Codec.decode(Codec.DomainId)(domain.domainId).flatMap { domainId =>
             domain.sequencers
               .traverse { s =>
@@ -646,6 +648,45 @@ object HttpScanAppClient {
       svName: String,
       availableAfter: Instant,
   )
+
+  case class ListSvcScans()
+      extends InternalBaseCommand[
+        http.ListSvcScansResponse,
+        Seq[DomainScans],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListSvcScansResponse] =
+      client.listSvcScans(headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListSvcScansResponse.OK(response) =>
+        response.scans.traverse { domain =>
+          // TODO (#9309): malicious scans can make this decoding fail
+          Codec.decode(Codec.DomainId)(domain.domainId).map { domainId =>
+            // all SVs validate the Uri, so this should only fail to parse for malicious SVs.
+            val (malformed, scanList) =
+              domain.scans.partitionMap(scan =>
+                Try(Uri(scan.publicUrl)).toEither
+                  .bimap(scan.publicUrl -> _, url => SvcScan(url, scan.svName))
+              )
+            DomainScans(domainId, scanList, malformed.toMap)
+          }
+        }
+    }
+  }
+  final case class DomainScans(
+      domainId: DomainId,
+      scans: Seq[SvcScan],
+      malformed: Map[String, Throwable],
+  )
+
+  final case class SvcScan(publicUrl: Uri, svName: String)
 
   case class ListTransactions(
       pageEndEventId: Option[String],

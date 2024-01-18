@@ -339,6 +339,18 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListSvcSequencersResponse"
+  /v0/scans:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listSvcScans"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListSvcScansResponse"
   /v0/activities:
     post:
       tags: [scan]
@@ -720,6 +732,32 @@ components:
         availableAfter:
           type: string
           format: date-time
+    ListSvcScansResponse:
+      type: object
+      required: [ "scans" ]
+      properties:
+        scans:
+          type: array
+          items:
+            $ref: "#/components/schemas/DomainScans"
+    DomainScans:
+      type: object
+      required: [ "domainId", "scans" ]
+      properties:
+        domainId:
+          type: string
+        scans:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScanInfo"
+    ScanInfo:
+      type: object
+      required: [ "publicUrl", "svName" ]
+      properties:
+        publicUrl:
+          type: string
+        svName:
+          type: string
     TransactionHistoryRequest:
       type: object
       required:

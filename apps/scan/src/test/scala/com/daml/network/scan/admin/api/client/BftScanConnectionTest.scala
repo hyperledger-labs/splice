@@ -3,16 +3,29 @@ package com.daml.network.scan.admin.api.client
 import com.daml.network.admin.http.HttpErrorWithHttpCode
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{BaseAppConnection, RetryProvider}
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.{DomainScans, SvcScan}
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.time.SimClock
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
-import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
+import org.apache.pekko.http.scaladsl.model.{
+  ContentTypes,
+  HttpEntity,
+  HttpResponse,
+  StatusCodes,
+  Uri,
+}
+import org.mockito.exceptions.base.MockitoAssertionError
 import org.scalatest.wordspec.AsyncWordSpec
 
+import java.time.Duration
 import scala.concurrent.Future
 
+// mock verification triggers this
+@SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))
 class BftScanConnectionTest
     extends AsyncWordSpec
     with BaseTest
@@ -21,6 +34,8 @@ class BftScanConnectionTest
 
   val retryProvider =
     RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory)
+
+  val clock = new SimClock(loggerFactory = loggerFactory)
 
   def getMockedConnections(n: Int): Seq[ScanConnection] = (0 until n).map { n =>
     val m = mock[ScanConnection]
@@ -35,8 +50,19 @@ class BftScanConnectionTest
   def makeMockFail(mock: ScanConnection, failure: Throwable): Unit = {
     when(mock.getSvcPartyId()).thenReturn(Future.failed(failure))
   }
-  def getBft(connections: Seq[ScanConnection]) = new BftScanConnection(
-    new BftScanConnection.Bft(connections, retryProvider, loggerFactory),
+  def getBft(
+      initialConnections: Seq[ScanConnection],
+      connectionBuilder: Uri => Future[ScanConnection] = _ =>
+        Future.failed(new RuntimeException("Shouldn't be refreshing!")),
+  ) = new BftScanConnection(
+    new BftScanConnection.Bft(
+      initialConnections,
+      connectionBuilder,
+      NonNegativeFiniteDuration.ofSeconds(1),
+      retryProvider,
+      loggerFactory,
+    ),
+    clock,
     retryProvider,
     loggerFactory,
   )
@@ -103,6 +129,42 @@ class BftScanConnectionTest
         },
         _.warningMessage should include("Consensus not reached."),
       )
+    }
+
+    "periodically refresh the list of scans" in {
+      val domainId = DomainId.tryFromString("domain::id")
+      val connections = getMockedConnections(n = 2)
+
+      connections.foreach(makeMockReturn(_, partyIdA))
+
+      connections.foreach { connection =>
+        when(connection.getCoinRulesDomain).thenReturn(() => _ => Future.successful(domainId))
+        when(connection.listSvcScans()).thenReturn(
+          Future.successful(
+            Seq(
+              DomainScans(
+                domainId,
+                scans = connections.zipWithIndex.map { case (_, n) =>
+                  SvcScan(s"https://$n.example.com", n.toString)
+                },
+                Map.empty,
+              )
+            )
+          )
+        )
+      }
+
+      // we initialize with just the first one, and the second one will be "built" when we refresh
+      val bft = getBft(connections.take(1), _ => Future.successful(connections(1)))
+      clock.advance(Duration.ofSeconds(2))
+
+      // eventually the refresh goes through and the second connection is used
+      eventually() {
+        val result = bft.getSvcPartyId().futureValue
+        try { verify(connections(1), atLeast(1)).getSvcPartyId() }
+        catch { case cause: MockitoAssertionError => fail("Mockito fail", cause) }
+        result should be(partyIdA)
+      }
     }
 
   }

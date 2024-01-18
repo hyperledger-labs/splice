@@ -292,7 +292,7 @@ class ValidatorApp(
           MinimalScanConnection(config, retryProvider, loggerFactory).flatMap(con =>
             con.checkActive().andThen(_ => con.close())
           )
-        case BftScanClientConfig.Bft(seedUrls, _) =>
+        case BftScanClientConfig.Bft(seedUrls, _, _) =>
           seedUrls
             .traverse { url =>
               val config = ScanAppClientConfig(NetworkAppClientConfig(url))
