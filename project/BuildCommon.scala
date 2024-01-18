@@ -130,6 +130,10 @@ object BuildCommon {
         .map(_.toInt)
         .map(Tags.limit(Tags.Test, _))
         .toSeq,
+      // Limit the number of concurrent damlTest tasks as they are pretty heavy on the RAM
+      // Number chosen to work well in CI on our Large executor, and our dev machines
+      // See #9400 for more details.
+      Global / concurrentRestrictions += Tags.limit(damlTestTag, 4),
       // copied from the Canton OSS repo
       Global / excludeLintKeys += Compile / damlBuildOrder,
       Global / excludeLintKeys += `canton-blake2b` / autoAPIMappings,
