@@ -11,7 +11,7 @@ import com.daml.network.store.CNNodeAppStore
   * We recommend using that connection for executing all command submissions that
   * depend on reads from the store to avoid synchronization issues like #4536
   */
-trait CNNodeAppStoreWithIngestion[Store <: CNNodeAppStore[?, ?]] {
+trait CNNodeAppStoreWithIngestion[Store <: CNNodeAppStore[?]] {
 
   /** The store setup with ingestion. */
   def store: Store

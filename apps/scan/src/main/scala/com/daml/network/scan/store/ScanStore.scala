@@ -6,13 +6,7 @@ import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.{
-  CNNodeAppStoreWithNewHistory,
-  Limit,
-  MultiDomainAcsStore,
-  PageLimit,
-  TxLogStoreNew,
-}
+import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore, PageLimit, TxLogStore}
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.scan.store.db.{DbScanStore, ScanTables}
 import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
@@ -37,7 +31,7 @@ object SortOrder {
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
 trait ScanStore
-    extends CNNodeAppStoreWithNewHistory[
+    extends CNNodeAppStore[
       TxLogEntry
     ]
     with PackageIdResolver.HasCoinRules {
@@ -54,7 +48,7 @@ trait ScanStore
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] =
     ScanStore.contractFilter(svcParty)
 
-  override lazy val txLogConfig = new TxLogStoreNew.Config[TxLogEntry] {
+  override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
     override val parser = new ScanTxLogParser(loggerFactory)
     override def entryToRow = ScanTables.ScanTxLogRowData.fromTxLogEntry
     override def encodeEntry = TxLogEntry.encode

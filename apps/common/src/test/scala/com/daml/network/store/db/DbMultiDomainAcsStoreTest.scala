@@ -3,28 +3,26 @@ package com.daml.network.store.db
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
 import com.daml.network.environment.{DarResources, RetryProvider}
-import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
-import com.daml.network.store.{MultiDomainAcsStore, MultiDomainAcsStoreTest, StoreTest}
+import com.daml.network.store.StoreTest.{TestTxLogEntry, testTxLogConfig}
+import com.daml.network.store.{MultiDomainAcsStore, MultiDomainAcsStoreTest}
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.tracing.TraceContext
 import slick.jdbc.JdbcProfile
 
 import scala.concurrent.Future
 
 class DbMultiDomainAcsStoreTest
     extends MultiDomainAcsStoreTest[
-      DbMultiDomainAcsStore[TestTxLogIndexRecord, TestTxLogEntry]
+      DbMultiDomainAcsStore[TestTxLogEntry]
     ]
     with CNPostgresTest
     with HasActorSystem
     with AcsJdbcTypes {
 
   override lazy val profile: JdbcProfile = storage.api.jdbcProfile
-  import storage.api.jdbcProfile.api.*
 
   "DbMultiDomainAcsStore" should {
 
@@ -96,10 +94,8 @@ class DbMultiDomainAcsStoreTest
       storeDescriptor(id),
       loggerFactory,
       filter,
-      TestTxLogStoreParser,
+      testTxLogConfig,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      ingestTxLogInsert = (_: StoreTest.TestTxLogIndexRecord, _: TraceContext) =>
-        Right(DBIO.successful(())),
     )
   }
 

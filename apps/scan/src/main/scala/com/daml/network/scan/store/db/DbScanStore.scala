@@ -12,12 +12,7 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.SortOrder.{Ascending, Descending}
 import com.daml.network.scan.store.db.ScanTables.txLogTableName
 import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry}
-import com.daml.network.store.db.{
-  AcsQueries,
-  AcsTables,
-  DbCNNodeAppStoreWithNewHistory,
-  TxLogQueries,
-}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.util.{ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -43,7 +38,7 @@ class DbScanStore(
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStoreWithNewHistory[TxLogEntry](
+) extends DbCNNodeAppStore[TxLogEntry](
       storage,
       ScanTables.acsTableName,
       ScanTables.txLogTableName,

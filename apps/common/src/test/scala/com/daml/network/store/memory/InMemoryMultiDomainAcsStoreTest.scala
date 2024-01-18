@@ -8,7 +8,7 @@ import com.daml.network.store.{
   MultiDomainAcsStore,
   MultiDomainAcsStoreTest,
 }
-import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord, TestTxLogStoreParser}
+import com.daml.network.store.StoreTest.{TestTxLogEntry, testTxLogConfig}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -17,7 +17,7 @@ import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 
 class InMemoryMultiDomainAcsStoreTest
     extends MultiDomainAcsStoreTest[
-      InMemoryMultiDomainAcsStore[TestTxLogIndexRecord, TestTxLogEntry]
+      InMemoryMultiDomainAcsStore[TestTxLogEntry]
     ]
     with HasExecutionContext
     with NamedLogging
@@ -27,11 +27,11 @@ class InMemoryMultiDomainAcsStoreTest
   override def mkStore(
       id: Int,
       filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData],
-  ): InMemoryMultiDomainAcsStore[TestTxLogIndexRecord, TestTxLogEntry] =
+  ): InMemoryMultiDomainAcsStore[TestTxLogEntry] =
     new InMemoryMultiDomainAcsStore(
       loggerFactory,
       filter,
-      TestTxLogStoreParser,
+      testTxLogConfig,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )(actorSystem.dispatcher)
 

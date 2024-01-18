@@ -13,11 +13,11 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.Validat
 import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry}
 import com.daml.network.store.{
   HardLimit,
-  InMemoryCNNodeAppStoreWithNewHistory,
+  InMemoryCNNodeAppStore,
   Limit,
   LimitHelpers,
   PageLimit,
-  TxLogStoreNew,
+  TxLogStore,
 }
 import com.daml.network.util.{Contract, ContractWithState}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -37,7 +37,7 @@ class InMemoryScanStore(
     override protected val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext
-) extends InMemoryCNNodeAppStoreWithNewHistory[TxLogEntry]
+) extends InMemoryCNNodeAppStore[TxLogEntry]
     with ScanStore
     with LimitHelpers {
 
@@ -246,17 +246,17 @@ class InMemoryScanStore(
     val entries = sortOrder match {
       case Descending =>
         pageEndEventId.fold(
-          TxLogStoreNew.firstPage[TxLogEntry, TxLogEntry.TransactionLogEntry](fromEnd, limit)
+          TxLogStore.firstPage[TxLogEntry, TxLogEntry.TransactionLogEntry](fromEnd, limit)
         )(endId =>
-          TxLogStoreNew.nextPage[TxLogEntry, TxLogEntry.TransactionLogEntry](fromEnd, endId, limit)(
+          TxLogStore.nextPage[TxLogEntry, TxLogEntry.TransactionLogEntry](fromEnd, endId, limit)(
             _.eventId
           )
         )
       case Ascending =>
         pageEndEventId.fold(
-          TxLogStoreNew.firstPage[TxLogEntry, TxLogEntry.TransactionLogEntry](fromBeginning, limit)
+          TxLogStore.firstPage[TxLogEntry, TxLogEntry.TransactionLogEntry](fromBeginning, limit)
         )(endId =>
-          TxLogStoreNew.nextPage[TxLogEntry, TxLogEntry.TransactionLogEntry](
+          TxLogStore.nextPage[TxLogEntry, TxLogEntry.TransactionLogEntry](
             fromBeginning,
             endId,
             limit,

@@ -17,7 +17,7 @@ import MultiDomainAcsStore.ContractState
   * can get called multiple times for the same contract as it gets transferred betweend domains.
   */
 abstract class OnAssignedContractTrigger[C, TCid <: ContractId[_], T](
-    store: CNNodeAppStore[_, _],
+    store: CNNodeAppStore[_],
     companion: C,
 )(implicit
     ec: ExecutionContext,

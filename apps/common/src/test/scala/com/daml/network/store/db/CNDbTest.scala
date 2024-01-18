@@ -51,7 +51,14 @@ trait CNDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
         sql"""TRUNCATE
                 user_wallet_acs_store,
                 user_wallet_txlog_store,
+                scan_acs_store,
+                scan_txlog_store,
+                sv_acs_store,
+                svc_acs_store,
+                svc_txlog_store,
                 acs_store_template,
+                txlog_store_template,
+                incomplete_reassignments,
                 store_descriptors,
                 round_totals,
                 round_party_totals

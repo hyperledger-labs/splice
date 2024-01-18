@@ -15,7 +15,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
 }
 import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
 import com.daml.network.store.db.AcsJdbcTypes
-import com.daml.network.store.{StoreErrors, TxLogStoreNew}
+import com.daml.network.store.{StoreErrors, TxLogStore}
 import com.daml.network.sv.history.*
 import com.daml.network.util.{ExerciseNode, TemplateJsonDecoder}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
@@ -37,7 +37,7 @@ import scala.jdk.CollectionConverters.*
 
 class SvcTxLogParser(
     override val loggerFactory: NamedLoggerFactory
-) extends TxLogStoreNew.Parser[
+) extends TxLogStore.Parser[
       SvcTxLogParser.TxLogEntry
     ]
     with NamedLogging {
@@ -97,7 +97,7 @@ class SvcTxLogParser(
 
 object SvcTxLogParser {
 
-  sealed trait TxLogEntry extends TxLogStoreNew.Entry {}
+  sealed trait TxLogEntry extends TxLogStore.Entry {}
 
   object TxLogEntry {
 

@@ -52,7 +52,7 @@ class InMemorySvSvcStore(
 )(implicit
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
-) extends InMemoryCNNodeAppStoreWithNewHistory[SvcTxLogParser.TxLogEntry]
+) extends InMemoryCNNodeAppStore[SvcTxLogParser.TxLogEntry]
     with SvSvcStore
     with LimitHelpers {
   import InMemorySvSvcStore.*

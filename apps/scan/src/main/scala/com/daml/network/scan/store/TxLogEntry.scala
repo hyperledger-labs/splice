@@ -3,7 +3,7 @@ package com.daml.network.scan.store
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
 import com.daml.network.codegen.java.cc
 import com.daml.network.history.*
-import com.daml.network.store.{StoreErrors, TxLogStoreNew}
+import com.daml.network.store.{StoreErrors, TxLogStore}
 import com.daml.network.util.{Codec, ExerciseNode}
 
 import scala.collection.immutable
@@ -25,7 +25,7 @@ import spray.json.{
 import java.time.ZoneOffset
 import scala.math.BigDecimal.RoundingMode
 
-sealed trait TxLogEntry extends TxLogStoreNew.Entry {
+sealed trait TxLogEntry extends TxLogStore.Entry {
   // Scan store uses the eventId for pagination
   def eventId: String
 }

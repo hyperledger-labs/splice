@@ -1,7 +1,7 @@
 package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.store.{StoreErrors, TxLogStoreNew}
+import com.daml.network.store.{StoreErrors, TxLogStore}
 import com.daml.network.store.db.TxLogQueries.{
   SelectFromTxLogTableResult,
   SelectFromTxLogTableResultWithOffset,
@@ -51,7 +51,7 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
 
   /** Same as [[selectFromAcsTableWithOffset]], but for tx log tables.
     */
-  protected def selectFromTxLogTableWithOffsetNew(
+  protected def selectFromTxLogTableWithOffset(
       tableName: String,
       storeId: Int,
       where: SQLActionBuilder,
@@ -85,7 +85,7 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
   }
 
   protected def txLogEntryFromRow[TXER <: TXE](
-      config: TxLogStoreNew.Config[TXE]
+      config: TxLogStore.Config[TXE]
   )(row: SelectFromTxLogTableResult)(implicit tag: ClassTag[TXER]): TXER = {
     config.decodeEntry(row.entryType, row.entryData) match {
       case e: TXER => e

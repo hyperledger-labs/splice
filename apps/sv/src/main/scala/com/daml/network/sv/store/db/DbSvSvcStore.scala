@@ -22,12 +22,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
 }
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
-import com.daml.network.store.db.{
-  AcsQueries,
-  AcsTables,
-  DbCNNodeAppStoreWithNewHistory,
-  TxLogQueries,
-}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{AcsStoreDump, Limit, LimitHelpers, MultiDomainAcsStore}
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
 import com.daml.network.util.*
@@ -53,7 +48,7 @@ class DbSvSvcStore(
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStoreWithNewHistory[SvcTxLogParser.TxLogEntry](
+) extends DbCNNodeAppStore[SvcTxLogParser.TxLogEntry](
       storage,
       SvcTables.acsTableName,
       SvcTables.txLogTableName,

@@ -8,51 +8,15 @@ import scala.concurrent.ExecutionContext
 /** In memory store setup shared by all of our apps
   */
 abstract class InMemoryCNNodeAppStore[
-    TXI <: TxLogStore.IndexRecord,
-    TXE <: TxLogStore.Entry[TXI],
+    TXE <: TxLogStore.Entry
 ](implicit protected val ec: ExecutionContext)
-    extends CNNodeAppStore[TXI, TXE] {
+    extends CNNodeAppStore[TXE] {
 
   protected def retryProvider: RetryProvider
   final protected def futureSupervisor: FutureSupervisor = retryProvider.futureSupervisor
 
-  override val multiDomainAcsStore: InMemoryMultiDomainAcsStore[TXI, TXE] =
+  override val multiDomainAcsStore: InMemoryMultiDomainAcsStore[TXE] =
     new InMemoryMultiDomainAcsStore(
-      loggerFactory,
-      acsContractFilter,
-      txLogParser,
-      retryProvider,
-    )
-
-  override def txLog: InMemoryMultiDomainAcsStore[TXI, TXE] = multiDomainAcsStore
-
-  override lazy val domains: DomainStore =
-    new InMemoryDomainStore(
-      acsContractFilter.ingestionFilter.primaryParty,
-      loggerFactory,
-      retryProvider,
-    )
-
-  override def close(): Unit = ()
-}
-
-abstract class InMemoryCNNodeAppStoreWithoutHistory(implicit
-    override protected val ec: ExecutionContext
-) extends InMemoryCNNodeAppStore[
-      TxLogStore.IndexRecord,
-      TxLogStore.Entry[TxLogStore.IndexRecord],
-    ] {}
-
-abstract class InMemoryCNNodeAppStoreWithNewHistory[
-    TXE <: TxLogStoreNew.Entry
-](implicit protected val ec: ExecutionContext)
-    extends CNNodeAppStoreWithNewHistory[TXE] {
-
-  protected def retryProvider: RetryProvider
-  final protected def futureSupervisor: FutureSupervisor = retryProvider.futureSupervisor
-
-  override val multiDomainAcsStore: InMemoryMultiDomainAcsStoreNew[TXE] =
-    new InMemoryMultiDomainAcsStoreNew(
       loggerFactory,
       acsContractFilter,
       txLogConfig,
@@ -67,7 +31,10 @@ abstract class InMemoryCNNodeAppStoreWithNewHistory[
     )
 
   override def close(): Unit = ()
-
-  // The following members will be deleted
-  override def txLog = ???
 }
+
+abstract class InMemoryCNNodeAppStoreWithoutHistory(implicit
+    override protected val ec: ExecutionContext
+) extends InMemoryCNNodeAppStore[
+      TxLogStore.Entry
+    ] {}

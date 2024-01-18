@@ -8,7 +8,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.store.{LimitHelpers, MultiDomainAcsStore}
-import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutNewHistory}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.util.{
   AssignedContract,
   Contract,
@@ -36,7 +36,7 @@ class DbSplitwellStore(
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStoreWithoutNewHistory(
+) extends DbCNNodeAppStoreWithoutHistory(
       storage = storage,
       acsTableName = SplitwellTables.acsTableName,
       storeDescriptor = Json.obj(

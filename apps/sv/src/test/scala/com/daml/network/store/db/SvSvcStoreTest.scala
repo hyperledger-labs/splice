@@ -48,7 +48,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.store.{Limit, PageLimit, StoreTest, TxLogStore}
+import com.daml.network.store.{Limit, PageLimit, StoreTest}
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.history.SvcRulesExecuteDefiniteVote
 import com.daml.network.sv.store.SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry
@@ -962,7 +962,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           votes = (1 to 4).map(n => vote(userParty(n), voteRequestContract.contractId)).toList
           result = mkExecuteDefiniteVoteResult(voteRequestContract)
           _ <- MonadUtil.sequentialTraverse(votes)(dummyDomain.create(_)(store.multiDomainAcsStore))
-          definitiveVoteTx <- dummyDomain.exercise(
+          _ <- dummyDomain.exercise(
             contract = svcRules(),
             interfaceId = Some(SvcRules.TEMPLATE_ID),
             choiceName = SvcRulesExecuteDefiniteVote.choice.name,
@@ -975,7 +975,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             store.multiDomainAcsStore
           )
         } yield {
-          transactionTreeSource.addTree(definitiveVoteTx)
           store
             .listVoteResults(
               Some("AddMember"),
@@ -1485,7 +1484,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
   }
 
   protected def mkStore(): Future[SvSvcStore]
-  protected lazy val transactionTreeSource = TxLogStore.TransactionTreeSource.ForTesting()
 
   lazy val acsOffset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
   lazy val domain = dummyDomain.toProtoPrimitive

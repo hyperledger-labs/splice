@@ -43,9 +43,12 @@ import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.store.db.TxLogRowData.TxLogRowDataWithoutIndices
+import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.protocol.LfContractId
 import com.google.protobuf.ByteString
+import spray.json.{DefaultJsonProtocol, DeserializationException, JsValue, RootJsonFormat}
 
 import java.time.{Duration, Instant}
 import java.util.Optional
@@ -845,27 +848,44 @@ object StoreTest {
 
   val dummyDomain = DomainId.tryFromString("dummy::domain")
 
-  case class TestTxLogIndexRecord(
-      optOffset: Option[String],
-      eventId: String,
-      domainId: DomainId,
-  ) extends TxLogStore.IndexRecord {
-    override def acsContractId: Option[ContractId[_]] = None
+  case class TestTxLogEntry(
+      payload: String
+  ) extends TxLogStore.Entry
+
+  object TestTxLogEntry extends StoreErrors {
+
+    val dbType: String3 = String3.tryCreate("tte")
+    def encode(entry: TestTxLogEntry): (String3, JsValue) = {
+      import spray.json.*
+      import TestTxLogEntry.JsonProtocol.*
+      (TestTxLogEntry.dbType, entry.toJson)
+    }
+    def decode(dbType: String3, json: JsValue): TestTxLogEntry = {
+      import TestTxLogEntry.JsonProtocol.*
+      try {
+        dbType match {
+          case TestTxLogEntry.dbType => json.convertTo[TestTxLogEntry]
+          case _ => throw txDecodingFailed()
+        }
+      } catch {
+        case _: DeserializationException => throw txDecodingFailed()
+      }
+    }
+
+    object JsonProtocol extends DefaultJsonProtocol {
+      implicit val partyBalanceChangeFormat: RootJsonFormat[TestTxLogEntry] =
+        jsonFormat1(TestTxLogEntry.apply)
+    }
   }
 
-  case class TestTxLogEntry(
-      indexRecord: TestTxLogIndexRecord,
-      payload: String,
-  ) extends TxLogStore.Entry[TestTxLogIndexRecord]
-
-  object TestTxLogStoreParser extends TxLogStore.Parser[TestTxLogIndexRecord, TestTxLogEntry] {
+  object TestTxLogStoreParser extends TxLogStore.Parser[TestTxLogEntry] {
     def parseAcs(
         acs: Seq[ActiveContract],
         incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
     )(implicit
         tc: TraceContext
-    ): Seq[(DomainId, TestTxLogEntry)] = Seq.empty
+    ): Seq[(DomainId, Option[ContractId[?]], TestTxLogEntry)] = Seq.empty
 
     override def tryParse(tx: TransactionTreeV2, domain: DomainId)(implicit
         tc: TraceContext
@@ -874,12 +894,7 @@ object StoreTest {
         onCreate = (res, event, _) => {
           res :+
             TestTxLogEntry(
-              indexRecord = TestTxLogIndexRecord(
-                optOffset = Some(tx.getOffset),
-                eventId = event.getEventId,
-                domainId = dummyDomain,
-              ),
-              payload = event.getEventId,
+              payload = event.getEventId
             )
         },
         onExercise = (res, _, _) => res,
@@ -891,5 +906,12 @@ object StoreTest {
         eventId: String,
         domainId: DomainId,
     ): Option[TestTxLogEntry] = None
+  }
+
+  val testTxLogConfig = new TxLogStore.Config[TestTxLogEntry] {
+    override def parser = TestTxLogStoreParser
+    override def entryToRow = e => TxLogRowDataWithoutIndices(e)
+    override def encodeEntry = TestTxLogEntry.encode
+    override def decodeEntry = TestTxLogEntry.decode
   }
 }

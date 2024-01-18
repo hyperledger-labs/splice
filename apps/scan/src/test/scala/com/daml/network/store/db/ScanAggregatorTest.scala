@@ -10,7 +10,6 @@ import com.daml.network.scan.store.db.ScanAggregator.*
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.store.StoreTest
 import com.daml.network.store.StoreErrors
-import com.daml.network.store.TxLogStore
 import com.daml.network.store.db.CNPostgresTest
 import com.daml.network.util.ResourceTemplateDecoder
 import com.daml.network.util.TemplateJsonDecoder
@@ -377,7 +376,6 @@ class ScanAggregatorTest
   private lazy val user1 = userParty(1)
   lazy val offset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
   lazy val domain = dummyDomain.toProtoPrimitive
-  lazy val transactionTreeSource = TxLogStore.TransactionTreeSource.ForTesting()
 
   def mkAggregator(
       serviceUserPrimaryParty: PartyId,

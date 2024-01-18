@@ -42,7 +42,7 @@ class DbValidatorStore(
     closeContext: CloseContext,
 ) extends DbCNNodeAppStoreWithoutHistory(
       storage = storage,
-      tableName = ValidatorTables.acsTableName,
+      acsTableName = ValidatorTables.acsTableName,
       storeDescriptor = Json.obj(
         "version" -> Json.fromInt(1),
         "store" -> Json.fromString("DbValidatorStore"),

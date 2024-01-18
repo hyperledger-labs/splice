@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cc.coin.{CoinCreateSummary, CoinExpireSumma
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.fees.ExpiringAmount
 import com.daml.network.history.*
-import com.daml.network.store.TxLogStoreNew
+import com.daml.network.store.TxLogStore
 import com.daml.network.scan.store.TxLogEntry.*
 import com.daml.network.util.{Codec, ExerciseNode}
 import com.daml.network.util.CNNodeUtil.dollarsToCC
@@ -25,7 +25,7 @@ import com.digitalasset.canton.topology.DomainId
 
 class ScanTxLogParser(
     override val loggerFactory: NamedLoggerFactory
-) extends TxLogStoreNew.Parser[
+) extends TxLogStore.Parser[
       TxLogEntry
     ]
     with NamedLogging {

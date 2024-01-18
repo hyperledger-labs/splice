@@ -47,7 +47,7 @@ import com.daml.network.history.{
   Tap,
   Transfer,
 }
-import com.daml.network.store.TxLogStoreNew
+import com.daml.network.store.TxLogStore
 import com.daml.network.util.ExerciseNode
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
@@ -64,7 +64,7 @@ class UserWalletTxLogParser(
     override val loggerFactory: NamedLoggerFactory,
     endUserParty: PartyId,
     endUserName: String,
-) extends TxLogStoreNew.Parser[TxLogEntry]
+) extends TxLogStore.Parser[TxLogEntry]
     with NamedLogging {
   import UserWalletTxLogParser.*
 

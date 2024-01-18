@@ -16,7 +16,7 @@ import com.daml.network.history.{
 }
 import com.daml.network.http.v0.definitions as httpDef
 import com.daml.network.http.v0.definitions.GetTransferOfferStatusResponse
-import com.daml.network.store.{StoreErrors, TxLogStoreNew}
+import com.daml.network.store.{StoreErrors, TxLogStore}
 import com.daml.network.util.{Codec, ExerciseNodeCompanion}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import spray.json.{
@@ -31,7 +31,7 @@ import spray.json.{
 
 import java.time.{Instant, ZoneOffset}
 
-sealed trait TxLogEntry extends TxLogStoreNew.Entry
+sealed trait TxLogEntry extends TxLogStore.Entry
 
 sealed trait TxLogEntryCompanion {
 

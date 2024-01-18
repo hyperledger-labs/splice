@@ -5,12 +5,7 @@ import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cc.round.types.Round
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.store.db.{
-  AcsQueries,
-  AcsTables,
-  DbCNNodeAppStoreWithNewHistory,
-  TxLogQueries,
-}
+import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.util.{Contract, TemplateJsonDecoder}
 import com.daml.network.wallet.store
@@ -34,7 +29,7 @@ class DbUserWalletStore(
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStoreWithNewHistory[TxLogEntry](
+) extends DbCNNodeAppStore[TxLogEntry](
       storage = storage,
       acsTableName = WalletTables.acsTableName,
       txLogTableName = WalletTables.txLogTableName,
@@ -175,7 +170,7 @@ class DbUserWalletStore(
       for {
         resultWithOffset <- storage
           .querySingle(
-            selectFromTxLogTableWithOffsetNew(
+            selectFromTxLogTableWithOffset(
               WalletTables.txLogTableName,
               storeId,
               sql"entry_type = ${TxLogEntry.TransferOffer.dbType} and tracking_id = ${lengthLimited(trackingId)}",
@@ -201,7 +196,7 @@ class DbUserWalletStore(
       for {
         resultWithOffset <- storage
           .querySingle(
-            selectFromTxLogTableWithOffsetNew(
+            selectFromTxLogTableWithOffset(
               WalletTables.txLogTableName,
               storeId,
               sql"entry_type = ${TxLogEntry.BuyTrafficRequest.dbType} and tracking_id = ${lengthLimited(trackingId)}",

@@ -60,7 +60,7 @@ import scala.jdk.OptionConverters.*
 
 /* Store used by the SV app for filtering contracts visible to the SVC party. */
 trait SvSvcStore
-    extends CNNodeAppStoreWithNewHistory[
+    extends CNNodeAppStore[
       SvcTxLogParser.TxLogEntry
     ]
     with PackageIdResolver.HasCoinRules {
@@ -75,7 +75,7 @@ trait SvSvcStore
   override lazy val acsContractFilter =
     SvSvcStore.contractFilter(key.svcParty, key.svParty)
 
-  override lazy val txLogConfig = new TxLogStoreNew.Config[SvcTxLogParser.TxLogEntry] {
+  override lazy val txLogConfig = new TxLogStore.Config[SvcTxLogParser.TxLogEntry] {
     val codec = SvcTxLogParser.TxLogEntry.Codec(templateJsonDecoder)
     override val parser = new SvcTxLogParser(loggerFactory)
     override def entryToRow = SvcTables.SvcTxLogRowData.fromTxLogEntry

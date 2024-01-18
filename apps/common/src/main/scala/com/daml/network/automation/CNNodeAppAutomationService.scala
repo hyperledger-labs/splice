@@ -19,7 +19,7 @@ import scala.concurrent.{ExecutionContext, Future}
 /** A class that wires up a single store with an ingestion service, and provides a suitable
   * context for registering triggers against that store.
   */
-abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?, ?]](
+abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?]](
     automationConfig: AutomationConfig,
     clock: Clock,
     override val store: Store,

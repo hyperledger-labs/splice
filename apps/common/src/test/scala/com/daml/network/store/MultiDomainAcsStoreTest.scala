@@ -9,7 +9,6 @@ import com.daml.network.codegen.java.cn.splitwell.*
 import com.daml.network.codegen.java.cn.wallet.payment.AppPaymentRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.ledger.api.ReassignmentEvent
-import com.daml.network.store.StoreTest.{TestTxLogEntry, TestTxLogIndexRecord}
 import com.daml.network.store.db.{AcsRowData, IndexColumnValue}
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, QualifiedName}
 import com.daml.nonempty.NonEmpty
@@ -21,10 +20,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 
 abstract class MultiDomainAcsStoreTest[
-    S <: MultiDomainAcsStore with TxLogStore[
-      TestTxLogIndexRecord,
-      TestTxLogEntry,
-    ]
+    S <: MultiDomainAcsStore
 ] extends StoreTest { this: HasActorSystem =>
 
   import MultiDomainAcsStore.*

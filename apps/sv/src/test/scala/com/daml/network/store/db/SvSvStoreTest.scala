@@ -45,6 +45,9 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
           store.lookupValidatorOnboardingBySecretWithOffset("good_secret").futureValue should be(
             QueryResult(secondOffset, Some(wanted))
           )
+          store.lookupValidatorOnboardingBySecretWithOffset("bad_secret").futureValue should be(
+            QueryResult(secondOffset, Some(unwanted))
+          )
         }
       }
 
@@ -78,6 +81,9 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
           store.lookupUsedSecretWithOffset("good_secret").futureValue should be(
             QueryResult(secondOffset, Some(wanted))
           )
+          store.lookupUsedSecretWithOffset("bad_secret").futureValue should be(
+            QueryResult(secondOffset, Some(unwanted))
+          )
         }
       }
 
@@ -104,6 +110,9 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
           store.lookupApprovedSvIdentityByNameWithOffset("good_name").futureValue should be(
             QueryResult(secondOffset, Some(wanted))
           )
+          store.lookupApprovedSvIdentityByNameWithOffset("bad_name").futureValue should be(
+            QueryResult(secondOffset, Some(unwanted))
+          )
         }
       }
 
@@ -122,7 +131,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
 
     contract(
       identifier = templateId,
-      contractId = new vo.ValidatorOnboarding.ContractId(s"$domain#$n"),
+      contractId = new vo.ValidatorOnboarding.ContractId(nextCid()),
       payload = template,
     )
   }
@@ -135,7 +144,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
 
     contract(
       templateId,
-      new UsedSecret.ContractId(validContractId(1)),
+      new UsedSecret.ContractId(nextCid()),
       template,
     )
   }
@@ -145,7 +154,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
 
     contract(
       ApprovedSvIdentity.TEMPLATE_ID,
-      new ApprovedSvIdentity.ContractId(validContractId(1)),
+      new ApprovedSvIdentity.ContractId(nextCid()),
       template,
     )
   }

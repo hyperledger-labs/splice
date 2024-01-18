@@ -13,7 +13,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class AssignTrigger(
     override protected val context: TriggerContext,
-    store: CNNodeAppStore[_, _],
+    store: CNNodeAppStore[_],
     connection: CNLedgerConnection,
     partyId: PartyId,
 )(implicit
