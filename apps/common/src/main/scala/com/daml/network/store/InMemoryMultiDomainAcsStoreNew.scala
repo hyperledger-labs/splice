@@ -11,6 +11,7 @@ import com.daml.network.store.db.AcsRowData
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, QualifiedName, Trees}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -35,6 +36,8 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
 
   import InMemoryMultiDomainAcsStoreNew.reassignmentContractOrder
   import MultiDomainAcsStore.*
+
+  override protected def metricsFactory: LabeledMetricsFactory = retryProvider.metricsFactory
 
   private val finishedAcsIngestion: Promise[Unit] = Promise()
 
@@ -539,7 +542,7 @@ class InMemoryMultiDomainAcsStoreNew[TXE <: TxLogStoreNew.Entry](
         )
       })
 
-  override def signalWhenIngestedOrShutdown(offset: String)(implicit
+  override protected def signalWhenIngestedOrShutdownImpl(offset: String)(implicit
       tc: TraceContext
   ): Future[Unit] =
     updateState[Future[Unit]](state =>

@@ -48,6 +48,7 @@ import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, Reassignm
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableWithStateResult
 import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
 
 import scala.collection.mutable
 
@@ -76,6 +77,8 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
   import MultiDomainAcsStore.*
   import DbMultiDomainAcsStore.*
   import profile.api.jdbcActionExtensionMethods
+
+  override protected def metricsFactory: LabeledMetricsFactory = retryProvider.metricsFactory
 
   private val state = new AtomicReference[State](State.empty())
 
@@ -421,7 +424,7 @@ class DbMultiDomainAcsStore[TXI <: TxLogStore.IndexRecord, TXE <: TxLogStore.Ent
       }
   }
 
-  override def signalWhenIngestedOrShutdown(offset: String)(implicit
+  override protected def signalWhenIngestedOrShutdownImpl(offset: String)(implicit
       tc: TraceContext
   ): Future[Unit] = {
     state

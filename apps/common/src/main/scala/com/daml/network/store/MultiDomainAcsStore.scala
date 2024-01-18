@@ -7,6 +7,7 @@ import com.daml.ledger.api.v2.transaction_filter.TransactionFilter as LapiTransa
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractCompanion as JavaContractCompanion}
+import com.daml.metrics.api.MetricsContext
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.environment.ledger.api.{
@@ -30,6 +31,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -42,6 +44,11 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
+  private implicit val mc: MetricsContext = MetricsContext(
+    "store_name" -> this.getClass.getSimpleName
+  )
+  protected def metricsFactory: LabeledMetricsFactory
+  val metrics = new StoreMetrics(metricsFactory)
 
   import MultiDomainAcsStore.*
 
@@ -201,6 +208,12 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
     * or a larger one or node-level shutdown was initiated
     */
   def signalWhenIngestedOrShutdown(offset: String)(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
+    metrics.signalWhenIngestedLatency.timeFuture(signalWhenIngestedOrShutdownImpl(offset))
+  }
+
+  protected def signalWhenIngestedOrShutdownImpl(offset: String)(implicit
       tc: TraceContext
   ): Future[Unit]
 
