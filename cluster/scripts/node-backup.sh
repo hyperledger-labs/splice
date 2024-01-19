@@ -4,20 +4,9 @@ set -euo pipefail
 
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
+source "${REPO_ROOT}/cluster/scripts/utils.source"
 
 RUN_ID=$(date +%s)
-
-function get_postgres_type() {
-  local instance=$1
-
-  cncluster pulumi canton-network stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*canton:.*:postgres::${instance}\")) | .type"
-}
-
-function get_cloudsql_id() {
-  local instance=$1
-
-  cncluster pulumi canton-network stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*DatabaseInstance::${instance}\")) | .id"
-}
 
 ##### PVC Backup & Restore
 

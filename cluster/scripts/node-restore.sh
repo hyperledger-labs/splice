@@ -4,6 +4,7 @@ set -euo pipefail
 
 # shellcheck disable=SC1091
 source "${TOOLS_LIB}/libcli.source"
+source "${REPO_ROOT}/cluster/scripts/utils.source"
 
 declare -A component_to_deployment
 component_to_deployment["sequencer-0"]="global-domain-0-sequencer"
@@ -14,19 +15,6 @@ component_to_deployment["cometbft-0"]="global-domain-0-cometbft"
 component_to_deployment["validator"]="validator-app"
 component_to_deployment["sv-app-0"]="sv-app-0"
 component_to_deployment["scan"]="scan-app"
-
-
-function get_postgres_type() {
-  local instance=$1
-
-  cncluster pulumi canton-network stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*canton:.*:postgres::${instance}\")) | .type"
-}
-
-function get_cloudsql_id() {
-  local instance=$1
-
-  cncluster pulumi canton-network stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*DatabaseInstance::${instance}\")) | .id"
-}
 
 function create_pvc_from_snapshot() {
   local -r snapshot_name=$1

@@ -1909,13 +1909,9 @@ function subcmd_restore_node() {
 
     if [ -z "$backup_run_id" ]; then
         _info "No backup run_id given, looking for the latest backup"
-        # ATM, we assume the latest backup was a full one, so we take the last created volumeSnapshot,
-        # and extract the runID from its name.
-        # TODO(#9361) make this more robust
-        # TODO(#9361) this will not work for validators with CloudSQL storage (for SVs, cometBFT backup is always a pvc snapshot, so this works for SVs)
-        backup_run_id=$(kubectl get volumesnapshot -n "$node" --sort-by=.metadata.creationTimestamp -o json | jq -r '.items[-1].metadata.name' | grep -o '[^-]*$')
-        if [ "$backup_run_id" == "null" ]; then
-            _error "No volume snapshots found in namespace $node. Was this node backed up? Is it an SV, or a validator that uses k8s-hosted postgres?"
+        backup_run_id=$("$REPO_ROOT"/cluster/scripts/find-recent-backup.sh "$node")
+        if [ -z "$backup_run_id" ]; then
+            _error "No recent backup found for $node"
         fi
         _info "Found latest backup run ID: $backup_run_id"
     fi
