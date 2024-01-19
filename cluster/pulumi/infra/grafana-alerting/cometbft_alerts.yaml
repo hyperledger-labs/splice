@@ -168,12 +168,17 @@ groups:
           __panelId__: "48"
           description: We're missing {{ index $values "current_invalid_voting_power" }} voting power from a total of {{ index $values "current_total_voting_power" }}. We can tolerate f = {{ index $values "acceptable_invalid_voting_power" }}.
           severity: |-
-            {{ if (gt (index $values "current_invalid_voting_power").Value (index $values "acceptable_invalid_voting_power").Value) -}}
+            {{- if (gt (index $values "current_invalid_voting_power").Value (index $values "acceptable_invalid_voting_power").Value) -}}
             critical
-            {{ else -}}
+            {{- else -}}
             medium
-            {{- end }}
-          summary: CometBFT network voting power close to byzantine status
+            {{- end -}}
+          summary: |-
+            {{- if (gt (index $values "current_invalid_voting_power").Value (index $values "acceptable_invalid_voting_power").Value) -}}
+            CometBFT network voting power is byzantine
+            {{- else -}}
+            CometBFT network voting power close to byzantine status
+            {{- end -}}
         isPaused: false
       - uid: a3b47fca-0982-491b-80bb-0c70f04dcd8b
         title: Cometbft Height Not Advancing
