@@ -444,6 +444,9 @@ Here are a few strategies and techniques that can be useful for speeding up the 
   Following that you can trigger a redeploy by whatever means is most convenient.
   Make sure that `TARGET_COMMIT` is a commit that was actually used previously in a `TestNet` or (for `DevNet`) `DevNet` deployment.
   If this is not the case, you need to ensure that public artifacts for this version have been published first (see below).
+  It is also important to not redeploy a cluster against the same commit.
+  That will keep the CometBFT chain id the same (and potentially also the domain id on testnet) which can result in nodes that have not yet
+  been reset connecting to the new chain/domain resulting in a fork.
 - If you have reason to believe that you can fix the underlying (not CI-related) deployment problem quickly by merging an appropriate PR,
   or that a fix already exists on the `main` branch for a commit that is younger than the deployed version,
   you need to bump the version of the failed deployment so your fix will be included in the redeployment attempt.
