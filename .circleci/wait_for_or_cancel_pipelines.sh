@@ -14,6 +14,7 @@ MAX_AGE_SECONDS="${6:-0}"
 # valid values for WAIT_OR_CANCEL:
 # - wait - (default) wait for pipelines with workflows matching WORKFLOW_NAMES to complete
 # - cancel_self - cancel current workflow if there exists a previously running pipeline with workflows matching WORKFLOW_NAMES
+# - cancel_self_if_found - cancel current workflow if there exists a previously pipeline (regardless of their status) with workflows matching WORKFLOW_NAMES
 # - cancel_pipeline - cancel previously running pipelines with workflows matching WORKFLOW_NAMES
 WAIT_OR_CANCEL="${7:-wait}"
 
@@ -228,6 +229,9 @@ run() {
                     if [ "$WAIT_OR_CANCEL" = "cancel_self" ]; then
                         echo "Pipeline contains workflow $WORKFLOW_NAME, cancelling current workflow if pipeline is still running..."
                         cancel_self_if_pipeline_running "$PIPELINE_ID"
+                    elif [ "$WAIT_OR_CANCEL" = "cancel_self_if_found" ]; then
+                        echo "Pipeline contains workflow $WORKFLOW_NAME, cancelling current workflow (regardless of the found pipeline's status)"
+                        cancel_workflow "$CIRCLE_WORKFLOW_ID"
                     elif [ "$WAIT_OR_CANCEL" = "cancel_pipeline" ]; then
                         echo "Pipeline contains workflow $WORKFLOW_NAME, cancelling all workflows for pipeline ..."
                         cancel_all_pipeline_workflows "$PIPELINE_ID"

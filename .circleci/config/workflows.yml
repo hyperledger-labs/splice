@@ -735,7 +735,7 @@ workflows:
             - artifactory
             - slack-context
           # Only wait for sv runbook deployments and for backup-recovery, concurrent preflight checks are fine.
-          workflow_names: "redeploy_sv_runbook_cidaily restore_sv_cidaily"
+          workflow_names: "redeploy_sv_runbook_cidaily"
       - cancel_if_previous_pipeline:
           <<: *notify-fail
           filters:
@@ -748,6 +748,22 @@ workflows:
           # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
           # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
           workflow_names: "deploy_cidaily_and_cidaily_testnet"
+      - cancel_if_previous_pipeline:
+          name: skip_during_catchup
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          # Skip healthchecks for ~1.5 hour after starting an sv node restore from backup.
+          # ATM, some tests are expected to fail while an SV is catching up, others are prone to failure.
+          # TODO(#9433): once we parallelize the restore, we can probably reduce the time to 1 hour.
+          max_pipeline_age_secs: 5400
+          workflow_names: "restore_sv_cidaily"
+          only_if_running: false
       - preflight_check:
           filters:
             branches:
@@ -762,6 +778,7 @@ workflows:
           requires:
             - wait_for_previous_pipeline
             - cancel_if_previous_pipeline
+            - skip_during_catchup
 
   cidaily_testnet_health_check:
     when:

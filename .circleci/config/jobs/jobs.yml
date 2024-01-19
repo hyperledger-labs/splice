@@ -466,14 +466,23 @@ jobs:
       max_pipeline_age_secs:
         type: integer
         default: 28800  # limit search to pipelines that are 8 hours old
+      only_if_running:
+        # if set to false, will cancel if a relevant pipeline is found, regardless of its current status
+        type: boolean
+        default: true
     steps:
       - checkout
       - run:
           name: "Cancel if previous pipeline"
           command: |
+            if [[ << parameters.only_if_running >> == true ]]; then
+              action="cancel_self"
+            else
+              action="cancel_self_if_found"
+            fi
             .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
               "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
-              << parameters.max_pipeline_age_secs >> cancel_self
+              << parameters.max_pipeline_age_secs >> $action
 
   cancel_previous_pipelines:
     docker:
