@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 55,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -55,10 +55,6 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
@@ -92,7 +88,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cn_trigger_completed_total{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"polling\"}[$__rate_interval]))",
+          "expr": "sum(rate(cn_trigger_latency_duration_seconds_count{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"polling\"}[$__rate_interval]))",
           "hide": false,
           "instant": false,
           "range": true,
@@ -154,7 +150,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cn_trigger_retried_total{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"polling\"}[$__rate_interval]))",
+          "expr": "sum(rate(cn_retries_failures{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"polling\", error_kind=\"transient\"}[$__rate_interval]))",
           "instant": false,
           "range": true,
           "refId": "A"
@@ -213,8 +209,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "editorMode": "code",
-          "expr": "sum(rate(cn_trigger_iterations_failed_total{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"polling\"}[$__rate_interval]))",
+          "editorMode": "builder",
+          "expr": "sum(rate(cn_retries_failures{namespace=~\"$namespace\", node_type=~\"$app\", trigger_name=~\"$trigger_name\", trigger_type=\"polling\", error_kind=\"fatal\"}[$__rate_interval]))",
           "instant": false,
           "range": true,
           "refId": "A"
@@ -374,7 +370,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by(trigger_name) (rate(cn_trigger_completed_total{namespace=~\"$namespace\", node_type=~\"$app\", trigger_type=\"polling\"}[$__rate_interval]))",
+          "expr": "sum by(trigger_name) (rate(cn_trigger_latency_duration_seconds_count{namespace=~\"$namespace\", node_type=~\"$app\", trigger_type=\"polling\"}[$__rate_interval]))",
           "format": "time_series",
           "instant": false,
           "range": true,
@@ -817,8 +813,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -972,8 +967,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -1065,7 +1059,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_trigger_completed_total,namespace)",
+        "definition": "label_values(cn_trigger_latency_duration_seconds_count,namespace)",
         "hide": 0,
         "includeAll": true,
         "label": "Namespace",
@@ -1073,7 +1067,7 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(cn_trigger_completed_total,namespace)",
+          "query": "label_values(cn_trigger_latency_duration_seconds_count,namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1092,7 +1086,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_trigger_completed_total{namespace=~\"$namespace\"},node_type)",
+        "definition": "label_values(cn_trigger_latency_duration_seconds_count{namespace=~\"$namespace\"},node_type)",
         "hide": 0,
         "includeAll": true,
         "label": "App",
@@ -1100,7 +1094,7 @@
         "name": "app",
         "options": [],
         "query": {
-          "query": "label_values(cn_trigger_completed_total{namespace=~\"$namespace\"},node_type)",
+          "query": "label_values(cn_trigger_latency_duration_seconds_count{namespace=~\"$namespace\"},node_type)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -1111,15 +1105,15 @@
       },
       {
         "current": {
-          "selected": true,
-          "text": "AdvanceOpenMiningRoundTrigger",
-          "value": "AdvanceOpenMiningRoundTrigger"
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(cn_trigger_completed_total{namespace=~\"$namespace\", node_type=~\"$app\"},trigger_name)",
+        "definition": "label_values(cn_trigger_latency_duration_seconds_count{namespace=~\"$namespace\", node_type=~\"$app\"},trigger_name)",
         "hide": 0,
         "includeAll": true,
         "label": "Trigger Name",
@@ -1127,7 +1121,7 @@
         "name": "trigger_name",
         "options": [],
         "query": {
-          "query": "label_values(cn_trigger_completed_total{namespace=~\"$namespace\", node_type=~\"$app\"},trigger_name)",
+          "query": "label_values(cn_trigger_latency_duration_seconds_count{namespace=~\"$namespace\", node_type=~\"$app\"},trigger_name)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
