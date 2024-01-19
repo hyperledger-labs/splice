@@ -18,7 +18,7 @@ class ScanAutomationService(
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
-    override val store: ScanStore,
+    store: ScanStore,
     ingestFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContextExecutor,

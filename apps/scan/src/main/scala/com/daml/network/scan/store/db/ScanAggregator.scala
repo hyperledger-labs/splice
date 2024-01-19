@@ -78,7 +78,7 @@ final class ScanAggregator(
              coalesce(total_coin_balance,0)
       from   round_totals
       where  store_id = $storeId
-      and    closed_round = (select coalesce(max(closed_round), 0) from round_totals)      
+      and    closed_round = (select coalesce(max(closed_round), 0) from round_totals)
     """
     storage
       .querySingle(
@@ -132,7 +132,6 @@ final class ScanAggregator(
                coalesce(cumulative_validator_rewards, 0), 
                coalesce(cumulative_change_to_initial_amount_as_of_round_zero, 0),
                coalesce(cumulative_change_to_holding_fees_rate, 0),
-               coalesce(total_coin_balance, 0),
                coalesce(cumulative_traffic_purchased, 0),
                coalesce(cumulative_traffic_purchased_cc_spent, 0),
                coalesce(cumulative_traffic_num_purchases, 0)
@@ -158,8 +157,13 @@ final class ScanAggregator(
     val lastAggregatedRound = lastAggregatedRoundO.getOrElse(-1L)
     for {
       rounds <- getClosedMiningRoundsSinceLastAggregated(lastAggregatedRound)
-      _ = if (rounds.nonEmpty)
-        logger.debug("Closed mining rounds since last aggregated: " + rounds.mkString(", "))
+      _ = if (rounds.nonEmpty) {
+        // Just in case the rounds_total table is truncated.
+        val roundsReported =
+          if (rounds.size < 100) rounds.mkString(", ")
+          else rounds.take(100).mkString(", ") + "..."
+        logger.debug(s"Closed mining rounds since last aggregated: $roundsReported")
+      }
       roundsIncomplete <- getIncompleteRoundsByContract(
         rounds.collect { case (round, Some(cId)) =>
           (round, cId)
@@ -439,7 +443,9 @@ final class ScanAggregator(
                   0 as validator_rewards,
                   0 as traffic_purchased,
                   0 as traffic_purchased_cc_spent,
-                  0 as traffic_num_purchases 
+                  0 as traffic_num_purchases,
+                  0 as change_to_initial_amount_as_of_round_zero,
+                  0 as change_to_holding_fees_rate
         from      scan_txlog_store
         where     store_id = $storeId
         and       round > (select last_closed_round from previously_aggregated)
@@ -455,7 +461,9 @@ final class ScanAggregator(
                   sum(reward_amount) as validator_rewards,
                   0 as traffic_purchased,
                   0 as traffic_purchased_cc_spent,
-                  0 as traffic_num_purchases 
+                  0 as traffic_num_purchases,
+                  0 as change_to_initial_amount_as_of_round_zero,
+                  0 as change_to_holding_fees_rate
         from      scan_txlog_store
         where     store_id = $storeId
         and       round > (select last_closed_round from previously_aggregated)
@@ -471,7 +479,9 @@ final class ScanAggregator(
                   0 as validator_rewards,
                   sum(extra_traffic_purchase_traffic_purchased) as traffic_purchased,
                   sum(extra_traffic_purchase_cc_spent) as traffic_purchased_cc_spent,
-                  count(case when extra_traffic_purchase_traffic_purchased is not null then 1 end) as traffic_num_purchases
+                  count(case when extra_traffic_purchase_traffic_purchased is not null then 1 end) as traffic_num_purchases,
+                  0 as change_to_initial_amount_as_of_round_zero,
+                  0 as change_to_holding_fees_rate
         from      scan_txlog_store
         where     store_id = $storeId
         and       round > (select last_closed_round from previously_aggregated)
@@ -480,6 +490,24 @@ final class ScanAggregator(
         and       extra_traffic_validator is not null
         group by  round, 
                   extra_traffic_validator
+        union all
+        select    round,
+                  key as party,
+                  0 as app_rewards,
+                  0 as validator_rewards,
+                  0 as traffic_purchased,
+                  0 as traffic_purchased_cc_spent,
+                  0 as traffic_num_purchases,
+                  sum((value ->> 'changeToInitialAmountAsOfRoundZero')::numeric) as change_to_initial_amount_as_of_round_zero,
+                  sum((value ->> 'changeToHoldingFeesRate')::numeric) as change_to_holding_fees_rate
+        from      scan_txlog_store,
+                  jsonb_each(entry_data -> 'partyBalanceChanges')
+        where     store_id = $storeId
+        and       round > (select last_closed_round from previously_aggregated)
+        and       round <= $lastClosedRound
+        and       entry_type = ${TxLogEntry.BalanceChangeLogEntry.dbType}
+        group by  round, 
+                  party
       ),
       new_totals as(
         select    round,
@@ -488,7 +516,9 @@ final class ScanAggregator(
                   sum(validator_rewards) as validator_rewards,
                   sum(traffic_purchased) as traffic_purchased,
                   sum(traffic_purchased_cc_spent) as traffic_purchased_cc_spent,
-                  sum(traffic_num_purchases) as traffic_num_purchases
+                  sum(traffic_num_purchases) as traffic_num_purchases,
+                  sum(change_to_initial_amount_as_of_round_zero) as change_to_initial_amount_as_of_round_zero,
+                  sum(change_to_holding_fees_rate) as change_to_holding_fees_rate
         from      new_totals_per_entry
         group by  round, 
                   party
@@ -499,7 +529,9 @@ final class ScanAggregator(
                   max(coalesce(cumulative_validator_rewards, 0)) as prev_cumulative_validator_rewards,
                   max(coalesce(cumulative_traffic_purchased, 0)) as prev_cumulative_traffic_purchased,
                   max(coalesce(cumulative_traffic_purchased_cc_spent, 0)) as prev_cumulative_traffic_purchased_cc_spent,
-                  max(coalesce(cumulative_traffic_num_purchases, 0)) as prev_cumulative_traffic_num_purchases
+                  max(coalesce(cumulative_traffic_num_purchases, 0)) as prev_cumulative_traffic_num_purchases,
+                  max(coalesce(cumulative_change_to_initial_amount_as_of_round_zero, 0)) as prev_cumulative_change_to_initial_amount_as_of_round_zero,
+                  max(coalesce(cumulative_change_to_holding_fees_rate, 0)) as prev_cumulative_change_to_holding_fees_rate
         from      round_party_totals
         where     store_id = $storeId
         group by  party
@@ -516,7 +548,9 @@ final class ScanAggregator(
                   sum(nt.validator_rewards) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_validator_rewards,0) as cumulative_validator_rewards,
                   sum(nt.traffic_purchased) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_traffic_purchased,0) as cumulative_traffic_purchased,
                   sum(nt.traffic_purchased_cc_spent) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_traffic_purchased_cc_spent,0) as cumulative_traffic_purchased_cc_spent,
-                  sum(nt.traffic_num_purchases) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_traffic_num_purchases,0) as cumulative_traffic_num_purchases
+                  sum(nt.traffic_num_purchases) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_traffic_num_purchases,0) as cumulative_traffic_num_purchases,
+                  sum(nt.change_to_initial_amount_as_of_round_zero) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_change_to_initial_amount_as_of_round_zero,0) as cumulative_change_to_initial_amount_as_of_round_zero,
+                  sum(nt.change_to_holding_fees_rate) over (partition by nt.party order by round) + coalesce(pt.prev_cumulative_change_to_holding_fees_rate,0) as cumulative_change_to_holding_fees_rate
         from      new_totals nt
         left join previous_totals pt
         on        nt.party = pt.party
@@ -534,7 +568,9 @@ final class ScanAggregator(
                   cumulative_validator_rewards, 
                   cumulative_traffic_purchased,
                   cumulative_traffic_purchased_cc_spent,
-                  cumulative_traffic_num_purchases
+                  cumulative_traffic_num_purchases,
+                  cumulative_change_to_initial_amount_as_of_round_zero,
+                  cumulative_change_to_holding_fees_rate
       )
       select      $storeId,
                   ct.round, 
@@ -548,7 +584,9 @@ final class ScanAggregator(
                   ct.cumulative_validator_rewards, 
                   ct.cumulative_traffic_purchased,
                   ct.cumulative_traffic_purchased_cc_spent,
-                  ct.cumulative_traffic_num_purchases
+                  ct.cumulative_traffic_num_purchases,
+                  ct.cumulative_change_to_initial_amount_as_of_round_zero,
+                  ct.cumulative_change_to_holding_fees_rate
       from        cumulative_totals ct
       on conflict do nothing
       """.asUpdate
@@ -615,11 +653,8 @@ object ScanAggregator {
       trafficNumPurchases: Long = 0L,
       cumulativeAppRewards: BigDecimal = zero,
       cumulativeValidatorRewards: BigDecimal = zero,
-      // TODO(#9077) aggregate
       cumulativeChangeToInitialAmountAsOfRoundZero: BigDecimal = zero,
-      // TODO(#9077) aggregate
       cumulativeChangeToHoldingFeesRate: BigDecimal = zero,
-      totalCoinBalance: BigDecimal = zero,
       cumulativeTrafficPurchased: Long = 0L,
       cumulativeTrafficPurchasedCcSpent: BigDecimal = zero,
       cumulativeTrafficNumPurchases: Long = 0L,
@@ -637,7 +672,6 @@ object ScanAggregator {
           <<[Long],
           <<[BigDecimal],
           <<[Long],
-          <<[BigDecimal],
           <<[BigDecimal],
           <<[BigDecimal],
           <<[BigDecimal],

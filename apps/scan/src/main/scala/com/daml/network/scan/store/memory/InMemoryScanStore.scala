@@ -43,7 +43,7 @@ class InMemoryScanStore(
 
   def aggregate()(implicit
       tc: TraceContext
-  ): Future[Unit] = Future.successful(())
+  ) = Future.successful(None)
 
   override def lookupCoinRules()(implicit
       tc: TraceContext

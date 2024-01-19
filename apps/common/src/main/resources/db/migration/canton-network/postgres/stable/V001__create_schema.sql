@@ -484,9 +484,6 @@ create table round_party_totals
     -- the cumulative change_to_holding_fees_rate for the party from round zero up to and including the round
     cumulative_change_to_holding_fees_rate numeric,
 
-    -- the total coin balance for the party as of end of round
-    total_coin_balance numeric,
-    
     -- the cumulative traffic purchased for the party from round zero up to and including the round
     cumulative_traffic_purchased bigint,
 

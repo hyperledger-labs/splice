@@ -63,10 +63,10 @@ class DbScanStore(
 
   def aggregate()(implicit
       tc: TraceContext
-  ): Future[Unit] = for {
+  ): Future[Option[ScanAggregator.RoundTotals]] = for {
     a <- aggregator
-    _ <- a.aggregate()
-  } yield ()
+    r <- a.aggregate()
+  } yield r
 
   def storeId: Int = multiDomainAcsStore.storeId
 
@@ -325,21 +325,25 @@ class DbScanStore(
       tc: TraceContext
   ): Future[BigDecimal] = waitUntilAcsIngested {
     for {
-      result <- storage.query(
-        sql"""
-             select sum((entry_data -> 'partyBalanceChanges' -> $partyId
-                         ->> 'changeToInitialAmountAsOfRoundZero')::numeric)
-                    - ($asOfEndOfRound + 1)
-                      * sum((entry_data -> 'partyBalanceChanges' -> $partyId
-                             ->> 'changeToHoldingFeesRate')::numeric)
-             from scan_txlog_store
-             where store_id = $storeId
-               and entry_type = ${TxLogEntry.BalanceChangeLogEntry.dbType}
-               and round <= $asOfEndOfRound
-               and (entry_data -> 'partyBalanceChanges') ?? $partyId;
+      (round, _) <- getRoundOfLatestData()
+      result <-
+        if (round >= asOfEndOfRound) {
+          storage.query(
+            // The round_party_totals might not have a row for the given round, (when the party has not been active in that round)
+            // in that case just take the most recent round.
+            // This is also why the total_coin_balance is calculated from the two cumulative fields.
+            sql"""
+             select   cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1) as total_coin_balance
+             from     round_party_totals
+             where    store_id = $storeId
+             and      closed_round <= $asOfEndOfRound
+             and      party = $partyId
+             order by closed_round desc
+             limit    1;
            """.as[Option[BigDecimal]].headOption,
-        "getWalletBalance",
-      )
+            "getWalletBalance",
+          )
+        } else Future.successful(None)
     } yield result.flatten.getOrElse(0)
   }
 
@@ -402,8 +406,11 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
     for {
-      rows <- storage.query(
-        sql"""
+      (round, _) <- getRoundOfLatestData()
+      rows <-
+        if (round >= asOfEndOfRound) {
+          storage.query(
+            sql"""
               with ranked_providers_by_app_rewards as (
                 select   party as provider,
                          max(cumulative_app_rewards) as cumulative_app_rewards,
@@ -411,6 +418,7 @@ class DbScanStore(
                 from     round_party_totals
                 where    store_id = $storeId
                 and      closed_round <= $asOfEndOfRound
+                and      cumulative_app_rewards > 0
                 group by party
               )
               select   provider,
@@ -419,8 +427,9 @@ class DbScanStore(
               where    rank_nr <= $limit
               order by rank_nr;       
         """.as[(PartyId, BigDecimal)],
-        "getTopProvidersByAppRewards",
-      )
+            "getTopProvidersByAppRewards",
+          )
+        } else Future.successful(Seq.empty)
     } yield rows
   }
 
@@ -428,8 +437,11 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
     for {
-      rows <- storage.query(
-        sql"""
+      (round, _) <- getRoundOfLatestData()
+      rows <-
+        if (round >= asOfEndOfRound) {
+          storage.query(
+            sql"""
               with ranked_validators_by_validator_rewards as (
                 select   party as validator,
                          max(cumulative_validator_rewards) as cumulative_validator_rewards,
@@ -437,6 +449,7 @@ class DbScanStore(
                 from     round_party_totals
                 where    store_id = $storeId
                 and      closed_round <= $asOfEndOfRound
+                and      cumulative_validator_rewards > 0
                 group by party
               )
               select   validator,
@@ -445,8 +458,9 @@ class DbScanStore(
               where    rank_nr <= $limit
               order by rank_nr;       
            """.as[(PartyId, BigDecimal)],
-        "getTopValidatorsByValidatorRewards",
-      )
+            "getTopValidatorsByValidatorRewards",
+          )
+        } else Future.successful(Seq.empty)
     } yield rows
   }
 
@@ -454,11 +468,14 @@ class DbScanStore(
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.ValidatorPurchasedTraffic]] = waitUntilAcsIngested {
     for {
-      // There might not be a row for a party where closed_round = asOfEndOfRound, so we need to use the
-      // max cumulatives for each party up to including asOfEndOfRound
-      // and separately get the last purchased round for each party in the leaderboard
-      rows <- storage.query(
-        sql"""
+      (round, _) <- getRoundOfLatestData()
+      rows <-
+        if (round >= asOfEndOfRound) {
+          // There might not be a row for a party where closed_round = asOfEndOfRound, so we need to use the
+          // max cumulatives for each party up to including asOfEndOfRound
+          // and separately get the last purchased round for each party in the leaderboard
+          storage.query(
+            sql"""
               with ranked_validators_by_purchased_traffic as (
                 select   party as validator,
                          max(cumulative_traffic_num_purchases) as cumulative_traffic_num_purchases,
@@ -468,6 +485,7 @@ class DbScanStore(
                 from     round_party_totals
                 where    store_id = $storeId
                 and      closed_round <= $asOfEndOfRound
+                and      cumulative_traffic_purchased > 0
                 group by party
               ),
               last_purchases as (
@@ -490,8 +508,9 @@ class DbScanStore(
               where     rv.rank_nr <= $limit
               order by  rv.rank_nr;       
            """.as[(PartyId, Long, Long, BigDecimal, Long)],
-        "getTopValidatorsByPurchasedTraffic",
-      )
+            "getTopValidatorsByPurchasedTraffic",
+          )
+        } else Future.successful(Seq.empty)
     } yield rows.map((HttpScanAppClient.ValidatorPurchasedTraffic.apply _).tupled)
   }
 

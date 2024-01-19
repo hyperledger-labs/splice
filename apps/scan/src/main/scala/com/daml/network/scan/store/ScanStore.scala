@@ -21,6 +21,7 @@ import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
 import java.time.Instant
+import com.daml.network.scan.store.db.ScanAggregator
 
 sealed trait SortOrder
 
@@ -38,7 +39,7 @@ trait ScanStore
 
   def aggregate()(implicit
       tc: TraceContext
-  ): Future[Unit]
+  ): Future[Option[ScanAggregator.RoundTotals]]
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId

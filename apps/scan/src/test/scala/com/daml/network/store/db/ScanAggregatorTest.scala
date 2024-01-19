@@ -321,6 +321,7 @@ class ScanAggregatorTest
         .toMap
 
       for (i <- 0 to lastRound.toInt) {
+        val _ = aggr.appendRoundTotals(None, i.toLong).futureValue
         val _ = aggr.appendRoundPartyTotals(i.toLong).futureValue
       }
       val limit = 10

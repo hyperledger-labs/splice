@@ -9,11 +9,11 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
+import com.daml.network.scan.automation.ScanAggregationTrigger
 import com.daml.network.util.*
 import com.daml.network.util.CNNodeUtil.defaultCnsConfig
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-
 import scala.jdk.CollectionConverters.*
 
 class ScanTimeBasedIntegrationTest
@@ -32,6 +32,12 @@ class ScanTimeBasedIntegrationTest
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndCoinMerging
+      // Start ScanAggregationTrigger in paused state, calling runOnce in tests
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
+          _.withPausedTrigger[ScanAggregationTrigger]
+        )(config)
+      )
 
   "report correct reference data" in { implicit env =>
     def roundNum() =
@@ -153,17 +159,18 @@ class ScanTimeBasedIntegrationTest
       "Advance 1 more tick to make sure we capture at least one round change in the tx history"
     ) {
       advanceRoundsByOneTick
-      sv1ScanBackend.automation.store.aggregate().futureValue
+      sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
       sv1ScanBackend.getRoundOfLatestData()._1
     }
     clue("Advance one more tick to get to the next closed round") {
       advanceRoundsByOneTick
       val ledgerTime = getLedgerTime.toInstant
-      sv1ScanBackend.automation.store.aggregate().futureValue
+      sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
       sv1ScanBackend.getRoundOfLatestData() should be((baseRoundWithLatestData + 1, ledgerTime))
     }
     clue("Data for a later round does not yet exist")({
-      val laterRound = baseRoundWithLatestData + 2
+      val lastAggregatedRound = sv1ScanBackend.getRoundOfLatestData()._1
+      val laterRound = lastAggregatedRound + 1
       sv1ScanBackend.getTopProvidersByAppRewards(laterRound, 10) shouldBe empty
       sv1ScanBackend.getTopValidatorsByValidatorRewards(laterRound, 10) shouldBe empty
     })
@@ -184,7 +191,7 @@ class ScanTimeBasedIntegrationTest
       "Test leaderboards for ends of rounds 4 and 5",
       _ => {
         val ledgerTime = getLedgerTime.toInstant
-        sv1ScanBackend.automation.store.aggregate().futureValue
+        sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
         sv1ScanBackend.getRoundOfLatestData() should be((baseRoundWithLatestData + 5, ledgerTime))
 
         // TODO(#2930): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
@@ -260,16 +267,18 @@ class ScanTimeBasedIntegrationTest
 
     actAndCheck(
       "advance to close round 2",
-      (0 to 5).foreach(_ => advanceRoundsByOneTick),
+      (0 to 4).foreach(_ => advanceRoundsByOneTick),
     )(
       "check round 2 is closed",
       _ => {
+        sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
         sv1ScanBackend.getRoundOfLatestData()._1 shouldBe 2
       },
     )
 
     clue("Get total balances for round 0, 1 and 2") {
       val holdingFee = BigDecimal(CNNodeUtil.defaultHoldingFee.rate)
+
       val total0 = sv1ScanBackend.getTotalCoinBalance(0)
       val total1 = sv1ScanBackend.getTotalCoinBalance(1)
       val total2 = sv1ScanBackend.getTotalCoinBalance(2)

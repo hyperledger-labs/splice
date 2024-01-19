@@ -213,6 +213,11 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         val keptCoinAmount = 60.0
         val sentCoinAmount = 40.0
         val coinAmount = keptCoinAmount + sentCoinAmount
+
+        val closedRounds = (0 to 3).map { round =>
+          closedMiningRound(svcParty, round = round.toLong)
+        }
+
         for {
           store <- mkStore()
           coinRulesContract = coinRules()
@@ -242,6 +247,12 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           )(
             store.multiDomainAcsStore
           )
+          _ <- MonadUtil.sequentialTraverse(closedRounds) { closed =>
+            dummyDomain.create(closed)(
+              store.multiDomainAcsStore
+            )
+          }
+          _ <- store.aggregate()
         } yield {
           // 100.0 is the initial amount as of round 0, so at the end of round 2 the holding fee was applied three times
           forEvery(
@@ -494,6 +505,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             ),
           )(store.multiDomainAcsStore)
         }
+        _ <- dummyDomain.archive(open)(store.multiDomainAcsStore)
         _ <- store.aggregate()
       } yield {
         getTopProviders(store, asOfEndOfRound, 2).futureValue shouldBe Seq(
@@ -613,6 +625,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           _ <- MonadUtil.sequentialTraverse(trafficPurchaseTrees)(
             dummyDomain.ingest(_)(store.multiDomainAcsStore)
           )
+          _ <- dummyDomain.archive(open)(store.multiDomainAcsStore)
           _ <- store.aggregate()
         } yield {
           store
