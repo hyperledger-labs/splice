@@ -10,7 +10,7 @@ module CN.SVC.CoinPrice where
 import DA.List
 import DA.Optional
 
-import CN.Util.Assert
+import CN.Util
 
 -- | A vote by an SV for their desired coin price.
 template CoinPriceVote with
@@ -29,7 +29,7 @@ template CoinPriceVote with
 fetchMedianCoinPrice : Party -> [Party] -> [ContractId CoinPriceVote] -> Update Decimal
 fetchMedianCoinPrice svc members voteCids = do
   votes <- forA voteCids $ \voteCid -> do
-    vote <- fetch voteCid
+    vote <- fetchReferenceData voteCid
     require "SVC matches" (vote.svc == svc)
     pure vote
   let voters = map (.sv) votes

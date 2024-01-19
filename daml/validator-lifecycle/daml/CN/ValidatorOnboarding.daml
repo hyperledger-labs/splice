@@ -1,6 +1,6 @@
 module CN.ValidatorOnboarding where
 
-import CN.Util.Assert
+import CN.Util
 
 -- | Template used by a sponsoring SV node to keep track of the onboarding of a validator candidate.
 -- We use a secret for authenticating the candidate once he has set up his participant.

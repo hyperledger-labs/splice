@@ -9,7 +9,7 @@ import CC.Expiry
 import CC.Round.Types
 import CC.Round
 import CN.Wallet.Payment
-import CN.Util.Assert
+import CN.Util
 
 -- Subscriptions flow (happy path) for reference;
 -- solid arrows represent state transitions via exercising a choice,
@@ -78,7 +78,8 @@ template TerminatedSubscription
 
 assertSubscriptionMatches: ContractId Subscription -> SubscriptionData -> Update ()
 assertSubscriptionMatches subscription subscriptionData = do
-  actualSubscriptionData <- fetch subscription
+  -- TODO(#2109): remove this hidden 'fetchButArchiveLater' call as part of improving the checking of contracts matching the callers expectations when fetching them.
+  actualSubscriptionData <- fetchButArchiveLater subscription
   require "Subscription data matches referenced subscription" (actualSubscriptionData.subscriptionData == subscriptionData)
   pure ()
 

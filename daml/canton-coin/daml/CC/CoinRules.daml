@@ -25,7 +25,7 @@ import CC.Round.Types
 import CC.GlobalDomain
 import CC.ValidatorLicense
 
-import CN.Util.Assert
+import CN.Util
 
 -- | The rules governing how CC users can modify the CC state
 -- managed by the SVC.
@@ -129,15 +129,13 @@ template CoinRules
       do
         -- fetch, validate and archive all given contracts
         let firstCid::remainingCids = trafficCids
-        first <- fetch firstCid
-        archive firstCid
+        first <- fetchAndArchive firstCid
         require "SVC matches" (first.svc == svc)
         rest <- forA remainingCids $ \trafficCid -> do
-          traffic <- fetch trafficCid
+          traffic <- fetchAndArchive trafficCid
           require "SVC matches" (traffic.svc == svc)
           require "Member-id matches" (traffic.memberId == first.memberId)
           require "Domain-id matches" (traffic.domainId == first.domainId)
-          archive trafficCid
           pure traffic
         let traffics = first::rest
 
@@ -165,7 +163,7 @@ template CoinRules
         openRound: ContractId OpenMiningRound
       controller svc, receiver
       do
-        openRound <- fetch openRound
+        openRound <- fetchReferenceData openRound
         let transferConfigCC = transferConfigCCFromOpenRound openRound
             expiringAmount = ExpiringAmount with
                         initialAmount = amount
@@ -258,9 +256,9 @@ template CoinRules
         latestRoundCid : ContractId OpenMiningRound
       controller svc
       do
-        roundToArchive <- fetch roundToArchiveCid
-        middleRound <- fetch middleRoundCid
-        latestRound <- fetch latestRoundCid
+        roundToArchive <- fetchAndArchive roundToArchiveCid
+        middleRound <- fetchReferenceData middleRoundCid
+        latestRound <- fetchReferenceData latestRoundCid
 
         now <- getTime
         require "middleRound is one after roundToArchive" (middleRound.round.number == roundToArchive.round.number + 1)
@@ -270,7 +268,6 @@ template CoinRules
         require "middle round has been open for >= 1 tick" (addRelTime middleRound.opensAt middleRound.tickDuration <= now)
 
         -- archive and create the rounds
-        archive roundToArchiveCid
         newSummarizingRound <- create SummarizingMiningRound with
             svc
             round = roundToArchive.round
@@ -307,8 +304,7 @@ template CoinRules
       controller svc
       do
         -- archive summarizing mining round
-        miningRound <- fetch miningRoundCid
-        archive miningRoundCid
+        miningRound <- fetchAndArchive miningRoundCid
         require "SVC matches" (miningRound.svc == svc)
         validateOpenMiningRoundSummary summary
 
@@ -352,8 +348,7 @@ template CoinRules
       do
         -- archive issuing mining round
         now <- getTime
-        issuingRound <- fetch issuingRoundCid
-        archive issuingRoundCid
+        issuingRound <- fetchAndArchive issuingRoundCid
         require "SVC matches" (issuingRound.svc == svc)
         require "Mining round is past targetClosesAt" (issuingRound.targetClosesAt <= now)
 
@@ -374,8 +369,7 @@ template CoinRules
       controller svc
       do
         -- archive closed mining round
-        miningRound <- fetch closedRoundCid
-        archive closedRoundCid
+        miningRound <- fetchAndArchive closedRoundCid
         require "SVC matches" (miningRound.svc == svc)
 
     -- Batch expiry of unclaimed rewards for a specific claimed round
@@ -389,7 +383,7 @@ template CoinRules
       controller svc
       do
         -- retrieve round
-        closedRound <- fetch closedRoundCid
+        closedRound <- fetchReferenceData closedRoundCid
         require "SVC matches" (closedRound.svc == svc)
 
         -- expire validator rewards and compute their unclaimed rewards
@@ -430,10 +424,9 @@ template CoinRules
       do
         require "More than one unclaimed reward contracts" (length unclaimedRewardCids > 1)
 
-        -- fetch and archive all given rewards
+        -- archive all given rewards
         archivedAmounts <- forA unclaimedRewardCids $ \unclaimedRewardCid -> do
-          unclaimedReward <- fetch unclaimedRewardCid
-          archive unclaimedRewardCid
+          unclaimedReward <- fetchAndArchive unclaimedRewardCid
           require "SVC matches" (unclaimedReward.svc == svc)
           pure unclaimedReward.amount
 
@@ -503,7 +496,7 @@ scaleCoinConfig coinPrice config = CoinConfig with
 
 computeFees : Party -> TransferContext -> Party -> [TransferOutput] -> Update [Decimal]
 computeFees svc context sender outputs = do
-  openRound <- fetch context.openMiningRound
+  openRound <- fetchReferenceData context.openMiningRound
   require ("mining round matches svc") (openRound.svc == svc)
   let transferConfigCC = transferConfigCCFromOpenRound openRound
   return $ map (computeOutputFee transferConfigCC sender) outputs
@@ -607,19 +600,19 @@ summarizeAndValidateContext : TransferContext -> Party -> Transfer -> Update Tra
 summarizeAndValidateContext context svc tf = do
   now <- getTime
   -- check that the current mining round is open and issued by the svc
-  openRound <- fetch context.openMiningRound
+  openRound <- fetchReferenceData context.openMiningRound
   require ("mining round matches svc") (openRound.svc == svc)
   require ("mining round is open: " <> show openRound) (openRound.opensAt <= now)
 
   -- check the featured app right, if present
   featuredAppProvider <- forA context.featuredAppRight $ \featuredAppRightCid -> do
-    featuredAppRight <- fetch featuredAppRightCid
+    featuredAppRight <- fetchReferenceData featuredAppRightCid
     require "featured app right must match" (featuredAppRight == FeaturedAppRight with svc; provider = tf.provider)
     pure featuredAppRight.provider
 
   -- pre-resolve issuing mining rounds
   issuingMiningRounds <- forA (Map.toList context.issuingMiningRounds) $ \(round, issuingRoundCid) -> do
-    issuingRound <- fetch issuingRoundCid
+    issuingRound <- fetchReferenceData issuingRoundCid
     require "SVC matches" (issuingRound.svc == svc)
     require "Round matches" (issuingRound.round == round)
     now <- getTime
@@ -628,7 +621,7 @@ summarizeAndValidateContext context svc tf = do
 
   -- pre-resolve validator rights
   validatorRights <- forA (Map.toList context.validatorRights) $ \(user, rightCid) -> do
-      right <-fetch rightCid
+      right <-fetchReferenceData rightCid
       let expectedRight = ValidatorRight with
             svc
             validator = tf.sender
@@ -671,9 +664,7 @@ summarizeAndConsumeInputs csum svc sender inps = do
       changeToHoldingFeesRate = 0.0
 
     summarizeAndConsumeInput round s (InputCoin coinCid) = do
-      -- fetch and archive
-      coin <- fetch coinCid
-      archive coinCid
+      coin <- fetchAndArchive coinCid
       -- check validity
       require "SVC matches" (svc == coin.svc)
       require "Sender matches owner" (sender == coin.owner)
@@ -691,9 +682,7 @@ summarizeAndConsumeInputs csum svc sender inps = do
         changeToHoldingFeesRate = s.changeToHoldingFeesRate - coin.amount.ratePerRound.rate
 
     summarizeAndConsumeInput _round s (InputAppRewardCoupon couponCid) = do
-      -- fetch and archive
-      coupon <- fetch couponCid
-      archive couponCid
+      coupon <- fetchAndArchive couponCid
       -- check validity
       require "SVC matches" (svc == coupon.svc)
       require "Sender matches app provider" (sender == coupon.provider)
@@ -713,10 +702,9 @@ summarizeAndConsumeInputs csum svc sender inps = do
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
 
     summarizeAndConsumeInput _round s (InputValidatorRewardCoupon couponCid) = do
-      -- fetch and archive
-      coupon <- fetch couponCid
+      -- we must and do use the validator right to archive the coupon of the user
+      coupon <- fetchButArchiveLater couponCid
       do
-        -- we must use the validator right to actually archive the coupon of the user
         rightCid <- getValidatorRight csum coupon.user
         exercise couponCid ValidatorRewardCoupon_ArchiveAsValidator with
           validator = sender
@@ -736,9 +724,7 @@ summarizeAndConsumeInputs csum svc sender inps = do
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
 
     summarizeAndConsumeInput _round s (InputSvRewardCoupon couponCid) = do
-      -- fetch and archive
-      coupon <- fetch couponCid
-      archive couponCid
+      coupon <- fetchAndArchive couponCid
       -- check coupon
       require "SVC matches" (svc == coupon.svc)
       require "Sender matches SV" (sender == coupon.sv)
@@ -758,9 +744,7 @@ summarizeAndConsumeInputs csum svc sender inps = do
       optional (pure s) (summarizeAndConsumeValidatorFaucetInput s) optInputValidatorFaucetCoupon
 
     summarizeAndConsumeValidatorFaucetInput s couponCid = do
-      -- fetch and archive
-      coupon <- fetch couponCid
-      archive couponCid
+      coupon <- fetchAndArchive couponCid
       -- check coupon
       require "SVC matches" (svc == coupon.svc)
       require "Sender matches validator" (sender == coupon.validator)

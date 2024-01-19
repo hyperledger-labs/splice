@@ -8,7 +8,7 @@ import Daml.Script
 import CC.Coin
 import CC.Scripts.Util
 import CC.ValidatorLicense
-import CN.Util.Assert
+import CN.Util
 
 test_ValidatorFaucet: Script ()
 test_ValidatorFaucet = do

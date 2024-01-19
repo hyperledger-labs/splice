@@ -5,7 +5,7 @@ import DA.Text
 import CC.Coin
 import CC.CoinRules
 import CC.Round
-import CN.Util.Assert
+import CN.Util
 import CN.Wallet.Payment
 
 

@@ -6,7 +6,7 @@ import CC.Coin
 import CC.CoinRules
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
-import CN.Util.Assert
+import CN.Util
 
 -- | The rules governing how users can pay to use the Canton Name service.
 template CnsRules
@@ -65,7 +65,7 @@ template CnsRules
           transferContext
         -- burn the received coin
         archive coinCid
-        subscriptionState <- fetch subscriptionStateCid
+        subscriptionState <- fetchReferenceData subscriptionStateCid
         -- deliver the promised good: create the cns entry
         entryCid <- case context of
           CnsEntryContext{..} -> create CnsEntry with
@@ -85,9 +85,10 @@ template CnsRules
       controller svc, user
       do
         payment <- fetchAndValidatePayment paymentCid (ExpectedPayment with svc, sender = user)
-        subscription <- fetch payment.subscription
+        subscription <- fetchReferenceData payment.subscription
         context <- fetchAndValidateEntryContext entryContext (ExpectedEntryContext with svc, user, reference = subscription.reference)
-        entry <- fetch entryCid
+        -- fetch entry, will be archived by the renewal further below
+        entry <- fetchButArchiveLater entryCid
         -- sanity checks
         require "Current entry matches subscription context"
           ((CnsEntryContext svc entry.user entry.name entry.url entry.description subscription.reference) == context)
@@ -98,7 +99,7 @@ template CnsRules
           transferContext
         -- burn the received coin
         archive coinCid
-        -- renew the entry
+        -- renew entry
         entryCid <- exercise entryCid CnsEntry_Renew with
           extension = payment.payData.paymentInterval
         -- return the created contracts
@@ -120,14 +121,16 @@ data ExpectedPayment = ExpectedPayment
 
 fetchAndValidateInitialPayment : ContractId SubscriptionInitialPayment -> ExpectedPayment -> Update SubscriptionInitialPayment
 fetchAndValidateInitialPayment cid ExpectedPayment{..} = do
-  payment <- fetch cid
+  payment <- fetchButArchiveLater cid
+  -- TODO(#2109): get rid of this fetchButArchiveLater by replacing this function with the use of checked fetches
   require "SVC matches" (svc == payment.subscriptionData.provider)
   require "Sender matches" (sender == payment.subscriptionData.sender)
   pure payment
 
 fetchAndValidatePayment : ContractId SubscriptionPayment -> ExpectedPayment -> Update SubscriptionPayment
 fetchAndValidatePayment cid ExpectedPayment{..} = do
-  payment <- fetch cid
+  payment <- fetchButArchiveLater cid
+  -- TODO(#2109): get rid of this fetchButArchiveLater by replacing this function with the use of checked fetches
   require "SVC matches" (svc == payment.subscriptionData.provider)
   require "Sender matches" (sender == payment.subscriptionData.sender)
   pure payment
@@ -141,7 +144,7 @@ data ExpectedEntryContext = ExpectedEntryContext
 
 fetchAndValidateEntryContext : ContractId CnsEntryContext -> ExpectedEntryContext -> Update CnsEntryContext
 fetchAndValidateEntryContext cid ExpectedEntryContext{..} = do
-  context <- fetch cid
+  context <- fetchReferenceData cid
   require "SVC matches" (svc == context.svc)
   require "User matches" (user == context.user)
   require "Subscription reference matches" (reference == context.reference)
@@ -171,9 +174,8 @@ template CnsEntryContext
         terminatedSubscriptionCid : ContractId TerminatedSubscription
       controller actor
       do require "Actor is signatory" (actor `elem` signatory this)
-         terminated <- fetch terminatedSubscriptionCid
+         terminated <- fetchAndArchive terminatedSubscriptionCid
          require "Reference matches" (terminated.reference == reference)
-         archive terminatedSubscriptionCid
 
     nonconsuming choice CnsEntryContext_CollectInitialEntryPayment : (ContractId CnsEntry, ContractId SubscriptionIdleState)
       with

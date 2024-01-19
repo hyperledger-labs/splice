@@ -6,7 +6,7 @@ import qualified DA.Map as Map
 import DA.Time
 import Daml.Script
 
-import CN.Util.Assert
+import CN.Util
 import CC.Coin
 import CC.CoinRules
 import CC.Expiry
@@ -32,11 +32,11 @@ template Escrow
         paymentCoin : ContractId Coin
         transferContext : AppTransferContext
       controller p
-      do LockedCoin{lock,coin=locked} <- fetch lockedCoin
+      do LockedCoin{lock,coin=locked} <- fetchButArchiveLater lockedCoin -- archived as part of unlocking
          require "SVC matches locked coin" (locked.svc == this.svc)
          require "owner matches locked coin" (locked.owner == this.p)
          require "lock holder matches locked coin " ([arbiter] == lock.holders)
-         payment <- fetch paymentCoin
+         payment <- fetchButArchiveLater paymentCoin -- archived as part of the Transfer
          require "SVC matches payment coin" (payment.svc == this.svc)
          require "owner matches payment coin" (payment.owner == this.p)
          CoinCreateSummary cid _ _ <- exercise lockedCoin (LockedCoin_Unlock transferContext.openMiningRound)

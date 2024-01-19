@@ -20,7 +20,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/wallet-payments/daml/CN/Wallet/P
 diff -ur -x '*~' -x target -x dar -x .daml daml/wallet-payments/daml/CN/Wallet/Subscriptions.daml daml/wallet-payments-upgrade/daml/CN/Wallet/Subscriptions.daml
 --- daml/wallet-payments/daml/CN/Wallet/Subscriptions.daml
 +++ daml/wallet-payments-upgrade/daml/CN/Wallet/Subscriptions.daml
-@@ -329,6 +329,7 @@
+@@ -330,6 +330,7 @@
                 expiresAt = expiresAt
               receiverFeeRatio = 0.0
           ]
@@ -28,7 +28,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/wallet-payments/daml/CN/Wallet/S
  
    result <- exercisePaymentTransfer context transfer
    let [TransferResultLockedCoin lockedCoin] = result.createdCoins
-@@ -347,6 +348,7 @@
+@@ -348,6 +349,7 @@
          provider
          inputs = [InputCoin ccsum.coin]
          outputs = [mkTransferOutput receiver targetAmount]

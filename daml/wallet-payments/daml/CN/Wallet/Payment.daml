@@ -3,7 +3,7 @@ module CN.Wallet.Payment where
 import DA.List (dedupSort)
 import DA.Time
 
-import CN.Util.Assert
+import CN.Util
 import CC.Coin
 import CC.CoinRules
 import CC.Expiry

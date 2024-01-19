@@ -2,7 +2,7 @@ module CC.ValidatorLicense where
 
 import CC.Round
 import CC.Round.Types
-import CN.Util.Assert
+import CN.Util
 
 data FaucetState = FaucetState with
     firstReceivedFor : Round -- ^ The first round for which a coupon was received.
@@ -79,6 +79,6 @@ template ValidatorFaucetCoupon with
       with
         closedRoundCid : ContractId ClosedMiningRound
       controller svc
-      do closedRound <- fetch closedRoundCid
+      do closedRound <- fetchReferenceData closedRoundCid
          require "SVC matches" (svc == closedRound.svc)
          require "Mining round matches" (round == closedRound.round)

@@ -1,0 +1,30 @@
+-- | Utility functions shared accross all CN core apps.
+module CN.Util where
+
+-- | Check whether a required condition is true. If it's not, abort the
+-- transaction with a message saying that the requirement was not met.
+require : CanAssert m => Text -> Bool -> m ()
+require msg invariant =
+  assertMsg ("The requirement '" <> msg <> "' was not met.") invariant
+
+-- | Fetch and archive a contract in one go.
+--
+-- Use this when implementing choices that mutate another contract by
+-- fetching, archiving, and then creating the updated contract.
+fetchAndArchive : (HasFetch b, HasArchive b) => ContractId b -> Update b
+fetchAndArchive cid = do
+  co <- fetch cid
+  archive cid
+  return co
+
+-- | Fetch a contract that serves as reference data.
+--
+-- Use this whenever you need to fetch a contract that you do not intend to mutate.
+fetchReferenceData : HasFetch t => ContractId t -> Update t
+fetchReferenceData = fetch
+
+-- | Fetch a contract that is not reference data, and should be archived later in some cases.
+--
+-- Prefer `fetchAndArchive` over this function, as it avoids forgetting to archive the contract.
+fetchButArchiveLater : HasFetch t => ContractId t -> Update t
+fetchButArchiveLater = fetch

@@ -13,7 +13,7 @@ import CC.Round
 import CC.Scripts.Util
 import CN.SvcRules
 import CN.Scripts.SvcTestUtils
-import CN.Util.Assert
+import CN.Util
 
 test_SvRewards : Script ()
 test_SvRewards = do

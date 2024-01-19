@@ -5,7 +5,7 @@ import CC.Coin
 import CC.Round
 import CC.ValidatorLicense
 
-import CN.Util.Assert
+import CN.Util
 
 data ImportPayload
   = IP_Coin Coin

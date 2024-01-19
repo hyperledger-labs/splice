@@ -8,7 +8,7 @@ import DA.Time
 import DA.Set qualified as Set
 import CC.CoinRules (AppTransferContext(..))
 import CC.Round
-import CN.Util.Assert
+import CN.Util
 import CN.Wallet.Payment
 
 -- Stable identifier for a group. We avoid contract keys
@@ -47,7 +47,7 @@ template SplitwellInstallRequest
 -- A `restrictAuthority` primitive in LF would be very helpful here.
 assertOwner : ContractId Group -> Party -> Update ()
 assertOwner group p = do
-  Group {..} <- fetch group
+  Group {..} <- fetchReferenceData group
   owner === p
 
 -- TODO(#7411) Remove this once the domain migration automation
@@ -259,19 +259,21 @@ template TransferInProgress
         terminatedAppPaymentCid : ContractId TerminatedAppPayment
       controller actor
       do require "Actor is signatory" (actor `elem` signatory this)
-         terminated <- fetch terminatedAppPaymentCid
+         terminated <- fetchAndArchive terminatedAppPaymentCid
          require "Reference matches" (terminated.reference == reference)
-         archive terminatedAppPaymentCid
 
     postconsuming choice TransferInProgress_CompleteTransfer : [ContractId BalanceUpdate]
       with
         acceptedPaymentCid : ContractId AcceptedAppPayment
         transferContext : AppTransferContext
       controller group.provider
-      do acceptedPayment <- fetch acceptedPaymentCid
+      do
+         -- archival happens via the consuming AcceptedAppPayment_Colllect choice
+         acceptedPayment <- fetchButArchiveLater acceptedPaymentCid
          exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
          acceptedPayment.sender === sender
          openMiningRound <- exercise @OpenMiningRound transferContext.openMiningRound (OpenMiningRound_Fetch group.provider)
+         -- TODO(#2109): we should check that the 'SVC' party matches here!
          let expectedAcceptedPayment = AcceptedAppPayment with
                sender
                provider = group.provider
@@ -345,6 +347,8 @@ template AcceptedGroupInvite
       with
         group : ContractId Group
       controller groupKey.owner
-      do k <- getGroupKey <$> fetch group
+      do
+         -- archival happens via the Group_Join choice
+         k <- getGroupKey <$> fetchButArchiveLater group
          require "Group key matches" (k == groupKey)
          exercise group (Group_Join invitee)

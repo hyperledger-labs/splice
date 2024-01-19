@@ -1,6 +1,6 @@
 module CN.SvOnboarding where
 
-import CN.Util.Assert
+import CN.Util
 
 -- | Template used by the SV collective to collect confirmations for the onboarding of an SV candidate.
 -- The existence of this contract triggers SV automation that creates confirmation contracts for

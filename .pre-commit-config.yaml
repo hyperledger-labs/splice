@@ -69,3 +69,8 @@ repos:
         language: system
         entry: "./scripts/check-trailing-whitespace.sh"
         pass_filenames: false
+      - id: check-daml-warts
+        name: Check for Daml warts
+        language: system
+        entry: "./scripts/check-daml-warts.sh"
+        pass_filenames: false

@@ -8,7 +8,7 @@ import CC.Fees
 import CC.Round
 import CC.Round.Types
 
-import CN.Util.Assert
+import CN.Util
 
 data CoinExpireSummary = CoinExpireSummary with
   owner : Party
@@ -157,7 +157,7 @@ template AppRewardCoupon
       with
         closedRoundCid : ContractId ClosedMiningRound
       controller svc
-      do closedRound <- fetch closedRoundCid
+      do closedRound <- fetchReferenceData closedRoundCid
          require "SVC matches" (svc == closedRound.svc)
          require "Mining round matches" (round == closedRound.round)
          pure (featured, amount)
@@ -178,7 +178,7 @@ template ValidatorRewardCoupon
       with
         closedRoundCid : ContractId ClosedMiningRound
       controller svc
-      do closedRound <- fetch closedRoundCid
+      do closedRound <- fetchReferenceData closedRoundCid
          require "SVC matches" (svc == closedRound.svc)
          require "Mining round matches" (round == closedRound.round)
          pure amount
@@ -191,7 +191,7 @@ template ValidatorRewardCoupon
         rightCid : ContractId ValidatorRight
       controller svc, validator
       do
-        right <- fetch rightCid
+        right <- fetchReferenceData rightCid
         require "Right must match" (right == ValidatorRight with svc; validator, user)
 
 -- | The reward for the SVC members for running a mining round.
@@ -224,7 +224,7 @@ template UnclaimedReward with
 
 requireCoinExpiredForAllOpenRounds : ContractId OpenMiningRound -> Coin -> Update ()
 requireCoinExpiredForAllOpenRounds roundCid coin = do
-  round <- fetch roundCid
+  round <- fetchReferenceData roundCid
   require "SVC of the round matches SVC of the coin" (round.svc == coin.svc)
   -- Note: we exploit that there are exactly three open rounds active at any
   -- point in time; and we ensure that a coin can be expired as soon as it can

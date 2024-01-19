@@ -971,6 +971,12 @@ commands:
           cmd_name: Check for trailing whitespace
           cmd: ./scripts/check-trailing-whitespace.sh
 
+  run_daml_warts_check:
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: Check for Daml warts
+          cmd: ./scripts/check-daml-warts.sh
+
   set-failed-parallel-run-url:
     steps:
       - run:

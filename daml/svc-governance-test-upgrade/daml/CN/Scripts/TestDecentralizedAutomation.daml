@@ -14,7 +14,7 @@ import CC.Coin
 import CC.CoinRules
 
 import CN.SvcRules
-import CN.Util.Assert
+import CN.Util
 
 import CC.Scripts.Util
 import CN.Scripts.SvcTestUtils

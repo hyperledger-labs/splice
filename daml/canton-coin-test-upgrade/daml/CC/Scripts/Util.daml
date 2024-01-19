@@ -25,7 +25,7 @@ import CC.Schedule
 import CC.ValidatorLicense
 
 import CC.Scripts.Parameters
-import CN.Util.Assert
+import CN.Util
 
 -- Bootstrapping CC
 -------------------

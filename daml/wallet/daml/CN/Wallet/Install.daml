@@ -1,9 +1,9 @@
 module CN.Wallet.Install where
 
+import DA.Action (void)
 import DA.Exception
 import DA.Time
 import DA.Foldable (forA_)
-import DA.Traversable (forA)
 import DA.Optional (isSome)
 
 import CC.Coin
@@ -16,7 +16,7 @@ import CN.Wallet.TransferOffer
 import CN.Wallet.BuyTrafficRequest
 import CN.Wallet.TopUpState
 import Prelude hiding (forA)
-import CN.Util.Assert (require)
+import CN.Util (require, fetchAndArchive)
 
 
 -- Evaluates an update, catches any exceptions it throws and converts them into an Either
@@ -85,15 +85,15 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
     handleBuyMemberTraffic: Int -> Text -> Text -> RelTime -> Optional (ContractId ValidatorTopUpState) -> Update (ContractId MemberTraffic, Optional (ContractId Coin))
     handleBuyMemberTraffic trafficAmount memberId domainId minTopupInterval topupStateCidO = do
       now <- getTime
-      -- fetch and validate topupState if provided
-      topupStateO <- forA topupStateCidO $ \topupStateCid -> do
-        topupState <- fetch topupStateCid
+      -- validate and update topupState if provided
+      forA_ topupStateCidO $ \topupStateCid -> do
+        topupState <- fetchAndArchive topupStateCid
         require "validator party and ValidatorTopUpState match" (validatorP == topupState.validator)
         require "domain-id and ValidatorTopUpState match" (domainId == topupState.domainId)
         require "member-id and ValidatorTopUpState match" (memberId == topupState.memberId)
         -- protect against successive topups being too close together
         require "enough time has elapsed since the last topup" (addRelTime topupState.lastPurchasedAt minTopupInterval <= now)
-        pure (topupStateCid, topupState)
+        void $ create topupState with lastPurchasedAt = now
       -- auto-tap enough CC to buy extra traffic
       -- Note that auto-tapping is done only to make integration testing of the valdiator top-up loop easier.
       -- So, we only do this when the choice is exercised from the top-up automation and we are on DevNet.
@@ -119,15 +119,6 @@ executeCoinOperationRec endUserP validatorP context inputs prevResults (operatio
       -- purchase extra traffic for given member
       result <- exercise coinRulesCid
         (CoinRules_BuyMemberTraffic newInputs context.context validatorP memberId domainId trafficAmount)
-      -- update topupState if provided
-      forA_ topupStateO $ \(topupStateCid, topupState) -> do
-        archive topupStateCid
-        _ <- create ValidatorTopUpState with
-          validator = topupState.validator
-          memberId = topupState.memberId
-          domainId = topupState.domainId
-          lastPurchasedAt = now
-        pure ()
       pure (result.purchasedTraffic, result.senderChangeCoin)
 
 executeCoinOperationRec _endUserP _validatorP _context _inputs prevResults [] = do

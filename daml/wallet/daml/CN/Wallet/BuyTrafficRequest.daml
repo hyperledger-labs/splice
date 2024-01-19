@@ -3,7 +3,7 @@ module CN.Wallet.BuyTrafficRequest where
 import CC.Coin
 import CC.CoinRules
 import CC.GlobalDomain (MemberTraffic)
-import CN.Util.Assert
+import CN.Util
 
 
 data BuyTrafficRequestTrackingInfo = BuyTrafficRequestTrackingInfo

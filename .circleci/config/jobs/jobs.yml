@@ -18,6 +18,7 @@ jobs:
       - setup_sbt_test_job
       # Run the cheap checks before the sbt based ones to provide fast feedback
       - run_trailing_whitespace_check
+      - run_daml_warts_check
       - run_todo_script
       - execute_sbt_command:
           cmd: "Test/compile lint"

@@ -1,7 +1,0 @@
-module CN.Util.Assert where
-
--- | Check whether a required condition is true. If it's not, abort the
--- transaction with a message saying that the requirement was not met.
-require : CanAssert m => Text -> Bool -> m ()
-require msg invariant =
-  assertMsg ("The requirement '" <> msg <> "' was not met.") invariant

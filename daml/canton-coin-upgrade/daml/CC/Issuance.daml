@@ -6,7 +6,7 @@ import DA.Time
 
 import CC.Schedule
 
-import CN.Util.Assert (require)
+import CN.Util (require)
 
 
 -- issuance curve
