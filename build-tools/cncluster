@@ -961,7 +961,7 @@ function subcmd_eipaddr() {
     _cluster_must_exist
 
     kubectl exec -n docs "$(kubectl get pods -n docs -lapp=docs -o name)" -- \
-            curl -s http://checkip.amazonaws.com
+            curl -sSLf http://checkip.amazonaws.com
 }
 
 ###
@@ -1137,7 +1137,7 @@ function subcmd_wait_version() {
         exit 1
     fi
 
-    _retry_until_value "curl -sL http://${GCP_CLUSTER_BASENAME}.network.canton.global/version" "expected version" "$expected"
+    _retry_until_value "curl -sSLf http://${GCP_CLUSTER_BASENAME}.network.canton.global/version" "expected version" "$expected"
 
     _log "Done. Cluster is now reporting version: $expected"
 }
@@ -1822,7 +1822,7 @@ function _get_ledger_api_auth_token_from_auth0() {
 
     TOKEN_URL=${LEDGER_API_AUTH_URL//\/.well-known\/openid-configuration/\/oauth\/token/}
 
-    curl --request POST \
+    curl -sSLf --request POST \
       --url "$TOKEN_URL" \
       --header "content-type: application/json" \
       --data "{\"client_id\":\"$LEDGER_API_AUTH_CLIENT_ID\",\"client_secret\":\"$LEDGER_API_AUTH_CLIENT_SECRET\",\"audience\":\"$LEDGER_API_AUTH_AUDIENCE\",\"grant_type\":\"client_credentials\"}" \
