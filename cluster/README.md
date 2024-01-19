@@ -790,7 +790,7 @@ Grafana is used to visualize Prometheus metrics in various ways, aggregated into
 open source observability
 example [here](https://github.com/digital-asset/daml-platform-observability-example/tree/main/grafana/dashboards). Check `grafana-dashboards.nix` to see how we get the dashboards. These are installed in the `platform` and `participant` folders in Grafana.
 
-- Custom dashboards built by us. To add a new dashboard, add its JSON definition to a file in `cluster/grafana-dashboards`. It will then be pushed to the cluster via the `infra` Pulumi stack, under the `canton-network` folder in Grafana.
+- Custom dashboards built by us. To add a new dashboard, add its JSON definition to a file in `cluster/pulumi/infra/grafana-dashboards`. It will then be pushed to the cluster via the `infra` Pulumi stack, under the `canton-network` folder in Grafana.
 
 To access Grafana on a given cluster, browse to `grafana.<CLUSTER_DNS>` and login with the credentials in [our shared passwords document](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit?ouid=103930368588823687273&usp=docs_home&ths=true).
 
