@@ -81,7 +81,7 @@ class SplitwellApp(
       partyId: PartyId,
   ): Future[SplitwellApp.State] = for {
     scanConnection <- appInitStep(s"Get scan connection") {
-      ScanConnection(
+      ScanConnection.singleCached(
         ledgerClient,
         config.scanClient,
         clock,

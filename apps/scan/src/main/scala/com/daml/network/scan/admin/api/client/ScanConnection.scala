@@ -1,17 +1,16 @@
 package com.daml.network.scan.admin.api.client
 
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
-import org.apache.pekko.stream.Materializer
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinrules.{AppTransferContext, CoinRules}
-import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.environment.{
   CNLedgerClient,
   HttpAppConnection,
   PackageIdResolver,
+  RetryFor,
   RetryProvider,
 }
 import com.daml.network.scan.admin.api.client.ScanConnection.*
@@ -19,107 +18,83 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.store.AcsStoreDump
-import com.daml.network.util.{
-  CNNodeUtil,
-  CoinConfigSchedule,
-  Contract,
-  ContractWithState,
-  DisclosedContracts,
-  TemplateJsonDecoder,
-}
 import com.daml.network.util.PrettyInstances.*
+import com.daml.network.util.*
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.lifecycle.FlagCloseableAsync
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
 
-import java.time.Duration
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.OptionConverters.*
 
-/** Connection to the admin API of CC Scan. This is used by other apps
-  * to query for the SVC party id.
-  */
-class ScanConnection private (
-    coinLedgerClient: CNLedgerClient,
-    private[client] val config: ScanAppClientConfig,
-    clock: Clock,
-    retryProvider: RetryProvider,
-    loggerFactory: NamedLoggerFactory,
-)(implicit
-    ec: ExecutionContextExecutor,
-    tc: TraceContext,
-    mat: Materializer,
-    httpClient: HttpRequest => Future[HttpResponse],
-    templateDecoder: TemplateJsonDecoder,
-) extends HttpAppConnection(config.adminApi, "scan", retryProvider, loggerFactory)
-    with PackageIdResolver.HasCoinRules {
-  import ScanConnection.GetCoinRulesDomain
+trait ScanConnection extends PackageIdResolver.HasCoinRules with FlagCloseableAsync {
 
-  // register the callback to potentially invalidate the CoinRules cache.
-  coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedCoinRulesCache)
-  // and the rounds cache
-  coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedRoundsCache)
+  protected val clock: Clock
+  protected val retryProvider: RetryProvider
+  implicit protected val ec: ExecutionContext
+  implicit protected val mat: Materializer
+  protected def logger: TracedLogger
 
-  /** We cache the CoinRules contract, but it may be come outdated if, e.g., the SVC updates the config schedule.
-    * The inactive-contracts error message that the ledger returns does not specify the template-id, thus we need
-    * to check for each inactive-contract we receive from the ledger that the failure was not caused by an outdated cache
-    * of the CoinRules.
+  def getSvcPartyId()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId]
+
+  /** Query for the SVC party id, retrying until it succeeds.
+    *
+    * Intended to be used for app init.
     */
-  private def signalPossiblyOutdatedCoinRulesCache(inactiveContract: String): Unit =
-    coinRulesCache.get() match {
-      case Some(CachedCoinRules(_, cachedContract))
-          if (cachedContract.contractId.contractId: String) == inactiveContract =>
-        logger.info(
-          show"Invalidating the CoinRules cache with value ${PrettyContractId(cachedContract.contract)}"
-        )(TraceContext.empty)
-        coinRulesCache.set(None)
-      case _ => ()
-    }
+  def getSvcPartyIdWithRetries()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] =
+    retryProvider.getValueWithRetries(
+      RetryFor.WaitingOnInitDependency,
+      "SVC party ID from scan",
+      getSvcPartyId(),
+      logger,
+    )
 
-  private def signalPossiblyOutdatedRoundsCache(inactiveContract: String): Unit = {
-    val rounds = cachedRounds.get()
-    if (rounds containsContractId inactiveContract) {
-      logger.debug(
-        show"Invalidating the rounds cache at ${rounds.describeRounds}"
-      )(TraceContext.empty)
-      cachedRounds.set(CachedMiningRounds())
-    } else ()
-  }
+  def getCoinRulesWithState()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ContractWithState[CoinRules.ContractId, CoinRules]]
 
-  // cached SVC reference.
-  private val svcRef: AtomicReference[Option[PartyId]] = new AtomicReference(None)
+  def getCnsRules()(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[ContractWithState[CnsRules.ContractId, CnsRules]]
 
-  private val coinRulesCache: AtomicReference[Option[CachedCoinRules]] =
-    new AtomicReference(None)
+  def getOpenAndIssuingMiningRounds()(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[
+    (
+        Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
+        Seq[ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]],
+    )
+  ]
 
-  private val cnsRulesCache: AtomicReference[Option[CachedCnsRules]] =
-    new AtomicReference(None)
+  def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
+      ec: ExecutionContext,
+      mat: Materializer,
+      tc: TraceContext,
+  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
-  private val cachedRounds: AtomicReference[CachedMiningRounds] =
-    new AtomicReference(CachedMiningRounds())
+  def listImportCrates(
+      party: PartyId
+  )(implicit tc: TraceContext): Future[
+    Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]
+  ]
 
-  /** Query for the SVC party id. This caches the result internally so
-    * clients can call this repeatedly without having to implement caching themselves.
-    */
-  def getSvcPartyId(): Future[PartyId] = {
-    val prev = svcRef.get()
-    prev match {
-      case Some(partyId) => Future.successful(partyId)
-      case None =>
-        for {
-          partyId <- runHttpCmd(config.adminApi.url, HttpScanAppClient.GetSvcPartyId(List()))
-        } yield {
-          // The party id never changes so we don’t need to worry about concurrent setters writing different values.
-          svcRef.set(Some(partyId))
-          partyId
-        }
-    }
-  }
+  def listSvcSequencers()(implicit
+      tc: TraceContext
+  ): Future[Seq[HttpScanAppClient.DomainSequencers]]
+
+  def listSvcScans()(implicit tc: TraceContext): Future[Seq[HttpScanAppClient.DomainScans]]
 
   def getTransferContextWithInstances()(implicit
       ec: ExecutionContext,
@@ -132,74 +107,6 @@ class ScanConnection private (
       latestOpenMiningRound = CNNodeUtil.selectLatestOpenMiningRound(clock.now, openRounds)
       coinRules <- getCoinRulesWithState()
     } yield TransferContextWithInstances(coinRules, latestOpenMiningRound, openRounds)
-  }
-
-  def getCoinRulesWithState()(implicit
-      ec: ExecutionContext,
-      mat: Materializer,
-      tc: TraceContext,
-  ): Future[ContractWithState[CoinRules.ContractId, CoinRules]] = {
-    val now = clock.now
-    coinRulesCache.get() match {
-      case Some(ccr @ CachedCoinRules(_, coinRules)) if ccr validAsOf now =>
-        Future.successful(coinRules)
-      case cacheO =>
-        // Note that here and at other caches in this class, multiple concurrent cache misses result in multiple
-        // requests that are not deduplicated against each other. We accept that as we expect low concurrency by default.
-        logger.debug(
-          s"CoinRules cache is empty or outdated, retrieving CoinRules from CC scan."
-        )
-        for {
-          coinRules <- runHttpCmd(
-            config.adminApi.url,
-            HttpScanAppClient.GetCoinRules(cacheO.map(_.coinRules)),
-          )
-        } yield {
-          coinRulesCache.set(
-            Some(
-              CachedCoinRules(
-                now.add(config.coinRulesCacheTimeToLive.asJava),
-                coinRules,
-              )
-            )
-          )
-          coinRules
-        }
-    }
-  }
-
-  def getCnsRules()(implicit
-      ec: ExecutionContext,
-      mat: Materializer,
-      tc: TraceContext,
-  ): Future[ContractWithState[CnsRules.ContractId, CnsRules]] = {
-    val now = clock.now
-    getCoinRulesWithState().flatMap { coinRules =>
-      cnsRulesCache.get() match {
-        case Some(ccr @ CachedCnsRules(_, cnsRules)) if ccr.validAsOf(now, coinRules) =>
-          Future.successful(cnsRules)
-        case cacheO =>
-          logger.debug(
-            s"cnsRules cache is empty or outdated, retrieving CnsRules from CC scan."
-          )
-          for {
-            cnsRules <- runHttpCmd(
-              config.adminApi.url,
-              HttpScanAppClient.GetCnsRules(cacheO.map(_.cnsRules)),
-            )
-          } yield {
-            cnsRulesCache.set(
-              Some(
-                CachedCnsRules(
-                  now.add(config.coinRulesCacheTimeToLive.asJava),
-                  cnsRules,
-                )
-              )
-            )
-            cnsRules
-          }
-      }
-    }
   }
 
   def getCoinRulesDomain: GetCoinRulesDomain = { () => implicit tc =>
@@ -227,59 +134,6 @@ class ScanConnection private (
       now = clock.now
       openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
     } yield openRound
-  }
-
-  def getOpenAndIssuingMiningRounds()(implicit
-      ec: ExecutionContext,
-      mat: Materializer,
-      tc: TraceContext,
-  ): Future[
-    (
-        Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
-        Seq[ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]],
-    )
-  ] = {
-    val now = clock.now
-    val cache = cachedRounds.get()
-    getCoinRulesWithState().flatMap { coinRules =>
-      if (cache.validAsOf(now, coinRules)) {
-        logger.info(
-          s"Using the client-cache (validUntil ${cache.cacheValidUntil}) to load ${cache.describeRounds}."
-        )
-        Future.successful(cache.getRoundTuple)
-      } else {
-        logger.debug(
-          s"querying the scan app for the latest round information because the cache expired at ${cache.cacheValidUntil}"
-        )
-        for {
-          (openRounds, issuingRounds, ttlInMicros) <- runHttpCmd(
-            config.adminApi.url,
-            HttpScanAppClient.GetSortedOpenAndIssuingMiningRounds(
-              cache.sortedOpenMiningRounds,
-              cache.sortedIssuingMiningRounds,
-            ),
-          )
-
-        } yield {
-          val newValidUntil = now.add(Duration.ofNanos(ttlInMicros.longValue * 1000))
-          val newRoundsCache = CachedMiningRounds(
-            Some(newValidUntil),
-            openRounds,
-            issuingRounds,
-          )
-          logger.info(s"New rounds-cache is $newRoundsCache.")
-          cachedRounds.set(newRoundsCache)
-          cachedRounds.get().getRoundTuple
-        }
-      }
-    }
-  }
-
-  def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
-      ec: ExecutionContext,
-      mat: Materializer,
-  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
-    runHttpCmd(config.adminApi.url, HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
   }
 
   def getAppTransferContext(providerPartyId: PartyId)(implicit
@@ -333,16 +187,6 @@ class ScanConnection private (
     }
   }
 
-  def listImportCrates(
-      party: PartyId
-  ): Future[
-    Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]
-  ] =
-    runHttpCmd(
-      config.adminApi.url,
-      HttpScanAppClient.ListImportCrates(party),
-    )
-
   def getImportShipment(
       party: PartyId
   )(implicit tc: TraceContext): Future[AcsStoreDump.ImportShipment] = {
@@ -364,30 +208,10 @@ class ScanConnection private (
     } yield AcsStoreDump.ImportShipment(openRound, crates)
   }
 
-  def listSvcSequencers(): Future[Seq[HttpScanAppClient.DomainSequencers]] = {
-    runHttpCmd(
-      config.adminApi.url,
-      HttpScanAppClient.ListSvcSequencers(),
-    )
-  }
-
-  def listSvcScans(): Future[Seq[HttpScanAppClient.DomainScans]] = {
-    runHttpCmd(
-      config.adminApi.url,
-      HttpScanAppClient.ListSvcScans(),
-    ).map(_.map { scans =>
-      if (scans.malformed.nonEmpty) {
-        logger.warn(
-          s"Malformed scans found for domain ${scans.domainId}: ${scans.malformed.keys}. This likely indicates malicious SVs."
-        )
-      }
-      scans
-    })
-  }
 }
 
 object ScanConnection {
-  def apply(
+  def singleCached(
       coinLedgerClient: CNLedgerClient,
       config: ScanAppClientConfig,
       clock: Clock,
@@ -401,10 +225,26 @@ object ScanConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[ScanConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new ScanConnection(coinLedgerClient, config, clock, retryProvider, loggerFactory)
+      new CachedScanConnection(coinLedgerClient, config, clock, retryProvider, loggerFactory)
     )
 
-  private case class CachedCoinRules(
+  def singleUncached(
+      config: ScanAppClientConfig,
+      clock: Clock,
+      retryProvider: RetryProvider,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      ec: ExecutionContextExecutor,
+      tc: TraceContext,
+      mat: Materializer,
+      httpClient: HttpRequest => Future[HttpResponse],
+      templateDecoder: TemplateJsonDecoder,
+  ): Future[SingleScanConnection] =
+    HttpAppConnection.checkVersionOrClose(
+      new SingleScanConnection(config, clock, retryProvider, loggerFactory)
+    )
+
+  private[client] case class CachedCoinRules(
       cacheValidUntil: CantonTimestamp,
       coinRules: ContractWithState[CoinRules.ContractId, CoinRules],
   ) {
@@ -419,7 +259,7 @@ object ScanConnection {
       )
   }
 
-  private case class CachedCnsRules(
+  private[client] case class CachedCnsRules(
       cacheValidUntil: CantonTimestamp,
       cnsRules: ContractWithState[CnsRules.ContractId, CnsRules],
   ) {
@@ -434,7 +274,7 @@ object ScanConnection {
       )
   }
 
-  private case class CachedMiningRounds(
+  private[client] case class CachedMiningRounds(
       cacheValidUntil: Option[CantonTimestamp] = None,
       sortedOpenMiningRounds: Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]] =
         Seq(),

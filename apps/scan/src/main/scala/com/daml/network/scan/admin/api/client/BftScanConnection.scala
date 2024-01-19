@@ -3,6 +3,8 @@ package com.daml.network.scan.admin.api.client
 import cats.data.NonEmptyList
 import cats.implicits.*
 import com.daml.network.admin.http.HttpErrorWithHttpCode
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns.CnsRules
@@ -10,11 +12,9 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.PackageIdResolver.HasCoinRules
 import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryFor, RetryProvider}
 import com.daml.network.scan.admin.api.client.BftScanConnection.ScanList
-import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcScan
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.store.AcsStoreDump
 import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
@@ -24,14 +24,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import io.grpc.Status
-import org.apache.pekko.http.scaladsl.model.{
-  HttpRequest,
-  HttpResponse,
-  MediaTypes,
-  StatusCode,
-  StatusCodes,
-  Uri,
-}
+import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.ByteString
@@ -43,15 +36,18 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Random, Success, Try}
 
 class BftScanConnection(
+    override protected val coinLedgerClient: CNLedgerClient,
+    override protected val coinRulesCacheTimeToLive: NonNegativeFiniteDuration,
     scanList: ScanList,
-    clock: Clock,
+    protected val clock: Clock,
     val retryProvider: RetryProvider,
     val loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContextExecutor, mat: Materializer)
+)(implicit protected val ec: ExecutionContextExecutor, protected val mat: Materializer)
     extends FlagCloseableAsync
     with NamedLogging
     with RetryProvider.Has
-    with HasCoinRules {
+    with HasCoinRules
+    with CachingScanConnection {
 
   private val refreshAction: Option[PeriodicAction] = scanList match {
     case _: BftScanConnection.TrustSingle =>
@@ -73,89 +69,65 @@ class BftScanConnection(
       )
   }
 
-  /** Query for the SVC party id, retrying until it succeeds.
-    *
-    * Intended to be used for app init.
-    */
-  def getSvcPartyIdWithRetries()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] =
-    retryProvider.getValueWithRetries(
-      RetryFor.WaitingOnInitDependency,
-      "SVC party ID from scan",
-      getSvcPartyId(),
-      logger,
-    )
-
-  def getSvcPartyId()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] =
+  override def getSvcPartyId()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] =
     bftCall(
       _.getSvcPartyId()
     )
 
-  def getCoinRulesWithState()(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[ContractWithState[CoinRules.ContractId, CoinRules]] = {
-    bftCall(_.getCoinRulesWithState())
-  }
+  override protected def runGetCoinRulesWithState(
+      cachedCoinRules: Option[ContractWithState[CoinRules.ContractId, CoinRules]]
+  )(implicit tc: TraceContext): Future[ContractWithState[CoinRules.ContractId, CoinRules]] =
+    bftCall(
+      _.getCoinRulesWithState(cachedCoinRules)
+    )
 
-  override def getCoinRules()(implicit
-      tc: TraceContext
-  ): Future[Contract[CoinRules.ContractId, CoinRules]] = {
-    bftCall(_.getCoinRules())
-  }
+  override protected def runGetCnsRules(
+      cachedCnsRules: Option[ContractWithState[CnsRules.ContractId, CnsRules]]
+  )(implicit tc: TraceContext): Future[ContractWithState[CnsRules.ContractId, CnsRules]] = bftCall(
+    _.getCnsRules(cachedCnsRules)
+  )
 
-  def getCoinRulesDomain: GetCoinRulesDomain = { () => implicit tc =>
-    bftCall(_.getCoinRulesDomain()(tc))
-  }
+  override protected def runGetOpenAndIssuingMiningRounds(
+      cachedOpenRounds: Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
+      cachedIssuingRounds: Seq[ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]],
+  )(implicit ec: ExecutionContext, mat: Materializer, tc: TraceContext): Future[
+    (
+        Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
+        Seq[ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]],
+        BigInt,
+    )
+  ] = bftCall(_.getOpenAndIssuingMiningRounds(cachedOpenRounds, cachedIssuingRounds))
 
-  def listSvcSequencers()(implicit
+  override def listSvcSequencers()(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainSequencers]] = {
     bftCall(_.listSvcSequencers())
   }
 
-  def listSvcScans()(implicit
+  override def listSvcScans()(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainScans]] = {
     bftCall(_.listSvcScans())
   }
 
-  def getOpenAndIssuingMiningRounds()(implicit
+  override def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
       ec: ExecutionContext,
       mat: Materializer,
       tc: TraceContext,
-  ): Future[
-    (
-        Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
-        Seq[ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]],
-    )
-  ] = {
-    bftCall(_.getOpenAndIssuingMiningRounds())
+  ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
+    bftCall(_.lookupFeaturedAppRight(providerPartyId))
   }
 
-  def getLatestOpenMiningRound()(implicit
-      ec: ExecutionContext,
-      mat: Materializer,
-      tc: TraceContext,
-  ): Future[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]] = {
-    bftCall(_.getLatestOpenMiningRound())
-  }
-
-  def getImportShipment(
+  override def listImportCrates(
       party: PartyId
-  )(implicit tc: TraceContext): Future[AcsStoreDump.ImportShipment] = {
-    bftCall(_.getImportShipment(party))
-  }
-
-  def getCnsRules()(implicit
-      ec: ExecutionContext,
-      mat: Materializer,
-      tc: TraceContext,
-  ): Future[ContractWithState[CnsRules.ContractId, CnsRules]] = {
-    bftCall(_.getCnsRules())
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[ContractWithState[ImportCrate.ContractId, ImportCrate]]] = {
+    bftCall(_.listImportCrates(party))
   }
 
   private def bftCall[T](
-      call: ScanConnection => Future[T]
+      call: SingleScanConnection => Future[T]
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
     val connections = scanList.scanConnections()
     val f = (connections.size - 1) / 3
@@ -258,28 +230,29 @@ object BftScanConnection {
       extends FlagCloseableAsync
       with NamedLogging
       with RetryProvider.Has {
-    def scanConnections(): Seq[ScanConnection]
+    def scanConnections(): Seq[SingleScanConnection]
   }
   class TrustSingle(
-      scanConnection: ScanConnection,
+      scanConnection: SingleScanConnection,
       val retryProvider: RetryProvider,
       val loggerFactory: NamedLoggerFactory,
   ) extends ScanList {
-    override def scanConnections(): Seq[ScanConnection] = Seq(scanConnection)
+    override def scanConnections(): Seq[SingleScanConnection] = Seq(scanConnection)
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
       SyncCloseable("scan_connection", scanConnection.close())
     )
   }
   class Bft(
-      initialScanConnections: Seq[ScanConnection],
-      connectionBuilder: Uri => Future[ScanConnection],
+      initialScanConnections: Seq[SingleScanConnection],
+      connectionBuilder: Uri => Future[SingleScanConnection],
       val scansRefreshInterval: NonNegativeFiniteDuration,
       val retryProvider: RetryProvider,
       val loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext)
       extends ScanList {
     type SvName = String
-    private val currentScanConnectionsRef: AtomicReference[Map[Uri, (ScanConnection, SvName)]] =
+    private val currentScanConnectionsRef
+        : AtomicReference[Map[Uri, (SingleScanConnection, SvName)]] =
       new AtomicReference(
         initialScanConnections.zipWithIndex.map { case (conn, n) =>
           (conn.config.adminApi.url, (conn, s"Seed URL #$n"))
@@ -340,7 +313,7 @@ object BftScanConnection {
 
     private def connectToAllScansOrFail(
         scans: Seq[SvcScan]
-    )(implicit tc: TraceContext): Future[Seq[(Uri, (ScanConnection, SvName))]] = {
+    )(implicit tc: TraceContext): Future[Seq[(Uri, (SingleScanConnection, SvName))]] = {
       for {
         addedScans <- scans
           .traverse { scan =>
@@ -374,7 +347,9 @@ object BftScanConnection {
       } yield successfullyConnected
     }
 
-    private def attemptToClose(connection: ScanConnection)(implicit tc: TraceContext): Unit = {
+    private def attemptToClose(
+        connection: SingleScanConnection
+    )(implicit tc: TraceContext): Unit = {
       try {
         connection.close()
       } catch {
@@ -383,7 +358,7 @@ object BftScanConnection {
       }
     }
 
-    override def scanConnections(): Seq[ScanConnection] =
+    override def scanConnections(): Seq[SingleScanConnection] =
       currentScanConnectionsRef.get().values.map(_._1).toSeq
 
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
@@ -405,13 +380,15 @@ object BftScanConnection {
       httpClient: HttpRequest => Future[HttpResponse],
       templateDecoder: TemplateJsonDecoder,
   ): Future[BftScanConnection] = {
-    val builder = buildScanConnection(cnLedgerClient, clock, retryProvider, loggerFactory)
+    val builder = buildScanConnection(clock, retryProvider, loggerFactory)
     config match {
       case BftScanClientConfig.TrustSingle(url, coinRulesCacheTimeToLive) =>
         val connectionF = builder(url, coinRulesCacheTimeToLive)
         connectionF
           .map(conn =>
             new BftScanConnection(
+              cnLedgerClient,
+              coinRulesCacheTimeToLive,
               new TrustSingle(conn, retryProvider, loggerFactory),
               clock,
               retryProvider,
@@ -432,6 +409,8 @@ object BftScanConnection {
               )
             )
           bftConnection = new BftScanConnection(
+            cnLedgerClient,
+            coinRulesCacheTimeToLive,
             bft,
             clock,
             retryProvider,
@@ -456,7 +435,6 @@ object BftScanConnection {
   }
 
   private def buildScanConnection(
-      cnLedgerClient: CNLedgerClient,
       clock: Clock,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
@@ -466,10 +444,9 @@ object BftScanConnection {
       mat: Materializer,
       httpClient: HttpRequest => Future[HttpResponse],
       templateDecoder: TemplateJsonDecoder,
-  ): (Uri, NonNegativeFiniteDuration) => Future[ScanConnection] =
+  ): (Uri, NonNegativeFiniteDuration) => Future[SingleScanConnection] =
     (uri: Uri, coinRulesCacheTimeToLive: NonNegativeFiniteDuration) => {
-      ScanConnection(
-        cnLedgerClient,
+      ScanConnection.singleUncached( // BFTScanConnection caches itself so that caches don't desync
         ScanAppClientConfig(
           NetworkAppClientConfig(
             uri,

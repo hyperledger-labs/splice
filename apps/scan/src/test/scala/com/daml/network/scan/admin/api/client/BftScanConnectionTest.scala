@@ -2,15 +2,18 @@ package com.daml.network.scan.admin.api.client
 
 import com.daml.network.admin.http.HttpErrorWithHttpCode
 import com.daml.network.config.NetworkAppClientConfig
-import com.daml.network.environment.{BaseAppConnection, RetryProvider}
+import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.{DomainScans, SvcScan}
 import com.daml.network.scan.config.ScanAppClientConfig
+import com.daml.network.store.MultiDomainAcsStore.ContractState
+import com.daml.network.util.{CNNodeUtil, Contract, ContractWithState}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
+import com.google.protobuf.ByteString
 import org.apache.pekko.http.scaladsl.model.{
   ContentTypes,
   HttpEntity,
@@ -21,8 +24,11 @@ import org.apache.pekko.http.scaladsl.model.{
 import org.mockito.exceptions.base.MockitoAssertionError
 import org.scalatest.wordspec.AsyncWordSpec
 
-import java.time.Duration
-import scala.concurrent.Future
+import java.time.{Duration, Instant}
+import java.util.Optional
+import scala.concurrent.{ExecutionContext, Future}
+import com.daml.network.codegen.java.cc.coinrules as coinrulesCodegen
+import com.digitalasset.canton.tracing.TraceContext
 
 // mock verification triggers this
 @SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))
@@ -37,35 +43,39 @@ class BftScanConnectionTest
 
   val clock = new SimClock(loggerFactory = loggerFactory)
 
-  def getMockedConnections(n: Int): Seq[ScanConnection] = (0 until n).map { n =>
-    val m = mock[ScanConnection]
+  def getMockedConnections(n: Int): Seq[SingleScanConnection] = (0 until n).map { n =>
+    val m = mock[SingleScanConnection]
     when(m.config).thenReturn(
       ScanAppClientConfig(NetworkAppClientConfig(s"https://$n.example.com"))
     )
     m
   }
-  def makeMockReturn(mock: ScanConnection, returns: PartyId): Unit = {
+  def makeMockReturn(mock: SingleScanConnection, returns: PartyId): Unit = {
     when(mock.getSvcPartyId()).thenReturn(Future.successful(returns))
   }
-  def makeMockFail(mock: ScanConnection, failure: Throwable): Unit = {
+  def makeMockFail(mock: SingleScanConnection, failure: Throwable): Unit = {
     when(mock.getSvcPartyId()).thenReturn(Future.failed(failure))
   }
   def getBft(
-      initialConnections: Seq[ScanConnection],
-      connectionBuilder: Uri => Future[ScanConnection] = _ =>
+      initialConnections: Seq[SingleScanConnection],
+      connectionBuilder: Uri => Future[SingleScanConnection] = _ =>
         Future.failed(new RuntimeException("Shouldn't be refreshing!")),
-  ) = new BftScanConnection(
-    new BftScanConnection.Bft(
-      initialConnections,
-      connectionBuilder,
+  ) = {
+    new BftScanConnection(
+      mock[CNLedgerClient],
       NonNegativeFiniteDuration.ofSeconds(1),
+      new BftScanConnection.Bft(
+        initialConnections,
+        connectionBuilder,
+        NonNegativeFiniteDuration.ofSeconds(1),
+        retryProvider,
+        loggerFactory,
+      ),
+      clock,
       retryProvider,
       loggerFactory,
-    ),
-    clock,
-    retryProvider,
-    loggerFactory,
-  )
+    )
+  }
   val partyIdA = PartyId.tryFromProtoPrimitive("whatever::a")
   val partyIdB = PartyId.tryFromProtoPrimitive("whatever::b")
 
@@ -138,8 +148,32 @@ class BftScanConnectionTest
       connections.foreach(makeMockReturn(_, partyIdA))
 
       connections.foreach { connection =>
-        when(connection.getCoinRulesDomain).thenReturn(() => _ => Future.successful(domainId))
-        when(connection.listSvcScans()).thenReturn(
+        // all of this is noise...
+        when(connection.getCoinRulesWithState(eqTo(None))(any[ExecutionContext], any[TraceContext]))
+          .thenReturn(
+            Future.successful(
+              ContractWithState(
+                Contract(
+                  coinrulesCodegen.CoinRules.TEMPLATE_ID,
+                  new coinrulesCodegen.CoinRules.ContractId("whatever"),
+                  new coinrulesCodegen.CoinRules(
+                    partyIdA.toProtoPrimitive,
+                    CNNodeUtil.defaultCoinConfigSchedule(
+                      NonNegativeFiniteDuration(Duration.ofMinutes(10)),
+                      10,
+                      domainId,
+                    ),
+                    false,
+                    Optional.empty(),
+                  ),
+                  ByteString.EMPTY,
+                  Instant.EPOCH,
+                ),
+                ContractState.Assigned(domainId), // ...except this
+              )
+            )
+          )
+        when(connection.listSvcScans()(any[TraceContext])).thenReturn(
           Future.successful(
             Seq(
               DomainScans(
