@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 38,
+  "id": 12,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -103,14 +103,14 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.2",
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
           "editorMode": "code",
-          "expr": "cometbft_consensus_height{chain_id=\"$chain_id\", job=\"$instance\"}",
+          "expr": "cometbft_consensus_height{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
           "format": "time_series",
           "hide": false,
           "instant": true,
@@ -124,6 +124,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$DS"
       },
       "description": "",
@@ -175,16 +176,18 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.2",
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
-          "expr": "cometbft_consensus_total_txs{chain_id=\"$chain_id\", job=\"$instance\"}",
+          "editorMode": "code",
+          "expr": "cometbft_consensus_total_txs{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
           "format": "time_series",
           "interval": "30s",
           "intervalFactor": 1,
+          "range": true,
           "refId": "A"
         }
       ],
@@ -216,6 +219,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -304,6 +308,7 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
         "uid": "$DS"
       },
       "description": "",
@@ -355,13 +360,14 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.2",
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
-          "expr": "cometbft_consensus_validators_power{chain_id=\"$chain_id\", job=\"$instance\"}",
+          "editorMode": "code",
+          "expr": "cometbft_consensus_validators_power{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
           "format": "time_series",
           "instant": false,
           "interval": "30s",
@@ -397,6 +403,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -538,14 +545,14 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.2",
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
           "editorMode": "code",
-          "expr": "rate(cometbft_consensus_block_interval_seconds_sum{chain_id=\"$chain_id\", job=\"$instance\"}[$__rate_interval]) / rate(cometbft_consensus_block_interval_seconds_count{chain_id=\"$chain_id\", job=\"$instance\"}[$__rate_interval])",
+          "expr": "rate(cometbft_consensus_block_interval_seconds_sum{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}[$__rate_interval]) / rate(cometbft_consensus_block_interval_seconds_count{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}[$__rate_interval])",
           "format": "time_series",
           "interval": "30s",
           "intervalFactor": 1,
@@ -558,68 +565,132 @@
       "type": "stat"
     },
     {
-      "aliasColors": {
-        "Height for last 3 hours": "#447ebc",
-        "Total Transactions for last 3 hours": "#ef843c"
-      },
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
       "datasource": {
+        "type": "prometheus",
         "uid": "$DS"
       },
-      "decimals": 0,
       "fieldConfig": {
         "defaults": {
-          "links": []
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "links": [],
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "locale"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Height for last 3 hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#447ebc",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total Transactions for last 3 hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#ef843c",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
-      "fill": 3,
-      "fillGradient": 0,
       "gridPos": {
         "h": 9,
         "w": 12,
         "x": 0,
         "y": 9
       },
-      "hiddenSeries": false,
       "hideTimeOverride": false,
       "id": 15,
-      "legend": {
-        "alignAsTable": true,
-        "avg": false,
-        "current": true,
-        "max": true,
-        "min": true,
-        "rightSide": false,
-        "show": true,
-        "sideWidth": 350,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
       "links": [],
-      "nullPointMode": "null",
       "options": {
-        "alertThreshold": true
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "width": 350
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       },
-      "percentage": false,
-      "pluginVersion": "10.0.2",
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
-          "expr": "cometbft_consensus_validators{chain_id=\"$chain_id\", job=\"$instance\"}",
+          "editorMode": "code",
+          "expr": "cometbft_consensus_validators{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -631,119 +702,158 @@
           "datasource": {
             "uid": "$DS"
           },
-          "expr": "cometbft_consensus_missing_validators{chain_id=\"$chain_id\", job=\"$instance\"}",
+          "editorMode": "code",
+          "expr": "cometbft_consensus_missing_validators{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "legendFormat": "Missing",
+          "range": true,
           "refId": "B"
         },
         {
           "datasource": {
             "uid": "$DS"
           },
-          "expr": "cometbft_consensus_byzantine_validators{chain_id=\"$chain_id\", job=\"$instance\"}",
+          "editorMode": "code",
+          "expr": "cometbft_consensus_byzantine_validators{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "Byzantine",
+          "range": true,
           "refId": "C"
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
       "title": "Validators",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "decimals": 0,
-          "format": "locale",
-          "label": "",
-          "logBase": 1,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "none",
-          "logBase": 1,
-          "show": false
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
+      "type": "timeseries"
     },
     {
-      "aliasColors": {
-        "Height for last 3 hours": "#447ebc",
-        "Total Transactions for last 3 hours": "#ef843c"
-      },
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
       "datasource": {
+        "type": "prometheus",
         "uid": "$DS"
       },
       "fieldConfig": {
         "defaults": {
-          "links": []
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "links": [],
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Height for last 3 hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#447ebc",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total Transactions for last 3 hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#ef843c",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
-      "fill": 3,
-      "fillGradient": 0,
       "gridPos": {
         "h": 9,
         "w": 12,
         "x": 12,
         "y": 9
       },
-      "hiddenSeries": false,
       "hideTimeOverride": false,
       "id": 48,
-      "legend": {
-        "alignAsTable": true,
-        "avg": false,
-        "current": true,
-        "max": true,
-        "min": true,
-        "rightSide": false,
-        "show": true,
-        "sideWidth": 350,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
       "links": [],
-      "nullPointMode": "null",
       "options": {
-        "alertThreshold": true
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "width": 350
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       },
-      "percentage": false,
-      "pluginVersion": "10.0.2",
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
-          "expr": "cometbft_consensus_validators_power{chain_id=\"$chain_id\", job=\"$instance\"}",
+          "editorMode": "code",
+          "expr": "cometbft_consensus_validators_power{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -755,118 +865,240 @@
           "datasource": {
             "uid": "$DS"
           },
-          "expr": "cometbft_consensus_missing_validators_power{chain_id=\"$chain_id\", job=\"$instance\"}",
+          "editorMode": "code",
+          "expr": "cometbft_consensus_missing_validators_power{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "legendFormat": "Missing",
+          "range": true,
           "refId": "B"
         },
         {
           "datasource": {
             "uid": "$DS"
           },
-          "expr": "cometbft_consensus_byzantine_validators_power{chain_id=\"$chain_id\", job=\"$instance\"}",
+          "editorMode": "code",
+          "expr": "cometbft_consensus_byzantine_validators_power{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "Byzantine",
+          "range": true,
           "refId": "C"
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
       "title": "Voting Power",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "decimals": 0,
-          "format": "short",
-          "label": "",
-          "logBase": 1,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "none",
-          "logBase": 1,
-          "show": false
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
+      "type": "timeseries"
     },
     {
-      "aliasColors": {
-        "Height for last 3 hours": "#447ebc",
-        "Total Transactions for last 3 hours": "#ef843c"
-      },
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
       "datasource": {
+        "type": "prometheus",
+        "uid": "${DS}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-RdYlGr"
+          },
+          "custom": {
+            "fillOpacity": 70,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#e24d42",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "hideTimeOverride": true,
+      "id": 67,
+      "links": [],
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "rowHeight": 0.9,
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "10.1.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS}"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "cometbft_consensus_round_voting_power_percent{namespace=\"$namespace\", chain_id=\"$chain_id\", service=\"$instance\"}",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "{{vote_type}}",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Consensus round voting power",
+      "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
         "uid": "$DS"
       },
       "fieldConfig": {
         "defaults": {
-          "links": []
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "links": [],
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Height for last 3 hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#447ebc",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total Transactions for last 3 hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#ef843c",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
-      "fill": 3,
-      "fillGradient": 0,
       "gridPos": {
         "h": 5,
         "w": 12,
         "x": 0,
-        "y": 18
+        "y": 26
       },
-      "hiddenSeries": false,
       "hideTimeOverride": false,
       "id": 49,
-      "legend": {
-        "alignAsTable": false,
-        "avg": true,
-        "current": false,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
       "links": [],
-      "nullPointMode": "null",
       "options": {
-        "alertThreshold": true
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       },
-      "percentage": false,
-      "pluginVersion": "10.0.2",
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
-          "expr": "cometbft_consensus_block_size_bytes{chain_id=\"$chain_id\", job=\"$instance\"}",
+          "editorMode": "code",
+          "expr": "cometbft_consensus_block_size_bytes{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -875,101 +1107,135 @@
           "refId": "A"
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
       "title": "Block Size",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "decimals": 2,
-          "format": "bytes",
-          "label": "",
-          "logBase": 1,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "none",
-          "logBase": 1,
-          "show": false
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
+      "type": "timeseries"
     },
     {
-      "aliasColors": {
-        "Height for last 3 hours": "#447ebc",
-        "Total Transactions for last 3 hours": "#ef843c"
-      },
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
       "datasource": {
+        "type": "prometheus",
         "uid": "$DS"
       },
-      "decimals": 0,
       "fieldConfig": {
         "defaults": {
-          "links": []
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "links": [],
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Height for last 3 hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#447ebc",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total Transactions for last 3 hours"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#ef843c",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
-      "fill": 3,
-      "fillGradient": 0,
       "gridPos": {
         "h": 5,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 26
       },
-      "hiddenSeries": false,
       "hideTimeOverride": false,
       "id": 50,
-      "legend": {
-        "alignAsTable": false,
-        "avg": true,
-        "current": false,
-        "max": true,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "total": true,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
       "links": [],
-      "nullPointMode": "null",
       "options": {
-        "alertThreshold": true
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "sum"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       },
-      "percentage": false,
-      "pluginVersion": "10.0.2",
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
-          "expr": "cometbft_consensus_num_txs{chain_id=\"$chain_id\", job=\"$instance\"}",
+          "editorMode": "code",
+          "expr": "cometbft_consensus_num_txs{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -978,38 +1244,8 @@
           "refId": "A"
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
       "title": "Transactions",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "decimals": 0,
-          "format": "short",
-          "label": "",
-          "logBase": 1,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "none",
-          "logBase": 1,
-          "show": false
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
+      "type": "timeseries"
     },
     {
       "collapsed": false,
@@ -1021,7 +1257,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 31
       },
       "id": 55,
       "panels": [],
@@ -1078,7 +1314,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 24
+        "y": 32
       },
       "hideTimeOverride": true,
       "id": 53,
@@ -1095,14 +1331,14 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "10.0.2",
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
           "editorMode": "code",
-          "expr": "cometbft_p2p_peers{chain_id=\"$chain_id\", job=~\"$instance\"}",
+          "expr": "cometbft_p2p_peers{namespace=\"$namespace\", chain_id=\"$chain_id\", job=~\"$instance\"}",
           "format": "time_series",
           "instant": true,
           "interval": "30s",
@@ -1152,7 +1388,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 24
+        "y": 32
       },
       "hideTimeOverride": true,
       "id": 56,
@@ -1169,14 +1405,14 @@
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "10.0.2",
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
           "editorMode": "code",
-          "expr": "cometbft_mempool_size{chain_id=\"$chain_id\", job=~\"$instance\"}",
+          "expr": "cometbft_mempool_size{namespace=\"$namespace\", chain_id=\"$chain_id\", job=~\"$instance\"}",
           "format": "time_series",
           "instant": true,
           "interval": "30s",
@@ -1221,7 +1457,7 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 24
+        "y": 32
       },
       "hideTimeOverride": true,
       "id": 60,
@@ -1241,14 +1477,14 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.2",
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
           "editorMode": "code",
-          "expr": "cometbft_mempool_failed_txs{chain_id=\"$chain_id\", job=~\"$instance\"}",
+          "expr": "cometbft_mempool_failed_txs{namespace=\"$namespace\", chain_id=\"$chain_id\", job=~\"$instance\"}",
           "format": "time_series",
           "instant": true,
           "interval": "30s",
@@ -1293,7 +1529,7 @@
         "h": 4,
         "w": 6,
         "x": 18,
-        "y": 24
+        "y": 32
       },
       "hideTimeOverride": true,
       "id": 61,
@@ -1313,14 +1549,14 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.2",
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
           "editorMode": "code",
-          "expr": "cometbft_mempool_recheck_times{chain_id=\"$chain_id\", job=~\"$instance\"}",
+          "expr": "cometbft_mempool_recheck_times{namespace=\"$namespace\", chain_id=\"$chain_id\", job=~\"$instance\"}",
           "format": "time_series",
           "instant": true,
           "interval": "30s",
@@ -1332,192 +1568,200 @@
       "type": "stat"
     },
     {
-      "aliasColors": {},
-      "bars": true,
-      "dashLength": 10,
-      "dashes": false,
       "datasource": {
+        "type": "prometheus",
         "uid": "$DS"
       },
       "fieldConfig": {
         "defaults": {
-          "links": []
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 100,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "links": [],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
         },
         "overrides": []
       },
-      "fill": 1,
-      "fillGradient": 0,
       "gridPos": {
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 28
+        "y": 36
       },
-      "hiddenSeries": false,
       "id": 59,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": false,
-      "linewidth": 1,
       "links": [],
-      "nullPointMode": "null",
       "options": {
-        "alertThreshold": true
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
-      "percentage": false,
-      "pluginVersion": "10.0.2",
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
-          "expr": "cometbft_p2p_peer_receive_bytes_total{chain_id=\"$chain_id\", job=\"$instance\"}",
+          "editorMode": "code",
+          "expr": "cometbft_p2p_peer_receive_bytes_total{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{peer_id}}",
+          "range": true,
           "refId": "A"
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
       "title": "Total Network Input",
-      "tooltip": {
-        "shared": false,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "series",
-        "show": false,
-        "values": [
-          "current"
-        ]
-      },
-      "yaxes": [
-        {
-          "format": "bytes",
-          "logBase": 1,
-          "show": true
-        },
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": false
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
+      "type": "timeseries"
     },
     {
-      "aliasColors": {},
-      "bars": true,
-      "dashLength": 10,
-      "dashes": false,
       "datasource": {
+        "type": "prometheus",
         "uid": "$DS"
       },
       "fieldConfig": {
         "defaults": {
-          "links": []
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 100,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "links": [],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
         },
         "overrides": []
       },
-      "fill": 1,
-      "fillGradient": 0,
       "gridPos": {
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 28
+        "y": 36
       },
-      "hiddenSeries": false,
       "id": 58,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": false,
-      "linewidth": 1,
       "links": [],
-      "nullPointMode": "null",
       "options": {
-        "alertThreshold": true
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
-      "percentage": false,
-      "pluginVersion": "10.0.2",
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
+      "pluginVersion": "10.1.5",
       "targets": [
         {
           "datasource": {
             "uid": "$DS"
           },
-          "expr": "cometbft_p2p_peer_send_bytes_total{chain_id=\"$chain_id\", job=\"$instance\"}",
+          "editorMode": "code",
+          "expr": "cometbft_p2p_peer_send_bytes_total{namespace=\"$namespace\", chain_id=\"$chain_id\", job=\"$instance\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{peer_id}}",
+          "range": true,
           "refId": "A"
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
       "title": "Total Network Output",
-      "tooltip": {
-        "shared": false,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "series",
-        "show": false,
-        "values": [
-          "current"
-        ]
-      },
-      "yaxes": [
-        {
-          "format": "bytes",
-          "logBase": 1,
-          "show": true
-        },
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": false
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
+      "type": "timeseries"
     }
   ],
   "refresh": "",
@@ -1550,8 +1794,38 @@
       {
         "current": {
           "selected": false,
-          "text": "dev-0.1.1-snapshot.20230922.3811.0.v30f8a230",
-          "value": "dev-0.1.1-snapshot.20230922.3811.0.v30f8a230"
+          "text": "sv-1",
+          "value": "sv-1"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "$DS"
+        },
+        "definition": "label_values(cometbft_consensus_height,namespace)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "namespace",
+        "multi": false,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "query": "label_values(cometbft_consensus_height,namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "dev-0.1.1-snapshot.20240111.4526.0.v552e1828",
+          "value": "dev-0.1.1-snapshot.20240111.4526.0.v552e1828"
         },
         "datasource": {
           "type": "prometheus",
@@ -1578,8 +1852,8 @@
         "allValue": "",
         "current": {
           "selected": false,
-          "text": "cometbft-sv-1-cometbft-rpc",
-          "value": "cometbft-sv-1-cometbft-rpc"
+          "text": "global-domain-0-cometbft-cometbft-rpc",
+          "value": "global-domain-0-cometbft-cometbft-rpc"
         },
         "datasource": {
           "type": "prometheus",
@@ -1608,7 +1882,7 @@
     ]
   },
   "time": {
-    "from": "now/d",
+    "from": "now-12h",
     "to": "now"
   },
   "timepicker": {
@@ -1639,6 +1913,6 @@
   "timezone": "",
   "title": "CometBFT",
   "uid": "UJyurCTWz",
-  "version": 3,
+  "version": 10,
   "weekStart": ""
 }
