@@ -592,20 +592,21 @@ lazy val `apps-validator` =
         directory = "external-openapi-ts-client",
       ),
       Compile / guardrailTasks :=
-        List("validator-internal", "json-api-proxy-internal", "cns-external").flatMap(api =>
-          List(
-            ScalaServer(
-              new File(s"apps/validator/src/main/openapi/${api}.yaml"),
-              pkg = "com.daml.network.http.v0",
-              modules = List("pekko-http-v1.0.0", "circe"),
-              customExtraction = true,
-            ),
-            ScalaClient(
-              new File(s"apps/validator/src/main/openapi/${api}.yaml"),
-              pkg = "com.daml.network.http.v0",
-              modules = List("pekko-http-v1.0.0", "circe"),
-            ),
-          )
+        List("validator-internal", "json-api-proxy-internal", "cns-external", "scan-proxy").flatMap(
+          api =>
+            List(
+              ScalaServer(
+                new File(s"apps/validator/src/main/openapi/${api}.yaml"),
+                pkg = "com.daml.network.http.v0",
+                modules = List("pekko-http-v1.0.0", "circe"),
+                customExtraction = true,
+              ),
+              ScalaClient(
+                new File(s"apps/validator/src/main/openapi/${api}.yaml"),
+                pkg = "com.daml.network.http.v0",
+                modules = List("pekko-http-v1.0.0", "circe"),
+              ),
+            )
         ),
     )
 

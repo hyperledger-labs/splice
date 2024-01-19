@@ -103,7 +103,7 @@ abstract class ScanAppReference(
   @Help.Summary("Lookup a cns entry by the party that registered it")
   def lookupEntryByParty(
       party: PartyId
-  ): Contract[CnsEntry.ContractId, CnsEntry] =
+  ): Option[Contract[CnsEntry.ContractId, CnsEntry]] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.LookupCnsEntryByParty(party))
     }

@@ -4,7 +4,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cn.cns.CnsRules
+import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.ScanAppClientConfig
@@ -98,6 +98,15 @@ class SingleScanConnection private[client] (
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.GetCnsRules(cachedCnsRules),
+    )
+  }
+
+  def lookupCnsEntryByParty(
+      id: PartyId
+  )(implicit tc: TraceContext): Future[Option[Contract[CnsEntry.ContractId, CnsEntry]]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupCnsEntryByParty(id),
     )
   }
 

@@ -1,0 +1,102 @@
+openapi: 3.0.0
+info:
+  title: Validator API
+  version: 0.0.1
+tags:
+  - name: validator
+servers:
+  - url: https://example.com/api/validator
+paths:
+  /v0/scan-proxy/featured-apps/{provider_party_id}:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "lookupFeaturedAppRight"
+      parameters:
+        - name: "provider_party_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupFeaturedAppRightResponse"
+  /v0/scan-proxy/open-and-issuing-mining-rounds:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "getOpenAndIssuingMiningRounds"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetOpenAndIssuingMiningRoundsProxyResponse"
+  /v0/scan-proxy/coin-rules:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "getCoinRules"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetCoinRulesProxyResponse"
+  /v0/cns-entries/by-party/{party}:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "lookupCnsEntryByParty"
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupEntryByPartyResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+
+components:
+  schemas:
+    # does not include the TTL, and the contracts are not-MaybeCached
+    GetOpenAndIssuingMiningRoundsProxyResponse:
+      type: object
+      required:
+        [
+          "open_mining_rounds",
+          "issuing_mining_rounds",
+        ]
+      properties:
+        open_mining_rounds:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+        issuing_mining_rounds:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+    # the contract is not-MaybeCached
+    GetCoinRulesProxyResponse:
+      type: object
+      required:
+        [
+          "coin_rules",
+        ]
+      properties:
+        coin_rules:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
+

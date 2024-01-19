@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cn.cns.CnsRules
+import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.PackageIdResolver.HasCoinRules
 import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryFor, RetryProvider}
@@ -86,6 +86,11 @@ class BftScanConnection(
   )(implicit tc: TraceContext): Future[ContractWithState[CnsRules.ContractId, CnsRules]] = bftCall(
     _.getCnsRules(cachedCnsRules)
   )
+
+  def lookupCnsEntryByParty(id: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[CnsEntry.ContractId, CnsEntry]]] =
+    bftCall(_.lookupCnsEntryByParty(id))
 
   override protected def runGetOpenAndIssuingMiningRounds(
       cachedOpenRounds: Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],

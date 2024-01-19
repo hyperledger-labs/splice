@@ -311,7 +311,7 @@ object HttpScanAppClient {
       party: PartyId
   ) extends InternalBaseCommand[
         http.LookupCnsEntryByPartyResponse,
-        Contract[CnsEntry.ContractId, CnsEntry],
+        Option[Contract[CnsEntry.ContractId, CnsEntry]],
       ] {
 
     override def submitRequest(
@@ -321,12 +321,15 @@ object HttpScanAppClient {
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.LookupCnsEntryByPartyResponse.OK(response) =>
-      for {
-        entry <- Contract
-          .fromHttp(CnsEntry.COMPANION)(response.entry)
-          .leftMap(_.toString)
-      } yield entry
+    ) = {
+      case http.LookupCnsEntryByPartyResponse.OK(response) =>
+        for {
+          entry <- Contract
+            .fromHttp(CnsEntry.COMPANION)(response.entry)
+            .leftMap(_.toString)
+        } yield Some(entry)
+      case http.LookupCnsEntryByPartyResponse.NotFound(_) =>
+        Right(None)
     }
   }
 

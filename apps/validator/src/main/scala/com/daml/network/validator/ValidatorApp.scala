@@ -66,6 +66,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.daml.network.validator.admin.http.HttpExternalCnsHandler
 import com.daml.network.http.v0.external.cns.CnsResource
+import com.daml.network.http.v0.scanproxy.ScanproxyResource
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
@@ -638,6 +639,11 @@ class ValidatorApp(
         loggerFactory,
       )
 
+      scanProxyHandler = new HttpScanProxyHandler(
+        scanConnection,
+        loggerFactory,
+      )
+
       publicHandler = new HttpValidatorPublicHandler(
         automation.store,
         config.ledgerApiUser,
@@ -737,6 +743,10 @@ class ValidatorApp(
                   CnsResource.routes(
                     cnsExternalHandler,
                     AuthExtractor(verifier, loggerFactory, "canton network cns realm"),
+                  ),
+                  ScanproxyResource.routes(
+                    scanProxyHandler,
+                    AuthExtractor(verifier, loggerFactory, "canton network scan proxy realm"),
                   ),
                   ValidatorAdminResource.routes(
                     adminHandler,
