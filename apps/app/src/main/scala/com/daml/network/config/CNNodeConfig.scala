@@ -432,6 +432,9 @@ object CNNodeConfig {
       deriveReader[SvOnboardingConfig.FoundCollective]
     implicit val svOnboardingJoinWithKeyReader: ConfigReader[SvOnboardingConfig.JoinWithKey] =
       deriveReader[SvOnboardingConfig.JoinWithKey]
+    implicit val svOnboardingDomainMigrationReader
+        : ConfigReader[SvOnboardingConfig.DomainMigration] =
+      deriveReader[SvOnboardingConfig.DomainMigration]
     implicit val svOnboardingConfigReader: ConfigReader[SvOnboardingConfig] =
       deriveReader[SvOnboardingConfig]
     implicit val expectedValidatorOnboardingConfigReader
@@ -472,6 +475,7 @@ object CNNodeConfig {
           _ match {
             case _: SvOnboardingConfig.FoundCollective => conf.localDomainNode.isDefined
             case _: SvOnboardingConfig.JoinWithKey => true
+            case _: SvOnboardingConfig.DomainMigration => true
           }
         }
         Either.cond(
@@ -671,6 +675,9 @@ object CNNodeConfig {
       deriveWriter[SvOnboardingConfig.FoundCollective]
     implicit val svOnboardingJoinWithKeyWriter: ConfigWriter[SvOnboardingConfig.JoinWithKey] =
       deriveWriter[SvOnboardingConfig.JoinWithKey]
+    implicit val svOnboardingDomainMigrationWriter
+        : ConfigWriter[SvOnboardingConfig.DomainMigration] =
+      deriveWriter[SvOnboardingConfig.DomainMigration]
     implicit val svOnboardingConfigWriter: ConfigWriter[SvOnboardingConfig] =
       confidentialWriter[SvOnboardingConfig](SvOnboardingConfig.hideConfidential)
 

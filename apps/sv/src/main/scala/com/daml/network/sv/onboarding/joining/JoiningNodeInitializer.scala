@@ -158,10 +158,10 @@ class JoiningNodeInitializer(
         if (svcPartyIsAuthorized) {
           logger.info("SVC party is authorized to our participant.")
           for {
-            _ <- svAutomation.connection.grantUserRights(
+            _ <- SetupUtil.grantSvUserRightReadAsSvc(
+              svAutomation.connection,
               config.ledgerApiUser,
-              Seq.empty,
-              Seq(svStore.key.svcParty),
+              svStore.key.svcParty,
             )
             svcAutomation =
               newSvSvcAutomationService(

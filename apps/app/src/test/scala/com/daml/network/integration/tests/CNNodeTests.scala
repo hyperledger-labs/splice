@@ -194,7 +194,8 @@ object CNNodeTests {
       NonNegativeFiniteDuration.ofSeconds((sv1Backend.config.onboarding match {
         case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
           foundCollective.initialTickDuration.asJava
-        case Some(_: SvOnboardingConfig.JoinWithKey) | None =>
+        case Some(_: SvOnboardingConfig.JoinWithKey) |
+            Some(_: SvOnboardingConfig.DomainMigration) | None =>
           fail("Failed to retrieve defaultTickDuration from sv1.")
       }).toSeconds)
 
@@ -207,7 +208,8 @@ object CNNodeTests {
       sv1Backend.config.onboarding match {
         case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
           foundCollective.initialTrafficControlConfig
-        case Some(_: SvOnboardingConfig.JoinWithKey) | None =>
+        case Some(_: SvOnboardingConfig.JoinWithKey) | Some(_: SvOnboardingConfig.DomainMigration) |
+            None =>
           fail("Failed to retrieve defaultTrafficControlConfig from sv1.")
       }
 

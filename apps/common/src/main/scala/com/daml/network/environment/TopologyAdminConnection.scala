@@ -740,7 +740,9 @@ abstract class TopologyAdminConnection(
       s"Adding topology transactions $txs"
     )
     retryProvider
-      .ensureThat[Seq[GenericSignedTopologyTransactionX], Seq[GenericSignedTopologyTransactionX]](
+      .ensureThat[Seq[GenericSignedTopologyTransactionX], Seq[
+        GenericSignedTopologyTransactionX
+      ], Seq[Status.Code]](
         RetryFor.ClientCalls,
         "Topology transaction are added",
         listAllTransactions(

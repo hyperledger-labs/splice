@@ -228,39 +228,39 @@ final class RetryProvider(
     })
 
   /** Variant of ensureThat where the check returns only a Boolean. */
-  def ensureThatB(
+  def ensureThatB[R](
       retryFor: RetryFor,
       conditionDesc: String,
       check: => Future[Boolean],
       establish: => Future[Unit],
       logger: TracedLogger,
-      additionalCodes: Seq[Status.Code] = Seq.empty,
-  )(implicit ec: ExecutionContext): Future[Unit] =
+      retryable: R = Seq.empty,
+  )(implicit ec: ExecutionContext, mkRetryable: Retryable[R]): Future[Unit] =
     ensureThatO(
       retryFor,
       conditionDesc,
       check.map(Option.when(_)(())),
       establish,
       logger,
-      additionalCodes,
+      retryable,
     )
 
   /** Variant of ensureThat where the check returns only a result. */
-  def ensureThatO[T](
+  def ensureThatO[T, R](
       retryFor: RetryFor,
       conditionDesc: String,
       check: => Future[Option[T]],
       establish: => Future[Unit],
       logger: TracedLogger,
-      additionalCodes: Seq[Status.Code] = Seq.empty,
-  )(implicit ec: ExecutionContext, pp: Pretty[T]): Future[T] =
+      retryable: R = Seq.empty,
+  )(implicit ec: ExecutionContext, pp: Pretty[T], mkRetryable: Retryable[R]): Future[T] =
     ensureThat(
       retryFor,
       conditionDesc,
       check = check.map(_.toRight(())),
       establish = (_: Unit) => establish,
       logger,
-      additionalCodes,
+      retryable,
     )
 
   /** Ensure that a particular condition holds as part of an init-like process.
@@ -268,30 +268,40 @@ final class RetryProvider(
     * Checks the condition and establishes it, if it does not host;
     * and waits until the condition holds after establishing it.
     */
-  def ensureThat[A, B](
+  def ensureThat[A, B, R](
       retryFor: RetryFor,
       conditionDesc: String,
       check: => Future[Either[A, B]],
       establish: A => Future[Unit],
       logger: TracedLogger,
-      additionalCodes: Seq[Status.Code] = Seq.empty,
-  )(implicit ec: ExecutionContext, pa: Pretty[A], pb: Pretty[B]): Future[B] =
-    ensureThatI(retryFor, conditionDesc, check, check, establish, logger, additionalCodes)
+      retryable: R = Seq.empty,
+  )(implicit
+      ec: ExecutionContext,
+      pa: Pretty[A],
+      pb: Pretty[B],
+      mkRetryable: Retryable[R],
+  ): Future[B] =
+    ensureThatI(retryFor, conditionDesc, check, check, establish, logger, retryable)
 
   /** Ensure that a particular condition holds as part of an init-like process.
     *
     * Checks the condition with [[initialCheck]] and establishes it, if it does not hold;
     * and waits until the condition holds with [[establishedCheck]] after establishing it.
     */
-  def ensureThatI[A, B](
+  def ensureThatI[A, B, R](
       retryFor: RetryFor,
       conditionDesc: String,
       initialCheck: => Future[Either[A, B]],
       establishedCheck: => Future[Either[A, B]],
       establish: A => Future[Unit],
       logger: TracedLogger,
-      additionalCodes: Seq[Status.Code] = Seq.empty,
-  )(implicit ec: ExecutionContext, pa: Pretty[A], pb: Pretty[B]): Future[B] =
+      additionalCodes: R = Seq.empty,
+  )(implicit
+      ec: ExecutionContext,
+      pa: Pretty[A],
+      pb: Pretty[B],
+      mkRetryable: Retryable[R],
+  ): Future[B] =
     TraceContext.withNewTraceContext(tc0 => {
       implicit val tc: TraceContext = tc0;
       logger.info(s"Ensuring that $conditionDesc")
@@ -531,6 +541,10 @@ object RetryProvider {
                       // by toxiproxy (or a like network condition). See #4256 for details.
                       (statusCode == Status.Code.UNKNOWN && description.contains(
                         "channel closed"
+                      )) ||
+                      // DbStorage instance could still be in passive state during startup
+                      (statusCode == Status.Code.INTERNAL && description.contains(
+                        "DbStorage instance is not active"
                       )) ||
                       // additional codes subject to conditions
                       additionalConditions

@@ -71,6 +71,7 @@ object CNNodeConfigTransforms {
                 )
               )
             case Some(joinWithKey: SvOnboardingConfig.JoinWithKey) => Some(joinWithKey)
+            case Some(domainMigration: SvOnboardingConfig.DomainMigration) => Some(domainMigration)
             case None => None
           },
         )
@@ -242,6 +243,7 @@ object CNNodeConfigTransforms {
           case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
             Some(update(foundCollective))
           case Some(joinWithKey: SvOnboardingConfig.JoinWithKey) => Some(joinWithKey)
+          case Some(domainMigration: SvOnboardingConfig.DomainMigration) => Some(domainMigration)
           case None => None
         })
     )

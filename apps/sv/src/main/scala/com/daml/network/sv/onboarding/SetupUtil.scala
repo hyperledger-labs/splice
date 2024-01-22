@@ -217,4 +217,16 @@ private[onboarding] object SetupUtil {
     svcParty.toProtoPrimitive,
     RetryFor.WaitingOnInitDependency,
   )
+
+  def grantSvUserRightReadAsSvc(
+      connection: CNLedgerConnection,
+      user: String,
+      svc: PartyId,
+  ): Future[Unit] = {
+    connection.grantUserRights(
+      user,
+      Seq.empty,
+      Seq(svc),
+    )
+  }
 }

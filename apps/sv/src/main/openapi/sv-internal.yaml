@@ -1076,13 +1076,39 @@ components:
         mediator:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
 
+    Dar:
+      type: object
+      required:
+        - hash
+        - content
+      properties:
+        hash:
+          type: string
+        content:
+          description: |
+            base64 encoded string of a dar package
+          type: string
+
     GetDomainMigrationDumpResponse:
       type: object
       required:
+        - sv_party_id
+        - svc_party_id
+        - domain_alias
+        - domain_id
         - identities
         - topology_snapshot
         - acs_snapshot
+        - dars
       properties:
+        sv_party_id:
+          type: string
+        svc_party_id:
+          type: string
+        domain_alias:
+          type: string
+        domain_id:
+          type: string
         identities:
           $ref: "#/components/schemas/DomainMigrationIdentities"
         topology_snapshot:
@@ -1093,3 +1119,7 @@ components:
           description: |
             base64 encoded string of acs snapshot
           type: string
+        dars:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dar"

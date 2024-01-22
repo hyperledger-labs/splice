@@ -29,7 +29,8 @@ import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 import ParticipantAdminConnection.HasParticipantId
-import com.digitalasset.canton.admin.participant.v0.ExportAcsResponse
+import com.digitalasset.canton.admin.participant.v0.{DarDescription, ExportAcsResponse}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 
 /** Connection to the subset of the Canton admin API that we rely
   * on in our own applications.
@@ -275,6 +276,13 @@ class ParticipantAdminConnection(
   def lookupDar(hash: Hash)(implicit traceContext: TraceContext): Future[Option[ByteString]] =
     runCmd(
       ParticipantAdminConnection.LookupDarByteString(hash)
+    )
+
+  def listDars(limit: PositiveInt = PositiveInt.MaxValue)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[DarDescription]] =
+    runCmd(
+      ParticipantAdminCommands.Package.ListDars(limit)
     )
 
   private def uploadDarFileInternal(

@@ -90,6 +90,11 @@ object SvOnboardingConfig {
 
   // TODO(#3232) Consider adding `JoinWithToken` based on an already signed token instead of the raw keys
 
+  case class DomainMigration(
+      name: String,
+      dumpFilePath: Path,
+  ) extends SvOnboardingConfig
+
   def hideConfidential(config: SvOnboardingConfig): SvOnboardingConfig = {
     val hidden = "****"
     config match {

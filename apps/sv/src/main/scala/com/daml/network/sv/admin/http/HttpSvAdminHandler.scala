@@ -1,6 +1,7 @@
 package com.daml.network.sv.admin.http
 
 import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
+import cats.syntax.traverse.*
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn
@@ -29,13 +30,16 @@ import com.daml.network.http.v0.{definitions, sv_admin as v0}
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, PageLimit}
 import com.daml.network.store.db.AcsJdbcTypes
+import com.daml.network.sv.DomainMigrationDump.{Dar, DomainMigrationDumpNodeIdentities}
 import com.daml.network.sv.cometbft.CometBftClient
+import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
-import com.daml.network.sv.{LocalDomainNode, SvApp}
+import com.daml.network.sv.{DomainMigrationDump, LocalDomainNode, SvApp}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
@@ -45,12 +49,11 @@ import io.opentelemetry.api.trace.Tracer
 import slick.jdbc.PostgresProfile
 
 import java.time.Instant
-import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 class HttpSvAdminHandler(
-    optAcsDumpConfig: Option[BackupDumpConfig],
+    config: SvAppBackendConfig,
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     cometBftClient: Option[CometBftClient],
@@ -459,7 +462,7 @@ class HttpSvAdminHandler(
   ): Future[SvAdminResource.TriggerAcsDumpResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.triggerAcsDump") { _ => _ =>
-      optAcsDumpConfig match {
+      config.acsStoreDump match {
         case None =>
           Future.failed(
             Status.FAILED_PRECONDITION
@@ -573,17 +576,26 @@ class HttpSvAdminHandler(
             acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
               Set(svcStore.key.svParty, svcStore.key.svcParty)
             )
+            darDescriptions <- participantAdminConnection.listDars()
+            dars <- darDescriptions.traverse { dar =>
+              val hash = Hash.tryFromHexString(dar.hash)
+              participantAdminConnection.lookupDar(hash).map(_.map(Dar(hash, _)))
+            }
           } yield SvAdminResource.GetDomainMigrationDumpResponse.OK(
-            definitions.GetDomainMigrationDumpResponse(
-              identities = definitions.DomainMigrationIdentities(
-                participantIdentities.toHttp,
-                sequencerIdentities.toHttp,
-                mediatorIdentities.toHttp,
+            DomainMigrationDump(
+              svcStore.key.svParty,
+              svcStore.key.svcParty,
+              config.domains.global.alias,
+              globalDomain,
+              DomainMigrationDumpNodeIdentities(
+                participantIdentities,
+                sequencerIdentities,
+                mediatorIdentities,
               ),
-              topologySnapshot =
-                Base64.getEncoder.encodeToString(topologySnapshot.toProtoV0.toByteArray),
-              acsSnapshot = Base64.getEncoder.encodeToString(acsSnapshot.toByteArray),
-            )
+              topologySnapshot,
+              acsSnapshot,
+              dars.flatten,
+            ).toHttp
           )
         case None =>
           Future.failed(

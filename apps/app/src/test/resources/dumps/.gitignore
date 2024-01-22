@@ -1,3 +1,4 @@
 # Outputs created by some of our file-based tests,
 # which don't use temp-files so that dumps are easily inspectable
 /test-outputs/
+/domain-migration-dump/

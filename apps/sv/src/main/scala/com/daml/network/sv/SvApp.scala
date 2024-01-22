@@ -36,6 +36,7 @@ import com.daml.network.sv.cometbft.{
 }
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.metrics.SvAppMetrics
+import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
 import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
@@ -257,6 +258,24 @@ class SvApp(
             )
             initializer.joinCollectiveAndOnboardNodes().map((_, None))
           }
+        case Some(domainMigrationConfig: SvOnboardingConfig.DomainMigration) =>
+          appInitStep("DomainMigrationInitializer initializing node from dump") {
+            val initializer = new DomainMigrationInitializer(
+              config,
+              domainMigrationConfig,
+              cometBftNode,
+              loggerFactory,
+              retryProvider,
+              ledgerClient,
+              participantAdminConnection,
+              clock,
+              storage,
+              localDomainNode.getOrElse(
+                sys.error("It must always specify a domain config for Domain Migration")
+              ),
+            )
+            initializer.migrateDomain().map((_, None))
+          }
         case None =>
           appInitStep("JoiningNodeInitializer joining collective") {
             val initializer = new JoiningNodeInitializer(
@@ -363,7 +382,7 @@ class SvApp(
       )
 
       adminHandler = new HttpSvAdminHandler(
-        config.acsStoreDump,
+        config,
         svAutomation,
         svcAutomation,
         cometBftClient,
@@ -498,6 +517,10 @@ class SvApp(
             )
           case _: SvOnboardingConfig.FoundCollective => {
             logger.info("Skipping early version check because we are the founding SV.")
+            Future.unit
+          }
+          case _: SvOnboardingConfig.DomainMigration => {
+            logger.info("Skipping version check because we are migrating to upgrade domain.")
             Future.unit
           }
         }
