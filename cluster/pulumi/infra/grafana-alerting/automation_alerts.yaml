@@ -18,7 +18,7 @@ groups:
               disableTextWrap: false
               editorMode: builder
               exemplar: false
-              expr: sum by(namespace, app, trigger_name) (rate(cn_retries_failures{error_kind="fatal"}[$__rate_interval]))
+              expr: sum by(namespace, node_type, trigger_name) (rate(cn_retries_failures{error_kind="fatal"}[$__rate_interval]))
               fullMetaSearch: false
               includeNullMetadata: true
               instant: true
@@ -64,5 +64,8 @@ groups:
         annotations:
           __dashboardUid__: a3e1385f-6f03-46d9-908c-34aca0f507a6
           __panelId__: "8"
-          summary: The {{ trigger_name }} for the {{ app }} app in the {{ namespace }} namespace experienced fatal errors.
+          severity: critical
+          summary: Fatal errors occurred in automation trigger
+          description: |-
+            The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace experienced fatal errors.
         isPaused: false
