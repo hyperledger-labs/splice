@@ -462,6 +462,8 @@ object CNNodeConfig {
       deriveReader[BackupDumpConfig.Gcp]
     implicit val backupDumpConfigReader: ConfigReader[BackupDumpConfig] =
       deriveReader[BackupDumpConfig]
+    implicit val migrateSvPartyConfigReader: ConfigReader[MigrateSvPartyConfig] =
+      deriveReader[MigrateSvPartyConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         // We support joining nodes without sequencers/mediators but
@@ -702,6 +704,8 @@ object CNNodeConfig {
       deriveWriter[BackupDumpConfig.Gcp]
     implicit val backupDumpConfigWriter: ConfigWriter[BackupDumpConfig] =
       deriveWriter[BackupDumpConfig]
+    implicit val migrateSvPartyConfigWriter: ConfigWriter[MigrateSvPartyConfig] =
+      deriveWriter[MigrateSvPartyConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

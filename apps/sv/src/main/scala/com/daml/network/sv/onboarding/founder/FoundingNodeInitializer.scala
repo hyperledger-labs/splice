@@ -63,6 +63,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import java.util.concurrent.TimeUnit
@@ -86,6 +87,7 @@ class FoundingNodeInitializer(
     localDomainNode: LocalDomainNode,
 )(implicit
     ec: ExecutionContextExecutor,
+    httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
     mat: Materializer,
@@ -124,8 +126,14 @@ class FoundingNodeInitializer(
       )
       _ = logger.info("Participant connected to domain")
       svcParty <- setupSvcParty(domainId, initConnection, namespace)
-      // founder does not need to lock here
-      svParty <- SetupUtil.setupSvParty(initConnection, config, participantAdminConnection)
+      svParty <- SetupUtil.setupSvParty(
+        initConnection,
+        config,
+        participantAdminConnection,
+        clock,
+        retryProvider,
+        loggerFactory,
+      )
       _ <- participantAdminConnection.uploadDarFiles(
         requiredDars,
         RetryFor.WaitingOnInitDependency,

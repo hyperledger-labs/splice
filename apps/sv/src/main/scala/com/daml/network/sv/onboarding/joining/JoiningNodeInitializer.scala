@@ -115,6 +115,9 @@ class JoiningNodeInitializer(
             initConnection,
             config,
             participantAdminConnection,
+            clock,
+            retryProvider,
+            loggerFactory,
           )
         } yield svParty,
       ).tupled

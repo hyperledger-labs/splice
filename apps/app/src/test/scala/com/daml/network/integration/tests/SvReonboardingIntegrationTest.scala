@@ -1,18 +1,21 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.sv.automation.singlesv.membership.offboarding.SvOffboardingPartyToParticipantProposalTrigger
-import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.topology.{Identifier, ParticipantId, UniqueIdentifier}
-import com.digitalasset.canton.topology.store.TopologyStoreId.{AuthorizedStore, DomainStore}
-import com.digitalasset.canton.topology.transaction.ParticipantPermissionX
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.*
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.*
-import com.daml.network.config.{CNNodeConfigTransforms, CNParticipantClientConfig}
-import com.daml.network.environment.{CNNodeEnvironmentImpl, DarResources}
+import com.daml.network.config.{
+  CNNodeConfigTransforms,
+  CNParticipantClientConfig,
+  NetworkAppClientConfig,
+  ParticipantBootstrapDumpConfig,
+}
+import com.daml.network.sv.config.MigrateSvPartyConfig
+import com.daml.network.scan.config.ScanAppClientConfig
+import com.daml.network.environment.{CNNodeEnvironmentImpl}
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
@@ -22,9 +25,8 @@ import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.util.ProcessTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.jdk.CollectionConverters.*
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.scalatest.time.{Minute, Span}
-import com.google.protobuf.ByteString
-import scala.util.Using
 import java.nio.file.Files
 
 // TODO(#9076) Create fresh database instances within the test to support running it multiple times.
@@ -33,6 +35,8 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
   // TODO(#9014) make it work with persistend stores
   registerPlugin(new UseInMemoryStores(loggerFactory))
+
+  val dumpPath = Files.createTempFile("participant-dump", ".json")
 
   private def tweakSv4ParticipantConfig(conf: CNParticipantClientConfig) =
     // Remap to the participant started through withCanton
@@ -46,6 +50,8 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
         )
       ),
     )
+
+  private def sv4ReonboardBackend(implicit env: CNNodeTestConsoleEnvironment) = svb("sv4Reonboard")
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -61,7 +67,7 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
             if (name == "sv4") {
               conf.copy(
                 participantClient = tweakSv4ParticipantConfig(conf.participantClient),
-                // TODO(#9284) Also test reonboarding sequencers/mediators with fresh dbs.
+                // TODO(#9358) Also test reonboarding sequencers/mediators with fresh dbs.
                 localDomainNode = None,
               )
             } else {
@@ -76,6 +82,26 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
               conf
             }
           })(config),
+        (_, config) =>
+          config.copy(
+            svApps = config.svApps +
+              (InstanceName.tryCreate("sv4Reonboard") ->
+                config
+                  .svApps(InstanceName.tryCreate("sv4"))
+                  .copy(
+                    participantBootstrappingDump =
+                      Some(ParticipantBootstrapDumpConfig.File(dumpPath, Some("sv4ReonboardNew"))),
+                    migrateSvParty = Some(
+                      MigrateSvPartyConfig(
+                        ScanAppClientConfig(
+                          adminApi = NetworkAppClientConfig(
+                            Uri(s"http://localhost:5012")
+                          )
+                        )
+                      )
+                    ),
+                  ))
+          ),
       )
       .withManualStart
 
@@ -181,107 +207,18 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
       "sv reonboarding new",
       "ADMIN_USER" -> sv4Backend.config.ledgerApiUser,
     ) {
-      // We need to clear the cache, otherwise the participant id gets cached in memory and
-      // some commands still use the old participant id.
-      sv4Backend.participantClientWithAdminToken.clear_cache()
       eventually() {
-        sv4Backend.participantClientWithAdminToken.health.status shouldBe NodeStatus.NotInitialized(
-          true
+        sv4ReonboardBackend.participantClientWithAdminToken.health.status shouldBe NodeStatus
+          .NotInitialized(
+            true
+          )
+      }
+      better.files
+        .File(dumpPath)
+        .overwrite(
+          dump.toJson.noSpaces
         )
-      }
-
-      val (newParticipantId, _) = actAndCheck(
-        "Initializing new SV4 participant", {
-          eventuallySucceeds() {
-            sv4Backend.participantClientWithAdminToken.topology.transactions
-              .load(dump.bootstrapTxs, AuthorizedStore.filterName)
-          }
-
-          dump.keys.foreach { key =>
-            sv4Backend.participantClientWithAdminToken.keys.secret
-              .upload(ByteString.copyFrom(key.keyPair), key.name)
-          }
-          val newParticipantId = ParticipantId(
-            UniqueIdentifier(Identifier.tryCreate("sv4ReonboardNew"), dump.id.uid.namespace)
-          )
-          // We need to create OwnerToKeyMappingX transactions for init_id to work properly.
-          // They are not included in the import from dump since that obviously only has the txs for the old
-          // participant id.
-          sv4Backend.participantClientWithAdminToken.keys.secret.list().map { key =>
-            sv4Backend.participantClientWithAdminToken.topology.owner_to_key_mappings.add_key(
-              key.id,
-              key.purpose,
-              keyOwner = newParticipantId,
-              signedBy = Some(newParticipantId.uid.namespace.fingerprint),
-            )
-          }
-          sv4Backend.participantClientWithAdminToken.topology.init_id(newParticipantId.uid)
-          newParticipantId
-        },
-      )(
-        "sv4 participant is initialized",
-        _ =>
-          sv4Backend.participantClientWithAdminToken.health.status shouldBe a[NodeStatus.Success[_]],
-      )
-      sv4Backend.participantClientWithAdminToken.id shouldBe newParticipantId
-      clue("Connect new participant global domain") {
-        sv4Backend.participantClientWithAdminToken.domains.connect(
-          DomainConnectionConfig(
-            sv4Backend.config.domains.global.alias,
-            SequencerConnections.single(
-              GrpcSequencerConnection.tryCreate(sv4Backend.config.domains.global.url)
-            ),
-          )
-        )
-      }
-      val globalDomainId =
-        sv4Backend.participantClientWithAdminToken.domains.list_connected().loneElement.domainId
-      actAndCheck(
-        "Submit topology transaction to migrate SV4 party", {
-          val topology =
-            sv4Backend.participantClientWithAdminToken.topology.party_to_participant_mappings
-              .list(filterParty = sv4Party.toProtoPrimitive)
-              .loneElement
-          val newSerial = Some(topology.context.serial.increment)
-          sv4Backend.participantClientWithAdminToken.topology.party_to_participant_mappings.propose(
-            sv4Party,
-            newParticipants = Seq((newParticipantId, ParticipantPermissionX.Submission)),
-            store = DomainStore(globalDomainId).filterName,
-            serial = newSerial,
-          )
-          newSerial
-        },
-      )(
-        "topology transaction is committed",
-        newSerial => {
-          val newTopology =
-            sv4Backend.participantClientWithAdminToken.topology.party_to_participant_mappings
-              .list(filterParty = sv4Party.toProtoPrimitive)
-          Some(newTopology.loneElement.context.serial) shouldBe newSerial
-        },
-      )
-      clue("Import ACS") {
-        sv4Backend.participantClientWithAdminToken.domains.disconnect_all()
-        (DarResources.svcGovernance.all ++ DarResources.wallet.all ++ DarResources.svLocal.all)
-          .map { dar =>
-            val darData = Using.resource(getClass.getClassLoader.getResourceAsStream(dar.path))(
-              ByteString.readFrom(_)
-            )
-            sv4Backend.participantClientWithAdminToken.dars
-              .upload(dar.path, darDataO = Some(darData))
-          }
-        val acsExport = sv1ScanBackend.getAcsSnapshot(sv4Party)
-        val acsExportFile = Files.createTempFile("acs-export", ".gz")
-        try {
-          Using.resource(Files.newOutputStream(acsExportFile))(acsExport.writeTo(_))
-          sv4Backend.participantClientWithAdminToken.repair
-            .import_acs(inputFile = acsExportFile.toString)
-        } finally {
-          Files.delete(acsExportFile)
-        }
-        sv4Backend.participantClientWithAdminToken.domains.reconnect_all()
-      }
-      sv4Backend.startSync()
+      sv4ReonboardBackend.startSync()
       val mapping = sv1Backend.appState.participantAdminConnection
         .getPartyToParticipant(globalDomainId, sv1Backend.getSvcInfo().svcParty)
         .futureValue
@@ -290,7 +227,7 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
         sv1Backend.participantClient.id,
         sv2Backend.participantClient.id,
         sv3Backend.participantClient.id,
-        sv4Backend.participantClient.id,
+        sv4ReonboardBackend.participantClient.id,
       )
       mapping.threshold shouldBe PositiveInt.tryCreate(3)
       // Test that SV4 can submit transactions and they're observed by others.
@@ -302,7 +239,7 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
         )
       actAndCheck(
         "SV4 can create vote requests",
-        sv4Backend.createVoteRequest(
+        sv4ReonboardBackend.createVoteRequest(
           sv4Party.toProtoPrimitive,
           action,
           "url",
@@ -312,7 +249,7 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
       )(
         "vote request is observed by sv1-3",
         _ => {
-          val voteRequest = sv4Backend.listVoteRequests().loneElement
+          val voteRequest = sv4ReonboardBackend.listVoteRequests().loneElement
           voteRequest.payload.action shouldBe action
           Seq(sv1Backend, sv2Backend, sv3Backend).foreach { sv =>
             forExactly(1, sv.listVoteRequests()) { _.contractId shouldBe voteRequest.contractId }

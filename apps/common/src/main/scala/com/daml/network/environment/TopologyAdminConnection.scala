@@ -18,11 +18,12 @@ import com.digitalasset.canton.admin.api.client.commands.{
 }
 import com.digitalasset.canton.admin.api.client.data.topologyx.{
   BaseResult,
+  ListOwnerToKeyMappingResult,
   ListSequencerDomainStateResult,
 }
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt, PositiveLong}
-import com.digitalasset.canton.crypto.Fingerprint
+import com.digitalasset.canton.crypto.{Fingerprint, PublicKey}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -41,11 +42,7 @@ import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.Generi
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
-import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
-  IdentifierDelegationX,
-  NamespaceDelegationX,
-  OwnerToKeyMappingX,
-}
+import com.digitalasset.canton.topology.transaction.TopologyMappingX
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
@@ -234,7 +231,7 @@ abstract class TopologyAdminConnection(
       domainId: Option[DomainId],
   )(implicit traceContext: TraceContext): Future[Seq[GenericSignedTopologyTransactionX]] =
     getTransactions(
-      Set(NamespaceDelegationX, OwnerToKeyMappingX),
+      Set(TopologyMappingX.Code.NamespaceDelegationX, TopologyMappingX.Code.OwnerToKeyMappingX),
       Some(id),
       domainId,
     )
@@ -299,9 +296,70 @@ abstract class TopologyAdminConnection(
       transactions.result
         .map(_.transaction)
         .filter(tx =>
-          Set(NamespaceDelegationX, OwnerToKeyMappingX, IdentifierDelegationX)
+          Set(
+            TopologyMappingX.Code.NamespaceDelegationX,
+            TopologyMappingX.Code.OwnerToKeyMappingX,
+            TopologyMappingX.Code.IdentifierDelegationX,
+          )
             .contains(tx.transaction.mapping.code)
         )
+    }
+
+  def ensureInitialOwnerToKeyMapping(
+      member: Member,
+      keys: NonEmpty[Seq[PublicKey]],
+      signedBy: Fingerprint,
+      retryFor: RetryFor,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    retryProvider.ensureThatB(
+      retryFor,
+      show"Initial key mapping for $member exists",
+      listOwnerToKeyMapping(
+        member
+      ).map(_.nonEmpty),
+      proposeInitialOwnerToKeyMapping(member, keys, signedBy).map(_ => ()),
+      logger,
+    )
+
+  private def proposeInitialOwnerToKeyMapping(
+      member: Member,
+      keys: NonEmpty[Seq[PublicKey]],
+      signedBy: Fingerprint,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[SignedTopologyTransactionX[TopologyChangeOpX, OwnerToKeyMappingX]] =
+    proposeMapping(
+      TopologyStoreId.AuthorizedStore,
+      OwnerToKeyMappingX(
+        member,
+        domain = None,
+        keys = keys,
+      ),
+      signedBy = signedBy,
+      serial = PositiveInt.one,
+      isProposal = false,
+    )
+
+  private def listOwnerToKeyMapping(member: Member)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[TopologyResult[OwnerToKeyMappingX]]] =
+    runCmd(
+      TopologyAdminCommandsX.Read.ListOwnerToKeyMapping(
+        BaseQueryX(
+          filterStore = AuthorizedStore.filterName,
+          proposals = false,
+          timeQuery = TimeQueryX.HeadState,
+          ops = None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        ),
+        filterKeyOwnerType = None,
+        filterKeyOwnerUid = member.uid.toProtoPrimitive,
+      )
+    ).map { txs =>
+      txs.map { case ListOwnerToKeyMappingResult(base, mapping) =>
+        TopologyResult(base, mapping)
+      }
     }
 
   def getTopologySnapshot(domainId: DomainId)(implicit

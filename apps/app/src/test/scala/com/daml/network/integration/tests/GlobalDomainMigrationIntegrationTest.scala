@@ -660,7 +660,10 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
       for {
         _ <- newParticipantInitializer.initializeAndWait(participantIdentities)
         sequencerIdentities = nodeIdentities.sequencer
-        _ <- newDomainNodeIdentities.sequencerInitializer.initializeFromDump(sequencerIdentities)
+        _ <- newDomainNodeIdentities.sequencerInitializer.initializeFromDump(
+          sequencerIdentities,
+          None,
+        )
         _ = logger.info(
           s"Restoring sequencer topology with sequencer transactions ${domainTopologyTransactions.sequencerInitTopologyTransactions}"
         )
@@ -709,7 +712,7 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
         )
         mediatorIdentities = nodeIdentities.mediator
         _ <-
-          newDomainNodeIdentities.mediatorInitializer.initializeFromDump(mediatorIdentities)
+          newDomainNodeIdentities.mediatorInitializer.initializeFromDump(mediatorIdentities, None)
         _ <- newLocalDomainNode.mediatorAdminConnection
           .initialize(
             globalDomainId,

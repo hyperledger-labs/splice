@@ -17,6 +17,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
+import com.google.protobuf.ByteString
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
@@ -189,6 +190,13 @@ class SingleScanConnection private[client] (
       }
       scans
     })
+  }
+
+  def getAcsSnapshot(partyId: PartyId)(implicit tc: TraceContext): Future[ByteString] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetAcsSnapshot(partyId),
+    )
   }
 }
 

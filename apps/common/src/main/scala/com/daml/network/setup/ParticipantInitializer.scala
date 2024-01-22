@@ -8,7 +8,7 @@ import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, Retry
 import com.daml.network.identities.NodeIdentitiesDump
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.{Identifier, ParticipantId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -62,10 +62,13 @@ class ParticipantInitializer(
 
   def ensureInitializedWithExpectedId(): Future[Unit] =
     dumpConfig match {
-      case Some(c) =>
+      case Some(c: ParticipantBootstrapDumpConfig.File) =>
         for {
           dump <- getDump(c)
-          result <- nodeInitializer.initializeAndWait(dump)
+          newParticipantId = c.newParticipantIdentifier.fold(dump.id)(id =>
+            ParticipantId(UniqueIdentifier(Identifier.tryCreate(id), dump.id.uid.namespace))
+          )
+          result <- nodeInitializer.initializeAndWait(dump, Some(newParticipantId))
         } yield result
       case None =>
         retryProvider
@@ -95,7 +98,7 @@ class ParticipantInitializer(
 
   private def getDump(config: ParticipantBootstrapDumpConfig): Future[NodeIdentitiesDump] =
     config match {
-      case ParticipantBootstrapDumpConfig.File(file) => getDumpFromFile(file)
+      case ParticipantBootstrapDumpConfig.File(file, _) => getDumpFromFile(file)
     }
 
   private def getDumpFromFile(file: Path): Future[NodeIdentitiesDump] = {

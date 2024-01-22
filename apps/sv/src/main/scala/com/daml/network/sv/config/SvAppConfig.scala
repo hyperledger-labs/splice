@@ -13,6 +13,7 @@ import com.daml.network.config.{
   NetworkAppClientConfig,
   ParticipantBootstrapDumpConfig,
 }
+import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
@@ -136,6 +137,13 @@ final case class SvDomainConfig(
     global: SvGlobalDomainConfig
 )
 
+final case class MigrateSvPartyConfig(
+    // The scan instance the ACS snapshot should be fetched from.
+    // We don't require a BFT read as ACS commitments are a sufficient indicator
+    // that something went wrong.
+    scan: ScanAppClientConfig
+)
+
 case class SvAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CNDbConfig,
@@ -159,6 +167,8 @@ case class SvAppBackendConfig(
     localDomainNode: Option[SvDomainNodeConfig],
     scan: Option[SvScanConfig],
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
+    // Migrate the SV party from an existing participant with the same namespace.
+    migrateSvParty: Option[MigrateSvPartyConfig] = None,
     acsStoreDump: Option[BackupDumpConfig] = None,
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(6),
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),

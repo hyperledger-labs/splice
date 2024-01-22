@@ -184,6 +184,21 @@ class BaseLedgerConnection(
       logger,
     )
 
+  def ensureUserHasPrimaryParty(
+      userId: String,
+      partyId: PartyId,
+  ): Future[PartyId] =
+    retryProvider.ensureThatO(
+      RetryFor.WaitingOnInitDependency,
+      s"User $userId has primary party",
+      check = getOptionalPrimaryParty(userId),
+      establish = for {
+        _ <- setUserPrimaryParty(userId, partyId)
+        _ <- grantUserRights(userId, actAsParties = Seq(partyId), readAsParties = Seq.empty)
+      } yield (),
+      logger,
+    )
+
   def ensurePartyAllocated(
       store: TopologyStoreId,
       hint: String,
