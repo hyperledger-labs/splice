@@ -90,6 +90,7 @@ sv\dParticipantUpgrade.*ACS_COMMITMENT_MISMATCH.*
 # globalMediatorSv4 is offboarded at this time
 c.d.c.t.TimeProofRequestSubmitterImpl:mediatorx=globalMediatorSv
 RequestRefused\(SenderUnknown\(.*globalMediatorSv4
+RequestRefused\(SenderUnknown\(.*globalReonboardMediator_4
 LOCAL_VERDICT_TIMEOUT.* Rejected transaction due to a participant determined timeout.*c.d.c.p.p.TransactionProcessingSteps:participant=sv
 
 # Make sure to have a trailing newline

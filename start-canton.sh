@@ -115,8 +115,7 @@ any_time_db_names=(
   "participant_bob"
   "participant_splitwell"
   "sequencer_driver_global_upgrade"
-  "participant_sv4_reonboard"
-  "participant_sv4_reonboard_new"
+  "sequencer_driver_global_reonboard"
 )
 
 for (( domain_node = 0; domain_node < 5; domain_node++ )); do
@@ -126,6 +125,20 @@ for (( domain_node = 0; domain_node < 5; domain_node++ )); do
   "mediator_global_upgrade_$domain_node"
   )
 done
+
+for (( domain_node = 0; domain_node < 5; domain_node++ )); do
+  any_time_db_names+=(
+  "participant_sv${domain_node}_reonboard"
+  "sequencer_global_reonboard_$domain_node"
+  "mediator_global_reonboard_$domain_node"
+  )
+done
+
+any_time_db_names+=(
+"participant_sv4_reonboard_new"
+"sequencer_global_reonboard_new_4"
+"mediator_global_reonboard_new_4"
+)
 
 db_names=()
 if [ $wallclocktime -eq 1 ]; then
