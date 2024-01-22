@@ -84,6 +84,8 @@ Sender .* of send request .* is not registered so cannot send or receive events\
 
 # This is happenening during party migration and is expected. We can remove this in the future if/when canton detects and handles this warning
 .*Received a commitment where we have no shared contract.*ACS_MISMATCH_NO_SHARED_CONTRACTS.*
+# TODO(#9125): happens until we import the dump acs, check in the future if we can remove it
+sv\dParticipantUpgrade.*ACS_COMMITMENT_MISMATCH.*
 
 
 # Make sure to have a trailing newline
