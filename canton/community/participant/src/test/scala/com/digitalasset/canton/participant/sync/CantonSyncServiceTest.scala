@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.sync
@@ -151,7 +151,7 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
       partyNotifier,
       syncCrypto,
       pruningProcessor,
-      DAMLe.newEngine(uniqueContractKeys = false, enableLfDev = false, enableStackTraces = false),
+      DAMLe.newEngine(enableLfDev = false, enableStackTraces = false),
       syncDomainStateFactory,
       new SimClock(loggerFactory = loggerFactory),
       new ResourceManagementService.CommunityResourceManagementService(
@@ -167,6 +167,7 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
       () => true,
       FutureSupervisor.Noop,
       SuppressingLogger(getClass),
+      skipRecipientsCheck = false,
       multiDomainLedgerAPIEnabled = false,
     )
   }

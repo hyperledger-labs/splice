@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http
@@ -26,7 +26,6 @@ import com.digitalasset.canton.http.util.Logging.{
   extendWithRequestIdLogCtx,
 }
 import com.digitalasset.canton.ledger.client.services.admin.UserManagementClient
-import com.digitalasset.canton.ledger.client.services.identity.LedgerIdentityClient
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.NoTracing
 import scalaz.std.scalaFuture.*
@@ -54,7 +53,6 @@ object WebsocketEndpoints {
       req: WebSocketUpgrade,
       subprotocol: String,
       userManagementClient: UserManagementClient,
-      ledgerIdentityClient: LedgerIdentityClient,
   )(implicit ec: ExecutionContext): EitherT[Future, Error, (Jwt, JwtPayload)] =
     for {
       _ <- EitherT.either(
@@ -67,7 +65,6 @@ object WebsocketEndpoints {
         jwt0,
         decodeJwt,
         userManagementClient,
-        ledgerIdentityClient,
       ).leftMap(it => it: Error)
     } yield payload
 }
@@ -76,7 +73,6 @@ class WebsocketEndpoints(
     decodeJwt: ValidateJwt,
     webSocketService: WebSocketService,
     userManagementClient: UserManagementClient,
-    ledgerIdentityClient: LedgerIdentityClient,
     val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging
@@ -107,7 +103,6 @@ class WebsocketEndpoints(
                   upgradeReq,
                   wsProtocol,
                   userManagementClient,
-                  ledgerIdentityClient,
                 )
                 (jwt, jwtPayload) = payload
               } yield {
@@ -138,7 +133,6 @@ class WebsocketEndpoints(
                   upgradeReq,
                   wsProtocol,
                   userManagementClient,
-                  ledgerIdentityClient,
                 )
                 (jwt, jwtPayload) = payload
               } yield {

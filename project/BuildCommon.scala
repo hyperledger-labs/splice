@@ -565,6 +565,7 @@ object BuildCommon {
       .dependsOn(
         `canton-community-app-base`,
         `canton-community-testing`,
+        `canton-community-reference-driver`,
       )
       .settings(
         sharedCantonSettings,
@@ -600,6 +601,8 @@ object BuildCommon {
         disableTests,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
+          pekko_http,
+          pekko_http_core,
           pekko_slf4j, // not used at compile time, but required by com.digitalasset.canton.util.pekkoUtil.createActorSystem
           daml_lf_archive_reader,
           daml_lf_engine,
@@ -714,6 +717,7 @@ object BuildCommon {
       .dependsOn(
         `canton-community-common` % "compile->compile;test->test",
         `canton-community-admin-api` % "compile->compile;test->test",
+        `canton-sequencer-driver-api`,
       )
       .settings(
         removeTestSources,
@@ -1213,6 +1217,58 @@ object BuildCommon {
             (Test / damlDarOutput).value / "JsonEncodingTest.dar",
             "com.digitalasset.canton.http.json.encoding",
           )
+        ),
+      )
+  }
+
+  lazy val `canton-sequencer-driver-api` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-sequencer-driver-api", file("canton/community/sequencer-driver"))
+      .dependsOn(
+        `canton-ledger-api`
+      )
+      .dependsOn(`canton-util-external`)
+      .settings(
+        sharedCantonSettings,
+        libraryDependencies ++= Seq(
+          logback_classic,
+          logback_core,
+          scala_logging,
+          scala_collection_contrib,
+          scalatest % Test,
+          mockito_scala % Test,
+          scalatestMockito % Test,
+          better_files,
+          cats,
+          jul_to_slf4j % Test,
+          log4j_core,
+          log4j_api,
+          monocle_macro, // Include it here, even if unused, so that it can be used everywhere
+          pureconfig,
+        ),
+        dependencyOverrides ++= Seq(log4j_core, log4j_api),
+        // commented out from Canton OS repo as settings don't apply to us (yet)
+        // JvmRulesPlugin.damlRepoHeaderSettings,
+      )
+  }
+
+  lazy val `canton-community-reference-driver` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-community-reference-driver", file("canton/community/drivers/reference"))
+      .dependsOn(
+        `canton-util-external`,
+        `canton-community-common` % "compile->compile;test->test",
+        `canton-sequencer-driver-api` % "compile->compile;test->test",
+        `canton-community-testing` % Test,
+      )
+      .dependsOn(`canton-util-external`)
+      .settings(
+        sharedCantonSettings,
+        dependencyOverrides ++= Seq(log4j_core, log4j_api),
+        Compile / PB.targets := Seq(
+          scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
         ),
       )
   }

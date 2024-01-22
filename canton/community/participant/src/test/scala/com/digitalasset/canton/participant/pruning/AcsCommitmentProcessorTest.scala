@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.pruning
@@ -993,6 +993,7 @@ class AcsCommitmentProcessorTest
       val sequencerCounterTrackerStore =
         new InMemorySequencerCounterTrackerStore(loggerFactory, timeouts)
       val inFlightSubmissionStore = new InMemoryInFlightSubmissionStore(loggerFactory)
+
       val ts0 = CantonTimestamp.Epoch
       val ts1 = CantonTimestamp.ofEpochMilli(requestTsDelta.toMillis)
       val ts2 = CantonTimestamp.ofEpochMilli(requestTsDelta.toMillis * 2)

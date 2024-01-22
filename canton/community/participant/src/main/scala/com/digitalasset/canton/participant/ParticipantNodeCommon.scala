@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant
@@ -36,11 +36,7 @@ import com.digitalasset.canton.participant.admin.{
 }
 import com.digitalasset.canton.participant.config.*
 import com.digitalasset.canton.participant.domain.grpc.GrpcDomainRegistry
-import com.digitalasset.canton.participant.domain.{
-  AgreementService,
-  DomainAliasManager,
-  DomainAliasResolution,
-}
+import com.digitalasset.canton.participant.domain.{DomainAliasManager, DomainAliasResolution}
 import com.digitalasset.canton.participant.ledger.api.CantonLedgerApiServerWrapper.{
   IndexerLockIds,
   LedgerApiServerState,
@@ -251,7 +247,7 @@ trait ParticipantNodeBootstrapCommon {
       topologyManager: ParticipantTopologyManagerOps,
       packageDependencyResolver: PackageDependencyResolver,
       componentFactory: ParticipantComponentBootstrapFactory,
-      overrideKeyUniqueness: Option[Boolean] = None, // TODO(i13235) remove when UCK is gone
+      skipRecipientsCheck: Boolean,
   )(implicit executionSequencerFactory: ExecutionSequencerFactory): EitherT[
     FutureUnlessShutdown,
     String,
@@ -269,20 +265,13 @@ trait ParticipantNodeBootstrapCommon {
       participantId,
       ips,
       crypto,
-      config.caching,
+      config.parameters.caching,
       timeouts,
       futureSupervisor,
       loggerFactory,
     )
     // closed in DomainAliasManager
     val registeredDomainsStore = RegisteredDomainsStore(storage, timeouts, loggerFactory)
-
-    // closed in grpc domain registry
-    val agreementService = {
-      // store is cleaned up as part of the agreement service
-      val acceptedAgreements = ServiceAgreementStore(storage, timeouts, loggerFactory)
-      new AgreementService(acceptedAgreements, parameterConfig, loggerFactory)
-    }
 
     for {
       domainConnectionConfigStore <- EitherT
@@ -314,9 +303,7 @@ trait ParticipantNodeBootstrapCommon {
           storage,
           clock,
           config.init.ledgerApi.maxDeduplicationDuration.toInternal.some,
-          overrideKeyUniqueness.orElse(config.init.parameters.uniqueContractKeys.some),
           parameterConfig.batchingConfig,
-          parameterConfig.stores,
           ReleaseProtocolVersion.latest,
           arguments.metrics,
           indexedStringStore,
@@ -369,7 +356,6 @@ trait ParticipantNodeBootstrapCommon {
         participantId,
         syncDomainPersistentStateManager,
         persistentState.map(_.settingsStore),
-        agreementService,
         topologyDispatcher,
         syncCrypto,
         config.crypto,
@@ -422,6 +408,7 @@ trait ParticipantNodeBootstrapCommon {
                 storage,
                 adminToken,
                 parameterConfig.stores,
+                parameterConfig.batchingConfig,
               )
             )
           )
@@ -453,6 +440,7 @@ trait ParticipantNodeBootstrapCommon {
         sequencerInfoLoader,
         arguments.futureSupervisor,
         loggerFactory,
+        skipRecipientsCheck,
         multiDomainLedgerAPIEnabled = ledgerApiServerFactory.multiDomainEnabled,
       )
 
@@ -504,7 +492,6 @@ trait ParticipantNodeBootstrapCommon {
       val stateService = new DomainConnectivityService(
         sync,
         domainAliasManager,
-        agreementService,
         parameterConfig.processingTimeouts,
         sequencerInfoLoader,
         loggerFactory,

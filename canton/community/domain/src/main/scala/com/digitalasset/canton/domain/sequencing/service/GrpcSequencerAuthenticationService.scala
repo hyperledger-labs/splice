@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.domain.sequencing.service
@@ -158,7 +158,8 @@ class GrpcSequencerAuthenticationService(
     def maliciousOrFaulty(): Status =
       Status.INTERNAL.withDescription(err.reason)
     err match {
-      case MemberAuthentication.ParticipantDisabled(_) | MemberAuthentication.MediatorDisabled(_) =>
+      case MemberAuthentication.ParticipantAccessDisabled(_) |
+          MemberAuthentication.MediatorAccessDisabled(_) =>
         Status.PERMISSION_DENIED.withDescription(err.reason)
       case MemberAuthentication.ServiceAgreementAcceptanceError(_, _) =>
         Status.FAILED_PRECONDITION.withDescription(err.reason)

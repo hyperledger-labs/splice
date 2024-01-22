@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.domain.sequencing
@@ -17,7 +17,6 @@ import com.digitalasset.canton.domain.sequencing.sequencer.{
   Sequencer,
 }
 import com.digitalasset.canton.domain.sequencing.service.GrpcSequencerTopologyBootstrapService
-import com.digitalasset.canton.domain.service.ServiceAgreementManager
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.StaticDomainParameters
@@ -73,7 +72,6 @@ class SequencerRuntimeForSeparateNode(
     additionalAdminServiceFactory: Sequencer => Option[ServerServiceDefinition],
     staticMembersToRegister: Seq[Member],
     futureSupervisor: FutureSupervisor,
-    agreementManager: Option[ServiceAgreementManager],
     memberAuthenticationServiceFactory: MemberAuthenticationServiceFactory,
     topologyStateForInitializationService: Option[TopologyStateForInitializationService],
     maybeDomainOutboxFactory: Option[DomainOutboxXFactorySingleCreate],
@@ -101,7 +99,6 @@ class SequencerRuntimeForSeparateNode(
       additionalAdminServiceFactory,
       staticMembersToRegister,
       futureSupervisor,
-      agreementManager,
       memberAuthenticationServiceFactory,
       topologyStateForInitializationService,
       loggerFactory,
@@ -184,7 +181,7 @@ class SequencerRuntimeForSeparateNode(
     for {
       _ <- initialize(topologyInitIsCompleted = false)
       _ = logger.debug(
-        s"Subscribing topology client within sequencer runtime for ${clientDiscriminator}"
+        s"Subscribing topology client within sequencer runtime for $clientDiscriminator"
       )
       _ <- EitherT.right(
         client.subscribeTracking(

@@ -34,6 +34,8 @@ lazy val `canton-daml-errors` = BuildCommon.`canton-daml-errors`
 lazy val `canton-ledger-api` = BuildCommon.`canton-ledger-api`
 lazy val `canton-bindings-java` = BuildCommon.`canton-bindings-java`
 lazy val `canton-google-common-protos-scala` = BuildCommon.`canton-google-common-protos-scala`
+lazy val `canton-sequencer-driver-api` = BuildCommon.`canton-sequencer-driver-api`
+lazy val `canton-community-reference-driver` = BuildCommon.`canton-community-reference-driver`
 
 lazy val `cn-wartremover-extension` = Wartremover.`cn-wartremover-extension`
 

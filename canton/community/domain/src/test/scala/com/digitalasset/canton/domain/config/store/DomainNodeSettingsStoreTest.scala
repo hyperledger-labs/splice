@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.domain.config.store
@@ -12,21 +12,17 @@ import org.scalatest.wordspec.{AsyncWordSpec, AsyncWordSpecLike}
 import scala.concurrent.Future
 
 trait DomainNodeSettingsStoreTest {
-  this: AsyncWordSpecLike with BaseTest =>
+  this: AsyncWordSpecLike & BaseTest =>
 
-  protected def makeConfig(uniqueKeys: Boolean = false) =
-    StoredDomainNodeSettings(
-      defaultStaticDomainParameters.update(uniqueContractKeys = uniqueKeys)
-    )
+  protected lazy val config: StoredDomainNodeSettings =
+    StoredDomainNodeSettings(defaultStaticDomainParameters)
 
   protected def domainNodeSettingsStoreTest(
       // argument: reset static domain parameters
       mkStore: => BaseNodeSettingsStore[StoredDomainNodeSettings]
   ): Unit = {
-
     "returns stored values" in {
       val store = mkStore
-      val config = makeConfig()
       for {
         _ <- store.saveSettings(config).valueOrFail("save")
         current <- store.fetchSettings.valueOrFail("fetch")
@@ -34,24 +30,7 @@ trait DomainNodeSettingsStoreTest {
         current should contain(config)
       }
     }
-
-    "supports updating values" in {
-      defaultStaticDomainParameters.uniqueContractKeys shouldBe false // test assumes that this default doesn't change
-      val store = mkStore
-      val config = makeConfig()
-      val updateConfig = makeConfig(true)
-
-      for {
-        _ <- store.saveSettings(config).valueOrFail("save")
-        _ <- store.saveSettings(updateConfig).valueOrFail("save")
-        current <- store.fetchSettings.valueOrFail("fetch")
-      } yield {
-        current should contain(updateConfig)
-      }
-    }
-
   }
-
 }
 
 class DomainNodeSettingsStoreTestInMemory

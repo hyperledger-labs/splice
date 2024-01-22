@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.sync
@@ -158,6 +158,7 @@ class CantonSyncService(
     val isActive: () => Boolean,
     futureSupervisor: FutureSupervisor,
     protected val loggerFactory: NamedLoggerFactory,
+    skipRecipientsCheck: Boolean,
     multiDomainLedgerAPIEnabled: Boolean,
 )(implicit ec: ExecutionContext, mat: Materializer, val tracer: Tracer)
     extends state.v2.WriteService
@@ -1215,6 +1216,7 @@ class CantonSyncService(
           trafficStateController,
           futureSupervisor,
           domainLoggerFactory,
+          skipRecipientsCheck = skipRecipientsCheck,
         )
 
         // update list of connected domains
@@ -1415,7 +1417,7 @@ class CantonSyncService(
   }
 
   private val emitWarningOnDetailLoggingAndHighLoad =
-    (parameters.general.loggingConfig.eventDetails || parameters.general.loggingConfig.api.logMessagePayloads) && parameters.general.loggingConfig.api.warnBeyondLoad.nonEmpty
+    (parameters.general.loggingConfig.eventDetails || parameters.general.loggingConfig.api.messagePayloads) && parameters.general.loggingConfig.api.warnBeyondLoad.nonEmpty
 
   def checkOverloaded(traceContext: TraceContext): Option[state.v2.SubmissionResult] = {
     implicit val errorLogger: ErrorLoggingContext =
@@ -1649,6 +1651,7 @@ object CantonSyncService {
         sequencerInfoLoader: SequencerInfoLoader,
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
+        skipRecipientsCheck: Boolean,
         multiDomainLedgerAPIEnabled: Boolean,
     )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer): T
   }
@@ -1679,6 +1682,7 @@ object CantonSyncService {
         sequencerInfoLoader: SequencerInfoLoader,
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
+        skipRecipientsCheck: Boolean,
         multiDomainLedgerAPIEnabled: Boolean,
     )(implicit
         ec: ExecutionContext,
@@ -1712,6 +1716,7 @@ object CantonSyncService {
         () => storage.isActive,
         futureSupervisor,
         loggerFactory,
+        skipRecipientsCheck = skipRecipientsCheck,
         multiDomainLedgerAPIEnabled: Boolean,
       )
   }
@@ -1834,9 +1839,11 @@ object SyncServiceError extends SyncServiceErrorGroup {
   }
 
   @Explanation(
-    "This error is logged when the synchronization service shuts down because the remote domain has disabled this participant."
+    "This error is logged when the synchronization service shuts down because the remote sequencer API is denying access."
   )
-  @Resolution("Contact the domain operator and inquire why you have been booted out.")
+  @Resolution(
+    "Contact the sequencer operator and inquire why you are not allowed to connect anymore."
+  )
   object SyncServiceDomainDisabledUs
       extends ErrorCode(
         "SYNC_SERVICE_DOMAIN_DISABLED_US",

@@ -1,11 +1,9 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
 
 import cats.data.EitherT
-import cats.instances.option.*
-import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
@@ -28,7 +26,6 @@ import com.digitalasset.canton.domain.sequencing.SequencerNodeBootstrapX
 import com.digitalasset.canton.environment.CantonNodeBootstrap.HealthDumpFunction
 import com.digitalasset.canton.environment.Environment.*
 import com.digitalasset.canton.environment.ParticipantNodes.{ParticipantNodesOld, ParticipantNodesX}
-import com.digitalasset.canton.health.{HealthCheck, HealthServer}
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.MetricsConfig.Prometheus
@@ -242,7 +239,16 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
         clock.advanceTo(parent.now)
         clock
       case ClockConfig.RemoteClock(clientConfig) =>
-        new RemoteClock(clientConfig, config.parameters.timeouts.processing, clockLoggerFactory)
+        new RemoteClock(
+          clientConfig,
+          config.parameters.timeouts.processing,
+          // Canton determine whether to get time from the X node by checking canton config:
+          // `config.participantsX.nonEmpty || config.sequencersX.nonEmpty || config.mediatorsX.nonEmpty,`
+          // We don't have these x nodes configured in our topology config as we have a separate canton config for these X nodes.
+          // Setting this to true because we use X nodes in our test and deployment.
+          getTimeFromXNode = true,
+          clockLoggerFactory,
+        )
       case ClockConfig.WallClock(skewW) =>
         val skewMs = skewW.asJava.toMillis
         val tickTock =
@@ -253,15 +259,6 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
   }
 
   private val testingTimeService = new TestingTimeService(clock, () => simClocks)
-
-  protected lazy val healthCheck: Option[HealthCheck] = config.monitoring.health.map(config =>
-    HealthCheck(config.check, metricsFactory.health, timeouts, loggerFactory)(this)
-  )
-
-  private val healthServer =
-    (healthCheck, config.monitoring.health).mapN { case (check, config) =>
-      new HealthServer(check, config.server.address, config.server.port, timeouts, loggerFactory)
-    }
 
   private val envQueueSize = () => executionContext.queueSize
   metricsFactory.forEnv.registerExecutionContextQueueSize(envQueueSize)
@@ -390,7 +387,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
   ): Unit = {
     final case class ParticipantApis(ledgerApi: Int, adminApi: Int)
     config.parameters.portsFile.foreach { portsFile =>
-      val items = participants.running.map { node =>
+      val items = participantsX.running.map { node =>
         (
           node.name.unwrap,
           ParticipantApis(node.config.ledgerApi.port.unwrap, node.config.adminApi.port.unwrap),
@@ -632,14 +629,12 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
       ExecutorServiceExtensions(executionContext)(logger, timeouts)
     val closeScheduler: AutoCloseable = ExecutorServiceExtensions(scheduler)(logger, timeouts)
 
-    val closeHealthServer: AutoCloseable = () => healthServer.foreach(_.close())
-
     val closeHeadlessHealthAdministration: AutoCloseable =
       () => healthDumpGenerator.get.foreach(_.grpcAdminCommandRunner.close())
 
     // the allNodes list is ordered in ideal startup order, so reverse to shutdown
     val instances =
-      monitorO.toList ++ userCloseables ++ allNodes.reverse :+ metricsFactory :+ configuredOpenTelemetry :+ clock :+ closeHealthServer :+
+      monitorO.toList ++ userCloseables ++ allNodes.reverse :+ metricsFactory :+ configuredOpenTelemetry :+ clock :+
         closeHeadlessHealthAdministration :+ executionSequencerFactory :+ closeActorSystem :+ closeExecutionContext :+
         closeScheduler
     logger.info("Closing environment...")

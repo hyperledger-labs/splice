@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
@@ -7,6 +7,7 @@ import better.files.File
 import cats.syntax.either.*
 import cats.syntax.functor.*
 import cats.syntax.functorFilter.*
+import cats.syntax.traverse.*
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.classic.{Level, Logger}
 import ch.qos.logback.core.spi.AppenderAttachable
@@ -34,6 +35,11 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.crypto.{CryptoPureApi, Salt}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.health.admin.data.{
+  MediatorNodeStatus,
+  NodeStatus,
+  SequencerNodeStatus,
+}
 import com.digitalasset.canton.logging.{LastErrorsAppender, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
 import com.digitalasset.canton.participant.admin.repair.RepairService
@@ -48,13 +54,7 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.{
   GenericSignedTopologyTransactionX,
   PositiveSignedTopologyTransactionX,
 }
-import com.digitalasset.canton.topology.transaction.{
-  DecentralizedNamespaceDefinitionX,
-  NamespaceDelegationX,
-  OwnerToKeyMappingX,
-  SignedTopologyTransactionX,
-  TopologyChangeOpX,
-}
+import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.{BinaryFileUtil, EitherUtil}
 import com.digitalasset.canton.version.ProtocolVersion
@@ -143,36 +143,6 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       ConsoleMacros.utils.retry_until_true(timeoutO.getOrElse(env.commandTimeouts.bounded)) {
         env.nodes.all.forall(_.topology.synchronisation.is_idle())
       }
-    }
-
-    @Help.Summary("Create a navigator ui-backend.conf for a participant")
-    def generate_navigator_conf(
-        participant: LocalParticipantReference,
-        file: Option[String] = None,
-    ): JFile = {
-      val conf =
-        participant.parties
-          .hosted()
-          .map(x => x.party)
-          .map(party => {
-            s"""    ${party.uid.id.unwrap} {
-               |        party = "${party.uid.toProtoPrimitive}"
-               |        password = password
-               |    }
-               |""".stripMargin
-          })
-          .mkString("\n")
-      val port = participant.config.ledgerApi.port
-      val targetFile = file.map(File(_)).getOrElse(File(s"ui-backend-${participant.name}.conf"))
-      val instructions =
-        s"daml navigator server localhost ${port.unwrap} -t wallclock --port ${(port + 4).unwrap.toString} -c ${targetFile.name}"
-
-      targetFile.overwrite("// run with\n// ")
-      targetFile.appendLines(instructions, "users {")
-      targetFile.appendText(conf)
-      targetFile.appendLine("}")
-
-      targetFile.toJava
     }
 
     @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
@@ -784,23 +754,48 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         owners: Seq[InstanceReferenceX],
         store: String = AuthorizedStore.filterName,
     ): (Namespace, Seq[GenericSignedTopologyTransactionX]) = {
-      val decentralizedNamespaceDefinition = NonEmpty
+      val ownersNE = NonEmpty
         .from(owners)
         .getOrElse(
           throw new IllegalArgumentException(
             "There must be at least 1 owner for a decentralizedNamespace."
           )
         )
-        .map(
-          _.topology.decentralized_namespaces.propose(
-            owners.map(_.id.member.uid.namespace).toSet,
-            PositiveInt.tryCreate(1.max(owners.size - 1)),
-            store = store,
+      val expectedDNS = DecentralizedNamespaceDefinitionX.computeNamespace(
+        owners.map(_.id.member.uid.namespace).toSet
+      )
+      val proposedOrExisting = ownersNE
+        .map { owner =>
+          val existingDnsO =
+            owner.topology.transactions
+              .findLatestByMappingHash[DecentralizedNamespaceDefinitionX](
+                DecentralizedNamespaceDefinitionX.uniqueKey(expectedDNS),
+                filterStore = AuthorizedStore.filterName,
+                includeProposals = true,
+              )
+              .map(_.transaction)
+
+          existingDnsO.getOrElse(
+            owner.topology.decentralized_namespaces.propose(
+              owners.map(_.id.member.uid.namespace).toSet,
+              PositiveInt.tryCreate(1.max(owners.size - 1)),
+              store = store,
+            )
           )
+        }
+
+      // require that all proposed or previously existing transactions have the same hash,
+      // otherwise there is no chance for success
+      if (proposedOrExisting.distinctBy(_.transaction.hash).sizeIs != 1) {
+        throw new IllegalStateException(
+          s"Proposed or previously existing transactions disagree on the founding of the domain's decentralized namespace:\n$proposedOrExisting"
         )
-        // merging the signatures here is an "optimization" so that later we only upload a single
-        // decentralizedNamespace transaction, instead of a transaction per owner.
-        .reduceLeft[SignedTopologyTransactionX[
+      }
+
+      // merging the signatures here is an "optimization" so that later we only upload a single
+      // decentralizedNamespace transaction, instead of a transaction per owner.
+      val decentralizedNamespaceDefinition =
+        proposedOrExisting.reduceLeft[SignedTopologyTransactionX[
           TopologyChangeOpX,
           DecentralizedNamespaceDefinitionX,
         ]]((txA, txB) => txA.addSignatures(txB.signatures.forgetNE.toSeq))
@@ -814,38 +809,76 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     }
 
     private def expected_namespace(
-        owners: NonEmpty[Set[InstanceReferenceX]]
+        owners: Seq[InstanceReferenceX]
     ): Either[String, Option[Namespace]] = {
       val expectedNamespace =
         DecentralizedNamespaceDefinitionX.computeNamespace(
-          owners.forgetNE.map(_.id.member.uid.namespace)
+          owners.map(_.id.member.uid.namespace).toSet
         )
       val recordedNamespaces =
         owners.map(
-          _.topology.decentralized_namespaces
-            .list(filterStore = AuthorizedStore.filterName)
-            .collectFirst {
-              case result if result.item.namespace == expectedNamespace => result.item.namespace
-            }
+          _.topology.transactions
+            .findLatestByMappingHash[DecentralizedNamespaceDefinitionX](
+              DecentralizedNamespaceDefinitionX.uniqueKey(expectedNamespace),
+              filterStore = AuthorizedStore.filterName,
+              includeProposals = true,
+            )
+            .map(_.mapping.namespace)
         )
-      Either.cond(
-        recordedNamespaces.sizeIs == 1,
-        recordedNamespaces.head1,
-        "the domain owners do not agree on the decentralizedNamespace",
-      )
+
+      recordedNamespaces.distinct match {
+        case Seq(namespaceO) => Right(namespaceO)
+        case otherwise =>
+          Left(s"the domain owners do not agree on the decentralizedNamespace: $otherwise")
+      }
     }
 
     private def in_domain(
-        sequencers: NonEmpty[Set[SequencerNodeReferenceX]],
-        mediators: NonEmpty[Set[MediatorReferenceX]],
-    )(domainId: DomainId): Either[String, Unit] =
-      EitherUtil.condUnitE(
-        sequencers.forall(_.health.status.successOption.exists(_.domainId == domainId)) &&
-          mediators.forall(_.health.status.successOption.exists(_.domainId == domainId)),
-        "the domain has already been bootstrapped but not all the given sequencers and mediators are in it",
-      )
+        sequencers: NonEmpty[Seq[SequencerNodeReferenceX]],
+        mediators: NonEmpty[Seq[MediatorReferenceX]],
+    )(domainId: DomainId): Either[String, Option[DomainId]] = {
+      def isNotInitializedOrSuccessWithDomain(
+          instance: InstanceReferenceX
+      ): Either[String, Boolean /* isInitializedWithDomain */ ] = {
+        instance.health.status match {
+          case nonFailure if nonFailure.isActive.contains(false) =>
+            Left(s"${instance.id.member} is currently not active")
+          case NodeStatus.Success(status: SequencerNodeStatus) =>
+            // sequencer is already fully initialized for this domain
+            Either.cond(
+              status.domainId == domainId,
+              true,
+              s"${instance.id.member} has already been initialized for domain ${status.domainId} instead of $domainId.",
+            )
+          case NodeStatus.Success(status: MediatorNodeStatus) =>
+            // mediator is already fully initialized for this domain
+            Either.cond(
+              status.domainId == domainId,
+              true,
+              s"${instance.id.member} has already been initialized for domain ${status.domainId} instead of $domainId",
+            )
+          case NodeStatus.NotInitialized(true) =>
+            // the node is not yet initialized for this domain
+            Right(false)
+          case NodeStatus.Failure(msg) =>
+            Left(s"Error obtaining status for ${instance.id.member}: $msg")
+          case otherwise =>
+            // Unexpected status response. All cases should be covered by the patterns above
+            Left(s"Unexpected status: $otherwise")
+        }
+      }
 
-    private def no_domain(nodes: NonEmpty[Set[InstanceReferenceX]]): Either[String, Unit] =
+      val alreadyFullyInitialized =
+        (sequencers ++ mediators).forgetNE.toSeq.traverse(isNotInitializedOrSuccessWithDomain(_))
+      alreadyFullyInitialized
+        .map(nodesOnDomainOrNotInitialized =>
+          // any false in the result means, that some nodes haven't been initialized yet
+          if (nodesOnDomainOrNotInitialized.forall(identity)) Some(domainId)
+          else None
+        )
+    }
+
+    private def no_domain(nodes: NonEmpty[Seq[InstanceReferenceX]]): Either[String, Unit] =
       EitherUtil.condUnitE(
         !nodes.exists(_.health.initialized()),
         "the domain has not yet been bootstrapped but some sequencers or mediators are already part of one",
@@ -858,15 +891,19 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         mediators: Seq[MediatorReferenceX],
     ): Either[String, Option[DomainId]] =
       for {
-        neOwners <- NonEmpty.from(owners.toSet).toRight("you need at least one domain owner")
-        neSequencers <- NonEmpty.from(sequencers.toSet).toRight("you need at least one sequencer")
-        neMediators <- NonEmpty.from(mediators.toSet).toRight("you need at least one mediator")
+        neOwners <- NonEmpty.from(owners.distinct).toRight("you need at least one domain owner")
+        neSequencers <- NonEmpty
+          .from(sequencers.distinct)
+          .toRight("you need at least one sequencer")
+        neMediators <- NonEmpty.from(mediators.distinct).toRight("you need at least one mediator")
         nodes = neOwners ++ neSequencers ++ neMediators
         _ = EitherUtil.condUnitE(nodes.forall(_.health.running()), "all nodes must be running")
         ns <- expected_namespace(neOwners)
-        id = ns.map(ns => DomainId(UniqueIdentifier.tryCreate(name, ns.toProtoPrimitive)))
-        _ <- id.fold(no_domain(neSequencers ++ neMediators))(in_domain(neSequencers, neMediators))
-      } yield id
+        expectedId = ns.map(ns => DomainId(UniqueIdentifier.tryCreate(name, ns.toProtoPrimitive)))
+        actualIdIfAllNodesAreInitialized <- expectedId.fold(
+          no_domain(neSequencers ++ neMediators).map[Option[DomainId]](_ => None)
+        )(in_domain(neSequencers, neMediators))
+      } yield actualIdIfAllNodesAreInitialized
 
     private def run_bootstrap(
         domainName: String,
@@ -921,22 +958,24 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         .toSeq
         .sortBy(tx => orderingMap(tx.transaction.mapping.code))
 
-      // TODO(#14075) resolve with raf on what to use here (right now we use internal case structure)
-      sequencers.foreach(_.setup.assign_from_beginning(merged, staticDomainParameters).discard)
+      sequencers
+        .filterNot(_.health.initialized())
+        .foreach(x => x.setup.assign_from_beginning(merged, staticDomainParameters).discard)
 
-      mediators.foreach { mediator =>
-        mediator.setup
-          .assign(
-            domainId,
-            staticDomainParameters,
-            SequencerConnections.tryMany(
-              sequencers.map(s =>
-                s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))
+      mediators
+        .filter(!_.health.initialized())
+        .foreach(
+          _.setup
+            .assign(
+              domainId,
+              staticDomainParameters,
+              SequencerConnections.tryMany(
+                sequencers
+                  .map(s => s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))),
+                PositiveInt.tryCreate(1),
               ),
-              PositiveInt.tryCreate(1),
-            ),
-          )
-      }
+            )
+        )
 
       domainId
     }
@@ -988,7 +1027,7 @@ object ConsoleMacros extends ConsoleMacros with NamedLogging {
 object DebuggingHelpers extends LazyLogging {
 
   def get_active_contracts(
-      ref: LocalParticipantReference,
+      ref: LocalParticipantReferenceCommon[?],
       limit: PositiveInt = PositiveInt.tryCreate(1000000),
   ): (Map[String, String], Map[String, TemplateId]) =
     get_active_contracts_helper(
@@ -997,7 +1036,7 @@ object DebuggingHelpers extends LazyLogging {
     )
 
   def get_active_contracts_from_internal_db_state(
-      ref: ParticipantReference,
+      ref: ParticipantReferenceCommon,
       state: SyncStateInspection,
       limit: PositiveInt = PositiveInt.tryCreate(1000000),
   ): (Map[String, String], Map[String, TemplateId]) =
@@ -1010,7 +1049,7 @@ object DebuggingHelpers extends LazyLogging {
     )
 
   private def get_active_contracts_helper(
-      ref: ParticipantReference,
+      ref: ParticipantReferenceCommon,
       lookup: DomainAlias => Seq[(Boolean, SerializableContract)],
   ): (Map[String, String], Map[String, TemplateId]) = {
     val syncAcs = ref.domains
@@ -1022,11 +1061,12 @@ object DebuggingHelpers extends LazyLogging {
           (sc.contractId.coid, sc.contractInstance.unversioned.template.qualifiedName.toString())
       }
       .toMap
-    val lapiAcs = ref.ledger_api.acs.of_all().map(ev => (ev.event.contractId, ev.templateId)).toMap
+    val lapiAcs =
+      ref.ledger_api.acs.of_all().map(ev => (ev.event.contractId, ev.templateId)).toMap
     (syncAcs, lapiAcs)
   }
 
-  def diff_active_contracts(ref: LocalParticipantReference, limit: Int = 1000000): Unit = {
+  def diff_active_contracts(ref: LocalParticipantReferenceCommon[?], limit: Int = 1000000): Unit = {
     val (syncAcs, lapiAcs) = get_active_contracts(ref, limit)
     if (syncAcs.sizeCompare(lapiAcs) != 0) {
       logger.error(s"Sync ACS differs ${syncAcs.size} from Ledger API ACS ${lapiAcs.size} in size")
@@ -1053,7 +1093,7 @@ object DebuggingHelpers extends LazyLogging {
   }
 
   def active_contracts_by_template(
-      ref: LocalParticipantReference,
+      ref: LocalParticipantReferenceCommon[?],
       limit: Int = 1000000,
   ): (Map[String, Int], Map[TemplateId, Int]) = {
     val (syncAcs, lapiAcs) = get_active_contracts(ref, limit)

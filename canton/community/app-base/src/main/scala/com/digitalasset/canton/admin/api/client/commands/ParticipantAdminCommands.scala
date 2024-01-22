@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.admin.api.client.commands
@@ -743,42 +743,6 @@ object ParticipantAdminCommands {
 
       override def handleResponse(response: ModifyDomainResponse): Either[String, Unit] = Right(())
 
-    }
-
-    final case class GetAgreement(domainAlias: DomainAlias)
-        extends Base[GetAgreementRequest, GetAgreementResponse, Option[(Agreement, Boolean)]] {
-
-      override def createRequest(): Either[String, GetAgreementRequest] = Right(
-        GetAgreementRequest(domainAlias.unwrap)
-      )
-
-      override def submitRequest(
-          service: DomainConnectivityServiceStub,
-          request: GetAgreementRequest,
-      ): Future[GetAgreementResponse] =
-        service.getAgreement(request)
-
-      override def handleResponse(
-          response: GetAgreementResponse
-      ): Either[String, Option[(Agreement, Boolean)]] =
-        Right(response.agreement.map(ag => (ag, response.accepted)))
-    }
-
-    final case class AcceptAgreement(domainAlias: DomainAlias, agreementId: String)
-        extends Base[AcceptAgreementRequest, AcceptAgreementResponse, Unit] {
-
-      override def createRequest(): Either[String, AcceptAgreementRequest] =
-        Right(AcceptAgreementRequest(domainAlias.unwrap, agreementId))
-
-      override def submitRequest(
-          service: DomainConnectivityServiceStub,
-          request: AcceptAgreementRequest,
-      ): Future[AcceptAgreementResponse] =
-        service.acceptAgreement(request)
-
-      override def handleResponse(response: AcceptAgreementResponse): Either[String, Unit] = Right(
-        ()
-      )
     }
 
   }

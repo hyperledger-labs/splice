@@ -14,7 +14,6 @@ abstract class CNNodeBackendConfig extends LocalNodeConfig {
   override val init: InitConfig = InitConfig()
   override val crypto: CryptoConfig = CommunityCryptoConfig()
   override val sequencerClient: SequencerClientConfig = SequencerClientConfig()
-  override val caching: CachingConfigs = CachingConfigs()
   override val topologyX: TopologyXConfig = TopologyXConfig()
 
   override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
@@ -57,7 +56,6 @@ case class SharedCNNodeAppParameters(
     override val dontWarnOnDeprecatedPV: Boolean,
     override val initialProtocolVersion: ProtocolVersion,
     override val dbMigrateAndStart: Boolean,
-    override val skipTopologyManagerSignatureValidation: Boolean,
     override val batchingConfig: BatchingConfig,
 ) extends CantonNodeParameters {
   override val delayLoggingThreshold = delayLoggingThreshold_.toInternal

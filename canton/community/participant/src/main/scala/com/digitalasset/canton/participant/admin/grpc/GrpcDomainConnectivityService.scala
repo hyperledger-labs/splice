@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin.grpc
@@ -48,16 +48,6 @@ class GrpcDomainConnectivityService(service: DomainConnectivityService)(implicit
   override def registerDomain(request: RegisterDomainRequest): Future[RegisterDomainResponse] = {
     implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
     nonEmptyProcess(request.add, service.registerDomain)
-  }
-
-  override def getAgreement(request: GetAgreementRequest): Future[GetAgreementResponse] = {
-    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-    service.getAgreement(request.domainAlias)
-  }
-
-  override def acceptAgreement(request: AcceptAgreementRequest): Future[AcceptAgreementResponse] = {
-    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
-    service.acceptAgreement(request.domainAlias, request.agreementId)
   }
 
   /** reconfigure a domain connection

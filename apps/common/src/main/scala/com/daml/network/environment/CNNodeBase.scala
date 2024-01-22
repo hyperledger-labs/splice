@@ -100,7 +100,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     {
       val requestTraceCtx = traceContextFromHeaders(request.headers)
       import parameters.loggingConfig.api.*
-      val logPayload = messagePayloads.getOrElse(false)
+      val logPayload = messagePayloads
       val pathLimited = request.uri.path.toString
         .limit(maxMethodLength)
       def msg(message: String): String =

@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console.commands
@@ -14,8 +14,8 @@ import com.digitalasset.canton.admin.api.client.data.{
   TrafficControlParameters,
 }
 import com.digitalasset.canton.config
-import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt, PositiveLong}
+import com.digitalasset.canton.config.{NonNegativeDuration, RequireTypes}
 import com.digitalasset.canton.console.CommandErrors.GenericCommandError
 import com.digitalasset.canton.console.{
   CommandErrors,
@@ -37,8 +37,13 @@ import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.{BaseQueryX, TopologyStore}
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
-import com.digitalasset.canton.topology.store.{StoredTopologyTransactionsX, TimeQueryX}
+import com.digitalasset.canton.topology.store.{
+  StoredTopologyTransactionX,
+  StoredTopologyTransactionsX,
+  TimeQueryX,
+}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
+import com.digitalasset.canton.topology.transaction.TopologyMappingX.MappingHash
 import com.digitalasset.canton.topology.transaction.TopologyTransactionX.TxHash
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.TraceContext
@@ -212,6 +217,33 @@ class TopologyAdministrationGroupX(
         }
     }
 
+    @Help.Summary("Find the latest transaction for a given mapping hash")
+    @Help.Description(
+      """
+        mappingHash: the unique key of the topology mapping to find
+        store: - "Authorized": the topology transaction will be looked up in the node's authorized store.
+               - "<domain-id>": the topology transaction will be looked up in the specified domain store.
+        includeProposals: when true, the result could be the latest proposal, otherwise will only return the latest fully authorized transaction"""
+    )
+    def findLatestByMappingHash[M <: TopologyMappingX: ClassTag](
+        mappingHash: MappingHash,
+        filterStore: String,
+        includeProposals: Boolean = false,
+    ): Option[StoredTopologyTransactionX[TopologyChangeOpX, M]] = {
+      val latestAuthorized = list(filterStore = filterStore)
+        .collectOfMapping[M]
+        .filter(_.mapping.uniqueKey == mappingHash)
+        .result
+      val latestProposal =
+        if (includeProposals)
+          list(filterStore = filterStore, proposals = true)
+            .collectOfMapping[M]
+            .filter(_.mapping.uniqueKey == mappingHash)
+            .result
+        else Seq.empty
+      (latestAuthorized ++ latestProposal).maxByOption(_.transaction.transaction.serial)
+    }
+
     @Help.Summary("Manage topology transaction purging", FeatureFlag.Preview)
     @Help.Group("Purge Topology Transactions")
     object purge extends Helpful {
@@ -260,37 +292,58 @@ class TopologyAdministrationGroupX(
 
       val thisNodeRootKey = Some(instance.id.uid.namespace.fingerprint)
 
+      def latest[M <: TopologyMappingX: ClassTag](hash: MappingHash) = {
+        instance.topology.transactions
+          .findLatestByMappingHash[M](
+            hash,
+            filterStore = AuthorizedStore.filterName,
+            includeProposals = true,
+          )
+          .map(_.transaction)
+      }
+
       // create and sign the initial domain parameters
       val domainParameterState =
-        instance.topology.domain_parameters.propose(
-          domainId,
-          ConsoleDynamicDomainParameters
-            .initialValues(
-              consoleEnvironment.environment.clock,
-              ProtocolVersion.latest,
-            ),
-          signedBy = thisNodeRootKey,
-          store = Some(AuthorizedStore.filterName),
-        )
+        latest[DomainParametersStateX](DomainParametersStateX.uniqueKey(domainId))
+          .getOrElse(
+            instance.topology.domain_parameters.propose(
+              domainId,
+              ConsoleDynamicDomainParameters
+                .initialValues(
+                  consoleEnvironment.environment.clock,
+                  ProtocolVersion.latest,
+                ),
+              signedBy = thisNodeRootKey,
+              store = Some(AuthorizedStore.filterName),
+            )
+          )
 
-      val mediatorState =
-        instance.topology.mediators.propose(
-          domainId,
-          threshold = PositiveInt.one,
-          group = NonNegativeInt.zero,
-          active = mediators,
-          signedBy = thisNodeRootKey,
-          store = Some(AuthorizedStore.filterName),
-        )
+      val mediatorState = {
+        latest[MediatorDomainStateX](MediatorDomainStateX.uniqueKey(domainId, NonNegativeInt.zero))
+          .getOrElse(
+            instance.topology.mediators.propose(
+              domainId,
+              threshold = PositiveInt.one,
+              group = NonNegativeInt.zero,
+              active = mediators,
+              signedBy = thisNodeRootKey,
+              store = Some(AuthorizedStore.filterName),
+            )
+          )
+      }
 
-      val sequencerState =
-        instance.topology.sequencers.propose(
-          domainId,
-          threshold = PositiveInt.one,
-          active = sequencers,
-          signedBy = thisNodeRootKey,
-          store = Some(AuthorizedStore.filterName),
-        )
+      val sequencerState = {
+        latest[SequencerDomainStateX](SequencerDomainStateX.uniqueKey(domainId))
+          .getOrElse(
+            instance.topology.sequencers.propose(
+              domainId,
+              threshold = PositiveInt.one,
+              active = sequencers,
+              signedBy = thisNodeRootKey,
+              store = Some(AuthorizedStore.filterName),
+            )
+          )
+      }
 
       Seq(domainParameterState, sequencerState, mediatorState)
     }
@@ -443,6 +496,7 @@ class TopologyAdministrationGroupX(
         store: String = AuthorizedStore.filterName,
         mustFullyAuthorize: Boolean = true,
         serial: Option[PositiveInt] = None,
+        signedBy: Seq[Fingerprint] = Seq(instance.id.uid.namespace.fingerprint),
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
@@ -450,7 +504,7 @@ class TopologyAdministrationGroupX(
       synchronisation.runAdminCommand(synchronize)(
         TopologyAdminCommandsX.Write.Propose(
           NamespaceDelegationX.create(namespace, targetKey, isRootDelegation),
-          signedBy = Seq(instance.id.uid.namespace.fingerprint),
+          signedBy = signedBy,
           store = store,
           serial = serial,
           change = TopologyChangeOpX.Replace,
@@ -489,6 +543,7 @@ class TopologyAdministrationGroupX(
         store: String = AuthorizedStore.filterName,
         mustFullyAuthorize: Boolean = true,
         serial: Option[PositiveInt] = None,
+        signedBy: Seq[Fingerprint] = Seq(instance.id.uid.namespace.fingerprint),
         force: Boolean = false,
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
@@ -503,7 +558,7 @@ class TopologyAdministrationGroupX(
           synchronisation.runAdminCommand(synchronize)(
             TopologyAdminCommandsX.Write.Propose(
               nsd.item,
-              signedBy = Seq(instance.id.uid.namespace.fingerprint),
+              signedBy = signedBy,
               store = store,
               serial = serial,
               change = TopologyChangeOpX.Remove,
@@ -692,7 +747,7 @@ class TopologyAdministrationGroupX(
         ),
         // configurable in case of a key under a decentralized namespace
         mustFullyAuthorize: Boolean = true,
-    ): Unit = propose(
+    ): Unit = update(
       key,
       purpose,
       keyOwner,
@@ -734,7 +789,7 @@ class TopologyAdministrationGroupX(
         // configurable in case of a key under a decentralized namespace
         mustFullyAuthorize: Boolean = true,
         force: Boolean = false,
-    ): Unit = propose(
+    ): Unit = update(
       key,
       purpose,
       keyOwner,
@@ -764,6 +819,7 @@ class TopologyAdministrationGroupX(
         member: Member,
         currentKey: PublicKey,
         newKey: PublicKey,
+        synchronize: Option[config.NonNegativeDuration],
     ): Unit = nodeInstance match {
       case nodeInstanceX: InstanceReferenceX =>
         val keysInStore = nodeInstance.keys.secret.list().map(_.publicKey)
@@ -792,7 +848,7 @@ class TopologyAdministrationGroupX(
           // Authorize the new key
           // The owner will now have two keys, but by convention the first one added is always
           // used by everybody.
-          propose(
+          update(
             newKey.fingerprint,
             newKey.purpose,
             member,
@@ -800,10 +856,11 @@ class TopologyAdministrationGroupX(
             signedBy = signingKeyForNow,
             add = true,
             nodeInstance = nodeInstanceX,
+            synchronize = synchronize,
           )
 
           // Remove the old key by sending the matching `Remove` transaction
-          propose(
+          update(
             currentKey.fingerprint,
             currentKey.purpose,
             member,
@@ -811,6 +868,7 @@ class TopologyAdministrationGroupX(
             signedBy = signingKeyForNow,
             add = false,
             nodeInstance = nodeInstanceX,
+            synchronize = synchronize,
           )
         }
       case _ =>
@@ -819,7 +877,7 @@ class TopologyAdministrationGroupX(
         )
     }
 
-    private def propose(
+    private def update(
         key: Fingerprint,
         purpose: KeyPurpose,
         keyOwner: Member,
@@ -834,20 +892,18 @@ class TopologyAdministrationGroupX(
         nodeInstance: InstanceReferenceX,
     ): Unit = {
       // Ensure the specified key has a private key in the vault.
-      val publicKey =
-        nodeInstance.keys.secret
-          .list(
-            filterFingerprint = key.toProtoPrimitive,
-            purpose = Set(purpose),
-          ) match {
-          case privateKeyMetadata +: Nil => privateKeyMetadata.publicKey
-          case Nil =>
-            throw new IllegalArgumentException("The specified key is unknown to the key owner")
-          case multipleKeys =>
-            throw new IllegalArgumentException(
-              s"Found ${multipleKeys.size} keys where only one key was expected. Specify a full key instead of a prefix"
-            )
-        }
+      val publicKey = nodeInstance.keys.secret.list(
+        filterFingerprint = key.toProtoPrimitive,
+        purpose = Set(purpose),
+      ) match {
+        case privateKeyMetadata +: Nil => privateKeyMetadata.publicKey
+        case Nil =>
+          throw new IllegalArgumentException("The specified key is unknown to the key owner")
+        case multipleKeys =>
+          throw new IllegalArgumentException(
+            s"Found ${multipleKeys.size} keys where only one key was expected. Specify a full key instead of a prefix"
+          )
+      }
 
       // Look for an existing authorized OKM mapping.
       val maybePreviousState = expectAtMostOneResult(
@@ -906,21 +962,42 @@ class TopologyAdministrationGroupX(
         }
       }
 
-      synchronisation
-        .runAdminCommand(synchronize)(
-          TopologyAdminCommandsX.Write
-            .Propose(
-              mapping = proposedMapping,
-              signedBy = signedBy.toList,
-              change = ops,
-              serial = Some(serial),
-              mustFullyAuthorize = mustFullyAuthorize,
-              forceChange = force,
-              store = AuthorizedStore.filterName,
-            )
-        )
-        .discard
+      propose(
+        proposedMapping,
+        serial,
+        ops,
+        signedBy,
+        AuthorizedStore.filterName,
+        synchronize,
+        mustFullyAuthorize,
+        force,
+      ).discard
     }
+
+    def propose(
+        proposedMapping: OwnerToKeyMappingX,
+        serial: RequireTypes.PositiveNumeric[Int],
+        ops: TopologyChangeOpX = TopologyChangeOpX.Replace,
+        signedBy: Option[Fingerprint] = None,
+        store: String = AuthorizedStore.filterName,
+        synchronize: Option[config.NonNegativeDuration] = Some(
+          consoleEnvironment.commandTimeouts.bounded
+        ),
+        // configurable in case of a key under a decentralized namespace
+        mustFullyAuthorize: Boolean = true,
+        force: Boolean = false,
+    ): SignedTopologyTransactionX[TopologyChangeOpX, OwnerToKeyMappingX] =
+      synchronisation.runAdminCommand(synchronize)(
+        TopologyAdminCommandsX.Write.Propose(
+          mapping = proposedMapping,
+          signedBy = signedBy.toList,
+          store = store,
+          change = ops,
+          serial = Some(serial),
+          mustFullyAuthorize = mustFullyAuthorize,
+          forceChange = force,
+        )
+      )
   }
 
   @Help.Summary("Manage party to participant mappings")
@@ -1175,8 +1252,8 @@ class TopologyAdministrationGroupX(
     def propose(
         participantId: ParticipantId,
         domainId: DomainId,
-        transferOnlyToGivenTargetDomains: Boolean,
-        targetDomains: Seq[DomainId],
+        transferOnlyToGivenTargetDomains: Boolean = false,
+        targetDomains: Seq[DomainId] = Seq.empty,
         synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),

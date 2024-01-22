@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
@@ -368,6 +368,10 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
   def mergeLocalInstances(
       locals: Seq[LocalInstanceReferenceCommon]*
   ): Seq[LocalInstanceReferenceCommon] =
+    locals.flatten
+  def mergeLocalInstancesX(
+      locals: Seq[LocalInstanceReferenceX]*
+  ): Seq[LocalInstanceReferenceX] =
     locals.flatten
   def mergeRemoteInstances(remotes: Seq[InstanceReferenceCommon]*): Seq[InstanceReferenceCommon] =
     remotes.flatten

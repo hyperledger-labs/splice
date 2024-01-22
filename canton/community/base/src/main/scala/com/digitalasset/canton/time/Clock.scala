@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.time
@@ -23,8 +23,9 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, PriorityBlockingQueueUtil}
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.empty.Empty
+import com.google.protobuf.timestamp.Timestamp
 
-import java.time.{Duration, Instant, Clock as JClock}
+import java.time.{Clock as JClock, Duration, Instant}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicReference}
 import java.util.concurrent.{Callable, PriorityBlockingQueue, TimeUnit}
 import scala.annotation.tailrec
@@ -381,6 +382,7 @@ class SimClock(
 class RemoteClock(
     config: ClientConfig,
     timeouts: ProcessingTimeout,
+    getTimeFromXNode: Boolean,
     val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContextExecutor)
     extends Clock
@@ -392,8 +394,15 @@ class RemoteClock(
     noTracingLogger,
   )
   private val channel = ClientChannelBuilder.createChannelToTrustedServer(config)
-  private val service = InitializationServiceGrpc.stub(channel)
-  private val serviceX = IdentityInitializationServiceXGrpc.stub(channel)
+  private val service = Either.cond(
+    getTimeFromXNode,
+    IdentityInitializationServiceXGrpc.stub(channel),
+    InitializationServiceGrpc.stub(channel),
+  )
+
+  private def getCurrentRemoteTime(): Future[Timestamp] =
+    service.fold(_.currentTime(Empty()), _.currentTime(Empty()))
+
   private val running = new AtomicBoolean(true)
   private val updating = new AtomicReference[Option[CantonTimestamp]](None)
 
@@ -448,7 +457,7 @@ class RemoteClock(
   @tailrec
   private def getRemoteTime: CantonTimestamp = {
     val req = for {
-      pbTimestamp <- EitherT.right[ProtoDeserializationError](serviceX.currentTime(Empty()))
+      pbTimestamp <- EitherT.right[ProtoDeserializationError](getCurrentRemoteTime())
       timestamp <- EitherT.fromEither[Future](CantonTimestamp.fromProtoPrimitive(pbTimestamp))
     } yield timestamp
     import TraceContext.Implicits.Empty.*

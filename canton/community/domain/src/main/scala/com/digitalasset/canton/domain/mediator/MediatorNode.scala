@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.domain.mediator
@@ -125,6 +125,7 @@ final case class MediatorNodeParameterConfig(
     override val dontWarnOnDeprecatedPV: Boolean = false,
     override val initialProtocolVersion: ProtocolVersion = ProtocolVersion.latest,
     batching: BatchingConfig = BatchingConfig(),
+    caching: CachingConfigs = CachingConfigs(),
 ) extends ProtocolConfig
     with LocalNodeParametersConfig
 

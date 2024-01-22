@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.common.domain
@@ -50,10 +50,6 @@ trait SequencerConnectClient extends NamedLogging with AutoCloseable {
   def isActive(participantId: ParticipantId, waitForActive: Boolean)(implicit
       traceContext: TraceContext
   ): EitherT[Future, Error, Boolean]
-
-  def getAgreement(domainId: DomainId)(implicit
-      traceContext: TraceContext
-  ): EitherT[Future, Error, Option[ServiceAgreement]]
 
   protected def handleVerifyActiveResponse(
       response: v0.SequencerConnect.VerifyActive.Response

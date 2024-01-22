@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -439,7 +439,7 @@ abstract class CantonNodeBootstrapBase[
   /** Health service component of the node
     */
   protected lazy val nodeHealthService: HealthService = mkNodeHealthService(storage)
-  protected val (healthReporter, grpcHealthServer, livenessHealthService) =
+  protected val (healthReporter, grpcHealthServer, httpHealthServer, livenessHealthService) =
     mkHealthComponents(nodeHealthService)
 
   override protected def onClosed(): Unit = {
@@ -454,7 +454,7 @@ abstract class CantonNodeBootstrapBase[
         Lifecycle.toCloseableOption(initializationWatcherRef.get()),
         adminServerRegistry,
         adminServer,
-      ) ++ grpcHealthServer.toList ++ getNode.toList ++ stores ++ List(
+      ) ++ grpcHealthServer.toList ++ httpHealthServer.toList ++ getNode.toList ++ stores ++ List(
         crypto.value,
         storage,
         clock,

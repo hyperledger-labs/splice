@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin.repair
@@ -214,33 +214,6 @@ private final class MigrateContracts(
       }
     }
 
-  private def adjustContractKeys(
-      request: RepairRequest,
-      timeOfChange: MigrateContracts.Data[MigratedContract] => TimeOfChange,
-      contracts: List[MigrateContracts.Data[MigratedContract]],
-      newStatus: ContractKeyJournal.Status,
-  )(implicit
-      executionContext: ExecutionContext,
-      traceContext: TraceContext,
-  ): EitherT[Future, String, Unit] =
-    if (!request.domain.parameters.uniqueContractKeys)
-      EitherT.rightT(())
-    else
-      for {
-        keys <- EitherT.right(
-          contracts.parTraverseFilter(contract =>
-            getKeyIfOneMaintainerIsLocal(
-              request.domain.topologySnapshot,
-              contract.payload.contract.metadata.maybeKeyWithMaintainers,
-              participantId,
-            ).map(_.map(_ -> timeOfChange(contract)))
-          )
-        )
-        _ <- request.domain.persistentState.contractKeyJournal
-          .addKeyStateUpdates(keys.map { case (key, toc) => key -> (newStatus, toc) }.toMap)
-          .leftMap(_.toString)
-      } yield ()
-
   private def persistContracts(
       transactionId: TransactionId,
       contracts: List[MigrateContracts.Data[MigratedContract]],
@@ -249,18 +222,6 @@ private final class MigrateContracts(
       traceContext: TraceContext,
   ): EitherT[Future, String, Unit] =
     for {
-      _ <- adjustContractKeys(
-        repairSource,
-        _.sourceTimeOfChange,
-        contracts,
-        ContractKeyJournal.Unassigned,
-      )
-      _ <- adjustContractKeys(
-        repairTarget,
-        _.targetTimeOfChange,
-        contracts,
-        ContractKeyJournal.Assigned,
-      )
       _ <- EitherT.right {
         contracts.parTraverse_ { contract =>
           if (contract.payload.isNew)

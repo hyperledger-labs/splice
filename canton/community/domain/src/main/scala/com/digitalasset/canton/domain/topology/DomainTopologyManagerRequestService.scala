@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.domain.topology
@@ -298,16 +298,6 @@ private[domain] object RequestProcessingStrategy {
           keys.hasBothKeys(),
           (),
           DomainTopologyManagerError.ParticipantNotInitialized.Failure(participant, keys),
-        )
-        participantCert <- EitherT
-          .right(snapshot.findParticipantCertificate(participant))
-          .mapK(FutureUnlessShutdown.outcomeK)
-        _ <- EitherT.cond[FutureUnlessShutdown](
-          participantCert.nonEmpty || !config.requireParticipantCertificate,
-          (),
-          reject(
-            s"Participant $participant needs a SignedLegalIdentityClaim, but did not provide one"
-          ),
         )
         res <- EitherT.right(addTransactions(reduced1.toList))
         // Activate the participant

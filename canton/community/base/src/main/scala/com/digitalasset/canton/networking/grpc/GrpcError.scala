@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.networking.grpc
@@ -8,7 +8,7 @@ import com.digitalasset.canton.error.ErrorCodeUtils.errorCategoryFromString
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.sequencing.authentication.MemberAuthentication.{
   MissingToken,
-  ParticipantDisabled,
+  ParticipantAccessDisabled,
 }
 import com.digitalasset.canton.sequencing.authentication.grpc.Constant
 import com.digitalasset.canton.tracing.TraceContext
@@ -201,7 +201,7 @@ object GrpcError {
       case INVALID_ARGUMENT | UNAUTHENTICATED
           if !checkAuthenticationError(
             optTrailers,
-            Seq(MissingToken.toString, ParticipantDisabled.toString),
+            Seq(MissingToken.toString, ParticipantAccessDisabled.toString),
           ) =>
         GrpcClientError(request, serverName, status, optTrailers, rpcStatus)
 

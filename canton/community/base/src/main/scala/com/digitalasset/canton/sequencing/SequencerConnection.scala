@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing
@@ -30,25 +30,6 @@ sealed trait SequencerConnection extends PrettyPrinting {
   def withAlias(alias: SequencerAlias): SequencerConnection
 
   def toProtoV0: v0.SequencerConnection
-
-  @deprecated("Use addEndpoints instead", "2.7.1")
-  final def addConnection(
-      connection: String,
-      additionalConnections: String*
-  ): SequencerConnection =
-    addEndpoints(connection, additionalConnections *)
-
-  @deprecated("Use addEndpoints instead", "2.7.1")
-  final def addConnection(
-      connection: URI,
-      additionalConnections: URI*
-  ): SequencerConnection = addEndpoints(connection, additionalConnections *)
-
-  @deprecated("Use addEndpoints instead", "2.7.1")
-  final def addConnection(
-      connection: SequencerConnection,
-      additionalConnections: SequencerConnection*
-  ): SequencerConnection = addEndpoints(connection, additionalConnections *)
 
   def addEndpoints(
       connection: String,

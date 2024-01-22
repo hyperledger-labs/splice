@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client
@@ -6,7 +6,6 @@ package com.digitalasset.canton.sequencing.client
 import cats.data.EitherT
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.common.domain.ServiceAgreementId
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.*
@@ -68,7 +67,6 @@ object SequencerClientFactory {
       domainId: DomainId,
       syncCryptoApi: SyncCryptoClient[SyncCryptoApi],
       crypto: Crypto,
-      agreedAgreementId: Option[ServiceAgreementId],
       config: SequencerClientConfig,
       traceContextPropagation: TracingConfig.Propagation,
       testingConfig: TestingConfigInternal,
@@ -296,7 +294,6 @@ object SequencerClientFactory {
           domainId,
           member,
           crypto,
-          agreedAgreementId,
           channelPerEndpoint,
           supportedProtocolVersions,
           config.authToken,

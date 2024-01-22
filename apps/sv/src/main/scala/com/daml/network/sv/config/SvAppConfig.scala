@@ -225,6 +225,5 @@ final case class SvDomainNodeConfig(
     parameters: DomainParametersConfig = DomainParametersConfig(
       protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
       devVersionSupport = true,
-      uniqueContractKeys = false,
     ),
 )

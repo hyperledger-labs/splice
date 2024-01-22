@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.metrics
@@ -37,7 +37,6 @@ import io.prometheus.client.dropwizard.DropwizardExports
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.TimeUnit
-import scala.annotation.nowarn
 import scala.collection.concurrent.TrieMap
 
 final case class MetricsConfig(
@@ -122,19 +121,17 @@ object MetricsConfig {
 }
 
 final case class MetricsFactory(
-    val reporters: Seq[metrics.Reporter],
-    val registry: metrics.MetricRegistry,
-    val reportJVMMetrics: Boolean,
-    val meter: Meter,
-    val factoryType: MetricsFactoryType,
-    val reportExecutionContextMetrics: Boolean,
+    reporters: Seq[metrics.Reporter],
+    registry: metrics.MetricRegistry,
+    reportJVMMetrics: Boolean,
+    meter: Meter,
+    factoryType: MetricsFactoryType,
+    reportExecutionContextMetrics: Boolean,
 ) extends AutoCloseable {
 
-  @deprecated("Use LabeledMetricsFactory", since = "2.7.0")
-  val metricsFactory: MetricHandle.MetricsFactory =
-    createUnlabeledMetricsFactory(MetricsContext.Empty, registry)
-
-  @nowarn("cat=deprecation") private val envMetrics = new EnvMetrics(metricsFactory)
+  val metricsFactory: MetricHandle.LabeledMetricsFactory =
+    createDropwizardMetricsFactory(MetricsContext.Empty, registry)
+  private val envMetrics = new EnvMetrics(metricsFactory)
   private val participants = TrieMap[String, ParticipantMetrics]()
   private val domains = TrieMap[String, DomainMetrics]()
   private val sequencers = TrieMap[String, SequencerMetrics]()
@@ -145,7 +142,7 @@ final case class MetricsFactory(
     allNodeMetrics filterNot (_ eq toExclude)
 
   val executionServiceMetrics: ExecutorServiceMetrics = new ExecutorServiceMetrics(
-    createLabeledMetricsFactory(MetricsContext.Empty)
+    createOpenTelemetryMetricsFactory(MetricsContext.Empty)
   )
 
   object benchmark extends MetricsGroup(MetricName(MetricsFactory.prefix :+ "benchmark"), registry)
@@ -174,8 +171,8 @@ final case class MetricsFactory(
         new ParticipantMetrics(
           name,
           MetricsFactory.prefix,
-          createUnlabeledMetricsFactory(participantMetricsContext, participantRegistry),
-          createLabeledMetricsFactory(
+          createDropwizardMetricsFactory(participantMetricsContext, participantRegistry),
+          createOpenTelemetryMetricsFactory(
             participantMetricsContext
           ),
           participantRegistry,
@@ -193,10 +190,10 @@ final case class MetricsFactory(
         val metricName = deduplicateName(name, "domain", domains)
         val domainMetricsContext = MetricsContext("domain" -> name, "component" -> "domain")
         val labeledMetricsFactory =
-          createLabeledMetricsFactory(domainMetricsContext)
+          createOpenTelemetryMetricsFactory(domainMetricsContext)
         new DomainMetrics(
           MetricsFactory.prefix,
-          createUnlabeledMetricsFactory(domainMetricsContext, newRegistry(metricName)),
+          createDropwizardMetricsFactory(domainMetricsContext, newRegistry(metricName)),
           new DamlGrpcServerMetrics(labeledMetricsFactory, "domain"),
           new DMHealth(labeledMetricsFactory),
         )
@@ -210,12 +207,12 @@ final case class MetricsFactory(
         val metricName = deduplicateName(name, "sequencer", sequencers)
         val sequencerMetricsContext =
           MetricsContext("sequencer" -> name, "component" -> "sequencer")
-        val labeledMetricsFactory = createLabeledMetricsFactory(
+        val labeledMetricsFactory = createOpenTelemetryMetricsFactory(
           sequencerMetricsContext
         )
         new SequencerMetrics(
           MetricsFactory.prefix,
-          createUnlabeledMetricsFactory(sequencerMetricsContext, newRegistry(metricName)),
+          createDropwizardMetricsFactory(sequencerMetricsContext, newRegistry(metricName)),
           new DamlGrpcServerMetrics(labeledMetricsFactory, "sequencer"),
           new DMHealth(labeledMetricsFactory),
         )
@@ -229,10 +226,10 @@ final case class MetricsFactory(
         val metricName = deduplicateName(name, "mediator", mediators)
         val mediatorMetricsContext = MetricsContext("mediator" -> name, "component" -> "mediator")
         val labeledMetricsFactory =
-          createLabeledMetricsFactory(mediatorMetricsContext)
+          createOpenTelemetryMetricsFactory(mediatorMetricsContext)
         new MediatorNodeMetrics(
           MetricsFactory.prefix,
-          createUnlabeledMetricsFactory(mediatorMetricsContext, newRegistry(metricName)),
+          createDropwizardMetricsFactory(mediatorMetricsContext, newRegistry(metricName)),
           new DamlGrpcServerMetrics(labeledMetricsFactory, "mediator"),
           new DMHealth(labeledMetricsFactory),
         )
@@ -251,7 +248,7 @@ final case class MetricsFactory(
       s"$nodeType-$name"
     else name
 
-  def createLabeledMetricsFactory(extraContext: MetricsContext) = {
+  private def createOpenTelemetryMetricsFactory(extraContext: MetricsContext) = {
     factoryType match {
       case MetricsFactoryType.InMemory(provider) =>
         provider(extraContext)
@@ -265,7 +262,7 @@ final case class MetricsFactory(
     }
   }
 
-  private def createUnlabeledMetricsFactory(
+  private def createDropwizardMetricsFactory(
       extraContext: MetricsContext,
       registry: MetricRegistry,
   ) = factoryType match {

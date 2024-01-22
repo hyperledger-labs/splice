@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
@@ -48,7 +48,6 @@ class TransactionProcessingStepsTest extends AsyncWordSpec with BaseTest {
     new AuthenticationValidator(),
     new AuthorizationValidator(participantId, enableContractUpgrading = false),
     new InternalConsistencyChecker(
-      defaultStaticDomainParameters.uniqueContractKeys,
       defaultStaticDomainParameters.protocolVersion,
       loggerFactory,
     ),

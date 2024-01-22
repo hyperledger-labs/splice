@@ -106,11 +106,11 @@ case class CNNodeConfig(
       SharedCNNodeAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
-        monitoring.getLoggingConfig,
+        monitoring.logging,
         monitoring.logQueryCost,
         parameters.timeouts.processing,
         parameters.timeouts.console.requestTimeout,
-        validatorConfig.caching,
+        validatorConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
         parameters.nonStandardConfig,
@@ -119,7 +119,6 @@ case class CNNodeConfig(
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = true,
-        skipTopologyManagerSignatureValidation = false,
         batchingConfig = validatorConfig.parameters.batching,
       )
     }
@@ -148,11 +147,11 @@ case class CNNodeConfig(
       SharedCNNodeAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
-        monitoring.getLoggingConfig,
+        monitoring.logging,
         monitoring.logQueryCost,
         parameters.timeouts.processing,
         parameters.timeouts.console.requestTimeout,
-        svConfig.caching,
+        svConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
         parameters.nonStandardConfig,
@@ -161,7 +160,6 @@ case class CNNodeConfig(
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = true,
-        skipTopologyManagerSignatureValidation = false,
         batchingConfig = new BatchingConfig(),
       )
     }
@@ -189,11 +187,11 @@ case class CNNodeConfig(
       SharedCNNodeAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
-        monitoring.getLoggingConfig,
+        monitoring.logging,
         monitoring.logQueryCost,
         parameters.timeouts.processing,
         parameters.timeouts.console.requestTimeout,
-        scanConfig.caching,
+        scanConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
         parameters.nonStandardConfig,
@@ -202,7 +200,6 @@ case class CNNodeConfig(
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = true,
-        skipTopologyManagerSignatureValidation = false,
         batchingConfig = new BatchingConfig(),
       )
     }
@@ -230,11 +227,11 @@ case class CNNodeConfig(
       SharedCNNodeAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
-        monitoring.getLoggingConfig,
+        monitoring.logging,
         monitoring.logQueryCost,
         parameters.timeouts.processing,
         parameters.timeouts.console.requestTimeout,
-        splitwellConfig.caching,
+        splitwellConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
         parameters.nonStandardConfig,
@@ -243,7 +240,6 @@ case class CNNodeConfig(
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
         dbMigrateAndStart = true,
-        skipTopologyManagerSignatureValidation = false,
         batchingConfig = new BatchingConfig(),
       )
     }

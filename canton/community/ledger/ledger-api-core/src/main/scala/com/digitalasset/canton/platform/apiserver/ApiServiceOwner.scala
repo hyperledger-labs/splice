@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver
@@ -164,10 +164,10 @@ object ApiServiceOwner {
         enableExplicitDisclosure = enableExplicitDisclosure,
         telemetry = telemetry,
         loggerFactory = loggerFactory,
-        multiDomainEnabled = multiDomainEnabled,
         upgradingEnabled = upgradingEnabled,
         authenticateContract = authenticateContract,
         dynParamGetter = dynParamGetter,
+        multiDomainEnabled = multiDomainEnabled,
       )(materializer, executionSequencerFactory, tracer)
         .map(_.withServices(otherServices))
       apiService <- new LedgerApiService(

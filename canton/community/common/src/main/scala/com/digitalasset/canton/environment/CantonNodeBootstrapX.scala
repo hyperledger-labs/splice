@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -128,10 +128,11 @@ abstract class CantonNodeBootstrapX[
           // init health services once
           val healthService = mkNodeHealthService(storage)
           addCloseable(healthService)
-          val (healthReporter, grpcHealthServer, livenessHealthService) =
+          val (healthReporter, grpcHealthServer, httpHealthServer, livenessHealthService) =
             mkHealthComponents(healthService)
           addCloseable(livenessHealthService)
           grpcHealthServer.foreach(addCloseable)
+          httpHealthServer.foreach(addCloseable)
           addCloseable(storage)
           Some(new SetupCrypto(storage, healthReporter, healthService))
         }

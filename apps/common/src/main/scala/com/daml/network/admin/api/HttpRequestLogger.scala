@@ -15,14 +15,14 @@ import com.digitalasset.canton.util.ShowUtil.*
 
 object HttpRequestLogger {
   def apply(
-      messagePayloads: Option[Boolean],
+      messagePayloads: Boolean,
       maxPathLength: Int,
       maxStringLength: Int,
       maxMetadataSize: Int,
       loggerFactory: NamedLoggerFactory,
   )(implicit traceContext: TraceContext): Directive0 = {
     new HttpRequestLogger(
-      messagePayloads.getOrElse(false),
+      messagePayloads,
       maxPathLength,
       maxStringLength,
       maxMetadataSize,

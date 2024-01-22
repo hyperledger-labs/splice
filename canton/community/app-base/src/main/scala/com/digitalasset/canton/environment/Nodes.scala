@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.environment
@@ -392,7 +392,7 @@ class ParticipantNodes[B <: CantonNodeBootstrap[N], N <: CantonNode, PC <: Local
       timeouts,
       configs,
       parametersFor,
-      startUpGroup = 0,
+      startUpGroup = 2,
       loggerFactory,
     ) {
   private def migrateIndexerDatabase(name: InstanceName): Either[StartupError, Unit] = {

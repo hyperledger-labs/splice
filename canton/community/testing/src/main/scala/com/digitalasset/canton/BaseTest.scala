@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -168,7 +168,12 @@ trait BaseTest
   def eventually[T](
       timeUntilSuccess: FiniteDuration = 20.seconds,
       maxPollInterval: FiniteDuration = 100.millis,
-  )(testCode: => T): T = BaseTest.eventually(timeUntilSuccess, maxPollInterval)(testCode)
+  )(testCode: => T): T = BaseTest.eventually(timeUntilSuccess, maxPollInterval, true)(testCode)
+
+  def eventuallyNoException[T](
+      timeUntilSuccess: FiniteDuration = 20.seconds,
+      maxPollInterval: FiniteDuration = 5.seconds,
+  )(testCode: => T): T = BaseTest.eventually(timeUntilSuccess, maxPollInterval, false)(testCode)
 
   /** Keeps evaluating `testCode` until it fails or a timeout occurs.
     * @return the result the last evaluation of `testCode`
@@ -336,6 +341,7 @@ object BaseTest {
   def eventually[T](
       timeUntilSuccess: FiniteDuration = 20.seconds,
       maxPollInterval: FiniteDuration = 100.millis,
+      retryOnTestFailuresOnly: Boolean = true,
   )(testCode: => T): T = {
     require(
       timeUntilSuccess >= Duration.Zero,
@@ -343,14 +349,19 @@ object BaseTest {
     )
     val deadline = timeUntilSuccess.fromNow
     var sleepMs = 10L min (maxPollInterval.toMillis / 10L)
+    def sleep(): Unit = {
+      val timeLeft = deadline.timeLeft.toMillis max 0
+      Threading.sleep(sleepMs min timeLeft)
+      sleepMs = (sleepMs * 2) min maxPollInterval.toMillis
+    }
     while (deadline.hasTimeLeft()) {
       try {
         return testCode
       } catch {
         case _: TestFailedException =>
-          val timeLeft = deadline.timeLeft.toMillis max 0
-          Threading.sleep(sleepMs min timeLeft)
-          sleepMs = (sleepMs * 2) min maxPollInterval.toMillis
+          sleep()
+        case _: Throwable if !retryOnTestFailuresOnly =>
+          sleep()
       }
     }
     testCode // try one last time and throw exception, if assertion keeps failing
@@ -361,10 +372,8 @@ object BaseTest {
     defaultStaticDomainParametersWith()
 
   def defaultStaticDomainParametersWith(
-      uniqueContractKeys: Boolean = false,
-      protocolVersion: ProtocolVersion = testedProtocolVersion,
+      protocolVersion: ProtocolVersion = testedProtocolVersion
   ): StaticDomainParameters = StaticDomainParameters.create(
-    uniqueContractKeys = uniqueContractKeys,
     requiredSigningKeySchemes = SymbolicCryptoProvider.supportedSigningKeySchemes,
     requiredEncryptionKeySchemes = SymbolicCryptoProvider.supportedEncryptionKeySchemes,
     requiredSymmetricKeySchemes = SymbolicCryptoProvider.supportedSymmetricKeySchemes,

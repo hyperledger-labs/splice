@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.crypto
@@ -137,11 +137,6 @@ trait SyncCryptoApi {
 
   /** Decrypts a message using the private key of the public key given as the fingerprint. */
   def decrypt[M](encryptedMessage: AsymmetricEncrypted[M])(
-      deserialize: ByteString => Either[DeserializationError, M]
-  )(implicit traceContext: TraceContext): EitherT[Future, SyncCryptoError, M]
-
-  @Deprecated
-  def decrypt[M](encryptedMessage: Encrypted[M])(
       deserialize: ByteString => Either[DeserializationError, M]
   )(implicit traceContext: TraceContext): EitherT[Future, SyncCryptoError, M]
 

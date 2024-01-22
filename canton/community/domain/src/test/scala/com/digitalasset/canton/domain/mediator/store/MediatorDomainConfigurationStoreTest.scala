@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.domain.mediator.store
@@ -74,9 +74,7 @@ trait MediatorDomainConfigurationStoreTest {
       val updatedConfig = originalConfig
         .focus(_.domainParameters)
         .replace(
-          BaseTest.defaultStaticDomainParametersWith(
-            uniqueContractKeys = true
-          )
+          BaseTest.defaultStaticDomainParameters
         )
 
       for {

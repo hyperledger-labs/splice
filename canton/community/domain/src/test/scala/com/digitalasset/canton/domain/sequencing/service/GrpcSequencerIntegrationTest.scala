@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.domain.sequencing.service
@@ -122,7 +122,7 @@ final case class Env(loggerFactory: NamedLoggerFactory)(implicit
 
   private val domainParamsLookup: DynamicDomainParametersLookup[SequencerDomainParameters] =
     DomainParametersLookup.forSequencerDomainParameters(
-      BaseTest.defaultStaticDomainParametersWith(),
+      BaseTest.defaultStaticDomainParameters,
       None,
       topologyClient,
       futureSupervisor,
@@ -171,7 +171,6 @@ final case class Env(loggerFactory: NamedLoggerFactory)(implicit
     sequencerId = sequencerId,
     staticDomainParameters = BaseTest.defaultStaticDomainParameters,
     cryptoApi = cryptoApi,
-    agreementManager = None,
     loggerFactory = loggerFactory,
   )
 
@@ -234,7 +233,6 @@ final case class Env(loggerFactory: NamedLoggerFactory)(implicit
         domainId,
         cryptoApi,
         cryptoApi.crypto,
-        agreedAgreementId = None,
         SequencerClientConfig(),
         TracingConfig.Propagation.Disabled,
         TestingConfigInternal(),

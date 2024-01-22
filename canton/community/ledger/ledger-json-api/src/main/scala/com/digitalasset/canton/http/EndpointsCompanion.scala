@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http
@@ -27,16 +27,10 @@ import com.digitalasset.canton.http.util.Logging.{
   extendWithRequestIdLogCtx,
 }
 import com.digitalasset.canton.ledger.client.services.admin.UserManagementClient
-import com.digitalasset.canton.ledger.client.services.identity.LedgerIdentityClient
 import com.digitalasset.canton.ledger.service.Grpc.StatusEnvelope
 import com.daml.lf.data.Ref.UserId
 import com.daml.logging.LoggingContextOf
-import com.digitalasset.canton.http.domain.{
-  JwtPayload,
-  JwtPayloadLedgerIdOnly,
-  JwtWritePayload,
-  LedgerApiError,
-}
+import com.digitalasset.canton.http.domain.{JwtPayload, JwtWritePayload, LedgerApiError}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.NoTracing
 import com.google.rpc.Code as GrpcCode
@@ -46,7 +40,7 @@ import scalaz.{-\/, EitherT, Monad, NonEmptyList, Show, \/, \/-}
 import spray.json.JsValue
 import scalaz.syntax.std.either.*
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.util.control.NonFatal
 
 object EndpointsCompanion extends NoTracing {
@@ -109,7 +103,6 @@ object EndpointsCompanion extends NoTracing {
     def apply(
         jwt: StandardJWTPayload,
         listUserRights: UserId => Future[Seq[UserRight]],
-        getLedgerId: () => Future[String],
     ): EitherT[Future, Unauthorized, A]
   }
 
@@ -118,7 +111,7 @@ object EndpointsCompanion extends NoTracing {
     import com.digitalasset.canton.http.util.FutureUtil.either
 
     trait FromUser[A, B] {
-      def apply(userId: String, actAs: List[String], readAs: List[String], ledgerId: String): A \/ B
+      def apply(userId: String, actAs: List[String], readAs: List[String]): A \/ B
     }
 
     def userIdFromToken(
@@ -132,7 +125,6 @@ object EndpointsCompanion extends NoTracing {
     private def transformUserTokenTo[B](
         jwt: StandardJWTPayload,
         listUserRights: UserId => Future[Seq[UserRight]],
-        getLedgerId: () => Future[String],
     )(
         fromUser: FromUser[Unauthorized, B]
     )(implicit
@@ -148,8 +140,7 @@ object EndpointsCompanion extends NoTracing {
         readAs = rights.collect { case CanReadAs(party) =>
           party
         }
-        ledgerId <- EitherT.rightT(getLedgerId())
-        res <- either(fromUser(userId, actAs.toList, readAs.toList, ledgerId))
+        res <- either(fromUser(userId, actAs.toList, readAs.toList))
       } yield res
 
     implicit def jwtWritePayloadFromUserToken(implicit
@@ -158,9 +149,8 @@ object EndpointsCompanion extends NoTracing {
       (
           jwt,
           listUserRights,
-          getLedgerId,
       ) =>
-        transformUserTokenTo(jwt, listUserRights, getLedgerId)((userId, actAs, readAs, ledgerId) =>
+        transformUserTokenTo(jwt, listUserRights)((userId, actAs, readAs) =>
           for {
             actAsNonEmpty <-
               if (actAs.isEmpty)
@@ -169,20 +159,11 @@ object EndpointsCompanion extends NoTracing {
                 )
               else \/-(NonEmptyList(actAs.head: String, actAs.tail: _*))
           } yield JwtWritePayload(
-            lar.LedgerId(ledgerId),
             lar.ApplicationId(userId),
             lar.Party.subst(actAsNonEmpty),
             lar.Party.subst(readAs),
           )
         )
-
-    implicit def jwtPayloadLedgerIdOnlyFromUserToken(implicit
-        mf: Monad[Future]
-    ): CreateFromUserToken[JwtPayloadLedgerIdOnly] =
-      (_, _, getLedgerId: () => Future[String]) =>
-        EitherT
-          .rightT(getLedgerId())
-          .map(ledgerId => JwtPayloadLedgerIdOnly(lar.LedgerId(ledgerId)))
 
     implicit def jwtPayloadFromUserToken(implicit
         mf: Monad[Future]
@@ -190,11 +171,9 @@ object EndpointsCompanion extends NoTracing {
       (
           jwt,
           listUserRights,
-          getLedgerId,
       ) =>
-        transformUserTokenTo(jwt, listUserRights, getLedgerId)((userId, actAs, readAs, ledgerId) =>
+        transformUserTokenTo(jwt, listUserRights)((userId, actAs, readAs) =>
           \/ fromEither JwtPayload(
-            lar.LedgerId(ledgerId),
             lar.ApplicationId(userId),
             actAs = lar.Party.subst(actAs),
             readAs = lar.Party.subst(readAs),
@@ -207,11 +186,9 @@ object EndpointsCompanion extends NoTracing {
 
     implicit val jwtWritePayloadFromCustomToken: CreateFromCustomToken[JwtWritePayload] =
       (
-        jwt: CustomDamlJWTPayload
+        jwt: CustomDamlJWTPayload,
       ) =>
         for {
-          ledgerId <- jwt.ledgerId
-            .toRightDisjunction(Unauthorized("ledgerId missing in access token"))
           applicationId <- jwt.applicationId
             .toRightDisjunction(Unauthorized("applicationId missing in access token"))
           actAs <- jwt.actAs match {
@@ -220,28 +197,17 @@ object EndpointsCompanion extends NoTracing {
               -\/(Unauthorized(s"Expected one or more parties in actAs but got none"))
           }
         } yield JwtWritePayload(
-          lar.LedgerId(ledgerId),
           lar.ApplicationId(applicationId),
           lar.Party.subst(actAs),
           lar.Party.subst(jwt.readAs),
         )
 
-    implicit val jwtPayloadLedgerIdOnlyFromCustomToken
-        : CreateFromCustomToken[JwtPayloadLedgerIdOnly] =
-      (jwt: CustomDamlJWTPayload) =>
-        jwt.ledgerId
-          .toRightDisjunction(Unauthorized("ledgerId missing in access token"))
-          .map(ledgerId => JwtPayloadLedgerIdOnly(lar.LedgerId(ledgerId)))
-
     implicit val jwtPayloadFromCustomToken: CreateFromCustomToken[JwtPayload] =
       (jwt: CustomDamlJWTPayload) =>
         for {
-          ledgerId <- jwt.ledgerId
-            .toRightDisjunction(Unauthorized("ledgerId missing in access token"))
           applicationId <- jwt.applicationId
             .toRightDisjunction(Unauthorized("applicationId missing in access token"))
           payload <- JwtPayload(
-            lar.LedgerId(ledgerId),
             lar.ApplicationId(applicationId),
             actAs = lar.Party.subst(jwt.actAs),
             readAs = lar.Party.subst(jwt.readAs),
@@ -335,12 +301,10 @@ object EndpointsCompanion extends NoTracing {
       jwt: Jwt,
       decodeJwt: ValidateJwt,
       userManagementClient: UserManagementClient,
-      ledgerIdentityClient: LedgerIdentityClient,
   )(implicit
       createFromCustomToken: CreateFromCustomToken[A],
       createFromUserToken: CreateFromUserToken[A],
       fm: Monad[Future],
-      ec: ExecutionContext,
   ): EitherT[Future, Error, (Jwt, A)] = {
     for {
       token <- EitherT.either(decodeAndParseJwt(jwt, decodeJwt))
@@ -349,7 +313,6 @@ object EndpointsCompanion extends NoTracing {
           createFromUserToken(
             standardToken,
             userId => userManagementClient.listUserRights(userId = userId, token = Some(jwt.value)),
-            () => ledgerIdentityClient.getLedgerId(Some(jwt.value)),
           ).leftMap(identity[Error])
         case customToken: CustomDamlJWTPayload =>
           EitherT.either(createFromCustomToken(customToken): Error \/ A)

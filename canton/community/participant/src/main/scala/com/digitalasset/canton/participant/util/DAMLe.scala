@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.util
@@ -32,7 +32,6 @@ import scala.util.{Failure, Success}
 
 object DAMLe {
   def newEngine(
-      uniqueContractKeys: Boolean,
       enableLfDev: Boolean,
       enableStackTraces: Boolean,
       profileDir: Option[Path] = None,
@@ -56,9 +55,7 @@ object DAMLe {
         stackTraceMode = enableStackTraces,
         profileDir = profileDir,
         requireSuffixedGlobalContractId = true,
-        contractKeyUniqueness =
-          if (uniqueContractKeys) ContractKeyUniquenessMode.Strict
-          else ContractKeyUniquenessMode.Off,
+        contractKeyUniqueness = ContractKeyUniquenessMode.Off,
         enableContractUpgrading = enableContractUpgrading,
         iterationsBetweenInterruptions = iterationsBetweenInterruptions,
       )
