@@ -1,0 +1,68 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: automation
+    folder: canton-network
+    interval: 1m
+    rules:
+      - uid: fe73c0e7-dcb3-4975-a7d1-04ed8da087be
+        title: Automation Failures
+        condition: fatal_error_rate_above_threshold
+        data:
+          - refId: fatal_error_rate
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              disableTextWrap: false
+              editorMode: builder
+              exemplar: false
+              expr: sum by(namespace, app, trigger_name) (rate(cn_retries_failures{error_kind="fatal"}[$__rate_interval]))
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: fatal_error_rate
+              useBackend: false
+          - refId: fatal_error_rate_above_threshold
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: fatal_error_rate
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: fatal_error_rate_above_threshold
+              type: threshold
+        dashboardUid: a3e1385f-6f03-46d9-908c-34aca0f507a6
+        panelId: 8
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        annotations:
+          __dashboardUid__: a3e1385f-6f03-46d9-908c-34aca0f507a6
+          __panelId__: "8"
+          summary: The {{ trigger_name }} for the {{ app }} app in the {{ namespace }} namespace experienced fatal errors.
+        isPaused: false

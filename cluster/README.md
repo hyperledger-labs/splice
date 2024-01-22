@@ -821,9 +821,11 @@ disk volume utilization beyond 80%.
 
 ##### Grafana Alerts
 
-In the `grafana-alerting` folder we configure the alerting system for grafana, with the following alerts being sent over slack:
-
-- CometBFT available voting power <= 2/3 of the total voting power
+We configure the alerting system for grafana in the `cluster/pulumi/infra/grafana-alerting` folder. To create a new alert,
+head to the Alert Rules page in Grafana (`https://grafana.<CLUSTER_NAME>.network.canton.global/alerting/list`) and add
+a new alert rule either from scratch or by copying an existing one. You can then click on "View YAML" to export its YAML
+configuration, add it in the `grafana-alerting` folder and update `observability.ts` to ensure it gets automatically picked up
+and provisioned during cluster deployment.
 
 **Note**
 
