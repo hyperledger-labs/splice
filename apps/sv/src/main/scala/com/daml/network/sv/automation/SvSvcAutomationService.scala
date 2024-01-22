@@ -29,6 +29,7 @@ import com.daml.network.sv.automation.singlesv.membership.onboarding.{
   SvOnboardingPromoteParticipantToSubmitterTrigger,
   SvOnboardingSequencerProposalTrigger,
 }
+import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
 import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipTrigger
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
@@ -187,6 +188,13 @@ class SvSvcAutomationService(
     registerTrigger(
       new SvOffboardingPartyToParticipantProposalTrigger(
         triggerContext,
+        svcStore,
+        participantAdminConnection,
+      )
+    )
+    registerTrigger(
+      new SvOffboardingMediatorTrigger(
+        wallClockTriggerContext,
         svcStore,
         participantAdminConnection,
       )

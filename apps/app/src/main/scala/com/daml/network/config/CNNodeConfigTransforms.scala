@@ -8,6 +8,7 @@ import com.daml.network.splitwell.config.{
   SplitwellAppClientConfig,
   SplitwellDomains,
 }
+import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
 import com.daml.network.sv.config.*
 import com.daml.network.validator.config.{
   AppManagerConfig,
@@ -159,6 +160,7 @@ object CNNodeConfigTransforms {
       ensureNovelDamlNames(),
       useSelfSignedTokensForLedgerApiAuth("test"),
       reducePollingInterval,
+      withPausedSvOffboardingMediatorTrigger(),
     )
   }
 
@@ -171,6 +173,11 @@ object CNNodeConfigTransforms {
   type SplitwellAppTransform = CnAppConfigTransform[SplitwellAppBackendConfig]
   type RemoteSplitwellAppTransform = CnAppConfigTransform[SplitwellAppClientConfig]
   type AutomationConfigTransform = AutomationConfig => AutomationConfig
+
+  def withPausedSvOffboardingMediatorTrigger(): CNNodeConfigTransform =
+    CNNodeConfigTransforms.updateAllAutomationConfigs(
+      _.withPausedTrigger[SvOffboardingMediatorTrigger]
+    )
 
   def setCoinPrice(price: BigDecimal): CNNodeConfigTransform =
     config =>

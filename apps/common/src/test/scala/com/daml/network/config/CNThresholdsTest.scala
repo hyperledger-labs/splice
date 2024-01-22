@@ -32,20 +32,15 @@ class CNThresholdsTest extends AnyWordSpecLike with BaseTest {
     "return expected f based minimum SVC consortium thresholds" in {
       forAll(
         Table(
-          ("svc size", "mapping specific size", "threshold"),
-          (1, 1, 1),
-          (1, 2, 1),
-          (1, 4, 1),
-          (4, 1, 1),
-          (2, 2, 1),
-          (3, 3, 2),
-          (3, 4, 2),
-          (4, 4, 2),
+          ("mapping specific size", "threshold"),
+          (1, 1),
+          (2, 1),
+          (3, 1),
+          (4, 2),
         )
-      ) { (svcSize: Int, mappingSpecificSize: Int, threshold: Int) =>
-        CNThresholds.mediatorDomainStateThresholdWithNewMember(
-          svcSize,
-          mappingSpecificSize,
+      ) { (mappingSpecificSize: Int, threshold: Int) =>
+        CNThresholds.mediatorDomainStateThreshold(
+          mappingSpecificSize
         ) shouldBe PositiveInt
           .tryCreate(threshold)
       }

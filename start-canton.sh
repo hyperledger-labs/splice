@@ -135,6 +135,11 @@ if [ $wallclocktime -eq 1 ]; then
   )
 fi
 
+# same names, but with _mediator_offboarding suffix
+IFS=' ' read -r -a mediator_offboarding_db_names <<< \
+    "$(echo "${any_time_db_names[@]}" | sed -Ee 's/( |$)/_mediator_offboarding\1/g')"
+db_names+=("${mediator_offboarding_db_names[@]}")
+
 if [ $simtime -eq 1 ]; then
   # same names, but with _simtime suffix
   IFS=' ' read -r -a simtime_db_names <<< \

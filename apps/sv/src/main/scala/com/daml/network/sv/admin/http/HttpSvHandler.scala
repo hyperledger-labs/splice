@@ -549,17 +549,15 @@ class HttpSvHandler(
   }
 
   private def addMediatorToTopologyState(
-      mediatorId: MediatorId,
-      svcRulesMembersSize: Int,
+      mediatorId: MediatorId
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
       ourParticipant <- participantAdminConnection.getParticipantId()
       globalDomain <- svcStore.getSvcRules().map(_.domain)
-      _ <- participantAdminConnection.ensureMediatorDomainState(
+      _ <- participantAdminConnection.ensureMediatorDomainStateAdditionProposal(
         globalDomain,
         mediatorId,
         ourParticipant.uid.namespace.fingerprint,
-        svcRulesMembersSize,
         RetryFor.ClientCalls,
       )
     } yield ()
@@ -586,8 +584,7 @@ class HttpSvHandler(
       mediatorId: MediatorId
   )(implicit traceContext: TraceContext) = {
     for {
-      svcRules <- svcStore.getSvcRules()
-      _ <- addMediatorToTopologyState(mediatorId, svcRules.payload.members.size())
+      _ <- addMediatorToTopologyState(mediatorId)
       _ <- grantMediatorUnlimitedTraffic(mediatorId)
     } yield ()
   }

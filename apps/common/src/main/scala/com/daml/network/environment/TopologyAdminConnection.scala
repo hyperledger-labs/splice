@@ -853,33 +853,74 @@ abstract class TopologyAdminConnection(
       isProposal = false,
     )
 
-  def ensureMediatorDomainState(
+  def ensureMediatorDomainStateAdditionProposal(
       domainId: DomainId,
       newActiveMediator: MediatorId,
       signedBy: Fingerprint,
-      svcRulesMembersSize: Int,
+      retryFor: RetryFor,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[TopologyResult[MediatorDomainStateX]] = {
+    def mediatorChange(mediators: Seq[MediatorId]): Seq[MediatorId] = {
+      val newMediators = mediators :+ newActiveMediator
+      newMediators.distinct
+    }
+    ensureMediatorDomainState(
+      domainId,
+      mediatorChange,
+      signedBy,
+      retryFor,
+    )
+  }
+
+  def ensureMediatorDomainStateRemovalProposal(
+      domainId: DomainId,
+      mediatorToRemove: MediatorId,
+      signedBy: Fingerprint,
+      retryFor: RetryFor,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[TopologyResult[MediatorDomainStateX]] = {
+    def mediatorChange(mediators: Seq[MediatorId]): Seq[MediatorId] = {
+      mediators.filterNot(_ == mediatorToRemove)
+    }
+    ensureMediatorDomainState(
+      domainId,
+      mediatorChange,
+      signedBy,
+      retryFor,
+    )
+  }
+
+  private def ensureMediatorDomainState(
+      domainId: DomainId,
+      mediatorChange: Seq[MediatorId] => Seq[MediatorId],
+      signedBy: Fingerprint,
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[MediatorDomainStateX]] =
     ensureTopologyMapping[MediatorDomainStateX](
       TopologyStoreId.DomainStore(domainId),
-      show"Mediator $newActiveMediator is proposed active in MediatorDomainState",
+      show"New mediators are now active in MediatorDomainState",
       EitherT(
         getMediatorDomainState(domainId).map(result =>
-          Either.cond(result.mapping.active.contains(newActiveMediator), result, result)
+          Either
+            .cond(result.mapping.active == mediatorChange(result.mapping.active), result, result)
         )
       ),
-      previous =>
+      previous => {
+        val newMediators = mediatorChange(previous.active)
         // constructor is not exposed so no copy
         MediatorDomainStateX.create(
           previous.domain,
           previous.group,
           CNThresholds
-            .mediatorDomainStateThresholdWithNewMember(svcRulesMembersSize, previous.active.size),
-          newActiveMediator +: previous.active,
+            .mediatorDomainStateThreshold(newMediators.size),
+          newMediators,
           previous.observers,
-        ),
+        )
+      },
       retryFor,
       signedBy,
     )

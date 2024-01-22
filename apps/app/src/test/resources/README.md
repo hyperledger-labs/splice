@@ -61,6 +61,7 @@ all network indices must be odd numbers.
 - `26`: Reserved for CometBFT
 - `27`: Global Domain migration using wall clock
 - `28`: SV reonboarding tests using wall clock
+- `29`: Mediator offboarding tests using wall clock
 
 ### Allocated APIs
 

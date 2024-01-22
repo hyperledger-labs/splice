@@ -408,7 +408,7 @@ template SvcRules with
               pure $ case find (\(_, info) -> info.name == newMemberName) (Map.toList members) of
                 None -> offboardedMembers
                 Some (prev, info) ->
-                  Map.insert prev (OffboardedMemberInfo ("SV " <> show newMemberName <> " reonboarded as " <> show newMemberParty) info.lastReceivedRewardFor) offboardedMembers
+                  Map.insert prev (OffboardedMemberInfo { name = "SV " <> show newMemberName <> " reonboarded as " <> show newMemberParty, lastReceivedRewardFor = info.lastReceivedRewardFor }) offboardedMembers
             else do
               require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
               pure offboardedMembers
@@ -464,8 +464,8 @@ template SvcRules with
                   | member == leader = (head (Map.keys newMembers), epoch + 1)
                   | otherwise        = (leader, epoch)
             let offboardedMemberInfo = OffboardedMemberInfo with
-                  name = info.name
-                  lastReceivedRewardFor = info.lastReceivedRewardFor
+                    name = info.name
+                    lastReceivedRewardFor = info.lastReceivedRewardFor
             -- create the new rules contract
             create SvcRules with
               svc

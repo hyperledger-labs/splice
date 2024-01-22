@@ -82,11 +82,10 @@ class SvOnboardingMediatorProposalTrigger(
   ): Future[TaskOutcome] = {
     for {
       svcRules <- svcStore.getSvcRules()
-      _ <- participantAdminConnection.ensureMediatorDomainState(
+      _ <- participantAdminConnection.ensureMediatorDomainStateAdditionProposal(
         svcRules.domain,
         task,
         svParty.uid.namespace.fingerprint,
-        svcRules.contract.payload.members.size(),
         RetryFor.Automation,
       )
     } yield {

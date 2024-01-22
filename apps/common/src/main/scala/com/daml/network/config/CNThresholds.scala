@@ -18,15 +18,10 @@ object CNThresholds {
     }
   }
 
-  // TODO(#7884): update function after proper sv off-boarding
-  def mediatorDomainStateThresholdWithNewMember(
-      currentSvcSize: Int,
-      currentMediatorSize: Int,
+  def mediatorDomainStateThreshold(
+      currentMediatorSize: Int
   ): PositiveInt = {
-    // take the minimum to avoid setting a threshold which is too high in concurrent onboarding setup.
-    // add 1 to include the new sv.
-    val minSize = List(currentSvcSize, currentMediatorSize).min + 1
-    FPlus1Threshold(minSize)
+    FPlus1Threshold(currentMediatorSize)
   }
 
   def partyToParticipantThreshold(
