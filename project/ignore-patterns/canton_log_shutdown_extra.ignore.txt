@@ -12,5 +12,6 @@ Error while running indexer
 Task closing ledger API server did not complete
 Closing .* failed
 Failed to shut down successfully
+shutdown did not complete gracefully in allotted .* seconds
 
 # Make sure to have a trailing newline

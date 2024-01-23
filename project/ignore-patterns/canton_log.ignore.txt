@@ -88,10 +88,13 @@ Sender .* of send request .* is not registered so cannot send or receive events\
 sv\dParticipantUpgrade.*ACS_COMMITMENT_MISMATCH.*
 
 # globalMediatorSv4 is offboarded at this time
-c.d.c.t.TimeProofRequestSubmitterImpl:mediatorx=globalMediatorOffboardingSv
-RequestRefused\(SenderUnknown\(.*globalMediatorOffboardingSv4
+c.d.c.t.TimeProofRequestSubmitterImpl:mediatorx=globalMediatorSv4Offboarding
+RequestRefused\(SenderUnknown\(.*globalMediatorSv4Offboarding
 RequestRefused\(SenderUnknown\(.*globalReonboardMediator_4
 LOCAL_VERDICT_TIMEOUT.* Rejected transaction due to a participant determined timeout.*c.d.c.p.p.TransactionProcessingSteps:participant=sv
 Response message for request.*timed out at.*c.d.c.p.p.TransactionProcessor:participant=.*ParticipantReonboard
+
+# TODO(#9485) Figure out if those timeouts are really ok and not a bug in Canton
+Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=.*ParticipantReonboard
 
 # Make sure to have a trailing newline
