@@ -1,6 +1,8 @@
 package com.daml.network.integration.tests
 
+import cats.syntax.parallel.*
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.util.FutureInstances.*
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coinrules.CoinRules_AddFutureCoinConfigSchedule
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
@@ -22,6 +24,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import scala.concurrent.{ExecutionContext, Future}
 
 class ModelUpgradeIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
@@ -37,6 +40,7 @@ class ModelUpgradeIntegrationTest
 
   "daml model upgrade" should {
     "support switching to new svc-governance version" in { implicit env =>
+      implicit val ec: ExecutionContext = env.executionContext
       val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
@@ -97,22 +101,27 @@ class ModelUpgradeIntegrationTest
               )
             },
           )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
-          Seq(sv2Backend, sv3Backend).foreach { sv =>
-            clue(s"${sv.name} accepts vote") {
-              val svVoteRequest = eventually() {
-                sv.listVoteRequests().loneElement
+
+          Seq(sv2Backend, sv3Backend).parTraverse { sv =>
+            Future {
+              clue("both sv2 and sv3 see the vote request") {
+                val svVoteRequest = eventually() {
+                  sv.listVoteRequests().loneElement
+                }
+                svVoteRequest.contractId shouldBe voteRequest.contractId
               }
-              svVoteRequest.contractId shouldBe voteRequest.contractId
-              eventuallySucceeds() {
-                sv.castVote(
-                  svVoteRequest.contractId,
-                  true,
-                  "url",
-                  "description",
-                )
+              clue(s"${sv.name} accepts vote") {
+                eventuallySucceeds() {
+                  sv.castVote(
+                    voteRequest.contractId,
+                    true,
+                    "url",
+                    "description",
+                  )
+                }
               }
             }
-          }
+          }.futureValue
         },
       )(
         "observing CoinRules with upgraded config",
