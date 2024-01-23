@@ -245,7 +245,21 @@ function _retry_until_value() {
 
 
 function _current_lockholder() {
-    kubectl get secret cluster-lock -o jsonpath='{.data.lockholder}' 2>/dev/null | base64 --decode
+    local secret
+    local errorcode
+    errorcode=0
+    secret=$(kubectl get secret cluster-lock -o jsonpath='{.data.lockholder}' 2>&1) || errorcode=$?
+    if [ $errorcode != 0 ]; then
+        if [[ $secret == "Unable to connect to the server"* ]]; then
+            _error "Failed to get secret cluster-lock from the cluster. Please check that you are on VPN, and if so, try running \`cncluster activate\`"
+        elif [[ $secret == "Error from server (NotFound)"* ]]; then
+            echo ""
+        else
+            _error "Unknown error when fetching lock secret: $secret"
+        fi
+    else
+        echo "$secret" | base64 --decode
+    fi
 }
 
 function _current_lock_age() {
@@ -269,7 +283,8 @@ function _assert_lock() {
         return
     fi
 
-    if lockholder=$(_current_lockholder); then
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
         if [ "${1-}" != "--for-ci" ]; then
             if [ "${lockholder}" != "$(whoami)" ]; then
                 _error "Cluster already locked by: ${lockholder}"
@@ -887,7 +902,8 @@ function subcmd_ci_assert_fresh_lock() {
         exit 0
     fi
 
-    if lockholder=$(_current_lockholder); then
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
         age_secs="$(_current_lock_age)"
 
         if (( age_secs > 21600 )); then
@@ -919,7 +935,8 @@ function subcmd_ci_reset_unlock() {
     fi
 
     _cluster_reset
-    if lockholder=$(_current_lockholder); then
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
         _unlock
         _info "Cluster unlocked. Former lockholder was: ${lockholder}"
     else
@@ -1546,7 +1563,8 @@ function subcmd_ci_pdown_validator(){
 subcommand_whitelist[lock]="Attempt to claim the lock on a cluster."
 
 function subcmd_lock() {
-    if lockholder=$(_current_lockholder); then
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
         if [ "${lockholder}" = "$(whoami)" ]; then
             _info "Cluster is already locked to you. Lock age: $(_current_lock_age_formatted)."
         else
@@ -1610,7 +1628,8 @@ function _check_reset_and_unlock() {
 function subcmd_unlock() {
     _assert_lock
 
-    if lockholder=$(_current_lockholder); then
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
         if [ "${lockholder}" = "$(whoami)" ]; then
             _check_reset_and_unlock
             _info "Cluster lock successfully released."
@@ -1629,7 +1648,8 @@ subcommand_whitelist[unlock_force]="Forcibly release the lock on a cluster."
 function subcmd_unlock_force() {
     _prompt_to_confirm --no-lock
 
-    if lockholder=$(_current_lockholder); then
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
         _check_reset_and_unlock
         _warning "Cluster forcibly unlocked, please let former lockholder know: ${lockholder}"
     else
@@ -1646,7 +1666,8 @@ function subcmd_kill_sv_app() {
 
     _assert_lock
 
-    if lockholder=$(_current_lockholder); then
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
         if [ "${lockholder}" = "$(whoami)" ]; then
             _info "Killing sv-app for $1"
             kubectl patch deployment sv-app --namespace "$1" -p '{"spec":{"replicas":0}}'
@@ -1667,7 +1688,8 @@ function subcmd_revive_sv_app() {
 
     _assert_lock
 
-    if lockholder=$(_current_lockholder); then
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
         if [ "${lockholder}" = "$(whoami)" ]; then
             _info "Reviving sv-app for $1"
             kubectl patch deployment sv-app --namespace "$1" -p '{"spec":{"replicas":1}}'
