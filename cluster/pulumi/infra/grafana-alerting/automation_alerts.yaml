@@ -18,7 +18,7 @@ groups:
               disableTextWrap: false
               editorMode: builder
               exemplar: false
-              expr: sum by(namespace, node_type, trigger_name) (rate(cn_retries_failures{error_kind="fatal"}[$__rate_interval]))
+              expr: sum by(namespace, node_type, trigger_name) (rate(cn_retries_failures{trigger_name=~".+", error_kind="fatal"}[$__rate_interval]))
               fullMetaSearch: false
               includeNullMetadata: true
               instant: true
