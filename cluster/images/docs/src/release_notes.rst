@@ -3,6 +3,11 @@
 Release Notes
 =============
 
+2024-01-29
+----------
+
+* The ``/v0/wallet-balance`` endpoint to query a party's CC balance is exposed through the Scan app.
+
 2024-01-22
 ----------
 
@@ -16,7 +21,6 @@ Release Notes
 * Deployment:
 
   * Enabled pruning in sequencers of canton foundation
-
 
 2024-01-15
 ----------

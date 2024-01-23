@@ -273,7 +273,86 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         }
       }
 
-      // TODO (#9207) more cases
+      "accumulate on coin expiry, locked coin expiry, and minting" in {
+        import MonadUtil.sequentialTraverse_
+        val mintAmount1 = 60.0
+        val mintAmount2 = 40.0
+        val expireAmount1 = -24.0
+        val expireAmount2 = -18.0
+        for {
+          store <- mkStore()
+          coinRulesContract = coinRules()
+          // the round where the mint happened and for the rounds before and after
+          _ <- sequentialTraverse_(Seq(user1 -> mintAmount1, user2 -> mintAmount2)) {
+            case (user, mintAmount) =>
+              dummyDomain.ingest(
+                mintTransaction(user, mintAmount, 2, holdingFee)
+              )(store.multiDomainAcsStore)
+          }
+          // "the round where the coin expired and for the rounds before and after"
+          coinContract = coin(user1, mintAmount1, 2, holdingFee)
+          _ <- dummyDomain.exercise(
+            coinContract,
+            interfaceId = Some(cc.coin.Coin.TEMPLATE_ID),
+            CoinExpire.choice.name,
+            mkCoinExpire(),
+            mkCoinExpireSummary(
+              user1,
+              4,
+              expireAmount1,
+              holdingFee,
+            ),
+            "011",
+          )(store.multiDomainAcsStore)
+          // "the round where the locked coin expired and for the rounds before and after
+          lockedCoinContract = lockedCoin(user2, mintAmount2, 2, holdingFee)
+          _ <- dummyDomain.exercise(
+            lockedCoinContract,
+            interfaceId = Some(cc.coin.LockedCoin.TEMPLATE_ID),
+            LockedCoinExpireCoin.choice.name,
+            mkLockedCoinExpireCoin(),
+            mkCoinExpireSummary(
+              user2,
+              6,
+              expireAmount2,
+              holdingFee,
+            ),
+            "012",
+          )(
+            store.multiDomainAcsStore
+          )
+          closedRounds = (0 to 7).map { round =>
+            closedMiningRound(svcParty, round = round.toLong)
+          }
+          _ <- MonadUtil.sequentialTraverse(closedRounds) { closed =>
+            dummyDomain.create(closed)(store.multiDomainAcsStore)
+          }
+          _ <- store.aggregate()
+        } yield forEvery(
+          Table(
+            ("user", "round", "coin amount"),
+            (user1, 1L, 0),
+            (user2, 1L, 0),
+            // check mints
+            (user1, 2L, mintAmount1 - 1 * holdingFee),
+            (user2, 2L, mintAmount2 - 1 * holdingFee),
+            (user1, 3L, mintAmount1 - 2 * holdingFee),
+            (user2, 3L, mintAmount2 - 2 * holdingFee),
+            // check expire user1
+            (user1, 4L, mintAmount1 - 3 * holdingFee + expireAmount1 - 5 * holdingFee),
+            (user2, 4L, mintAmount2 - 3 * holdingFee),
+            (user1, 5L, mintAmount1 - 4 * holdingFee + expireAmount1 - 6 * holdingFee),
+            (user2, 5L, mintAmount2 - 4 * holdingFee),
+            // check locked expire user2
+            (user1, 6L, mintAmount1 - 5 * holdingFee + expireAmount1 - 7 * holdingFee),
+            (user2, 6L, mintAmount2 - 5 * holdingFee + expireAmount2 - 7 * holdingFee),
+            (user1, 7L, mintAmount1 - 6 * holdingFee + expireAmount1 - 8 * holdingFee),
+            (user2, 7L, mintAmount2 - 6 * holdingFee + expireAmount2 - 8 * holdingFee),
+          )
+        ) { (user, round, coinAmount) =>
+          store.getWalletBalance(user, round).futureValue shouldBe coinAmount
+        }
+      }
     }
 
     "getTotalRewardsCollectedEver" should {
