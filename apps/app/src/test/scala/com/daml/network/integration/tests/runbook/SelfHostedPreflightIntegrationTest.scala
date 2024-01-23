@@ -50,7 +50,7 @@ class SelfHostedPreflightIntegrationTest
       // we don't want such as adjusting daml names or triggering automation every second
       .clearConfigTransforms()
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.withPausedSvOffboardingMediatorTrigger()(config)
+        CNNodeConfigTransforms.withPauseSvDomainComponentsOffboardingTriggers()(config)
       )
       .addConfigTransforms((_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(1000)(conf))
       // Obtain a fresh onboarding secret from a SV because this is what we want runbook users to do.

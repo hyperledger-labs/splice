@@ -12,10 +12,13 @@ import com.daml.network.config.{
   ParticipantBootstrapDumpConfig,
 }
 import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
-import com.daml.network.sv.automation.singlesv.membership.offboarding.SvOffboardingPartyToParticipantProposalTrigger
+import com.daml.network.sv.automation.singlesv.membership.offboarding.{
+  SvOffboardingPartyToParticipantProposalTrigger,
+  SvOffboardingSequencerTrigger,
+}
 import com.daml.network.sv.config.MigrateSvPartyConfig
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.environment.{CNNodeEnvironmentImpl}
+import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
@@ -24,9 +27,11 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.util.ProcessTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+
 import scala.jdk.CollectionConverters.*
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.scalatest.time.{Minute, Span}
+
 import java.nio.file.Files
 
 // TODO(#9076) Create fresh database instances within the test to support running it multiple times.
@@ -75,6 +80,10 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
           CNNodeConfigTransforms.updateAllAutomationConfigs(
             _.withResumedTrigger[SvOffboardingMediatorTrigger]
           )(config),
+        (_, config) =>
+          CNNodeConfigTransforms.updateAllAutomationConfigs(
+            _.withResumedTrigger[SvOffboardingSequencerTrigger]
+          )(config),
       )
       .withManualStart
 
@@ -94,8 +103,8 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
       val (
         dump,
         sv4Party,
-        (sv1MediatorId, sv2MediatorId, sv3MediatorId, sv4MediatorId),
-        (sv1SequencerId, sv2SequencerId, sv3SequencerId, sv4SequencerId),
+        (sv1MediatorId, sv2MediatorId, sv3MediatorId, _),
+        (sv1SequencerId, sv2SequencerId, sv3SequencerId, _),
       ) = withCanton(
         Seq(testResourcesPath / "sv4-reonboard-canton.conf"),
         Seq.empty,
@@ -219,7 +228,6 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
               sv2MediatorId,
               sv3MediatorId,
             )
-            // TODO(#9448) Sequencer should be offboarded here.
             sv1Backend.appState.participantAdminConnection
               .getSequencerDomainState(globalDomainId)
               .futureValue
@@ -229,7 +237,6 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
               sv1SequencerId,
               sv2SequencerId,
               sv3SequencerId,
-              sv4SequencerId,
             )
           }
         }
@@ -295,19 +302,12 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
           .futureValue
           .mapping
           .active
-          .forgetNE should not contain (sv4MediatorId)
-        sv1Backend.appState.participantAdminConnection
-          .getMediatorDomainState(globalDomainId)
-          .futureValue
-          .mapping
-          .active
           .forgetNE should contain theSameElementsAs Seq(
           sv1MediatorId,
           sv2MediatorId,
           sv3MediatorId,
           sv4MediatorIdNew,
         )
-        // TODO(#9448) sv4SequencerId sequencer should be offboarded here.
         sv1Backend.appState.participantAdminConnection
           .getSequencerDomainState(globalDomainId)
           .futureValue
@@ -317,7 +317,6 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
           sv1SequencerId,
           sv2SequencerId,
           sv3SequencerId,
-          sv4SequencerId,
           sv4SequencerIdNew,
         )
         mapping.threshold shouldBe PositiveInt.tryCreate(3)

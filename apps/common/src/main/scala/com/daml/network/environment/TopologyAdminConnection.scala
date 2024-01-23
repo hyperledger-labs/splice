@@ -805,32 +805,80 @@ abstract class TopologyAdminConnection(
       isProposal = false,
     )
 
-  def ensureSequencerDomainState(
+  def ensureSequencerDomainStateAddition(
       domainId: DomainId,
       newActiveSequencer: SequencerId,
       signedBy: Fingerprint,
       retryFor: RetryFor,
   )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[SequencerDomainStateX]] = ensureTopologyMapping[SequencerDomainStateX](
-    TopologyStoreId.DomainStore(domainId),
-    show"Sequencer $newActiveSequencer is active in SequencerDomainState",
-    EitherT(
-      getSequencerDomainState(domainId).map(result =>
-        Either.cond(result.mapping.active.contains(newActiveSequencer), result, result)
-      )
-    ),
-    previous =>
-      // constructor is not exposed so no copy
-      SequencerDomainStateX.create(
-        previous.domain,
-        previous.threshold,
-        newActiveSequencer +: previous.active,
-        previous.observers,
+  ): Future[TopologyResult[SequencerDomainStateX]] = {
+    def sequencerChange(sequencers: Seq[SequencerId]): Seq[SequencerId] = {
+      val newSequencers = sequencers :+ newActiveSequencer
+      newSequencers.distinct
+    }
+
+    ensureSequencerDomainState(
+      domainId,
+      sequencerChange,
+      signedBy,
+      retryFor,
+    )
+  }
+
+  def ensureSequencerDomainStateRemoval(
+      domainId: DomainId,
+      sequencerToRemove: SequencerId,
+      signedBy: Fingerprint,
+      retryFor: RetryFor,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[TopologyResult[SequencerDomainStateX]] = {
+    def sequencerChange(sequencers: Seq[SequencerId]): Seq[SequencerId] = {
+      sequencers.filterNot(_ == sequencerToRemove)
+    }
+
+    ensureSequencerDomainState(
+      domainId,
+      sequencerChange,
+      signedBy,
+      retryFor,
+    )
+  }
+
+  private def ensureSequencerDomainState(
+      domainId: DomainId,
+      sequencerChange: Seq[SequencerId] => Seq[SequencerId],
+      signedBy: Fingerprint,
+      retryFor: RetryFor,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[TopologyResult[SequencerDomainStateX]] = {
+    ensureTopologyMapping[SequencerDomainStateX](
+      TopologyStoreId.DomainStore(domainId),
+      s"New sequencers ${getSequencerDomainState(domainId).map(result => sequencerChange(result.mapping.active))} are now active in SequencerDomainState",
+      EitherT(
+        getSequencerDomainState(domainId).map(result =>
+          Either
+            .cond(result.mapping.active == sequencerChange(result.mapping.active), result, result)
+        )
       ),
-    retryFor,
-    signedBy,
-  )
+      previous => {
+        val newSequencers = sequencerChange(previous.active)
+        // The threshold in here does not matter for anything at this point.
+        // It is purely on the read side through the sequencer trust threshold.
+        SequencerDomainStateX.create(
+          previous.domain,
+          CNThresholds
+            .sequencerConnectionsSizeThreshold(newSequencers.size),
+          newSequencers,
+          previous.observers,
+        )
+      },
+      retryFor,
+      signedBy,
+    )
+  }
 
   def proposeInitialMediatorDomainState(
       domainId: DomainId,

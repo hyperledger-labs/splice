@@ -11,11 +11,12 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.sv.automation.singlesv.membership.offboarding.SvOffboardingSequencerTrigger
 import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
 import com.daml.network.util.ProcessTestUtil
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.MediatorId
+import com.digitalasset.canton.topology.{MediatorId, SequencerId}
 import org.scalatest.time.{Minute, Span}
 
 import scala.jdk.CollectionConverters.CollectionHasAsScala
@@ -44,6 +45,7 @@ class SvOffboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTes
       .addConfigTransforms((_, config) =>
         CNNodeConfigTransforms.updateAllAutomationConfigs(
           _.withResumedTrigger[SvOffboardingMediatorTrigger]
+            .withResumedTrigger[SvOffboardingSequencerTrigger]
         )(config)
       )
       .withManualStart
@@ -185,6 +187,41 @@ class SvOffboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTes
                     .fold(
                       error => {
                         logger.warn(s"Failed to parse mediator id $mediatorId. $error")
+                        None
+                      },
+                      Some(_),
+                    )
+                )
+                .toSet
+            }
+
+            clue("Check sequencer offboarding") {
+              val sequencers =
+                sv3Backend.appState.participantAdminConnection
+                  .getSequencerDomainState(globalDomainId)
+                  .futureValue
+                  .mapping
+                  .active
+                  .forgetNE
+                  .toSet
+
+              sequencers.size shouldBe 3
+              sequencers shouldBe sv3Backend
+                .getSvcInfo()
+                .svcRules
+                .payload
+                .members
+                .values()
+                .asScala
+                .flatMap(_.domainNodes.values().asScala)
+                .flatMap(_.sequencer.toScala)
+                .map(_.sequencerId)
+                .flatMap(sequencerId =>
+                  SequencerId
+                    .fromProtoPrimitive(sequencerId, "sequencerId")
+                    .fold(
+                      error => {
+                        logger.warn(s"Failed to parse sequencer id $sequencerId. $error")
                         None
                       },
                       Some(_),

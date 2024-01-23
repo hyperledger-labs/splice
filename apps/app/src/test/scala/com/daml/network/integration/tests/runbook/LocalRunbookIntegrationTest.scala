@@ -98,7 +98,7 @@ class LocalRunbookIntegrationTest
       )
       .clearConfigTransforms()
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.withPausedSvOffboardingMediatorTrigger()(config)
+        CNNodeConfigTransforms.withPauseSvDomainComponentsOffboardingTriggers()(config)
       )
       .addConfigTransforms(
         // In the runbook, the participant of the self-hosted validator uses ports 5xxx.

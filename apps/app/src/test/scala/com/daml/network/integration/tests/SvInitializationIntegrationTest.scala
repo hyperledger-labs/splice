@@ -166,7 +166,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
           .getSequencerDomainState(globalDomainId)
           .futureValue
           .mapping
-          .threshold shouldBe PositiveInt.tryCreate(1)
+          .threshold shouldBe PositiveInt.tryCreate(2)
         participantAdminConnection
           .getMediatorDomainState(globalDomainId)
           .futureValue

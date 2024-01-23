@@ -64,7 +64,7 @@ class SvOnboardingSequencerProposalTrigger(
   ): Future[TaskOutcome] = {
     for {
       svcRules <- svcStore.getSvcRules()
-      _ <- participantAdminConnection.ensureSequencerDomainState(
+      _ <- participantAdminConnection.ensureSequencerDomainStateAddition(
         svcRules.domain,
         task,
         svParty.uid.namespace.fingerprint,
