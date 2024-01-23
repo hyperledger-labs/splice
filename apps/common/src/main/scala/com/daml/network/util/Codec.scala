@@ -15,7 +15,7 @@ import com.digitalasset.canton.topology.{
   UniqueIdentifier,
 }
 import io.grpc.Status
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 
 /** Trait for values used in our requests.
   * Dec is the Scala representation while Enc is the representation used in code generated for the serialization format, e.g., Codec[BigDecimal, String].

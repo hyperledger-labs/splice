@@ -12,6 +12,9 @@ import DA.Optional
 
 import CN.Util
 
+import CC.Types
+
+
 -- | A vote by an SV for their desired coin price.
 template CoinPriceVote with
     svc : Party
@@ -29,9 +32,7 @@ template CoinPriceVote with
 fetchMedianCoinPrice : Party -> [Party] -> [ContractId CoinPriceVote] -> Update Decimal
 fetchMedianCoinPrice svc members voteCids = do
   votes <- forA voteCids $ \voteCid -> do
-    vote <- fetchReferenceData voteCid
-    require "SVC matches" (vote.svc == svc)
-    pure vote
+    fetchReferenceData (ForSvc with svc) voteCid
   let voters = map (.sv) votes
   require "Every member voted exactly once" (sort voters == sort members)
   pure $ median $ mapOptional (.coinPrice) votes
@@ -44,3 +45,13 @@ median xs0 =
   where
     xs = sort xs0
     n = length xs
+
+
+-- instances
+------------
+
+instance HasCheckedFetch CoinPriceVote ForSvc where
+  contractGroupId CoinPriceVote {..} = ForSvc with svc
+
+instance HasCheckedFetch CoinPriceVote ForOwner where
+  contractGroupId CoinPriceVote {..} = ForOwner with svc; owner = sv

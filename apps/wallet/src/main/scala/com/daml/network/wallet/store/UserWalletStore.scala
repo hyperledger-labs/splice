@@ -252,7 +252,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
     */
   def listSortedAppRewards(
-      issuingRoundsMap: Map[cc.round.types.Round, roundCodegen.IssuingMiningRound],
+      issuingRoundsMap: Map[cc.types.Round, roundCodegen.IssuingMiningRound],
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)

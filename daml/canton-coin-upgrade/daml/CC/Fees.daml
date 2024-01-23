@@ -1,7 +1,7 @@
 -- | Utility functions for different kinds of fees.
 module CC.Fees where
 
-import CC.Round.Types
+import CC.Types
 import CC.RelRound
 import DA.Time
 

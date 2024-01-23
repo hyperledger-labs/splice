@@ -1,6 +1,6 @@
 package com.daml.network.util
 
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.fees as feesCodegen
 import com.daml.network.codegen.java.cn.cns as cnsCodegen

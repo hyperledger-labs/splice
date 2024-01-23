@@ -6,7 +6,7 @@ import DA.List (dedupSort)
 import CC.Coin
 import CC.CoinRules
 import CC.Expiry
-import CC.Round.Types
+import CC.Types
 import CC.Round
 import CN.Wallet.Payment
 import CN.Util
@@ -75,13 +75,6 @@ template TerminatedSubscription
     reference : ContractId SubscriptionRequest
   where
     signatory subscriptionSignatories subscriptionData
-
-assertSubscriptionMatches: ContractId Subscription -> SubscriptionData -> Update ()
-assertSubscriptionMatches subscription subscriptionData = do
-  -- TODO(#2109): remove this hidden 'fetchButArchiveLater' call as part of improving the checking of contracts matching the callers expectations when fetching them.
-  actualSubscriptionData <- fetchButArchiveLater subscription
-  require "Subscription data matches referenced subscription" (actualSubscriptionData.subscriptionData == subscriptionData)
-  pure ()
 
 -- | Payment-related properties. Expected to be mutated rarely.
 data SubscriptionPayData = SubscriptionPayData
@@ -205,7 +198,7 @@ template SubscriptionIdleState
         walletProvider : Party
       controller subscriptionData.sender, walletProvider
       do
-        assertSubscriptionMatches subscription subscriptionData
+        requireMatchingContract subscription (Subscription with subscriptionData, reference)
 
         now <- getTime
         require "The next due date is close enough to make the next payment." (now `addRelTime` payData.paymentDuration >= nextPaymentDueAt)
@@ -227,7 +220,7 @@ template SubscriptionIdleState
       do
         time <- getTime
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
-        assertSubscriptionMatches subscription subscriptionData
+        requireMatchingContract subscription (Subscription with subscriptionData, reference)
         require "Last subscription payment was missed" (nextPaymentDueAt < time)
         exercise subscription Subscription_Archive
 
@@ -235,7 +228,7 @@ template SubscriptionIdleState
     choice SubscriptionIdleState_CancelSubscription : ContractId TerminatedSubscription
       controller subscriptionData.sender
       do
-        assertSubscriptionMatches subscription subscriptionData
+        requireMatchingContract subscription (Subscription with subscriptionData, reference)
         exercise subscription Subscription_Archive
 
 
@@ -262,7 +255,8 @@ template SubscriptionPayment
       do
         contextRound <- exercise transferContext.openMiningRound (OpenMiningRound_Fetch subscriptionData.provider)
         require ("Round at subscription payment " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
-        assertSubscriptionMatches subscription subscriptionData
+        -- TODO(#9465): look into why we even need the separate subscription contract given that we duplicate all its data
+        requireMatchingContract subscription (Subscription with subscriptionData, reference)
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt `addRelTime` payData.paymentInterval
           ..
@@ -274,7 +268,7 @@ template SubscriptionPayment
         transferContext : AppTransferContext
       controller subscriptionData.receiver
       do
-        assertSubscriptionMatches subscription subscriptionData
+        requireMatchingContract subscription (Subscription with subscriptionData, reference)
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
@@ -289,7 +283,7 @@ template SubscriptionPayment
       do
         -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedCoin, and the AcceptedAppPayment in #3152
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
-        assertSubscriptionMatches subscription subscriptionData
+        requireMatchingContract subscription (Subscription with subscriptionData, reference)
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..

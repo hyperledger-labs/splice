@@ -4,7 +4,7 @@ import Daml.Script
 
 import CC.Expiry
 import CC.Fees
-import CC.Round.Types
+import CC.Types
 import CC.Round
 import CC.Schedule
 import CC.Scripts.Parameters

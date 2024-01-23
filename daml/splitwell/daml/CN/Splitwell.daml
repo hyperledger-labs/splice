@@ -1,5 +1,6 @@
 module CN.Splitwell where
 
+import DA.Action (void)
 import DA.Map (Map)
 import qualified DA.Map as M
 import DA.Assert
@@ -24,6 +25,27 @@ data GroupKey = GroupKey
 newtype GroupId = GroupId Text
   deriving (Show, Eq)
 
+data ForOwner = ForOwner
+  with
+    owner : Party
+    provider : Party
+  deriving (Show, Eq)
+
+data ForApp = ForApp
+  with
+    provider : Party
+  deriving (Show, Eq)
+
+instance HasCheckedFetch Group ForApp where
+  contractGroupId Group{..} = ForApp{..}
+
+instance HasCheckedFetch Group ForOwner where
+  contractGroupId Group{..} = ForOwner{..}
+
+instance HasCheckedFetch Group GroupKey where
+  contractGroupId group = getGroupKey group
+
+
 groupMembers : Group -> [Party]
 groupMembers Group{..} = owner :: members
 
@@ -41,14 +63,6 @@ template SplitwellInstallRequest
     choice SplitwellInstallRequest_Reject : ()
       controller provider
       do pure ()
-
--- Assert that the given party is the owner of the group.
--- This is used to avoid leaking authorization from the provider.
--- A `restrictAuthority` primitive in LF would be very helpful here.
-assertOwner : ContractId Group -> Party -> Update ()
-assertOwner group p = do
-  Group {..} <- fetchReferenceData group
-  owner === p
 
 -- TODO(#7411) Remove this once the domain migration automation
 -- no longer relies on it.
@@ -85,7 +99,7 @@ template SplitwellRules
         group : ContractId Group
         user : Party
       controller user
-      do assertOwner group user
+      do void $ fetchReferenceData (ForOwner with provider; owner = user) group
          exercise group Group_CreateInvite
 
     nonconsuming choice SplitwellRules_AcceptInvite : ContractId AcceptedGroupInvite
@@ -93,6 +107,7 @@ template SplitwellRules
         cid : ContractId GroupInvite
         user : Party
       controller user
+      -- TODO(#9464): use checked fetches to avoid this exercise being executed on the wrong contract.
       do exercise cid (GroupInvite_Accept user)
 
     nonconsuming choice SplitwellRules_Join : ContractId Group
@@ -101,7 +116,7 @@ template SplitwellRules
         cid : ContractId AcceptedGroupInvite
         user : Party
       controller user
-      do assertOwner group user
+      do void $ fetchReferenceData (ForOwner with provider; owner = user) group
          exercise cid (AcceptedGroupInvite_Join group)
 
     nonconsuming choice SplitwellRules_EnterPayment : ContractId BalanceUpdate
@@ -131,7 +146,7 @@ template SplitwellRules
         balanceChanges : Map Party (Map Party Decimal)
         user : Party
       controller user
-      do assertOwner group user
+      do void $ fetchReferenceData (ForOwner with provider; owner = user) group
          exercise group Group_Net with
            ..
 
@@ -259,7 +274,8 @@ template TransferInProgress
         terminatedAppPaymentCid : ContractId TerminatedAppPayment
       controller actor
       do require "Actor is signatory" (actor `elem` signatory this)
-         terminated <- fetchAndArchive terminatedAppPaymentCid
+         -- TODO(#9464): use a checkedFetch
+         terminated <- fetchUncheckedAndArchive terminatedAppPaymentCid
          require "Reference matches" (terminated.reference == reference)
 
     postconsuming choice TransferInProgress_CompleteTransfer : [ContractId BalanceUpdate]
@@ -269,11 +285,12 @@ template TransferInProgress
       controller group.provider
       do
          -- archival happens via the consuming AcceptedAppPayment_Colllect choice
-         acceptedPayment <- fetchButArchiveLater acceptedPaymentCid
+         -- TODO(#9464): use a checkedFetch
+         acceptedPayment <- fetchUncheckedButArchiveLater acceptedPaymentCid
          exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
          acceptedPayment.sender === sender
          openMiningRound <- exercise @OpenMiningRound transferContext.openMiningRound (OpenMiningRound_Fetch group.provider)
-         -- TODO(#2109): we should check that the 'SVC' party matches here!
+         -- TODO(#9464): we should check that the 'SVC' party matches here!
          let expectedAcceptedPayment = AcceptedAppPayment with
                sender
                provider = group.provider
@@ -349,6 +366,5 @@ template AcceptedGroupInvite
       controller groupKey.owner
       do
          -- archival happens via the Group_Join choice
-         k <- getGroupKey <$> fetchButArchiveLater group
-         require "Group key matches" (k == groupKey)
+         void $ fetchButArchiveLater groupKey group
          exercise group (Group_Join invitee)

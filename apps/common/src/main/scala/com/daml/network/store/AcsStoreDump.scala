@@ -54,7 +54,7 @@ object AcsStoreDump {
 
   def extractEarliestOpenMiningRound(
       contracts: Seq[http.Contract]
-  ): Option[cc.round.types.Round] = {
+  ): Option[cc.types.Round] = {
     val qualifiedName =
       cc.round.OpenMiningRound.TEMPLATE_ID.getModuleName + ":" +
         cc.round.OpenMiningRound.TEMPLATE_ID.getEntityName
@@ -72,7 +72,7 @@ object AcsStoreDump {
       )
     )
     // Return the minimum of all candidates, provided there are some
-    candidates.minOption.map(new cc.round.types.Round(_))
+    candidates.minOption.map(new cc.types.Round(_))
   }
 
   def extractImportCommands(svcParty: PartyId)(

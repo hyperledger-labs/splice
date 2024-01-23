@@ -7,7 +7,7 @@ import DA.List.Total
 import CC.Coin
 import CC.CoinRules
 import CC.Round
-import CC.Round.Types
+import CC.Types
 import CC.Scripts.Util
 import CC.ValidatorLicense
 import CN.Util

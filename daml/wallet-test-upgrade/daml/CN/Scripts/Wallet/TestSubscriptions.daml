@@ -8,7 +8,7 @@ import Daml.Script
 
 import CC.Coin
 import CC.CoinRules
-import CC.Round.Types
+import CC.Types
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 

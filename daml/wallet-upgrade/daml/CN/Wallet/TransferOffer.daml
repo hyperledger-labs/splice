@@ -74,7 +74,7 @@ template AcceptedTransferOffer
   where
     signatory sender, receiver
 
-    nonconsuming choice AcceptedTransferOffer_Complete
+    choice AcceptedTransferOffer_Complete
       : ((TransferResult, TransferOfferTrackingInfo), Optional (ContractId Coin))
       with
         inputs : [TransferInput]
@@ -101,7 +101,6 @@ template AcceptedTransferOffer
               ]
             upgrade = Some ()
         result <- exercisePaymentTransfer transferContext transfer
-        archive self
         pure ((result, TransferOfferTrackingInfo { .. }), result.senderChangeCoin)
 
     choice AcceptedTransferOffer_Withdraw : TransferOfferTrackingInfo

@@ -187,7 +187,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       companion.toContractId(new ContractId(created.contractId.contractId))
     }
 
-    val dummyRound = new cc.round.types.Round(42)
+    val dummyRound = new cc.types.Round(42)
     val dummyDecimal = new java.math.BigDecimal(42)
 
     clue("create governance contracts of various kinds") {

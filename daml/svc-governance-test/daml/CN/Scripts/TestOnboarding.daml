@@ -21,7 +21,7 @@ import CC.GlobalDomain (MemberTraffic, initialMemberTraffic)
 import CC.Coin (Coin)
 import CC.CoinRules (CoinRules)
 import CC.Round
-import CC.Round.Types
+import CC.Types
 
 
 testOnboardValidator : Script ()

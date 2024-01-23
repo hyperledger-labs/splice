@@ -20,7 +20,7 @@ import com.daml.network.codegen.java.cc.{
   round as roundCodegen,
   schedule as scheduleCodegen,
 }
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen

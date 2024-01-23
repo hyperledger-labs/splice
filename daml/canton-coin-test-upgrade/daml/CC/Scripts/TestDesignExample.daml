@@ -10,7 +10,7 @@ import CN.Util
 import CC.Coin
 import CC.CoinRules
 import CC.Expiry
-import CC.Round.Types
+import CC.Types
 import CC.RelRound
 import CC.Fees
 import CC.Scripts.Util
@@ -32,13 +32,8 @@ template Escrow
         paymentCoin : ContractId Coin
         transferContext : AppTransferContext
       controller p
-      do LockedCoin{lock,coin=locked} <- fetchButArchiveLater lockedCoin -- archived as part of unlocking
-         require "SVC matches locked coin" (locked.svc == this.svc)
-         require "owner matches locked coin" (locked.owner == this.p)
+      do LockedCoin{lock,coin=locked} <- fetchButArchiveLater (ForOwner with svc; owner = p) lockedCoin -- archived as part of unlocking
          require "lock holder matches locked coin " ([arbiter] == lock.holders)
-         payment <- fetchButArchiveLater paymentCoin -- archived as part of the Transfer
-         require "SVC matches payment coin" (payment.svc == this.svc)
-         require "owner matches payment coin" (payment.owner == this.p)
          CoinCreateSummary cid _ _ <- exercise lockedCoin (LockedCoin_Unlock transferContext.openMiningRound)
          let transfer = Transfer with
                sender = p

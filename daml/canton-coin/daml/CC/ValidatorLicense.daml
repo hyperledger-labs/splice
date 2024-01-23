@@ -1,7 +1,9 @@
 module CC.ValidatorLicense where
 
+import DA.Action (void)
+
 import CC.Round
-import CC.Round.Types
+import CC.Types
 import CN.Util
 
 data FaucetState = FaucetState with
@@ -28,8 +30,7 @@ template ValidatorLicense with
       controller validator
       do
         now <- getTime
-        openRound <- exercise openRoundCid (OpenMiningRound_Fetch validator)
-        require "SVC of open round matches" (openRound.svc == svc)
+        openRound <- fetchReferenceData (ForSvc with svc) openRoundCid
         require "OpenRound is open" (openRound.opensAt <= now)
 
         newFaucetState <- case faucetState of
@@ -79,6 +80,13 @@ template ValidatorFaucetCoupon with
       with
         closedRoundCid : ContractId ClosedMiningRound
       controller svc
-      do closedRound <- fetchReferenceData closedRoundCid
-         require "SVC matches" (svc == closedRound.svc)
-         require "Mining round matches" (round == closedRound.round)
+      do
+         -- Expiry requires proof of the coupon's round being closed, as all rounds advance on their own time.
+         void $ fetchReferenceData (ForRound with svc; round) closedRoundCid
+
+
+-- instances
+------------
+
+instance HasCheckedFetch ValidatorFaucetCoupon ForOwner where
+  contractGroupId ValidatorFaucetCoupon{..} = ForOwner with svc; owner = validator

@@ -102,7 +102,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts
 diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts/TestDesignExample.daml daml/canton-coin-test-upgrade/daml/CC/Scripts/TestDesignExample.daml
 --- daml/canton-coin-test/daml/CC/Scripts/TestDesignExample.daml
 +++ daml/canton-coin-test-upgrade/daml/CC/Scripts/TestDesignExample.daml
-@@ -58,6 +58,7 @@
+@@ -53,6 +53,7 @@
                       lock = None
                       receiverFeeRatio = 1.0
                   ]
@@ -110,7 +110,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts
           exerciseAppTransfer transferContext transfer
  
  -- | This matches the example in the design doc
-@@ -192,10 +193,12 @@
+@@ -187,10 +188,12 @@
        svc = app.svc
        owner = alice.primaryParty
        amount = expiringAmount transferConfig.holdingFee 1000.25 c2.round
@@ -123,7 +123,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts
  
    payment === Coin with
      svc = app.svc
-@@ -203,6 +206,7 @@
+@@ -198,6 +201,7 @@
      amount =
        let amount = arbiterPaymentAmount - transferredCoinFee
        in expiringAmount transferConfig.holdingFee amount c2.round

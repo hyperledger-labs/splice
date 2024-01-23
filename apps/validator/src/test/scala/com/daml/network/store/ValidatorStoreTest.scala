@@ -499,6 +499,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
     val sequencerMemberId = "sequencerMemberId"
     val lastPurchasedAt = Instant.EPOCH
     val template = new topUpCodegen.ValidatorTopUpState(
+      svcParty.toProtoPrimitive,
       validator.toProtoPrimitive,
       sequencerMemberId,
       domainId.toProtoPrimitive,

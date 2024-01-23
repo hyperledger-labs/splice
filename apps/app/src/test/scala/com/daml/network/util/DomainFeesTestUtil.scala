@@ -4,7 +4,7 @@ import com.daml.ledger.javaapi
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_BuyMemberTraffic
 import com.daml.network.codegen.java.cn.wallet.install.{
   CoinOperation,
@@ -67,12 +67,13 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
       validatorApp: ValidatorAppBackendReference,
       memberId: Member,
       domainId: DomainId,
-  ): ValidatorTopUpState.ContractId = {
+  )(implicit env: CNNodeTestConsoleEnvironment): ValidatorTopUpState.ContractId = {
     inside(listValidatorContracts(ValidatorTopUpState.COMPANION)(validatorApp)) {
       case Seq(topupState) => topupState.id
       case Seq() =>
         val validatorParty = validatorApp.getValidatorPartyId()
         val topupStateCreationCmd = ValidatorTopUpState.create(
+          svcParty.toProtoPrimitive,
           validatorParty.toProtoPrimitive,
           memberId.toProtoPrimitive,
           domainId.toProtoPrimitive,

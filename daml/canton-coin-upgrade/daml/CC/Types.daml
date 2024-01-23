@@ -1,0 +1,35 @@
+-- Base types for CC and all related modules.
+module CC.Types where
+
+
+newtype Round = Round with number : Int
+  deriving (Eq, Show, Ord)
+
+-- | Check if a round has a positive round number
+isDefinedRound : Round -> Bool
+isDefinedRound round = round.number >= 0
+
+
+-- | The group of contracts issued by the same SVC.
+--
+-- Used for checked fetches.
+data ForSvc = ForSvc with
+    svc : Party
+  deriving (Eq, Show)
+
+
+-- | The groupp of contracts issued by the SVC for a specific mining round.
+--
+-- Used for checked fetches.
+data ForRound = ForRound with
+    svc : Party
+    round : Round
+  deriving (Eq, Show)
+
+-- | The group of contracts issued by the SVC and owned by party.
+--
+-- Used for checked fetches.
+data ForOwner = ForOwner with
+    svc : Party
+    owner : Party
+  deriving (Eq, Show)

@@ -13,18 +13,25 @@ ignored_files=(
   'daml/cn-util/daml/CN/Util.daml'
   'canton/')
 
-command=('git' 'grep' '-P' '(?<!-- )fetch\b' '--' '*.daml')
+# TODO(#9466): also check for naked `Xyz_Fetch` choices
+
+command=('git' 'grep' '-n' -E '(fetch|archive)\b' '--' '*.daml')
 for ignored_file in "${ignored_files[@]}"; do
   command+=(":!$ignored_file")
 done
 
-if "${command[@]}" &> /dev/null ; then
-  echo "ERROR: found naked 'fetch' invocations:"
+## Ignore matches of comment lines
+ignore_comments=('grep' '-v' '-E' '^.*\.daml:[0-9]*:\s*--')
+
+
+if "${command[@]}" | "${ignore_comments[@]}" &> /dev/null ; then
+  echo "ERROR: found naked 'fetch' or 'archive' invocations:"
   echo ""
-  "${command[@]}"
+  "${command[@]}" | "${ignore_comments[@]}"
   echo ""
   echo "Please replace them with one of the alternatives in CN.ChoiceUtil:"
-  echo "fetchAndArchive, fetchReferenceData, or if really required, fetchButArchiveLater"
+  echo "- for fetch: fetchAndArchive, fetchReferenceData, or if really required, fetchButArchiveLater"
+  echo "- for archive: fetchAndArchive, or if really required, potentiallyUnsafeArchive"
   exit 1
 fi
 

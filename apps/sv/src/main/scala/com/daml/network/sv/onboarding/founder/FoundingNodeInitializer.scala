@@ -393,7 +393,7 @@ class FoundingNodeInitializer(
       )
     }
 
-    private def importAcsSnapshot(): Future[Option[cc.round.types.Round]] =
+    private def importAcsSnapshot(): Future[Option[cc.types.Round]] =
       foundingConfig.bootstrappingDump match {
         case None =>
           logger.debug("Skipping importing an ACS snapshot, as none was configured.")

@@ -19,7 +19,7 @@ import CC.Expiry
 import CC.Issuance
 import CC.Round
 import CC.Fees
-import CC.Round.Types
+import CC.Types
 import CC.RelRound
 import CC.Schedule
 import CC.ValidatorLicense

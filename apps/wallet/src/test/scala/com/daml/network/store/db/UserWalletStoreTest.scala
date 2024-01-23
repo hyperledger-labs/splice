@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cc.{
   coinrules as coinrulesCodegen,
   round as roundCodegen,
 }
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
@@ -1222,7 +1222,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         new coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId](
           coinContract.contractId,
           new java.math.BigDecimal(coinPrice),
-          new roundCodegen.types.Round(round),
+          new Round(round),
         )
           .toValue(_.toValue),
       ),

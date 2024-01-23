@@ -8,7 +8,7 @@ import DA.List
 
 import CC.Coin
 import CC.CoinRules
-import CC.Round.Types
+import CC.Types
 import CC.Schedule
 import CC.GlobalDomain
 import CN.Wallet.Install
@@ -551,7 +551,7 @@ testBuyMemberTraffic = script do
 
   -- create initial validator top-up state contract
   topupStateCid <- submit aliceValidator.primaryParty $
-    createCmd (initialValidatorTopUpState aliceValidator.primaryParty testParticipantId domainId)
+    createCmd (initialValidatorTopUpState app.svc aliceValidator.primaryParty testParticipantId domainId)
 
   -- test that buying less extra traffic than the configured min topup amount fails
   let minTopupAmount = globalDomainConfig.fees.minTopupAmount
@@ -562,7 +562,7 @@ testBuyMemberTraffic = script do
   -- test that providing an invalid global domain ID fails
   let invalidDomainId = domainId <> "_invalid"
   invalidTopupStateCid <- submit aliceValidator.primaryParty $
-    createCmd (initialValidatorTopUpState aliceValidator.primaryParty testParticipantId invalidDomainId)
+    createCmd (initialValidatorTopUpState app.svc aliceValidator.primaryParty testParticipantId invalidDomainId)
   outcome <- executeCoinOperation app aliceValidator $
     CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId invalidDomainId (minutes 1) (Some invalidTopupStateCid)
   outcome === COO_Error (ITR_UnknownDomain invalidDomainId)

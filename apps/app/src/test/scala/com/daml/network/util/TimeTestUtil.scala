@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cc.coin.SvcReward
 import com.daml.network.codegen.java.cc.coinrules.TransferOutput
 import com.daml.network.codegen.java.cc.expiry.TimeLock
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.svcrules.SvReward
 import com.daml.network.console.*
 import com.daml.network.environment.CNLedgerConnection

@@ -9,7 +9,7 @@ import CC.CoinRules
 import CC.Fees
 import CC.Expiry
 import CC.Round
-import CC.Round.Types
+import CC.Types
 import CC.RelRound
 import CC.Schedule
 import CC.Scripts.Parameters

@@ -4,6 +4,9 @@ module CC.GlobalDomain where
 import qualified DA.Set as Set
 import DA.Time
 
+import CC.Types
+import CN.Util
+
 
 -- Global domain configuration
 -------------------------------
@@ -74,3 +77,15 @@ initialMemberTraffic svc memberId domainId amount = MemberTraffic with
     numPurchases = 0
     ccSpent = 0.0
     usdSpent = 0.0
+
+data ForMemberTraffic = ForMemberTraffic with
+    svc : Party
+    memberId : Text
+    domainId : Text
+  deriving (Eq, Show)
+
+instance HasCheckedFetch MemberTraffic ForSvc where
+    contractGroupId MemberTraffic{..} = ForSvc with ..
+
+instance HasCheckedFetch MemberTraffic ForMemberTraffic where
+    contractGroupId MemberTraffic{..} = ForMemberTraffic with ..

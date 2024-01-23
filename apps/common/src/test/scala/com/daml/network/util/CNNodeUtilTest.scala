@@ -2,7 +2,7 @@ package com.daml.network.util
 
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.cc.fees.{ExpiringAmount, RatePerRound}
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 import com.digitalasset.canton.BaseTest
 import java.math.BigDecimal
 import java.util.Optional

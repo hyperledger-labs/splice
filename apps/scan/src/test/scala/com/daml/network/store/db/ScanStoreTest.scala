@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_Coin
 import com.daml.network.codegen.java.cc.coinrules.BuyMemberTrafficResult
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.cns.CnsEntry
 import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, svcrules as svcrulesCodegen}
@@ -1069,7 +1069,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       coinPrice: Double,
   ) =
     new cc.coinrules.TransferResult(
-      new cc.round.types.Round(round),
+      new cc.types.Round(round),
       mkTransferSummary(
         inputAppRewardAmount,
         inputValidatorRewardAmount,
@@ -1205,7 +1205,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         new cc.coin.CoinCreateSummary[coinCodegen.Coin.ContractId](
           coinContract.contractId,
           new java.math.BigDecimal(coinPrice),
-          new roundCodegen.types.Round(round),
+          new Round(round),
         )
           .toValue(_.toValue),
       ),
@@ -1232,7 +1232,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
   ) =
     new cc.coin.CoinExpireSummary(
       owner.toProtoPrimitive,
-      new cc.round.types.Round(round),
+      new cc.types.Round(round),
       new java.math.BigDecimal(changeToInitialAmountAsOfRoundZero),
       new java.math.BigDecimal(changeToHoldingFeesRate),
     ).toValue
@@ -1261,7 +1261,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 
   private def expiringAmount(amount: Double) = new cc.fees.ExpiringAmount(
     numeric(amount),
-    new cc.round.types.Round(0L),
+    new cc.types.Round(0L),
     new cc.fees.RatePerRound(numeric(amount)),
   )
 

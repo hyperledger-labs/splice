@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cc.coinrules.{
   AppTransferContext,
   CoinRules_MiningRound_Archive,
 }
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.validatorlicense as vl
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{

@@ -8,7 +8,7 @@ import CC.Coin
 import CC.CoinRules
 import CC.Expiry
 import CC.Round
-import CC.Round.Types
+import CC.Types
 
 data Currency
   = USD

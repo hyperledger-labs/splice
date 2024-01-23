@@ -5,7 +5,7 @@ import com.daml.ledger.javaapi.data.DamlRecord
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coinrules.AppTransferContext
 import com.daml.network.codegen.java.cc.coinrules.CoinRules_MiningRound_Archive
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.coinimport.importpayload.{IP_Coin, IP_ValidatorLicense}
 import com.daml.network.codegen.java.cc.coinimport.{ImportCrate, ImportPayload}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic

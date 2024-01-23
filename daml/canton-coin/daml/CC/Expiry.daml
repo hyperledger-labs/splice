@@ -16,7 +16,7 @@ module CC.Expiry
 
 -- import CC.Coin
 import CC.Fees
-import CC.Round.Types
+import CC.Types
 import CC.Round
 import CC.RelRound
 

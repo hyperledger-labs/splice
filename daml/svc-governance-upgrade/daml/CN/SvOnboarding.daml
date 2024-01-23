@@ -1,5 +1,7 @@
 module CN.SvOnboarding where
 
+import CC.Types
+
 import CN.Util
 
 -- | Template used by the SV collective to collect confirmations for the onboarding of an SV candidate.
@@ -43,3 +45,17 @@ template SvOnboardingConfirmed with
         now <- getTime
         require "SV candidate confirmation has expired" (now >= expiresAt)
         pure ()
+
+
+-- instances
+------------
+
+instance HasCheckedFetch SvOnboardingConfirmed ForOwner where
+  contractGroupId SvOnboardingConfirmed {..} = ForOwner with svc; owner = svParty
+
+instance HasCheckedFetch SvOnboardingConfirmed ForSvc where
+  contractGroupId SvOnboardingConfirmed {..} = ForSvc with svc
+
+
+instance HasCheckedFetch SvOnboardingRequest ForSvc where
+  contractGroupId SvOnboardingRequest {..} = ForSvc with svc

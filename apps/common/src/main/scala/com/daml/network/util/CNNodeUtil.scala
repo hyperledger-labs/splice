@@ -4,7 +4,7 @@ import com.daml.ledger.javaapi.data.Unit as DamlUnit
 import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.cc.globaldomain.{
   BaseRateTrafficLimits,

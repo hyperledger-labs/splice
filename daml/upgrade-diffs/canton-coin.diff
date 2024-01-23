@@ -1,7 +1,7 @@
 diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/Coin.daml daml/canton-coin-upgrade/daml/CC/Coin.daml
 --- daml/canton-coin/daml/CC/Coin.daml
 +++ daml/canton-coin-upgrade/daml/CC/Coin.daml
-@@ -35,6 +35,7 @@
+@@ -36,6 +36,7 @@
      svc : Party
      owner : Party
      amount : ExpiringAmount
@@ -39,7 +39,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
              -- We don't issue any rewards as part of the transfer, as these are only for the burned fees.
              rewardsConfig = RewardsIssuanceConfig with
                issueAppRewards = False
-@@ -172,6 +174,7 @@
+@@ -171,6 +173,7 @@
          coin <- create Coin with
                    owner = receiver
                    amount = expiringAmount
@@ -47,7 +47,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
                    ..
          return CoinCreateSummary with
                    coin
-@@ -564,6 +567,7 @@
+@@ -554,6 +557,7 @@
    return TransferResult with
      round = csum.openRound.round
      summary = summary
@@ -55,7 +55,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
      ..
  
  
-@@ -885,11 +889,13 @@
+@@ -854,11 +858,13 @@
              svc
              owner = sender
              amount = expiringAmount transferConfigCC.holdingFee summary.senderChangeAmount currentOpenRound.round
@@ -69,7 +69,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
  
        case out.lock of
          None -> TransferResultCoin <$> create coin
-@@ -1018,6 +1024,7 @@
+@@ -987,6 +993,7 @@
      provider : Party
      inputs : [TransferInput]
      outputs : [TransferOutput]
@@ -77,7 +77,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
    deriving (Eq, Ord, Show)
  
  -- | An individual output for a batch transfer.
-@@ -1043,6 +1050,7 @@
+@@ -1012,6 +1019,7 @@
      senderChangeCoin: Optional (ContractId Coin)
        -- ^ Optional reference to the coin for the change returned to the sender.
        -- Only created if there was some change to be returned after deducting the fee for returning change.

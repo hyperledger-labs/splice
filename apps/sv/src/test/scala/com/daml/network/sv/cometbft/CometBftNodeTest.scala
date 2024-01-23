@@ -3,7 +3,7 @@ package com.daml.network.sv.cometbft
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.drivers as proto
 import com.daml.network.codegen.java.cn as daml
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.cometbft.{
   CometBftConfig,
   CometBftNodeConfig,

@@ -1,6 +1,6 @@
 module CC.RelRound where
 
-import CC.Round.Types (Round(..))
+import CC.Types (Round(..))
 
 -- Round utilities
 ------------------

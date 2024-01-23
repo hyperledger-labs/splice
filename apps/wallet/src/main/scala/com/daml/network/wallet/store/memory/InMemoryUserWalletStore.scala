@@ -1,6 +1,6 @@
 package com.daml.network.wallet.store.memory
 
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.RetryProvider

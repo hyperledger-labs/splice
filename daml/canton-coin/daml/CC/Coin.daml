@@ -2,11 +2,12 @@
 module CC.Coin where
 
 import Prelude hiding (forA)
+import DA.Action (void)
 
 import CC.Expiry
 import CC.Fees
 import CC.Round
-import CC.Round.Types
+import CC.Types
 
 import CN.Util
 
@@ -63,7 +64,7 @@ template LockedCoin
       with
         openRoundCid : ContractId OpenMiningRound
       controller coin.owner :: lock.holders
-      do openMiningRound <- exercise openRoundCid (OpenMiningRound_Fetch coin.owner)
+      do openMiningRound <- fetchReferenceData (ForSvc with svc = coin.svc) openRoundCid
          coinCid <- create coin
          return CoinCreateSummary with
            coin = coinCid
@@ -74,7 +75,7 @@ template LockedCoin
       with
         openRoundCid : ContractId OpenMiningRound
       controller coin.owner
-      do openMiningRound <- exercise openRoundCid (OpenMiningRound_Fetch coin.owner)
+      do openMiningRound <- fetchReferenceData (ForSvc with svc = coin.svc) openRoundCid
          t <- getTime
          require "Lock is expired" (lock.expiresAt < t)
          coinCid <- create coin
@@ -97,9 +98,9 @@ template LockedCoin
            changeToInitialAmountAsOfRoundZero = -(getValueAsOfRound0 coin.amount)
            changeToHoldingFeesRate = - (coin.amount.ratePerRound.rate)
 
+
 -- Contracts to implement reward issuance
 -- ======================================
-
 
 -- | The right to claim coin issuances for a user's burns as their validator.
 template ValidatorRight with
@@ -156,10 +157,11 @@ template AppRewardCoupon
       with
         closedRoundCid : ContractId ClosedMiningRound
       controller svc
-      do closedRound <- fetchReferenceData closedRoundCid
-         require "SVC matches" (svc == closedRound.svc)
-         require "Mining round matches" (round == closedRound.round)
+      do
+         -- Expiry requires proof of the coupon's round being closed, as all rounds go through their phases at their own pace
+         void $ fetchReferenceData (ForRound with svc; round) closedRoundCid
          pure (featured, amount)
+
 
 -- | A coupon for receiving validator rewards proportional to the usage fee paid by a user
 -- hosted by a validator operator.
@@ -177,10 +179,10 @@ template ValidatorRewardCoupon
       with
         closedRoundCid : ContractId ClosedMiningRound
       controller svc
-      do closedRound <- fetchReferenceData closedRoundCid
-         require "SVC matches" (svc == closedRound.svc)
-         require "Mining round matches" (round == closedRound.round)
-         pure amount
+      do
+         -- Expiry requires proof of the coupon's round being closed, as all rounds go through their phases at their own pace
+        void $ fetchReferenceData (ForRound with svc; round) closedRoundCid
+        pure amount
 
 
     choice ValidatorRewardCoupon_ArchiveAsValidator : ()
@@ -190,8 +192,8 @@ template ValidatorRewardCoupon
         rightCid : ContractId ValidatorRight
       controller svc, validator
       do
-        right <- fetchReferenceData rightCid
-        require "Right must match" (right == ValidatorRight with svc; validator, user)
+        requireMatchingContract rightCid (ValidatorRight with svc; validator, user)
+
 
 -- | The reward for the SVC members for running a mining round.
 -- TODO(#9149): remove this template once we switch to the new reward model.
@@ -223,9 +225,32 @@ template UnclaimedReward with
 
 requireCoinExpiredForAllOpenRounds : ContractId OpenMiningRound -> Coin -> Update ()
 requireCoinExpiredForAllOpenRounds roundCid coin = do
-  round <- fetchReferenceData roundCid
-  require "SVC of the round matches SVC of the coin" (round.svc == coin.svc)
+  round <- fetchReferenceData (ForSvc with svc = coin.svc) roundCid
   -- Note: we exploit that there are exactly three open rounds active at any
   -- point in time; and we ensure that a coin can be expired as soon as it can
   -- definitely not be used as an input to transfer anymore.
   require "Coin is expired" (isCoinExpired round coin.amount)
+
+
+-- instances
+------------
+
+instance HasCheckedFetch Coin ForOwner where
+  contractGroupId Coin{..} = ForOwner with ..
+
+instance HasCheckedFetch LockedCoin ForOwner where
+  contractGroupId lockedCoin = contractGroupId (lockedCoin.coin)
+
+instance HasCheckedFetch AppRewardCoupon ForOwner where
+  contractGroupId AppRewardCoupon{..} = ForOwner with svc; owner = provider
+
+instance HasCheckedFetch SvRewardCoupon ForOwner where
+  contractGroupId SvRewardCoupon{..} = ForOwner with svc; owner = sv
+
+-- This instance is slightly dangerous, as it could lead to a missed check of the validator.
+-- We accept this, as at least the SVC check is done, and the remainder is careful coding.
+instance HasCheckedFetch ValidatorRewardCoupon ForSvc where
+  contractGroupId ValidatorRewardCoupon {..} = ForSvc with svc
+
+instance HasCheckedFetch UnclaimedReward ForSvc where
+  contractGroupId UnclaimedReward {..} = ForSvc with svc

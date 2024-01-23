@@ -15,7 +15,7 @@ import com.daml.network.codegen.java.cc.coinrules.{
   TransferInput,
 }
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.codegen.java.cc.round.types.Round
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
 import com.daml.network.codegen.java.cn.wallet.install.{
   ExecuteBatchResult,

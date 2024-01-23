@@ -3,8 +3,10 @@ module CC.Round where
 import DA.Optional (fromOptional)
 
 import CC.CoinConfig
-import CC.Round.Types
+import CC.Types
 import CC.Issuance
+
+import CN.Util
 
 import DA.Time
 
@@ -88,3 +90,31 @@ template ClosedMiningRound
 getClosedMiningRoundIssuancePerValidatorFaucetCoupon : ClosedMiningRound -> Decimal
 getClosedMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound =
   fromOptional 0.0 issuingMiningRound.optIssuancePerValidatorFaucetCoupon
+
+
+-- instances
+------------
+
+instance HasCheckedFetch OpenMiningRound ForSvc where
+  contractGroupId OpenMiningRound with svc; .. = ForSvc with svc
+
+instance HasCheckedFetch OpenMiningRound ForRound where
+  contractGroupId OpenMiningRound with svc; round; .. = ForRound with svc; round
+
+instance HasCheckedFetch SummarizingMiningRound ForSvc where
+  contractGroupId SummarizingMiningRound with svc; .. = ForSvc with svc
+
+instance HasCheckedFetch SummarizingMiningRound ForRound where
+  contractGroupId SummarizingMiningRound with svc; round; .. = ForRound with svc; round
+
+instance HasCheckedFetch IssuingMiningRound ForSvc where
+  contractGroupId IssuingMiningRound with svc; .. = ForSvc with svc
+
+instance HasCheckedFetch IssuingMiningRound ForRound where
+  contractGroupId IssuingMiningRound with svc; round; .. = ForRound with svc; round
+
+instance HasCheckedFetch ClosedMiningRound ForSvc where
+  contractGroupId ClosedMiningRound with svc; .. = ForSvc with svc
+
+instance HasCheckedFetch ClosedMiningRound ForRound where
+  contractGroupId ClosedMiningRound with svc; round; .. = ForRound with svc; round
