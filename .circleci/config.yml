@@ -3178,7 +3178,7 @@ workflows:
             - slack-context
           # Skip healthchecks for ~1.5 hour after starting an sv node restore from backup.
           # ATM, some tests are expected to fail while an SV is catching up, others are prone to failure.
-          # TODO(#9433): once we parallelize the restore, we can probably reduce the time to 1 hour.
+          # TODO(#9438): once we parallelize the restore, we can probably reduce the time to 1 hour.
           max_pipeline_age_secs: 5400
           workflow_names: "restore_sv_cidaily"
           only_if_running: false

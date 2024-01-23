@@ -134,8 +134,7 @@ function restore_cloudsql_postgres() {
   await_confirmation
 
   _info "Restoring CloudSQL DB instance $cloudsql_id from backup $backup_id"
-  gcloud sql backups restore "$backup_id" --restore-instance="$cloudsql_id" --backup-instance="$cloudsql_id" --quiet
-  # TODO(#9361): make this asynchronous
+  gcloud sql backups restore "$backup_id" --restore-instance="$cloudsql_id" --backup-instance="$cloudsql_id" --quiet --async
 }
 
 function restore_component() {
@@ -155,6 +154,48 @@ function restore_component() {
         ;;
       "canton:cloud:postgres")
         restore_cloudsql_postgres "$component"
+        ;;
+      *)
+        _error "Unknown postgres type: $type"
+        ;;
+    esac
+  fi
+}
+
+function wait_cloudsql_restore() {
+  local -r component=$1
+
+  cloudsql_id=$(get_cloudsql_id "$namespace-$component-pg")
+
+  local -i i=0
+  _info "Waiting for restore of $component to finish..."
+
+  while true; do
+    num_running=$(gcloud sql operations list --instance="$cloudsql_id" --filter="(operationType=RESTORE_VOLUME AND status!=DONE)" --format=json | jq length)
+    if [ "$num_running" == 0 ]; then
+      _info "Restore of instance $component done"
+      break
+    else
+      (( i++ ))&& (( i > 300 )) &&_error "Timed out waiting for backup restore of $component"
+      sleep 5
+      _info "still waiting..."
+    fi
+  done
+}
+
+function wait_restore_component() {
+  local -r component=$1
+
+  if [ "$component" == "cometbft-0" ]; then
+    _info "Nothing to do, cometbft restore is currently synchronous"
+  else
+    type=$(get_postgres_type "$namespace-$component-pg")
+    case "$type" in
+      "canton:network:postgres")
+        _info "Nothing to do, self-hosted postgres restore is currently synchronous"
+        ;;
+      "canton:cloud:postgres")
+        wait_cloudsql_restore "$component"
         ;;
       *)
         _error "Unknown postgres type: $type"
@@ -214,6 +255,12 @@ function main() {
   for component in "${@:3}"; do
     restore_component "$component"
   done
+
+  _info " ** Waiting for all restore operations to finish ** "
+  for component in "${@:3}"; do
+    wait_restore_component "$component"
+  done
+
 
   _info " ** Scaling up ** "
   for component in "${@:3}"; do
