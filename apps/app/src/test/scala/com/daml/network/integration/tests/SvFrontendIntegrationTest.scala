@@ -280,7 +280,9 @@ class SvFrontendIntegrationTest
 
         actAndCheck(
           "sv2 set the desired price", {
-            sv2Backend.updateCoinPriceVote(BigDecimal(15.55))
+            eventuallySucceeds() {
+              sv2Backend.updateCoinPriceVote(BigDecimal(15.55))
+            }
           },
         )(
           "median coin price changed and coin price updated on the row for sv2",
@@ -291,7 +293,9 @@ class SvFrontendIntegrationTest
 
         actAndCheck(
           "sv3 set the desired price", {
-            sv3Backend.updateCoinPriceVote(BigDecimal(5))
+            eventuallySucceeds() {
+              sv3Backend.updateCoinPriceVote(BigDecimal(5))
+            }
           },
         )(
           "median coin price changed and coin price updated on the row for sv2",
@@ -302,7 +306,9 @@ class SvFrontendIntegrationTest
 
         actAndCheck(
           "sv4 set the desired price", {
-            sv4Backend.updateCoinPriceVote(BigDecimal(9.0))
+            eventuallySucceeds() {
+              sv4Backend.updateCoinPriceVote(BigDecimal(9.0))
+            }
           },
         )(
           "median coin price changed and coin price updated on the row for sv4",
@@ -313,7 +319,9 @@ class SvFrontendIntegrationTest
 
         actAndCheck(
           "sv1 update the desired price", {
-            sv1Backend.updateCoinPriceVote(BigDecimal(1.0))
+            eventuallySucceeds() {
+              sv1Backend.updateCoinPriceVote(BigDecimal(1.0))
+            }
           },
         )(
           "median coin price changed",
