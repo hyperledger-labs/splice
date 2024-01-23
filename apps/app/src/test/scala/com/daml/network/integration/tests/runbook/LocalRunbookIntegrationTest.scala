@@ -97,6 +97,9 @@ class LocalRunbookIntegrationTest
         scanAppPath / "app.conf",
       )
       .clearConfigTransforms()
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.withPausedSvOffboardingMediatorTrigger()(config)
+      )
       .addConfigTransforms(
         // In the runbook, the participant of the self-hosted validator uses ports 5xxx.
         // This test starts the participant on ports 7xxx instead, so we need to adjust all remote participant

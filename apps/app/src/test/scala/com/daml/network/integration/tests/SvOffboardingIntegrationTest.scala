@@ -62,9 +62,6 @@ class SvOffboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTes
       "SV2_ADMIN_USER" -> sv2Backend.config.ledgerApiUser,
       "SV3_ADMIN_USER" -> sv3Backend.config.ledgerApiUser,
       "SV4_ADMIN_USER" -> sv4Backend.config.ledgerApiUser,
-      "ALICE_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
-      "BOB_ADMIN_USER" -> bobValidatorBackend.config.ledgerApiUser,
-      "SPLITWELL_ADMIN_USER" -> splitwellValidatorBackend.config.ledgerApiUser,
     ) {
       clue("Initialize SVC with 4 SVs") {
         startAllSync(

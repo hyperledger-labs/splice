@@ -88,9 +88,10 @@ Sender .* of send request .* is not registered so cannot send or receive events\
 sv\dParticipantUpgrade.*ACS_COMMITMENT_MISMATCH.*
 
 # globalMediatorSv4 is offboarded at this time
-c.d.c.t.TimeProofRequestSubmitterImpl:mediatorx=globalMediatorSv
-RequestRefused\(SenderUnknown\(.*globalMediatorSv4
+c.d.c.t.TimeProofRequestSubmitterImpl:mediatorx=globalMediatorOffboardingSv
+RequestRefused\(SenderUnknown\(.*globalMediatorOffboardingSv4
 RequestRefused\(SenderUnknown\(.*globalReonboardMediator_4
 LOCAL_VERDICT_TIMEOUT.* Rejected transaction due to a participant determined timeout.*c.d.c.p.p.TransactionProcessingSteps:participant=sv
+Response message for request.*timed out at.*c.d.c.p.p.TransactionProcessor:participant=.*ParticipantReonboard
 
 # Make sure to have a trailing newline

@@ -51,6 +51,9 @@ class SelfHostedSplitwellPreflightIntegrationTest
       // clearing default config transforms because they have settings
       // we don't want such as adjusting daml names or triggering automation every second
       .clearConfigTransforms()
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.withPausedSvOffboardingMediatorTrigger()(config)
+      )
       .addConfigTransforms((_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(2000)(conf))
       .addConfigTransforms((_, conf) =>
         CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(2000)(conf)

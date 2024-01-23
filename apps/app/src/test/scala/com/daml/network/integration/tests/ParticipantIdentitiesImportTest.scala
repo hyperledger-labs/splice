@@ -1,7 +1,11 @@
 package com.daml.network.integration.tests
 
 import better.files.File
-import com.daml.network.config.{CNNodeConfig, ParticipantBootstrapDumpConfig}
+import com.daml.network.config.{
+  CNNodeConfig,
+  CNNodeConfigTransforms,
+  ParticipantBootstrapDumpConfig,
+}
 import com.daml.network.config.CNNodeConfigTransforms.{
   ensureNovelDamlNames,
   selfSignedTokenAuthSourceTransform,
@@ -52,6 +56,9 @@ abstract class ParticipantIdentitiesImportTestBase
         validatorAppPath / "app.conf",
       )
       .clearConfigTransforms()
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.withPausedSvOffboardingMediatorTrigger()(config)
+      )
       .addConfigTransforms(
         (_, config) => ensureNovelDamlNames()(config),
         (_, config) => useSelfSignedTokensForLongRunningLedgerApiAuth("test", config),
