@@ -1,5 +1,4 @@
-import { Loading, PartyId } from 'common-frontend';
-import dayjs from 'dayjs';
+import { DateDisplay, Loading, PartyId } from 'common-frontend';
 import React from 'react';
 
 import {
@@ -94,12 +93,8 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
             actionType={actionType}
             actionName={coinRulesAction.tag}
             valuesMap={{
-              Time: (
-                <PrettyJsonPrint
-                  data={dayjs(coinRulesAction.value.newScheduleItem._1)
-                    .toString()
-                    .replace('GMT', 'UTC')}
-                />
+              'Effective Time': (
+                <DateDisplay format="PPp O" datetime={coinRulesAction.value.newScheduleItem._1} />
               ),
               NewScheduleItem: <PrettyJsonPrint data={coinRulesAction.value.newScheduleItem._2} />,
             }}
@@ -112,11 +107,7 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
             actionType={actionType}
             actionName={coinRulesAction.tag}
             valuesMap={{
-              Time: (
-                <PrettyJsonPrint
-                  data={dayjs(coinRulesAction.value.scheduleTime).toString().replace('GMT', 'UTC')}
-                />
-              ),
+              Time: <DateDisplay format="PPp O" datetime={coinRulesAction.value.scheduleTime} />,
               ScheduleItem: (
                 <PrettyJsonPrint
                   data={
@@ -136,13 +127,7 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
             actionType={actionType}
             actionName={coinRulesAction.tag}
             valuesMap={{
-              Time: (
-                <PrettyJsonPrint
-                  data={dayjs(coinRulesAction.value.scheduleItem._1)
-                    .toString()
-                    .replace('GMT', 'UTC')}
-                />
-              ),
+              Time: <DateDisplay format="PPp O" datetime={coinRulesAction.value.scheduleItem._1} />,
               ScheduleItem: <PrettyJsonPrint data={coinRulesAction.value.scheduleItem._2} />,
             }}
           />
