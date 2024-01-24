@@ -2,6 +2,7 @@ package com.daml.network.sv.cometbft
 
 import cats.data.EitherT
 import cats.implicits.catsSyntaxTuple4Semigroupal
+import com.daml.network.http.v0.definitions.CometBftJsonRpcRequestId
 import com.daml.network.sv.cometbft.CometBftClient.{CometBftNodeDump, GovernanceAbciQueryParams}
 import com.daml.network.sv.cometbft.CometBftHttpRpcClient.{
   CometBftError,
@@ -57,7 +58,11 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
       .nodeStatus()
       .rethrowAsGrpcException("node status")
 
-  def jsonRpcCall(id: Json, method: String, params: Map[String, Json] = Map.empty)(implicit
+  def jsonRpcCall(
+      id: CometBftJsonRpcRequestId,
+      method: String,
+      params: Map[String, Json] = Map.empty,
+  )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[CometBftHttpRpcClient.CometBftCallResponse[Json]] = {

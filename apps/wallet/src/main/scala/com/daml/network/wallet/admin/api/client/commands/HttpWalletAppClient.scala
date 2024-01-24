@@ -116,10 +116,10 @@ object HttpWalletAppClient {
   object SubscriptionStateContract {
     def unapply(state: definitions.SubscriptionState): Option[SubscriptionStateContract] = {
       state match {
-        case definitions.SubscriptionState(Some(state), None) =>
-          Some(SubscriptionStateIdleContract(state))
-        case definitions.SubscriptionState(None, Some(state)) =>
-          Some(SubscriptionStatePaymentContract(state))
+        case definitions.SubscriptionState.members.SubscriptionIdleState(state) =>
+          Some(SubscriptionStateIdleContract(state.idle))
+        case definitions.SubscriptionState.members.SubscriptionPaymentState(state) =>
+          Some(SubscriptionStatePaymentContract(state.payment))
         case _ => None
       }
     }
@@ -732,8 +732,9 @@ object HttpWalletAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], externalHttp.GetBuyTrafficRequestStatusResponse] =
+    ], externalHttp.GetBuyTrafficRequestStatusResponse] = {
       client.getBuyTrafficRequestStatus(trackingId = trackingId, headers = headers)
+    }
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder

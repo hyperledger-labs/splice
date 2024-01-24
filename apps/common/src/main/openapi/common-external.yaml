@@ -167,14 +167,33 @@ components:
       properties:
         active:
           type: boolean
-
-    NodeStatus:
+    SuccessStatusResponse:
       type: object
+      required:
+        - success
+      properties:
+        success:
+          $ref: "#/components/schemas/Status"
+    NotInitializedStatusResponse:
+      type: object
+      required:
+        - not_initialized
       properties:
         not_initialized:
           $ref: "#/components/schemas/NotInitialized"
-        success:
-          $ref: "#/components/schemas/Status"
+    FailureStatusResponse:
+      type: object
+      required:
+        - failed
+      properties:
+        failed:
+          $ref: "#/components/schemas/ErrorResponse"
+    NodeStatus:
+      oneOf:
+        - $ref: "#/components/schemas/SuccessStatusResponse"
+        - $ref: "#/components/schemas/NotInitializedStatusResponse"
+        - $ref: "#/components/schemas/FailureStatusResponse"
+
     Version:
       type: object
       required: [ "version", "commit_ts" ]

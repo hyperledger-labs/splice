@@ -12,6 +12,7 @@ import com.daml.network.wallet.automation.{
   CompleteBuyTrafficRequestTrigger,
   ExpireBuyTrafficRequestsTrigger,
 }
+import com.daml.network.wallet.store.TxLogEntry.BuyTrafficRequestStatus
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -94,14 +95,15 @@ class WalletBuyTrafficRequestIntegrationTest
         eventually() {
           val response = aliceWalletClient.getTrafficRequestStatus(defaultTrackingId)
           inside(response) {
-            case d0.GetBuyTrafficRequestStatusResponse(
-                  status,
-                  _,
-                  Some(failure),
-                  Some(rejectionReason),
+            case d0.GetBuyTrafficRequestStatusResponse.members.BuyTrafficRequestFailedResponse(
+                  d0.BuyTrafficRequestFailedResponse(
+                    status,
+                    failure,
+                    Some(rejectionReason),
+                  )
                 ) =>
-              status shouldBe d0.GetBuyTrafficRequestStatusResponse.Status.Failed
-              failure shouldBe d0.GetBuyTrafficRequestStatusResponse.FailureReason.Rejected
+              status shouldBe BuyTrafficRequestStatus.Failed.status
+              failure shouldBe d0.BuyTrafficRequestFailedResponse.FailureReason.Rejected
               rejectionReason should startWith("out of funds")
           }
         }
@@ -123,14 +125,15 @@ class WalletBuyTrafficRequestIntegrationTest
         eventually() {
           val response = aliceWalletClient.getTrafficRequestStatus(defaultTrackingId)
           inside(response) {
-            case d0.GetBuyTrafficRequestStatusResponse(
-                  status,
-                  _,
-                  Some(failure),
-                  Some(rejectionReason),
+            case d0.GetBuyTrafficRequestStatusResponse.members.BuyTrafficRequestFailedResponse(
+                  d0.BuyTrafficRequestFailedResponse(
+                    status,
+                    failure,
+                    Some(rejectionReason),
+                  )
                 ) =>
-              status shouldBe d0.GetBuyTrafficRequestStatusResponse.Status.Failed
-              failure shouldBe d0.GetBuyTrafficRequestStatusResponse.FailureReason.Rejected
+              status shouldBe BuyTrafficRequestStatus.Failed.status
+              failure shouldBe d0.BuyTrafficRequestFailedResponse.FailureReason.Rejected
               rejectionReason should startWith("not enough traffic requested")
           }
         }
@@ -156,8 +159,11 @@ class WalletBuyTrafficRequestIntegrationTest
         clue("Alice sees the traffic request as completed") {
           eventually() {
             val response = aliceWalletClient.getTrafficRequestStatus(defaultTrackingId)
-            inside(response) { case d0.GetBuyTrafficRequestStatusResponse(status, _, None, None) =>
-              status shouldBe d0.GetBuyTrafficRequestStatusResponse.Status.Completed
+            inside(response) {
+              case d0.GetBuyTrafficRequestStatusResponse.members.BuyTrafficRequestCompletedResponse(
+                    d0.BuyTrafficRequestCompletedResponse(status, _)
+                  ) =>
+                status shouldBe BuyTrafficRequestStatus.Completed.status
             }
             clue("Receiving validator's on-ledger traffic is updated") {
               val expectedTotalPurchasedTraffic = (initialTrafficAmount + minTopupAmount)
@@ -238,11 +244,12 @@ class WalletBuyTrafficRequestIntegrationTest
       )(
         "Alice sees the traffic request as Expired",
         _ => {
-          val response = aliceWalletClient.getTrafficRequestStatus(trackingId)
-          inside(response) {
-            case d0.GetBuyTrafficRequestStatusResponse(status, _, Some(failureReason), None) =>
-              status shouldBe d0.GetBuyTrafficRequestStatusResponse.Status.Failed
-              failureReason shouldBe d0.GetBuyTrafficRequestStatusResponse.FailureReason.Expired
+          inside(aliceWalletClient.getTrafficRequestStatus(trackingId)) {
+            case d0.GetBuyTrafficRequestStatusResponse.members.BuyTrafficRequestFailedResponse(
+                  d0.BuyTrafficRequestFailedResponse(status, failureReason, None)
+                ) =>
+              status shouldBe BuyTrafficRequestStatus.Failed.status
+              failureReason shouldBe d0.BuyTrafficRequestFailedResponse.FailureReason.Expired
           }
         },
       )
@@ -366,8 +373,10 @@ class WalletBuyTrafficRequestIntegrationTest
         _ => {
           val response =
             aliceWalletClient.getTrafficRequestStatus(trackingId.getOrElse(defaultTrackingId))
-          inside(response) { case d0.GetBuyTrafficRequestStatusResponse(status, None, None, None) =>
-            status shouldBe d0.GetBuyTrafficRequestStatusResponse.Status.Created
+          inside(response) {
+            case d0.GetBuyTrafficRequestStatusResponse.members
+                  .BuyTrafficRequestCreatedResponse(d0.BuyTrafficRequestCreatedResponse(status)) =>
+              status shouldBe BuyTrafficRequestStatus.Created.status
           }
         },
       )

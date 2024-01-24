@@ -2,21 +2,12 @@ package com.daml.network.sv.admin.http
 
 import cats.data.{EitherT, OptionT}
 import cats.syntax.applicative.*
-import cats.syntax.option.*
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.*
-import com.daml.network.http.v0.definitions.{
-  CometBftNodeStatusResponse,
-  CometBftStatusOrError,
-  ErrorResponse,
-  OnboardSvPartyMigrationAuthorizeErrorResponse,
-}
-import com.daml.network.http.v0.sv.SvResource
-import com.daml.network.http.v0.sv.SvResource.OnboardSvPartyMigrationAuthorizeResponseBadRequest
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -155,7 +146,7 @@ class HttpSvHandler(
       respond: v0.SvResource.GetSvOnboardingStatusResponse.type
   )(
       svPartyOrName: String
-  )(extracted: TraceContext): Future[SvResource.GetSvOnboardingStatusResponse] = {
+  )(extracted: TraceContext): Future[v0.SvResource.GetSvOnboardingStatusResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getSvOnboardingStatus") { _ => _ =>
       Codec.decode(Codec.Party)(svPartyOrName) match {
@@ -173,7 +164,9 @@ class HttpSvHandler(
             case Some(result) => result
             case None =>
               if (svPartyOrName.nonEmpty) {
-                definitions.GetSvOnboardingStatusResponse(state = "unknown")
+                definitions.GetSvOnboardingStatusResponse(
+                  definitions.SvOnboardingStateUnknown(state = "unknown")
+                )
               } else {
                 throw HttpErrorHandler.badRequest(
                   s"Could not find any party ID or name matching: $svPartyOrName; error: $error"
@@ -196,7 +189,10 @@ class HttpSvHandler(
               .value
           } yield result match {
             case Some(result) => result
-            case None => definitions.GetSvOnboardingStatusResponse(state = "unknown")
+            case None =>
+              definitions.GetSvOnboardingStatusResponse(
+                definitions.SvOnboardingStateUnknown(state = "unknown")
+              )
           }
       }
     }
@@ -263,21 +259,21 @@ class HttpSvHandler(
   }
 
   def getCometBftNodeStatus(
-      respond: SvResource.GetCometBftNodeStatusResponse.type
+      respond: v0.SvResource.GetCometBftNodeStatusResponse.type
   )()(extracted: TraceContext): Future[
-    SvResource.GetCometBftNodeStatusResponse
+    v0.SvResource.GetCometBftNodeStatusResponse
   ] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getCometBftNodeStatus") { _ => _ =>
       withClientOrNotFound(respond.NotFound) {
         _.nodeStatus()
           .map(status =>
-            CometBftStatusOrError(
-              response = CometBftNodeStatusResponse(
+            definitions.CometBftNodeStatusOrErrorResponse(
+              definitions.CometBftNodeStatusResponse(
                 status.nodeInfo.id,
                 status.syncInfo.catchingUp,
                 BigDecimal(status.validatorInfo.votingPower),
-              ).some
+              )
             )
           )
       }
@@ -285,21 +281,21 @@ class HttpSvHandler(
   }
 
   override def cometBftJsonRpcRequest(
-      respond: SvResource.CometBftJsonRpcRequestResponse.type
+      respond: v0.SvResource.CometBftJsonRpcRequestResponse.type
   )(
       body: definitions.CometBftJsonRpcRequest
-  )(extracted: TraceContext): Future[SvResource.CometBftJsonRpcRequestResponse] = {
+  )(extracted: TraceContext): Future[v0.SvResource.CometBftJsonRpcRequestResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.cometBftJsonRpcRequest") { _ => _ =>
       withClientOrNotFound(respond.NotFound) { client =>
         client
           .jsonRpcCall(body.id, body.method.value, body.params.getOrElse(Map.empty))
           .map(res =>
-            SvResource.CometBftJsonRpcRequestResponseOK(
+            v0.SvResource.CometBftJsonRpcRequestResponse.OK(
               definitions.CometBftJsonRpcResponse(
                 res.jsonrpc,
                 res.id,
-                Some(res.result),
+                res.result,
               )
             )
           )
@@ -351,7 +347,7 @@ class HttpSvHandler(
 
   private def authorizeParticipantForHostingSvcParty(
       participantId: ParticipantId
-  )(implicit tc: TraceContext): Future[SvResource.OnboardSvPartyMigrationAuthorizeResponse] = {
+  )(implicit tc: TraceContext): Future[v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse] = {
     svcPartyMigration
       .authorizeParticipantForHostingSvcParty(
         participantId
@@ -362,12 +358,10 @@ class HttpSvHandler(
                 .RequiredProposalNotFound(
                   partyToParticipantSerial
                 ) =>
-            OnboardSvPartyMigrationAuthorizeResponseBadRequest(
-              OnboardSvPartyMigrationAuthorizeErrorResponse(
-                proposalNotFound = Some(
-                  OnboardSvPartyMigrationAuthorizeErrorResponse.ProposalNotFound(
-                    BigInt(partyToParticipantSerial.value)
-                  )
+            v0.SvResource.OnboardSvPartyMigrationAuthorizeResponseBadRequest(
+              definitions.ProposalNotFoundErrorResponse(
+                proposalNotFound = definitions.ProposalNotFoundErrorResponse.ProposalNotFound(
+                  BigInt(partyToParticipantSerial.value)
                 )
               )
             )
@@ -428,10 +422,10 @@ class HttpSvHandler(
   }
 
   private def withClientOrNotFound[T](
-      notFound: ErrorResponse => T
+      notFound: definitions.ErrorResponse => T
   )(call: CometBftClient => Future[T]) = cometBftClient
     .fold {
-      notFound(ErrorResponse("CometBFT is not configured."))
+      notFound(definitions.ErrorResponse("CometBFT is not configured."))
         .pure[Future]
     } {
       call
@@ -594,10 +588,10 @@ class HttpSvHandler(
       svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
   ): Option[definitions.GetSvOnboardingStatusResponse] = {
     Option.when(SvApp.isSvcMemberParty(svParty, svcRules))(
-      definitions.GetSvOnboardingStatusResponse(
+      definitions.SvOnboardingStateCompleted(
         state = "completed",
-        name = Some(svcRules.payload.members.get(svParty.toProtoPrimitive).name),
-        contractId = Some(Codec.encodeContractId(svcRules.contractId)),
+        name = svcRules.payload.members.get(svParty.toProtoPrimitive).name,
+        contractId = Codec.encodeContractId(svcRules.contractId),
       )
     )
   }
@@ -607,10 +601,10 @@ class HttpSvHandler(
       svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
   ): Option[definitions.GetSvOnboardingStatusResponse] = {
     Option.when(SvApp.isSvcMemberName(svParty, svcRules))(
-      definitions.GetSvOnboardingStatusResponse(
+      definitions.SvOnboardingStateCompleted(
         state = "completed",
-        name = Some(svParty),
-        contractId = Some(Codec.encodeContractId(svcRules.contractId)),
+        name = svParty,
+        contractId = Codec.encodeContractId(svcRules.contractId),
       )
     )
   }
@@ -649,12 +643,12 @@ class HttpSvHandler(
           }
         )
         .toVector
-    } yield definitions.GetSvOnboardingStatusResponse(
+    } yield definitions.SvOnboardingStateRequested(
       state = "requested",
-      name = Some(svOnboardingRequest.payload.candidateName),
-      contractId = Some(Codec.encodeContractId(svOnboardingRequest.contractId)),
-      confirmedBy = Some(confirmedBy),
-      requiredNumConfirmations = Some(CNThresholds.requiredNumVotes(svcRules)),
+      name = svOnboardingRequest.payload.candidateName,
+      contractId = Codec.encodeContractId(svOnboardingRequest.contractId),
+      confirmedBy = confirmedBy,
+      requiredNumConfirmations = CNThresholds.requiredNumVotes(svcRules),
     )
   }
 
@@ -666,10 +660,10 @@ class HttpSvHandler(
       svcStore
         .lookupSvOnboardingConfirmedByParty(svParty)
     ).map(svOnboardingConfirmed =>
-      definitions.GetSvOnboardingStatusResponse(
+      definitions.SvOnboardingStateConfirmed(
         state = "confirmed",
-        name = Some(svOnboardingConfirmed.payload.svName),
-        contractId = Some(Codec.encodeContractId(svOnboardingConfirmed.contractId)),
+        name = svOnboardingConfirmed.payload.svName,
+        contractId = Codec.encodeContractId(svOnboardingConfirmed.contractId),
       )
     )
   }
@@ -682,10 +676,10 @@ class HttpSvHandler(
       svcStore
         .lookupSvOnboardingConfirmedByName(svName)
     ).map(svOnboardingConfirmed =>
-      definitions.GetSvOnboardingStatusResponse(
+      definitions.SvOnboardingStateConfirmed(
         state = "confirmed",
-        name = Some(svOnboardingConfirmed.payload.svName),
-        contractId = Some(Codec.encodeContractId(svOnboardingConfirmed.contractId)),
+        name = svOnboardingConfirmed.payload.svName,
+        contractId = Codec.encodeContractId(svOnboardingConfirmed.contractId),
       )
     )
   }

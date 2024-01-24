@@ -1,6 +1,6 @@
 package com.daml.network.sv.admin.http
 
-import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
+import cats.implicits.catsSyntaxApplicativeId
 import cats.syntax.traverse.*
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
@@ -14,18 +14,7 @@ import com.daml.network.environment.{
   SequencerAdminConnection,
   TopologyAdminConnection,
 }
-import com.daml.network.http.v0.definitions.{
-  BatchListVotesByVoteRequestsRequest,
-  CastVoteRequest,
-  CometBftNodeDumpResponse,
-  CreateElectionRequest,
-  CreateVoteRequest,
-  ErrorResponse,
-  ListVoteResultsRequest,
-  UpdateVoteRequest,
-}
 import com.daml.network.util.{Codec, JsonUtil, TemplateJsonDecoder}
-import com.daml.network.http.v0.sv_admin.SvAdminResource
 import com.daml.network.http.v0.{definitions, sv_admin as v0}
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, PageLimit}
@@ -232,9 +221,9 @@ class HttpSvAdminHandler(
     }
   }
 
-  def createElectionRequest(respond: SvAdminResource.CreateElectionRequestResponse.type)(
-      body: CreateElectionRequest
-  )(tuser: TracedUser): Future[SvAdminResource.CreateElectionRequestResponse] = {
+  def createElectionRequest(respond: v0.SvAdminResource.CreateElectionRequestResponse.type)(
+      body: definitions.CreateElectionRequest
+  )(tuser: TracedUser): Future[v0.SvAdminResource.CreateElectionRequestResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.createElectionRequest") { _ => _ =>
       SvApp
@@ -251,8 +240,8 @@ class HttpSvAdminHandler(
   }
 
   def getElectionRequest(
-      respond: SvAdminResource.GetElectionRequestResponse.type
-  )()(tuser: TracedUser): Future[SvAdminResource.GetElectionRequestResponse] = {
+      respond: v0.SvAdminResource.GetElectionRequestResponse.type
+  )()(tuser: TracedUser): Future[v0.SvAdminResource.GetElectionRequestResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getElectionRequest") { _ => _ =>
       for {
@@ -265,9 +254,9 @@ class HttpSvAdminHandler(
     }
   }
 
-  def createVoteRequest(respond: SvAdminResource.CreateVoteRequestResponse.type)(
-      body: CreateVoteRequest
-  )(tuser: TracedUser): Future[SvAdminResource.CreateVoteRequestResponse] = {
+  def createVoteRequest(respond: v0.SvAdminResource.CreateVoteRequestResponse.type)(
+      body: definitions.CreateVoteRequest
+  )(tuser: TracedUser): Future[v0.SvAdminResource.CreateVoteRequestResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.createVoteRequest") { _ => _ =>
       SvApp
@@ -287,7 +276,7 @@ class HttpSvAdminHandler(
   }
 
   def listSvcRulesVoteRequests(
-      respond: SvAdminResource.ListSvcRulesVoteRequestsResponse.type
+      respond: v0.SvAdminResource.ListSvcRulesVoteRequestsResponse.type
   )()(tuser: TracedUser): Future[v0.SvAdminResource.ListSvcRulesVoteRequestsResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.listSvcRulesVoteRequests") { _ => _ =>
@@ -302,9 +291,9 @@ class HttpSvAdminHandler(
   }
 
   def listSvcRulesVoteResults(
-      respond: SvAdminResource.ListSvcRulesVoteResultsResponse.type
+      respond: v0.SvAdminResource.ListSvcRulesVoteResultsResponse.type
   )(
-      body: ListVoteResultsRequest
+      body: definitions.ListVoteResultsRequest
   )(tuser: TracedUser): Future[v0.SvAdminResource.ListSvcRulesVoteResultsResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.listSvcRulesVoteResults") { _ => _ =>
@@ -342,7 +331,7 @@ class HttpSvAdminHandler(
     }
   }
 
-  def lookupSvcRulesVoteRequest(respond: SvAdminResource.LookupSvcRulesVoteRequestResponse.type)(
+  def lookupSvcRulesVoteRequest(respond: v0.SvAdminResource.LookupSvcRulesVoteRequestResponse.type)(
       voteRequestContractId: String
   )(tuser: TracedUser): Future[v0.SvAdminResource.LookupSvcRulesVoteRequestResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
@@ -370,9 +359,9 @@ class HttpSvAdminHandler(
     }
   }
 
-  def castVote(respond: SvAdminResource.CastVoteResponse.type)(
-      body: CastVoteRequest
-  )(tuser: TracedUser): Future[SvAdminResource.CastVoteResponse] = {
+  def castVote(respond: v0.SvAdminResource.CastVoteResponse.type)(
+      body: definitions.CastVoteRequest
+  )(tuser: TracedUser): Future[v0.SvAdminResource.CastVoteResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.castVote") { _ => _ =>
       SvApp
@@ -390,9 +379,9 @@ class HttpSvAdminHandler(
     }
   }
 
-  def updateVote(respond: SvAdminResource.UpdateVoteResponse.type)(
-      body: UpdateVoteRequest
-  )(tuser: TracedUser): Future[SvAdminResource.UpdateVoteResponse] = {
+  def updateVote(respond: v0.SvAdminResource.UpdateVoteResponse.type)(
+      body: definitions.UpdateVoteRequest
+  )(tuser: TracedUser): Future[v0.SvAdminResource.UpdateVoteResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.updateVote") { _ => _ =>
       SvApp
@@ -415,9 +404,9 @@ class HttpSvAdminHandler(
   }
 
   def batchListVotesByVoteRequests(
-      respond: SvAdminResource.BatchListVotesByVoteRequestsResponse.type
+      respond: v0.SvAdminResource.BatchListVotesByVoteRequestsResponse.type
   )(
-      body: BatchListVotesByVoteRequestsRequest
+      body: definitions.BatchListVotesByVoteRequestsRequest
   )(tuser: TracedUser): Future[v0.SvAdminResource.BatchListVotesByVoteRequestsResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.batchListVotesByVoteRequests") { _ => _ =>
@@ -434,9 +423,9 @@ class HttpSvAdminHandler(
   }
 
   override def getCometBftNodeDebugDump(
-      respond: SvAdminResource.GetCometBftNodeDebugDumpResponse.type
+      respond: v0.SvAdminResource.GetCometBftNodeDebugDumpResponse.type
   )()(tuser: TracedUser): Future[
-    SvAdminResource.GetCometBftNodeDebugDumpResponse
+    v0.SvAdminResource.GetCometBftNodeDebugDumpResponse
   ] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getCometBftNodeDebugDump") { _ => _ =>
@@ -445,21 +434,21 @@ class HttpSvAdminHandler(
           .nodeDebugDump()
           .map(response =>
             definitions.CometBftNodeDumpOrErrorResponse(
-              response = CometBftNodeDumpResponse(
+              definitions.CometBftNodeDumpResponse(
                 status = response.status,
                 networkInfo = response.networkInfo,
                 abciInfo = response.abciInfo,
                 validators = response.validators,
-              ).some
+              )
             )
           )
       }
     }
   }
 
-  override def triggerAcsDump(respond: SvAdminResource.TriggerAcsDumpResponse.type)()(
+  override def triggerAcsDump(respond: v0.SvAdminResource.TriggerAcsDumpResponse.type)()(
       tuser: TracedUser
-  ): Future[SvAdminResource.TriggerAcsDumpResponse] = {
+  ): Future[v0.SvAdminResource.TriggerAcsDumpResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.triggerAcsDump") { _ => _ =>
       config.acsStoreDump match {
@@ -478,7 +467,7 @@ class HttpSvAdminHandler(
               svcStore,
               clock,
             )
-          } yield SvAdminResource.TriggerAcsDumpResponseOK(
+          } yield v0.SvAdminResource.TriggerAcsDumpResponseOK(
             definitions.TriggerAcsDumpResponse(
               filename = filename.toString,
               numEvents = snapshot.contracts.size,
@@ -489,16 +478,16 @@ class HttpSvAdminHandler(
     }
   }
   override def getAcsStoreDump(
-      respond: SvAdminResource.GetAcsStoreDumpResponse.type
+      respond: v0.SvAdminResource.GetAcsStoreDumpResponse.type
   )()(tuser: TracedUser): scala.concurrent.Future[
-    SvAdminResource.GetAcsStoreDumpResponse
+    v0.SvAdminResource.GetAcsStoreDumpResponse
   ] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getAcsStoreDump") { _ => _ =>
       svcStore
         .getJsonAcsSnapshot()
         .map(snapshot =>
-          SvAdminResource.GetAcsStoreDumpResponse.OK(
+          v0.SvAdminResource.GetAcsStoreDumpResponse.OK(
             definitions.GetAcsStoreDumpResponse(
               offset = snapshot.offset,
               contracts = snapshot.contracts.map(_.toHttp).toVector,
@@ -509,9 +498,9 @@ class HttpSvAdminHandler(
   }
 
   override def getSequencerNodeStatus(
-      respond: SvAdminResource.GetSequencerNodeStatusResponse.type
+      respond: v0.SvAdminResource.GetSequencerNodeStatusResponse.type
   )()(tuser: TracedUser): Future[
-    SvAdminResource.GetSequencerNodeStatusResponse
+    v0.SvAdminResource.GetSequencerNodeStatusResponse
   ] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getSequencerNodeStatus") { _ => _ =>
@@ -522,9 +511,9 @@ class HttpSvAdminHandler(
   }
 
   override def getMediatorNodeStatus(
-      respond: SvAdminResource.GetMediatorNodeStatusResponse.type
+      respond: v0.SvAdminResource.GetMediatorNodeStatusResponse.type
   )()(tuser: TracedUser): Future[
-    SvAdminResource.GetMediatorNodeStatusResponse
+    v0.SvAdminResource.GetMediatorNodeStatusResponse
   ] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getMediatorNodeStatus") { _ => _ =>
@@ -534,23 +523,23 @@ class HttpSvAdminHandler(
     }
   }
 
-  override def pauseGlobalDomain(respond: SvAdminResource.PauseGlobalDomainResponse.type)()(
+  override def pauseGlobalDomain(respond: v0.SvAdminResource.PauseGlobalDomainResponse.type)()(
       tuser: TracedUser
-  ): Future[SvAdminResource.PauseGlobalDomainResponse] = {
+  ): Future[v0.SvAdminResource.PauseGlobalDomainResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.pauseGlobalDomain") { _ => _ =>
       for {
         globalDomain <- svcStore.getSvcRules().map(_.domain)
         _ <- changeDomainRatePerParticipant(globalDomain, NonNegativeInt.zero)
-      } yield SvAdminResource.PauseGlobalDomainResponseOK
+      } yield v0.SvAdminResource.PauseGlobalDomainResponseOK
     }
   }
 
   override def getDomainMigrationDump(
-      respond: SvAdminResource.GetDomainMigrationDumpResponse.type
+      respond: v0.SvAdminResource.GetDomainMigrationDumpResponse.type
   )()(
       tuser: TracedUser
-  ): Future[SvAdminResource.GetDomainMigrationDumpResponse] = {
+  ): Future[v0.SvAdminResource.GetDomainMigrationDumpResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.pauseGlobalDomain") { _ => _ =>
       localDomainNode match {
@@ -581,7 +570,7 @@ class HttpSvAdminHandler(
               val hash = Hash.tryFromHexString(dar.hash)
               participantAdminConnection.lookupDar(hash).map(_.map(Dar(hash, _)))
             }
-          } yield SvAdminResource.GetDomainMigrationDumpResponse.OK(
+          } yield v0.SvAdminResource.GetDomainMigrationDumpResponse.OK(
             DomainMigrationDump(
               svcStore.key.svParty,
               svcStore.key.svcParty,
@@ -608,28 +597,28 @@ class HttpSvAdminHandler(
   }
 
   private def withClientOrNotFound[T](
-      notFound: ErrorResponse => T
+      notFound: definitions.ErrorResponse => T
   )(call: CometBftClient => Future[T]) = cometBftClient
     .fold {
-      notFound(ErrorResponse("CometBFT is not configured."))
+      notFound(definitions.ErrorResponse("CometBFT is not configured."))
         .pure[Future]
     } { call }
 
   private def withSequencerConnectionOrNotFound[T](
-      notFound: ErrorResponse => T
+      notFound: definitions.ErrorResponse => T
   )(call: SequencerAdminConnection => Future[T]) = localDomainNode
     .map(_.sequencerAdminConnection)
     .fold {
-      notFound(ErrorResponse("Sequencer is not configured."))
+      notFound(definitions.ErrorResponse("Sequencer is not configured."))
         .pure[Future]
     } { call }
 
   private def withMediatorConnectionOrNotFound[T](
-      notFound: ErrorResponse => T
+      notFound: definitions.ErrorResponse => T
   )(call: MediatorAdminConnection => Future[T]) = localDomainNode
     .map(_.mediatorAdminConnection)
     .fold {
-      notFound(ErrorResponse("Mediator is not configured."))
+      notFound(definitions.ErrorResponse("Mediator is not configured."))
         .pure[Future]
     } { call }
 

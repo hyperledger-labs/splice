@@ -2,6 +2,7 @@
 
 package com.daml.network.sv.cometbft
 
+import com.daml.network.http.v0.definitions.CometBftJsonRpcRequestId
 import com.daml.network.sv.cometbft.CometBftClientIntegrationTest.{
   InitialVotingPower,
   PubKey2,
@@ -22,7 +23,6 @@ import com.digitalasset.canton.drivers.cometbft.{
   UpdateNetworkConfigRequest,
 }
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import io.circe.Json
 import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.ExecutionContext
@@ -113,7 +113,7 @@ class CometBftClientIntegrationTest
     }
 
     "json rpc call" in {
-      val id = Json.fromInt(0)
+      val id = CometBftJsonRpcRequestId.fromNested2(0)
       cometBftClient
         .jsonRpcCall(id, "status")
         .map { response =>

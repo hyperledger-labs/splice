@@ -76,26 +76,24 @@ object CNNodeStatus {
   def toHttpNodeStatus[S <: NodeStatus.Status](status: NodeStatus[S]): jsonV0.NodeStatus =
     status match {
       case NodeStatus.Success(status) =>
-        jsonV0.NodeStatus(success = Some(CNNodeStatus.fromStatus(status).toHttp))
+        jsonV0.SuccessStatusResponse(CNNodeStatus.fromStatus(status).toHttp)
       case NodeStatus.NotInitialized(active) =>
-        jsonV0.NodeStatus(
-          notInitialized = Some(jsonV0.NotInitialized(active))
-        )
-      case NodeStatus.Failure(_) =>
-        jsonV0.NodeStatus(None, None)
+        jsonV0.NotInitializedStatusResponse(jsonV0.NotInitialized(active))
+      case NodeStatus.Failure(msg) =>
+        jsonV0.FailureStatusResponse(jsonV0.ErrorResponse(msg))
     }
 
   def fromHttpNodeStatus[S <: NodeStatus.Status](
       deserialize: jsonV0.Status => Either[String, S]
   )(status: jsonV0.NodeStatus): Either[String, NodeStatus[S]] =
     status match {
-      case jsonV0.NodeStatus(None, Some(success)) => {
+      case jsonV0.NodeStatus.members.SuccessStatusResponse(jsonV0.SuccessStatusResponse(success)) =>
         deserialize(success).map(NodeStatus.Success(_))
-      }
-      case jsonV0.NodeStatus(Some(notInitialized), None) => {
+      case jsonV0.NodeStatus.members
+            .NotInitializedStatusResponse(jsonV0.NotInitializedStatusResponse(notInitialized)) =>
         Right(NodeStatus.NotInitialized(notInitialized.active))
-      }
-      case _ => Left("Unsuccessful status response")
+      case jsonV0.NodeStatus.members.FailureStatusResponse(jsonV0.FailureStatusResponse(failure)) =>
+        Left(failure.error)
     }
 
   def fromHttp(json: jsonV0.Status): Either[String, CNNodeStatus] = {

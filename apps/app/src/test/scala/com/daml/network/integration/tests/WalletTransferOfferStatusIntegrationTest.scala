@@ -10,6 +10,7 @@ import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.wallet.automation.AcceptedTransferOfferTrigger
+import com.daml.network.wallet.store.TxLogEntry.TransferOfferStatus
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
@@ -49,14 +50,14 @@ class WalletTransferOfferStatusIntegrationTest
         offerCid => {
           val response = aliceWalletClient.getTransferOfferStatus(trackingId)
           inside(response) {
-            case d0.GetTransferOfferStatusResponse(
-                  status,
-                  Some(txId),
-                  Some(contractId),
-                  None,
-                  None,
+            case d0.GetTransferOfferStatusResponse.members.TransferOfferCreatedResponse(
+                  d0.TransferOfferCreatedResponse(
+                    status,
+                    txId,
+                    contractId,
+                  )
                 ) =>
-              status should be(d0.GetTransferOfferStatusResponse.Status.Created)
+              status should be(TransferOfferStatus.Created.status)
               getRootFromTxId(
                 txId,
                 Set(senderParty, receiverParty),
@@ -103,14 +104,14 @@ class WalletTransferOfferStatusIntegrationTest
           _ => {
             val response = bobWalletClient.getTransferOfferStatus(trackingId)
             inside(response) {
-              case d0.GetTransferOfferStatusResponse(
-                    status,
-                    Some(txId),
-                    Some(contractId),
-                    None,
-                    None,
+              case d0.GetTransferOfferStatusResponse.members.TransferOfferAcceptedResponse(
+                    d0.TransferOfferAcceptedResponse(
+                      status,
+                      txId,
+                      contractId,
+                    )
                   ) =>
-                status should be(d0.GetTransferOfferStatusResponse.Status.Accepted)
+                status should be(TransferOfferStatus.Accepted.status)
                 val (tree, exercise) = getRootFromTxId(
                   txId,
                   Set(aliceUserParty, bobUserParty),
@@ -133,14 +134,14 @@ class WalletTransferOfferStatusIntegrationTest
         _ => {
           val response = bobWalletClient.getTransferOfferStatus(trackingId)
           inside(response) {
-            case d0.GetTransferOfferStatusResponse(
-                  status,
-                  Some(txId),
-                  Some(contractId),
-                  None,
-                  None,
+            case d0.GetTransferOfferStatusResponse.members.TransferOfferCompletedResponse(
+                  d0.TransferOfferCompletedResponse(
+                    status,
+                    txId,
+                    contractId,
+                  )
                 ) =>
-              status should be(d0.GetTransferOfferStatusResponse.Status.Completed)
+              status should be(TransferOfferStatus.Completed.status)
               val (tree, batchExercise) = getRootFromTxId(
                 txId,
                 Set(aliceUserParty, bobUserParty),
@@ -183,15 +184,15 @@ class WalletTransferOfferStatusIntegrationTest
         _ => {
           val response = aliceWalletClient.getTransferOfferStatus(trackingId)
           inside(response) {
-            case d0.GetTransferOfferStatusResponse(
-                  status,
-                  None,
-                  None,
-                  Some(failure),
-                  Some(withdrawReason),
+            case d0.GetTransferOfferStatusResponse.members.TransferOfferFailedResponse(
+                  d0.TransferOfferFailedResponse(
+                    status,
+                    failure,
+                    Some(withdrawReason),
+                  )
                 ) =>
-              status should be(d0.GetTransferOfferStatusResponse.Status.Failed)
-              failure should be(d0.GetTransferOfferStatusResponse.FailureKind.Withdrawn)
+              status should be(TransferOfferStatus.Failed.status)
+              failure should be(d0.TransferOfferFailedResponse.FailureKind.Withdrawn)
               withdrawReason should be("Withdrawn by sender")
           }
         },
@@ -214,15 +215,15 @@ class WalletTransferOfferStatusIntegrationTest
         _ => {
           val response = aliceWalletClient.getTransferOfferStatus(trackingId)
           inside(response) {
-            case d0.GetTransferOfferStatusResponse(
-                  status,
-                  None,
-                  None,
-                  Some(failure),
-                  Some(withdrawReason),
+            case d0.GetTransferOfferStatusResponse.members.TransferOfferFailedResponse(
+                  d0.TransferOfferFailedResponse(
+                    status,
+                    failure,
+                    Some(withdrawReason),
+                  )
                 ) =>
-              status should be(d0.GetTransferOfferStatusResponse.Status.Failed)
-              failure should be(d0.GetTransferOfferStatusResponse.FailureKind.Withdrawn)
+              status should be(TransferOfferStatus.Failed.status)
+              failure should be(d0.TransferOfferFailedResponse.FailureKind.Withdrawn)
               withdrawReason should startWith("out of funds")
           }
         },
@@ -244,15 +245,15 @@ class WalletTransferOfferStatusIntegrationTest
         _ => {
           val response = aliceWalletClient.getTransferOfferStatus(trackingId)
           inside(response) {
-            case d0.GetTransferOfferStatusResponse(
-                  status,
-                  None,
-                  None,
-                  Some(failure),
-                  None,
+            case d0.GetTransferOfferStatusResponse.members.TransferOfferFailedResponse(
+                  d0.TransferOfferFailedResponse(
+                    status,
+                    failure,
+                    None,
+                  )
                 ) =>
-              status should be(d0.GetTransferOfferStatusResponse.Status.Failed)
-              failure should be(d0.GetTransferOfferStatusResponse.FailureKind.Rejected)
+              status should be(TransferOfferStatus.Failed.status)
+              failure should be(d0.TransferOfferFailedResponse.FailureKind.Rejected)
           }
         },
       )
@@ -277,9 +278,11 @@ class WalletTransferOfferStatusIntegrationTest
         _ => {
           val response = aliceWalletClient.getTransferOfferStatus(trackingId)
           inside(response) {
-            case d0.GetTransferOfferStatusResponse(status, None, None, Some(failure), None) =>
-              status should be(d0.GetTransferOfferStatusResponse.Status.Failed)
-              failure should be(d0.GetTransferOfferStatusResponse.FailureKind.Expired)
+            case d0.GetTransferOfferStatusResponse.members.TransferOfferFailedResponse(
+                  d0.TransferOfferFailedResponse(status, failure, None)
+                ) =>
+              status should be(TransferOfferStatus.Failed.status)
+              failure should be(d0.TransferOfferFailedResponse.FailureKind.Expired)
           }
         },
       )

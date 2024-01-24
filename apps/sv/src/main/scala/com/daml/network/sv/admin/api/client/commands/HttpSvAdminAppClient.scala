@@ -397,8 +397,15 @@ object HttpSvAdminAppClient {
     ): PartialFunction[
       GetCometBftNodeDebugDumpResponse,
       Either[String, CometBftNodeDumpResponse],
-    ] = { case http.GetCometBftNodeDebugDumpResponse.OK(response) =>
-      response.response.toRight(response.error.map(_.error).getOrElse("No response found"))
+    ] = {
+      case http.GetCometBftNodeDebugDumpResponse.OK(
+            definitions.CometBftNodeDumpOrErrorResponse.members.CometBftNodeDumpResponse(response)
+          ) =>
+        Right(response)
+      case http.GetCometBftNodeDebugDumpResponse.OK(
+            definitions.CometBftNodeDumpOrErrorResponse.members.ErrorResponse(response)
+          ) =>
+        Left(response.error)
     }
   }
 

@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.SvAppBackendReference
 import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.http.v0.definitions.CometBftJsonRpcRequest
+import com.daml.network.http.v0.definitions.{CometBftJsonRpcRequest, CometBftJsonRpcRequestId}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.CometBftNetworkPlugin
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -166,17 +166,17 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
   }
 
   private def testJsonRpcCall(
-      id: Int,
+      id: Long,
       method: String,
       params: Map[String, Json],
       responseKeys: Seq[String],
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
-    val id_ = Json.fromInt(id)
+    val id_ = CometBftJsonRpcRequestId.fromNested2(id)
     val method_ = CometBftJsonRpcRequest.Method.from(method).value
     val response = sv1Backend.cometBftJsonRpcRequest(id_, method_, params)
     response.id shouldBe id_
     response.jsonrpc shouldBe "2.0"
-    responseKeys.foreach(key => response.result.value.findAllByKey(key) should not be empty)
+    responseKeys.foreach(key => response.result.findAllByKey(key) should not be empty)
   }
 
 }

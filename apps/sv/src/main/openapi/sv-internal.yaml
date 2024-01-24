@@ -66,8 +66,7 @@ paths:
           content:
             application/json:
               schema:
-                # Either `response` or `error` will be populated. To be improved once oneOf is supported
-                "$ref": "#/components/schemas/CometBftStatusOrError"
+                "$ref": "#/components/schemas/CometBftNodeStatusOrErrorResponse"
         "404":
           description: "CometBFT is not configured for this app."
           content:
@@ -93,7 +92,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/CometBftJsonRpcResponse"
+                "$ref": "#/components/schemas/CometBftJsonRpcOrErrorResponse"
         "404":
           description: "CometBFT is not configured for this app."
           content:
@@ -626,14 +625,10 @@ components:
         secret:
           type: string
 
-    # TODO(#2755) make prettier with support of oneOf
-    CometBftStatusOrError:
-      type: object
-      properties:
-        error:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
-        response:
-          $ref: "#/components/schemas/CometBftNodeStatusResponse"
+    CometBftNodeStatusOrErrorResponse:
+      oneOf:
+        - $ref: "#/components/schemas/CometBftNodeStatusResponse"
+        - $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
 
     CometBftNodeStatusResponse:
       type: object
@@ -652,52 +647,10 @@ components:
           type: number
           description: "The voting power assigned to the CometBFT node"
 
-    CometBftJsonRpcRequest:
-      type: object
-      required:
-        - id
-        - method
-      properties:
-        # TODO(#2755): restrict to string and integer once oneOf is supported
-        id:
-          type: object # accept any value
-        method:
-          type: string
-          # status, block - used in configure-state-sync.sh
-          # commit, validators, consensus_params - used by the CometBFT Light client for state sync
-          enum:
-            - status
-            - block
-            - commit
-            - validators
-            - consensus_params
-        params:
-          type: object
-          additionalProperties: true
-    CometBftJsonRpcResponse:
-      type: object
-      required:
-        - jsonrpc
-        - id
-      properties:
-        jsonrpc:
-          type: string
-        # TODO(#2755): restrict to string and integer once oneOf is supported
-        id:
-          type: object
-        result:
-          type: object
-        error:
-          type: object
-
-    # TODO(#2755) make prettier with support of oneOf
     CometBftNodeDumpOrErrorResponse:
-      type: object
-      properties:
-        error:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
-        response:
-          $ref: "#/components/schemas/CometBftNodeDumpResponse"
+      oneOf:
+        - $ref: "#/components/schemas/CometBftNodeDumpResponse"
+        - $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
 
     CometBftNodeDumpResponse:
       type: object
@@ -714,6 +667,53 @@ components:
         abci_info:
           type: object
         validators:
+          type: object
+
+    CometBftJsonRpcRequestId:
+      oneOf:
+        - type: string
+        - type: integer
+          format: int64
+
+    CometBftJsonRpcRequest:
+      type: object
+      required:
+        - id
+        - method
+      properties:
+        id:
+          $ref: "#/components/schemas/CometBftJsonRpcRequestId"
+        method:
+          type: string
+          # status, block - used in configure-state-sync.sh
+          # commit, validators, consensus_params - used by the CometBFT Light client for state sync
+          enum:
+            - status
+            - block
+            - commit
+            - validators
+            - consensus_params
+        params:
+          type: object
+          additionalProperties: true
+
+    CometBftJsonRpcOrErrorResponse:
+      oneOf:
+        - $ref: "#/components/schemas/CometBftJsonRpcResponse"
+        - $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+
+    CometBftJsonRpcResponse:
+      type: object
+      required:
+        - jsonrpc
+        - id
+        - result
+      properties:
+        jsonrpc:
+          type: string
+        id:
+          $ref: "#/components/schemas/CometBftJsonRpcRequestId"
+        result:
           type: object
 
     ApproveSvIdentityRequest:
@@ -896,31 +896,78 @@ components:
         token:
           type: string
 
-    GetSvOnboardingStatusResponse:
+    BaseSvOnboardingState:
       type: object
       required:
         - state
       properties:
-        # Note: our codegen does not support oneOf; if it did, the state would be an enum with the following values:
-        # - 'unknown', with no fields
-        # - 'requested', with fields: name, contract_id (of `SvOnboardingRequested`), confirmed_by, required_num_confirmations
-        # - 'confirmed', with fields: name, contract_id (of `SvOnboardingConfirmed`)
-        # - 'completed', with fields: name, contract_id (of `SvcRules`)
-        # TODO(#2755) Make an issue to refactor this with a proper `oneOf`.
         state:
           type: string
-        name:
-          type: string
-        contract_id:
-          type: string
-        confirmed_by:
-          type: array
-          items:
-            type: string
-        required_num_confirmations:
-          type: integer
-          format: int32
-          minimum: 1
+    SvOnboardingStateRequested:
+      allOf:
+        - "$ref": "#/components/schemas/BaseSvOnboardingState"
+        - type: object
+          required:
+            - name
+            - contract_id
+            - confirmed_by
+            - required_num_confirmations
+          properties:
+            name:
+              type: string
+            contract_id:
+              type: string
+              description: ContractId of the SvOnboardingRequested contract
+            confirmed_by:
+              type: array
+              items:
+                type: string
+            required_num_confirmations:
+              type: integer
+              format: int32
+              minimum: 1
+    SvOnboardingStateConfirmed:
+      allOf:
+        - "$ref": "#/components/schemas/BaseSvOnboardingState"
+        - type: object
+          required:
+            - name
+            - contract_id
+          properties:
+            name:
+              type: string
+            contract_id:
+              type: string
+              description: ContractId of the SvOnboardingConfirmed contract
+    SvOnboardingStateCompleted:
+      allOf:
+        - "$ref": "#/components/schemas/BaseSvOnboardingState"
+        - type: object
+          required:
+            - name
+            - contract_id
+          properties:
+            name:
+              type: string
+            contract_id:
+              type: string
+              description: ContractId of the SvcRules contract
+    SvOnboardingStateUnknown:
+      allOf:
+        - "$ref": "#/components/schemas/BaseSvOnboardingState"
+    GetSvOnboardingStatusResponse:
+      oneOf:
+        - "$ref": "#/components/schemas/SvOnboardingStateRequested"
+        - "$ref": "#/components/schemas/SvOnboardingStateConfirmed"
+        - "$ref": "#/components/schemas/SvOnboardingStateCompleted"
+        - "$ref": "#/components/schemas/SvOnboardingStateUnknown"
+      discriminator:
+        propertyName: state
+        mapping:
+          requested: "#/components/schemas/SvOnboardingStateRequested"
+          confirmed: "#/components/schemas/SvOnboardingStateConfirmed"
+          completed: "#/components/schemas/SvOnboardingStateCompleted"
+          unknown: "#/components/schemas/SvOnboardingStateUnknown"
 
     OnboardSvPartyMigrationAuthorizeRequest:
       type: object
@@ -942,10 +989,21 @@ components:
           type: string
 
     OnboardSvPartyMigrationAuthorizeErrorResponse:
+      oneOf:
+        - "$ref": "#/components/schemas/AcceptedStateNotFoundErrorResponse"
+        - "$ref": "#/components/schemas/ProposalNotFoundErrorResponse"
+    AcceptedStateNotFoundErrorResponse:
       type: object
+      required:
+        - accepted_state_not_found
       properties:
         accepted_state_not_found:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+    ProposalNotFoundErrorResponse:
+      type: object
+      required:
+        - proposal_not_found
+      properties:
         proposal_not_found:
           type: object
           required:

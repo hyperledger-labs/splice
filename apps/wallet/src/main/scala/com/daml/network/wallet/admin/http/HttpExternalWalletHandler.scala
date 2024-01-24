@@ -271,7 +271,9 @@ class HttpExternalWalletHandler(
             r0.GetBuyTrafficRequestStatusResponse(
               d0.ErrorResponse(s"Couldn't find transfer offer with tracking id $trackingId")
             )
-          )(status => r0.GetBuyTrafficRequestStatusResponse(status.toStatusResponse))
+          )(status => {
+            r0.GetBuyTrafficRequestStatusResponse(status.toStatusResponse)
+          })
       }
     }
   }

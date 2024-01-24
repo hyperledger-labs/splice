@@ -11,13 +11,14 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{ValidatorAppBackendReference, *}
-import com.daml.network.http.v0.definitions.GetTransferOfferStatusResponse
+import com.daml.network.http.v0.definitions as d0
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.WalletTestUtil.{DynamicUserRefs, StaticUserRefs}
+import com.daml.network.wallet.store.TxLogEntry.TransferOfferStatus
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -199,9 +200,10 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     )(
       "the transfer offer shows up as created",
       transferOfferId => {
-        val status = senderWallet.getTransferOfferStatus(trackingId)
-        status.status shouldBe GetTransferOfferStatusResponse.Status.Created
-
+        inside(senderWallet.getTransferOfferStatus(trackingId)) {
+          case d0.GetTransferOfferStatusResponse.members.TransferOfferCreatedResponse(response) =>
+            response.status shouldBe TransferOfferStatus.Created.status
+        }
         forExactly(1, receiverWallet.listTransferOffers()) { offer =>
           offer.contractId shouldBe transferOfferId
           offer.payload.trackingId shouldBe trackingId
@@ -216,8 +218,10 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     )(
       "the transfer offer shows up as completed",
       _ => {
-        val status = senderWallet.getTransferOfferStatus(trackingId)
-        status.status shouldBe GetTransferOfferStatusResponse.Status.Completed
+        inside(senderWallet.getTransferOfferStatus(trackingId)) {
+          case d0.GetTransferOfferStatusResponse.members.TransferOfferCompletedResponse(response) =>
+            response.status shouldBe TransferOfferStatus.Completed.status
+        }
       },
     )
   }

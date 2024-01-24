@@ -4,6 +4,7 @@ package com.daml.network.sv.cometbft
 
 import cats.data.EitherT
 import cats.syntax.either.*
+import com.daml.network.http.v0.definitions.CometBftJsonRpcRequestId
 import com.daml.network.sv.cometbft.CometBftHttpRpcClient.CometBftCallResponse.{
   cometBftBroadcastResultDecoder,
   queryDecoder,
@@ -52,7 +53,7 @@ class CometBftHttpRpcClient(
   def rawCall(
       path: String,
       params: Map[String, Json] = Map.empty,
-      id: Option[Json] = None,
+      id: Option[CometBftJsonRpcRequestId] = None,
   ): EitherT[Future, CometBftError, Json] = {
     callCometBftJsonHttp[Json](path, params, id).map(_.result)
   }
@@ -60,7 +61,7 @@ class CometBftHttpRpcClient(
   def rawCallFullResponse(
       path: String,
       params: Map[String, Json] = Map.empty,
-      id: Option[Json] = None,
+      id: Option[CometBftJsonRpcRequestId] = None,
   ): EitherT[Future, CometBftError, CometBftCallResponse[Json]] = {
     callCometBftJsonHttp[Json](path, params, id)
   }
@@ -109,7 +110,7 @@ class CometBftHttpRpcClient(
   private def callCometBftJsonHttp[T: Decoder](
       method: String,
       params: Map[String, Json],
-      id: Option[Json] = None,
+      id: Option[CometBftJsonRpcRequestId] = None,
   ): EitherT[Future, CometBftError, CometBftCallResponse[T]] = EitherT {
     // if not provided, id is set to a unique id for correlating requests with responses
     // without an id the request is treated fully async
@@ -202,19 +203,25 @@ object CometBftHttpRpcClient {
 
   private[cometbft] sealed trait CometBftJsonHttpResponse {
     def jsonrpc: String
-    def id: Json // id could be a string (auto-generated UUID in our code) or a number (used by the CometBft Light client during state sync)
+    def id: CometBftJsonRpcRequestId // id could be a string (auto-generated UUID in our code) or a number (used by the CometBft Light client during state sync)
   }
 
   // Ideally error should be a `String`, as defined by the API spec, but it seems that it's not really enforced and sometimes it's an object
-  private[cometbft] case class CometBftErrorResponse(jsonrpc: String, id: Json, error: Json)
-      extends CometBftJsonHttpResponse
+  private[cometbft] case class CometBftErrorResponse(
+      jsonrpc: String,
+      id: CometBftJsonRpcRequestId,
+      error: Json,
+  ) extends CometBftJsonHttpResponse
 
   private[cometbft] object CometBftErrorResponse {
     implicit val errorDecoder: Decoder[CometBftErrorResponse] =
       deriveDecoder[CometBftErrorResponse]
   }
-  private[cometbft] case class CometBftCallResponse[T](jsonrpc: String, id: Json, result: T)
-      extends CometBftJsonHttpResponse
+  private[cometbft] case class CometBftCallResponse[T](
+      jsonrpc: String,
+      id: CometBftJsonRpcRequestId,
+      result: T,
+  ) extends CometBftJsonHttpResponse
 
   private[cometbft] object CometBftCallResponse {
     implicit val responseDecoder: Decoder[CometBftQueryResponse] =

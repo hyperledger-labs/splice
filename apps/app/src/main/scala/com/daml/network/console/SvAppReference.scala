@@ -86,7 +86,7 @@ abstract class SvAppReference(
 
   @Help.Summary("Make a CometBFT Json RPC request")
   def cometBftJsonRpcRequest(
-      id: io.circe.Json,
+      id: definitions.CometBftJsonRpcRequestId,
       method: definitions.CometBftJsonRpcRequest.Method,
       params: Map[String, io.circe.Json] = Map.empty,
   ): definitions.CometBftJsonRpcResponse =

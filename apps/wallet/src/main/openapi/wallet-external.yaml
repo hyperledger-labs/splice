@@ -195,7 +195,7 @@ components:
         expires_at:
           description: |
             Expiry time of the transfer offer as unix timestamp in microseconds. After this time, the offer can no longer be accepted
-            and automation in the wallet will eventually expire the tranfer offer.
+            and automation in the wallet will eventually expire the transfer offer.
             Note that this time is compared against the ledger effective time of the Daml transaction accepting or expiring an offer, and can skew from the wall clock
             time measured on the caller's machine. See https://docs.daml.com/concepts/time.html
             for how ledger effective time is bound to the record time of a transaction on a domain.
@@ -203,19 +203,20 @@ components:
           format: int64
         tracking_id:
           description: |
-            tracking id to support exactly once submission. Once submitted, all succeessive calls with the same tracking id
+            tracking id to support exactly once submission. Once submitted, all successive calls with the same tracking id
             will get rejected with a 409 or 429 status code unless the command fails and the offer did not get created.
             Clients should create a fresh tracking id when they try to create a new transfer offer. If that command submission fails
             with a retryable error or the application crashed and got restarted, successive command submissions must reuse the same
             tracking id to ensure they don't create the same offer multiple times.
           type: string
 
-    GetTransferOfferStatusResponse:
+    BaseGetTransferOfferStatusResponse:
       type: object
       required:
         - status
       properties:
         status:
+          type: string
           description: |
             The status of the transfer offer.
             created:
@@ -232,40 +233,92 @@ components:
             failed:
               The transfer has failed permanently and no CC has been transferred. Refer to
               failure_reason for details. A new transfer offer can be created with a different tracking_id.
-          type: string
-          enum:
-            - created
-            - accepted
-            - completed
-            - failed
-        transaction_id:
-          type: string
-          description: |
-            Set for created, accepted and completed but not for failed. Refer to the description of status
-            for the transaction this references.
-        contract_id:
-          type: string
-          description: |
-            Set for created, accepted and completed but not for failed. Refer to the description of status
-            for the contract id this references.
-        failure_kind:
-          type: string
-          description: |
-            The reason for the failure of the transfer offer.
-            expired:
-              The transfer offer or the accepted transfer offer expired before it could be completed.
-            rejected:
-              The receiver rejected the transfer offer or withdraw their accepted offer.
-            withdrawn:
-              The sender withdraw their offer, e.g., due to insufficient funds or operational reasons.
-          enum:
-            - expired
-            - rejected
-            - withdrawn
-        withdrawn_reason:
-          type: string
-          description: |
-            Human readable description of the reason for the sender withdrawing their offer.
+    TransferOfferCreatedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetTransferOfferStatusResponse"
+        - type: object
+          required:
+            - transaction_id
+            - contract_id
+          properties:
+            transaction_id:
+              type: string
+              description: |
+                Id of the transaction that created the transfer offer
+            contract_id:
+              type: string
+              description: |
+                Contract id of the created transfer offer
+    TransferOfferAcceptedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetTransferOfferStatusResponse"
+        - type: object
+          required:
+            - transaction_id
+            - contract_id
+          properties:
+            transaction_id:
+              type: string
+              description: |
+                Id of the transaction that accepted the transfer offer
+            contract_id:
+              type: string
+              description: |
+                Contract id of the accepted transfer offer
+    TransferOfferCompletedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetTransferOfferStatusResponse"
+        - type: object
+          required:
+            - transaction_id
+            - contract_id
+          properties:
+            transaction_id:
+              type: string
+              description: |
+                Id of the transaction of the transfer
+            contract_id:
+              type: string
+              description: |
+                Contract id of the created coin for the receiver
+    TransferOfferFailedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetTransferOfferStatusResponse"
+        - type: object
+          required:
+            - failure_kind
+          properties:
+            failure_kind:
+              type: string
+              description: |
+                The reason for the failure of the transfer offer.
+                expired:
+                  The transfer offer or the accepted transfer offer expired before it could be completed.
+                rejected:
+                  The receiver rejected the transfer offer or withdrew their accepted offer.
+                withdrawn:
+                  The sender withdraw their offer, e.g., due to insufficient funds or operational reasons.
+              enum:
+                - expired
+                - rejected
+                - withdrawn
+            withdrawn_reason:
+              type: string
+              description: |
+                Human readable description of the reason for the sender withdrawing their offer.
+    GetTransferOfferStatusResponse:
+      oneOf:
+        - "$ref": "#/components/schemas/TransferOfferCreatedResponse"
+        - "$ref": "#/components/schemas/TransferOfferAcceptedResponse"
+        - "$ref": "#/components/schemas/TransferOfferCompletedResponse"
+        - "$ref": "#/components/schemas/TransferOfferFailedResponse"
+      discriminator:
+        propertyName: status
+        mapping:
+          created: "#/components/schemas/TransferOfferCreatedResponse"
+          accepted: "#/components/schemas/TransferOfferAcceptedResponse"
+          completed: "#/components/schemas/TransferOfferCompletedResponse"
+          failed: "#/components/schemas/TransferOfferFailedResponse"
 
     CreateTransferOfferResponse:
       type: object
@@ -334,12 +387,13 @@ components:
         request_contract_id:
           type: string
 
-    GetBuyTrafficRequestStatusResponse:
+    BaseGetBuyTrafficRequestStatusResponse:
       type: object
       required:
         - status
       properties:
         status:
+          type: string
           description: |
             The status of the traffic request
             created:
@@ -351,27 +405,50 @@ components:
             failed:
               The request to buy traffic has failed permanently and no CC has been transferred. Refer to
               failure_reason for details. Use a new tracking_id if you want to retry buying traffic.
-          type: string
-          enum:
-            - created
-            - completed
-            - failed
-        transaction_id:
-          type: string
-          description: |
-            Set for status=completed and points to the transaction that purchased traffic.
-        failure_reason:
-          type: string
-          description: |
-            The reason for the failure of the request to buy traffic.
-            expired:
-              The wallet automation did not process the request in time.
-            rejected:
-              The wallet automation rejected the request, e.g., due to insufficient funds or operational reasons.
-          enum:
-            - expired
-            - rejected
-        rejection_reason:
-          description: |
-            Human readable description of the rejection reason.
-          type: string
+    BuyTrafficRequestCreatedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetBuyTrafficRequestStatusResponse"
+    BuyTrafficRequestCompletedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetBuyTrafficRequestStatusResponse"
+        - type: object
+          required:
+            - transaction_id
+          properties:
+            transaction_id:
+              type: string
+              description: |
+                Id of the transaction that purchased traffic.
+    BuyTrafficRequestFailedResponse:
+      allOf:
+        - "$ref": "#/components/schemas/BaseGetBuyTrafficRequestStatusResponse"
+        - type: object
+          required:
+            - failure_reason
+          properties:
+            failure_reason:
+              type: string
+              description: |
+                The reason for the failure of the request to buy traffic.
+                expired:
+                  The wallet automation did not process the request in time.
+                rejected:
+                  The wallet automation rejected the request, e.g., due to insufficient funds or operational reasons.
+              enum:
+                - expired
+                - rejected
+            rejection_reason:
+              description: |
+                Human readable description of the rejection reason.
+              type: string
+    GetBuyTrafficRequestStatusResponse:
+      oneOf:
+        - "$ref": "#/components/schemas/BuyTrafficRequestCreatedResponse"
+        - "$ref": "#/components/schemas/BuyTrafficRequestCompletedResponse"
+        - "$ref": "#/components/schemas/BuyTrafficRequestFailedResponse"
+      discriminator:
+        propertyName: status
+        mapping:
+          created: "#/components/schemas/BuyTrafficRequestCreatedResponse"
+          completed: "#/components/schemas/BuyTrafficRequestCompletedResponse"
+          failed: "#/components/schemas/BuyTrafficRequestFailedResponse"

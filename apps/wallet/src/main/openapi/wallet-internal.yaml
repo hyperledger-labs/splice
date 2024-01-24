@@ -649,10 +649,27 @@ components:
         state:
           $ref: "#/components/schemas/SubscriptionState"
     SubscriptionState:
+      oneOf:
+        - $ref: "#/components/schemas/SubscriptionIdleState"
+        - $ref: "#/components/schemas/SubscriptionPaymentState"
       type: object
       properties:
         idle:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        payment:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+    SubscriptionIdleState:
+      type: object
+      required:
+        - idle
+      properties:
+        idle:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+    SubscriptionPaymentState:
+      type: object
+      required:
+        - payment
+      properties:
         payment:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
@@ -749,7 +766,7 @@ components:
         coin_operation:
           type: string
 
-    ListTransactionsResponseItem:
+    BaseListTransactionsResponseItem:
       type: object
       required:
         - transaction_type
@@ -757,11 +774,6 @@ components:
         - event_id
         - date
       properties:
-        # Note: our codegen does not support oneOf. The property transaction_type should be a discriminator for a sum type.
-        # Supported transaction types:
-        # - 'transfer', with fields: provider, sender, receivers, holding_fees, coin_price
-        # - 'balance_change', with fields: receivers, coin_price
-        # - 'notification', with fields: details
         transaction_type:
           type: string
         transaction_subtype:
@@ -771,24 +783,74 @@ components:
         date:
           type: string
           format: date-time
-        provider:
-          type: string
-        sender:
-          $ref: "#/components/schemas/PartyAndAmount"
-        receivers:
-          type: array
-          items:
-            $ref: "#/components/schemas/PartyAndAmount"
-        holding_fees:
-          type: string
-        coin_price:
-          type: string
-        app_rewards_used:
-          type: string
-        validator_rewards_used:
-          type: string
-        details:
-          type: string
+    TransferResponseItem:
+      allOf:
+        - $ref: "#/components/schemas/BaseListTransactionsResponseItem"
+        - type: object
+          required:
+            - provider
+            - sender
+            - receivers
+            - holding_fees
+            - coin_price
+            - app_rewards_used
+            - validator_rewards_used
+          properties:
+            provider:
+              type: string
+            sender:
+              $ref: "#/components/schemas/PartyAndAmount"
+            receivers:
+              type: array
+              items:
+                $ref: "#/components/schemas/PartyAndAmount"
+            holding_fees:
+              type: string
+            coin_price:
+              type: string
+            app_rewards_used:
+              type: string
+            validator_rewards_used:
+              type: string
+    BalanceChangeResponseItem:
+      allOf:
+        - $ref: "#/components/schemas/BaseListTransactionsResponseItem"
+        - type: object
+          required:
+            - receivers
+            - coin_price
+          properties:
+            receivers:
+              type: array
+              items:
+                $ref: "#/components/schemas/PartyAndAmount"
+            coin_price:
+              type: string
+    NotificationResponseItem:
+      allOf:
+        - $ref: "#/components/schemas/BaseListTransactionsResponseItem"
+        - type: object
+          required:
+            - details
+          properties:
+            details:
+              type: string
+    UnknownResponseItem:
+      allOf:
+        - $ref: "#/components/schemas/BaseListTransactionsResponseItem"
+    ListTransactionsResponseItem:
+      oneOf:
+        - $ref: "#/components/schemas/TransferResponseItem"
+        - $ref: "#/components/schemas/BalanceChangeResponseItem"
+        - $ref: "#/components/schemas/NotificationResponseItem"
+        - $ref: "#/components/schemas/UnknownResponseItem"
+      discriminator:
+        propertyName: transaction_type
+        mapping:
+          transfer: "#/components/schemas/TransferResponseItem"
+          balance_change: "#/components/schemas/BalanceChangeResponseItem"
+          notification: "#/components/schemas/NotificationResponseItem"
+          unknown: "#/components/schemas/UnknownResponseItem"
 
     ListTransactionsResponse:
       type: object

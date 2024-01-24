@@ -58,14 +58,14 @@ const GeneralInformationView: React.FC = () => {
   const resp = useSvcInfos();
   if (!resp.isLoading) {
     const data = resp.data!;
-    var cs: { key: string; value: string }[] = [];
+    let cs: { key: string; value: string }[] = [];
     data.svcRules.payload.members.forEach((value, key) => cs.push(createRow(key, value.name)));
     const svInfos = [
       createRow('svUser', data.svUser),
       createRow('svPartyId', data.svPartyId, true),
     ];
     const membersInfos: { key: string; value: string; isParty: boolean }[] = [];
-    for (var member of cs) {
+    for (const member of cs) {
       membersInfos.push(createRow(member.value, member.key, true));
     }
     const svcInfos = [
@@ -123,30 +123,22 @@ function getCometBftDebugData(
   const data = cometBftNodeDebugQuery.data;
 
   if (data.error) {
-    return <p>Error encountered in cometBFT node: {data.error?.error} </p>;
+    return <p>Error encountered in cometBFT node: {data.error} </p>;
   }
 
   return (
     <div>
-      <JSONPretty
-        id="comet-bft-debug-abci"
-        style={{ fontSize: '10pt' }}
-        data={data.response?.abci_info}
-      />
+      <JSONPretty id="comet-bft-debug-abci" style={{ fontSize: '10pt' }} data={data.abci_info} />
       <JSONPretty
         id="comet-bft-debug-validators"
         style={{ fontSize: '10pt' }}
-        data={data.response?.validators}
+        data={data.validators}
       />
-      <JSONPretty
-        id="comet-bft-debug-status"
-        style={{ fontSize: '10pt' }}
-        data={data.response?.status}
-      />
+      <JSONPretty id="comet-bft-debug-status" style={{ fontSize: '10pt' }} data={data.status} />
       <JSONPretty
         id="comet-bft-debug-network"
         style={{ fontSize: '10pt' }}
-        data={data.response?.network_info}
+        data={data.network_info}
       />
     </div>
   );
@@ -162,7 +154,9 @@ const StatusDisplay: React.FC<{ status: UseQueryResult<NodeStatus> }> = ({ statu
 
   const data = status.data;
 
-  if (data.not_initialized) {
+  if (data.failed) {
+    return <ErrorDisplay message={`Failed to fetch status: ${data.failed.error}`} />;
+  } else if (data.not_initialized) {
     return <div>Not initialized</div>;
   }
 

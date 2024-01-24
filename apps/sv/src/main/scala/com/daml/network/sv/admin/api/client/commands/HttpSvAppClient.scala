@@ -9,8 +9,6 @@ import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
-import com.daml.network.http.v0.definitions.CometBftNodeStatusResponse
-import com.daml.network.http.v0.sv.{GetCometBftNodeStatusResponse, SvClient}
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -49,7 +47,7 @@ object HttpSvAppClient {
       svcRules: Contract[SvcRules.ContractId, SvcRules],
   )
 
-  sealed trait SvOnboardingStatus;
+  sealed trait SvOnboardingStatus
   object SvOnboardingStatus {
     final case class Unknown() extends SvOnboardingStatus
     final case class Requested(
@@ -118,51 +116,42 @@ object HttpSvAppClient {
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.GetSvOnboardingStatusResponse.OK(response) =>
-      (response.state match {
-        case "unknown" => Some(SvOnboardingStatus.Unknown())
-        case "requested" =>
-          for {
-            name <- response.name
-            cidString <- response.contractId
-            svOnboardingRequestCid <- Codec
-              .decodeJavaContractId(SvOnboardingRequest.COMPANION)(cidString)
-              .toOption
-            confirmedBy <- response.confirmedBy
-            requiredNumConfirmations <- response.requiredNumConfirmations
-          } yield SvOnboardingStatus.Requested(
-            name,
-            svOnboardingRequestCid,
-            confirmedBy,
-            requiredNumConfirmations,
-          )
-        case "confirmed" =>
-          for {
-            name <- response.name
-            cidString <- response.contractId
-            svOnboardingConfirmedCid <- Codec
-              .decodeJavaContractId(SvOnboardingConfirmed.COMPANION)(cidString)
-              .toOption
-          } yield SvOnboardingStatus.Confirmed(
-            name,
-            svOnboardingConfirmedCid,
-          )
-        case "completed" =>
-          for {
-            name <- response.name
-            cidString <- response.contractId
-            svcRulesCid <- Codec
-              .decodeJavaContractId(SvcRules.COMPANION)(cidString)
-              .toOption
-          } yield SvOnboardingStatus.Completed(
-            name,
-            svcRulesCid,
-          )
-        case _ => None
-      }) match {
-        case Some(status) => Right(status: SvOnboardingStatus)
-        case None => Left(s"Could not parse response: $response.")
-      }
+    ): PartialFunction[http.GetSvOnboardingStatusResponse, Either[String, SvOnboardingStatus]] = {
+      case http.GetSvOnboardingStatusResponse.OK(response) =>
+        response match {
+          case definitions.GetSvOnboardingStatusResponse.members
+                .SvOnboardingStateRequested(status) =>
+            for {
+              svOnboardingRequestCid <- Codec.decodeJavaContractId(SvOnboardingRequest.COMPANION)(
+                status.contractId
+              )
+            } yield SvOnboardingStatus.Requested(
+              status.name,
+              svOnboardingRequestCid,
+              status.confirmedBy,
+              status.requiredNumConfirmations,
+            )
+          case definitions.GetSvOnboardingStatusResponse.members
+                .SvOnboardingStateConfirmed(status) =>
+            for {
+              svOnboardingConfirmedCid <- Codec
+                .decodeJavaContractId(SvOnboardingConfirmed.COMPANION)(status.contractId)
+            } yield SvOnboardingStatus.Confirmed(
+              status.name,
+              svOnboardingConfirmedCid,
+            )
+          case definitions.GetSvOnboardingStatusResponse.members
+                .SvOnboardingStateCompleted(status) =>
+            for {
+              svcRulesCid <- Codec
+                .decodeJavaContractId(SvcRules.COMPANION)(status.contractId)
+            } yield SvOnboardingStatus.Completed(
+              status.name,
+              svcRulesCid,
+            )
+          case definitions.GetSvOnboardingStatusResponse.members.SvOnboardingStateUnknown(_) =>
+            Right(SvOnboardingStatus.Unknown())
+        }
     }
   }
 
@@ -258,7 +247,7 @@ object HttpSvAppClient {
         tc: TraceContext,
         ec: ExecutionContext,
         mat: Materializer,
-    ): SvClient =
+    ): http.SvClient =
       http.SvClient.httpClient(
         HttpClientBuilder().buildClient(Set(StatusCodes.BadRequest)),
         host,
@@ -283,22 +272,22 @@ object HttpSvAppClient {
         decoder: TemplateJsonDecoder
     ) = {
       case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(
-            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse(
-              Some(acceptedStateNotFound),
-              None,
-            )
+            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse.members
+              .AcceptedStateNotFoundErrorResponse(
+                response
+              )
           ) =>
-        Left(acceptedStateNotFound.error)
+        Left(response.acceptedStateNotFound.error)
       case http.OnboardSvPartyMigrationAuthorizeResponse.BadRequest(
-            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse(
-              None,
-              Some(proposalNotFound),
-            )
+            definitions.OnboardSvPartyMigrationAuthorizeErrorResponse.members
+              .ProposalNotFoundErrorResponse(
+                response
+              )
           ) =>
         Right(
           Left(
             OnboardSvPartyMigrationAuthorizeProposalNotFound(
-              PositiveInt.tryCreate(proposalNotFound.partyToParticipantBaseSerial.intValue)
+              PositiveInt.tryCreate(response.proposalNotFound.partyToParticipantBaseSerial.intValue)
             )
           )
         )
@@ -396,15 +385,23 @@ object HttpSvAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ): PartialFunction[
-      GetCometBftNodeStatusResponse,
-      Either[String, CometBftNodeStatusResponse],
-    ] = { case http.GetCometBftNodeStatusResponse.OK(response) =>
-      response.response.toRight(response.error.map(_.error).getOrElse("No response found"))
+      http.GetCometBftNodeStatusResponse,
+      Either[String, definitions.CometBftNodeStatusResponse],
+    ] = {
+      case http.GetCometBftNodeStatusResponse.OK(
+            definitions.CometBftNodeStatusOrErrorResponse.members
+              .CometBftNodeStatusResponse(response)
+          ) =>
+        Right(response)
+      case http.GetCometBftNodeStatusResponse.OK(
+            definitions.CometBftNodeStatusOrErrorResponse.members.ErrorResponse(response)
+          ) =>
+        Left(response.error)
     }
   }
 
   case class CometBftJsonRpcRequest(
-      id: io.circe.Json,
+      id: definitions.CometBftJsonRpcRequestId,
       method: definitions.CometBftJsonRpcRequest.Method,
       params: Map[String, io.circe.Json],
   ) extends BaseCommand[
@@ -427,7 +424,14 @@ object HttpSvAppClient {
       http.CometBftJsonRpcRequestResponse,
       Either[String, definitions.CometBftJsonRpcResponse],
     ] = {
-      case http.CometBftJsonRpcRequestResponse.OK(response) => Right(response)
+      case http.CometBftJsonRpcRequestResponse.OK(
+            definitions.CometBftJsonRpcOrErrorResponse.members.CometBftJsonRpcResponse(response)
+          ) =>
+        Right(response)
+      case http.CometBftJsonRpcRequestResponse.OK(
+            definitions.CometBftJsonRpcOrErrorResponse.members.ErrorResponse(response)
+          ) =>
+        Left(response.error)
       case http.CometBftJsonRpcRequestResponse.NotFound(response) => Left(response.error)
     }
   }

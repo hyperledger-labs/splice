@@ -185,9 +185,9 @@ class HttpWalletHandler(
                 subscription.subscription.toHttp,
                 subscription.state match {
                   case UserWalletStore.SubscriptionIdleState(contract) =>
-                    d0.SubscriptionState(idle = Some(contract.toHttp))
+                    d0.SubscriptionIdleState(idle = contract.toHttp)
                   case UserWalletStore.SubscriptionPaymentState(contract) =>
-                    d0.SubscriptionState(payment = Some(contract.toHttp))
+                    d0.SubscriptionPaymentState(payment = contract.toHttp)
                 },
               )
             }.toVector
