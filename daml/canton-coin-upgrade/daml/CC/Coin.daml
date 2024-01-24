@@ -247,8 +247,7 @@ template UnclaimedReward with
     svc : Party
     amount : Decimal
   where
-    -- ensure amount >= 0.0
-    -- TODO(#9216): add back this invariant once Decimal-division rounding in rewards issuance is fixed.
+    ensure amount > 0.0
 
     signatory svc
 

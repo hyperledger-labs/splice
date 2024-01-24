@@ -99,10 +99,14 @@ computeIssuingRoundParameters tickDuration coinPrice config summary =
 
     issuancePerSvRewardCoupon =
       if summary.totalSvRewardWeight == 0
-        then 0.0
+        then coinsToIssueToSvc -- signal what could be earned with one coupon in this round
         else coinsToIssueToSvc / intToDecimal summary.totalSvRewardWeight
 
-    unclaimedSvRewards = coinsToIssueToSvc - issuancePerSvRewardCoupon * intToDecimal summary.totalSvRewardWeight
+    -- As noted in `computeIssuanceTranche` below, Decimal uses HalfEven rounding on division and multiplication,
+    -- which means that for a fully subscribed SVC issuance, there is a rounding error of up to 0.5e-10 * 2.4e6 = 0.00012.
+    -- This is 1.2 USD at the high price of 10k USD per coin, which we accept as it does not meaningfully affect the tokenomics.
+    unclaimedSvRewards =
+      max 0.0 $ coinsToIssueToSvc - issuancePerSvRewardCoupon * intToDecimal summary.totalSvRewardWeight
 
     roundsPerYear =
       intToDecimal (convertRelTimeToMicroseconds (days 365)) /
@@ -143,15 +147,25 @@ data IssuanceTranche = IssuanceTranche with
 -- computes parameters that issue as many rewards per coupon as possible up to
 -- a maximum of `capPerCoupon` coins.
 computeIssuanceTranche : Decimal -> Decimal -> Decimal -> IssuanceTranche
-computeIssuanceTranche rewardsToIssue capPerCoupon totalCoupons =
-    IssuanceTranche with
+computeIssuanceTranche rewardsToIssue capPerCoupon totalCoupons
+  | totalCoupons <= 0.0 = IssuanceTranche with
       rewardsToIssue
-      -- note: no risk of overflow, as coinsToIssueInRound * cap is always way below the largest Decimal
-      issuancePerCoupon =
-        if  scaledTotalCoupons <= 0.0
-          then capPerCoupon
-          else (cappedRewardsToIssue * capPerCoupon) / scaledTotalCoupons
-      unclaimedRewards = rewardsToIssue - cappedRewardsToIssue
-  where
-    scaledTotalCoupons = capPerCoupon * totalCoupons
-    cappedRewardsToIssue = min rewardsToIssue scaledTotalCoupons
+      issuancePerCoupon = capPerCoupon  -- signal what could be earned with one coupon in this round
+      unclaimedRewards = rewardsToIssue
+  | otherwise =
+      let
+        scaledTotalCoupons = capPerCoupon * totalCoupons
+        cappedRewardsToIssue = min rewardsToIssue scaledTotalCoupons
+        issuancePerCoupon =
+          -- note: no risk of overflow, as rewardsToIssue * capPerCoupon is always way below the largest Decimal
+          (cappedRewardsToIssue * capPerCoupon) / scaledTotalCoupons
+
+        -- Decimal uses HalfEven rounding on division and multiplication, which means that when rounding up there is a
+        -- rounding error of up to 0.5e-10 * rewardsToIssue. We accept this as it does not meaningfully affect the
+        -- tokenomics; and is in favor of the rewardees.
+        --
+        -- There are obviously no unclaimed rewards when over-issuing.
+        unclaimedRewards = max 0.0 $ rewardsToIssue - issuancePerCoupon * totalCoupons
+      in
+        IssuanceTranche with ..
+

@@ -90,8 +90,7 @@ expectedParameters_E1_1p5_5 = IssuingRoundParameters with
   coinsToIssueToSvc = 38051.7503805175
   unclaimedValidatorRewards = 3746.5753424658
   unclaimedAppRewards = 72200.4261796042
-  -- TODO(#9216): fix Decimal-division rounding to not have negative unclaimed rewards
-  unclaimedSvRewards = -0.0000000025
+  unclaimedSvRewards = 0.0
 
 expectedParameters_E1_5_10 : IssuingRoundParameters
 expectedParameters_E1_5_10 = IssuingRoundParameters with
@@ -101,10 +100,9 @@ expectedParameters_E1_5_10 = IssuingRoundParameters with
   issuancePerValidatorFaucetCoupon = 359.5433789954
   issuancePerSvRewardCoupon = 95.1293759513
   coinsToIssueToSvc = 9512.9375951294
-  unclaimedValidatorRewards = 0.0000000000
+  unclaimedValidatorRewards = 0.0000000017
   unclaimedAppRewards = 19879.2694063927
-  -- TODO(#9216): fix Decimal-division rounding to not have negative unclaimed rewards
-  unclaimedSvRewards = -0.0000000006
+  unclaimedSvRewards = 0.0
 
 expectedParameters_E1_10plus : IssuingRoundParameters
 expectedParameters_E1_10plus = IssuingRoundParameters with
@@ -114,8 +112,8 @@ expectedParameters_E1_10plus = IssuingRoundParameters with
   issuancePerValidatorFaucetCoupon = 150.2587519026
   issuancePerSvRewardCoupon = 23.7823439878
   coinsToIssueToSvc = 2378.2343987823
-  unclaimedValidatorRewards = 0.0000000000
-  unclaimedAppRewards = 0.0
+  unclaimedValidatorRewards = 0.0
+  unclaimedAppRewards = 0.0000000152
   unclaimedSvRewards = 0.0000000023
 
 testE1 : Script ()
@@ -146,7 +144,7 @@ expectedParameters_NoActivity_0_0p5 = IssuingRoundParameters with
   issuancePerFeaturedAppRewardCoupon = 100.0000000000
   issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
   issuancePerValidatorFaucetCoupon = 570.0
-  issuancePerSvRewardCoupon = 0.0
+  issuancePerSvRewardCoupon = 608828.0060882801
   coinsToIssueToSvc = 608828.0060882801
   unclaimedValidatorRewards = 38051.7503805175
   unclaimedAppRewards = 114155.2511415525
@@ -188,5 +186,46 @@ testE4 = script do
   validateOpenMiningRoundSummary summaryExample3
 
   expectedParameters_E3_0_0p5 === computeIssuingRoundParameters tickDuration coinPrice issuanceConfig_0_0p5 summaryExample3
+
+
+-- Example 4: fully subscribed SVC after 10 years
+-------------------------------------------------
+
+
+summaryExampleFullSvc : OpenMiningRoundSummary
+summaryExampleFullSvc = OpenMiningRoundSummary with
+  totalValidatorRewardCoupons = 0.0
+  totalFeaturedAppRewardCoupons = 0.0
+  totalUnfeaturedAppRewardCoupons = 0.0
+  optTotalValidatorFaucetCoupons = Some 0
+  totalSvRewardWeight = 240 * 10000  -- total weight is 240 and it is represented in basis points
+
+expectedParameters_FullSvc_10plus : IssuingRoundParameters
+expectedParameters_FullSvc_10plus = IssuingRoundParameters with
+  issuancePerValidatorRewardCoupon = 0.2000000000
+  issuancePerFeaturedAppRewardCoupon = 100.0000000000
+  issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
+  issuancePerValidatorFaucetCoupon = 570.0
+  issuancePerSvRewardCoupon = 0.000990931
+  coinsToIssueToSvc = 2378.2343987823
+  unclaimedAppRewards = 35673.5159817352
+  unclaimedValidatorRewards = 9512.9375951294
+  unclaimedSvRewards = 0.0
+
+testFullSvc : Script ()
+testFullSvc = script do
+  validateOpenMiningRoundSummary summaryExamplNoActivity
+
+  let actual = computeIssuingRoundParameters tickDuration coinPrice issuanceConfig_10plus summaryExampleFullSvc
+  let actualUnclaimedSvRewards =
+        actual.coinsToIssueToSvc -
+        actual.issuancePerSvRewardCoupon * intToDecimal summaryExampleFullSvc.totalSvRewardWeight
+  expectedParameters_FullSvc_10plus === actual
+
+  -- The maximal over-issuance is: 2.4e6 * 0.5e-10 * 1e4 = 0.00012, which is 1.2 USD at the high price of 10k USD per coin
+  -- We accept this, as it does not meanginfully impact the tokenomics.
+  -- In this concrete example, the over-issuance is two orders of magnitude lower: -0.0000012177
+  -0.0000012177 === actualUnclaimedSvRewards
+
 
 
