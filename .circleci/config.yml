@@ -1506,6 +1506,10 @@ jobs:
     resource_class: "xlarge"
     environment:
       <<: *env
+    parameters:
+      mark-for-devnet:
+        type: boolean
+        default: true
     steps:
       - checkout
       - record_job_start_time
@@ -1740,6 +1744,12 @@ jobs:
             LATEST_SNAPSHOT=`git describe --tags --match '*-snapshot.*' --abbrev=0 HEAD`
             git tag --force testnet-next $LATEST_SNAPSHOT
             git push --force origin testnet-next
+      - slack/notify:
+          # #team-canton-network-internal-ci
+          channel: C05DT77QF5M
+          event: pass
+          custom: |
+            { "text": "*✅Job '${CIRCLE_JOB}' marked the commit for testnet*\n<${CIRCLE_BUILD_URL}| Commit $(git describe --tags --match '*-snapshot.*' --abbrev=0 HEAD | sed s/\"//g)>" }
 
   update_pipeline_schedule:
     docker:
@@ -1889,6 +1899,16 @@ jobs:
              git tag devnet-next
              git push origin devnet-next
            fi
+      - when:
+          condition:
+            equal: [ true, <<pipeline.parameters.mark-for-devnet>> ]
+          steps:
+            - slack/notify:
+                # #team-canton-network-internal-ci
+                channel: C05DT77QF5M
+                event: pass
+                custom: |
+                  { "text": "*✅Job '${CIRCLE_JOB}' marked the commit for devnet*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
       - collect_test_timings_and_send_to_datadog
 
   docker_images_build:
