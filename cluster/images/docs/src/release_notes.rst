@@ -8,6 +8,10 @@ Release Notes
 
 * The ``/v0/wallet-balance`` endpoint to query a party's CC balance is exposed through the Scan app.
 
+* Non-SV validators now connect to all registered Scans in the domain and read from them in a BFT fashion (safe as long as less than 1/3 of them are faulty).
+  Scans are registered as part of the SV onboarding, using the public URL that was configured in the 2024-01-15 deployment (``scan.publicUrl`` in SV-app's helm chart).
+  SV validators still trust the Scan app of the SV.
+
 2024-01-22
 ----------
 
