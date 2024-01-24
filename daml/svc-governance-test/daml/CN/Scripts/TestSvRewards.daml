@@ -2,6 +2,7 @@ module CN.Scripts.TestSvRewards where
 
 import DA.Assert
 import DA.Action (void)
+import DA.List (sortOn)
 import DA.Foldable (forA_)
 import DA.Time
 import qualified DA.Map as Map
@@ -20,6 +21,9 @@ test_SvRewards = do
 
     (app, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
 
+    -- extra party to represent beneficiary
+    extraBeneficiary <- allocateParty "beneficiary"
+
     -- create validator rights for sv1-4, so that runCoinDepositBots can collect the rewards
     forA_ [sv1, sv2, sv3, sv4] $ \sv -> do
       submit sv $ createCmd ValidatorRight with
@@ -28,31 +32,41 @@ test_SvRewards = do
         validator = sv
 
     let checkSvRewardCouponsDoNotExist round = do
-          [] <- queryFilter @SvRewardCoupon app.svc (\co -> co.round == round)
+          [] <- queryFilter @SvRewardCoupon app.svc (\co -> co.round == round && co.beneficiary /= extraBeneficiary)
           pure ()
     let checkBalance sv amount = do
           [(_, coin)] <- query @Coin sv
           require (show sv <> " balance: expected " <> show amount <> " == " <> show coin.amount.initialAmount)
             (coin.amount.initialAmount == amount)
+    let getSvRewardWeight sv = do
+          [(_, rules)] <- query @SvcRules svc
+          pure $ optional 0 (.svRewardWeight) $ Map.lookup sv rules.members
+
     let receiveSvRewardCouponFails sv round rulesCid = do
+          weight <- getSvRewardWeight sv
           -- check that collecting the reward coupon fails
           void $ submitMultiMustFail [sv] [svc] $ exerciseCmd rulesCid SvcRules_ReceiveSvRewardCoupon with
             openRoundCid = round._1
+            beneficiaries = [(sv, weight)]
             sv = sv
     let receiveSvRewardCoupon : Party -> (ContractId OpenMiningRound, OpenMiningRound) -> ContractId SvcRules -> Script (ContractId SvcRules)
         receiveSvRewardCoupon sv round rulesCid = do
+          weight <- getSvRewardWeight sv
           -- collect reward coupon
-          (_, newRulesCid) <- submitMulti [sv] [svc] $ exerciseCmd rulesCid SvcRules_ReceiveSvRewardCoupon with
+          (newRulesCid, _) <- submitMulti [sv] [svc] $ exerciseCmd rulesCid SvcRules_ReceiveSvRewardCoupon with
             openRoundCid = round._1
+            beneficiaries = [(sv, weight - 1), (extraBeneficiary, 1)]
             sv = sv
-          [(_, rules)] <- query @SvcRules svc
           -- check that the coupon exists and has the right weight
           coupons <- queryFilter @SvRewardCoupon sv (\co -> co.round == round._2.round)
-          map (._2) coupons === [SvRewardCoupon with
+          sortOn (.weight) (map (._2) coupons) === sortOn (.weight)
+            [SvRewardCoupon with
                 svc = app.svc
                 sv
-                weight = optional (-1) (.svRewardWeight) $ Map.lookup sv rules.members
-                round = round._2.round]
+                beneficiary
+                weight
+                round = round._2.round
+              | (beneficiary, weight) <- [(sv, weight - 1), (extraBeneficiary, 1)]]
           -- return the new rules contract-id
           pure newRulesCid
 
@@ -85,8 +99,10 @@ test_SvRewards = do
     -- Note: SV1 weight is 10 and SV2 weight is 3
     checkSvRewardCouponsDoNotExist round0._2.round
     [(_, round)] <- queryFilter @IssuingMiningRound app.svc (\r -> r.round == round0._2.round)
-    let sv1Balance0 = round.issuancePerSvRewardCoupon * 10.0 - createFee
-    let sv2Balance = round.issuancePerSvRewardCoupon * 3.0 - createFee
+    let sv1Weight = intToDecimal $ bpsMultiplier * 10 - 1
+    let sv2Weight = intToDecimal $ bpsMultiplier * 3 - 1
+    let sv1Balance0 = round.issuancePerSvRewardCoupon * sv1Weight - createFee
+    let sv2Balance = round.issuancePerSvRewardCoupon * sv2Weight - createFee
     checkBalance sv1 sv1Balance0
     checkBalance sv2 sv2Balance
 
@@ -98,7 +114,7 @@ test_SvRewards = do
 
     [(_, round)] <- queryFilter @IssuingMiningRound app.svc (\r -> r.round == round1._2.round)
     let sv1Balance1 =
-            round.issuancePerSvRewardCoupon * 10.0 - createFee - openRound.transferConfigUsd.holdingFee.rate
+            round.issuancePerSvRewardCoupon * sv1Weight - createFee - openRound.transferConfigUsd.holdingFee.rate
             + sv1Balance0
     checkBalance sv1 sv1Balance1
     checkBalance sv2 sv2Balance -- no balance change for SV2 as it did not collect round 1

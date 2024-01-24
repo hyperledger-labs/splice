@@ -145,14 +145,30 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts
 diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts/TestRewardComputation.daml daml/canton-coin-test-upgrade/daml/CC/Scripts/TestRewardComputation.daml
 --- daml/canton-coin-test/daml/CC/Scripts/TestRewardComputation.daml
 +++ daml/canton-coin-test-upgrade/daml/CC/Scripts/TestRewardComputation.daml
-@@ -82,6 +82,7 @@
+@@ -88,6 +88,7 @@
+       provider = provider1.primaryParty
+       inputs = [ InputSvRewardCoupon svRewardBob2 ]
+       outputs = [ ]
++      upgrade = Some ()
+     context = context.context
+ 
+ 
+@@ -99,6 +100,7 @@
+       provider = bob.primaryParty
+       inputs = [ InputSvRewardCoupon svRewardBob2 ]
+       outputs = [ ]
++      upgrade = Some ()
+     context = context.context
+   transferResult.summary.senderChangeAmount ===
+     ( intToDecimal bob2Weight * issuingMiningRound0.issuancePerSvRewardCoupon - createFee)
+@@ -123,6 +125,7 @@
                      amount = 8.0
                      lock = None
                  ]
 +      upgrade = Some ()
      context = context.context
  
-   issuingMiningRounds <- queryFilter @IssuingMiningRound app.svc (\r -> r.round == Round 0)
+   let expectedValidatorFaucetAmount = getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound0
 diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin-test/daml/CC/Scripts/Util.daml daml/canton-coin-test-upgrade/daml/CC/Scripts/Util.daml
 --- daml/canton-coin-test/daml/CC/Scripts/Util.daml
 +++ daml/canton-coin-test-upgrade/daml/CC/Scripts/Util.daml

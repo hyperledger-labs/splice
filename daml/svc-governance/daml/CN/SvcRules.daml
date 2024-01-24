@@ -1215,10 +1215,11 @@ template SvcRules with
     -- Round durations are long enough that it's OK to have this bit of contention from all members drawing on their
     -- coupons at about the same time.
     choice SvcRules_ReceiveSvRewardCoupon
-      : (ContractId SvRewardCoupon, ContractId SvcRules)
+      : (ContractId SvcRules, [ContractId SvRewardCoupon])
       with
         sv : Party
         openRoundCid : ContractId OpenMiningRound
+        beneficiaries : [(Party, Int)]
       controller sv
       do
         case Map.lookup sv members of
@@ -1237,13 +1238,18 @@ template SvcRules with
             rulesCid <- create this with
               members = Map.insert sv newInfo members
 
-            couponCid <- create SvRewardCoupon with
-              svc
-              sv
-              weight = info.svRewardWeight
-              round = openRound.round
+            let totalBenficiaryWeight = sum $ map snd beneficiaries
+            require "Total beneficiary weight matches SV operator weight" (totalBenficiaryWeight == info.svRewardWeight)
 
-            return (couponCid, rulesCid)
+            couponCids <- forA beneficiaries $ \(beneficiary, weight) ->
+              create SvRewardCoupon with
+                svc
+                sv
+                beneficiary
+                weight
+                round = openRound.round
+
+            return (rulesCid, couponCids)
 
 
     -- TODO(#9149): remove this choice once the apps switched to the new SV reward issuance

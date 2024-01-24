@@ -699,7 +699,10 @@ summarizeAndConsumeInputs csum svc sender inps = do
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
 
     summarizeAndConsumeInput _round s (InputSvRewardCoupon couponCid) = do
-      coupon <- fetchAndArchive forOwner couponCid
+      -- we use the SvRewardCoupon_ArchiveAsBeneficiary choice to signal the archival of the coupon
+      -- upon the request of the beneficiary
+      coupon <- fetchButArchiveLater forOwner couponCid
+      exercise couponCid SvRewardCoupon_ArchiveAsBeneficiary
       -- compute balance change
       miningRound <- getIssuingMiningRound csum coupon.round
       return TransferInputsSummary with

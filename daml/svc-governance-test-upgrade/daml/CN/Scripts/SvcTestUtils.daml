@@ -27,6 +27,10 @@ import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
 import CN.Scripts.CnsRulesParameters
 
+-- | Multiplier for the SV weights, which are recorded in basis-points, i.e., 1/10000ths
+bpsMultiplier : Int
+bpsMultiplier = 10000
+
 initMainNetCollective : Script (CCApp, Party, (Party, Party, Party, Party))
 initMainNetCollective = initCollective 0 False
 
@@ -74,7 +78,7 @@ initCollective initialRoundNumber isDevNet = do
       svc
       founderParty = sv1
       founderName = "sv1"
-      founderRewardWeight = 10 -- Tier 1 SVs get weight 10
+      founderRewardWeight = 10 * bpsMultiplier -- Tier 1 SVs get weight 10, and weights are recorded in basis-points, i.e., 1/10000ths
       founderParticipantId = "sv1-participant-id"
       founderDomainNodes = Map.fromList
         -- NOTE: the Canton domain and CometBft keys and config need to be allocated before bootstrapping the SvcRules
@@ -122,7 +126,7 @@ initCollective initialRoundNumber isDevNet = do
     submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember with
       newMemberParty = svParty
       newMemberName = svName
-      newMemberRewardWeight = 3 -- Simulate the new nodes being Tier 2 SV nodes
+      newMemberRewardWeight = 3 * bpsMultiplier -- Simulate the new nodes being Tier 2 SV nodes
       newMemberParticipantId = svName <> "-participant-id"
       joinedAsOfRound = earliestOpenRound.round
       domainId = coinConfig.globalDomain.activeDomain

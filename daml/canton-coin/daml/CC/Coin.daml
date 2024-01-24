@@ -204,14 +204,42 @@ template SvcReward with
   where
     signatory svc
 
--- | A coupon for an SV to receive their part of the SVC issuance for the given round.
+-- | A coupon for a beneficiary to receive part of the SVC issuance for a specific SV node and round.
 template SvRewardCoupon with
     svc : Party
-    sv : Party
+    sv : Party -- ^ The party identifying the SV node for which the reward is issued.
+    beneficiary : Party -- ^ The beneficiary allowed to receive the reward.
     round : Round
     weight : Int -- ^ Coupons receive a share of the SVC issuance proportional to their weight.
   where
-    signatory svc, sv
+    ensure weight > 0
+
+    signatory svc
+
+    -- The beneficiary is an observer of the coupon, as they need to be able to claim it; but they are not
+    -- a signatory, to avoid their node's unavailability to block the coupon issuance.
+    observer beneficiary
+
+    -- The SV is an observes so they can see both the transaction creating and the one archiving the coupon.
+    -- They are not a signatory to ensure their node's unavailability cannot block the coupon redemption.
+    observer sv
+
+    choice SvRewardCoupon_SvcExpire : Int
+      with
+        closedRoundCid : ContractId ClosedMiningRound
+      controller svc
+      do
+         -- Expiry requires proof of the coupon's round being closed, as all rounds go through their phases at their own pace
+        void $ fetchReferenceData (ForRound with svc; round) closedRoundCid
+        pure weight
+
+    -- Choice called by the beneficiary as part of a CoinRules_Transfer to claim the reward.
+    choice SvRewardCoupon_ArchiveAsBeneficiary : ()
+      controller beneficiary
+      do pure ()
+
+
+
 
 -- | Rewards that have not been claimed and are thus at the disposal of the foundation.
 template UnclaimedReward with
@@ -245,7 +273,7 @@ instance HasCheckedFetch AppRewardCoupon ForOwner where
   contractGroupId AppRewardCoupon{..} = ForOwner with svc; owner = provider
 
 instance HasCheckedFetch SvRewardCoupon ForOwner where
-  contractGroupId SvRewardCoupon{..} = ForOwner with svc; owner = sv
+  contractGroupId SvRewardCoupon{..} = ForOwner with svc; owner = beneficiary
 
 -- This instance is slightly dangerous, as it could lead to a missed check of the validator.
 -- We accept this, as at least the SVC check is done, and the remainder is careful coding.

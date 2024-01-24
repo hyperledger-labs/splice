@@ -377,6 +377,7 @@ testSvMemberReonboarding = do
     submitMulti [sv4] [svc] $ exerciseCmd rulesCid SvcRules_ReceiveSvRewardCoupon with
       openRoundCid = roundCid
       sv = sv4
+      beneficiaries = [(sv4, 3 * bpsMultiplier)]
 
   initateAndAcceptVote2 app [sv1, sv2, sv3] $
     ARC_SvcRules with
@@ -432,6 +433,7 @@ testSvMemberReonboarding = do
     submitMultiMustFail [sv4] [svc] $ exerciseCmd rulesCid SvcRules_ReceiveSvRewardCoupon with
       openRoundCid = roundCid
       sv = sv4
+      beneficiaries = [(sv4, 3 * bpsMultiplier)]
 
   pure ()
 

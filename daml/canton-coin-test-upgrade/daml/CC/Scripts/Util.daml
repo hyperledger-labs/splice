@@ -413,7 +413,7 @@ runCoinDepositBots app = do
       c.round `elem` issuingRoundNumbers && c.validator == user
 
     svRewardCoupons <- queryFilter @SvRewardCoupon app.svc $ \c ->
-      c.round `elem` issuingRoundNumbers && c.sv == user
+      c.round `elem` issuingRoundNumbers && c.beneficiary == user
 
     -- get all coins of this user
     coins <- getCoinInputs user
