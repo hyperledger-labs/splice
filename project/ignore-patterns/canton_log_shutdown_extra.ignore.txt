@@ -9,9 +9,12 @@ INDEX_DB_SQL_NON_TRANSIENT_ERROR.*Database is already closed
 Error while running indexer
 
 # shutdown can be slower than the timeouts
-Task closing ledger API server did not complete
+Task closing .* did not complete
 Closing .* failed
 Failed to shut down successfully
 shutdown did not complete gracefully in allotted .* seconds
+
+# database pools don't always close cleanly
+failed connection pool health check
 
 # Make sure to have a trailing newline
