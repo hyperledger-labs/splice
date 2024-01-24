@@ -1189,42 +1189,6 @@ class DbMultiDomainAcsStore[TXE](
     )
   }
 
-  // TODO(#8944): Method is unused
-  /* Returns the first `limit` TxLog entries that were inserted after the entry
-     with the given event id, in reverse insertion order (newest first). */
-  def getTxLogEventsInReverseOrder(
-      beginAfterEventIdO: Option[String],
-      limit: Int,
-  )(implicit lc: TraceContext): Future[Seq[TxLogEvent]] = {
-    for {
-      eventIds <- storage
-        .query(
-          beginAfterEventIdO.fold(
-            sql"""
-                select event_id, domain_id, acs_contract_id
-                from #${txLogTableName}
-                where store_id = $storeId
-                order by entry_number desc
-                limit $limit
-              """.as[(String, DomainId, Option[ContractId[Any]])]
-          )(beginAfterEventId => sql"""
-                select event_id, domain_id, acs_contract_id
-                from #${txLogTableName}
-                where store_id = $storeId
-                  and entry_number < (
-                      select entry_number
-                      from #${txLogTableName}
-                      where store_id = $storeId
-                      and event_id = ${lengthLimited(beginAfterEventId)}
-                  )
-                order by entry_number desc
-                limit $limit
-              """.as[(String, DomainId, Option[ContractId[Any]])]),
-          "getTxLogEventIdsInReverseOrder",
-        )
-    } yield eventIds.map((TxLogEvent.apply _).tupled)
-  }
-
   override def getJsonAcsSnapshot(
       ignoredContracts: Set[QualifiedName]
   )(implicit tc: TraceContext): Future[JsonAcsSnapshot] = {
