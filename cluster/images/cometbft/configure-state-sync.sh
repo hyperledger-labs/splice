@@ -39,6 +39,7 @@ function _configure_state_sync() {
 function _json_rpc_call() {
   server_url="$1"
   request_data="$2"
+  trap 'echo "Error: Failed to execute the curl command for URL: ${server_url}"' ERR
   curl -fsSL --connect-timeout 10 -H "Content-Type: application/json" -X POST -d "${request_data}" "${server_url}"
 }
 

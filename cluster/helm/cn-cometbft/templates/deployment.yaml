@@ -62,6 +62,8 @@ spec:
               value: "{{ $.Values.stateSync.minTrustHeightAge | default $.Values.node.snapshotHeightDelta }}"
             - name: STATE_SYNC_TRUST_PERIOD
               value: "{{ $.Values.stateSync.trustPeriod }}"
+            - name: BASH_XTRACEFD
+              value: "1"
           command:
             - /bin/sh
             - -c
