@@ -584,11 +584,6 @@ lazy val `apps-validator` =
         openApiSpec = "validator-internal.yaml",
       ),
       BuildCommon.TS.openApiSettings(
-        npmName = "jsonapi-proxy-openapi",
-        openApiSpec = "json-api-proxy-internal.yaml",
-        directory = "jsonapi-proxy-ts-client",
-      ),
-      BuildCommon.TS.openApiSettings(
         npmName = "cns-external-openapi",
         openApiSpec = "cns-external.yaml",
         directory = "external-openapi-ts-client",
@@ -770,12 +765,6 @@ lazy val `apps-common-frontend` = {
               npmRootDir.value,
               "build",
               "validator/openapi-ts-client",
-              log,
-            )
-            BuildCommon.TS.runWorkspaceCommand(
-              npmRootDir.value,
-              "build",
-              "validator/jsonapi-proxy-ts-client",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(
