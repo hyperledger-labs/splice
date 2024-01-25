@@ -21,6 +21,6 @@
   ],
   "test": {
     "duration": "$K6_TEST_DURATION",
-    "iterationsPerMinute": 1
+    "iterationsPerMinute": "$K6_ITERATIONS_PER_MINUTE"
   }
 }

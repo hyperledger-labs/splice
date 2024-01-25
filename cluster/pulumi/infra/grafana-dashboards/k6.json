@@ -20,7 +20,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 19665,
   "graphTooltip": 0,
-  "id": 14,
+  "id": 59,
   "links": [
     {
       "asDropdown": false,
@@ -101,8 +101,8 @@
             "uid": "prometheus"
           },
           "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "sum(k6_transfers_completed_total)",
+          "editorMode": "builder",
+          "expr": "last_over_time(k6_transfers_completed_total[$__interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -155,8 +155,8 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["last"],
-          "fields": "/^C$/",
+          "calcs": ["lastNotNull"],
+          "fields": "",
           "values": false
         },
         "textMode": "auto"
@@ -169,8 +169,8 @@
             "uid": "prometheus"
           },
           "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "sum(k6_transfers_failed_total)",
+          "editorMode": "builder",
+          "expr": "last_over_time(k6_transfers_failed_total[$__interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -234,12 +234,16 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "code",
-          "expr": "sum(irate(k6_transfers_completed_total[$__rate_interval]))",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "rate(k6_transfers_completed_total[$__rate_interval])",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
       "title": "Peak transaction rate",
@@ -484,6 +488,8 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
+            "axisSoftMax": 2,
+            "axisSoftMin": 0,
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 0,
@@ -494,12 +500,12 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "linear",
+            "lineInterpolation": "smooth",
             "lineStyle": {
               "fill": "solid"
             },
             "lineWidth": 1,
-            "pointSize": 5,
+            "pointSize": 6,
             "scaleDistribution": {
               "type": "linear"
             },
@@ -553,8 +559,8 @@
             "uid": "prometheus"
           },
           "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "sum(rate(k6_transfers_completed_total[$__interval]))",
+          "editorMode": "builder",
+          "expr": "rate(k6_transfers_completed_total[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -2516,6 +2522,6 @@
   "timezone": "",
   "title": "k6 Load Tester",
   "uid": "ccbb2351-2ae2-462f-ae0e-f2c893ad1028",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

@@ -36,8 +36,9 @@ export function syncRetryUntil<A>(
   action: () => A | undefined,
   condition: (result: A | undefined) => boolean,
 ): A | undefined {
-  let retries = 5;
+  let retries = 200; // The sleep is 200ms, so a larger retry value is fine
   let final = undefined;
+
   while (retries >= 0) {
     const result = action();
     if (condition(result)) {

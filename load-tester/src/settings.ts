@@ -23,7 +23,7 @@ export const configSchema = z.object({
   validators: z.array(validatorSchema).min(1),
   test: z.object({
     duration: z.string().min(1),
-    iterationsPerMinute: z.number().min(1),
+    iterationsPerMinute: z.coerce.number().min(1),
   }),
 });
 

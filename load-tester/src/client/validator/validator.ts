@@ -104,7 +104,12 @@ export class ValidatorClient {
           .success(
             `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers/${tracking_id}/status`,
             undefined,
-            { headers: this.headers() },
+            {
+              headers: this.headers(),
+              tags: {
+                name: `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers/$tracking_id/status`,
+              },
+            },
           )
           .then(resp => jsonStringDecoder(getTransferOfferStatusResponse, resp.body));
       },
