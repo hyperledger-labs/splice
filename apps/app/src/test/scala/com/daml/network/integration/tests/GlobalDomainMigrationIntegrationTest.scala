@@ -28,7 +28,7 @@ import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.ProcessTestUtil
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DiscardOps
-import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration, ProcessingTimeout}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -160,6 +160,9 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
         ) {
           // TODO(#8761) wait until it's safe, based on params described in the design
           // also consider(from Martin): If a node was offline and joins the (old) domain a bit later, how will it know that it has caught up to the final ACS state so it's safe to take the snapshot?
+          Threading.sleep(
+            domainDynamicParams.mediatorReactionTimeout.duration.toMillis + domainDynamicParams.participantResponseTimeout.duration.toMillis
+          )
           majorityUpgradeNodes.foreach { node =>
             val dump = node.oldBackend.getDomainMigrationDump()
             writeMigrationDump(s"${node.oldBackend.name}Local", dump)

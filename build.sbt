@@ -1296,7 +1296,6 @@ checkErrors := {
   def splitAndCheckCantonLogFile(
       logName: String,
       usesSimtime: Boolean,
-      isGlobalDomainMigration: Boolean = false,
   ): Unit = {
     val logFile = s"log/${logName}.clog"
     val logFileBefore = s"log/${logName}_before_shutdown.clog"
@@ -1306,10 +1305,8 @@ checkErrors := {
     Seq(".circleci/canton-scripts/split-canton-logs.sh", logFile, logFileBefore, logFileAfter).!
 
     val simtimeIgnorePatterns = if (usesSimtime) Seq("canton_log_simtime_extra") else Seq.empty
-    val globalDomainMigrationPatterns =
-      if (isGlobalDomainMigration) Seq("canton_log_global_domain_migration_extra") else Seq.empty
     val beforeIgnorePatterns =
-      Seq("canton_log") ++ simtimeIgnorePatterns ++ globalDomainMigrationPatterns
+      Seq("canton_log") ++ simtimeIgnorePatterns
     val afterIgnorePatterns = beforeIgnorePatterns ++ Seq("canton_log_shutdown_extra")
 
     checkLogs(logFileBefore, beforeIgnorePatterns)
@@ -1328,7 +1325,6 @@ checkErrors := {
         splitAndCheckCantonLogFile(
           name,
           usesSimtime = false,
-          isGlobalDomainMigration = name.contains("global-domain-migration"),
         )
       }
 

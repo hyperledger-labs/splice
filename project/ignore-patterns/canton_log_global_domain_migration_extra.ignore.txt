@@ -1,5 +1,0 @@
-# Extra patterns to ignore when using Canton with simtime
-# See 'canton_log.ignore.txt' for details on how to write these.
-
-# TODO(#9491) Remove this once we fixed the issue
-Request.*with failed activeness check is approved
