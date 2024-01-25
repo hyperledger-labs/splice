@@ -14,7 +14,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.SetHasAsScala
+import scala.jdk.CollectionConverters.{CollectionHasAsScala}
 
 /** Offboard a participant from the hosting of the SVC party.
   * - Runs when a member part of offboardedMembers still exist on the partyToParticipantX mapping
@@ -37,24 +37,19 @@ class SvOffboardingPartyToParticipantProposalTrigger(
     for {
       svcRules <- svcStore.getSvcRules()
       offboardedMembers = svcRules.contract.payload.offboardedMembers
-      offboardedSvNamespaces = offboardedMembers
-        .keySet()
+      offboardedParticipants = offboardedMembers
+        .values()
         .asScala
-        .map(PartyId.tryFromProtoPrimitive)
-        .map(_.uid.namespace)
+        .map(_.participantId)
+        .map(ParticipantId.tryFromProtoPrimitive)
         .toSeq
-      currentHostingParticipants <- participantAdminConnection
+      currentHostingParticipantIds <- participantAdminConnection
         .getPartyToParticipant(
           svcRules.domain,
           svcParty,
         )
-        .map(_.mapping.participants)
-    } yield {
-      val currentParticipantIds = currentHostingParticipants.map(_.participantId)
-      val participantsToBeRemoved =
-        currentParticipantIds.filter(e => offboardedSvNamespaces.contains(e.uid.namespace))
-      participantsToBeRemoved
-    }
+        .map(_.mapping.participantIds)
+    } yield currentHostingParticipantIds.filter(e => offboardedParticipants.contains(e))
   }
 
   override protected def completeTask(task: ParticipantId)(implicit
@@ -77,5 +72,16 @@ class SvOffboardingPartyToParticipantProposalTrigger(
   // proposing is safe and it checks when running the task so no need to duplicate the same check here
   override protected def isStaleTask(task: ParticipantId)(implicit
       tc: TraceContext
-  ): Future[Boolean] = Future.successful(false)
+  ): Future[Boolean] = {
+    for {
+      svcRules <- svcStore.getSvcRules()
+      currentHostingParticipants <- participantAdminConnection
+        .getPartyToParticipant(
+          svcRules.domain,
+          svcParty,
+        )
+    } yield {
+      !currentHostingParticipants.mapping.participantIds.contains(task)
+    }
+  }
 }

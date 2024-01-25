@@ -12,10 +12,7 @@ import com.daml.network.config.{
   ParticipantBootstrapDumpConfig,
 }
 import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
-import com.daml.network.sv.automation.singlesv.membership.offboarding.{
-  SvOffboardingPartyToParticipantProposalTrigger,
-  SvOffboardingSequencerTrigger,
-}
+import com.daml.network.sv.automation.singlesv.membership.offboarding.SvOffboardingSequencerTrigger
 import com.daml.network.sv.config.MigrateSvPartyConfig
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.environment.CNNodeEnvironmentImpl
@@ -239,15 +236,6 @@ class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTe
               sv3SequencerId,
             )
           }
-        }
-
-        // TODO(#9142) Keep offboarding triggers running once they don't offboard SV4’s new participant
-        // immediately because it uses the same namespace.
-        Seq(sv1Backend, sv2Backend, sv3Backend).foreach { sv =>
-          sv.svcAutomation
-            .trigger[SvOffboardingPartyToParticipantProposalTrigger]
-            .pause()
-            .futureValue
         }
 
         val dump = sv4ValidatorBackend.dumpParticipantIdentities()
