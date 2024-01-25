@@ -371,6 +371,7 @@ workflows:
         context:
           - artifactory
           - datadog
+          - slack-context
         requires:
           - preflight_check_devnet
           - preflight_check_testnet
@@ -521,6 +522,7 @@ workflows:
         context:
           - artifactory
           - datadog
+          - slack-context
     - preflight_sv_check:
         <<: *main-branch-only
         context:

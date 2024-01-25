@@ -1506,10 +1506,6 @@ jobs:
     resource_class: "xlarge"
     environment:
       <<: *env
-    parameters:
-      mark-for-devnet:
-        type: boolean
-        default: true
     steps:
       - checkout
       - record_job_start_time
@@ -1902,6 +1898,7 @@ jobs:
       - when:
           condition:
             equal: [ true, <<pipeline.parameters.mark-for-devnet>> ]
+
           steps:
             - slack/notify:
                 # #team-canton-network-internal-ci
@@ -2809,6 +2806,7 @@ workflows:
         context:
           - artifactory
           - datadog
+          - slack-context
         requires:
           - preflight_check_devnet
           - preflight_check_testnet
@@ -2959,6 +2957,7 @@ workflows:
         context:
           - artifactory
           - datadog
+          - slack-context
     - preflight_sv_check:
         <<: *main-branch-only
         context:

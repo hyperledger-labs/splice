@@ -7,10 +7,6 @@ jobs:
     resource_class: "xlarge"
     environment:
       <<: *env
-    parameters:
-      mark-for-devnet:
-        type: boolean
-        default: true
     steps:
       - checkout
       - record_job_start_time
@@ -403,6 +399,7 @@ jobs:
       - when:
           condition:
             equal: [ true, <<pipeline.parameters.mark-for-devnet>> ]
+
           steps:
             - slack/notify:
                 # #team-canton-network-internal-ci
