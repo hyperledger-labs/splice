@@ -2,15 +2,9 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.console.CNParticipantClientReference
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
-import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.TopologyChangeOpX
-
-import java.time.Instant
-import java.util.Optional
-import org.slf4j.event.Level
 
 class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
 
@@ -52,14 +46,13 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
 
   "The SVC Party can be setup in the participant after SV has been confirmed to be part of the SVC" in {
     implicit env =>
-      val nrOfScanBackends = 1
       clue("Starting SVC app and SV1 app") {
-        startAllSync(sv1ScanBackend, sv1Backend)
+        startAllSync(sv1ScanBackend, sv1Backend, sv1ValidatorBackend)
       }
 
       val svcParty = sv1Backend.getSvcInfo().svcParty
       val svcPartyStr: String = svcParty.toProtoPrimitive
-      val svcParticipant = sv1Backend.participantClient
+      val sv1Participant = sv1Backend.participantClient
       val sv4Participant = sv4Backend.participantClient
 
       clue(
@@ -77,10 +70,10 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         )
       }
 
+      val sv1Party = sv1Backend.getSvcInfo().svParty
       clue(
         "SVC party hosting authorization request with party which is not hosted on the target participant"
       ) {
-        val sv1Party = sv1Backend.getSvcInfo().svParty
         val publicKey =
           "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmeNnFncZa2O0wNLaoq3KNrlF5GpbpF4ZfIXcvqPFxtSMm5rL3sxjf6NY1GnHncrT9MZgfWuU161Y2FM1pEZ1Zg=="
         val privateKey =
@@ -102,21 +95,21 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
 
       }
 
-      createCoinOwnBySvc(svcParticipant, 1.0, nrOfScanBackends)
+      sv1WalletClient.tap(1.0)
 
       clue("start onboarding new SV and SVC party setup on new SV's dedicated participant") {
         // SV4 is configured to join the SVC. After the SV is onboarded, it will start the SVC party hosting on its own dedicated participant
-        startAllSync(sv4ValidatorBackend, sv4Backend)
+        startAllSync(sv4ValidatorBackend, sv4Backend, sv4ValidatorBackend)
       }
 
-      createCoinOwnBySvc(svcParticipant, 2.0, nrOfScanBackends)
+      sv1WalletClient.tap(2.0)
 
       val globalDomainId = inside(sv4Participant.domains.list_connected()) { case Seq(domain) =>
         domain.domainId
       }
 
       eventually() {
-        svcParticipant.topology.party_to_participant_mappings
+        sv1Participant.topology.party_to_participant_mappings
           .list(
             operation = Some(TopologyChangeOpX.Replace),
             filterStore = globalDomainId.filterString,
@@ -132,10 +125,10 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
             filterParticipant = sv4Participant.id.toProtoPrimitive,
           ) should have size 1
         val coinFromSv4Participant = getCoins(sv4Participant, svcParty)
-        val coinFromSvcParticipant = getCoins(svcParticipant, svcParty)
+        val coinFromSv1Participant = getCoins(sv1Participant, svcParty)
 
         coinFromSv4Participant should have size 2
-        coinFromSv4Participant shouldBe coinFromSvcParticipant
+        coinFromSv4Participant shouldBe coinFromSv1Participant
 
         sv4Participant.ledger_api.acs.of_party(svcParty) should not be empty
       }
@@ -143,29 +136,9 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       clue("sv4 can exercise CoinRules_DevNet_Tap without disclosed contracts or extra observer.") {
         val sv4Party = sv4Backend.getSvcInfo().svParty
 
-        val coinRules = sv4Participant.ledger_api_extensions.acs
-          .filterJava(cc.coinrules.CoinRules.COMPANION)(svcParty)
-          .head
+        wc("sv4Wallet").tap(100.0)
 
-        val openRound = sv4Participant.ledger_api_extensions.acs
-          .filterJava(cc.round.OpenMiningRound.COMPANION)(
-            svcParty,
-            _.data.opensAt.isBefore(Instant.now),
-          )
-          .maxBy(_.data.round.number)
-
-        sv4Participant.ledger_api_extensions.commands.submitWithResult(
-          sv4Backend.config.ledgerApiUser,
-          actAs = Seq(sv4Party),
-          readAs = Seq(svcParty),
-          update = coinRules.id.exerciseCoinRules_DevNet_Tap(
-            sv4Party.toProtoPrimitive,
-            BigDecimal(100.0).bigDecimal,
-            openRound.id,
-          ),
-        )
-
-        def checkCoinContract(participant: CNParticipantClientReference, party: PartyId) = {
+        def checkSv4CoinContract(participant: CNParticipantClientReference, party: PartyId) = {
           val coins = getCoins(participant, party, _.data.owner == sv4Party.toProtoPrimitive)
           inside(coins) { case Seq(coin) =>
             coin.data.svc shouldBe svcPartyStr
@@ -175,8 +148,8 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         }
 
         eventually() {
-          checkCoinContract(svcParticipant, svcParty)
-          checkCoinContract(sv4Participant, sv4Party)
+          checkSv4CoinContract(sv1Participant, svcParty)
+          checkSv4CoinContract(sv4Participant, sv4Party)
         }
       }
 
@@ -195,42 +168,4 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       .filterJava(cc.coin.Coin.COMPANION)(party, predicate)
       .sortBy(_.data.amount.initialAmount)
   }
-
-  private def createCoinOwnBySvc(
-      participant: CNParticipantClientReference,
-      amount: Double,
-      nrOfScanBackends: Int,
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
-    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-      {
-        participant.ledger_api_extensions.commands.submitWithResult(
-          userId = sv1Backend.config.ledgerApiUser,
-          actAs = Seq(svcParty),
-          readAs = Seq.empty,
-          update = coin(amount, svcParty).create,
-        )
-      },
-      logs =>
-        inside(logs) { case logLines =>
-          logLines
-            .filter(_.errorMessage contains ("RuntimeException"))
-            .foreach(_.errorMessage should include("Unexpected coin create event"))
-          logLines should have size (nrOfScanBackends.toLong)
-        },
-    )
-  }
-
-  private def coin(amount: Double, party: PartyId) = new cc.coin.Coin(
-    party.toProtoPrimitive,
-    party.toProtoPrimitive,
-    expiringAmount(amount),
-    Optional.empty(),
-  )
-
-  private def expiringAmount(amount: Double) = new cc.fees.ExpiringAmount(
-    BigDecimal(amount).bigDecimal,
-    new cc.types.Round(0L),
-    new cc.fees.RatePerRound(BigDecimal(amount).bigDecimal),
-  )
-
 }
