@@ -1,5 +1,3 @@
-import { DevNetOnly } from 'common-frontend';
-import { useLookupFeaturedAppRight } from 'common-frontend/scan-api';
 import React from 'react';
 
 import { Star } from '@mui/icons-material';
@@ -7,6 +5,8 @@ import { Button, Tooltip } from '@mui/material';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { usePrimaryParty } from '../hooks';
+import useLookupFeaturedAppRight from '../hooks/scan-proxy/useLookupFeaturedAppRight';
+import DevNetOnly from './DevNetOnly';
 
 const FeaturedAppRight: React.FC = () => {
   const { selfGrantFeaturedAppRights } = useWalletClient();

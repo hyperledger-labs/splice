@@ -3,18 +3,29 @@ import React from 'react';
 import { Typography, TypographyProps } from '@mui/material';
 import Tooltip from '@mui/material/Tooltip';
 
+import { CnsEntry as CnsEntryC } from '@daml.js/cns/lib/CN/Cns/';
+
 import useLookupCnsEntryByParty from '../api/scan/useLookupCnsEntryByParty';
+import { Contract } from '../utils';
 import PartyId, { PartyIdProps } from './PartyId';
 
-type CnsEntryProps = PartyIdProps & TypographyProps;
+export type CnsEntryProps = PartyIdProps & TypographyProps;
 
 const CnsEntry: React.FC<CnsEntryProps> = props => {
-  const { partyId, className, noCopy: _, ...typographyProps } = props;
+  const { partyId } = props;
   const { data: cnsEntry, isLoading, isError } = useLookupCnsEntryByParty(partyId);
 
   if (isLoading || isError) {
     return <div>...</div>;
+  } else {
+    return <CnsEntryDisplay cnsEntry={cnsEntry} {...props} />;
   }
+};
+
+export const CnsEntryDisplay: React.FC<
+  CnsEntryProps & { cnsEntry: Contract<CnsEntryC> | null }
+> = props => {
+  const { cnsEntry, partyId, className, noCopy: _, ...typographyProps } = props;
 
   if (cnsEntry === null) {
     return <PartyId {...props} />;

@@ -1,11 +1,11 @@
 import * as React from 'react';
 import { AmountDisplay, ErrorDisplay, Loading } from 'common-frontend';
-import { useCoinPrice } from 'common-frontend/scan-api';
 
 import { Box, Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
 import { useBalance } from '../hooks';
+import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
 
 const Hero: React.FC = () => {
   const balanceQuery = useBalance();

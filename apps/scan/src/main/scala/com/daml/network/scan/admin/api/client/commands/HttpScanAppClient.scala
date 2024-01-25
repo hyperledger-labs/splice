@@ -1,6 +1,12 @@
 package com.daml.network.scan.admin.api.client.commands
 
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
+import org.apache.pekko.http.scaladsl.model.{
+  HttpHeader,
+  HttpRequest,
+  HttpResponse,
+  StatusCodes,
+  Uri,
+}
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import cats.syntax.either.*
@@ -42,7 +48,7 @@ object HttpScanAppClient {
         ec: ExecutionContext,
         mat: Materializer,
     ): Client =
-      http.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
+      http.ScanClient.httpClient(HttpClientBuilder().buildClient(Set(StatusCodes.NotFound)), host)
   }
 
   abstract class ExternalBaseCommand[Res, Result] extends HttpCommand[Res, Result] {
@@ -289,14 +295,14 @@ object HttpScanAppClient {
   }
 
   case class ListCnsEntries(
-      namePrefix: String,
+      namePrefix: Option[String],
       pageSize: Int,
   ) extends InternalBaseCommand[http.ListCnsEntriesResponse, Seq[
         Contract[CnsEntry.ContractId, CnsEntry]
       ]] {
 
     def submitRequest(client: Client, headers: List[HttpHeader]) =
-      client.listCnsEntries(Some(namePrefix), pageSize, headers = headers)
+      client.listCnsEntries(namePrefix, pageSize, headers = headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
@@ -337,7 +343,7 @@ object HttpScanAppClient {
       name: String
   ) extends InternalBaseCommand[
         http.LookupCnsEntryByNameResponse,
-        Contract[CnsEntry.ContractId, CnsEntry],
+        Option[Contract[CnsEntry.ContractId, CnsEntry]],
       ] {
 
     override def submitRequest(
@@ -347,12 +353,15 @@ object HttpScanAppClient {
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.LookupCnsEntryByNameResponse.OK(response) =>
-      for {
-        entry <- Contract
-          .fromHttp(CnsEntry.COMPANION)(response.entry)
-          .leftMap(_.toString)
-      } yield entry
+    ) = {
+      case http.LookupCnsEntryByNameResponse.OK(response) =>
+        for {
+          entry <- Contract
+            .fromHttp(CnsEntry.COMPANION)(response.entry)
+            .leftMap(_.toString)
+        } yield Some(entry)
+      case http.LookupCnsEntryByNameResponse.NotFound(_) =>
+        Right(None)
     }
   }
 
@@ -407,24 +416,27 @@ object HttpScanAppClient {
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.GetCoinConfigForRoundResponse.OK(response) =>
-      for {
-        coinCreate <- Codec.decode(Codec.BigDecimal)(response.coinCreateFee)
-        holding <- Codec.decode(Codec.BigDecimal)(response.holdingFee)
-        lockHolder <- Codec.decode(Codec.BigDecimal)(response.lockHolderFee)
-        initial <- Codec.decode(Codec.BigDecimal)(response.transferFee.initial)
-        steps <- decodeTransferFeeSteps(response.transferFee.steps.toSeq)
-      } yield {
-        CoinConfig(
-          coinCreateFee = coinCreate,
-          holdingFee = holding,
-          lockHolderFee = lockHolder,
-          transferFee = SteppedRate(
-            initial = initial,
-            steps = steps,
-          ),
-        )
-      }
+    ) = {
+      case http.GetCoinConfigForRoundResponse.OK(response) =>
+        for {
+          coinCreate <- Codec.decode(Codec.BigDecimal)(response.coinCreateFee)
+          holding <- Codec.decode(Codec.BigDecimal)(response.holdingFee)
+          lockHolder <- Codec.decode(Codec.BigDecimal)(response.lockHolderFee)
+          initial <- Codec.decode(Codec.BigDecimal)(response.transferFee.initial)
+          steps <- decodeTransferFeeSteps(response.transferFee.steps.toSeq)
+        } yield {
+          CoinConfig(
+            coinCreateFee = coinCreate,
+            holdingFee = holding,
+            lockHolderFee = lockHolder,
+            transferFee = SteppedRate(
+              initial = initial,
+              steps = steps,
+            ),
+          )
+        }
+      case http.GetCoinConfigForRoundResponse.NotFound(err) =>
+        Left(err.error)
     }
   }
 
@@ -440,6 +452,8 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetRoundOfLatestDataResponse.OK(response) =>
         Right((response.round, response.effectiveAt.toInstant))
+      case http.GetRoundOfLatestDataResponse.NotFound(err) =>
+        Left(err.error)
     }
   }
 

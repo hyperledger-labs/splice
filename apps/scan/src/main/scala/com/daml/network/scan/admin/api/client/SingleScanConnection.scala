@@ -111,6 +111,22 @@ class SingleScanConnection private[client] (
     )
   }
 
+  def lookupCnsEntryByName(
+      name: String
+  )(implicit tc: TraceContext): Future[Option[Contract[CnsEntry.ContractId, CnsEntry]]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupCnsEntryByName(name),
+    )
+  }
+
+  def listCnsEntries(namePrefix: Option[String], pageSize: Int)(implicit tc: TraceContext) = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListCnsEntries(namePrefix, pageSize),
+    )
+  }
+
   override def getOpenAndIssuingMiningRounds()(implicit
       ec: ExecutionContext,
       mat: Materializer,

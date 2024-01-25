@@ -1,7 +1,6 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, CnsEntry, ErrorDisplay, RateDisplay, Loading } from 'common-frontend';
-import { useCoinPrice } from 'common-frontend/scan-api';
+import { AmountDisplay, ErrorDisplay, RateDisplay, Loading } from 'common-frontend';
 import formatISO from 'date-fns/formatISO';
 
 import {
@@ -26,7 +25,9 @@ import Typography from '@mui/material/Typography';
 import { Party } from '@daml/types';
 
 import { usePrimaryParty, useTransactions } from '../hooks';
+import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
 import { Transaction, TransactionSubtype } from '../models/models';
+import BftCnsEntry from './BftCnsEntry';
 
 const TransactionHistory: React.FC = () => {
   const txQuery = useTransactions();
@@ -317,11 +318,11 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
     );
   } else if (transaction.senderId !== primaryPartyId) {
     senderOrReceiver = (
-      <CnsEntry className="sender-or-receiver" partyId={transaction.senderId} variant="body1" />
+      <BftCnsEntry className="sender-or-receiver" partyId={transaction.senderId} variant="body1" />
     );
   } else if (transaction.receivers.length === 1) {
     senderOrReceiver = (
-      <CnsEntry
+      <BftCnsEntry
         className="sender-or-receiver"
         partyId={transaction.receivers[0].party}
         variant="body1"
@@ -344,7 +345,7 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
       {senderOrReceiver}
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="caption">via </Typography>
-        <CnsEntry className="provider-id" partyId={transaction.providerId} variant="caption" />
+        <BftCnsEntry className="provider-id" partyId={transaction.providerId} variant="caption" />
       </Stack>
     </Stack>
   );

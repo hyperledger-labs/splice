@@ -3,6 +3,12 @@
 Release Notes
 =============
 
+2024-02-05
+----------
+
+* The wallet of non-SV validators now execute all reads through a Scan proxy in the validator,
+  thus executing them in a BFT fashion.
+
 2024-01-29
 ----------
 

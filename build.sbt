@@ -588,6 +588,11 @@ lazy val `apps-validator` =
         openApiSpec = "cns-external.yaml",
         directory = "external-openapi-ts-client",
       ),
+      BuildCommon.TS.openApiSettings(
+        npmName = "scan-proxy-openapi",
+        openApiSpec = "scan-proxy.yaml",
+        directory = "scan-proxy-openapi-ts-client",
+      ),
       Compile / guardrailTasks :=
         List("validator-internal", "json-api-proxy-internal", "cns-external", "scan-proxy").flatMap(
           api =>
@@ -771,6 +776,12 @@ lazy val `apps-common-frontend` = {
               npmRootDir.value,
               "build",
               "validator/external-openapi-ts-client",
+              log,
+            )
+            BuildCommon.TS.runWorkspaceCommand(
+              npmRootDir.value,
+              "build",
+              "validator/scan-proxy-openapi-ts-client",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(

@@ -1,10 +1,10 @@
 import * as React from 'react';
 import { AmountDisplay, ErrorDisplay, Loading } from 'common-frontend';
-import { useCoinPrice } from 'common-frontend/scan-api';
 
 import { Box, Divider, Stack, Toolbar, Typography } from '@mui/material';
 
 import { useBalance } from '../hooks';
+import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
 import CurrentUser from './CurrentUser';
 import { LogoutButton } from './LogoutButton';
 

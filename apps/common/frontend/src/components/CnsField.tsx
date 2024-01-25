@@ -1,3 +1,4 @@
+import { UseQueryResult } from '@tanstack/react-query';
 import React, { useEffect } from 'react';
 
 import { Autocomplete, StandardTextFieldProps, TextField } from '@mui/material';
@@ -9,26 +10,53 @@ import useListCnsEntries from '../api/scan/useListCnsEntries';
 import useLookupCnsEntryByName from '../api/scan/useLookupCnsEntryByName';
 import { Contract } from '../utils';
 
-interface Props extends StandardTextFieldProps {
+export interface CnsFieldProps extends StandardTextFieldProps {
   onPartyChanged: (newParty: Party) => void;
 }
 
-type UserInput = { type: 'typed'; value: string } | { type: 'selected'; value: string };
+export type UserInput = { type: 'typed'; value: string } | { type: 'selected'; value: string };
 
-const CnsField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
+const CnsField: React.FC<CnsFieldProps> = props => {
   const [userInput, setUserInput] = React.useState<UserInput>({ type: 'typed', value: '' });
-  const [resolvedPartyId, setResolvedPartyId] = React.useState<string>('');
   const cnsEntriesQuery = useListCnsEntries(20, userInput.value);
   const cnsEntryQuery = useLookupCnsEntryByName(userInput.value, userInput.type === 'typed');
+
+  return (
+    <BaseCnsField
+      {...props}
+      userInput={userInput}
+      updateUserInput={setUserInput}
+      cnsEntries={cnsEntriesQuery}
+      cnsEntry={cnsEntryQuery}
+    />
+  );
+};
+
+interface BaseCnsFieldProps extends CnsFieldProps {
+  userInput: UserInput;
+  updateUserInput: (userInput: UserInput) => void;
+  cnsEntries: UseQueryResult<Contract<CnsEntry>[]>;
+  cnsEntry: UseQueryResult<Contract<CnsEntry>>;
+}
+
+export const BaseCnsField: React.FC<BaseCnsFieldProps> = ({
+  userInput,
+  updateUserInput,
+  onPartyChanged,
+  cnsEntries,
+  cnsEntry,
+  ...props
+}) => {
+  const [resolvedPartyId, setResolvedPartyId] = React.useState<string>('');
 
   useEffect(() => {
     const setPartyAndNotify = (party: string) => {
       onPartyChanged(party);
       setResolvedPartyId(party);
     };
-    const cnsEntryParty = cnsEntryQuery.data?.payload.user || userInput.value;
+    const cnsEntryParty = cnsEntry.data?.payload.user || userInput.value;
     setPartyAndNotify(cnsEntryParty);
-  }, [userInput, cnsEntryQuery, onPartyChanged]);
+  }, [userInput, cnsEntry, onPartyChanged]);
 
   const onInputChange = async (_: React.SyntheticEvent, newValue: string, reason: string) => {
     if (reason === 'reset') {
@@ -36,10 +64,10 @@ const CnsField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
     }
 
     if (reason === 'clear') {
-      setUserInput({ type: 'typed', value: '' });
+      updateUserInput({ type: 'typed', value: '' });
     }
 
-    setUserInput({ type: 'typed', value: newValue });
+    updateUserInput({ type: 'typed', value: newValue });
   };
 
   const onItemSelected = async (
@@ -50,7 +78,7 @@ const CnsField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
       return;
     }
     // User selected an item from the auto-complete dropdown. Use the party associated with that entry.
-    setUserInput({ type: 'selected', value: item.payload.user });
+    updateUserInput({ type: 'selected', value: item.payload.user });
   };
 
   return (
@@ -67,7 +95,7 @@ const CnsField: React.FC<Props> = ({ onPartyChanged, ...props }) => {
           inputProps={{ ...params.inputProps, 'data-resolved-party-id': resolvedPartyId }}
         />
       )}
-      options={cnsEntriesQuery.data || []}
+      options={cnsEntries.data || []}
       getOptionLabel={(option: Contract<CnsEntry> | string) =>
         typeof option === 'string' ? option : option.payload.name
       }

@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { ApiException } from 'scan-openapi';
+import { ApiException, LookupEntryByNameResponse } from 'scan-openapi';
 
 import { CnsEntry } from '@daml.js/cns/lib/CN/Cns/';
 
@@ -15,12 +15,28 @@ const useLookupCnsEntryByName = (
 ): UseQueryResult<Contract<CnsEntry>> => {
   const scanClient = useScanClient();
 
+  return useLookupCnsEntryByNameFromResponse(
+    name => scanClient.lookupCnsEntryByName(name),
+    name,
+    enabled,
+    retryWhenNotFound,
+    retry
+  );
+};
+
+export function useLookupCnsEntryByNameFromResponse(
+  getResponse: (name: string) => Promise<LookupEntryByNameResponse>,
+  name: string,
+  enabled: boolean = true,
+  retryWhenNotFound: boolean = false,
+  retry: number = 3
+): UseQueryResult<Contract<CnsEntry>> {
   return useQuery({
     refetchInterval: PollingStrategy.NONE,
     queryKey: ['scan-api', 'lookupCnsEntryByName', CnsEntry, name],
     queryFn: async () => {
       try {
-        const response = await scanClient.lookupCnsEntryByName(name);
+        const response = await getResponse(name);
         return Contract.decodeOpenAPI(response.entry, CnsEntry);
       } catch (e: unknown) {
         if ((e as ApiException<undefined>).code === 404) {
@@ -39,6 +55,6 @@ const useLookupCnsEntryByName = (
     enabled: name !== '' && enabled,
     retry,
   });
-};
+}
 
 export default useLookupCnsEntryByName;

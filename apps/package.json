@@ -12,6 +12,7 @@
     "sv/openapi-ts-client",
     "validator/openapi-ts-client",
     "validator/external-openapi-ts-client",
+    "validator/scan-proxy-openapi-ts-client",
     "wallet/frontend",
     "wallet/openapi-ts-client",
     "wallet/external-openapi-ts-client",

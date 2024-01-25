@@ -8,7 +8,6 @@ import {
   theme,
   UserProvider,
 } from 'common-frontend';
-import { ScanClientProvider } from 'common-frontend/scan-api';
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -20,6 +19,7 @@ import {
 import { CssBaseline, ThemeProvider } from '@mui/material';
 
 import { CurrentUserProvider } from './contexts/CurrentUserContext';
+import { ValidatorScanProxyClientProvider } from './contexts/ValidatorScanProxyContext';
 import { ValidatorClientProvider } from './contexts/ValidatorServiceContext';
 import { WalletClientProvider } from './contexts/WalletServiceContext';
 import AuthCheck from './routes/authCheck';
@@ -55,9 +55,9 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
           <ValidatorClientProvider url={config.services.validator.url}>
             <WalletClientProvider url={config.services.validator.url}>
-              <ScanClientProvider url={config.services.scan.url}>
+              <ValidatorScanProxyClientProvider validatorUrl={config.services.validator.url}>
                 <CurrentUserProvider>{children}</CurrentUserProvider>
-              </ScanClientProvider>
+              </ValidatorScanProxyClientProvider>
             </WalletClientProvider>
           </ValidatorClientProvider>
         </UserProvider>

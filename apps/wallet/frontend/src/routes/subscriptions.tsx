@@ -2,13 +2,11 @@ import * as React from 'react';
 import BigNumber from 'bignumber.js';
 import {
   AmountDisplay,
-  CnsEntry,
   DisableConditionally,
   ErrorDisplay,
   IntervalDisplay,
   Loading,
 } from 'common-frontend';
-import { useCoinPrice } from 'common-frontend/scan-api';
 import differenceInMilliseconds from 'date-fns/differenceInMilliseconds';
 import intlFormat from 'date-fns/intlFormat';
 import parseISO from 'date-fns/parseISO';
@@ -29,8 +27,10 @@ import {
 import { SubscriptionPayData } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { Party } from '@daml/types';
 
+import BftCnsEntry from '../components/BftCnsEntry';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useSubscriptions } from '../hooks';
+import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
 import { SubscriptionState, WalletSubscription } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
@@ -101,7 +101,7 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
   return (
     <TableRow className="subscription-row">
       <TableCell variant="party">
-        <CnsEntry
+        <BftCnsEntry
           className="sub-receiver"
           partyId={subscription.subscription.payload.subscriptionData.receiver}
         />
@@ -144,7 +144,7 @@ const Service: React.FC<{ provider: Party; description: string }> = ({ provider,
       <Typography variant="h6" className="sub-description">
         {description}
       </Typography>
-      <CnsEntry partyId={provider} variant="caption" className="sub-provider" />
+      <BftCnsEntry partyId={provider} variant="caption" className="sub-provider" />
     </Stack>
   );
 };

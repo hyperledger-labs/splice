@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { PollingStrategy } from 'common-frontend';
-import { useLookupCnsEntryByParty } from 'common-frontend/scan-api';
 import { createContext, useContext, useState } from 'react';
 
 import { Party } from '@daml/types';
 
 import { usePrimaryParty } from '../hooks';
+import useLookupCnsEntryByParty from '../hooks/scan-proxy/useLookupCnsEntryByParty';
 
 type CurrentUser =
   | { state: 'onboarded'; primaryParty: Party; cnsEntry: string | undefined }

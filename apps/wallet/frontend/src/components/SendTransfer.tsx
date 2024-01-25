@@ -1,7 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
-import { CnsField, DisableConditionally } from 'common-frontend';
-import { useCoinPrice } from 'common-frontend/scan-api';
+import { DisableConditionally } from 'common-frontend';
 import addHours from 'date-fns/addHours';
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -22,6 +21,8 @@ import {
 } from '@mui/material';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
+import BftCnsField from './BftCnsField';
 
 const SendTransfer: React.FC = () => {
   const { createTransferOffer } = useWalletClient();
@@ -87,7 +88,7 @@ const SendTransfer: React.FC = () => {
         <CardContent sx={{ paddingX: '64px' }}>
           <Stack direction="column" mb={4} spacing={1}>
             <Typography variant="h6">Recipient</Typography>
-            <CnsField id="create-offer-receiver" label="Receiver" onPartyChanged={setReceiver} />
+            <BftCnsField id="create-offer-receiver" label="Receiver" onPartyChanged={setReceiver} />
           </Stack>
 
           <Stack direction="column" mb={4} spacing={1}>

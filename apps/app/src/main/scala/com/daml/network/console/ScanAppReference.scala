@@ -20,11 +20,12 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.util.{CNNodeUtil, CoinConfigSchedule, Contract, ContractWithState}
-import com.digitalasset.canton.console.{BaseInspection, Help}
+import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.google.protobuf.ByteString
+
 import java.time.Instant
 
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
@@ -97,7 +98,7 @@ abstract class ScanAppReference(
       pageSize: Int,
   ): Seq[Contract[CnsEntry.ContractId, CnsEntry]] =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.ListCnsEntries(namePrefix, pageSize))
+      httpCommand(HttpScanAppClient.ListCnsEntries(Some(namePrefix), pageSize))
     }
 
   @Help.Summary("Lookup a cns entry by the party that registered it")
@@ -112,9 +113,13 @@ abstract class ScanAppReference(
   def lookupEntryByName(
       name: String
   ): Contract[CnsEntry.ContractId, CnsEntry] =
-    consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.LookupCnsEntryByName(name))
-    }
+    consoleEnvironment
+      .run {
+        httpCommand(HttpScanAppClient.LookupCnsEntryByName(name))
+          .flatMap(optContract =>
+            ConsoleCommandResult.fromEither(optContract.toRight(s"Entry with name $name not found"))
+          )
+      }
 
   @Help.Summary(
     "Get the (cached) coin config effective now. Note that changes to the config might take some time to propagate due to the client-side caching."

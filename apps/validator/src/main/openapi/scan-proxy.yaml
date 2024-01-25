@@ -69,6 +69,49 @@ paths:
                 "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupEntryByPartyResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/cns-entries:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "listCnsEntries"
+      parameters:
+        - name: "name_prefix"
+          in: "query"
+          schema:
+            type: string
+        - name: "page_size"
+          in: "query"
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/ListEntriesResponse"
+  /v0/cns-entries/by-name/{name}:
+    get:
+      tags: [ scan-proxy ]
+      x-jvm-package: scanproxy
+      operationId: "lookupCnsEntryByName"
+      parameters:
+        - name: "name"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupEntryByNameResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
 components:
   schemas:

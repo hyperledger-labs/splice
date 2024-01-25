@@ -1,7 +1,6 @@
 package com.daml.network.validator.admin.http
 
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.http.v0.scanproxy.ScanproxyHandler
 import com.daml.network.http.v0.{definitions, scanproxy as v0}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -19,7 +18,7 @@ class HttpScanProxyHandler(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends ScanproxyHandler[TracedUser]
+) extends v0.ScanproxyHandler[TracedUser]
     with Spanning
     with NamedLogging {
 
@@ -93,6 +92,40 @@ class HttpScanProxyHandler(
             respond.NotFound(definitions.ErrorResponse(s"Party $party does not have any CNSEntry."))
         }
 
+      }
+    }
+  }
+
+  override def lookupCnsEntryByName(
+      respond: v0.ScanproxyResource.LookupCnsEntryByNameResponse.type
+  )(name: String)(tUser: TracedUser): Future[v0.ScanproxyResource.LookupCnsEntryByNameResponse] = {
+    implicit val TracedUser(_, traceContext) = tUser
+    withSpan(s"$workflowId.lookupCnsEntryByParty") { implicit traceContext => _ =>
+      for {
+        entry <- scanConnection.lookupCnsEntryByName(name)
+      } yield {
+        entry match {
+          case Some(value) =>
+            respond.OK(definitions.LookupEntryByNameResponse(value.toHttp))
+          case None =>
+            respond.NotFound(definitions.ErrorResponse(s"Did not find a CnsEntry with name $name"))
+        }
+
+      }
+    }
+  }
+
+  override def listCnsEntries(
+      respond: v0.ScanproxyResource.ListCnsEntriesResponse.type
+  )(namePrefix: Option[String], pageSize: Int)(
+      tUser: TracedUser
+  ): Future[v0.ScanproxyResource.ListCnsEntriesResponse] = {
+    implicit val TracedUser(_, traceContext) = tUser
+    withSpan(s"$workflowId.lookupCnsEntryByParty") { implicit traceContext => _ =>
+      for {
+        entries <- scanConnection.listCnsEntries(namePrefix, pageSize)
+      } yield {
+        respond.OK(definitions.ListEntriesResponse(entries.map(_.toHttp).toVector))
       }
     }
   }

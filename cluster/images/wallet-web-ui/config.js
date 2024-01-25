@@ -11,10 +11,6 @@ window.canton_network_config = {
     validator: {
       url: "https://" + window.location.hostname + "/api/validator",
     },
-    scan: {
-      // URL of the scan app's HTTP API
-      url: `https://scan.sv-1.svc.${cluster}/api/scan`,
-    },
   },
   clusterUrl: `https://${cluster}`,
 };

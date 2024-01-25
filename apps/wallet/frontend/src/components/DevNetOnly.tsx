@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { useGetCoinRules } from '../api/scan';
+import useGetCoinRules from '../hooks/scan-proxy/useGetCoinRules';
 
 const DevNetOnly: React.FC<{ children: React.ReactElement }> = props => {
   const { data: coinRules, error } = useGetCoinRules();

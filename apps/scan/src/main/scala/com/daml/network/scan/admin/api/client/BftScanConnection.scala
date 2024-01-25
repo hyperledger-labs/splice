@@ -92,6 +92,14 @@ class BftScanConnection(
   ): Future[Option[Contract[CnsEntry.ContractId, CnsEntry]]] =
     bftCall(_.lookupCnsEntryByParty(id))
 
+  def lookupCnsEntryByName(name: String)(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[CnsEntry.ContractId, CnsEntry]]] =
+    bftCall(_.lookupCnsEntryByName(name))
+
+  def listCnsEntries(namePrefix: Option[String], pageSize: Int)(implicit tc: TraceContext) =
+    bftCall(_.listCnsEntries(namePrefix, pageSize))
+
   override protected def runGetOpenAndIssuingMiningRounds(
       cachedOpenRounds: Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],
       cachedIssuingRounds: Seq[ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]],

@@ -637,7 +637,11 @@ class HttpScanHandler(
             )
           )
         case None =>
-          Future.failed(HttpErrorHandler.notFound(s"No cns entry found for name: $name"))
+          Future.successful(
+            v0.ScanResource.LookupCnsEntryByNameResponse.NotFound(
+              definitions.ErrorResponse(s"No cns entry found for name: $name")
+            )
+          )
       }
     }
   }
@@ -657,8 +661,10 @@ class HttpScanHandler(
               )
             )
           case None =>
-            Future.failed(
-              HttpErrorHandler.notFound(s"No cns entry found for party: ${party}")
+            Future.successful(
+              v0.ScanResource.LookupCnsEntryByPartyResponse.NotFound(
+                definitions.ErrorResponse(s"No cns entry found for party: $party")
+              )
             )
         }
     }

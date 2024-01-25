@@ -1,14 +1,12 @@
 import BigNumber from 'bignumber.js';
 import {
   AmountDisplay,
-  CnsEntry,
   Loading,
   ErrorDisplay,
   IntervalDisplay,
   Contract,
   DisableConditionally,
 } from 'common-frontend';
-import { useCoinPrice } from 'common-frontend/scan-api';
 import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
@@ -20,8 +18,10 @@ import {
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';
 
+import BftCnsEntry from '../components/BftCnsEntry';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useSubscriptionRequest } from '../hooks';
+import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmSubscription: React.FC = () => {
@@ -44,14 +44,14 @@ export const ConfirmSubscription: React.FC = () => {
             <Stack alignItems="center" spacing={1}>
               <Stack alignItems="center" direction="row" spacing={1}>
                 <Typography variant="h6">Confirm Subscription to </Typography>
-                <CnsEntry
+                <BftCnsEntry
                   partyId={subscriptionRequestQuery.data.payload.subscriptionData.receiver}
                   variant="h5"
                 />
               </Stack>
               <Stack alignItems="center" direction="row" spacing={1}>
                 <Typography variant="body2">via </Typography>
-                <CnsEntry
+                <BftCnsEntry
                   partyId={subscriptionRequestQuery.data.payload.subscriptionData.provider}
                   variant="body2"
                 />

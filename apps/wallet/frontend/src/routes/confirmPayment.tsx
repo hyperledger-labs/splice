@@ -1,13 +1,11 @@
 import BigNumber from 'bignumber.js';
 import {
   AmountDisplay,
-  CnsEntry,
   DisableConditionally,
   ErrorDisplay,
   Loading,
   RateDisplay,
 } from 'common-frontend';
-import { useCoinPrice, useGetCoinRules } from 'common-frontend/scan-api';
 import React from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
@@ -29,8 +27,11 @@ import * as payment from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 import { Currency, ReceiverAmount } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 import { ContractId } from '@daml/types';
 
+import BftCnsEntry from '../components/BftCnsEntry';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useAppPaymentRequest } from '../hooks';
+import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
+import useGetCoinRules from '../hooks/scan-proxy/useGetCoinRules';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmPayment: React.FC = () => {
@@ -160,10 +161,10 @@ const SingleRecipientInfo: React.FC<SingleRecipientInfoProps> = ({
       <Typography variant="h5" className="payment-amount">
         Send <AmountDisplay amount={BigNumber(amount.amount)} currency={amount.currency} /> to{' '}
       </Typography>
-      <CnsEntry partyId={receiver} variant="h5" fontWeight="bold" className="payment-receiver" />
+      <BftCnsEntry partyId={receiver} variant="h5" fontWeight="bold" className="payment-receiver" />
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="body2">via</Typography>{' '}
-        <CnsEntry partyId={provider} variant="body2" className="payment-provider" />
+        <BftCnsEntry partyId={provider} variant="body2" className="payment-provider" />
       </Stack>
     </Stack>
   );
@@ -190,7 +191,7 @@ const MultiRecipientsInfo: React.FC<MultipleRecipientsInfoProps> = ({
       </Typography>
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="body2">via</Typography>{' '}
-        <CnsEntry partyId={provider} variant="body2" className="payment-provider" />
+        <BftCnsEntry partyId={provider} variant="body2" className="payment-provider" />
       </Stack>
       <Table>
         <TableBody>
@@ -199,7 +200,7 @@ const MultiRecipientsInfo: React.FC<MultipleRecipientsInfoProps> = ({
             return (
               <TableRow key={receiver} id={`${receiver}-payment-row`}>
                 <TableCell variant="party">
-                  <CnsEntry partyId={receiver} variant="h6" className="receiver-entry" />
+                  <BftCnsEntry partyId={receiver} variant="h6" className="receiver-entry" />
                 </TableCell>
                 <TableCell>
                   <Typography variant="h6" className="receiver-amount">

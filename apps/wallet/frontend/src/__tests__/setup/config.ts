@@ -19,13 +19,6 @@ const config = {
       // URL of the validator app HTTP API
       url: 'http://localhost:5003/api/validator',
     },
-    // BEGIN_WALLET_CLUSTER_BACKEND_CONFIG
-    scan: {
-      // URL of scan backend.
-      // Edit this to the cluster you're trying to connect on.
-      url: 'https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/scan',
-    },
-    // END_WALLET_CLUSTER_BACKEND_CONFIG
   },
   clusterUrl: `https://TARGET_CLUSTER.network.canton.global`,
 };

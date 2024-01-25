@@ -1,11 +1,10 @@
 import AmountDisplay from './AmountDisplay';
 import AuthProvider from './AuthProvider';
-import CnsEntry from './CnsEntry';
-import CnsField from './CnsField';
+import CnsEntry, { CnsEntryDisplay, CnsEntryProps } from './CnsEntry';
+import CnsField, { BaseCnsField, CnsFieldProps, UserInput } from './CnsField';
 import CopyableTypography from './CopyableTypography';
 import Copyright from './Copyright';
 import DateDisplay from './DateDisplay';
-import DevNetOnly from './DevNetOnly';
 import DisableConditionally from './DisableConditionally';
 import ErrorBoundary from './ErrorBoundary';
 import ErrorDisplay from './ErrorDisplay';
@@ -24,12 +23,16 @@ export {
   AmountDisplay,
   AuthProvider,
   CnsEntry,
+  CnsEntryDisplay,
+  CnsEntryProps,
   CnsField,
+  BaseCnsField,
+  CnsFieldProps,
+  UserInput,
   CopyableTypography,
   Copyright,
   DateDisplay,
   DisableConditionally,
-  DevNetOnly,
   ErrorBoundary,
   ErrorDisplay,
   ErrorRouterPage,

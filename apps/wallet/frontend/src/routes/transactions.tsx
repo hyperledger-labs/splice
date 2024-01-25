@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { DevNetOnly } from 'common-frontend';
 
 import { Box } from '@mui/material';
 
+import DevNetOnly from '../components/DevNetOnly';
 import Tap from '../components/Tap';
 import TransactionHistory from '../components/TransactionHistory';
 import { TransferOffers } from '../components/TransferOffers';

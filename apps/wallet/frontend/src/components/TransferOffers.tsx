@@ -1,14 +1,6 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import {
-  AmountDisplay,
-  Contract,
-  CnsEntry,
-  DateDisplay,
-  ErrorDisplay,
-  Loading,
-} from 'common-frontend';
-import { useCoinPrice } from 'common-frontend/scan-api';
+import { AmountDisplay, Contract, DateDisplay, ErrorDisplay, Loading } from 'common-frontend';
 import { useCallback, useMemo, useState } from 'react';
 
 import { ArrowCircleLeftOutlined } from '@mui/icons-material';
@@ -20,8 +12,10 @@ import { TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer/modul
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { usePrimaryParty, useTransferOffers } from '../hooks';
+import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
 import { WalletTransferOffer } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
+import BftCnsEntry from './BftCnsEntry';
 
 export const TransferOffers: React.FC = () => {
   const [offers, setOffers] = useState<WalletTransferOffer[]>([]);
@@ -111,7 +105,11 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
         <ArrowCircleLeftOutlined fontSize="large" />
         <Stack direction="row" alignItems="center">
           <Stack direction="column">
-            <CnsEntry partyId={offer.senderId} variant="h5" className={'transfer-offer-sender'} />
+            <BftCnsEntry
+              partyId={offer.senderId}
+              variant="h5"
+              className={'transfer-offer-sender'}
+            />
           </Stack>
         </Stack>
         <Stack direction="column" alignItems="flex-end">

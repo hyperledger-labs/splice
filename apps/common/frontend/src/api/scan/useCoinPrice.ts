@@ -10,19 +10,30 @@ import { useScanClient } from './ScanClientContext';
 const useCoinPrice = (): UseQueryResult<BigNumber> => {
   const scanClient = useScanClient();
 
+  const request: GetOpenAndIssuingMiningRoundsRequest = {
+    cached_open_mining_round_contract_ids: [],
+    cached_issuing_round_contract_ids: [],
+  };
+
+  return useCoinPriceFromOpenRounds(() =>
+    scanClient.getOpenAndIssuingMiningRounds(request).then(response => {
+      return Object.values(response.open_mining_rounds).map(mybCached =>
+        Contract.decodeOpenAPI(mybCached.contract!, OpenMiningRound)
+      );
+    })
+  );
+};
+
+export function useCoinPriceFromOpenRounds(
+  getOpenRounds: () => Promise<Contract<OpenMiningRound>[]>
+): UseQueryResult<BigNumber> {
   return useQuery({
     refetchInterval: PollingStrategy.FIXED,
     queryKey: ['scan-api', 'coinPrice'],
     queryFn: async () => {
-      const request: GetOpenAndIssuingMiningRoundsRequest = {
-        cached_open_mining_round_contract_ids: [],
-        cached_issuing_round_contract_ids: [],
-      };
-      const openAndIssuingMiningRounds = await scanClient.getOpenAndIssuingMiningRounds(request);
-
-      const openOpenRounds = Object.values(openAndIssuingMiningRounds.open_mining_rounds)
-        .map(mybCached => Contract.decodeOpenAPI(mybCached.contract!, OpenMiningRound))
-        .filter(omr => Date.parse(omr.payload.opensAt) <= Date.now());
+      const openOpenRounds = (await getOpenRounds()).filter(
+        omr => Date.parse(omr.payload.opensAt) <= Date.now()
+      );
 
       if (openOpenRounds.length > 0) {
         const latestOpenRound = openOpenRounds.reduce((prevOmr, currentOmr) =>
@@ -34,6 +45,6 @@ const useCoinPrice = (): UseQueryResult<BigNumber> => {
       }
     },
   });
-};
+}
 
 export default useCoinPrice;
