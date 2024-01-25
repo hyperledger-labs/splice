@@ -228,7 +228,11 @@ class ScanFrontendTimeBasedIntegrationTest
         "Buy some traffic in rounds 1&2, and advance enough rounds for round 2 to close", {
           aliceValidatorWalletClient.tap(100.0)
           bobValidatorWalletClient.tap(100.0)
-          val trafficAmount = 1_000_000L
+          val trafficAmount = sv1ScanBackend
+            .getCoinConfigAsOf(env.environment.clock.now)
+            .globalDomain
+            .fees
+            .minTopupAmount
           buyMemberTraffic(
             aliceValidatorBackend,
             trafficAmount,
@@ -268,8 +272,8 @@ class ScanFrontendTimeBasedIntegrationTest
           compareLeaderboardTable(
             "domain-fees-leaderboard-row",
             Seq(
-              s"${aliceValidatorWalletParty} 2 2000000 1 CC ${(firstRound + 1).toString}",
-              s"${bobValidatorWalletParty} 1 1000000 0.5 CC ${(firstRound + 1).toString}",
+              s"${aliceValidatorWalletParty} 2 20000000 10 CC ${(firstRound + 1).toString}",
+              s"${bobValidatorWalletParty} 1 10000000 5 CC ${(firstRound + 1).toString}",
             ),
           )
         }

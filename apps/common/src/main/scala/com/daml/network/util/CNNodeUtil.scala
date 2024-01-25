@@ -196,8 +196,9 @@ object CNNodeUtil {
 
   // TODO(#6032): determine the best defaults here
   val defaultExtraTrafficPrice = BigDecimal(1.0) // extraTrafficPrice (in $/MB)
+  // TODO(#9537): reduce minTopupAmount once more
   val defaultMinTopupAmount =
-    1_000_000L // minTopupAmount chosen such that at least 1$ is spent per top-up (too low and the output fees for its corresponding transfer can't even be paid)
+    10_000_000L // minTopupAmount chosen such that at least 1$ is spent per top-up (too low and the output fees for its corresponding transfer can't even be paid)
 
   // These are dummy values only made use of by some unit tests.
   // The traffic control parameters are provided in the founding SV App config with the defaults in TrafficControlConfig
