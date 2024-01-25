@@ -496,9 +496,14 @@ class DbSvSvcStore(
       import scala.jdk.CollectionConverters.*
       val svCandidates = svcRules.payload.members.asScala
         .map { case (party, member) =>
-          s"('$party', '${member.name}')"
+          sql"(${lengthLimited(party)}, ${lengthLimited(member.name)})"
         }
-        .mkString("(", ",", ")")
+        .reduceOption { (acc, next) =>
+          (acc ++ sql"," ++ next).toActionBuilder
+        }
+        .getOrElse(
+          throw new IllegalArgumentException("SvcRules is supposed to have at least one member")
+        )
       for {
         result <- storage
           .query(
@@ -508,7 +513,7 @@ class DbSvSvcStore(
                    and template_id_qualified_name = ${QualifiedName(
                   SvOnboardingRequest.TEMPLATE_ID
                 )}
-                   and (sv_candidate_party, sv_candidate_name) in #$svCandidates
+                   and (sv_candidate_party, sv_candidate_name) in (""" ++ svCandidates ++ sql""")
                  limit ${sqlLimit(limit)}
                """).toActionBuilder.as[SelectFromAcsTableResult],
             "listSvOnboardingRequestsBySvcMembers",
@@ -572,18 +577,19 @@ class DbSvSvcStore(
     import scala.jdk.CollectionConverters.*
     for {
       svcRules <- getSvcRules()
-      voterParties = svcRules.payload.members.asScala
-        .map { case (party, _) =>
-          party
-        }
-        .mkString("('", "','", "')")
+      voterParties = inClause(
+        svcRules.payload.members.asScala
+          .map { case (party, _) =>
+            lengthLimited(party)
+          }
+      )
       result <- storage
         .query(
           (selectFromAcsTable(SvcTables.acsTableName) ++
             sql"""
                where store_id = $storeId
                  and template_id_qualified_name = ${QualifiedName(CoinPriceVote.TEMPLATE_ID)}
-                 and voter in #$voterParties
+                 and voter in """ ++ voterParties ++ sql"""
                limit ${sqlLimit(limit)}
              """).toActionBuilder.as[SelectFromAcsTableResult],
           "listMemberCoinPriceVotes",
@@ -671,9 +677,7 @@ class DbSvSvcStore(
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[Vote.ContractId, Vote]]] = waitUntilAcsIngested {
-    val voteRequestCidsSql = voteRequestCids
-      .map(_.contractId)
-      .mkString("('", "','", "')")
+    val voteRequestCidsSql = inClause(voteRequestCids)
     for {
       result <- storage
         .query(
@@ -681,7 +685,7 @@ class DbSvSvcStore(
             sql"""
                  where store_id = $storeId
                    and template_id_qualified_name = ${QualifiedName(Vote.TEMPLATE_ID)}
-                   and vote_request_cid in #$voteRequestCidsSql
+                   and vote_request_cid in """ ++ voteRequestCidsSql ++ sql"""
                  limit ${sqlLimit(limit)}
                """).toActionBuilder.as[SelectFromAcsTableResult],
           "listVotesByVoteRequests",
@@ -843,7 +847,7 @@ class DbSvSvcStore(
       tc: TraceContext
   ): Future[Seq[Contract[ElectionRequest.ContractId, ElectionRequest]]] = waitUntilAcsIngested {
     import scala.jdk.CollectionConverters.*
-    val requesters = svcRules.payload.members.keySet().asScala.mkString("('", "','", "')")
+    val requesters = inClause(svcRules.payload.members.keySet().asScala.map(lengthLimited))
     val electionRequestEpoch = svcRules.payload.epoch.longValue()
     for {
       result <- storage
@@ -854,7 +858,7 @@ class DbSvSvcStore(
                        and template_id_qualified_name = ${QualifiedName(
                 ElectionRequest.TEMPLATE_ID
               )}
-                       and requester IN #$requesters
+                       and requester IN """ ++ requesters ++ sql"""
                        and election_request_epoch = $electionRequestEpoch
                      limit ${sqlLimit(limit)}
                    """).toActionBuilder.as[SelectFromAcsTableResult],

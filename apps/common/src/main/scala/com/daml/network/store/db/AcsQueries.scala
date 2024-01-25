@@ -16,14 +16,17 @@ import com.daml.network.util.{
   QualifiedName,
   TemplateJsonDecoder,
 }
-import slick.jdbc.{GetResult, PositionedResult}
+import slick.jdbc.{GetResult, PositionedResult, SetParameter}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json
 import io.grpc.Status
 import slick.jdbc.canton.SQLActionBuilder
 import com.google.protobuf.ByteString
+
+import scala.annotation.nowarn
 
 trait AcsQueries extends AcsJdbcTypes {
 
@@ -207,6 +210,26 @@ trait AcsQueries extends AcsJdbcTypes {
         },
       )
   }
+
+  /** Constructions like `seq.mkString("(", ",", ")")` are dangerous because they can lead to SQL injection.
+    * Prefer using this instead, or [[inClause]] when in a `WHERE x IN`.
+    */
+  protected def sqlCommaSeparated[V](
+      seq: Iterable[V]
+  )(implicit
+      // used in the Slick macro
+      @nowarn("msg=parameter sp in method sqlCommaSeparated is never used") sp: SetParameter[V]
+  ): SQLActionBuilder = {
+    seq
+      .map(v => sql"$v")
+      .reduceOption { (acc, next) =>
+        (acc ++ sql"," ++ next).toActionBuilder
+      }
+      .getOrElse(sql"")
+  }
+
+  protected def inClause[V: SetParameter](seq: Iterable[V]): SQLActionBuilderChain =
+    sql"(" ++ sqlCommaSeparated(seq) ++ sql")"
 
   protected def contractFromRow[C, TCId <: ContractId[_], T](companion: C)(
       row: AcsQueries.SelectFromAcsTableResult

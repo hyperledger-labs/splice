@@ -273,7 +273,7 @@ class DbMultiDomainAcsStore[TXE](
     val templateIdMap = companions
       .map(c => QualifiedName(c.TEMPLATE_ID) -> c)
       .toMap
-    val templateIds = templateIdMap.keys.mkString("('", "','", "')")
+    val templateIds = inClause(templateIdMap.keys)
     for {
       participantId <- participantIdSource.getParticipantId()
       result <- storage.query(
@@ -281,7 +281,7 @@ class DbMultiDomainAcsStore[TXE](
           acsTableName,
           storeId,
           where =
-            sql"""template_id_qualified_name IN #${templateIds} and assigned_domain is not null and assigned_domain != $excludedDomain""",
+            (sql"""template_id_qualified_name IN """ ++ templateIds ++ sql""" and assigned_domain is not null and assigned_domain != $excludedDomain""").toActionBuilder,
           // bytea comparison in PG is left-to-right unsigned ascending, shorter
           // array is lesser if bytes are otherwise equal; there's an equivalent
           // soft implementation in
