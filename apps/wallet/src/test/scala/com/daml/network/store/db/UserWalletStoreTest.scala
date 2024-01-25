@@ -21,7 +21,12 @@ import com.daml.network.wallet.store.db.DbUserWalletStore
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.{Limit, PageLimit, StoreTest}
-import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
+import com.daml.network.util.{
+  Contract,
+  ContractWithState,
+  ResourceTemplateDecoder,
+  TemplateJsonDecoder,
+}
 import com.daml.network.wallet.store.TxLogEntry.{BuyTrafficRequestStatus, TransferOfferStatus}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
@@ -376,7 +381,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummyDomain.createMulti(request2, createdEventSignatories = Seq(user2))(allAcsStores)
         } yield {
           def resultCids(
-              r: Contract[
+              r: ContractWithState[
                 paymentCodegen.AppPaymentRequest.ContractId,
                 paymentCodegen.AppPaymentRequest,
               ]
@@ -403,7 +408,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           // Pointwise lookup - only user1 store should see request1
           store1
             .getAppPaymentRequest(request1.contractId)
-            .map(_.contract)
             .map(resultCids)
             .futureValue should be(
             request1.contractId.contractId
@@ -457,7 +461,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummyDomain.archive(request3)(store1.multiDomainAcsStore)
         } yield {
           def resultCids(
-              r: Contract[
+              r: ContractWithState[
                 paymentCodegen.AppPaymentRequest.ContractId,
                 paymentCodegen.AppPaymentRequest,
               ]
@@ -474,7 +478,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           // Pointwise lookup - only request1 should be visible
           store1
             .getAppPaymentRequest(request1.contractId)
-            .map(_.contract)
             .map(resultCids)
             .futureValue should be(
             request1.contractId.contractId

@@ -13,7 +13,7 @@ import com.daml.network.http.v0.definitions.{
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
 }
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ContractWithState}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.{
   ListResponse,
@@ -82,7 +82,7 @@ abstract class WalletAppReference(
       "Returns all found payment requests."
   )
   def listAppPaymentRequests(): Seq[
-    Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
+    ContractWithState[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
   ] = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.ListAppPaymentRequests)

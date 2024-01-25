@@ -105,13 +105,15 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
   final def listAppPaymentRequests(
       limit: Limit = Limit.DefaultLimit
   )(implicit tc: TraceContext): Future[
-    Seq[Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]]
+    Seq[
+      ContractWithState[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
+    ]
   ] = for {
     contracts <- multiDomainAcsStore.listContracts(
       walletCodegen.AppPaymentRequest.COMPANION,
       limit,
     )
-  } yield contracts map (_.contract)
+  } yield contracts
 
   def getAppPaymentRequest(
       cid: walletCodegen.AppPaymentRequest.ContractId

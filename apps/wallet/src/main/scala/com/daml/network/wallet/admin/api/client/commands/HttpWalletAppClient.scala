@@ -19,7 +19,8 @@ import com.daml.network.http.v0.wallet.{
   GetAppPaymentRequestResponse,
   GetSubscriptionRequestResponse,
 }
-import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
+import com.daml.network.store.MultiDomainAcsStore.ContractState
+import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
 import com.daml.network.wallet.store.TxLogEntry
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
@@ -249,7 +250,10 @@ object HttpWalletAppClient {
   case object ListAppPaymentRequests
       extends InternalBaseCommand[
         http.ListAppPaymentRequestsResponse,
-        Seq[Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]],
+        Seq[ContractWithState[
+          walletCodegen.AppPaymentRequest.ContractId,
+          walletCodegen.AppPaymentRequest,
+        ]],
       ] {
     def submitRequest(
         client: Client,
@@ -261,8 +265,17 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListAppPaymentRequestsResponse.OK(response) =>
       response.paymentRequests
-        .traverse(req => Contract.fromHttp(walletCodegen.AppPaymentRequest.COMPANION)(req))
-        .leftMap(_.toString)
+        .traverse(contractWithState =>
+          for {
+            contract <- Contract
+              .fromHttp(walletCodegen.AppPaymentRequest.COMPANION)(contractWithState.contract)
+              .leftMap(_.toString)
+            domainId <- contractWithState.domainId.traverse(DomainId.fromString)
+          } yield ContractWithState(
+            contract,
+            domainId.fold(ContractState.InFlight: ContractState)(ContractState.Assigned),
+          )
+        )
     }
   }
 
