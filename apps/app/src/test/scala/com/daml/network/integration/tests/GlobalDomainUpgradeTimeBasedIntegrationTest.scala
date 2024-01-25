@@ -250,6 +250,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           svcRulesCid.exerciseSvcRules_StartSvOnboarding(
             "irrelevant name",
             sv1Party.toProtoPrimitive, // irrelevant party
+            "PAR::sv::1220f3e2",
             "irrelevant token",
             sv1Party.toProtoPrimitive,
           )
@@ -285,6 +286,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         new so.SvOnboardingConfirmed(
           sv1Party.toProtoPrimitive,
           "irrelevant name",
+          "PAR::sv::1220f3e2",
           dummySvRewardWeight,
           "observing domain migration",
           svcParty.toProtoPrimitive,

@@ -129,15 +129,15 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       ),
     )(_.lookupConfirmationByActionWithOffset(storeSvParty, addUser666Action))
     lookupTests("lookupSvOnboardingRequestByTokenWithOffset")(
-      create = svOnboardingRequest("good", userParty(1), "good"),
+      create = svOnboardingRequest("good", userParty(1), "good-pid", "good"),
       noise = Seq(
-        svOnboardingRequest("bad", userParty(2), "bad")
+        svOnboardingRequest("bad", userParty(2), "bad-pid", "bad")
       ),
     )(_.lookupSvOnboardingRequestByTokenWithOffset("good"))
     lookupTests("lookupSvOnboardingRequestByCandidateParty")(
-      create = svOnboardingRequest("good", userParty(1), "good"),
+      create = svOnboardingRequest("good", userParty(1), "good-pid", "good"),
       noise = Seq(
-        svOnboardingRequest("bad", userParty(2), "bad")
+        svOnboardingRequest("bad", userParty(2), "bad-pid", "bad")
       ),
     )(
       _.lookupSvOnboardingRequestByCandidateParty(userParty(1)).map(
@@ -145,9 +145,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       )
     )
     lookupTests("lookupSvOnboardingRequestByCandidateName")(
-      create = svOnboardingRequest("good", userParty(1), "good"),
+      create = svOnboardingRequest("good", userParty(1), "good-pid", "good"),
       noise = Seq(
-        svOnboardingRequest("bad", userParty(2), "bad")
+        svOnboardingRequest("bad", userParty(2), "bad-pid", "bad")
       ),
     )(
       _.lookupSvOnboardingRequestByCandidateName("good").map(
@@ -156,13 +156,13 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     )
     "lookupSvOnboardingConfirmedByParty" should {
       offsetFreeLookupTest(
-        create = svOnboardingConfirmed("good", userParty(1)),
-        noise = Seq(svOnboardingConfirmed("bad", userParty(2))),
+        create = svOnboardingConfirmed("good", userParty(1), "good-pid"),
+        noise = Seq(svOnboardingConfirmed("bad", userParty(2), "bad-pid")),
       )(_.lookupSvOnboardingConfirmedByParty(userParty(1)))
     }
     lookupTests("lookupSvOnboardingConfirmedByNameWithOffset")(
-      create = svOnboardingConfirmed("good", userParty(1)),
-      noise = Seq(svOnboardingConfirmed("bad", userParty(2))),
+      create = svOnboardingConfirmed("good", userParty(1), "good-pid"),
+      noise = Seq(svOnboardingConfirmed("bad", userParty(2), "bad-pid")),
     )(
       _.lookupSvOnboardingConfirmedByNameWithOffset("good")
     )
@@ -611,12 +611,20 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           svOnboardingRequest(
             n.toString,
             userParty(n),
+            s"participant-id-${n.toString}",
             n.toString,
             Instant.now().minusSeconds(n.toLong * 3600),
           )
         )
         val notExpired =
-          (4 to 6).map(n => svOnboardingRequest(n.toString, userParty(n), n.toString))
+          (4 to 6).map(n =>
+            svOnboardingRequest(
+              n.toString,
+              userParty(n),
+              s"PAR::sv${n.toString}::12345",
+              n.toString,
+            )
+          )
         for {
           store <- mkStore()
           _ <- MonadUtil.sequentialTraverse(expired ++ notExpired)(
@@ -643,10 +651,14 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           svOnboardingConfirmed(
             n.toString,
             userParty(n),
+            s"PAR::sv${n.toString}::12345",
             Instant.now().minusSeconds(n.toLong * 3600),
           )
         )
-        val notExpired = (4 to 6).map(n => svOnboardingConfirmed(n.toString, userParty(n)))
+        val notExpired =
+          (4 to 6).map(n =>
+            svOnboardingConfirmed(n.toString, userParty(n), s"PAR::sv${n.toString}::12345")
+          )
         for {
           store <- mkStore()
           _ <- MonadUtil.sequentialTraverse(expired ++ notExpired)(
@@ -1325,7 +1337,15 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def memberInfo(name: String) = {
-    new MemberInfo(name, new Round(1L), new Round(123L), 456L, 789L, Collections.emptyMap())
+    new MemberInfo(
+      name,
+      new Round(1L),
+      new Round(123L),
+      456L,
+      789L,
+      s"PAR::${name}::12345",
+      Collections.emptyMap(),
+    )
   }
 
   private def memberTraffic(member: Member, totalPurchased: Long) = {
@@ -1429,12 +1449,14 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
   private def svOnboardingRequest(
       name: String,
       candidate: PartyId,
+      participantId: String,
       token: String,
       expiry: Instant = Instant.now().plusSeconds(3600),
   ) = {
     val template = new SvOnboardingRequest(
       name,
       candidate.toProtoPrimitive,
+      participantId,
       token,
       storeSvParty.toProtoPrimitive,
       svcParty.toProtoPrimitive,
@@ -1451,11 +1473,13 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
   private def svOnboardingConfirmed(
       name: String,
       candidate: PartyId,
+      participantId: String,
       expiry: Instant = Instant.now().plusSeconds(3600),
   ) = {
     val template = new SvOnboardingConfirmed(
       candidate.toProtoPrimitive,
       name,
+      participantId,
       dummySvRewardWeight,
       "reason",
       svcParty.toProtoPrimitive,

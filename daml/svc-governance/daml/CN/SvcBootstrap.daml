@@ -66,6 +66,7 @@ template SvcBootstrap with
               lastReceivedRewardFor = Round (initialRoundNumber - 1)
               numRewardCouponsMissed = 0
               svRewardWeight = founderRewardWeight
+              participantId = founderParticipantId
               domainNodes = founderDomainNodes
         _ <- create SvcRules with
           svc

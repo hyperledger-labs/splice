@@ -99,6 +99,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
             new Round(456L), // last received reward for round
             123L, // num coupons missed
             dummySvRewardWeight, // SV reward weight
+            s"PAR::sv${svNodeNr}::12345",
             Map(
               dummySvcDomainId.toProtoPrimitive -> new DomainNodeConfig(
                 new CometBftConfig(

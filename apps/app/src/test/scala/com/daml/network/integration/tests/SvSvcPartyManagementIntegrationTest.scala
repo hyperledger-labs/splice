@@ -3,9 +3,11 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.console.CNParticipantClientReference
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.TopologyChangeOpX
+
 import java.time.Instant
 import java.util.Optional
 import org.slf4j.event.Level
@@ -79,15 +81,25 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         "SVC party hosting authorization request with party which is not hosted on the target participant"
       ) {
         val sv1Party = sv1Backend.getSvcInfo().svParty
+        val publicKey =
+          "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmeNnFncZa2O0wNLaoq3KNrlF5GpbpF4ZfIXcvqPFxtSMm5rL3sxjf6NY1GnHncrT9MZgfWuU161Y2FM1pEZ1Zg=="
+        val privateKey =
+          "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgtYbz4yBUZofTNVGjwg+QR6M3Ku1LP7RZJAPfokjDbWWhRANCAASZ42cWdxlrY7TA0tqirco2uUXkalukXhl8hdy+o8XG1IybmsvezGN/o1jUacedytP0xmB9a5TXrVjYUzWkRnVm"
         assertThrowsAndLogsCommandFailures(
-          sv1Backend.onboardSvPartyMigrationAuthorize(
-            sv4Backend.participantClient.id,
-            sv1Party,
+          sv1Backend.startSvOnboarding(
+            SvOnboardingToken(
+              "Canton-Foundation-1",
+              publicKey,
+              sv1Party,
+              sv4Backend.participantClient.id,
+              svcParty,
+            ).signAndEncode(SvUtil.parsePrivateKey(privateKey).value).value
           ),
           _.errorMessage should include(
-            s"Candidate party $sv1Party is not authorized by participant"
+            s"Candidate party ${sv1Party} is not authorized by participant "
           ),
         )
+
       }
 
       createCoinOwnBySvc(svcParticipant, 1.0, nrOfScanBackends)

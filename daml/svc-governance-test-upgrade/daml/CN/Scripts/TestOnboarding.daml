@@ -76,13 +76,14 @@ testSvOnboarding = do
 
   -- sv2 (not the leader) initiates the onboarding of the new sv
   svSubmits app sv2 $ \cid -> exerciseCmd cid $
-    SvcRules_StartSvOnboarding "svX" svX token sv2
+    SvcRules_StartSvOnboarding "svX" svX "svX-participant-id" token sv2
 
   -- an onboarding request for svX has been created
   [(_, svOnboardingRequest)] <- query @SvOnboardingRequest svc
   svOnboardingRequest === SvOnboardingRequest with
     candidateName = "svX"
     candidateParty = svX
+    candidateParticipantId = "svX-participant-id"
     token
     sponsor = sv2
     svc
@@ -97,6 +98,7 @@ testSvOnboarding = do
         svcAction = SRARC_ConfirmSvOnboarding $ SvcRules_ConfirmSvOnboarding with
           newMemberParty = svX
           newMemberName = "svX"
+          newParticipantId = "svX-participant-id"
           reason = "because"
           newMemberRewardWeight = 19 -- we use 19 as a dummy reward weight for testing
   executeAllConfirmedActions app
@@ -106,6 +108,7 @@ testSvOnboarding = do
   svOnboardingConfirmed === SvOnboardingConfirmed with
     svParty = svX
     svName = "svX"
+    svParticipantId = "svX-participant-id"
     reason = "because"
     svRewardWeight = 19
     svc
@@ -130,7 +133,6 @@ testSvOnboarding = do
     middleRoundCid
     latestRoundCid = earliestRoundCid
     coinRulesCid
-    svParticipantId = "svX-participant-id"
   submitMultiMustFail [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
     sv = svX
     svOnboardingConfirmedCid
@@ -138,7 +140,6 @@ testSvOnboarding = do
     middleRoundCid = earliestRoundCid
     latestRoundCid = earliestRoundCid
     coinRulesCid
-    svParticipantId = "svX-participant-id"
 
   -- svX completes its own onboarding by adding itself to the SvcRules
   submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
@@ -148,7 +149,6 @@ testSvOnboarding = do
     middleRoundCid
     latestRoundCid
     coinRulesCid
-    svParticipantId = "svX-participant-id"
 
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
   case Map.lookup svX svcRules.members of
@@ -221,7 +221,7 @@ testSvOnboardingRequestExpiry = do
 
   -- sv2 (not the leader) initiates the onboarding of the new sv
   svOnboardingRequestCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
-    SvcRules_StartSvOnboarding "svX" svX token sv2
+    SvcRules_StartSvOnboarding "svX" svX "svX-participant-id" token sv2
 
   -- leader tries to expire the onboarding, but it's too early
   leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
@@ -248,7 +248,7 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
 
   -- sv2 (not the leader) initiates the onboarding of the new sv
   svOnboardingRequestCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
-    SvcRules_StartSvOnboarding "svX" svX token sv2
+    SvcRules_StartSvOnboarding "svX" svX "svx-participant-id" token sv2
 
   [(svcRulesCid, _)] <- query @SvcRules svc
 
@@ -290,6 +290,7 @@ testSvOnboardingConfirmedExpiry = do
         svcAction = SRARC_ConfirmSvOnboarding $ SvcRules_ConfirmSvOnboarding with
           newMemberParty = svX
           newMemberName = "svX"
+          newParticipantId = "svX-participant-id"
           newMemberRewardWeight = 19
           reason = "because"
 
@@ -349,7 +350,7 @@ testSvMemberOverwriteInDevNet = do
   submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" 19 "sv2-participant-id" (Round 3) domainId
 
   [(_, svcRules)] <- query @SvcRules app.svc
-  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" (Round (-1)))]
+  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" ("sv2-participant-id") (Round (-1)))]
 
   svX2 <- allocateParty "svX2"
 
@@ -359,7 +360,7 @@ testSvMemberOverwriteInDevNet = do
   submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX2 "sv2" 19 "sv2-participant-id" (Round 3) domainId
 
   [(_, svcRules)] <- query @SvcRules app.svc
-  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" (Round (-1))), (svX, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX2'" (Round 2))]
+  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" ("sv2-participant-id") (Round (-1))), (svX, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX2'" ("sv2-participant-id") (Round 2))]
 
   pure ()
 
@@ -393,7 +394,7 @@ testSvMemberReonboarding = do
   let token = "mock-token"
 
   svSubmits app sv1 $ \cid -> exerciseCmd cid $
-    SvcRules_StartSvOnboarding "sv4" sv4 token sv1
+    SvcRules_StartSvOnboarding "sv4" sv4 "sv4-participant-id" token sv1
   forA_ [sv1,sv2,sv3] $ \sv ->
     svSubmits app sv $ \cid -> exerciseCmd cid $ SvcRules_ConfirmAction with
       confirmer = sv
@@ -401,6 +402,7 @@ testSvMemberReonboarding = do
         svcAction = SRARC_ConfirmSvOnboarding $ SvcRules_ConfirmSvOnboarding with
           newMemberParty = sv4
           newMemberName = "sv4"
+          newParticipantId = "sv4-participant-id"
           reason = "because"
           newMemberRewardWeight = 19 -- we use 19 as a dummy reward weight for testing
   executeAllConfirmedActions app
@@ -418,7 +420,6 @@ testSvMemberReonboarding = do
     middleRoundCid
     latestRoundCid
     coinRulesCid
-    svParticipantId = "sv4-participant-id"
 
   [(_, svcRules)] <- query @SvcRules svc
 

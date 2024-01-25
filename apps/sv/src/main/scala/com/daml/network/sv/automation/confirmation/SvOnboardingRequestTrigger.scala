@@ -52,6 +52,7 @@ class SvOnboardingRequestTrigger(
   private def svcRulesConfirmSvOnboardingAction(
       candidateParty: PartyId,
       candidateName: String,
+      candidateParticipantId: String,
       reason: String,
   ): ActionRequiringConfirmation = new ARC_SvcRules(
     new SRARC_ConfirmSvOnboarding(
@@ -59,6 +60,7 @@ class SvOnboardingRequestTrigger(
       new SvcRules_ConfirmSvOnboarding(
         candidateParty.toProtoPrimitive,
         candidateName,
+        candidateParticipantId,
         dummySvRewardWeight,
         reason,
       )
@@ -105,7 +107,13 @@ class SvOnboardingRequestTrigger(
             case Left(err) =>
               Future.failed(err.asRuntimeException())
             case Right(_) =>
-              confirm(party, name, svOnboarding.payload.token, svcRules)
+              confirm(
+                party,
+                name,
+                svOnboarding.payload.candidateParticipantId,
+                svOnboarding.payload.token,
+                svcRules,
+              )
           }
         }
     } yield outcome
@@ -147,10 +155,11 @@ class SvOnboardingRequestTrigger(
   private def confirm(
       party: PartyId,
       name: String,
+      participantId: String,
       reason: String,
       svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val action = svcRulesConfirmSvOnboardingAction(party, name, reason)
+    val action = svcRulesConfirmSvOnboardingAction(party, name, participantId, reason)
     for {
       queryResult <- svcStore.lookupConfirmationByActionWithOffset(svParty, action)
       cmd = svcRules.exercise(

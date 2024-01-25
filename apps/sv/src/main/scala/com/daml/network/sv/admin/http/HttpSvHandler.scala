@@ -110,34 +110,63 @@ class HttpSvHandler(
             HttpErrorHandler.badRequest(s"Could not verify and decode token: $error")
           )
         case Right(token) =>
-          SvApp
-            .isApprovedSvIdentity(
-              token.candidateName,
-              token.candidateParty,
-              body.token,
-              svStore,
-              logger,
-            )
-            .flatMap {
-              case Left(reason) =>
+          for {
+            svcRules <- svcStore.getSvcRules()
+            isCandidatePartyHostedOnParticipant <- participantAdminConnection
+              .listPartyToParticipant(
+                svcRules.domain.filterString,
+                filterParty = token.candidateParty.filterString,
+                filterParticipant = token.candidateParticipantId.toProtoPrimitive,
+              )
+              .map(_.nonEmpty)
+            res <-
+              if (!isCandidatePartyHostedOnParticipant)
                 Future.failed(
                   HttpErrorHandler.unauthorized(
-                    s"Could not authorize onboarding request because of reason: $reason"
+                    s"Candidate party ${token.candidateParty} is not authorized by participant ${token.candidateParticipantId}"
                   )
                 )
-              case Right(_) =>
-                // We retry here because the SvcRules can change while attempting this.
-                retryProvider
-                  .retryForClientCalls(
-                    s"start SV ${token.candidateName} onboarding via SvcRules",
-                    startSvOnboarding(token.candidateName, token.candidateParty, body.token),
+              else
+                SvApp
+                  .isApprovedSvIdentity(
+                    token.candidateName,
+                    token.candidateParty,
+                    body.token,
+                    svStore,
                     logger,
                   )
                   .flatMap {
-                    case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
-                    case Right(()) => Future.successful(v0.SvResource.StartSvOnboardingResponseOK)
+                    case Left(reason) =>
+                      Future.failed(
+                        HttpErrorHandler.unauthorized(
+                          s"Could not approve SV Identity because of reason: $reason"
+                        )
+                      )
+                    case Right(_) =>
+                      // We retry here because the SvcRules can change while attempting this.
+                      retryProvider
+                        .retryForClientCalls(
+                          s"start SV ${token.candidateName} onboarding via SvcRules",
+                          startSvOnboarding(
+                            token.candidateName,
+                            token.candidateParty,
+                            token.candidateParticipantId,
+                            body.token,
+                          ),
+                          logger,
+                        )
+                        .flatMap {
+                          case Left(reason) =>
+                            Future.failed(
+                              HttpErrorHandler.badRequest(
+                                s"Could not start onboarding request because of reason: : $reason"
+                              )
+                            )
+                          case Right(_) =>
+                            Future.successful(v0.SvResource.StartSvOnboardingResponseOK)
+                        }
                   }
-            }
+          } yield res
       }
     }
   }
@@ -311,35 +340,32 @@ class HttpSvHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.onboardSvPartyMigrationAuthorize") { _ => _ =>
       (for {
-        participantId <- Codec.decode(Codec.Participant)(body.participantId)
         candidateParty <- Codec.decode(Codec.Party)(body.candidatePartyId)
       } yield {
+        val errorMessage =
+          s"Candidate party is not a member and no `SvOnboardingConfirmed` for the candidate party is found."
         for {
           isCandidateOnboardingConfirmed <- isOnboardingConfirmed(candidateParty)
           svcRules <- svcStore.getSvcRules()
           isCandidateMember = SvApp.isSvcMemberParty(candidateParty, svcRules)
-          isCandidatePartyHostedOnParticipant <- participantAdminConnection
-            .listPartyToParticipant(
-              svcRules.domain.filterString,
-              filterParty = candidateParty.filterString,
-              filterParticipant = participantId.toProtoPrimitive,
+          contracts <- svcStore.lookupSvOnboardingConfirmedByParty(candidateParty)
+          candidateParticipantId = contracts
+            .getOrElse(
+              throw Status.NOT_FOUND
+                .withDescription(errorMessage)
+                .asRuntimeException()
             )
-            .map(_.nonEmpty)
           res <-
             if (!isCandidateOnboardingConfirmed && !isCandidateMember)
               Future.failed(
                 HttpErrorHandler.unauthorized(
-                  s"Candidate party is not a member and no `SvOnboardingConfirmed` for the candidate party is found."
-                )
-              )
-            else if (!isCandidatePartyHostedOnParticipant)
-              Future.failed(
-                HttpErrorHandler.unauthorized(
-                  s"Candidate party $candidateParty is not authorized by participant $participantId"
+                  errorMessage
                 )
               )
             else
-              authorizeParticipantForHostingSvcParty(participantId)
+              authorizeParticipantForHostingSvcParty(
+                ParticipantId.tryFromProtoPrimitive(candidateParticipantId.payload.svParticipantId)
+              )
         } yield res
       }).fold(errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)), identity)
     }
@@ -712,6 +738,7 @@ class HttpSvHandler(
   private def startSvOnboarding(
       candidateName: String,
       candidateParty: PartyId,
+      candidateParticipantId: ParticipantId,
       token: String,
   )(implicit tc: TraceContext): Future[Either[String, Unit]] = {
     withSpan(s"$workflowId.startSvOnboarding") { _ => _ =>
@@ -733,6 +760,7 @@ class HttpSvHandler(
                   _.exerciseSvcRules_StartSvOnboarding(
                     candidateName,
                     candidateParty.toProtoPrimitive,
+                    candidateParticipantId.toProtoPrimitive,
                     token,
                     svParty.toProtoPrimitive,
                   )

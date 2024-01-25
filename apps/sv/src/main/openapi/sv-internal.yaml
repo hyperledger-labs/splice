@@ -972,11 +972,8 @@ components:
     OnboardSvPartyMigrationAuthorizeRequest:
       type: object
       required:
-        - participant_id
         - candidate_party_id
       properties:
-        participant_id:
-          type: string
         candidate_party_id:
           type: string
 

@@ -326,6 +326,7 @@ class JoiningNodeInitializer(
               _ <- requestOnboarding(
                 svClient.adminApi,
                 name,
+                participantId,
                 publicKey,
                 privateKey_,
               )
@@ -387,7 +388,6 @@ class JoiningNodeInitializer(
                         openMiningRounds.middle.contractId,
                         openMiningRounds.newest.contractId,
                         coinRules.contractId,
-                        participantId.toProtoPrimitive,
                       )
                     )
                     svcStoreWithIngestion.connection
@@ -438,6 +438,7 @@ class JoiningNodeInitializer(
                 _ <- requestOnboarding(
                   svClient.adminApi,
                   name,
+                  participantId,
                   publicKey,
                   privateKey_,
                 )
@@ -521,10 +522,13 @@ class JoiningNodeInitializer(
     private def requestOnboarding(
         sponsorConfig: NetworkAppClientConfig,
         name: String,
+        participantId: ParticipantId,
         publicKey: String,
         privateKey: ECPrivateKey,
     ): Future[Unit] = {
-      SvOnboardingToken(name, publicKey, svParty, svcParty).signAndEncode(privateKey) match {
+      SvOnboardingToken(name, publicKey, svParty, participantId, svcParty).signAndEncode(
+        privateKey
+      ) match {
         case Right(token) =>
           logger.info(s"Requesting to be onboarded via SV at: ${sponsorConfig.url}")
           retryProvider.retry(

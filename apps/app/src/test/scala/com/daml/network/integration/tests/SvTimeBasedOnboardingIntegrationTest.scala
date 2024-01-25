@@ -85,6 +85,7 @@ class SvTimeBasedOnboardingIntegrationTest
                   new SvcRules_ConfirmSvOnboarding(
                     svYParty.toProtoPrimitive,
                     "new random party",
+                    "PAR::sv::1220f3e2",
                     dummySvRewardWeight,
                     "create new `SvOnboardingConfirmed` contract",
                   )

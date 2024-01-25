@@ -5,7 +5,7 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.interfaces.DecodedJWT
 import com.daml.network.util.Codec
 import com.daml.network.sv.util.SvUtil
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import spray.json.*
 
 import java.security.interfaces.ECPrivateKey
@@ -17,15 +17,23 @@ private object JsonProtocol extends DefaultJsonProtocol {
       "name" -> JsString(t.candidateName),
       "key" -> JsString(t.candidateKey),
       "party" -> JsString(t.candidateParty.toProtoPrimitive),
+      "participantId" -> JsString(t.candidateParticipantId.toProtoPrimitive),
       "svc" -> JsString(t.svcParty.toProtoPrimitive),
     )
     def read(value: JsValue) = {
-      value.asJsObject.getFields("name", "key", "party", "svc") match {
-        case Seq(JsString(name), JsString(key), JsString(partyS), JsString(svcS)) =>
+      value.asJsObject.getFields("name", "key", "party", "participantId", "svc") match {
+        case Seq(
+              JsString(name),
+              JsString(key),
+              JsString(partyS),
+              JsString(participantId),
+              JsString(svcS),
+            ) =>
           (for {
             party <- Codec.decode(Codec.Party)(partyS)
             svc <- Codec.decode(Codec.Party)(svcS)
-          } yield new SvOnboardingToken(name, key, party, svc))
+            participantId <- Codec.decode(Codec.Participant)(participantId)
+          } yield new SvOnboardingToken(name, key, party, participantId, svc))
             .getOrElse(throw new DeserializationException("Could not parse party IDs"))
         case _ => throw new DeserializationException("Wrong fields in JSON object")
       }
@@ -38,6 +46,7 @@ case class SvOnboardingToken(
     candidateName: String,
     candidateKey: String,
     candidateParty: PartyId,
+    candidateParticipantId: ParticipantId,
     svcParty: PartyId,
 ) {
   def signAndEncode(privateKey: ECPrivateKey): Either[String, String] = for {

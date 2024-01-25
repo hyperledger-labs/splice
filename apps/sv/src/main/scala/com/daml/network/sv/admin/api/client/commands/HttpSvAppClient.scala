@@ -262,8 +262,7 @@ object HttpSvAppClient {
     ], http.OnboardSvPartyMigrationAuthorizeResponse] =
       client.onboardSvPartyMigrationAuthorize(
         body = definitions.OnboardSvPartyMigrationAuthorizeRequest(
-          participantId.toProtoPrimitive,
-          candidate.toProtoPrimitive,
+          candidate.toProtoPrimitive
         ),
         headers = headers,
       )

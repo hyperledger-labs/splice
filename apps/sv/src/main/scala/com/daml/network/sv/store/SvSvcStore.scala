@@ -502,6 +502,7 @@ trait SvSvcStore
         new SvcRules_ConfirmSvOnboarding(
           svOnboarding.payload.candidateParty,
           svOnboarding.payload.candidateName,
+          svOnboarding.payload.candidateParticipantId,
           // TODO(#9173): include SV reward weights in the onboarding configs
           dummySvRewardWeight,
           svOnboarding.payload.token,

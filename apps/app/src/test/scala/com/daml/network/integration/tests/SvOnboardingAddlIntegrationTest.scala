@@ -82,6 +82,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase {
             case Seq(svOnboarding) => {
               svOnboarding.data.candidateName shouldBe "Canton-Foundation-4"
               svOnboarding.data.candidateParty shouldBe sv4Party.toProtoPrimitive
+              svOnboarding.data.candidateParticipantId shouldBe sv4Backend.participantClient.id.toProtoPrimitive
               svOnboarding.data.sponsor shouldBe sv1Party.toProtoPrimitive
               svOnboarding.data.svc shouldBe svcParty.toProtoPrimitive
               // if this check fails:
@@ -92,6 +93,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase {
                 "Canton-Foundation-4",
                 "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA==",
                 sv4Party,
+                sv4Backend.participantClient.id,
                 svcParty,
               )
               (svOnboarding.data.token, svOnboarding.id)
@@ -255,6 +257,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase {
                 new SvcRules_ConfirmSvOnboarding(
                   sv2Party.toProtoPrimitive,
                   "Canton-Foundation-2",
+                  "PAR::sv2::1220f3e2",
                   dummySvRewardWeight,
                   "no reason",
                 )

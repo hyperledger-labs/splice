@@ -115,6 +115,7 @@ data MemberInfo = MemberInfo with
     lastReceivedRewardFor : Round -- ^ Last round for which the member received a reward coupon.
     numRewardCouponsMissed : Int -- ^ Number of reward coupons missed since they joined.
     svRewardWeight : Int -- ^ Weight of the SV in the SVC reward distribution.
+    participantId : Text -- ^ Participant ID of the SV.
     domainNodes : DomainNodeConfigMap
     -- ^ This is the config for the CometBFT nodes under control of this member.
     -- We expect the SvApp to run a reconciliation loop that applies all changes to this
@@ -125,6 +126,7 @@ data MemberInfo = MemberInfo with
 -- | Information about offboarded members
 data OffboardedMemberInfo = OffboardedMemberInfo with
     name : Text -- ^ Human-readable name; must be unique.
+    participantId : Text -- ^ Participant ID of the offboarded SV.
     lastReceivedRewardFor : Round
   deriving (Eq, Show)
 
@@ -408,7 +410,7 @@ template SvcRules with
               pure $ case find (\(_, info) -> info.name == newMemberName) (Map.toList members) of
                 None -> offboardedMembers
                 Some (prev, info) ->
-                  Map.insert prev (OffboardedMemberInfo { name = "SV " <> show newMemberName <> " reonboarded as " <> show newMemberParty, lastReceivedRewardFor = info.lastReceivedRewardFor }) offboardedMembers
+                  Map.insert prev (OffboardedMemberInfo { name = "SV " <> show newMemberName <> " reonboarded as " <> show newMemberParty, participantId = info.participantId, lastReceivedRewardFor = info.lastReceivedRewardFor }) offboardedMembers
             else do
               require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
               pure offboardedMembers
@@ -423,6 +425,7 @@ template SvcRules with
               -- TODO(#9175): consider counting missed coupons across reonboardings
               numRewardCouponsMissed = 0
               svRewardWeight = newMemberRewardWeight
+              participantId = newMemberParticipantId
               domainNodes = noDomainNodes
         let membersNotMatchingNewMemberName = Map.filter (\m -> m.name /= newMemberName) members
         now <- getTime
@@ -465,6 +468,7 @@ template SvcRules with
                   | otherwise        = (leader, epoch)
             let offboardedMemberInfo = OffboardedMemberInfo with
                     name = info.name
+                    participantId = info.participantId
                     lastReceivedRewardFor = info.lastReceivedRewardFor
             -- create the new rules contract
             create SvcRules with
@@ -541,7 +545,6 @@ template SvcRules with
         middleRoundCid : ContractId OpenMiningRound
         latestRoundCid : ContractId OpenMiningRound
         coinRulesCid: ContractId CoinRules
-        svParticipantId : Text
       controller sv
       do
 
@@ -561,7 +564,7 @@ template SvcRules with
           newMemberParty = sv
           newMemberName = svOnboardingConfirmed.svName
           newMemberRewardWeight = svOnboardingConfirmed.svRewardWeight
-          newMemberParticipantId = svParticipantId
+          newMemberParticipantId = svOnboardingConfirmed.svParticipantId
           joinedAsOfRound = earliestRound.round
           domainId = coinConfig.globalDomain.activeDomain
 
@@ -1056,6 +1059,7 @@ template SvcRules with
       with
         candidateName : Text
         candidateParty : Party
+        candidateParticipantId: Text
         token : Text
         sponsor : Party
       controller sponsor
@@ -1088,6 +1092,7 @@ template SvcRules with
       with
         newMemberParty : Party
         newMemberName : Text
+        newParticipantId : Text
         newMemberRewardWeight : Int
         reason : Text
       controller svc
@@ -1102,6 +1107,7 @@ template SvcRules with
         create SvOnboardingConfirmed with
           svParty = newMemberParty
           svName = newMemberName
+          svParticipantId = newParticipantId
           svRewardWeight = newMemberRewardWeight
           reason
           svc
@@ -1119,6 +1125,7 @@ template SvcRules with
         let party = svOnboardingConfirmed.svParty
         let info = OffboardedMemberInfo with
               name = svOnboardingConfirmed.svName
+              participantId = svOnboardingConfirmed.svParticipantId
               lastReceivedRewardFor =
                 max
                   (optional (Round (-1)) (.lastReceivedRewardFor) (Map.lookup party members))

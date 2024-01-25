@@ -317,6 +317,8 @@ export const svcInfo: GetSvcInfoResponse = {
               number: '0',
             },
             svRewardWeight: '10',
+            participantId:
+              'PAR::participant-1::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
             domainNodes: [
               [
                 'global-domain::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
@@ -365,6 +367,8 @@ export const svcInfo: GetSvcInfoResponse = {
               number: '0',
             },
             svRewardWeight: '12345',
+            participantId:
+              'PAR::participant-2::12205ab9210b258422a251d6148b031d71147405948c92bf9c4bc78029c5479aed75',
             domainNodes: [
               [
                 'global-domain::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
@@ -413,6 +417,8 @@ export const svcInfo: GetSvcInfoResponse = {
               number: '0',
             },
             svRewardWeight: '12345',
+            participantId:
+              'PAR::participant-3::12203cb019c9986425861c91685d9b7c0068cf48abb8dff8e20f166501f7f677dce7',
             domainNodes: [
               [
                 'global-domain::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
@@ -461,6 +467,8 @@ export const svcInfo: GetSvcInfoResponse = {
               number: '0',
             },
             svRewardWeight: '12345',
+            participantId:
+              'PAR::participant-4::122070fc4bb3519a4f39f5919b5a166e30794733e56ad9fba2157f7208ff458f7dc7',
             domainNodes: [
               [
                 'global-domain::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
