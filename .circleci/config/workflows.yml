@@ -27,6 +27,7 @@ workflows:
           context:
             - artifactory
             - datadog
+            - slack-context
           requires:
             - docker_images_push
 
