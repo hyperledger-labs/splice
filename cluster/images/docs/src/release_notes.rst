@@ -12,6 +12,16 @@ Release Notes
   Scans are registered as part of the SV onboarding, using the public URL that was configured in the 2024-01-15 deployment (``scan.publicUrl`` in SV-app's helm chart).
   SV validators still trust the Scan app of the SV.
 
+* Clean up our OpenAPI spec to use oneOf.
+  This involves minor changes to the some of our API endpoints including:
+
+  * getHealthStatus for all nodes
+  * getBuyTrafficRequestStatus and getTransferOfferStatus in the wallet API
+  * getCometBftNodeStatus and getCometBftNodeDebugDump in the SV app
+
+  In almost all cases, the changes should only involve some fields that were
+  optional now becoming required.
+
 2024-01-22
 ----------
 

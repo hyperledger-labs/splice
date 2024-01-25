@@ -17,4 +17,7 @@ shutdown did not complete gracefully in allotted .* seconds
 # database pools don't always close cleanly
 failed connection pool health check
 
+# See https://app.circleci.com/pipelines/github/DACH-NY/canton-network-node/137888/workflows/a856128a-eb86-4a44-ab2e-d2e377fc118c/jobs/664082
+Delaying setup of new sequencer subscription failed
+
 # Make sure to have a trailing newline
