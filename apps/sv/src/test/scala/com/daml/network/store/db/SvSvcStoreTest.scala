@@ -1324,6 +1324,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         1,
         new RelTime(1),
         new SvcGlobalDomainConfig(Collections.emptyMap(), newDomainId, newDomainId),
+        Optional.empty(),
       ),
       Collections.emptyMap(),
       true,

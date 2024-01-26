@@ -1375,6 +1375,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           newDomainId,
           newDomainId,
         ),
+        Optional.empty(),
       ),
       Collections.emptyMap(),
       true,

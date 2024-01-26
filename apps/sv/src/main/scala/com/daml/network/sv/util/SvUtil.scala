@@ -39,7 +39,7 @@ import java.security.interfaces.{ECPrivateKey, ECPublicKey}
 import java.security.spec.{EncodedKeySpec, PKCS8EncodedKeySpec, X509EncodedKeySpec}
 import java.security.{KeyFactory, SecureRandom, Signature}
 import java.time.{Instant, Duration as JavaDuration}
-import java.util.Base64
+import java.util.{Base64, Optional}
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.jdk.CollectionConverters.*
@@ -185,6 +185,7 @@ object SvUtil {
     defaultInitialTrafficGrant,
     new RelTime(TimeUnit.MINUTES.toMicros(30)), // svChallengeDeadline
     defaultSvcGlobalDomainConfig(domainId), // globalDomainConfig
+    Optional.empty(), // nextScheduledHardDomainMigration
   )
 
   def keyPairMatches(

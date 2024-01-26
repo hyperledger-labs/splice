@@ -170,6 +170,7 @@ class SvTimeBasedOnboardingIntegrationTest
               sv1Backend.getSvcInfo().svcRules.payload.config.initialTrafficGrant,
               sv1Backend.getSvcInfo().svcRules.payload.config.svChallengeDeadline,
               sv1Backend.getSvcInfo().svcRules.payload.config.globalDomain,
+              sv1Backend.getSvcInfo().svcRules.payload.config.nextScheduledHardDomainMigration,
             )
 
             val action: ActionRequiringConfirmation =
