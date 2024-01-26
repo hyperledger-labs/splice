@@ -10,7 +10,7 @@ resources:
     memory: 1Gi
 
 db:
-  volumeSize: 240Gi
+  volumeSize: 480Gi
   volumeStorageClass: standard-rwo
   pvcTemplateName: pg-data
 
