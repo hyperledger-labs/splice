@@ -195,7 +195,7 @@ function _retry_until_success() {
 
     set +e
     until $cmd; do
-        ((num_retries++))
+        ((++num_retries))
         if ((num_retries>max_retries)); then
             echo "Too many attempts, exiting"
             exit 1
@@ -250,7 +250,7 @@ function _retry_until_value() {
     }
 
     until found=$($cmd 2>&1 || true) && (is_expected "$found"); do
-        ((num_retries++))
+        ((++num_retries))
         if ((num_retries>max_retries)); then
             echo "Too many attempts, exiting"
             exit 1
