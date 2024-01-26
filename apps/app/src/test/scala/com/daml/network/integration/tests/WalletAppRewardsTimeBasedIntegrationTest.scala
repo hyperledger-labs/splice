@@ -62,6 +62,7 @@ class WalletAppRewardsTimeBasedIntegrationTest
             splitwellWalletClient.listAppRewardCoupons() should have length 1
             // One validator reward coupon per leg to alice's validator
             aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 2
+            // TODO(#8819): also test for validator faucet coupons
           },
         )
 
@@ -74,6 +75,7 @@ class WalletAppRewardsTimeBasedIntegrationTest
             aliceValidatorWalletClient.listAppRewardCoupons() should be(empty)
             splitwellWalletClient.listAppRewardCoupons() should be(empty)
             aliceValidatorWalletClient.listValidatorRewardCoupons() should be(empty)
+            // TODO(#8819): also test for validator faucet coupons
             checkBalance(
               aliceValidatorWalletClient,
               Some(aliceValidatorStartBalance.round + 4),
