@@ -15,7 +15,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
 import com.daml.network.http.v0.definitions
-import com.daml.network.sv.{DomainMigrationDump, SvApp}
+import com.daml.network.sv.{DomainMigrationDump, SvApp, SvAppBootstrap}
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
 import com.daml.network.sv.automation.{LeaderBasedAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.automation.singlesv.RestartLeaderBasedAutomationTrigger
@@ -23,7 +23,6 @@ import com.daml.network.sv.config.{SvAppBackendConfig, SvAppClientConfig}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.health.admin.data.NodeStatus
-import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 
 import scala.concurrent.duration.FiniteDuration
@@ -127,8 +126,7 @@ final case class SvAppClientReference(
     override val name: String,
     val config: SvAppClientConfig,
     override val token: Option[String] = None,
-) extends SvAppReference(consoleEnvironment, name)
-    with BaseInspection[ParticipantNode] {
+) extends SvAppReference(consoleEnvironment, name) {
 
   override def httpClientConfig = config.adminApi
 
@@ -145,7 +143,13 @@ class SvAppBackendReference(
 )(implicit actorSystem: ActorSystem)
     extends SvAppReference(consoleEnvironment, name)
     with CNNodeAppBackendReference
-    with BaseInspection[ParticipantNode] {
+    with BaseInspection[SvApp] {
+
+  override def runningNode: Option[SvAppBootstrap] =
+    consoleEnvironment.environment.svs.getRunning(name)
+
+  override def startingNode: Option[SvAppBootstrap] =
+    consoleEnvironment.environment.svs.getStarting(name)
 
   override protected val instanceType = "SV"
 
@@ -381,7 +385,4 @@ class SvAppBackendReference(
       s"remote participant for `$name`, with admin token",
       config.participantClient.participantClientConfigWithAdminToken,
     )
-
-  /** secret, not publicly documented way to get the admin token */
-  def adminToken: Option[String] = underlying.map(_.adminToken.secret)
 }

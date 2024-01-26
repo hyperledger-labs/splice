@@ -12,26 +12,23 @@ import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.commands.{
-  HealthAdministration,
+  HealthAdministrationX,
   KeyAdministrationGroup,
-  PartiesAdministrationGroup,
-  TopologyAdministrationGroup,
+  TopologyAdministrationGroupCommon,
 }
 import com.digitalasset.canton.console.{
   ConsoleCommandResult,
   ConsoleEnvironment,
   ConsoleMacros,
   Help,
-  InstanceReference,
-  LocalInstanceReference,
+  InstanceReferenceCommon,
+  LocalInstanceReferenceCommon,
   RemoteParticipantReferenceX,
 }
-import com.digitalasset.canton.environment.CantonNodeBootstrap
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
-import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId}
+import com.digitalasset.canton.topology.NodeIdentity
 
 import java.io.File
 import scala.concurrent.ExecutionContext
@@ -41,7 +38,7 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 /** Copy of Canton ParticipantReference */
-trait CNNodeAppReference extends InstanceReference {
+trait CNNodeAppReference extends InstanceReferenceCommon {
 
   override val name: String
 
@@ -60,36 +57,20 @@ trait CNNodeAppReference extends InstanceReference {
   @Help.Summary("Health and diagnostic related commands")
   @Help.Group("Health")
   override def health =
-    new HealthAdministration[SimpleStatus](
+    new HealthAdministrationX[SimpleStatus](
       this,
       consoleEnvironment,
       SimpleStatus.fromProtoV0,
     )
 
-  @Help.Summary(
-    "Yields the globally unique id of this participant. " +
-      "Throws an exception, if the id has not yet been allocated (e.g., the participant has not yet been started)."
-  )
-  override def id: NodeIdentity = topology.idHelper(ParticipantId(_))
+  // clear_cache exists to invalidate topology caches which we don't have in our apps.
+  override def clear_cache(): Unit = ()
 
-  private lazy val topology_ =
-    new TopologyAdministrationGroup(
-      this,
-      health.status.successOption.map(_.topologyQueue),
-      consoleEnvironment,
-      loggerFactory,
-    )
+  // Doesn't make sense for CN
+  def topology: TopologyAdministrationGroupCommon = ???
 
-  @Help.Summary("Topology management related commands")
-  @Help.Group("Topology")
-  @Help.Description(
-    "This group contains access to the full set of topology management commands."
-  )
-  def topology: TopologyAdministrationGroup = topology_
-
-  @Help.Summary("Inspect and manage parties")
-  @Help.Group("Parties")
-  override def parties: PartiesAdministrationGroup = partiesGroup
+  // Doesn't make sense for CN
+  override def id: NodeIdentity = ???
 
   @Help.Summary("Wait until initialization has completed")
   def waitForInitialization(
@@ -105,17 +86,6 @@ trait CNNodeAppReference extends InstanceReference {
         noTracingLogger.error(s"Timeout while waiting for initialization of ${name}", e)
         throw e
     }
-
-  // TODO(#736): slightly adapted compared to Canton.
-  // above command needs to be def such that `Help` works.
-  lazy private val partiesGroup =
-    new PartiesAdministrationGroup(this, consoleEnvironment)
-
-  def runningNode: Option[CantonNodeBootstrap[ParticipantNode]] =
-    consoleEnvironment.environment.participants.getRunning(name)
-
-  def startingNode: Option[CantonNodeBootstrap[ParticipantNode]] =
-    consoleEnvironment.environment.participants.getStarting(name)
 }
 
 trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
@@ -191,21 +161,6 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
       httpCommand(HttpAdminAppClient.GetVersion(basePath))
     }
 
-  // Override topology to avoid using grpc status check
-  private lazy val topology_ =
-    new TopologyAdministrationGroup(
-      this,
-      None,
-      consoleEnvironment,
-      loggerFactory,
-    )
-  @Help.Summary("Topology management related commands")
-  @Help.Group("Topology")
-  @Help.Description(
-    "This group contains access to the full set of topology management commands."
-  )
-  override def topology: TopologyAdministrationGroup = topology_
-
   private val defaultHealthStatusTimeout: NonNegativeDuration =
     NonNegativeDuration.tryFromDuration(5.minute)
   private val defaultHealthStatusMaxBackoff: NonNegativeDuration =
@@ -229,7 +184,7 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
     }
 }
 
-trait CNNodeAppBackendReference extends CNNodeAppReference with LocalInstanceReference {
+trait CNNodeAppBackendReference extends CNNodeAppReference with LocalInstanceReferenceCommon {
   override def config: CNNodeBackendConfig
 
   @Help.Summary("Start node and wait for initialization to complete")

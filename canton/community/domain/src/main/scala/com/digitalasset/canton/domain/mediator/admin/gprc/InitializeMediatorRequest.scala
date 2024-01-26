@@ -5,7 +5,7 @@ package com.digitalasset.canton.domain.mediator.admin.gprc
 
 import cats.syntax.traverse.*
 import com.digitalasset.canton.crypto.Fingerprint
-import com.digitalasset.canton.domain.admin.{v0, v2}
+import com.digitalasset.canton.domain.admin.{v30, v30old}
 import com.digitalasset.canton.domain.sequencing.admin.grpc.InitializeSequencerRequest
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.sequencing.{SequencerConnection, SequencerConnections}
@@ -23,23 +23,23 @@ final case class InitializeMediatorRequest(
     sequencerConnections: SequencerConnections,
     signingKeyFingerprint: Option[Fingerprint],
 ) {
-  def toProtoV0: v0.InitializeMediatorRequest =
-    v0.InitializeMediatorRequest(
+  def toProtoV30Old: v30old.InitializeMediatorRequest =
+    v30old.InitializeMediatorRequest(
       domainId.toProtoPrimitive,
       mediatorId.uid.toProtoPrimitive,
-      topologyState.map(_.toProtoV0),
-      Some(domainParameters.toProtoV1),
+      topologyState.map(_.toProtoV30),
+      Some(domainParameters.toProtoV30),
       // Non-BFT domain is only supporting a single sequencer connection
-      Some(sequencerConnections.default.toProtoV0),
+      Some(sequencerConnections.default.toProtoV30),
       signingKeyFingerprint.map(_.toProtoPrimitive),
     )
 }
 
 object InitializeMediatorRequest {
-  def fromProtoV0(
-      requestP: v0.InitializeMediatorRequest
+  def fromProtoV30Old(
+      requestP: v30old.InitializeMediatorRequest
   ): ParsingResult[InitializeMediatorRequest] = {
-    val v0.InitializeMediatorRequest(
+    val v30old.InitializeMediatorRequest(
       domainIdP,
       mediatorIdP,
       topologyStateP,
@@ -55,7 +55,7 @@ object InitializeMediatorRequest {
       topologyState <- topologyStateP.traverse(InitializeSequencerRequest.convertTopologySnapshot)
       domainParameters <- ProtoConverter
         .required("domain_parameters", domainParametersP)
-        .flatMap(StaticDomainParameters.fromProtoV1)
+        .flatMap(StaticDomainParameters.fromProtoV30)
       sequencerConnection <- ProtoConverter.parseRequired(
         SequencerConnection.fromProtoV0,
         "sequencer_connection",
@@ -78,34 +78,31 @@ final case class InitializeMediatorRequestX(
     domainParameters: StaticDomainParameters,
     sequencerConnections: SequencerConnections,
 ) {
-  def toProtoV2: v2.InitializeMediatorRequest =
-    v2.InitializeMediatorRequest(
+  def toProtoV30: v30.InitializeMediatorRequest =
+    v30.InitializeMediatorRequest(
       domainId.toProtoPrimitive,
-      Some(domainParameters.toProtoV1),
-      sequencerConnections.toProtoV0,
-      sequencerConnections.sequencerTrustThreshold.unwrap,
+      Some(domainParameters.toProtoV30),
+      Some(sequencerConnections.toProtoV30),
     )
 }
 
 object InitializeMediatorRequestX {
-  def fromProtoV2(
-      requestP: v2.InitializeMediatorRequest
+  def fromProtoV30(
+      requestP: v30.InitializeMediatorRequest
   ): ParsingResult[InitializeMediatorRequestX] = {
-    val v2.InitializeMediatorRequest(
+    val v30.InitializeMediatorRequest(
       domainIdP,
       domainParametersP,
-      sequencerConnectionP,
-      sequencerTrustThreshold,
+      sequencerConnectionsPO,
     ) = requestP
     for {
       domainId <- DomainId.fromProtoPrimitive(domainIdP, "domain_id")
       domainParameters <- ProtoConverter
         .required("domain_parameters", domainParametersP)
-        .flatMap(StaticDomainParameters.fromProtoV1)
-      sequencerConnections <- SequencerConnections.fromProtoV0(
-        sequencerConnectionP,
-        sequencerTrustThreshold,
-      )
+        .flatMap(StaticDomainParameters.fromProtoV30)
+      sequencerConnections <- ProtoConverter
+        .required("sequencerConnections", sequencerConnectionsPO)
+        .flatMap(SequencerConnections.fromProtoV30)
     } yield InitializeMediatorRequestX(
       domainId,
       domainParameters,

@@ -57,7 +57,7 @@ abstract class PackageVettingTrigger extends PollingTrigger with PackageIdResolv
       darResource match {
         case None =>
           logger.error(
-            s"Package ${pkg.packageName} is required in version ${version} according to CoinConfig but this version is not part of the deployed release, upgrade immediately to avoid any issues"
+            show"Package ${pkg.packageName} is required in version ${version.toString} according to CoinConfig but this version is not part of the deployed release, upgrade immediately to avoid any issues"
           )
           Future.unit
         case Some(resource) => uploadDar(resource)
@@ -75,7 +75,7 @@ abstract class PackageVettingTrigger extends PollingTrigger with PackageIdResolv
       val darResource = PackageIdResolver.lookupPackage(pkg, version)
       if (darResource.isEmpty) {
         logger.warn(
-          show"Package ${pkg.packageName} is required in version ${version} after $time according to CoinConfig but this version is not part of the deployed release, upgrade before $time to avoid any issues"
+          show"Package ${pkg.packageName} is required in version ${version.toString} after $time according to CoinConfig but this version is not part of the deployed release, upgrade before $time to avoid any issues"
         )
       }
       Future.unit

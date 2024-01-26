@@ -13,18 +13,12 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.console.{
   CantonHealthAdministration,
   CommunityCantonHealthAdministration,
-  CommunityLocalDomainReference,
-  CommunityRemoteDomainReference,
   ConsoleEnvironment,
   ConsoleEnvironmentBinding,
   ConsoleGrpcAdminCommandRunner,
   ConsoleOutput,
-  DomainReference,
-  FeatureFlag,
   Help,
-  LocalDomainReference,
   LocalInstanceReferenceCommon,
-  LocalParticipantReference,
   NodeReferences,
   StandardConsoleOutput,
 }
@@ -55,8 +49,6 @@ class CNNodeConsoleEnvironment(
   )(this.tracer, templateDecoder)
 
   override type Env = CNNodeEnvironmentImpl
-  override type DomainLocalRef = CommunityLocalDomainReference
-  override type DomainRemoteRef = CommunityRemoteDomainReference
   override type Status = CommunityCantonStatus
 
   def mergeLocalCNNodeInstances(
@@ -69,16 +61,8 @@ class CNNodeConsoleEnvironment(
 
   override lazy val nodes = NodeReferences(
     // this override ensures that config options like manualStart also work for CN apps
-    mergeLocalInstances(
-      participants.local,
-      domains.local,
-      coinNodes.local,
-    ),
-    mergeRemoteInstances(
-      participants.remote,
-      domains.remote,
-      coinNodes.remote,
-    ),
+    coinNodes.local,
+    coinNodes.remote,
   )
 
   lazy val coinNodes: NodeReferences[
@@ -380,53 +364,9 @@ class CNNodeConsoleEnvironment(
 
   override protected def startupOrderPrecedence(instance: LocalInstanceReferenceCommon): Int =
     instance match {
-      case _: LocalDomainReference => 1
-      case _: LocalParticipantReference => 2
-      case _: ScanAppBackendReference => 3
-      case _: ValidatorAppBackendReference => 4
+      case _: SvAppBackendReference => 1
+      case _: ScanAppBackendReference => 2
+      case _: ValidatorAppBackendReference => 3
       case _ => 5
     }
-
-  override protected def domainsTopLevelValue(
-      h: TopLevelValue.Partial,
-      domains: NodeReferences[
-        DomainReference,
-        CommunityRemoteDomainReference,
-        CommunityLocalDomainReference,
-      ],
-  ): TopLevelValue[
-    NodeReferences[DomainReference, CommunityRemoteDomainReference, CommunityLocalDomainReference]
-  ] =
-    h(domains)
-
-  override protected def localDomainTopLevelValue(
-      h: TopLevelValue.Partial,
-      d: CommunityLocalDomainReference,
-  ): TopLevelValue[CommunityLocalDomainReference] =
-    h(d)
-
-  override protected def remoteDomainTopLevelValue(
-      h: TopLevelValue.Partial,
-      d: CommunityRemoteDomainReference,
-  ): TopLevelValue[CommunityRemoteDomainReference] =
-    h(d)
-
-  override protected def localDomainHelpItems(
-      scope: Set[FeatureFlag],
-      localDomain: CommunityLocalDomainReference,
-  ): Seq[Help.Item] =
-    Help.getItems(localDomain, baseTopic = Seq("$domain"), scope = scope)
-
-  override protected def remoteDomainHelpItems(
-      scope: Set[FeatureFlag],
-      remoteDomain: CommunityRemoteDomainReference,
-  ): Seq[Help.Item] =
-    Help.getItems(remoteDomain, baseTopic = Seq("$domain"), scope = scope)
-
-  override protected def createDomainReference(name: String): CommunityLocalDomainReference =
-    new CommunityLocalDomainReference(this, name, environment.executionContext)
-
-  override protected def createRemoteDomainReference(name: String): CommunityRemoteDomainReference =
-    new CommunityRemoteDomainReference(this, name)
-
 }

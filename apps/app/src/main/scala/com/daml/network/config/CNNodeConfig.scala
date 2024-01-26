@@ -28,7 +28,6 @@ import com.daml.network.wallet.config.{
   WalletValidatorAppClientConfig,
 }
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.CantonCommunityConfig.CantonDeprecationImplicits
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.config.*
@@ -96,7 +95,6 @@ case class CNNodeConfig(
 ) extends CantonConfig // TODO(#736): generalize or fork this trait.
     with ConfigDefaults[DefaultPorts, CNNodeConfig] {
 
-  override type DomainConfigType = CommunityDomainConfig
   override type ParticipantConfigType = CommunityParticipantConfig
 
   override def validate: Validated[NonEmpty[Seq[String]], Unit] = Validated.valid(())
@@ -282,15 +280,15 @@ case class CNNodeConfig(
 
   override type MediatorNodeXConfigType = CommunityMediatorNodeXConfig
 
-  override def mediatorsX: Map[InstanceName, MediatorNodeXConfigType] = Map.empty
+  override def mediators: Map[InstanceName, MediatorNodeXConfigType] = Map.empty
 
-  override def remoteMediatorsX: Map[InstanceName, RemoteMediatorConfig] = Map.empty
+  override def remoteMediators: Map[InstanceName, RemoteMediatorConfig] = Map.empty
 
   override type SequencerNodeXConfigType = CommunitySequencerNodeXConfig
 
-  override def sequencersX: Map[InstanceName, SequencerNodeXConfigType] = Map.empty
+  override def sequencers: Map[InstanceName, SequencerNodeXConfigType] = Map.empty
 
-  override def remoteSequencersX: Map[InstanceName, RemoteSequencerConfig] = Map.empty
+  override def remoteSequencers: Map[InstanceName, RemoteSequencerConfig] = Map.empty
 }
 
 // NOTE: the below is patterned after CantonCommunityConfig.
@@ -318,10 +316,7 @@ object CNNodeConfig {
       private val
       elc: ErrorLoggingContext
   ) {
-    val configReaders: CantonConfig.ConfigReaders = new CantonConfig.ConfigReaders()
-    import configReaders.*
-    import DeprecatedConfigUtils.*
-    import CantonDeprecationImplicits.*
+    import CantonConfig.ConfigReaders.*
 
     implicit val nonNegativeBigDecimalReader: ConfigReader[NonNegativeNumeric[BigDecimal]] =
       NonNegativeNumeric.nonNegativeNumericReader[BigDecimal]
@@ -547,9 +542,9 @@ object CNNodeConfig {
       deriveReader[SplitwellAppClientConfig]
 
     implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =
-      deriveReader[CommunityDomainConfig].applyDeprecations
+      deriveReader[CommunityDomainConfig]
     implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =
-      deriveReader[CommunityParticipantConfig].applyDeprecations
+      deriveReader[CommunityParticipantConfig]
 
     implicit val cnNodeConfigReader: ConfigReader[CNNodeConfig] = deriveReader[CNNodeConfig]
   }
@@ -560,7 +555,6 @@ object CNNodeConfig {
 
     import writers.*
     import DeprecatedConfigUtils.*
-    import CantonDeprecationImplicits.*
 
     implicit val nonNegativeBigDecimalWriter: ConfigWriter[NonNegativeNumeric[BigDecimal]] =
       ConfigWriter.toString(x => x.unwrap.toString)

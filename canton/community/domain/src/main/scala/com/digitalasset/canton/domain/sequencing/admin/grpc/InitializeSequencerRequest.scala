@@ -5,9 +5,9 @@ package com.digitalasset.canton.domain.sequencing.admin.grpc
 
 import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.domain.admin.v2
+import com.digitalasset.canton.domain.admin.{v30 as adminProtoV30, v30old as adminProtoV30Old}
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot
-import com.digitalasset.canton.protocol.{StaticDomainParameters, v0 as protocolV0}
+import com.digitalasset.canton.protocol.{StaticDomainParameters, v30}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
@@ -34,10 +34,10 @@ final case class InitializeSequencerRequest(
   @transient override protected lazy val companionObj: InitializeSequencerRequest.type =
     InitializeSequencerRequest
 
-  def toProtoV2: v2.InitRequest = v2.InitRequest(
+  def toProtoV30Old: adminProtoV30Old.InitRequest = adminProtoV30Old.InitRequest(
     domainId.toProtoPrimitive,
-    Some(topologySnapshot.toProtoV0),
-    Some(domainParameters.toProtoV1),
+    Some(topologySnapshot.toProtoV30),
+    Some(domainParameters.toProtoV30),
     sequencerSnapshot.fold(ByteString.EMPTY)(_.toProtoVersioned.toByteString),
   )
 }
@@ -47,16 +47,16 @@ object InitializeSequencerRequest
   override val name: String = "InitializeSequencerRequest"
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(2) -> VersionedProtoConverter(ProtocolVersion.v30)(v2.InitRequest)(
-      supportedProtoVersion(_)(fromProtoV2),
-      _.toProtoV2.toByteString,
+    ProtoVersion(2) -> VersionedProtoConverter(ProtocolVersion.v30)(adminProtoV30Old.InitRequest)(
+      supportedProtoVersion(_)(fromProtoV30Old),
+      _.toProtoV30Old.toByteString,
     )
   )
 
   def convertTopologySnapshot(
-      transactionsP: protocolV0.TopologyTransactions
+      transactionsP: v30.TopologyTransactions
   ): ParsingResult[StoredTopologyTransactions[TopologyChangeOp.Positive]] = {
-    StoredTopologyTransactions.fromProtoV0(transactionsP).flatMap { topologySnapshot =>
+    StoredTopologyTransactions.fromProtoV30(transactionsP).flatMap { topologySnapshot =>
       val topologySnapshotPositive = topologySnapshot.collectOfType[TopologyChangeOp.Positive]
       if (topologySnapshot.result.sizeCompare(topologySnapshotPositive.result) == 0)
         Right(topologySnapshotPositive)
@@ -69,15 +69,15 @@ object InitializeSequencerRequest
     }
   }
 
-  private[sequencing] def fromProtoV2(
-      request: v2.InitRequest
+  private[sequencing] def fromProtoV30Old(
+      request: adminProtoV30Old.InitRequest
   ): ParsingResult[InitializeSequencerRequest] = {
     for {
       domainId <- UniqueIdentifier
         .fromProtoPrimitive(request.domainId, "domain_id")
         .map(DomainId(_))
       domainParameters <- ProtoConverter.parseRequired(
-        StaticDomainParameters.fromProtoV1,
+        StaticDomainParameters.fromProtoV30,
         "domain_parameters",
         request.domainParameters,
       )
@@ -107,10 +107,10 @@ final case class InitializeSequencerRequestX(
     sequencerSnapshot: Option[SequencerSnapshot] =
       None, // this will likely be a different type for X nodes
 ) {
-  def toProtoV2: v2.InitializeSequencerRequest = {
-    v2.InitializeSequencerRequest(
-      Some(topologySnapshot.toProtoV0),
-      Some(domainParameters.toProtoV1),
+  def toProtoV30: adminProtoV30.InitializeSequencerRequest = {
+    adminProtoV30.InitializeSequencerRequest(
+      Some(topologySnapshot.toProtoV30),
+      Some(domainParameters.toProtoV30),
       sequencerSnapshot.fold(ByteString.EMPTY)(_.toProtoVersioned.toByteString),
     )
   }
@@ -119,16 +119,16 @@ final case class InitializeSequencerRequestX(
 object InitializeSequencerRequestX {
 
   private[sequencing] def fromProtoV2(
-      request: v2.InitializeSequencerRequest
+      request: adminProtoV30.InitializeSequencerRequest
   ): ParsingResult[InitializeSequencerRequestX] =
     for {
       domainParameters <- ProtoConverter.parseRequired(
-        StaticDomainParameters.fromProtoV1,
+        StaticDomainParameters.fromProtoV30,
         "domain_parameters",
         request.domainParameters,
       )
       topologySnapshotAddO <- request.topologySnapshot.traverse(
-        StoredTopologyTransactionsX.fromProtoV0
+        StoredTopologyTransactionsX.fromProtoV30
       )
       snapshotO <- Option
         .when(!request.snapshot.isEmpty)(

@@ -2,8 +2,7 @@ package com.daml.network.console
 
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.http.v0.definitions
-import com.digitalasset.canton.console.{BaseInspection, Help}
-import com.digitalasset.canton.participant.ParticipantNode
+import com.digitalasset.canton.console.Help
 import com.daml.network.auth.AuthUtil
 import com.daml.network.validator.admin.api.client.commands.HttpCnsAppClient
 import com.daml.network.validator.config.CnsAppExternalClientConfig
@@ -39,8 +38,7 @@ final class CnsExternalAppClientReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
     val config: CnsAppExternalClientConfig,
-) extends CnsExternalAppReference(consoleEnvironment, name)
-    with BaseInspection[ParticipantNode] {
+) extends CnsExternalAppReference(consoleEnvironment, name) {
 
   override protected val instanceType = "External CNS Client"
   override def httpClientConfig = config.adminApi

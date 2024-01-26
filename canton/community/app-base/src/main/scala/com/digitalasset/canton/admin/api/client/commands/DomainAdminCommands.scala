@@ -5,7 +5,7 @@ package com.digitalasset.canton.admin.api.client.commands
 
 import cats.syntax.either.*
 import com.digitalasset.canton.admin.api.client.data.StaticDomainParameters as StaticDomainParametersConfig
-import com.digitalasset.canton.domain.admin.v0 as adminproto
+import com.digitalasset.canton.domain.admin.v30 as adminproto
 import com.digitalasset.canton.protocol.StaticDomainParameters as StaticDomainParametersInternal
 import io.grpc.ManagedChannel
 
@@ -45,7 +45,7 @@ object DomainAdminCommands {
         case Parameters.Empty => Left("Field parameters was not found in the response")
         case Parameters.ParametersV1(parametersV1) =>
           (for {
-            staticDomainParametersInternal <- StaticDomainParametersInternal.fromProtoV1(
+            staticDomainParametersInternal <- StaticDomainParametersInternal.fromProtoV30(
               parametersV1
             )
             staticDomainParametersConfig = StaticDomainParametersConfig(

@@ -2,6 +2,7 @@ package com.daml.network.util
 
 import com.daml.ledger.javaapi.data.Unit as DamlUnit
 import com.daml.lf.data.Numeric
+import com.daml.lf.data.Ref.PackageVersion
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.types.Round
@@ -39,17 +40,17 @@ import scala.jdk.OptionConverters.*
 
 object CNNodeUtil {
 
-  private def readDarVersion(resource: DarResource): String =
+  private def readDarVersion(resource: DarResource): PackageVersion =
     DarUtil.readDarMetadata(resource.path).version
 
   private def readPackageConfig(): cc.coinconfig.PackageConfig = {
     new cc.coinconfig.PackageConfig(
-      readDarVersion(DarResources.cantonCoin.bootstrap),
-      readDarVersion(DarResources.cantonNameService.bootstrap),
-      readDarVersion(DarResources.svcGovernance.bootstrap),
-      readDarVersion(DarResources.validatorLifecycle.bootstrap),
-      readDarVersion(DarResources.wallet.bootstrap),
-      readDarVersion(DarResources.walletPayments.bootstrap),
+      readDarVersion(DarResources.cantonCoin.bootstrap).toString,
+      readDarVersion(DarResources.cantonNameService.bootstrap).toString,
+      readDarVersion(DarResources.svcGovernance.bootstrap).toString,
+      readDarVersion(DarResources.validatorLifecycle.bootstrap).toString,
+      readDarVersion(DarResources.wallet.bootstrap).toString,
+      readDarVersion(DarResources.walletPayments.bootstrap).toString,
     )
   }
 

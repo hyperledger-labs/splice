@@ -9,6 +9,7 @@ Release Notes
 * The wallet of non-SV validators now execute all reads through a Scan proxy in the validator,
   thus executing them in a BFT fashion.
 * Increased postgres PVC size to 480GB to support longer running clusters.
+* You might see some ``ACS_COMMITMENT_MISMATCH`` warning logs in the participant. These can be ignored.
 
 2024-01-29
 ----------

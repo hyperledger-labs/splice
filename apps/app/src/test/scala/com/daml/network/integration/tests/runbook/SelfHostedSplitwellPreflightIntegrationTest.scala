@@ -73,10 +73,10 @@ class SelfHostedSplitwellPreflightIntegrationTest
         splitwellPath / "splitwell-participant.conf",
       ),
       Seq(
-        "canton.participants-x.validatorParticipant.ledger-api.port=7001",
-        "canton.participants-x.validatorParticipant.admin-api.port=7002",
-        "canton.participants-x.splitwellParticipant.ledger-api.port=7101",
-        "canton.participants-x.splitwellParticipant.admin-api.port=7102",
+        "canton.participants.validatorParticipant.ledger-api.port=7001",
+        "canton.participants.validatorParticipant.admin-api.port=7002",
+        "canton.participants.splitwellParticipant.ledger-api.port=7101",
+        "canton.participants.splitwellParticipant.admin-api.port=7102",
       ),
       "self-hosted-splitwell",
     ) {

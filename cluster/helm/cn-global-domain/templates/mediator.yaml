@@ -39,7 +39,7 @@ spec:
         - name: ADDITIONAL_CONFIG_MEDIATOR_AUTO_INIT
           value: |
             canton {
-              mediators-x {
+              mediators {
                 mediator {
                     init.auto-init = false
                 }

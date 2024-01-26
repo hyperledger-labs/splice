@@ -29,7 +29,7 @@ import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
 import ParticipantAdminConnection.HasParticipantId
-import com.digitalasset.canton.admin.participant.v0.{DarDescription, ExportAcsResponse}
+import com.digitalasset.canton.admin.participant.v30.{DarDescription, ExportAcsResponse}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 
 /** Connection to the subset of the Canton admin API that we rely
@@ -418,8 +418,8 @@ class ParticipantAdminConnection(
 
 object ParticipantAdminConnection {
   import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-  import com.digitalasset.canton.admin.participant.v0.*
-  import com.digitalasset.canton.admin.participant.v0.PackageServiceGrpc.PackageServiceStub
+  import com.digitalasset.canton.admin.participant.v30.*
+  import com.digitalasset.canton.admin.participant.v30.PackageServiceGrpc.PackageServiceStub
   import io.grpc.ManagedChannel
 
   // The Canton APIs insist on writing the bytestring to a file so we define

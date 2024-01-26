@@ -139,11 +139,9 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     @Help.Summary("Wait until all topology changes have been effected on all accessible nodes")
     def synchronize_topology(
         timeoutO: Option[NonNegativeDuration] = None
-    )(implicit env: ConsoleEnvironment): Unit = {
-      ConsoleMacros.utils.retry_until_true(timeoutO.getOrElse(env.commandTimeouts.bounded)) {
-        env.nodes.all.forall(_.topology.synchronisation.is_idle())
-      }
-    }
+    )(implicit env: ConsoleEnvironment): Unit =
+      // Disabled for CN as Canton runs in a separate process so this does nothing.
+      ()
 
     @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
     private object GenerateDamlScriptParticipantsConf {
@@ -328,7 +326,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         |part of repair or export/import procedure, the corresponding contract id must be recomputed."""
     )
     def recompute_contract_ids(
-        participant: LocalParticipantReference,
+        participant: LocalParticipantReferenceX,
         acs: Seq[SerializableContract],
         protocolVersion: ProtocolVersion,
     ): (Seq[SerializableContract], Map[LfContractId, LfContractId]) = {
@@ -338,10 +336,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         // Update the referenced contract ids
         val contractInstanceWithUpdatedContractIdReferences =
           SerializableRawContractInstance
-            .create(
-              contract.rawContractInstance.contractInstance.map(_.mapCid(contractIdMappings)),
-              AgreementText.empty, // Empty is fine, because the agreement text is not used when generating the raw serializable contract hash
-            )
+            .create(contract.rawContractInstance.contractInstance.map(_.mapCid(contractIdMappings)))
             .valueOr(err =>
               throw new RuntimeException(
                 s"Could not create serializable raw contract instance: $err"
@@ -574,7 +569,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     // intentionally not publicly documented
     object jwt {
       def generate_unsafe_token_for_participant(
-          participant: LocalParticipantReference,
+          participant: LocalParticipantReferenceX,
           admin: Boolean,
           applicationId: String,
       ): Map[PartyId, String] = {
@@ -1062,7 +1057,7 @@ object DebuggingHelpers extends LazyLogging {
       }
       .toMap
     val lapiAcs =
-      ref.ledger_api.acs.of_all().map(ev => (ev.event.contractId, ev.templateId)).toMap
+      ref.ledger_api_v2.state.acs.of_all().map(ev => (ev.event.contractId, ev.templateId)).toMap
     (syncAcs, lapiAcs)
   }
 

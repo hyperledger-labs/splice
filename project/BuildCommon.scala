@@ -825,18 +825,12 @@ object BuildCommon {
               (Compile / baseDirectory).value,
               (Compile / damlDarOutput).value / "AdminWorkflows-3.0.0.dar",
               "com.digitalasset.canton.participant.admin.workflows",
-            ),
-            (
-              (Compile / baseDirectory).value,
-              (Compile / damlDarOutput).value / "AdminWorkflowsWithVacuuming-3.0.0.dar",
-              "com.digitalasset.canton.participant.admin.workflows",
-            ),
+            )
           ),
         Compile / damlEnableJavaCodegen := true,
         Compile / damlCodegenUseProject := false,
         Compile / damlBuildOrder := Seq(
-          "daml/daml.yaml",
-          "daml/ping-pong-vacuum/daml.yaml",
+          "daml/daml.yaml"
         ),
         // TODO(#16168) Before creating the first stable release with backwards compatibility guarantees,
         //  make "AdminWorkflows.dar" stable again

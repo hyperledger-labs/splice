@@ -5,6 +5,7 @@ import com.daml.network.http.v0.definitions as http
 import com.digitalasset.canton.topology.NodeIdentity
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
+import com.google.protobuf.ByteString
 import io.circe.Json
 import io.circe.syntax.*
 
@@ -43,7 +44,7 @@ object NodeIdentitiesDump {
         keys = response.keys.toSeq.map(k => NodeKey(Base64.getDecoder.decode(k.keyPair), k.name)),
         bootstrapTxs = response.bootstrapTxs.toSeq.map(t =>
           SignedTopologyTransactionX
-            .fromByteArrayUnsafe(Base64.getDecoder.decode(t))
+            .fromByteStringUnsafe(ByteString.copyFrom(Base64.getDecoder.decode(t)))
             .fold(err => throw new IllegalArgumentException(err.message), identity)
         ),
         version = response.version,

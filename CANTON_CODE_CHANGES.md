@@ -53,6 +53,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Added `logAppVersion()` to `CantonAppDriver` abstract class and replaced canton version log with `logAppVersion()`.
 * Added `tryFromProtoPrimitive` to `Member` trait.
 * Support specifying `darData` on `upload.dars`.
+* Turned `synchronize_topology` into a noop.
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
 * Added support for `damlDependencies` in SBT DamlPlugin

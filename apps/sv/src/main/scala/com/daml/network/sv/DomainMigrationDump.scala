@@ -7,7 +7,7 @@ import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.util.Codec
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.crypto.Hash
-import com.digitalasset.canton.protocol.v0.TopologyTransactions
+import com.digitalasset.canton.protocol.v30.TopologyTransactions
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
@@ -37,7 +37,7 @@ case class DomainMigrationDump(
       nodeIdentities.sequencer.toHttp,
       nodeIdentities.mediator.toHttp,
     ),
-    Base64.getEncoder.encodeToString(topologySnapshot.toProtoV0.toByteArray),
+    Base64.getEncoder.encodeToString(topologySnapshot.toProtoV30.toByteArray),
     Base64.getEncoder.encodeToString(acsSnapshot.toByteArray),
     dars.map { dar =>
       val content = Base64.getEncoder.encodeToString(dar.content.toByteArray)
@@ -74,7 +74,7 @@ object DomainMigrationDump {
       val decoded = Base64.getDecoder().decode(response.topologySnapshot)
       val proto = TopologyTransactions.parseFrom(decoded)
       StoredTopologyTransactionsX
-        .fromProtoV0(proto)
+        .fromProtoV30(proto)
         .leftMap(_ => "Failed to parse Topology Transactions")
     }
     acsSnapshot = {

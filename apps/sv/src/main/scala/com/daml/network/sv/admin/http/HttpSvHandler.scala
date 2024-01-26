@@ -563,7 +563,7 @@ class HttpSvHandler(
         )
       )
     } yield definitions.SequencerSnapshot(
-      topologySnapshot = Base64.getEncoder.encodeToString(topologySnapshot.toProtoV0.toByteArray),
+      topologySnapshot = Base64.getEncoder.encodeToString(topologySnapshot.toProtoV30.toByteArray),
       sequencerSnapshot = Base64.getEncoder.encodeToString(sequencerSnapshot.toByteArray),
     )
   }

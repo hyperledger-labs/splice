@@ -66,8 +66,8 @@ class SelfHostedPreflightIntegrationTest
     withCanton(
       Seq(validatorPath / "validator-participant.conf"),
       Seq(
-        "canton.participants-x.validatorParticipant.admin-api.port=6002",
-        "canton.participants-x.validatorParticipant.ledger-api.port=6001",
+        "canton.participants.validatorParticipant.admin-api.port=6002",
+        "canton.participants.validatorParticipant.ledger-api.port=6001",
       ),
       "self-hosted-validator",
     ) {

@@ -19,32 +19,14 @@ import com.digitalasset.canton.console.{
   GrpcAdminCommandRunner,
   HealthDumpGenerator,
 }
-import com.digitalasset.canton.crypto.CommunityCryptoFactory
-import com.digitalasset.canton.crypto.admin.grpc.GrpcVaultService.CommunityGrpcVaultServiceFactory
-import com.digitalasset.canton.crypto.store.CryptoPrivateStore.CommunityCryptoPrivateStoreFactory
-import com.digitalasset.canton.domain.DomainNodeBootstrap
-import com.digitalasset.canton.domain.admin.v0.EnterpriseSequencerAdministrationServiceGrpc
-import com.digitalasset.canton.domain.mediator.{
-  CommunityMediatorNodeXConfig,
-  CommunityMediatorReplicaManager,
-  CommunityMediatorRuntimeFactory,
-  MediatorNodeBootstrapX,
-  MediatorNodeConfigCommon,
-  MediatorNodeParameters,
-}
-import com.digitalasset.canton.domain.metrics.MediatorNodeMetrics
+import com.digitalasset.canton.domain.mediator.CommunityMediatorNodeXConfig
+import com.digitalasset.canton.domain.mediator.MediatorNodeBootstrapX
 import com.digitalasset.canton.domain.sequencing.SequencerNodeBootstrapX
 import com.digitalasset.canton.domain.sequencing.config.CommunitySequencerNodeXConfig
-import com.digitalasset.canton.domain.sequencing.sequencer.CommunitySequencerFactory
 import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.networking.grpc.StaticGrpcServices
 import com.digitalasset.canton.participant.{ParticipantNodeBootstrap, ParticipantNodeBootstrapX}
-import com.digitalasset.canton.resource.{
-  CommunityDbMigrationsFactory,
-  CommunityStorageFactory,
-  DbMigrationsFactory,
-}
+import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrationsFactory}
 
 trait CNNodeEnvironment extends Environment {
 
@@ -227,17 +209,9 @@ class CNNodeEnvironmentImpl(
     new CNNodeHealthDumpGenerator(this, commandRunner)
   }
 
-  override protected val participantNodeFactory
-      : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType, ParticipantNodeBootstrap] =
-    ParticipantNodeBootstrap.CommunityParticipantFactory
-
   override protected def participantNodeFactoryX
       : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType, ParticipantNodeBootstrapX] =
     ParticipantNodeBootstrapX.CommunityParticipantFactory
-
-  override protected val domainFactory: DomainNodeBootstrap.Factory[Config#DomainConfigType] =
-    DomainNodeBootstrap.CommunityDomainFactory
-  override type Console = CNNodeConsoleEnvironment
 
   override protected lazy val migrationsFactory: DbMigrationsFactory =
     new CommunityDbMigrationsFactory(loggerFactory)
@@ -246,69 +220,12 @@ class CNNodeEnvironmentImpl(
   override protected def createMediatorX(
       name: String,
       mediatorConfig: CommunityMediatorNodeXConfig,
-  ): MediatorNodeBootstrapX = {
-    val factoryArguments = mediatorNodeFactoryArguments(name, mediatorConfig)
-    val arguments = factoryArguments
-      .toCantonNodeBootstrapCommonArguments(
-        new CommunityStorageFactory(mediatorConfig.storage),
-        new CommunityCryptoFactory(),
-        new CommunityCryptoPrivateStoreFactory(),
-        new CommunityGrpcVaultServiceFactory(),
-      )
-      .valueOr(err =>
-        throw new RuntimeException(s"Failed to create mediator bootstrap: $err")
-      ): CantonNodeBootstrapCommonArguments[
-      MediatorNodeConfigCommon,
-      MediatorNodeParameters,
-      MediatorNodeMetrics,
-    ]
-
-    new MediatorNodeBootstrapX(
-      arguments,
-      new CommunityMediatorReplicaManager(
-        config.parameters.timeouts.processing,
-        loggerFactory,
-      ),
-      CommunityMediatorRuntimeFactory,
-    )
-  }
+  ): MediatorNodeBootstrapX = ???
 
   override protected def createSequencerX(
       name: String,
       sequencerConfig: CommunitySequencerNodeXConfig,
-  ): SequencerNodeBootstrapX = {
-    val nodeFactoryArguments = NodeFactoryArguments(
-      name,
-      sequencerConfig,
-      config.sequencerNodeParametersByStringX(name),
-      createClock(Some(SequencerNodeBootstrapX.LoggerFactoryKeyName -> name)),
-      metricsFactory.forSequencer(name),
-      testingConfig,
-      futureSupervisor,
-      loggerFactory.append(SequencerNodeBootstrapX.LoggerFactoryKeyName, name),
-      writeHealthDumpToFile,
-      configuredOpenTelemetry,
-    )
-
-    val boostrapCommonArguments = nodeFactoryArguments
-      .toCantonNodeBootstrapCommonArguments(
-        new CommunityStorageFactory(sequencerConfig.storage),
-        new CommunityCryptoFactory(),
-        new CommunityCryptoPrivateStoreFactory(),
-        new CommunityGrpcVaultServiceFactory,
-      )
-      .valueOr(err => throw new RuntimeException(s"Failed to create sequencer-x node $name: $err"))
-
-    new SequencerNodeBootstrapX(
-      boostrapCommonArguments,
-      CommunitySequencerFactory,
-      (_, _) =>
-        Some(
-          StaticGrpcServices
-            .notSupportedByCommunity(EnterpriseSequencerAdministrationServiceGrpc.SERVICE, logger)
-        ),
-    )
-  }
+  ): SequencerNodeBootstrapX = ???
 
   override def isEnterprise: Boolean = false
 }

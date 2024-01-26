@@ -10,7 +10,7 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.console.LedgerApiExtensions.*
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.splitwell.SplitwellApp
+import com.daml.network.splitwell.{SplitwellApp, SplitwellAppBootstrap}
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.splitwell.automation.SplitwellAutomationService
 import com.daml.network.splitwell.config.{SplitwellAppBackendConfig, SplitwellAppClientConfig}
@@ -23,7 +23,6 @@ import com.digitalasset.canton.console.{
   LedgerApiCommandRunner,
 }
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
-import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.jdk.CollectionConverters.*
@@ -468,7 +467,13 @@ final class SplitwellAppBackendReference(
 )(implicit actorSystem: ActorSystem)
     extends SplitwellAppReference(consoleEnvironment, name)
     with CNNodeAppBackendReference
-    with BaseInspection[ParticipantNode] {
+    with BaseInspection[SplitwellApp] {
+
+  override def runningNode: Option[SplitwellAppBootstrap] =
+    consoleEnvironment.environment.splitwells.getRunning(name)
+
+  override def startingNode: Option[SplitwellAppBootstrap] =
+    consoleEnvironment.environment.splitwells.getStarting(name)
 
   override protected val instanceType = "Splitwell Backend"
 

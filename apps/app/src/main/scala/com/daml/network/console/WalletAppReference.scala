@@ -21,9 +21,8 @@ import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.{
 }
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.daml.network.wallet.store.TxLogEntry
-import com.digitalasset.canton.console.{BaseInspection, Help}
+import com.digitalasset.canton.console.Help
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 abstract class WalletAppReference(
@@ -416,8 +415,7 @@ final class WalletAppClientReference(
     override val consoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
     val config: WalletAppClientConfig,
-) extends WalletAppReference(consoleEnvironment, name)
-    with BaseInspection[ParticipantNode] {
+) extends WalletAppReference(consoleEnvironment, name) {
 
   override def httpClientConfig = config.adminApi
   override def token: Option[String] = {

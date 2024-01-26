@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.domain.admin.grpc
 
-import com.digitalasset.canton.domain.admin.v0.GetDomainParameters.Response.Parameters
-import com.digitalasset.canton.domain.admin.v0 as adminproto
+import com.digitalasset.canton.domain.admin.v30.GetDomainParameters.Response.Parameters
+import com.digitalasset.canton.domain.admin.v30 as adminproto
 import com.digitalasset.canton.protocol.StaticDomainParameters
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -18,7 +18,7 @@ class GrpcDomainService(
       request: adminproto.GetDomainParameters.Request
   ): Future[adminproto.GetDomainParameters.Response] = {
     val response = staticDomainParameters.protoVersion.v match {
-      case 1 => Future.successful(Parameters.ParametersV1(staticDomainParameters.toProtoV1))
+      case 1 => Future.successful(Parameters.ParametersV1(staticDomainParameters.toProtoV30))
       case unsupported =>
         Future.failed(
           new IllegalStateException(

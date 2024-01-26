@@ -14,7 +14,7 @@ import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.http.v0.definitions
-import com.daml.network.scan.ScanApp
+import com.daml.network.scan.{ScanApp, ScanAppBootstrap}
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
@@ -22,7 +22,6 @@ import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.util.{CNNodeUtil, CoinConfigSchedule, Contract, ContractWithState}
 import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.google.protobuf.ByteString
 
@@ -319,7 +318,13 @@ final class ScanAppBackendReference(
 )(implicit actorSystem: ActorSystem)
     extends ScanAppReference(cnNodeConsoleEnvironment, name)
     with CNNodeAppBackendReference
-    with BaseInspection[ParticipantNode] {
+    with BaseInspection[ScanApp] {
+
+  override def runningNode: Option[ScanAppBootstrap] =
+    cnNodeConsoleEnvironment.environment.scans.getRunning(name)
+
+  override def startingNode: Option[ScanAppBootstrap] =
+    cnNodeConsoleEnvironment.environment.scans.getStarting(name)
 
   override protected val instanceType = "Scan Backend"
 
@@ -367,8 +372,7 @@ final class ScanAppClientReference(
     override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     name: String,
     val config: ScanAppClientConfig,
-) extends ScanAppReference(cnNodeConsoleEnvironment, name)
-    with BaseInspection[ParticipantNode] {
+) extends ScanAppReference(cnNodeConsoleEnvironment, name) {
 
   override def httpClientConfig = config.adminApi
 

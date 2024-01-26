@@ -63,8 +63,8 @@ class LocalRunbookIntegrationTest
         svDomainPath / "canton.conf",
       ),
       Seq(
-        "canton.participants-x.validatorParticipant.ledger-api.port=7001",
-        "canton.participants-x.validatorParticipant.admin-api.port=7002",
+        "canton.participants.validatorParticipant.ledger-api.port=7001",
+        "canton.participants.validatorParticipant.admin-api.port=7002",
       ),
       "local-runbook",
     )

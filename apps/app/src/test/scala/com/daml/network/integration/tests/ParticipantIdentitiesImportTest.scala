@@ -100,12 +100,12 @@ abstract class ParticipantIdentitiesImportTestBase
       ),
       Seq(
         // avoid creating new identities
-        "canton.participants-x.sv_participant.init.auto-init=false",
-        "canton.participants-x.validator_participant.init.auto-init=false",
+        "canton.participants.sv_participant.init.auto-init=false",
+        "canton.participants.validator_participant.init.auto-init=false",
         // adjust user ids to account for the suffixing done by ensureNovelDamlNames
-        "canton.participants-x.sv_participant.ledger-api.user-management-service." +
+        "canton.participants.sv_participant.ledger-api.user-management-service." +
           s"additional-admin-user-id=${sv1LocalBackend.config.ledgerApiUser}",
-        "canton.participants-x.validator_participant.ledger-api.user-management-service." +
+        "canton.participants.validator_participant.ledger-api.user-management-service." +
           s"additional-admin-user-id=${aliceValidatorLocalBackend.config.ledgerApiUser}",
       ),
       "participant-export-import",

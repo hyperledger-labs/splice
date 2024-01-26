@@ -18,6 +18,7 @@ import com.digitalasset.canton.util.CheckedT
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.version.{
   ProtocolVersion,
+  ProtocolVersionValidation,
   ReleaseProtocolVersion,
   RepresentativeProtocolVersion,
 }
@@ -63,6 +64,8 @@ trait TestEssentials
   protected def timeouts: ProcessingTimeout = DefaultProcessingTimeouts.testing
 
   protected lazy val testedProtocolVersion: ProtocolVersion = BaseTest.testedProtocolVersion
+  protected lazy val testedProtocolVersionValidation: ProtocolVersionValidation =
+    BaseTest.testedProtocolVersionValidation
   protected lazy val testedReleaseProtocolVersion: ReleaseProtocolVersion =
     BaseTest.testedReleaseProtocolVersion
   protected lazy val defaultStaticDomainParameters: StaticDomainParameters =
@@ -384,6 +387,9 @@ object BaseTest {
 
   lazy val testedProtocolVersion: ProtocolVersion =
     tryGetProtocolVersionFromEnv.getOrElse(ProtocolVersion.latest)
+
+  lazy val testedProtocolVersionValidation: ProtocolVersionValidation =
+    ProtocolVersionValidation(testedProtocolVersion)
 
   lazy val testedReleaseProtocolVersion: ReleaseProtocolVersion = ReleaseProtocolVersion(
     testedProtocolVersion

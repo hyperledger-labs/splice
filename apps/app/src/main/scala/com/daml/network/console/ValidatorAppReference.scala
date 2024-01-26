@@ -7,7 +7,7 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.http.v0.definitions
 import com.daml.network.identities.NodeIdentitiesDump
-import com.daml.network.validator.ValidatorApp
+import com.daml.network.validator.{ValidatorApp, ValidatorAppBootstrap}
 import com.daml.network.validator.admin.api.client.commands.{
   HttpAppManagerAdminAppClient,
   HttpAppManagerAppClient,
@@ -24,7 +24,6 @@ import com.daml.network.validator.config.{
 }
 import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.digitalasset.canton.console.{BaseInspection, Help}
-import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.ByteString
 
@@ -232,7 +231,13 @@ final class ValidatorAppBackendReference(
 )(implicit actorSystem: ActorSystem)
     extends ValidatorAppReference(consoleEnvironment, name)
     with CNNodeAppBackendReference
-    with BaseInspection[ParticipantNode] {
+    with BaseInspection[ValidatorApp] {
+
+  override def runningNode: Option[ValidatorAppBootstrap] =
+    consoleEnvironment.environment.validators.getRunning(name)
+
+  override def startingNode: Option[ValidatorAppBootstrap] =
+    consoleEnvironment.environment.validators.getStarting(name)
 
   override protected val instanceType = "Local Validator"
 
@@ -286,9 +291,6 @@ final class ValidatorAppBackendReference(
       s"remote participant for `$name`, with admin token",
       config.participantClient.participantClientConfigWithAdminToken,
     )
-
-  /** secret, not publicly documented way to get the admin token */
-  def adminToken: Option[String] = underlying.map(_.adminToken.secret)
 }
 
 /** Client (aka remote) reference to a validator app in the style of CNParticipantClientReference, i.e.,
@@ -299,8 +301,7 @@ final case class ValidatorAppClientReference(
     override val name: String,
     val config: ValidatorAppClientConfig,
     override val token: Option[String] = None,
-) extends ValidatorAppReference(consoleEnvironment, name)
-    with BaseInspection[ParticipantNode] {
+) extends ValidatorAppReference(consoleEnvironment, name) {
 
   override def httpClientConfig = config.adminApi
 
@@ -311,8 +312,7 @@ final case class AppManagerAppClientReference(
     override val cnNodeConsoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
     val config: AppManagerAppClientConfig,
-) extends HttpCNNodeAppReference
-    with BaseInspection[ParticipantNode] {
+) extends HttpCNNodeAppReference {
 
   override def basePath = "/api/validator"
   override def httpClientConfig = config.adminApi
