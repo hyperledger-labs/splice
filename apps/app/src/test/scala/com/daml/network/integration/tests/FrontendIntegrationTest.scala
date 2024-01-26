@@ -105,8 +105,8 @@ abstract class FrontendIntegrationTest(override val frontendNames: String*)
     with FrontendTestCommon
     with ParallelTestExecution {
 
-  override def provideEnvironment = {
-    val env = super.provideEnvironment
+  override def provideEnvironment(testName: String) = {
+    val env = super.provideEnvironment(testName)
     // We need to start the web frontends afterwards because selenium
     // insists on automatically selecting free ports and those may
     // collide with the ports used by our own services.
@@ -116,12 +116,12 @@ abstract class FrontendIntegrationTest(override val frontendNames: String*)
     env
   }
 
-  override def testFinished(env: CNNodeTestConsoleEnvironment): Unit = {
+  override def testFinished(testName: String, env: CNNodeTestConsoleEnvironment): Unit = {
     // testFinished runs before afterEach and tears down all our apps.
     // Therefore, we stop the web browsers here so we don't get log warnings
     // because the frontends fail to connect to backends.
     stopWebDrivers(env.executionContext)
-    super.testFinished(env)
+    super.testFinished(testName, env)
   }
 }
 
@@ -136,14 +136,14 @@ abstract class FrontendIntegrationTestWithSharedEnvironment(override val fronten
     }
   }
 
-  override def testFinished(env: CNNodeTestConsoleEnvironment): Unit = {
-    clearWebDrivers(provideEnvironment.executionContext)
-    super.testFinished(env)
+  override def testFinished(testName: String, env: CNNodeTestConsoleEnvironment): Unit = {
+    clearWebDrivers(provideEnvironment(testName).executionContext)
+    super.testFinished(testName, env)
   }
 
   override def afterAll(): Unit = {
     try {
-      stopWebDrivers(provideEnvironment.executionContext)
+      stopWebDrivers(provideEnvironment("NotUsed").executionContext)
     } finally super.afterAll()
   }
 }

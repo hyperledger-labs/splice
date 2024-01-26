@@ -71,8 +71,8 @@ class LocalRunbookIntegrationTest
     cantonProcess = Some(process)
   }
 
-  override def testFinished(env: CNNodeTestConsoleEnvironment): Unit = {
-    super.testFinished(env)
+  override def testFinished(testName: String, env: CNNodeTestConsoleEnvironment): Unit = {
+    super.testFinished(testName, env)
     cantonProcess.foreach { p =>
       p.destroyAndWait()
     }

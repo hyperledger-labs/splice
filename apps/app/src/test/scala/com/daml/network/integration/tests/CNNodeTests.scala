@@ -5,18 +5,24 @@ import org.apache.pekko.Done
 import org.apache.pekko.http.scaladsl.Http
 import com.auth0.exception.Auth0Exception
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.metrics.api.MetricsContext
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.AuthTokenSourceConfig
 import com.daml.network.console.*
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.WaitForPorts
+import com.daml.network.metrics.CNNodeMetricsFactory
 import com.daml.network.sv.config.{SvOnboardingConfig, TrafficControlConfig}
 import com.daml.network.util.{Auth0Util, CommonCNNodeAppInstanceReferences}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.*
+import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
+import com.digitalasset.canton.metrics.MetricsFactoryType.External
 import com.digitalasset.canton.protocol.LfContractId
+import com.digitalasset.canton.telemetry.OpenTelemetryFactory
+import com.digitalasset.canton.tracing.TracingConfig.Tracer
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatest.{AppendedClues, BeforeAndAfterEach}
@@ -41,6 +47,22 @@ object CNNodeTests {
       with IsolatedCNNodeEnvironments
       with CNNodeTestCommon
       with LedgerApiExtensions {
+
+    override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
+      val configuredOpenTelemetry = OpenTelemetryFactory.initializeOpenTelemetry(
+        initializeGlobalOpenTelemetry = false,
+        metricsEnabled = true,
+        config = Tracer(),
+        histograms = Seq.empty,
+        loggerFactory,
+      )
+      CNNodeMetricsFactory
+        .forConfig(
+          configuredOpenTelemetry.openTelemetry.getMeterProvider,
+          metricsFactoryType = External,
+        )
+        .createLabeledMetricsFactory(MetricsContext.Empty)
+    }
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
 
@@ -78,9 +100,9 @@ object CNNodeTests {
       super.beforeEach()
     }
 
-    override def testFinished(env: CNNodeTestConsoleEnvironment): Unit = {
+    override def testFinished(testName: String, env: CNNodeTestConsoleEnvironment): Unit = {
       testCaseId += 1
-      super.testFinished(env)
+      super.testFinished(testName, env)
     }
 
     // make `aliceWallet` etc. use updated usernames

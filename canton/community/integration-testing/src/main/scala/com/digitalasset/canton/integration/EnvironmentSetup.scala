@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.integration
 
+import com.daml.metrics.Timed
 import com.digitalasset.canton.CloseableTest
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.environment.Environment
@@ -10,6 +11,7 @@ import com.digitalasset.canton.logging.{LogEntry, NamedLogging, SuppressingLogge
 import com.digitalasset.canton.metrics.{MetricsFactoryType, ScopedInMemoryMetricsFactory}
 import org.scalatest.{Assertion, BeforeAndAfterAll, Suite}
 
+import java.util.concurrent.TimeUnit
 import scala.util.control.NonFatal
 
 /** Provides an ability to create a canton environment when needed for test.
@@ -18,7 +20,7 @@ import scala.util.control.NonFatal
   */
 sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     extends BeforeAndAfterAll {
-  this: Suite with HasEnvironmentDefinition[E, TCE] with NamedLogging =>
+  this: Suite with HasEnvironmentDefinition[E, TCE] with IntegrationTestMetrics with NamedLogging =>
 
   private lazy val envDef = environmentDefinition
 
@@ -30,24 +32,25 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
     plugins = plugins :+ plugin
 
   override protected def beforeAll(): Unit = {
-    plugins.foreach(_.beforeTests())
+    Timed.value(testInfrastructureSuiteMetrics.pluginsBeforeTests, plugins.foreach(_.beforeTests()))
     super.beforeAll()
   }
 
   override protected def afterAll(): Unit = {
     try super.afterAll()
-    finally plugins.foreach(_.afterTests())
+    finally
+      Timed.value(testInfrastructureSuiteMetrics.pluginsAfterTests, plugins.foreach(_.afterTests()))
   }
 
   /** Provide an environment for an individual test either by reusing an existing one or creating a new one
     * depending on the approach being used.
     */
-  def provideEnvironment: TCE
+  def provideEnvironment(testName: String): TCE
 
   /** Optional hook for implementors to know when a test has finished and be provided the environment instance.
     * This is required over a afterEach hook as we need the environment instance passed.
     */
-  def testFinished(environment: TCE): Unit = {}
+  def testFinished(testName: String, environment: TCE): Unit = {}
 
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
 
@@ -72,21 +75,25 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
       initialConfig: E#Config = envDef.generateConfig,
       configTransform: E#Config => E#Config = identity,
       runPlugins: EnvironmentSetupPlugin[E, TCE] => Boolean = _ => true,
+      testName: Option[String],
   ): TCE = {
+    val metrics = testInfrastructureEnvironmentMetrics(testName)
     val testConfig = initialConfig
     // note: beforeEnvironmentCreate may well have side-effects (e.g. starting databases or docker containers)
-    val pluginConfig = {
+    val pluginConfig = Timed.value(
+      metrics.environmentCreatePluginsBefore,
       plugins.foldLeft(testConfig)((config, plugin) =>
         if (runPlugins(plugin))
           plugin.beforeEnvironmentCreated(config)
         else
           config
-      )
-    }
+      ),
+    )
     val finalConfig = configTransform(pluginConfig)
 
     val scopedMetricsFactory = new ScopedInMemoryMetricsFactory
-    val environmentFixture =
+    val environmentFixture = Timed.value(
+      metrics.environmentCreateFixture,
       envDef.environmentFactory.create(
         finalConfig,
         loggerFactory,
@@ -102,14 +109,18 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
             else MetricsFactoryType.External,
           initializeGlobalOpenTelemetry = false,
         ),
-      )
+      ),
+    )
 
     try {
       val testEnvironment: TCE =
         envDef.createTestConsole(environmentFixture, loggerFactory)
 
-      plugins.foreach(plugin =>
-        if (runPlugins(plugin)) plugin.afterEnvironmentCreated(finalConfig, testEnvironment)
+      Timed.value(
+        metrics.environmentCreatePluginsAfter,
+        plugins.foreach(plugin =>
+          if (runPlugins(plugin)) plugin.afterEnvironmentCreated(finalConfig, testEnvironment)
+        ),
       )
 
       if (!finalConfig.parameters.manualStart)
@@ -134,10 +145,15 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
     }
   }
 
-  protected def createEnvironment(): TCE =
-    ConcurrentEnvironmentLimiter.create(getClass.getName, numPermits)(
-      manualCreateEnvironment()
-    )
+  protected def createEnvironment(testName: Option[String]): TCE = {
+    val metrics = testInfrastructureEnvironmentMetrics(testName)
+    val waitBegin = System.nanoTime()
+    ConcurrentEnvironmentLimiter.create(getClass.getName, numPermits) {
+      val waitEnd = System.nanoTime()
+      metrics.environmentWait.update(waitEnd - waitBegin, TimeUnit.NANOSECONDS)
+      Timed.value(metrics.environmentCreate, manualCreateEnvironment(testName = testName))
+    }
+  }
 
   protected def manualDestroyEnvironment(environment: TCE): Unit = {
     val config = environment.actualConfig
@@ -150,9 +166,10 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
     }
   }
 
-  protected def destroyEnvironment(environment: TCE): Unit = {
+  protected def destroyEnvironment(testName: Option[String], environment: TCE): Unit = {
+    val metrics = testInfrastructureEnvironmentMetrics(testName)
     ConcurrentEnvironmentLimiter.destroy(getClass.getName, numPermits) {
-      manualDestroyEnvironment(environment)
+      Timed.value(metrics.environmentDestroy, manualDestroyEnvironment(environment))
     }
   }
 
@@ -170,22 +187,22 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
 trait SharedEnvironment[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     extends EnvironmentSetup[E, TCE]
     with CloseableTest {
-  this: Suite with HasEnvironmentDefinition[E, TCE] with NamedLogging =>
+  this: Suite with HasEnvironmentDefinition[E, TCE] with IntegrationTestMetrics with NamedLogging =>
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var sharedEnvironment: Option[TCE] = None
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    sharedEnvironment = Some(createEnvironment())
+    sharedEnvironment = Some(createEnvironment(None))
   }
 
   override def afterAll(): Unit =
     try {
-      sharedEnvironment.foreach(destroyEnvironment)
+      sharedEnvironment.foreach(destroyEnvironment(None, _))
     } finally super.afterAll()
 
-  override def provideEnvironment: TCE =
+  override def provideEnvironment(testName: String): TCE =
     sharedEnvironment.getOrElse(
       sys.error("beforeAll should have run before providing a shared environment")
     )
@@ -194,8 +211,11 @@ trait SharedEnvironment[E <: Environment, TCE <: TestConsoleEnvironment[E]]
 /** Creates an environment for each test. */
 trait IsolatedEnvironments[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     extends EnvironmentSetup[E, TCE] {
-  this: Suite with HasEnvironmentDefinition[E, TCE] with NamedLogging =>
+  this: Suite with HasEnvironmentDefinition[E, TCE] with IntegrationTestMetrics with NamedLogging =>
 
-  override def provideEnvironment: TCE = createEnvironment()
-  override def testFinished(environment: TCE): Unit = destroyEnvironment(environment)
+  override def provideEnvironment(testName: String): TCE = createEnvironment(Some(testName))
+  override def testFinished(testName: String, environment: TCE): Unit = destroyEnvironment(
+    Some(testName),
+    environment,
+  )
 }

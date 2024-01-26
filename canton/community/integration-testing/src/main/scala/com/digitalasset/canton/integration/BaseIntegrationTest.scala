@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.integration
 
+import com.daml.metrics.Timed
 import com.digitalasset.canton.console.{CommandFailure, ParticipantReferenceCommon}
 import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.logging.LogEntry
@@ -47,7 +48,8 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     with BaseTest
     with RepeatableTestSuiteTest
     with HasEnvironmentDefinition[E, TCE]
-    with ProtocolVersionChecksFixtureAnyWordSpec {
+    with ProtocolVersionChecksFixtureAnyWordSpec
+    with IntegrationTestMetrics {
   this: EnvironmentSetup[E, TCE] =>
 
   type FixtureParam = TCE
@@ -109,10 +111,22 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     override val pos: Option[Position] = test.pos
 
     override def apply(): Outcome = {
-      val environment = provideEnvironment
+      val metrics = testInfrastructureTestMetrics(test.name)
+      val environment = Timed.value(
+        metrics.testProvideEnvironment,
+        provideEnvironment(test.name),
+      )
       val testOutcome = {
-        try test.toNoArgTest(environment)()
-        finally testFinished(environment)
+        try
+          Timed.value(
+            metrics.testExecution,
+            test.toNoArgTest(environment)(),
+          )
+        finally
+          Timed.value(
+            metrics.testFinished,
+            testFinished(test.name, environment),
+          )
       }
       testOutcome
     }
