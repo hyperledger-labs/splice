@@ -8,7 +8,6 @@ import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRou
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.svcrules.SvReward
 import com.daml.network.console.*
-import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
@@ -253,7 +252,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
         .commands
         .asScala
         .toSeq,
-      workflowId = CNLedgerConnection.domainIdToWorkflowId(disclosure.assignedDomain),
+      domainId = Some(disclosure.assignedDomain),
       disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
       optTimeout = None,
     )

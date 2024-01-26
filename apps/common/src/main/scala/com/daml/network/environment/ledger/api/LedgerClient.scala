@@ -4,8 +4,8 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
-import com.daml.ledger.api.v1.*
 import com.daml.ledger.api.v1.admin.*
+import com.daml.ledger.api.v2.*
 import com.daml.ledger.javaapi.data.{
   Command,
   CreateUserResponse,
@@ -36,7 +36,7 @@ import com.daml.ledger.api.v1.admin.party_management_service.{
   PartyManagementServiceGrpc,
 }
 import com.daml.ledger.api.v1.admin.user_management_service as v1User
-import com.daml.ledger.api.v1.command_service.CommandServiceGrpc
+import com.daml.ledger.api.v2.command_service.CommandServiceGrpc
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset as V1LedgerOffset
 import com.daml.ledger.api.v1.package_service.{ListPackagesRequest, PackageServiceGrpc}
 import com.daml.ledger.api.v1.transaction_service.{GetLedgerEndRequest, TransactionServiceGrpc}
@@ -183,7 +183,7 @@ private[environment] class LedgerClient(
   }
 
   def submitAndWait[Z](
-      workflowId: String,
+      domainId: String,
       applicationId: String,
       commandId: String,
       deduplicationConfig: DedupConfig,
@@ -194,7 +194,7 @@ private[environment] class LedgerClient(
       waitFor: SubmitAndWaitFor[Z],
   )(implicit ec: ExecutionContext): Future[Z] = {
     val commandsBuilder = CommandsOuterClass.Commands.newBuilder
-      .setWorkflowId(workflowId)
+      .setDomainId(domainId)
       .setCommandId(commandId)
       .setApplicationId(applicationId)
       .addAllActAs(actAs.asJava)
@@ -559,21 +559,21 @@ object LedgerClient {
   }
 
   private[environment] object SubmitAndWaitFor {
-    import com.daml.ledger.api.v1.CommandServiceOuterClass as CSOC
+    import com.daml.ledger.api.v2.CommandServiceOuterClass as CSOC
     import com.daml.ledger.javaapi.data as jdata
 
     val CompletionOffset: SubmitAndWaitFor[String] =
-      impl((_: CSOC.SubmitAndWaitForTransactionIdResponse).getCompletionOffset)(
+      impl((_: CSOC.SubmitAndWaitForUpdateIdResponse).getCompletionOffset)(
         { case (stub, r, ec) =>
           stub
-            .submitAndWaitForTransactionId(command_service.SubmitAndWaitRequest.fromJavaProto(r))
-            .map(r => command_service.SubmitAndWaitForTransactionIdResponse.toJavaProto(r))(ec)
+            .submitAndWaitForUpdateId(command_service.SubmitAndWaitRequest.fromJavaProto(r))
+            .map(r => command_service.SubmitAndWaitForUpdateIdResponse.toJavaProto(r))(ec)
         }
       )
 
-    val Transaction: SubmitAndWaitFor[jdata.Transaction] =
+    val Transaction: SubmitAndWaitFor[jdata.TransactionV2] =
       impl((response: CSOC.SubmitAndWaitForTransactionResponse) =>
-        jdata.Transaction.fromProto(response.getTransaction)
+        jdata.TransactionV2.fromProto(response.getTransaction)
       ) {
         { case (stub, r, ec) =>
           stub
@@ -582,9 +582,9 @@ object LedgerClient {
         }
       }
 
-    val TransactionTree: SubmitAndWaitFor[jdata.TransactionTree] =
+    val TransactionTree: SubmitAndWaitFor[jdata.TransactionTreeV2] =
       impl((response: CSOC.SubmitAndWaitForTransactionTreeResponse) =>
-        jdata.TransactionTree.fromProto(response.getTransaction)
+        jdata.TransactionTreeV2.fromProto(response.getTransaction)
       ) {
         { case (stub, r, ec) =>
           stub

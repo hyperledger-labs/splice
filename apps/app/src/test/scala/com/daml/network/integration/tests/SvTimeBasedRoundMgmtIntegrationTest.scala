@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.sv.util.SvUtil
@@ -49,7 +49,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
       ) should have size 3
     )
 
-    val offsetBefore = sv1Backend.participantClientWithAdminToken.ledger_api.transactions.end()
+    val offsetBefore = sv1Backend.participantClientWithAdminToken.ledger_api_v2.state.end()
     // next tick - issuing round 0 can be closed
     // not using `advanceRoundsByOneTick` because this interferes with checking the state of the ClosedMiningRounds
     advanceTime(tickDurationWithBuffer)
@@ -62,8 +62,11 @@ class SvTimeBasedRoundMgmtIntegrationTest
             Set(svcParty),
             completeAfter = Int.MaxValue,
             beginOffset = offsetBefore,
-            endOffset =
-              Some(new LedgerOffset().withBoundary(LedgerOffset.LedgerBoundary.LEDGER_END)),
+            endOffset = Some(
+              new ParticipantOffset().withBoundary(
+                ParticipantOffset.ParticipantBoundary.PARTICIPANT_END
+              )
+            ),
           )
       val rounds =
         transactions.flatMap(

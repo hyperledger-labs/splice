@@ -13,8 +13,7 @@ import com.daml.ledger.javaapi.data.{
   CreatedEvent,
   ExercisedEvent,
   LedgerOffset,
-  Transaction,
-  TransactionTree,
+  TransactionV2,
   TransactionTreeV2,
   User,
 }
@@ -760,7 +759,7 @@ class CNLedgerConnection(
         dom: DomainIdRequired,
         dedup: SubmitDedup[CmdId],
         commandOut: SubmitCommands[C],
-    ): Future[Transaction] = go()
+    ): Future[TransactionV2] = go()
 
     @annotation.nowarn("cat=unused&msg=pickT")
     def yieldResult[Z]()(implicit
@@ -799,7 +798,7 @@ class CNLedgerConnection(
           def clientSubmit[W, U](waitFor: WF[W])(getOffsetAndResult: W => (String, U)): Future[U] =
             callCallbacksOnCompletionAndWaitForOffset(
               client.submitAndWait(
-                workflowId = CNLedgerConnection.domainIdToWorkflowId(domainId),
+                domainId = domainId.toProtoPrimitive,
                 applicationId = applicationId,
                 commandId = commandId,
                 deduplicationConfig = deduplicationConfig,
@@ -1010,14 +1009,9 @@ object CNLedgerConnection {
     }
   }
 
-  // Note: currently it is not possible to directly specify the target domain on command submissions.
-  // Instead, Canton looks at the workflow ID field, and interprets it as the target domain if it starts with "domain-id:"
-  def domainIdToWorkflowId(id: DomainId): String =
-    s"domain-id:${id.toProtoPrimitive}"
-
   def decodeExerciseResult[T](
       update: Update[T],
-      transaction: TransactionTree,
+      transaction: TransactionTreeV2,
   ): T = {
     val rootEventIds = transaction.getRootEventIds.asScala.toSeq
     if (rootEventIds.size == 1) {
@@ -1130,8 +1124,8 @@ object CNLedgerConnection {
   object SubmitResult {
     private[CNLedgerConnection] final class Ignored extends SubmitResult[Any, Unit]
     implicit val Ignored: SubmitResult[Any, Unit] = new Ignored
-    private[CNLedgerConnection] final class JustTransaction extends SubmitResult[Any, Transaction]
-    implicit val JustTransaction: SubmitResult[Any, Transaction] = new JustTransaction
+    private[CNLedgerConnection] final class JustTransaction extends SubmitResult[Any, TransactionV2]
+    implicit val JustTransaction: SubmitResult[Any, TransactionV2] = new JustTransaction
     implicit def resultAndOffset[T]: SubmitResult[Update[T], (String, T)] = new ResultAndOffset()
     implicit def onlyResult[T]: SubmitResult[Update[T], T] = new ResultAndOffset((_, t) => t)
     implicit def exercising[T, Z](implicit

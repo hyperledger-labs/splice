@@ -120,7 +120,7 @@ class WalletIntegrationTest
             )
           )
         val offsetBefore =
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.transactions.end()
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_v2.state.end()
         // sending three commands in short succession to the idle wallet should lead to two transactions being executed
         // tx 1: first command that arrived is immediately executed
         // tx 2: other commands that arrived after the first command was started are executed in one batch
@@ -170,7 +170,7 @@ class WalletIntegrationTest
         }
 
         val offsetBefore =
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.transactions.end()
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_v2.state.end()
 
         requests.foreach { case (requestId, _) =>
           Future(aliceWalletClient.acceptAppPaymentRequest(requestId)).discard

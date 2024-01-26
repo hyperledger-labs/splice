@@ -3,14 +3,14 @@ package com.daml.network.console
 import com.daml.ledger.api.v1.CommandsOuterClass
 import com.daml.ledger.api.v1.commands.{Command, DisclosedContract}
 import com.daml.ledger.api.v1.event.CreatedEvent
-import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
-import com.daml.ledger.api.v1.transaction.TransactionTree
+import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
+import com.daml.ledger.api.v2.transaction.TransactionTree
 import com.daml.ledger.javaapi
-import com.daml.ledger.javaapi.data.TransactionTree as JavaTransactionTree
+import com.daml.ledger.javaapi.data.TransactionTreeV2 as JavaTransactionTree
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
 import com.daml.network.environment.{CNLedgerConnection, PackageIdResolver}
 import com.daml.network.util.{Contract, JavaDecodeUtil}
-import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
+import com.digitalasset.canton.admin.api.client.commands.{LedgerApiCommands, LedgerApiV2Commands}
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.{
@@ -59,7 +59,7 @@ trait LedgerApiExtensions {
         def submitJava(
             actAs: Seq[PartyId],
             commands: Seq[javaapi.data.Command],
-            workflowId: String = "",
+            domainId: Option[DomainId] = None,
             commandId: String = "",
             optTimeout: Option[NonNegativeDuration] = Some(ledgerApi.timeouts.ledgerCommand),
             deduplicationPeriod: Option[DeduplicationPeriod] = None,
@@ -74,22 +74,23 @@ trait LedgerApiExtensions {
           )
           val tx = ledgerApi.consoleEnvironment.run {
             ledgerApi.ledgerApiCommand(
-              LedgerApiCommands.CommandService.SubmitAndWaitTransactionTree(
+              LedgerApiV2Commands.CommandService.SubmitAndWaitTransactionTree(
                 actAs.map(_.toLf),
                 readAs.map(_.toLf),
                 cmds.map(c => Command.fromJavaProto(c.toProtoCommand)),
-                applicationId,
-                workflowId,
-                commandId,
-                deduplicationPeriod,
-                submissionId,
-                minLedgerTimeAbs,
-                disclosedContracts.map(DisclosedContract.fromJavaProto(_)),
+                workflowId = "",
+                commandId = commandId,
+                deduplicationPeriod = deduplicationPeriod,
+                submissionId = submissionId,
+                minLedgerTimeAbs = minLedgerTimeAbs,
+                disclosedContracts = disclosedContracts.map(DisclosedContract.fromJavaProto(_)),
+                domainId = domainId,
+                applicationId = applicationId,
               )
             )
           }
-          javaapi.data.TransactionTree.fromProto(
-            TransactionTree.toJavaProto(ledgerApi.optionallyAwait(tx, tx.transactionId, optTimeout))
+          javaapi.data.TransactionTreeV2.fromProto(
+            TransactionTree.toJavaProto(ledgerApi.optionallyAwait(tx, tx.updateId, optTimeout))
           )
         }
 
@@ -105,7 +106,7 @@ trait LedgerApiExtensions {
           val tree = submitJava(
             actAs,
             update.commands.asScala.toSeq,
-            workflowId = domainId.fold("")(CNLedgerConnection.domainIdToWorkflowId(_)),
+            domainId = domainId,
             commandId.getOrElse(""),
             readAs = readAs,
             applicationId = userId,
@@ -134,7 +135,7 @@ trait LedgerApiExtensions {
           val tree = submitJava(
             actAs,
             update.commands.asScala.toSeq,
-            workflowId = domainId.fold("")(CNLedgerConnection.domainIdToWorkflowId(_)),
+            domainId = domainId,
             commandId.getOrElse(""),
             readAs = readAs,
             applicationId = userId,
@@ -186,15 +187,18 @@ trait LedgerApiExtensions {
         def treesJava(
             partyIds: Set[PartyId],
             completeAfter: Int,
-            beginOffset: LedgerOffset =
-              new LedgerOffset().withBoundary(LedgerOffset.LedgerBoundary.LEDGER_BEGIN),
-            endOffset: Option[LedgerOffset] = None,
+            beginOffset: ParticipantOffset = new ParticipantOffset().withBoundary(
+              ParticipantOffset.ParticipantBoundary.PARTICIPANT_BEGIN
+            ),
+            endOffset: Option[ParticipantOffset] = None,
             verbose: Boolean = true,
             timeout: NonNegativeDuration = ledgerApi.timeouts.ledgerCommand,
-        ): Seq[javaapi.data.TransactionTree] = {
-          ledgerApi.ledger_api.transactions
+        ): Seq[javaapi.data.TransactionTreeV2] = {
+          ledgerApi.ledger_api_v2.updates
             .trees(partyIds, completeAfter, beginOffset, endOffset, verbose, timeout)
-            .map(t => javaapi.data.TransactionTree.fromProto(TransactionTree.toJavaProto(t)))
+            .collect { case LedgerApiV2Commands.UpdateService.TransactionTreeWrapper(tree) =>
+              javaapi.data.TransactionTreeV2.fromProto(TransactionTree.toJavaProto(tree))
+            }
         }
       }
 
