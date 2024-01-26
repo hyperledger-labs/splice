@@ -8,6 +8,7 @@ import com.daml.network.automation.{
 import com.daml.network.environment.{
   CNLedgerClient,
   DarResources,
+  MediatorAdminConnection,
   PackageIdResolver,
   ParticipantAdminConnection,
   RetryProvider,
@@ -277,8 +278,10 @@ class SvSvcAutomationService(
           contextWithSpecificPolling,
           svcStore,
           sequencerContext.sequencerAdminConnection,
+          sequencerContext.mediatorAdminConnection,
           clock,
           pruningConfig.retentionPeriod,
+          participantAdminConnection,
         )
       )
     }
@@ -288,6 +291,7 @@ class SvSvcAutomationService(
 object SvSvcAutomationService {
   case class LocalSequencerClientContext(
       sequencerAdminConnection: SequencerAdminConnection,
+      mediatorAdminConnection: MediatorAdminConnection,
       internalClientConfig: Option[LocalSequencerClientConfig],
       pruningConfig: Option[SequencerPruningConfig] = None,
   )

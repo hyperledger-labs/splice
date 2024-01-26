@@ -571,6 +571,7 @@ class JoiningNodeInitializer(
         localDomainNode.map(cfg =>
           LocalSequencerClientContext(
             cfg.sequencerAdminConnection,
+            cfg.mediatorAdminConnection,
             Some(
               LocalSequencerClientConfig(
                 cfg.sequencerInternalConfig,
@@ -639,6 +640,7 @@ class JoiningNodeInitializer(
       localDomainNode.map(cfg =>
         LocalSequencerClientContext(
           cfg.sequencerAdminConnection,
+          cfg.mediatorAdminConnection,
           Some(
             LocalSequencerClientConfig(
               cfg.sequencerInternalConfig,

@@ -400,6 +400,7 @@ class DomainMigrationInitializer(
       localDomainNode.map(cfg =>
         LocalSequencerClientContext(
           cfg.sequencerAdminConnection,
+          cfg.mediatorAdminConnection,
           Some(
             LocalSequencerClientConfig(
               cfg.sequencerInternalConfig,

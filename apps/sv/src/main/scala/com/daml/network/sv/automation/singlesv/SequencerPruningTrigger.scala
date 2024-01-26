@@ -1,7 +1,11 @@
 package com.daml.network.sv.automation.singlesv
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
-import com.daml.network.environment.SequencerAdminConnection
+import com.daml.network.environment.{
+  MediatorAdminConnection,
+  ParticipantAdminConnection,
+  SequencerAdminConnection,
+}
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -20,8 +24,10 @@ class SequencerPruningTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
     sequencerAdminConnection: SequencerAdminConnection,
+    mediatorAdminConnection: MediatorAdminConnection,
     clock: Clock,
     retentionPeriod: NonNegativeFiniteDuration,
+    participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -55,16 +61,25 @@ class SequencerPruningTrigger(
     status <- sequencerAdminConnection.getSequencerPruningStatus()
     pruningTimestamp = status.now.minus(retentionPeriod.underlying.toJava)
     membersToDisable = status.clientsPreventingPruning(pruningTimestamp).members
-
-    // disabling member preventing pruning
-    _ <- Future.traverse(membersToDisable)(sequencerAdminConnection.disableMember)
-    _ = if (membersToDisable.nonEmpty) {
-      val disabled = membersToDisable.map(_.toProtoPrimitive)
-      logger.warn(
-        show"disabling ${disabled.size} member clients. $disabled"
-      )
-    }
-
+    _ <-
+      // disabling member preventing pruning
+      if (membersToDisable.nonEmpty) {
+        val disabled = membersToDisable.map(_.toProtoPrimitive)
+        disablingParticipantAndMediator(disabled).flatMap { isParticipantOrMediator =>
+          if (isParticipantOrMediator) {
+            logger.warn(
+              show"disabling ${disabled.size} member clients. $disabled"
+            )
+            Future.traverse(membersToDisable)(sequencerAdminConnection.disableMember)
+          } else {
+            throw Status.INTERNAL
+              .withDescription(
+                "Failed to prune sequencer because members to be disabled contains our own participant or mediator"
+              )
+              .asRuntimeException()
+          }
+        }
+      } else Future.unit
     statusAfterDisabling <- sequencerAdminConnection.getSequencerPruningStatus()
     safeTimestamp = statusAfterDisabling.safePruningTimestamp
     res <-
@@ -88,4 +103,13 @@ class SequencerPruningTrigger(
           )
 
   } yield res
+
+  private def disablingParticipantAndMediator(
+      disableMembers: Set[String]
+  )(implicit traceContext: TraceContext): Future[Boolean] = for {
+    participantId <- participantAdminConnection.getParticipantId()
+    mediatorId <- mediatorAdminConnection.getMediatorId
+  } yield disableMembers.exists(member =>
+    Set(participantId.toProtoPrimitive, mediatorId.toProtoPrimitive).contains(member)
+  )
 }

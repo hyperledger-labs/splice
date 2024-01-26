@@ -660,6 +660,7 @@ class FoundingNodeInitializer(
       Some(
         LocalSequencerClientContext(
           localDomainNode.sequencerAdminConnection,
+          localDomainNode.mediatorAdminConnection,
           // Founding SV should have already connected to its sequencer.
           // We put None here to indicate automation service not to create LocalSequencerConnectionsTrigger
           // which is responsible for reconnecting to its own sequencer
