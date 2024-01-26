@@ -13,12 +13,23 @@ In the future we may optionally add other kinds of load tests for different work
 To run this test from your machine:
 
 1. Add the following to your `.envrc.private` variables:
-    - `export K6_OAUTH_DOMAIN="https://canton-network-dev.us.auth0.com"`
-    - `export K6_OAUTH_CLIENT_ID="5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK"`
-    - `export K6_USERS_PASSWORD=<PASSWORD>` where `<PASSWORD>` is the actual password found in the passwords gdoc
-    - `export K6_VALIDATOR_ADMIN_PASSWORD=<PASSWORD>` where `<PASSWORD>` is the password for `admin@validator1.com`
-    - `export K6_TEST_DURATION="5m"` (or a different duration if you wish)
-    - `export K6_ITERATIONS_PER_MINUTE="60"` (for 1 cc tx/s)
+
+   ```.bash
+   export K6_OAUTH_DOMAIN="https://canton-network-dev.us.auth0.com"
+   export K6_OAUTH_CLIENT_ID="5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK"
+   export K6_TEST_DURATION="5m"
+
+   # 60 iterations = 1 transfer/second
+   export K6_ITERATIONS_PER_MINUTE="60"
+
+   export K6_USERS_PASSWORD=""
+   export K6_VALIDATOR_ADMIN_PASSWORD=""
+   ```
+
+   and use the [passwords gdoc](https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit) to set
+    - `K6_USERS_PASSWORD` to the password of `user@cn-load-tester.com`
+    - `K6_VALIDATOR_ADMIN_PASSWORD` to the password of `admin@validator1.com`
+
 2. Create & deploy a scratchnet cluster
 3. Run `cncluster load_test` from the cluster's deployment directory
 4. Visit `https://grafana.<SCRATCH>.network.canton.global/d/ccbb2351-2ae2-462f-ae0e-f2c893ad1028/k6-prometheus` to view results
