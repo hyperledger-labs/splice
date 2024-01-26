@@ -184,14 +184,26 @@ function _retry_until_success() {
         exit 1
     fi
 
-    local -i -r max_retries=$((100)) # with 5 second sleep + 1 second kubectl timeout, this is roughly 10 minutes
+    # with 5 second sleep + 1 second kubectl timeout, this is roughly 10 minutes
+    # See also max_wait which caps the overall wait time
+    local -i -r max_retries=$((100))
     local -i num_retries=0
+    local -i -r max_wait=$((60*60)) # do not wait longer than 60m in any case
+    local -i -r start_time=$(date +%s)
 
     _log "Running command with retry: $cmd"
 
     set +e
     until $cmd; do
-        ((num_retries++)) && ((num_retries>max_retries)) && echo "Too many attempts, exiting" && exit 1
+        ((num_retries++))
+        if ((num_retries>max_retries)); then
+            echo "Too many attempts, exiting"
+            exit 1
+        fi
+        if (($(date +%s) > (start_time+max_wait))); then
+            echo "Timed out after $max_wait seconds, exiting"
+            exit 1
+        fi
         sleep 5
     done
     set -e
@@ -208,8 +220,13 @@ function _retry_until_value() {
         exit 1
     fi
 
-    local -i -r max_retries=$((12*30)) # with 5 second sleep, this takes roughly 30 minutes + 360*N, where N is time it takes to run `cmd` in minutes. Usually this is negligible, but beware if `cmd` is resource heavy or does retries of its own.
+    # with 5 second sleep, this takes roughly 30 minutes + 360*N, where N is time it takes to run `cmd` in minutes.
+    # Usually this is negligible, but beware if `cmd` is resource heavy or does retries of its own.
+    # See also max_wait which caps the overall wait time
+    local -i -r max_retries=$((12*30))
     local -i num_retries=0
+    local -i -r max_wait=$((60*60)) # do not wait longer than 60m in any case
+    local -i -r start_time=$(date +%s)
 
     _log "Running command with retry (until $expected): $cmd"
 
@@ -233,7 +250,15 @@ function _retry_until_value() {
     }
 
     until found=$($cmd 2>&1 || true) && (is_expected "$found"); do
-        ((num_retries++)) && ((num_retries>max_retries)) && echo "Too many attempts, exiting" && exit 1
+        ((num_retries++))
+        if ((num_retries>max_retries)); then
+            echo "Too many attempts, exiting"
+            exit 1
+        fi
+        if (($(date +%s) > (start_time+max_wait))); then
+            echo "Timed out after $max_wait seconds, exiting"
+            exit 1
+        fi
         sleep 5
     done
 
