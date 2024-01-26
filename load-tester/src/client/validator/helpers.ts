@@ -44,7 +44,10 @@ export function sendAndWaitForTransferOffer(
     );
 
     if (receivingOffer) {
-      receiver.v0.wallet.acceptTransferOffer(receivingOffer.contract_id);
+      receiver.v0.wallet.acceptTransferOffer(
+        receivingOffer.contract_id,
+        receivingOffer.payload.trackingId,
+      );
 
       // Record transferOffer accept time
       const acceptOfferTime = Date.now();

@@ -60,12 +60,32 @@ export class ValidatorClient {
 
     // -*--- WALLET APIS ----------------------------------------------------------*-
     wallet: {
-      acceptTransferOffer: (transferOfferCid: string): AcceptTransferOfferResponse | undefined => {
+      acceptTransferOffer: (
+        transferOfferCid: string,
+        trackingId: string,
+      ): AcceptTransferOfferResponse | undefined => {
         return this.http.post
           .success(
             `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers/${transferOfferCid}/accept`,
             undefined,
             {
+              retry: (_, resp) => {
+                if (resp?.error_code) {
+                  // represents 4xx, 5xx, and non-http errors (https://grafana.com/docs/k6/latest/javascript-api/error-codes/)
+                  // we need to check if the accept actually went through on the backend via the status endpoint.
+                  const status = this.v0.wallet.getTransferOfferStatus(trackingId);
+
+                  if (!status) {
+                    // if this API request _also_ fails to respond, things are probably going pretty bad,
+                    // so disable this request's retries to avoid adding to the fire
+                    return false;
+                  }
+
+                  return status.status === 'created';
+                }
+
+                return true;
+              },
               headers: this.headers(),
               tags: {
                 name: `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers/$transferOfferCid/accept`,
@@ -85,21 +105,48 @@ export class ValidatorClient {
         amount: string,
         receiver_party_id: string,
       ): CreateTransferOfferResponse | undefined => {
+        const tracking_id = uuidv4();
+
         return this.http.post
           .success(
             `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers`,
             JSON.stringify({
               amount,
+              tracking_id,
               receiver_party_id,
               description: 'createTransfer from load tester',
               expires_at: getTomorrowMs(),
-              tracking_id: uuidv4(),
             }),
-            { headers: this.headers() },
+            {
+              retry: (_, resp) => {
+                if (resp?.status === 409) {
+                  // backend telling us this is a duplicate create request, explicitly do not retry
+                  return false;
+                }
+                if (resp?.error_code === 1050) {
+                  // this code represents a request timeout from k6 (https://grafana.com/docs/k6/latest/javascript-api/error-codes/)
+                  // we need to check if the create actually went through on the backend via the status endpoint.
+                  const status = this.v0.wallet.getTransferOfferStatus(tracking_id);
+
+                  if (!status) {
+                    // if this API request _also_ fails to respond, things are probably going pretty bad,
+                    // so disable this request's retries to avoid adding to the fire
+                    return false;
+                  }
+
+                  return status.status === 'not found';
+                }
+
+                return true;
+              },
+              headers: this.headers(),
+            },
           )
           .then(resp => jsonStringDecoder(createTransferOfferResponse, resp.body));
       },
-      getTransferOfferStatus: (tracking_id: string): GetTransferOfferStatusResponse | undefined => {
+      getTransferOfferStatus: (
+        tracking_id: string,
+      ): GetTransferOfferStatusResponse | { status: 'not found' } | undefined => {
         return this.http.post
           .success(
             `${this.validatorBaseUrl}/api/validator/v0/wallet/transfer-offers/${tracking_id}/status`,
@@ -111,7 +158,12 @@ export class ValidatorClient {
               },
             },
           )
-          .then(resp => jsonStringDecoder(getTransferOfferStatusResponse, resp.body));
+          .then(resp => {
+            if (resp.status === 404) {
+              return { status: 'not found' };
+            }
+            return jsonStringDecoder(getTransferOfferStatusResponse, resp.body);
+          });
       },
       listTransactions: (): ListTransactionsResponse | undefined => {
         return this.http.post
@@ -133,7 +185,7 @@ export class ValidatorClient {
         this.http.post.success(
           `${this.validatorBaseUrl}/api/validator/v0/wallet/tap`,
           JSON.stringify({ amount }),
-          { headers: this.headers() },
+          { retry: false, headers: this.headers() },
         );
       },
       userStatus: (): UserStatusResponse | undefined => {

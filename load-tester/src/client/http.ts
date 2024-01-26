@@ -9,6 +9,12 @@ type RedirectResponseHandler = {
   then: <T>(handleResponse: (n: RefinedResponse<'text'>, location: string) => T) => T;
 };
 
+interface RequestParams<R extends ResponseType> extends RefinedParams<R | undefined> {
+  retry?: number | boolean | RetryFn;
+}
+
+type RetryFn = (count: number, resp?: RefinedResponse<'text'>) => boolean;
+
 // HTTP client built off of k6/http, that automatically handles retries
 export class HttpClient {
   private retryCount: number = 5;
@@ -32,15 +38,12 @@ export class HttpClient {
     }
   }
 
-  // base HTTP request with simple error handling
-  private _request<R extends ResponseType>(
+  private _raw_request<R extends ResponseType>(
     url: string,
     method: 'GET' | 'POST',
     body: string | Buffer | undefined,
-    expectedStatus: 200 | 201 | 302,
-    retries: number,
-    params: RefinedParams<R | undefined> | null | undefined,
-  ): ResponseHandler {
+    params: RequestParams<R>,
+  ): RefinedResponse<'text'> {
     console.debug(`Calling ${method} on endpoint: ${url}`);
 
     const headers = {
@@ -62,18 +65,63 @@ export class HttpClient {
 
     console.debug(`Response data: ${JSON.stringify(resp)}`);
 
-    if (resp.status !== expectedStatus) {
-      if (retries > 0) {
-        console.debug(`Received an unexpected status code ${resp.status} for ${method} ${url}`);
-        console.debug(`${retries} retries remaining...`);
+    return resp;
+  }
 
+  // base HTTP request with simple error handling
+  private _request<R extends ResponseType>(
+    url: string,
+    method: 'GET' | 'POST',
+    body: string | Buffer | undefined,
+    expectedStatus: 200 | 201 | 302,
+    params: RequestParams<R>,
+  ): ResponseHandler {
+    const { retry = true } = params;
+
+    const hardRetryTimeout = 30; // in seconds
+
+    // default retry values
+    let maxRetryCount = this.retryCount;
+    let retryCount = 0;
+    let retryCondition: RetryFn = (count: number) => count < maxRetryCount;
+
+    switch (typeof retry) {
+      case 'boolean':
+        if (!params.retry) {
+          retryCondition = () => false;
+        }
+        break;
+      case 'number':
+        maxRetryCount = retry;
+        break;
+      case 'function':
+        retryCondition = retry;
+        break;
+    }
+
+    let resp = this._raw_request(url, method, body, params);
+
+    const startTime = Date.now();
+    while (resp.status !== expectedStatus) {
+      if (Date.now() - startTime > hardRetryTimeout * 1000) {
+        this.handleError(
+          `Exceeded max retry time of ${hardRetryTimeout} seconds: ${method} ${url}`,
+          resp.body,
+        );
+        break;
+      }
+
+      if (retryCondition(retryCount, resp)) {
+        console.log(`Retrying, count #${retryCount}...`);
         sleep(this.retryWait);
-        return this._request(url, method, body, expectedStatus, retries - 1, params);
+        resp = this._raw_request(url, method, body, params);
+        retryCount++;
       } else {
         this.handleError(
           `Expected status code ${expectedStatus} but received ${resp.status} for ${method} ${url}`,
           resp.body,
         );
+        break;
       }
     }
 
@@ -89,9 +137,9 @@ export class HttpClient {
     url: string,
     method: 'GET' | 'POST',
     body: string | Buffer | undefined,
-    params: RefinedParams<R | undefined> | null | undefined,
+    params: RequestParams<R>,
   ): RedirectResponseHandler {
-    return this._request(url, method, body, 302, this.retryCount, params).then(resp => {
+    return this._request(url, method, body, 302, params).then(resp => {
       const location = resp.headers['Location'];
 
       if (typeof location !== 'string') {
@@ -114,16 +162,16 @@ export class HttpClient {
   public get = {
     redirect: <R extends ResponseType>(
       url: string,
-      params: RefinedParams<R | undefined> | null | undefined,
+      params: RequestParams<R>,
     ): RedirectResponseHandler => {
       return this._redirect(url, 'GET', undefined, params);
     },
     success: <R extends ResponseType>(
       url: string,
       body: string | Buffer | undefined,
-      params: RefinedParams<R | undefined> | null | undefined,
+      params: RequestParams<R>,
     ): ResponseHandler => {
-      return this._request(url, 'GET', body, 200, this.retryCount, params);
+      return this._request(url, 'GET', body, 200, params);
     },
   };
 
@@ -131,23 +179,23 @@ export class HttpClient {
     redirect: <R extends ResponseType>(
       url: string,
       body: string | Buffer | undefined,
-      params: RefinedParams<R | undefined> | null | undefined,
+      params: RequestParams<R>,
     ): RedirectResponseHandler => {
       return this._redirect(url, 'POST', body, params);
     },
     success: <R extends ResponseType>(
       url: string,
       body: string | Buffer | undefined,
-      params: RefinedParams<R | undefined> | null | undefined,
+      params: RequestParams<R>,
     ): ResponseHandler => {
-      return this._request(url, 'POST', body, 200, this.retryCount, params);
+      return this._request(url, 'POST', body, 200, params);
     },
     s201: <R extends ResponseType>(
       url: string,
       body: string | Buffer | undefined,
-      params: RefinedParams<R | undefined> | null | undefined,
+      params: RequestParams<R>,
     ): ResponseHandler => {
-      return this._request(url, 'POST', body, 201, this.retryCount, params);
+      return this._request(url, 'POST', body, 201, params);
     },
   };
 }
