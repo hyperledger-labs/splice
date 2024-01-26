@@ -21,7 +21,7 @@ jobs:
         type: boolean
         default: true
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - setup_nix
       - when:
@@ -85,7 +85,7 @@ jobs:
         type: boolean
         default: false
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - setup_nix
       - when:
@@ -149,7 +149,7 @@ jobs:
         type: boolean
         default: true
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - setup_nix
       - when:
@@ -247,7 +247,7 @@ jobs:
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
       VPN_HOST_IP: 34.132.91.75
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - setup_vpn
       # Needs to occur before setup_vpn_routes

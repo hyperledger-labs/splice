@@ -26,7 +26,7 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     parallelism: << parameters.parallelism >>
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - run:
           # necessary for npm/webpack dev server launched in start-frontends.sh later
@@ -152,7 +152,7 @@ jobs:
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
       VPN_HOST_IP: 34.132.91.75
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - setup_vpn
       # Needs to occur before setup_vpn_routes
@@ -248,7 +248,7 @@ jobs:
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
       VPN_HOST_IP: 34.132.91.75
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - setup_vpn
       # Needs to occur before setup_vpn_routes

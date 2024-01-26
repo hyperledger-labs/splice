@@ -8,7 +8,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - run:
           name: Verify config.yml is up to date with source.
@@ -33,7 +33,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - setup_sbt_test_job
       - execute_sbt_command:
@@ -49,7 +49,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - setup_sbt_test_job
       - execute_sbt_command:
@@ -92,7 +92,7 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     parallelism: << parameters.parallelism >>
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - setup_sbt_test_job
       # Used to pull docker images for cometbft
@@ -127,7 +127,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - setup_sbt_test_job
       - execute_sbt_command:
@@ -170,7 +170,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - setup_nix
       - run_bash_command_in_nix:
@@ -188,7 +188,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
+      - checkout_with_retry
       - setup_nix
       # TODO(#6630): look into these caches
       - restore_precompiled_classes
@@ -212,7 +212,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
+      - checkout_with_retry
       - setup_nix
       - cluster_lock_reaper:
           cluster: "scratchneta"
@@ -231,7 +231,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
+      - checkout_with_retry
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Mark latest snapshot in branch for next TestNet release
@@ -254,7 +254,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
+      - checkout_with_retry
       - setup_nix
       - run_bash_command_in_nix:
          cmd_name: Update CircleCI pipeline configuration (incl. schedule triggers)
@@ -275,7 +275,7 @@ jobs:
         type: boolean
         default: false
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - restore_frontend_builds
       - setup_sbt_test_job
@@ -337,7 +337,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - setup_sbt_test_job
       - docker_login_artifactory
@@ -416,7 +416,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
+      - checkout_with_retry
       - record_job_start_time
       - restore_frontend_builds
       - setup_sbt_test_job
@@ -454,7 +454,7 @@ jobs:
         type: integer
         default: 28800  # limit search to pipelines that are 8 hours old
     steps:
-      - checkout
+      - checkout_with_retry
       - run:
           name: "Wait for previous pipeline"
           command: |
@@ -488,7 +488,7 @@ jobs:
         type: boolean
         default: true
     steps:
-      - checkout
+      - checkout_with_retry
       - run:
           name: "Cancel if previous pipeline"
           command: |
@@ -523,7 +523,7 @@ jobs:
         type: integer
         default: 28800  # limit search to pipelines that are 8 hours old
     steps:
-      - checkout
+      - checkout_with_retry
       - run:
           name: "Cancel previous pipelines"
           command: |
@@ -542,7 +542,7 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     parallelism: 3
     steps:
-      - checkout
+      - checkout_with_retry
       - setup_vpn
       - setup_nix
       - setup_vpn_routes:
@@ -587,7 +587,7 @@ jobs:
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
       VPN_HOST_IP: 34.132.91.75
     steps:
-      - checkout
+      - checkout_with_retry
       - setup_vpn
       - setup_nix
       - setup_vpn_routes:
