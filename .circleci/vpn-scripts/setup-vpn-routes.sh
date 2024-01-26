@@ -10,7 +10,7 @@ VPN_IP=$(/usr/bin/sudo ip --json addr show dev ens5 | tee /dev/stderr | jq -r '.
 echo "Querying for network gateway"
 GATEWAY=$(/usr/bin/sudo ip --json route list | tee /dev/stderr | jq -r '.[]|select(.gateway)|.gateway')
 echo "Querying for egress IP"
-EGRESS_IP=$(getent hosts "$GCP_CLUSTER_BASENAME".network.canton.global | tee /dev/stderr | awk '{ print $1 }')
+EGRESS_IP=$(/usr/bin/getent hosts "$GCP_CLUSTER_BASENAME".network.canton.global | tee /dev/stderr | awk '{ print $1 }')
 /usr/bin/sudo ip route add "$EGRESS_IP" via "$GATEWAY" table 220 src "$VPN_IP"
 KUBE_IP=$(sed -E -n 's|^.*server: https://(.*)$|\1|p' .kubecfg)
 echo "Setting VPN IP"

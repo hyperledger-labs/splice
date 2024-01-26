@@ -1154,7 +1154,7 @@ function subcmd_wait_version() {
         exit 1
     fi
 
-    _retry_until_value "curl -sSLf http://${GCP_CLUSTER_BASENAME}.network.canton.global/version" "expected version" "$expected"
+    _retry_until_value "curl -sSLf --connect-timeout 5 http://${GCP_CLUSTER_BASENAME}.network.canton.global/version" "expected version" "$expected"
 
     _log "Done. Cluster is now reporting version: $expected"
 }
