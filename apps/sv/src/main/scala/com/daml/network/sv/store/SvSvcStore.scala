@@ -318,10 +318,20 @@ trait SvSvcStore
               totalCouponsLimit = totalCouponsLimit,
             )
           } yield appRewardGroups.map(group =>
-            ExpiredRewardCouponsBatch(closedRound.contractId, Seq.empty, group)
+            ExpiredRewardCouponsBatch(
+              closedRound.contractId,
+              closedRound.contract.payload.round.number,
+              Seq.empty,
+              group,
+            )
           ) ++
             validatorRewardGroups.map(group =>
-              ExpiredRewardCouponsBatch(closedRound.contractId, group, Seq.empty)
+              ExpiredRewardCouponsBatch(
+                closedRound.contractId,
+                closedRound.contract.payload.round.number,
+                group,
+                Seq.empty,
+              )
             )
         case None => Future(Seq())
       }
@@ -1206,13 +1216,15 @@ object SvSvcStore {
 }
 
 case class ExpiredRewardCouponsBatch(
-    closedRound: cc.round.ClosedMiningRound.ContractId,
+    closedRoundCid: cc.round.ClosedMiningRound.ContractId,
+    closedRoundNumber: Long,
     validatorCoupons: Seq[cc.coin.ValidatorRewardCoupon.ContractId],
     appCoupons: Seq[cc.coin.AppRewardCoupon.ContractId],
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
     prettyOfClass(
-      param("closedRound", _.closedRound.contractId.singleQuoted),
+      param("closedRoundCid", _.closedRoundCid.contractId.singleQuoted),
+      param("closedRoundNumber", _.closedRoundNumber),
       customParam(inst => s"validatorCoupons: ${inst.validatorCoupons}"),
       customParam(inst => s"appCoupons: ${inst.appCoupons}"),
     )

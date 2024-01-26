@@ -6,6 +6,7 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
 import com.daml.network.util.Contract
 
+import scala.concurrent.duration.*
 import java.math.RoundingMode
 
 class SvTimeBasedIssuanceIntegrationTest
@@ -170,11 +171,14 @@ class SvTimeBasedIssuanceIntegrationTest
     )
 
     actAndCheck(
+      timeUntilSuccess = 30.seconds
+    )(
       "Advance 5 ticks, to close the round",
       (1 to 5).foreach(_ => advanceRoundsByOneTick),
     )(
       "Wait for all unclaimed coupons to be archived and the closed round to be archived",
       _ => {
+        // We need multiple polling triggers to trigger to get to the target state, which is why we advanceTime within the check
         advanceTimeByPollingInterval(sv1Backend)
         getRewardCoupons(round) shouldBe empty
         sv1ScanBackend

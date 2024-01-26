@@ -67,7 +67,7 @@ class ExpireRewardCouponsTrigger(
       _.exerciseSvcRules_ClaimExpiredRewards(
         coinRules.contractId,
         new CoinRules_ClaimExpiredRewards(
-          expiredRewardsTask.closedRound,
+          expiredRewardsTask.closedRoundCid,
           expiredRewardsTask.validatorCoupons.asJava,
           Seq.empty.asJava,
           None.toJava,
@@ -78,7 +78,7 @@ class ExpireRewardCouponsTrigger(
       _.exerciseSvcRules_ClaimExpiredRewards(
         coinRules.contractId,
         new CoinRules_ClaimExpiredRewards(
-          expiredRewardsTask.closedRound,
+          expiredRewardsTask.closedRoundCid,
           Seq.empty.asJava,
           expiredRewardsTask.appCoupons.asJava,
           None.toJava,
