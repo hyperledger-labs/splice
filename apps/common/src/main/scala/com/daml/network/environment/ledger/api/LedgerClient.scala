@@ -26,7 +26,6 @@ import com.digitalasset.canton.ledger.api.auth.client.LedgerCallCredentials
 import com.digitalasset.canton.ledger.client.GrpcChannel
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.daml.ledger.api.v1 as lapiv1
 import com.daml.ledger.api.v1.admin.package_management_service.{
   PackageManagementServiceGrpc,
   UploadDarFileRequest,
@@ -37,11 +36,9 @@ import com.daml.ledger.api.v1.admin.party_management_service.{
 }
 import com.daml.ledger.api.v1.admin.user_management_service as v1User
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc
-import com.daml.ledger.api.v1.ledger_offset.LedgerOffset as V1LedgerOffset
-import com.daml.ledger.api.v1.package_service.{ListPackagesRequest, PackageServiceGrpc}
-import com.daml.ledger.api.v1.transaction_service.{GetLedgerEndRequest, TransactionServiceGrpc}
-import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
+import com.daml.ledger.api.v2.package_service.{ListPackagesRequest, PackageServiceGrpc}
+import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.javaapi.data.User.Right
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.util.ErrorUtil
@@ -91,8 +88,6 @@ private[environment] class LedgerClient(
 
   private val commandServiceStub: CommandServiceGrpc.CommandServiceStub =
     CommandServiceGrpc.stub(channel)
-  private val transactionServiceStub: TransactionServiceGrpc.TransactionServiceStub =
-    TransactionServiceGrpc.stub(channel)
   private val packageServiceStub: PackageServiceGrpc.PackageServiceStub =
     PackageServiceGrpc.stub(channel)
   private val packageManagementServiceStub
@@ -114,8 +109,8 @@ private[environment] class LedgerClient(
   private val stateServiceStub: lapi.state_service.StateServiceGrpc.StateServiceStub =
     lapi.state_service.StateServiceGrpc.stub(channel)
   private val identityProviderConfigServiceStub
-      : lapiv1.admin.identity_provider_config_service.IdentityProviderConfigServiceGrpc.IdentityProviderConfigServiceStub =
-    lapiv1.admin.identity_provider_config_service.IdentityProviderConfigServiceGrpc.stub(channel)
+      : identity_provider_config_service.IdentityProviderConfigServiceGrpc.IdentityProviderConfigServiceStub =
+    identity_provider_config_service.IdentityProviderConfigServiceGrpc.stub(channel)
 
   private def toSource[T](f: Future[Source[T, NotUsed]]) =
     Source.futureSource(f).mapMaterializedValue(_ => NotUsed)
@@ -136,16 +131,6 @@ private[environment] class LedgerClient(
         ParticipantOffset.Value.Absolute(absolute)
       }
     } yield offset
-  }
-
-  def participantLedgerEnd(): Future[LedgerOffset] = {
-    val req = GetLedgerEndRequest.defaultInstance
-    for {
-      stub <- withCredentials(transactionServiceStub)
-      res <- stub
-        .getLedgerEnd(req)
-        .map(_.getOffset)
-    } yield LedgerOffset.fromProto(V1LedgerOffset.toJavaProto(res))
   }
 
   def activeContracts(
@@ -498,9 +483,9 @@ private[environment] class LedgerClient(
     for {
       stub <- withCredentials(identityProviderConfigServiceStub)
       _ <- stub.createIdentityProviderConfig(
-        lapiv1.admin.identity_provider_config_service.CreateIdentityProviderConfigRequest(
+        identity_provider_config_service.CreateIdentityProviderConfigRequest(
           Some(
-            lapiv1.admin.identity_provider_config_service.IdentityProviderConfig(
+            identity_provider_config_service.IdentityProviderConfig(
               identityProviderId = id,
               issuer = issuer,
               jwksUrl = jwksUrl,

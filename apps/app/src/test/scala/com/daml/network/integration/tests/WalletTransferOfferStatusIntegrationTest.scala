@@ -1,7 +1,8 @@
 package com.daml.network.integration.tests
 
 import com.daml.ledger.api.v1.event.CreatedEvent.toJavaProto
-import com.daml.ledger.api.v1.transaction.{TransactionTree, TreeEvent}
+import com.daml.ledger.api.v1.transaction.TreeEvent
+import com.daml.ledger.api.v2.transaction.TransactionTree
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.network.history.CoinCreate
 import com.daml.network.http.v0.definitions as d0
@@ -74,7 +75,7 @@ class WalletTransferOfferStatusIntegrationTest
     def getRootFromTxId(txId: String, parties: Set[PartyId])(implicit
         env: CNNodeTests.CNNodeTestConsoleEnvironment
     ): (TransactionTree, TreeEvent) = {
-      val txTree = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.transactions
+      val txTree = aliceValidatorBackend.participantClientWithAdminToken.ledger_api_v2.updates
         .by_id(parties, txId)
         .getOrElse(fail("Expected to see the transaction tree in the ledger."))
       val root = txTree.eventsById
