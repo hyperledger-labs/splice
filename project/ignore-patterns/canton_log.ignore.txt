@@ -103,4 +103,7 @@ sv\dParticipantReonboard.*ACS_COMMITMENT_MISMATCH.*
 # TODO(#9557) Remove this broad exclusion once the Canton bug is fixed.
 ACS_COMMITMENT_MISMATCH
 
+# TODO(#9500) Remove this once Canton fixes the bug
+INVALID_ACKNOWLEDGEMENT_SIGNATURE.*sequencer
+
 # Make sure to have a trailing newline
