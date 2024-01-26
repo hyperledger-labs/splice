@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import cats.implicits.catsSyntaxParallelTraverse1
+import com.daml.network.sv.automation.singlesv.SvRewardTrigger
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
@@ -60,21 +61,29 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
       .withResettedDecentralizedNamespace()
       .withZeroSequencerAvailabilityDelay
       .withManualStart
-      .addConfigTransforms((_, conf) =>
-        CNNodeConfigTransforms.updateAllSvAppConfigs((name, c) =>
-          if (name.endsWith("Local")) {
-            c.copy(
-              participantBootstrappingDump = Some(
-                ParticipantBootstrapDumpConfig.File(
-                  migrationParticipantIdentitiesFilePath(name).path
-                )
-              ),
-              onboarding = Some(
-                DomainMigration(c.onboarding.value.name, migrationDumpFilePath(name).path)
-              ),
-            )
-          } else c
-        )(conf)
+      .addConfigTransforms(
+        (_, conf) =>
+          CNNodeConfigTransforms.updateAllSvAppConfigs((name, c) =>
+            if (name.endsWith("Local")) {
+              c.copy(
+                participantBootstrappingDump = Some(
+                  ParticipantBootstrapDumpConfig.File(
+                    migrationParticipantIdentitiesFilePath(name).path
+                  )
+                ),
+                onboarding = Some(
+                  DomainMigration(c.onboarding.value.name, migrationDumpFilePath(name).path)
+                ),
+              )
+            } else c
+          )(conf),
+        // TODO(#9014) Consider keeping this running and instead
+        // making the test check history instead of balance once our
+        // stores handle hard domain migrations properly.
+        (_, conf) =>
+          CNNodeConfigTransforms.updateAllAutomationConfigs(
+            _.withPausedTrigger[SvRewardTrigger]
+          )(conf),
       )
 
   "migrate global domain to new nodes with downtime" in { implicit env =>
