@@ -19,6 +19,7 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
@@ -71,18 +72,25 @@ class ValidatorAutomationService(
 
   registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager))
   registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager, connection))
-  registerTrigger(
-    new TopupMemberTrafficTrigger(
-      triggerContext,
-      store,
-      connection,
-      participantAdminConnection,
-      buyExtraTrafficConfig,
-      clock,
-      walletManager,
-      scanConnection,
+
+  if (buyExtraTrafficConfig.targetThroughput.value > 0L)
+    registerTrigger(
+      new TopupMemberTrafficTrigger(
+        triggerContext,
+        store,
+        connection,
+        participantAdminConnection,
+        buyExtraTrafficConfig,
+        clock,
+        walletManager,
+        scanConnection,
+      )
     )
-  )
+  else
+    logger.info(
+      s"Not starting TopupMemberTrafficTrigger, as the validator is not configured to buy extra traffic."
+    )(TraceContext.empty)
+
   backupDumpConfig.foreach(config =>
     registerTrigger(
       new PeriodicParticipantIdentitiesBackupTrigger(

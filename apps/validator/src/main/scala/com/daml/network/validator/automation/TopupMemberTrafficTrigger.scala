@@ -50,8 +50,6 @@ class TopupMemberTrafficTrigger(
   private val validator = store.key.validatorParty
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
-    // TODO(#7472): Clean up noisy logs
-    logger.debug("Executing top-up member traffic trigger")
     for {
       coinRules <- scanConnection.getCoinRulesWithState()
       globalDomainConfig = CoinConfigSchedule(coinRules)
@@ -62,16 +60,11 @@ class TopupMemberTrafficTrigger(
         buyExtraTrafficConfig,
         context.config.pollingInterval,
       )
-      result <-
-        if (topupParameters.topupAmount == 0L) {
-          logger.debug(
-            s"Validator is not configured to buy extra traffic. Skipping..."
-          )
-          Future.successful(false)
-        } else {
-          val activeDomainId = DomainId.tryFromString(globalDomainConfig.activeDomain)
-          checkAndTopupIfNeeded(topupParameters, activeDomainId)
-        }
+      result <- {
+        assert(topupParameters.topupAmount > 0, "topupAmount must be positive")
+        val activeDomainId = DomainId.tryFromString(globalDomainConfig.activeDomain)
+        checkAndTopupIfNeeded(topupParameters, activeDomainId)
+      }
     } yield result
   }
 
