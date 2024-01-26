@@ -19,7 +19,6 @@
       - [Strategies for reacting to a failed TestNet or DevNet deployment](#strategies-for-reacting-to-a-failed-testnet-or-devnet-deployment)
       - [Testing deploy-devnet and deploy-testnet changes](#testing-deploy-devnet-and-deploy-testnet-changes)
     - [Manually Deploying via CI](#manually-deploying-via-ci)
-      - [Optional deployment settings](#optional-deployment-settings)
       - [Confirming the Deployment](#confirming-the-deployment)
     - [CloudSQL and ScratchNet Clusters](#cloudsql-and-scratchnet-clusters)
     - [Observing Cluster Operation](#observing-cluster-operation)
@@ -37,6 +36,9 @@
         - [Grafana Dashboards](#grafana-dashboards)
         - [The Observability Cluster](#the-observability-cluster)
       - [Alerts](#alerts)
+        - [Grafana Alerts](#grafana-alerts)
+          - [Creating an alert](#creating-an-alert)
+          - [Updating an alert](#updating-an-alert)
       - [JVM debug information](#jvm-debug-information)
       - [Connecting to a Postgres database](#connecting-to-a-postgres-database)
     - [Checking Pod Node Assignments and Memory Usage](#checking-pod-node-assignments-and-memory-usage)
@@ -47,6 +49,7 @@
       - [Fixing Connection Issues in kubectl](#fixing-connection-issues-in-kubectl)
     - [Cluster Infrastructure Setup](#cluster-infrastructure-setup)
     - [Deploy a Build to a Cluster](#deploy-a-build-to-a-cluster)
+      - [Deploy a previous CN version to a Cluster](#deploy-a-previous-cn-version-to-a-cluster)
     - [Add a Component to the Build](#add-a-component-to-the-build)
     - [Modifying a Deployed Cluster](#modifying-a-deployed-cluster)
     - [Manual Cleanup for an Interrupted Deployment](#manual-cleanup-for-an-interrupted-deployment)
@@ -63,9 +66,9 @@
       - [Approving via SV config](#approving-via-sv-config)
   - [Interacting with Canton Network UIs](#interacting-with-canton-network-uis)
   - [Interacting with Canton Network APIs](#interacting-with-canton-network-apis)
-      - [Canton Participant APIs](#canton-participant-apis)
-      - [App APIs without authentication](#app-apis-without-authentication)
-      - [App APIs with authentication](#app-apis-with-authentication)
+    - [Canton Participant APIs](#canton-participant-apis)
+    - [App APIs without authentication](#app-apis-without-authentication)
+    - [App APIs with authentication](#app-apis-with-authentication)
   - [Configuring a New GCP Project](#configuring-a-new-gcp-project)
   - [Cluster Data Dumps](#cluster-data-dumps)
     - [Test and CircleCI setup](#test-and-circleci-setup)
@@ -75,6 +78,8 @@
     - [Writing Tests against different Clusters](#writing-tests-against-different-clusters)
     - [Patching healthchecks against a deployed cluster](#patching-healthchecks-against-a-deployed-cluster)
   - [Backup and Recovery](#backup-and-recovery)
+    - [Backup](#backup)
+    - [Restore](#restore)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -342,13 +347,15 @@ subcommands. A few highlights include the following:
 * `cncluster apply` - Apply the current working copy's `canton-network`
   and `infra` Pulumi stacks to a cluster. The presence of all images referenced by that
   configuration is confirmed prior to application of the manifest.
-      * The tag for the images to be deployed can be overridden with an
-        optional parameter. If this is specified, then the docker image
-        presence check is also bypassed.
-      * To docker image check can also be bypassed by setting the
-        `CNCLUSTER_SKIP_DOCKER_CHECK` environment variable to 1. This
-        can also be added to `.envrc.private`.
-      * One can skip redeploying the `infra` stack by supplying the `--skip-infra` flag.
+
+  * The tag for the images to be deployed can be overridden with an
+    optional parameter. If this is specified, then the docker image
+    presence check is also bypassed.
+  * To docker image check can also be bypassed by setting the
+    `CNCLUSTER_SKIP_DOCKER_CHECK` environment variable to 1. This
+    can also be added to `.envrc.private`.
+  * One can skip redeploying the `infra` stack by supplying the `--skip-infra` flag.
+
 * `cncluster apply_sv` - Apply the sv-runbook Pulumi stack.
       * You need to provide a `target-domain-cluster` argument, for instance `scratcha` for scratchneta.
 * `cncluster pdown` - Take down any installed resources populated with
