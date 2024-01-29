@@ -13,6 +13,7 @@ import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import com.digitalasset.canton.util.ShowUtil.*
 
 import java.time.Instant
 import scala.jdk.OptionConverters.*
@@ -42,7 +43,7 @@ class LocalSequencerConnectionsTrigger(
       )
       _ <- svcRulesActiveSequencerConfig.fold {
         logger.debug(
-          s"sequencer information for svc member ${store.key.svParty} is not yet published to svcRules ${svcRules.payload.members}, skipping"
+          show"Member info or sequencer info not (yet) published to SvcRules for our own party ${store.key.svParty}, skipping"
         )
         Future.unit
       } { publishedSequencerInfo =>

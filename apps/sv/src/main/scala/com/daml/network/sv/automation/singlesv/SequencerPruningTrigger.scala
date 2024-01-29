@@ -49,12 +49,15 @@ class SequencerPruningTrigger(
       )
       _ <- svcRulesActiveSequencerConfig.fold {
         logger.debug(
-          s"sequencer for svc member ${store.key.svParty} not found or not yet available, skipping"
+          show"Member info or sequencer info not (yet) published to SvcRules for our own party ${store.key.svParty}, skipping"
         )
         Future.unit
       } { _ =>
-        prune().map { prunedResult =>
-          logger.debug(s"pruned sequencer: $prunedResult")
+        {
+          logger.debug("Attempt pruning our sequencer...")
+          prune().map { prunedResult =>
+            logger.debug(s"Completed pruning our sequencer with result: $prunedResult")
+          }
         }
       }
     } yield false
