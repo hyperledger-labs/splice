@@ -483,7 +483,7 @@ function subcmd_logs() {
 
 
 function k8s_labels_for_app() {
-    local non_domain_specific_namespaces=("sv" "validator1" "splitwell")
+    local non_domain_specific_namespaces=("sv" "validator1" "splitwell" "validator")
     local global_domain_specific_apps=("global-domain-cometbft" "global-domain-sequencer" "global-domain-mediator")
     local domain_specific_apps=("participant" "sv-app")
 
@@ -1774,7 +1774,11 @@ function subcmd_participant_console() {
         _error "Usage: $SCRIPTNAME participant_console <namespace-name>"
     fi
 
-    if ! participant_pod=$(_get_single_pod "$namespace" "participant-0"); then
+    app="participant"
+    app_container="$app"
+    k8s_labels_for_app
+
+    if ! participant_pod=$(_get_single_pod "$namespace" "$app"); then
       _error "No participant found in namespace '$namespace'."
     fi
 
@@ -1782,7 +1786,14 @@ function subcmd_participant_console() {
       _error "Ports 11001 and/or 11002 are already in use on localhost. Please close any processes that might be listening on them."
     fi
 
-    if [ ! "${LEDGER_API_AUTH_TOKEN-}" ] && sv_app_pod=$(_get_single_pod "$namespace" "sv-app"); then
+    app="sv-app"
+    k8s_labels_for_app
+    sv_app_pod_label=$app
+    app="validator-app"
+    k8s_labels_for_app
+    validator_app_pod_label=$app
+
+    if [ ! "${LEDGER_API_AUTH_TOKEN-}" ] && sv_app_pod=$(_get_single_pod "$namespace" "$sv_app_pod_label"); then
       if LEDGER_API_AUTH_TOKEN=$(_get_env_value "$namespace" "$sv_app_pod" CN_APP_SV_LEDGER_API_AUTH_TOKEN); then
         _info "Using Ledger API token from '$sv_app_pod'..."
       else
@@ -1799,7 +1810,7 @@ function subcmd_participant_console() {
           _info "Failed getting Ledger API Auth0 credentials from '$sv_app_pod'..."
         fi
       fi
-    elif validator_app_pod=$(_get_single_pod "$namespace" "validator-app"); then
+    elif validator_app_pod=$(_get_single_pod "$namespace" "$validator_app_pod_label"); then
       if LEDGER_API_AUTH_TOKEN=$(_get_env_value "$namespace" "$validator_app_pod" CN_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN); then
         _info "Using Ledger API token from '$validator_app_pod'..."
       else
