@@ -2371,6 +2371,9 @@ jobs:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
       - collect_test_timings_and_send_to_datadog
+      - store_artifacts:
+          name: Upload vpn log
+          path: /var/log/vpn.log
 
   preflight_validator_check:
     parameters:
@@ -2466,6 +2469,9 @@ jobs:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
       - collect_test_timings_and_send_to_datadog
+      - store_artifacts:
+          name: Upload vpn log
+          path: /var/log/vpn.log
 
 main-branch-only: &main-branch-only
   filters:
