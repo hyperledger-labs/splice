@@ -140,12 +140,13 @@ commands:
 
             git remote | grep -q origin || git remote add origin "$CIRCLE_REPOSITORY_URL"
 
-            git fetch origin main
-            git fetch origin "$CIRCLE_BRANCH"
-            git fetch origin "$CIRCLE_SHA1"
+            git fetch --tags --force origin
 
+            # We need to checkout main and $CIRCLE_BRANCH also because the todo checker uses `git log main..$CIRCLE_BRANCH`
+            # so both main and the branch have to be local refs
             git checkout main
             git checkout "$CIRCLE_BRANCH"
+
             git checkout "$CIRCLE_SHA1"
           }
 
