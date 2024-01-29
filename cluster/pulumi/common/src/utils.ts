@@ -7,8 +7,6 @@ import { CustomResourceOptions } from '@pulumi/pulumi';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
-import { InfrastructureOutputs } from './infra';
-
 export const config = new pulumi.Config();
 
 export const HELM_CHART_TIMEOUT_SEC = 480;
@@ -171,19 +169,6 @@ export function loadIPRanges(): string[] {
 }
 
 export function cnChartValues(chartPath: string, overrideValues: ChartValues = {}): ChartValues {
-  const externalIPRanges = loadIPRanges();
-  const networkSettingsJson = loadJsonFromFile(
-    process.env.REPO_ROOT +
-      (isDevNet
-        ? '/cluster/network-settings-devnet.json'
-        : '/cluster/network-settings-non-devnet.json')
-  );
-
-  const networkSettings = {
-    ...networkSettingsJson,
-    externalIPRanges,
-  };
-
   const chartDefaultValues = loadYamlFromFile(
     process.env.REPO_ROOT + '/cluster/helm/' + chartPath + '/values.yaml'
   );
@@ -199,9 +184,7 @@ export function cnChartValues(chartPath: string, overrideValues: ChartValues = {
         basename: CLUSTER_BASENAME,
         name: CLUSTER_NAME,
         fixedTokens: fixedTokens(),
-        ipAddress: infraStack.requireOutput(InfrastructureOutputs.INGRESS_IP),
         dnsName: CLUSTER_DNS_NAME,
-        networkSettings,
       },
       clusterUrl: `${CLUSTER_BASENAME}.network.canton.global`,
     },

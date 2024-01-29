@@ -1192,11 +1192,10 @@ This can be remedied by deleting the offending namespaces and rerunning `apply`:
 kubectl delete namespace sv-1 sv-2 sv-3 sv-4 validator1 splitwell docs
 ```
 
-### Memory Settings
+### Allowed IP Ranges
 
-The most commonly used memory settings for the cluster (Postgres and the ledger)
-are stored in [`network-settings-devnet.json`](./network-settings-devnet.json) and [`network-settings-non-devnet.json`](./network-settings-non-devnet.json)
-These memory settings may be adjusted there. There are also settings for the network whitelist.
+The allowed IP ranges are stored in [`allowed-ip-ranges-external.json`](./allowed-ip-ranges-external.json) for any external IP and
+[`allowed-ip-ranges-cn-internal.json`](./allowed-ip-ranges-cn-internal.json) for the IPs of our own clusters.
 
 ## TLS Certificate Provisioning
 

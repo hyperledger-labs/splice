@@ -2,8 +2,6 @@
 
 {{ $_ := required ".Values.cluster.basename is required." (.Values.cluster).basename }}
 {{ $_ := required ".Values.cluster.imageTag is required." (.Values.cluster).imageTag }}
-{{ $_ := required ".Values.cluster.ipAddress is required." (.Values.cluster).ipAddress }}
-{{ $_ := required ".Values.cluster.networkSettings.externalIPRanges is required." ((.Values.cluster).networkSettings).externalIPRanges }}
 
 {{ $_ := required ".Values.defaultJvmOptions is required." .Values.defaultJvmOptions }}
 {{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
