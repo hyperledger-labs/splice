@@ -72,6 +72,8 @@ import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+import cats.syntax.foldable.*
+import cats.instances.future.*
 
 class SvApp(
     override val name: InstanceName,
@@ -318,6 +320,9 @@ class SvApp(
           globalDomain,
           clock,
         )
+      }
+      _ <- appInitStep("Permanently archive offboarded SV identities") {
+        archiveRemovedSvIdentities(svAutomation, globalDomain)
       }
       _ <- appInitStep("Approve configured SV identities") {
         approveConfiguredSvIdentities(svAutomation, globalDomain)
@@ -630,6 +635,31 @@ class SvApp(
         },
       logger,
     )
+
+  private def archiveRemovedSvIdentities(
+      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
+      globalDomain: DomainId,
+  ) = {
+    val svStore = svStoreWithIngestion.store
+    for {
+      approvedSvIds <- svStore.listApprovedSvIdentities()
+      _ <- approvedSvIds
+        .filterNot(svId =>
+          config.approvedSvIdentities.map(_.name).contains(svId.payload.candidateName)
+        )
+        .traverse_(svId =>
+          svStoreWithIngestion.connection
+            .submit(
+              actAs = Seq(svStore.key.svParty),
+              readAs = Seq.empty,
+              update = svId.contractId.exerciseArchive(),
+            )
+            .noDedup
+            .withDomainId(globalDomain)
+            .yieldUnit()
+        )
+    } yield Right(())
+  }
 
   private def approveConfiguredSvIdentities(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],

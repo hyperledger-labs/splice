@@ -55,7 +55,9 @@ class SvOffboardingPartyToParticipantProposalTrigger(
   override protected def completeTask(task: ParticipantId)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-    logger.info(s"Removing participant with namespace ${task} from the hosting of the SVC party")
+    logger.info(
+      s"Removing participant with participantId ${task} from the hosting of the SVC party"
+    )
     for {
       svcRules <- svcStore.getSvcRules()
       _ <- participantAdminConnection.ensurePartyToParticipantRemovalProposal(

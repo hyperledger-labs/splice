@@ -89,6 +89,16 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
   ]]] =
     lookupApprovedSvIdentityByNameWithOffset(name).map(_.value)
 
+  def listApprovedSvIdentities(limit: Limit = Limit.DefaultLimit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[
+    svlocal.approvedsvidentity.ApprovedSvIdentity.ContractId,
+    svlocal.approvedsvidentity.ApprovedSvIdentity,
+  ]]] =
+    multiDomainAcsStore
+      .listContracts(svlocal.approvedsvidentity.ApprovedSvIdentity.COMPANION, limit)
+      .map(_ map (_.contract))
+
   def lookupSvOnboardingConfirmed()(implicit tc: TraceContext): Future[
     Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]
   ] =
