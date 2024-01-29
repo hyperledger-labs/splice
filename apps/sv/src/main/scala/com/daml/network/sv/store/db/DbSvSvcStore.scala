@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
-import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
+import com.daml.network.codegen.java.cc.validatorlicense.{ValidatorFaucetCoupon, ValidatorLicense}
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsEntryContext}
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.svcrules.*
@@ -21,6 +21,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   SubscriptionRequest,
 }
 import com.daml.network.environment.RetryProvider
+import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{AcsStoreDump, Limit, LimitHelpers, MultiDomainAcsStore}
@@ -38,6 +39,7 @@ import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.reflect.ClassTag
 
 class DbSvSvcStore(
     override val key: SvStore.Key,
@@ -184,28 +186,29 @@ class DbSvSvcStore(
 
   override def listAppRewardCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[AppRewardCoupon.ContractId, AppRewardCoupon]]] = waitUntilAcsIngested {
-    for {
-      result <- storage
-        .query(
-          (selectFromAcsTable(SvcTables.acsTableName) ++
-            sql"""
-                 where store_id = $storeId
-                   and template_id_qualified_name = ${QualifiedName(AppRewardCoupon.TEMPLATE_ID)}
-                   and reward_round = $round
-                   and assigned_domain = $domainId
-                   and reward_party is not null -- otherwise index is not used
-                 limit ${sqlLimit(limit)}
-               """).toActionBuilder.as[SelectFromAcsTableResult],
-          "listAppRewardCouponsOnDomain",
-        )
-      limited = applyLimit(limit, result)
-    } yield limited.map(contractFromRow(AppRewardCoupon.COMPANION)(_))
-  }
+  ): Future[Seq[Contract[AppRewardCoupon.ContractId, AppRewardCoupon]]] =
+    listRewardCouponsOnDomain(AppRewardCoupon.COMPANION, round, domainId, limit)
 
   override def listValidatorRewardCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(
       implicit tc: TraceContext
   ): Future[Seq[Contract[ValidatorRewardCoupon.ContractId, ValidatorRewardCoupon]]] =
+    listRewardCouponsOnDomain(ValidatorRewardCoupon.COMPANION, round, domainId, limit)
+
+  override def listValidatorFaucetCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(
+      implicit tc: TraceContext
+  ): Future[Seq[Contract[ValidatorFaucetCoupon.ContractId, ValidatorFaucetCoupon]]] =
+    listRewardCouponsOnDomain(ValidatorFaucetCoupon.COMPANION, round, domainId, limit)
+
+  private def listRewardCouponsOnDomain[C, TCId <: ContractId[_], T](
+      companion: C,
+      round: Long,
+      domainId: DomainId,
+      limit: Limit,
+  )(implicit
+      companionClass: ContractCompanion[C, TCId, T],
+      tc: TraceContext,
+  ): Future[Seq[Contract[TCId, T]]] = {
+    val templateId = companionClass.typeId(companion)
     waitUntilAcsIngested {
       for {
         result <- storage
@@ -213,19 +216,18 @@ class DbSvSvcStore(
             (selectFromAcsTable(SvcTables.acsTableName) ++
               sql"""
                    where store_id = $storeId
-                     and template_id_qualified_name = ${QualifiedName(
-                  ValidatorRewardCoupon.TEMPLATE_ID
-                )}
+                     and template_id_qualified_name = ${QualifiedName(templateId)}
                      and assigned_domain = $domainId
                      and reward_round = $round
                      and reward_party is not null -- otherwise index is not used
                    limit ${sqlLimit(limit)}
                  """).toActionBuilder.as[SelectFromAcsTableResult],
-            "listValidatorRewardCouponsOnDomain",
+            s"list${templateId.getEntityName}OnDomain",
           )
         limited = applyLimit(limit, result)
-      } yield limited.map(contractFromRow(ValidatorRewardCoupon.COMPANION)(_))
+      } yield limited.map(contractFromRow(companion)(_))
     }
+  }
 
   override def listAppRewardCouponsGroupedByCounterparty(
       roundNumber: Long,
@@ -233,33 +235,48 @@ class DbSvSvcStore(
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Seq[AppRewardCoupon.ContractId]]] = waitUntilAcsIngested {
-    for {
-      result <- storage
-        .query(
-          sql"""
-              select reward_party, array_agg(contract_id)
-              from svc_acs_store
-              where store_id = $storeId
-                and template_id_qualified_name = ${QualifiedName(AppRewardCoupon.TEMPLATE_ID)}
-                and assigned_domain = $roundDomain
-                and reward_round = $roundNumber
-                and reward_party is not null -- otherwise index is not used
-              group by reward_party
-              limit ${sqlLimit(totalCouponsLimit)}
-             """.as[(PartyId, Array[ContractId[AppRewardCoupon]])],
-          "listAppRewardCouponsGroupedByCounterparty",
-        )
-    } yield applyLimit(totalCouponsLimit, result).map(
-      _._2.map(cid => new AppRewardCoupon.ContractId(cid.contractId)).toSeq
+  ): Future[Seq[Seq[AppRewardCoupon.ContractId]]] =
+    listCouponsGroupedByCounterparty(
+      AppRewardCoupon.COMPANION,
+      roundNumber,
+      roundDomain,
+      totalCouponsLimit,
     )
-  }
 
   override def listValidatorRewardCouponsGroupedByCounterparty(
       roundNumber: Long,
       roundDomain: DomainId,
       totalCouponsLimit: Limit,
   )(implicit tc: TraceContext): Future[Seq[Seq[ValidatorRewardCoupon.ContractId]]] =
+    listCouponsGroupedByCounterparty(
+      ValidatorRewardCoupon.COMPANION,
+      roundNumber,
+      roundDomain,
+      totalCouponsLimit,
+    )
+
+  override def listValidatorFaucetCouponsGroupedByCounterparty(
+      roundNumber: Long,
+      roundDomain: DomainId,
+      totalCouponsLimit: Limit,
+  )(implicit tc: TraceContext): Future[Seq[Seq[ValidatorFaucetCoupon.ContractId]]] =
+    listCouponsGroupedByCounterparty(
+      ValidatorFaucetCoupon.COMPANION,
+      roundNumber,
+      roundDomain,
+      totalCouponsLimit,
+    )
+
+  private def listCouponsGroupedByCounterparty[C, TCId <: ContractId[_]: ClassTag, T](
+      companion: C,
+      roundNumber: Long,
+      roundDomain: DomainId,
+      totalCouponsLimit: Limit,
+  )(implicit
+      companionClass: ContractCompanion[C, TCId, T],
+      tc: TraceContext,
+  ): Future[Seq[Seq[TCId]]] = {
+    val templateId = companionClass.typeId(companion)
     waitUntilAcsIngested {
       for {
         result <- storage
@@ -268,21 +285,20 @@ class DbSvSvcStore(
                 select reward_party, array_agg(contract_id)
                 from svc_acs_store
                 where store_id = $storeId
-                  and template_id_qualified_name = ${QualifiedName(
-                ValidatorRewardCoupon.TEMPLATE_ID
-              )}
+                  and template_id_qualified_name = ${QualifiedName(templateId)}
                   and assigned_domain = $roundDomain
                   and reward_round = $roundNumber
                   and reward_party is not null -- otherwise index is not used
                 group by reward_party
                 limit ${sqlLimit(totalCouponsLimit)}
                """.as[(PartyId, Array[ContractId[ValidatorRewardCoupon]])],
-            "listValidatorRewardCouponsGroupedByCounterparty",
+            s"list${templateId.getEntityName}GroupedByCounterparty",
           )
       } yield applyLimit(totalCouponsLimit, result).map(
-        _._2.map(cid => new ValidatorRewardCoupon.ContractId(cid.contractId)).toSeq
+        _._2.map(cid => companionClass.toContractId(companion, cid.contractId)).toSeq
       )
     }
+  }
 
   override protected def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext

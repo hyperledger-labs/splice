@@ -264,6 +264,7 @@ object ValidatorStore {
     Seq[ConstrainedTemplate](
       walletCodegen.WalletAppInstall.COMPANION,
       coinCodegen.ValidatorRight.COMPANION,
+      validatorLicenseCodegen.ValidatorFaucetCoupon.COMPANION,
     ) ++ (if (appManagerEnabled)
             Seq[ConstrainedTemplate](
               appManagerCodegen.AppConfiguration.COMPANION,
@@ -298,7 +299,15 @@ object ValidatorStore {
         ) { contract =>
           ValidatorAcsStoreRowData(
             contract = contract,
-            validatorParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
+            validatorParty = Some(key.validatorParty),
+          )
+        },
+        mkFilter(validatorLicenseCodegen.ValidatorFaucetCoupon.COMPANION)(co =>
+          co.payload.validator == validator && co.payload.svc == svc
+        ) { contract =>
+          ValidatorAcsStoreRowData(
+            contract = contract,
+            validatorParty = Some(key.validatorParty),
           )
         },
         mkFilter(coinCodegen.ValidatorRight.COMPANION)(co =>
@@ -308,7 +317,7 @@ object ValidatorStore {
           ValidatorAcsStoreRowData(
             contract = contract,
             userParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
-            validatorParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
+            validatorParty = Some(key.validatorParty),
           )
         },
         mkFilter(coinCodegen.FeaturedAppRight.COMPANION)(co =>

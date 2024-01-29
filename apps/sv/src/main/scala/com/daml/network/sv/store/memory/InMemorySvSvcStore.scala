@@ -7,7 +7,7 @@ import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpired
 import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
-import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
+import com.daml.network.codegen.java.cc.validatorlicense.{ValidatorFaucetCoupon, ValidatorLicense}
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.svcrules.*
@@ -218,6 +218,41 @@ class InMemorySvSvcStore(
       }
       validatorRewardCouponsGrouped = validatorToCoupons.toSeq.map { case (_, coupons) => coupons }
     } yield validatorRewardCouponsGrouped
+  }
+
+  override def listValidatorFaucetCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(
+      implicit tc: TraceContext
+  ): Future[Seq[Contract[ValidatorFaucetCoupon.ContractId, ValidatorFaucetCoupon]]] = {
+    multiDomainAcsStore.filterContractsOnDomain(
+      cc.validatorlicense.ValidatorFaucetCoupon.COMPANION,
+      domainId,
+      (co: Contract[ValidatorFaucetCoupon.ContractId, ValidatorFaucetCoupon]) =>
+        co.payload.round.number == round,
+      limit,
+    )
+  }
+
+  override def listValidatorFaucetCouponsGroupedByCounterparty(
+      roundNumber: Long,
+      roundDomain: DomainId,
+      totalCouponsLimit: Limit,
+  )(implicit tc: TraceContext): Future[Seq[Seq[ValidatorFaucetCoupon.ContractId]]] = {
+    for {
+      validatorFaucets <- listValidatorFaucetCouponsOnDomain(
+        roundNumber,
+        roundDomain,
+        totalCouponsLimit,
+      )
+      validatorToCoupons = validatorFaucets.foldLeft(
+        Map[String, Seq[ValidatorFaucetCoupon.ContractId]]()
+      ) { (m, r) =>
+        m +
+          (r.payload.validator -> (Seq(r.contractId) ++ m.getOrElse(
+            r.payload.validator,
+            Seq[ValidatorFaucetCoupon.ContractId](),
+          )))
+      }
+    } yield validatorToCoupons.toSeq.map { case (_, coupons) => coupons }
   }
 
   override protected def lookupOldestClosedMiningRound()(implicit

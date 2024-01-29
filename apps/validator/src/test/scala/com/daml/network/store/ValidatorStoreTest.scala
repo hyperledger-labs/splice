@@ -396,6 +396,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
           registeredApp1 = registeredApp(provider1)
           installedApp1 = installedApp(provider1)
           approvedReleaseConfig1 = approvedReleaseConfig(provider1, 1L)
+          validatorFaucetCoupon1 = validatorFaucetCoupon(validator)
           _ <- dummyDomain.create(walletInstall1, createdEventSignatories = signatories)(
             store.multiDomainAcsStore
           )
@@ -418,6 +419,9 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
             store.multiDomainAcsStore
           )
           _ <- dummyDomain.create(approvedReleaseConfig1, createdEventSignatories = signatories)(
+            store.multiDomainAcsStore
+          )
+          _ <- dummyDomain.create(validatorFaucetCoupon1, createdEventSignatories = signatories)(
             store.multiDomainAcsStore
           )
           _ <- dummy2Domain.create(coinRules1)(

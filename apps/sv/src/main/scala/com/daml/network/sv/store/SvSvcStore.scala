@@ -287,6 +287,25 @@ trait SvSvcStore
       totalCouponsLimit: Limit,
   )(implicit tc: TraceContext): Future[Seq[Seq[cc.coin.ValidatorRewardCoupon.ContractId]]]
 
+  def listValidatorFaucetCouponsOnDomain(
+      round: Long,
+      domainId: DomainId,
+      limit: Limit,
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[
+      cc.validatorlicense.ValidatorFaucetCoupon.ContractId,
+      cc.validatorlicense.ValidatorFaucetCoupon,
+    ]]
+  ]
+
+  def listValidatorFaucetCouponsGroupedByCounterparty(
+      roundNumber: Long,
+      roundDomain: DomainId,
+      totalCouponsLimit: Limit,
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[Seq[cc.validatorlicense.ValidatorFaucetCoupon.ContractId]]]
+
   protected[this] def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
   ): Future[
@@ -317,12 +336,18 @@ trait SvSvcStore
               closedRound.domain,
               totalCouponsLimit = totalCouponsLimit,
             )
+            validatorFaucetGroups <- listValidatorFaucetCouponsGroupedByCounterparty(
+              closedRound.payload.round.number,
+              closedRound.domain,
+              totalCouponsLimit = totalCouponsLimit,
+            )
           } yield appRewardGroups.map(group =>
             ExpiredRewardCouponsBatch(
               closedRound.contractId,
               closedRound.contract.payload.round.number,
               Seq.empty,
               group,
+              Seq.empty,
             )
           ) ++
             validatorRewardGroups.map(group =>
@@ -331,6 +356,15 @@ trait SvSvcStore
                 closedRound.contract.payload.round.number,
                 group,
                 Seq.empty,
+                Seq.empty,
+              )
+            ) ++ validatorFaucetGroups.map(group =>
+              ExpiredRewardCouponsBatch(
+                closedRound.contractId,
+                closedRound.contract.payload.round.number,
+                Seq.empty,
+                Seq.empty,
+                group,
               )
             )
         case None => Future(Seq())
@@ -379,6 +413,11 @@ trait SvSvcStore
             domain,
             PageLimit.tryCreate(1),
           )
+          validatorFaucetCoupons <- listValidatorFaucetCouponsOnDomain(
+            round.payload.round.number,
+            domain,
+            PageLimit.tryCreate(1),
+          )
           action = new ARC_CoinRules(
             new CRARC_MiningRound_Archive(
               new CoinRules_MiningRound_Archive(
@@ -392,7 +431,7 @@ trait SvSvcStore
             // archivable if ...
             if (
               // ... there are no unclaimed rewards left in this round
-              appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty &&
+              appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty && validatorFaucetCoupons.isEmpty &&
               // ... and a confirmation to archive is not already created by this SV
               confirmationQueryResult.value.isEmpty
             ) Some(QueryResult(confirmationQueryResult.offset, AssignedContract(round, domain)))
@@ -874,11 +913,12 @@ object SvSvcStore {
   }
 
   val ignoredContractsForAcsDump: Set[QualifiedName] = Set(
-    // Note: these three kinds of contracts are not included in an ACS dump due to the ExpireUnclaimedRewards trigger
+    // Note: these four kinds of contracts are not included in an ACS dump due to the ExpireUnclaimedRewards trigger
     // being disabled, which leads to a too high growth of the ACS export per hour.
-    QualifiedName(cc.coin.AppRewardCoupon.COMPANION.TEMPLATE_ID),
-    QualifiedName(cc.coin.ValidatorRewardCoupon.COMPANION.TEMPLATE_ID),
-    QualifiedName(cc.round.ClosedMiningRound.COMPANION.TEMPLATE_ID),
+    QualifiedName(cc.coin.AppRewardCoupon.TEMPLATE_ID),
+    QualifiedName(cc.coin.ValidatorRewardCoupon.TEMPLATE_ID),
+    QualifiedName(cc.validatorlicense.ValidatorFaucetCoupon.TEMPLATE_ID),
+    QualifiedName(cc.round.ClosedMiningRound.TEMPLATE_ID),
   )
 
   private val svcRulesFollowers: Seq[ConstrainedTemplate] = {
@@ -1061,6 +1101,14 @@ object SvSvcStore {
           rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
         )
       },
+      mkFilter(cc.validatorlicense.ValidatorFaucetCoupon.COMPANION)(co => co.payload.svc == svc) {
+        contract =>
+          SvcAcsStoreRowData(
+            contract,
+            rewardRound = Some(contract.payload.round.number),
+            rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
+          )
+      },
       mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,
@@ -1220,6 +1268,7 @@ case class ExpiredRewardCouponsBatch(
     closedRoundNumber: Long,
     validatorCoupons: Seq[cc.coin.ValidatorRewardCoupon.ContractId],
     appCoupons: Seq[cc.coin.AppRewardCoupon.ContractId],
+    validatorFaucets: Seq[cc.validatorlicense.ValidatorFaucetCoupon.ContractId],
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
     prettyOfClass(
@@ -1227,5 +1276,6 @@ case class ExpiredRewardCouponsBatch(
       param("closedRoundNumber", _.closedRoundNumber),
       customParam(inst => s"validatorCoupons: ${inst.validatorCoupons}"),
       customParam(inst => s"appCoupons: ${inst.appCoupons}"),
+      customParam(inst => s"validatorFaucetCoupons: ${inst.validatorFaucets}"),
     )
 }

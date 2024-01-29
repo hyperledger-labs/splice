@@ -13,6 +13,7 @@ import com.daml.ledger.javaapi.data.{
   Value as damlValue,
 }
 import com.daml.network.codegen.java.cc.{
+  validatorlicense as validatorLicenseCodegen,
   coin as coinCodegen,
   coinrules as coinrulesCodegen,
   expiry as expiryCodegen,
@@ -242,6 +243,18 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         new Round(round),
       ),
     )
+
+  protected def validatorFaucetCoupon(validator: PartyId, round: Long = 1L) = {
+    contract(
+      identifier = validatorLicenseCodegen.ValidatorFaucetCoupon.TEMPLATE_ID,
+      contractId = new validatorLicenseCodegen.ValidatorFaucetCoupon.ContractId(nextCid()),
+      payload = new validatorLicenseCodegen.ValidatorFaucetCoupon(
+        svcParty.toProtoPrimitive,
+        validator.toProtoPrimitive,
+        new Round(round),
+      ),
+    )
+  }
 
   protected def subscriptionInitialPayment(
       reference: subCodegen.SubscriptionRequest.ContractId,

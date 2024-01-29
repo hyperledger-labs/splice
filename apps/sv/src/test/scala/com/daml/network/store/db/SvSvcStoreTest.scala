@@ -423,6 +423,32 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
+    "listValidatorFaucetCouponsOnDomain" should {
+
+      "list all the validator faucet coupons on the domain" in {
+        val inRound = (1 to 3).map(n => validatorFaucetCoupon(userParty(n), round = 3))
+        val outOfRound = (1 to 3).map(n => validatorFaucetCoupon(userParty(n), round = 2))
+        val inRoundOtherDomain = (1 to 3).map(n => validatorFaucetCoupon(userParty(n), round = 3))
+        for {
+          store <- mkStore()
+          _ <- MonadUtil.sequentialTraverse(inRound ++ outOfRound)(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          _ <- MonadUtil.sequentialTraverse(inRoundOtherDomain)(
+            dummy2Domain.create(_)(store.multiDomainAcsStore)
+          )
+          result <- store.listValidatorFaucetCouponsOnDomain(
+            round = 3,
+            dummyDomain,
+            Limit.DefaultLimit,
+          )
+        } yield {
+          result should contain theSameElementsAs inRound
+        }
+      }
+
+    }
+
     "listAppRewardCouponsGroupedByCounterparty" should {
 
       "return all app reward coupons in a round grouped by counterparty" in {
@@ -463,7 +489,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     "listValidatorRewardCouponsGroupedByCounterparty" should {
 
-      "return all app reward coupons in a round grouped by counterparty" in {
+      "return all validator reward coupons in a round grouped by counterparty" in {
         val provider1InRound = (1 to 3).map(_ => validatorRewardCoupon(round = 3, userParty(1)))
         val provider2InRound = (1 to 3).map(_ => validatorRewardCoupon(round = 3, userParty(2)))
         val provider1OutOfRound = (1 to 3).map(_ => validatorRewardCoupon(round = 2, userParty(1)))
@@ -492,6 +518,46 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             Set(
               provider1InRound.map(_.contractId).toSet,
               provider2InRound.map(_.contractId).toSet,
+            )
+          )
+        }
+      }
+
+    }
+
+    "listValidatorFaucetCouponsGroupedByCounterparty" should {
+
+      "return all validator faucet coupons in a round grouped by counterparty" in {
+        val validator1InRound = (1 to 3).map(_ => validatorFaucetCoupon(userParty(1), round = 3))
+        val validator2InRound = (1 to 3).map(_ => validatorFaucetCoupon(userParty(2), round = 3))
+        val validator1OutOfRound = (1 to 3).map(_ => validatorFaucetCoupon(userParty(1), round = 2))
+        val validator2OutOfRound = (1 to 3).map(_ => validatorFaucetCoupon(userParty(2), round = 2))
+        val validator1OtherDomain =
+          (1 to 3).map(_ => validatorFaucetCoupon(userParty(1), round = 3))
+        val validator2OtherDomain =
+          (1 to 3).map(_ => validatorFaucetCoupon(userParty(2), round = 3))
+        for {
+          store <- mkStore()
+          _ <- MonadUtil.sequentialTraverse(
+            validator1InRound ++ validator2InRound ++ validator1OutOfRound ++ validator2OutOfRound
+          )(
+            dummyDomain.create(_)(store.multiDomainAcsStore)
+          )
+          _ <- MonadUtil.sequentialTraverse(
+            validator1OtherDomain ++ validator2OtherDomain
+          )(
+            dummy2Domain.create(_)(store.multiDomainAcsStore)
+          )
+          result <- store.listValidatorFaucetCouponsGroupedByCounterparty(
+            roundNumber = 3,
+            roundDomain = dummyDomain,
+            totalCouponsLimit = PageLimit.tryCreate(1000),
+          )
+        } yield {
+          result.map(_.toSet).toSet should be(
+            Set(
+              validator1InRound.map(_.contractId).toSet,
+              validator2InRound.map(_.contractId).toSet,
             )
           )
         }

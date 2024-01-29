@@ -74,6 +74,17 @@ class ExpireRewardCouponsTrigger(
         ),
       )
     )
+    val validatorFaucetCmd = svcRules.exercise(
+      _.exerciseSvcRules_ClaimExpiredRewards(
+        coinRules.contractId,
+        new CoinRules_ClaimExpiredRewards(
+          expiredRewardsTask.closedRoundCid,
+          Seq.empty.asJava,
+          Seq.empty.asJava,
+          Some(expiredRewardsTask.validatorFaucets.asJava).toJava,
+        ),
+      )
+    )
     val appRewardCmd = svcRules.exercise(
       _.exerciseSvcRules_ClaimExpiredRewards(
         coinRules.contractId,
@@ -85,8 +96,7 @@ class ExpireRewardCouponsTrigger(
         ),
       )
     )
-    // TODO(#8818): claim expired validator faucet coupons
-    val cmds = Seq(validatorRewardCmd, appRewardCmd)
+    val cmds = Seq(validatorRewardCmd, validatorFaucetCmd, appRewardCmd)
     for {
       _ <- Future.sequence(
         cmds.map(cmd =>

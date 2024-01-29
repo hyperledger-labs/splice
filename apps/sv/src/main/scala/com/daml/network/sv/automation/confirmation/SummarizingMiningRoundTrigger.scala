@@ -23,8 +23,8 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.OptionConverters.*
 
 class SummarizingMiningRoundTrigger(
     override protected val context: TriggerContext,
@@ -123,6 +123,12 @@ class SummarizingMiningRoundTrigger(
       validatorRewardCoupons: Seq[
         Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]
       ],
+      validatorFaucetCoupons: Seq[
+        Contract[
+          cc.validatorlicense.ValidatorFaucetCoupon.ContractId,
+          cc.validatorlicense.ValidatorFaucetCoupon,
+        ]
+      ],
   ) {
     lazy val summary: cc.issuance.OpenMiningRoundSummary = new cc.issuance.OpenMiningRoundSummary(
       validatorRewardCoupons.map[BigDecimal](c => BigDecimal(c.payload.amount)).sum.bigDecimal,
@@ -136,8 +142,7 @@ class SummarizingMiningRoundTrigger(
         .bigDecimal,
       // TODO(#9173): total up SV reward coupons weights,
       0,
-      // TODO(#8819): total up validator faucet coupons,
-      None.toJava,
+      Optional.of(validatorFaucetCoupons.size.toLong),
     )
   }
 
@@ -148,6 +153,7 @@ class SummarizingMiningRoundTrigger(
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[RoundRewards] = {
+    // TODO (#9607): this will break if there's more than DefaultLimit contracts, sum/count in DB instead.
     for {
       appRewardCoupons <- store.listAppRewardCouponsOnDomain(round, domain, Limit.DefaultLimit)
       validatorRewardCoupons <- store.listValidatorRewardCouponsOnDomain(
@@ -155,11 +161,18 @@ class SummarizingMiningRoundTrigger(
         domain,
         Limit.DefaultLimit,
       )
+      validatorFaucetCoupons <- store
+        .listValidatorFaucetCouponsOnDomain(
+          round,
+          domain,
+          Limit.DefaultLimit,
+        )
     } yield {
       RoundRewards(
         round = round,
         appRewardCoupons = appRewardCoupons,
         validatorRewardCoupons = validatorRewardCoupons,
+        validatorFaucetCoupons = validatorFaucetCoupons,
       )
     }
   }

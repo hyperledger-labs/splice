@@ -466,6 +466,14 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         )
       )
 
+      createSampleAndEnsurePresence(cc.validatorlicense.ValidatorFaucetCoupon.COMPANION)(
+        new cc.validatorlicense.ValidatorFaucetCoupon(
+          svcParty.toProtoPrimitive,
+          validator.toProtoPrimitive,
+          dummyRound,
+        )
+      )
+
       val appPaymentRequestCid =
         createSampleAndEnsurePresence(cnw.payment.AppPaymentRequest.COMPANION)(
           new cnw.payment.AppPaymentRequest(
