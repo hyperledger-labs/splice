@@ -7,10 +7,14 @@ import com.daml.network.environment.{
   SequencerAdminConnection,
 }
 import com.daml.network.sv.store.SvSvcStore
-import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.domain.sequencing.sequencer.SequencerPruningStatus
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.topology.Member
+import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.jdk.DurationConverters.*
@@ -60,21 +64,20 @@ class SequencerPruningTrigger(
   private def prune()(implicit traceContext: TraceContext) = for {
     status <- sequencerAdminConnection.getSequencerPruningStatus()
     pruningTimestamp = status.now.minus(retentionPeriod.underlying.toJava)
-    membersToDisable = status.clientsPreventingPruning(pruningTimestamp).members
+    membersToDisable = clientsPreventingPruning(status, pruningTimestamp)
     _ <-
       // disabling member preventing pruning
       if (membersToDisable.nonEmpty) {
-        val disabled = membersToDisable.map(_.toProtoPrimitive)
-        disablingParticipantAndMediator(disabled).flatMap { isParticipantOrMediator =>
-          if (isParticipantOrMediator) {
+        filterToOurMembers(membersToDisable).flatMap { ourLaggingMembers =>
+          if (ourLaggingMembers.isEmpty) {
             logger.warn(
-              show"disabling ${disabled.size} member clients. $disabled"
+              show"disabling ${membersToDisable.size} member clients preventing pruning to $pruningTimestamp: $membersToDisable"
             )
-            Future.traverse(membersToDisable)(sequencerAdminConnection.disableMember)
+            Future.traverse(membersToDisable)(m => sequencerAdminConnection.disableMember(m.member))
           } else {
             throw Status.INTERNAL
               .withDescription(
-                "Failed to prune sequencer because members to be disabled contains our own participant or mediator"
+                show"Failed to prune sequencer to $pruningTimestamp because our own participant or mediator have not acknowledged that timestamp: ${ourLaggingMembers}"
               )
               .asRuntimeException()
           }
@@ -104,12 +107,38 @@ class SequencerPruningTrigger(
 
   } yield res
 
-  private def disablingParticipantAndMediator(
-      disableMembers: Set[String]
-  )(implicit traceContext: TraceContext): Future[Boolean] = for {
+  private def filterToOurMembers(
+      laggingMembers: Seq[SequencerPruningTrigger.LaggingMember]
+  )(implicit traceContext: TraceContext): Future[Seq[SequencerPruningTrigger.LaggingMember]] = for {
     participantId <- participantAdminConnection.getParticipantId()
     mediatorId <- mediatorAdminConnection.getMediatorId
-  } yield disableMembers.exists(member =>
-    Set(participantId.toProtoPrimitive, mediatorId.toProtoPrimitive).contains(member)
+  } yield laggingMembers.filter(m =>
+    Seq[Member](participantId.member, mediatorId.member).contains(m.member)
   )
+
+  private def clientsPreventingPruning(
+      status: SequencerPruningStatus,
+      timestamp: CantonTimestamp,
+  ): Seq[SequencerPruningTrigger.LaggingMember] = {
+    val memberToSafePruningTimestamp: Map[Member, CantonTimestamp] =
+      status.members.view.map(m => m.member -> m.safePruningTimestamp).toMap
+    status
+      .clientsPreventingPruning(timestamp)
+      .members
+      .toList
+      .map(m => SequencerPruningTrigger.LaggingMember(m, memberToSafePruningTimestamp(m)))
+  }
+}
+
+private object SequencerPruningTrigger {
+  final case class LaggingMember(
+      member: Member,
+      safePruningTimestamp: CantonTimestamp,
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(
+        param("member", _.member),
+        param("safePruningTimestamp", _.safePruningTimestamp),
+      )
+  }
 }
