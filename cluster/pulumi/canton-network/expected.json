@@ -656,7 +656,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
     "name": "cluster-ingress-cluster-ingress",
@@ -1096,7 +1096,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
     "name": "docs-docs",
@@ -1166,7 +1166,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -1223,7 +1223,7 @@
           "nodes": 10
         },
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
     "name": "splitwell-loopback",
@@ -1256,7 +1256,7 @@
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
         "enableHealthProbes": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -1311,7 +1311,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "domain_mediator",
           "host": "postgres.splitwell.svc.cluster.local",
@@ -1342,7 +1342,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "domain_sequencer",
           "host": "postgres.splitwell.svc.cluster.local",
@@ -1373,7 +1373,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "participant",
           "host": "postgres.splitwell.svc.cluster.local",
@@ -1416,7 +1416,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "val_splitwell",
           "host": "postgres.splitwell.svc.cluster.local",
@@ -1460,7 +1460,7 @@
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "postgres-secrets"
         },
@@ -1500,7 +1500,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -1568,7 +1568,7 @@
         ],
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -1673,7 +1673,7 @@
           "chainId": "mock"
         },
         "imageName": "cometbft",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -1767,7 +1767,7 @@
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
         "enableHealthProbes": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -1832,7 +1832,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": false,
           "globalDomain": {
@@ -1873,7 +1873,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": true,
           "globalDomain": {
@@ -1918,7 +1918,7 @@
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
         "enableHealthProbes": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -1973,7 +1973,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "global_domain_0_mediator",
           "host": "postgres.sv-1.svc.cluster.local",
@@ -2004,7 +2004,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "global_domain_0_sequencer",
           "host": "postgres.sv-1.svc.cluster.local",
@@ -2035,7 +2035,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "participant_0",
           "host": "postgres.sv-1.svc.cluster.local",
@@ -2078,7 +2078,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "scan_sv_1",
           "host": "postgres.sv-1.svc.cluster.local",
@@ -2109,7 +2109,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "validator_sv_1",
           "host": "postgres.sv-1.svc.cluster.local",
@@ -2153,7 +2153,7 @@
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "postgres-secrets"
         },
@@ -2193,7 +2193,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -2257,7 +2257,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "sv_1_0",
           "host": "sv-app-0-pg.sv-1.svc.cluster.local",
@@ -2301,7 +2301,7 @@
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "sv-app-0-pg-secrets"
         },
@@ -2442,7 +2442,7 @@
         ],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -2506,7 +2506,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -2602,7 +2602,7 @@
           "chainId": "mock"
         },
         "imageName": "cometbft",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -2692,7 +2692,7 @@
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
         "enableHealthProbes": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -2757,7 +2757,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": false,
           "globalDomain": {
@@ -2798,7 +2798,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": true,
           "globalDomain": {
@@ -2843,7 +2843,7 @@
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
         "enableHealthProbes": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -2898,7 +2898,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "global_domain_0_mediator",
           "host": "postgres.sv-2.svc.cluster.local",
@@ -2929,7 +2929,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "global_domain_0_sequencer",
           "host": "postgres.sv-2.svc.cluster.local",
@@ -2960,7 +2960,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "participant_0",
           "host": "postgres.sv-2.svc.cluster.local",
@@ -3003,7 +3003,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "scan_sv_2",
           "host": "postgres.sv-2.svc.cluster.local",
@@ -3034,7 +3034,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "validator_sv_2",
           "host": "postgres.sv-2.svc.cluster.local",
@@ -3078,7 +3078,7 @@
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "postgres-secrets"
         },
@@ -3118,7 +3118,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -3182,7 +3182,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "sv_2_0",
           "host": "sv-app-0-pg.sv-2.svc.cluster.local",
@@ -3226,7 +3226,7 @@
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "sv-app-0-pg-secrets"
         },
@@ -3336,7 +3336,7 @@
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -3403,7 +3403,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -3499,7 +3499,7 @@
           "chainId": "mock"
         },
         "imageName": "cometbft",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -3589,7 +3589,7 @@
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
         "enableHealthProbes": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -3654,7 +3654,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": false,
           "globalDomain": {
@@ -3695,7 +3695,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": true,
           "globalDomain": {
@@ -3740,7 +3740,7 @@
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
         "enableHealthProbes": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -3795,7 +3795,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "global_domain_0_mediator",
           "host": "postgres.sv-3.svc.cluster.local",
@@ -3826,7 +3826,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "global_domain_0_sequencer",
           "host": "postgres.sv-3.svc.cluster.local",
@@ -3857,7 +3857,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "participant_0",
           "host": "postgres.sv-3.svc.cluster.local",
@@ -3900,7 +3900,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "scan_sv_3",
           "host": "postgres.sv-3.svc.cluster.local",
@@ -3931,7 +3931,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "validator_sv_3",
           "host": "postgres.sv-3.svc.cluster.local",
@@ -3975,7 +3975,7 @@
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "postgres-secrets"
         },
@@ -4015,7 +4015,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -4079,7 +4079,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "sv_3_0",
           "host": "sv-app-0-pg.sv-3.svc.cluster.local",
@@ -4123,7 +4123,7 @@
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "sv-app-0-pg-secrets"
         },
@@ -4233,7 +4233,7 @@
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -4300,7 +4300,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -4396,7 +4396,7 @@
           "chainId": "mock"
         },
         "imageName": "cometbft",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -4486,7 +4486,7 @@
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
         "enableHealthProbes": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -4551,7 +4551,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": false,
           "globalDomain": {
@@ -4592,7 +4592,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": true,
           "globalDomain": {
@@ -4637,7 +4637,7 @@
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
         "enableHealthProbes": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -4692,7 +4692,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "global_domain_0_mediator",
           "host": "postgres.sv-4.svc.cluster.local",
@@ -4723,7 +4723,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "global_domain_0_sequencer",
           "host": "postgres.sv-4.svc.cluster.local",
@@ -4754,7 +4754,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "participant_0",
           "host": "postgres.sv-4.svc.cluster.local",
@@ -4797,7 +4797,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "scan_sv_4",
           "host": "postgres.sv-4.svc.cluster.local",
@@ -4828,7 +4828,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "validator_sv_4",
           "host": "postgres.sv-4.svc.cluster.local",
@@ -4872,7 +4872,7 @@
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "postgres-secrets"
         },
@@ -4912,7 +4912,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -4976,7 +4976,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "sv_4_0",
           "host": "sv-app-0-pg.sv-4.svc.cluster.local",
@@ -5020,7 +5020,7 @@
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "sv-app-0-pg-secrets"
         },
@@ -5130,7 +5130,7 @@
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -5197,7 +5197,7 @@
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -5277,7 +5277,7 @@
           "nodes": 10
         },
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
     "name": "validator1-loopback",
@@ -5310,7 +5310,7 @@
         "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
         "enableHealthProbes": true,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },
@@ -5365,7 +5365,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "participant",
           "host": "postgres.validator1.svc.cluster.local",
@@ -5408,7 +5408,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "validator1",
           "host": "postgres.validator1.svc.cluster.local",
@@ -5452,7 +5452,7 @@
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "secretName": "postgres-secrets"
         },
@@ -5491,7 +5491,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "resources": {
           "limits": {
             "cpu": "1",
@@ -5536,7 +5536,7 @@
         ],
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
         },

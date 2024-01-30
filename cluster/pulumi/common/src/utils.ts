@@ -180,7 +180,7 @@ export function cnChartValues(chartPath: string, overrideValues: ChartValues = {
     {},
     chartDefaultValues,
     {
-      imageRepo: 'us-central1-docker.pkg.dev/da-cn-images/cn-images',
+      imageRepo: 'us-central1-docker.pkg.dev/da-cn-shared/cn-images',
       cluster: {
         basename: CLUSTER_BASENAME,
         name: CLUSTER_NAME,

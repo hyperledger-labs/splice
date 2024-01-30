@@ -129,7 +129,7 @@
           "hostname": "svrun.network.canton.global",
           "svNamespace": "sv"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
     "name": "cluster-ingress-sv",
@@ -220,7 +220,7 @@
         "genesis": {
           "chainId": "svrun"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
@@ -260,7 +260,7 @@
       "namespace": "sv",
       "timeout": 480,
       "values": {
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "mediator": {
           "persistence": {
             "host": "postgres"
@@ -312,7 +312,7 @@
           "alias": "global",
           "url": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "host": "postgres",
           "schema": "sv_participant"
@@ -333,7 +333,7 @@
       "namespace": "sv",
       "timeout": 480,
       "values": {
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
     "name": "postgres",
@@ -351,7 +351,7 @@
       "timeout": 480,
       "values": {
         "clusterUrl": "svrun.network.com.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
     "name": "scan",
@@ -438,7 +438,7 @@
           "sequencerPublicUrl": "https://sequencer.sv.svc.svrun.network.canton.global"
         },
         "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global"
         },
@@ -498,7 +498,7 @@
         },
         "clusterUrl": "svrun.network.com.network.canton.global",
         "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "participantAddress": "participant",
         "scanAddress": "https://scan.sv-1.svc.svrun.network.com.network.canton.global",
         "svValidator": true,

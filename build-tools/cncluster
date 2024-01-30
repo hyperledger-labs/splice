@@ -1758,7 +1758,7 @@ metadata:
 spec:
   containers:
   - name: cn-debug
-    image: us-central1-docker.pkg.dev/da-cn-images/cn-images/cn-debug:${VERSION_NUMBER}
+    image: us-central1-docker.pkg.dev/da-cn-shared/cn-images/cn-debug:${VERSION_NUMBER}
     command: ["/bin/sleep", "2h"]
     imagePullPolicy: Always
   restartPolicy: Never

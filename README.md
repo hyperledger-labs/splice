@@ -1217,7 +1217,7 @@ logged in as a user that has access to this repository.
 
 Required for cluster deployments.
 
-Go to https://console.cloud.google.com/iam-admin/serviceaccounts?referrer=search&project=da-cn-images, select the `circleci@*` service account
+Go to https://console.cloud.google.com/iam-admin/serviceaccounts?referrer=search&project=da-cn-shared, select the `circleci@*` service account
 and create a new key through `manage keys` and revoke the old one. The full JSON file needs to be put in the corresponding circleci environment variables.
 
 The above creates the key for `GCP_DA_CN_IMAGES_KEY`, for `GCP_DA_CN_DEVNET_KEY` and `GCP_DA_CN_SCRATCHNET_KEY` change the project in the drop down at the top

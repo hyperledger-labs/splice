@@ -147,15 +147,15 @@ jobs:
           destination: release-artifacts
       - run_bash_command_in_nix:
          cmd_name: Publish release bundles
-         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY"
+         additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
          cmd: |
-           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
-           export GOOGLE_CLOUD_PROJECT=da-cn-images
+           echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
+           export GOOGLE_CLOUD_PROJECT=da-cn-shared
            VERSION=$(get-snapshot-version)
            (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
            # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
            # which would lead to an error due to a misisng `delete` permission
-           gsutil cp -n /tmp/artifacts/*.tar.gz gs://release-bundles
+           gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
          # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
       - cleanup_sbt_test_job:
           upload_caches: true
@@ -279,14 +279,14 @@ jobs:
       - docker_login_artifactory
       - run_bash_command_in_nix:
          cmd_name: GCloud authorization
-         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+         additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY \
            --keep DOCKER_CERT_PATH \
            --keep DOCKER_HOST \
            --keep DOCKER_MACHINE_NAME \
            --keep DOCKER_TLS_VERIFY \
            --keep NO_PROXY"
          cmd: |
-           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
+           echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
       - when:
           condition: << parameters.skip_if_exists >>
@@ -316,7 +316,7 @@ jobs:
       - docker_build
       - run_bash_command_in_nix:
          cmd_name: Push Docker images
-         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+         additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY \
            --keep DOCKER_CERT_PATH \
            --keep DOCKER_HOST \
            --keep DOCKER_MACHINE_NAME \
@@ -340,14 +340,14 @@ jobs:
       - docker_login_artifactory
       - run_bash_command_in_nix:
          cmd_name: Promote images to Artifactory
-         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+         additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY \
            --keep DOCKER_CERT_PATH \
            --keep DOCKER_HOST \
            --keep DOCKER_MACHINE_NAME \
            --keep DOCKER_TLS_VERIFY \
            --keep NO_PROXY"
          cmd: |
-           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
+           echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
 
            make docker-promote

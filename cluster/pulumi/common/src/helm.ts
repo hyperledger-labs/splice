@@ -37,7 +37,7 @@ export function installCNRunbookHelmChartByNamespaceName(
           },
       values: {
         ...values,
-        imageRepo: local ? 'us-central1-docker.pkg.dev/da-cn-images/cn-images' : undefined,
+        imageRepo: local ? 'us-central1-docker.pkg.dev/da-cn-shared/cn-images' : undefined,
       },
       timeout: HELM_CHART_TIMEOUT_SEC,
     },

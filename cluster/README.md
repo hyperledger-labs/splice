@@ -305,11 +305,11 @@ Most of the task of setting up clusters is automatic and scripted, but
 there are a few aspects that must be manually configured for each GCE
 Project through the Google Cloud Console UI.  When a new project is
 created within GCE that will host a Canton Network cluster, the
-following grants must be made within `da-cn-images` to the default
+following grants must be made within `da-cn-shared` to the default
 compute service account within the new cluster.
 
-* The service account must have access to the [Google Artifact Registry](https://console.cloud.google.com/artifacts?&project=da-cn-images) within `da-cn-images`.
-* The service account must have Read-Only access to the `release-bundles` Google Storage bucket.
+* The service account must have access to the [Google Artifact Registry](https://console.cloud.google.com/artifacts?&project=da-cn-shared) within `da-cn-shared`.
+* The service account must have Read-Only access to the `cn-release-bundles` Google Storage bucket.
 
 ### Docker Image Hosting
 
@@ -1556,11 +1556,11 @@ Network. Steps to do this are as follows:
    default service account has been created. It'll have a principal of
    the following form: '816347582626-compute@developer.gserviceaccount.com'.
 11. Add a role binding to enable the new default service account to
-   have access to `da-cn-images. The command to do this will look like
+   have access to `da-cn-shared. The command to do this will look like
    this:
 
    ```
-   gcloud projects add-iam-policy-binding da-cn-images \
+   gcloud projects add-iam-policy-binding da-cn-shared \
       --member='serviceAccount:816347582626-compute@developer.gserviceaccount.com' \
       --role='roles/artifactregistry.serviceAgent'
    ```

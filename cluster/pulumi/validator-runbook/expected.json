@@ -83,7 +83,7 @@
           "hostname": "validatorrun.network.canton.global",
           "svNamespace": "validator"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "withSvIngress": false
       }
     },
@@ -173,7 +173,7 @@
           "alias": "global",
           "url": "https://sequencer.sv-1.svc.validatorrun.network.com.network.canton.global"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -201,7 +201,7 @@
       "namespace": "validator",
       "timeout": 480,
       "values": {
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
     "name": "postgres",
@@ -254,7 +254,7 @@
         },
         "clusterUrl": "validatorrun.network.com.network.canton.global",
         "globalDomainUrl": "https://sequencer.sv-1.svc.validatorrun.network.com.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "onboardingSecretFrom": {
           "secretKeyRef": {
             "key": "secret",

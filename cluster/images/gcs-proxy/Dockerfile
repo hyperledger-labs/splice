@@ -9,6 +9,6 @@ RUN apt-get update \
     && tar zxf gcsproxy-${GCSPROXY_VERSION}-linux-amd64.tar.gz \
     && cp ./gcsproxy-${GCSPROXY_VERSION}-linux-amd64/gcsproxy /
 
-ENV GOOGLE_CLOUD_PROJECT=da-cn-images
+ENV GOOGLE_CLOUD_PROJECT=da-cn-shared
 
 CMD ["/gcsproxy", "-v", "-b", "0.0.0.0:8080" ]
