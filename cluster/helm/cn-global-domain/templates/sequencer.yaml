@@ -67,6 +67,7 @@ spec:
         {{- with .Values.resources }}
           resources: {{- toYaml . | nindent 12 }}
         {{- end }}
+        {{- if .Values.enableHealthProbes }}
           livenessProbe:
             grpc:
               port: 5061
@@ -82,6 +83,7 @@ spec:
             periodSeconds: 5
             failureThreshold: 3
             timeoutSeconds: 10
+        {{- end }}
       restartPolicy: Always
       {{- if .Values.init }}
       initContainers:

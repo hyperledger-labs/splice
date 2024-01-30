@@ -1766,6 +1766,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
+        "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -2690,6 +2691,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
+        "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -3586,6 +3588,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
+        "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -4482,6 +4485,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
         "disableAutoInit": false,
+        "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-images/cn-images",
         "init": {
           "initDb": "cantonnet"

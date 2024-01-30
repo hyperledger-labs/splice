@@ -10,6 +10,7 @@ Release Notes
   thus executing them in a BFT fashion.
 * Increased postgres PVC size to 480GB to support longer running clusters.
 * You might see some ``ACS_COMMITMENT_MISMATCH`` warning logs in the participant. These can be ignored.
+* Add `enableHealthProbes` to the global domain helm chart, providing the ability to disable gRPC readiness and liveness probes for the sequencer and mediator.
 
 2024-01-29
 ----------
