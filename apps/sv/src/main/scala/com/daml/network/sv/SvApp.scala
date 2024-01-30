@@ -1,9 +1,5 @@
 package com.daml.network.sv
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse}
-import org.apache.pekko.http.scaladsl.server.Directives.*
 import cats.data.OptionT
 import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.either.*
@@ -22,9 +18,9 @@ import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.sv_admin.SvAdminResource
-import com.daml.network.setup.ParticipantInitializer
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.setup.{NodeInitializer, ParticipantInitializer}
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
@@ -40,16 +36,16 @@ import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
 import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{
   CommunityCryptoConfig,
   NonNegativeFiniteDuration,
   ProcessingTimeout,
 }
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -66,8 +62,12 @@ import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.circe.Json
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.server.Directives.*
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -103,24 +103,49 @@ class SvApp(
   private val cometBftConfig = config.cometBftConfig
     .filter(_.enabled)
 
-  override def packages =
+  override def packages: Seq[DarResource] =
     super.packages ++ DarResources.svcGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.cantonNameService.all ++ DarResources.svLocal.all
 
-  override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
-    // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
-    _ <- appInitStep("Ensure version match") {
-      tryEnsureVersionMatch(config.onboarding)
-    }
-    _ <- appInitStep("Ensure participant initialized with expected id") {
-      ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
-        config.participantClient,
-        config.participantBootstrappingDump,
-        loggerFactory,
-        retryProvider,
-        clock,
-      )
-    }
-  } yield ()
+  override def preInitializeBeforeLedgerConnection(): Future[Unit] = {
+    val participantAdminConnection = new ParticipantAdminConnection(
+      config.participantClient.adminApi,
+      loggerFactory,
+      retryProvider,
+      clock,
+    )
+    (for {
+      // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
+      _ <- appInitStep("Ensure version match") {
+        tryEnsureVersionMatch(config.onboarding)
+      }
+      _ <-
+        appInitStep("Ensure participant initialized with expected id") {
+          config.onboarding match {
+            case Some(SvOnboardingConfig.DomainMigration(_, dumpFilePath)) =>
+              logger.info("We're restoring from a migration dump")
+              val participantInitializer = new NodeInitializer(
+                participantAdminConnection,
+                retryProvider,
+                loggerFactory,
+              )
+              participantInitializer.initializeAndWait(
+                DomainMigrationInitializer
+                  .loadDomainMigrationDump(dumpFilePath)
+                  .nodeIdentities
+                  .participant
+              )
+
+            case _ =>
+              ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+                participantAdminConnection,
+                config.participantBootstrappingDump,
+                loggerFactory,
+                retryProvider,
+              )
+          }
+        }
+    } yield ()).andThen { case _ => participantAdminConnection.close() }
+  }
 
   override def initializeNode(
       ledgerClient: CNLedgerClient
@@ -131,6 +156,7 @@ class SvApp(
       retryProvider,
       clock,
     )
+
     val localDomainNode = config.localDomainNode
       .map(config =>
         new LocalDomainNode(
@@ -160,8 +186,8 @@ class SvApp(
         )
       )
     initialize(
-      ledgerClient,
       participantAdminConnection,
+      ledgerClient,
       localDomainNode,
     )
       .recoverWith { case err =>
@@ -174,8 +200,8 @@ class SvApp(
   }
 
   private def initialize(
-      ledgerClient: CNLedgerClient,
       participantAdminConnection: ParticipantAdminConnection,
+      ledgerClient: CNLedgerClient,
       localDomainNode: Option[LocalDomainNode],
   ): Future[SvApp.State] = {
     for {
@@ -206,15 +232,12 @@ class SvApp(
       // -------------------------------------------------------------------------------
 
       case (
-        (
-          globalDomain,
-          svcPartyHosting,
-          svStore,
-          svAutomation,
-          svcStore,
-          svcAutomation,
-        ),
-        foundingConfig,
+        globalDomain,
+        svcPartyHosting,
+        svStore,
+        svAutomation,
+        svcStore,
+        svcAutomation,
       ) <-
       // We branch here on the type of onboarding config, as bootstrapping
       // a fresh collective is fundamentally different from joining an existing collective
@@ -239,7 +262,7 @@ class SvApp(
                   sys.error("Founding node must always specify a domain config")
                 ),
               )
-              initializer.bootstrapCollective().map((_, Some(foundingConfig)))
+              initializer.bootstrapCollective()
             })
           }
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
@@ -258,7 +281,7 @@ class SvApp(
               storage,
               localDomainNode,
             )
-            initializer.joinCollectiveAndOnboardNodes().map((_, None))
+            initializer.joinCollectiveAndOnboardNodes()
           }
         case Some(domainMigrationConfig: SvOnboardingConfig.DomainMigration) =>
           appInitStep("DomainMigrationInitializer initializing node from dump") {
@@ -276,7 +299,7 @@ class SvApp(
                 sys.error("It must always specify a domain config for Domain Migration")
               ),
             )
-            initializer.migrateDomain().map((_, None))
+            initializer.migrateDomain()
           }
         case None =>
           appInitStep("JoiningNodeInitializer joining collective") {
@@ -294,7 +317,7 @@ class SvApp(
               storage,
               localDomainNode,
             )
-            initializer.joinCollectiveAndOnboardNodes().map((_, None))
+            initializer.joinCollectiveAndOnboardNodes()
           }
       }
 
@@ -388,6 +411,7 @@ class SvApp(
 
       adminHandler = new HttpSvAdminHandler(
         config,
+        config.domainMigrationDumpPath,
         svAutomation,
         svcAutomation,
         cometBftClient,
@@ -520,21 +544,18 @@ class SvApp(
               withSvConnection(svClient.adminApi)(_.checkActive()),
               logger,
             )
-          case _: SvOnboardingConfig.FoundCollective => {
+          case _: SvOnboardingConfig.FoundCollective =>
             logger.info("Skipping early version check because we are the founding SV.")
             Future.unit
-          }
-          case _: SvOnboardingConfig.DomainMigration => {
+          case _: SvOnboardingConfig.DomainMigration =>
             logger.info("Skipping version check because we are migrating to upgrade domain.")
             Future.unit
-          }
         }
-      case None => {
+      case None =>
         // Given that the helm charts we ship to customers always set an
         // onboaring config, the risk of ending up in this condition is slim.
         logger.info("Skipping early version check because no onboarding sponsor is configured.")
         Future.unit
-      }
     }
 
   private def withSvConnection[T](
@@ -779,12 +800,11 @@ object SvApp {
     ).create()
     for {
       res <- svStore.lookupUsedSecretWithOffset(secret).flatMap {
-        case QueryResult(_, Some(usedSecret)) => {
+        case QueryResult(_, Some(usedSecret)) =>
           val validator = usedSecret.payload.validator
           Future.successful(
             Left(s"This secret has already been used before, for onboarding validator $validator")
           )
-        }
         case QueryResult(offset, None) =>
           svStore.lookupValidatorOnboardingBySecretWithOffset(secret).flatMap {
             case QueryResult(_, Some(_)) =>
@@ -1101,7 +1121,7 @@ object SvApp {
       case Right(_) =>
         for {
           res <- svStoreWithIngestion.store.lookupApprovedSvIdentityByNameWithOffset(name).flatMap {
-            case QueryResult(_, Some(id)) => {
+            case QueryResult(_, Some(id)) =>
               Future.successful(
                 Left(if (id.payload.candidateKey == key) {
                   s"The SV identitiy ($name:$key) is already approved."
@@ -1110,7 +1130,6 @@ object SvApp {
                     s"is already approved with key ${id.payload.candidateKey}."
                 })
               )
-            }
             case QueryResult(offset, None) =>
               for {
                 _ <- svStoreWithIngestion.connection
@@ -1196,8 +1215,7 @@ object SvApp {
   ): Boolean =
     svcRules.payload.members.asScala
       .get(party.toProtoPrimitive)
-      .map(_.name == name)
-      .getOrElse(false)
+      .exists(_.name == name)
 
   private[sv] def validateSvNamespace(
       candidateParty: PartyId,

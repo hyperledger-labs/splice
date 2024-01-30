@@ -107,13 +107,14 @@ class ValidatorApp(
   override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
     _ <- ensureVersionMatch(config.scanClient)
-    _ <- ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
-      config.participantClient,
-      config.participantBootstrappingDump,
-      loggerFactory,
-      retryProvider,
-      clock,
-    )
+    _ <- withParticipantAdminConnection { participantAdminConnection =>
+      ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+        participantAdminConnection,
+        config.participantBootstrappingDump,
+        loggerFactory,
+        retryProvider,
+      )
+    }
   } yield ()
 
   override def preInitializeAfterLedgerConnection(

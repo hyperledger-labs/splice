@@ -19,7 +19,10 @@ import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.CNNodeStatus
 import com.daml.network.http.v0.definitions.CometBftNodeDumpResponse
-import com.daml.network.http.v0.sv_admin.GetCometBftNodeDebugDumpResponse
+import com.daml.network.http.v0.sv_admin.{
+  GetCometBftNodeDebugDumpResponse,
+  TriggerDomainMigrationDumpResponse,
+}
 import com.daml.network.http.v0.{definitions, sv_admin as http}
 import com.daml.network.sv.DomainMigrationDump
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
@@ -475,6 +478,27 @@ object HttpSvAdminAppClient {
     }
   }
 
+  case class TriggerDomainMigrationDump()
+      extends BaseCommand[
+        http.TriggerDomainMigrationDumpResponse,
+        Unit,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], TriggerDomainMigrationDumpResponse] =
+      client.triggerDomainMigrationDump(headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.TriggerDomainMigrationDumpResponse.OK =>
+      Right(())
+    }
+  }
   case class GetDomainMigrationDump()
       extends BaseCommand[
         http.GetDomainMigrationDumpResponse,

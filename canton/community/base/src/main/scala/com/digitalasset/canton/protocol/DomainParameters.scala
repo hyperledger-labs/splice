@@ -443,9 +443,9 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
     NonNegativeInt.tryCreate(10 * 1024 * 1024)
   )
 
-  private val defaultParticipantResponseTimeout: NonNegativeFiniteDuration =
+  lazy val defaultParticipantResponseTimeout: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.tryOfSeconds(30)
-  private val defaultMediatorReactionTimeout: NonNegativeFiniteDuration =
+  lazy val defaultMediatorReactionTimeout: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.tryOfSeconds(30)
 
   private val defaultTransferExclusivityTimeout: NonNegativeFiniteDuration =

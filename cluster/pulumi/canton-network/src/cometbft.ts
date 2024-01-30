@@ -11,7 +11,7 @@ import {
   isDevNet,
 } from 'cn-pulumi-common';
 
-import { DomainIndex } from './globalDomainNode';
+import { DefaultGlobalDomainId, DomainIndex } from './globalDomainNode';
 
 /**
  * The CometBft deployment uses a different port for the istio VirtualService for each node
@@ -44,6 +44,8 @@ export function installCometBftNode(
   } else {
     stateSyncConfig = { enable: false };
   }
+  // for backwards compatibility, we keep the old chainId for the default global domain
+  const includeDomainInChainId = domain !== DefaultGlobalDomainId;
   const cometbftRelease = installCNHelmChart(
     xns,
     `cometbft-global-domain-${domain}`,
@@ -76,7 +78,9 @@ export function installCometBftNode(
       genesis: {
         // for TestNet-like deployments on scratchnet, set the chainId to 'test'
         chainId:
-          `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet ? 'test' : `${CLUSTER_BASENAME}`,
+          `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
+            ? 'test'
+            : `${CLUSTER_BASENAME}` + (includeDomainInChainId ? `-${domain}` : ''),
       },
       metrics: {
         enable: true,

@@ -2,14 +2,15 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Resource } from '@pulumi/pulumi';
-import { Auth0Client, CnInput, sanitizedForPostgres, SvIdKey } from 'cn-pulumi-common';
 import {
+  Auth0Client,
   auth0UserNameEnvVarSource,
   BackupConfig,
   BootstrappingDumpConfig,
   btoa,
   ChartValues,
   CLUSTER_BASENAME,
+  CnInput,
   ExactNamespace,
   exactNamespace,
   ExpectedValidatorOnboarding,
@@ -22,6 +23,8 @@ import {
   installValidatorOnboardingSecret,
   participantBootstrapDumpSecretName,
   PersistenceConfig,
+  sanitizedForPostgres,
+  SvIdKey,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
 } from 'cn-pulumi-common';
@@ -35,7 +38,7 @@ import {
   installDomainSpecificComponent,
 } from './globalDomainNode';
 import { installParticipant } from './ledger';
-import { Postgres, initDatabase } from './postgres';
+import { initDatabase, Postgres } from './postgres';
 import { installValidatorApp } from './validator';
 
 export function installSvKeySecret(
@@ -68,6 +71,7 @@ export function installSvKeySecret(
 }
 
 export type SvOnboarding =
+  | { type: 'domain-migration' }
   | { type: 'found-collective' }
   | {
       type: 'join-with-key';
@@ -275,7 +279,7 @@ function installDomainSpecificComponents(
   svConfig: SvConfig,
   dependsOn: CnInput<pulumi.Resource>[]
 ) {
-  return installDomainSpecificComponent(globalDomainUpgradeConfig, (id, isDefault) => {
+  return installDomainSpecificComponent(globalDomainUpgradeConfig, (id, isActive) => {
     const sequencerPostgres =
       defaultPostgres || postgres.installPostgres(xns, `sequencer-${id}-pg`, true);
     const mediatorPostgres =
@@ -283,7 +287,7 @@ function installDomainSpecificComponents(
     const participantPostgres =
       defaultPostgres || postgres.installPostgres(xns, `participant-${id}-pg`, true);
 
-    const mustBeManuallyInitialized = !isDefault;
+    const mustBeManuallyInitialized = !isActive;
     // If we have a dump, we disable auto init.
     const isParticipantRestoringFromDump = !!svConfig.bootstrappingDumpConfig;
     const participant = installParticipant(
@@ -293,34 +297,39 @@ function installDomainSpecificComponents(
       auth0UserNameEnvVarSource('sv'),
       isParticipantRestoringFromDump || mustBeManuallyInitialized
     );
-    // upgrade/legacy domains don't need cometbft state sync
-    if (id != globalDomainUpgradeConfig.activeGlobalDomainId && !isDefault) {
-      delete cometbft.syncSource;
-    }
     const globalDomainNode = new GlobalDomainNode(
       id,
       xns,
       sequencerPostgres,
       mediatorPostgres,
-      cometbft,
-      mustBeManuallyInitialized
+      // legacy domains don't need cometbft state sync because no new nodes will join
+      // upgrade domains don't need cometbft state sync because until they are active cometbft will not really progress its height a lot
+      isActive ? cometbft : { ...cometbft, syncSource: undefined },
+      mustBeManuallyInitialized,
+      isActive
+    );
+    let svAppConfigOverrides = {};
+    if (id === globalDomainUpgradeConfig.upgradeGlobalDomainId) {
+      svAppConfigOverrides = {
+        onboarding: {
+          type: 'domain-migration',
+        },
+      };
+    }
+    const svApp = installSvApp(
+      id,
+      { ...svConfig, ...svAppConfigOverrides },
+      xns,
+      dependsOn,
+      participant,
+      globalDomainNode,
+      globalDomainUpgradeConfig.prepareForUpgrade,
+      svConfig.backupConfig
     );
     return {
       globalDomain: globalDomainNode,
       participant: participant,
-      // TODO(#9109) - install the app for all the domains once onboarding allows it
-      svApp: isDefault
-        ? installSvApp(
-            id,
-            svConfig,
-            xns,
-            dependsOn,
-            participant,
-            globalDomainNode,
-            svConfig.backupConfig
-          )
-        : // TODO(#9299) safe to do as for now the active domain is always the default domain
-          (undefined as never),
+      svApp: svApp,
     };
   });
 }
@@ -332,6 +341,7 @@ function installSvApp(
   dependsOn: CnInput<Resource>[],
   participant: Release,
   globalDomain: GlobalDomainNode,
+  mustIncludeUpgradeConfig: boolean,
   backupConfig?: BackupConfig,
   defaultPostgres?: Postgres
 ) {
@@ -395,6 +405,12 @@ function installSvApp(
   if (config.onboarding.type == 'join-with-key') {
     svValues.joinWithKeyOnboarding = {
       sponsorApiUrl: config.onboarding.sponsorApiUrl,
+    };
+  }
+  if (mustIncludeUpgradeConfig) {
+    svValues.globalDomainUpgrade = {
+      isActiveNode: globalDomain.active,
+      storageClassName: 'standard-rwo',
     };
   }
 

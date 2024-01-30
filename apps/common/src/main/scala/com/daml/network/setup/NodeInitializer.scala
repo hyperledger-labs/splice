@@ -71,7 +71,7 @@ class NodeInitializer(
                 Future.failed(
                   Status.INTERNAL
                     .withDescription(
-                      "Participant is bootstrapping from dump but list of keys is empty"
+                      "Node is bootstrapping from dump but list of keys is empty"
                     )
                     .asRuntimeException
                 )
@@ -86,7 +86,7 @@ class NodeInitializer(
           }
         } else Future.unit
       _ <- {
-        logger.info(s"Triggering participant initialization for participant ID ${expectedId}")
+        logger.info(s"Triggering node initialization for node with ID $expectedId")
         connection.initId(expectedId)
       }
     } yield ()

@@ -25,3 +25,8 @@ persistence:
   port: 5432
   user: cnadmin
   secretName: "postgres-secrets"
+
+#Domain upgrade specific values
+#globalDomainUpgrade:
+#  isActiveNode: true # specifies that this node is current active node, the one that manages the PV
+#  storageClassName: standard

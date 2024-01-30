@@ -177,6 +177,15 @@ paths:
                 "$ref": "#/components/schemas/GetDomainMigrationDumpResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+    post:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "triggerDomainMigrationDump"
+      responses:
+        "200":
+          description: ok
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/admin/sv/identity/approve:
     post:
       tags: [sv]

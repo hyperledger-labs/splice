@@ -1,5 +1,7 @@
 ---
 {{- $appIdentifier := include "domainOrDefaultValue" (list .Values "sv-app") }}
+{{ $isActiveNode := ((.Values.globalDomainUpgrade).isActiveNode) }}
+{{ $isRestoringNode := and (.Values.globalDomainUpgrade) (not $isActiveNode) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -113,6 +115,18 @@ spec:
                   key: private
                   name: "cn-app-sv-key"
                   optional: false
+            {{- end }}
+            {{- if $isRestoringNode }}
+            - name: ADDITIONAL_CONFIG_SV_ONBOARDING
+              value: |
+                _onboarding {
+                  dump-file-path = "/domain-upgrade-dump/domain_migration_dump.json"
+                }
+            {{- end }}
+            {{- if $isActiveNode }}
+            - name: ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH
+              value: |
+                canton.sv-apps.sv.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
             {{- end }}
             {{- with .Values.domain }}
             - name: ADDITIONAL_CONFIG_SV_DOMAIN
@@ -230,6 +244,11 @@ spec:
               mountPath: /participant-bootstrapping-dump
               readOnly: true
           {{- end }}
+          {{- if .Values.globalDomainUpgrade }}
+          volumeMounts:
+            - name: domain-upgrade-dump-volume
+              mountPath: /domain-upgrade-dump
+          {{- end }}
           {{- with .Values.resources }}
           resources: {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -257,11 +276,20 @@ spec:
                 sleep 2;
               done
       {{- end }}
-      {{- with .Values.participantIdentitiesDumpImport }}
       volumes:
+      {{- with .Values.participantIdentitiesDumpImport }}
         - name: participant-bootstrapping-dump-volume
           secret:
             secretName: {{ .secretName }}
+      {{- end }}
+      {{- if or $isActiveNode $isRestoringNode }}
+        - name: domain-upgrade-dump-volume
+          persistentVolumeClaim:
+            {{- if $isActiveNode }}
+            claimName: "global-domain-active-pvc"
+            {{- else }}
+            claimName: "global-domain-upgrade-pvc"
+            {{- end }}
       {{- end }}
 ---
 apiVersion: v1
@@ -281,3 +309,37 @@ spec:
     - name: metrics
       port: 10013
       protocol: TCP
+{{- if $isActiveNode }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "global-domain-active-pvc"
+  namespace: {{ $.Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10G
+  storageClassName: {{ .Values.globalDomainUpgrade.storageClassName }}
+{{- end }}
+{{- if $isRestoringNode }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "global-domain-upgrade-pvc"
+  namespace: {{ $.Release.Namespace }}
+spec:
+  # Create the PVC as a clone of the active PVC, that must already contain the migration dump
+  dataSource:
+    name: "global-domain-active-pvc"
+    kind: PersistentVolumeClaim
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 20G
+  storageClassName: {{ .Values.globalDomainUpgrade.storageClassName }}
+{{- end }}

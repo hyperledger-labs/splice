@@ -1401,6 +1401,10 @@ printTests := {
     isPreflightIntegrationTest(name) && name.contains("RunbookSv")
   def isRunbookValidatorPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("RunbookValidator")
+  def isGlobalDomainDeploymentPreflightIntegrationTest(name: String): Boolean =
+    isPreflightIntegrationTest(
+      name
+    ) && name.contains("GlobalDomainUpgradeCluster")
 
   def isGlobalUpgradeTest(name: String): Boolean = name contains "GlobalDomainUpgrade"
   def isAppManagerTest(name: String): Boolean = name contains "AppManager"
@@ -1414,6 +1418,11 @@ printTests := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
+    (
+      "Global domain upgrade cluster preflight",
+      "test-full-class-names-global-domain-upgrade-preflight.log",
+      (t: String) => isGlobalDomainDeploymentPreflightIntegrationTest(t),
+    ),
     (
       "Preflight tests against core nodes",
       "test-full-class-names-core-preflight.log",

@@ -1088,6 +1088,18 @@ function subcmd_sbt_for_preflight() {
 
 ###
 
+subcommand_whitelist[preflight_global_domain_upgrade]='Run the global doamin upgrade preflights, preparing the cluster for the upgrade'
+
+function subcmd_preflight_global_domain_upgrade() {
+    preflight_tests=$(_get_preflight_test_names "global-domain-upgrade")
+    _log "Starting global domain upgrade preflight tests: $preflight_tests"
+    cd "${REPO_ROOT}" && \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+            sbt "apps-app/testOnly $preflight_tests"
+}
+
+###
+
 subcommand_whitelist[preflight_sv]='Run the SV runbook preflight tests against the cluster'
 
 function subcmd_preflight_sv() {

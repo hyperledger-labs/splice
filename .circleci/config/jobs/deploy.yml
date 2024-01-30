@@ -148,6 +148,20 @@ jobs:
       send_deployment_notification:
         type: boolean
         default: true
+      upgrade_global_domain_prepare:
+        type: boolean
+        default: false
+        description: "If true, it will set the env GLOBAL_DOMAIN_PREPARE_FOR_UPGRADE to true, and the deployment will attach the required PVC for the global domain migration dump to the sv app"
+      upgrade_global_domain_active_id:
+        type: integer
+        default: 0
+      upgrade_global_domain_upgrade_id:
+        type: integer
+        default: 0
+      upgrade_global_domain_legacy_id:
+        type: integer
+        default: 0
+
     steps:
       - checkout_with_retry
       - record_job_start_time
@@ -203,7 +217,20 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            if [[ << pipeline.parameters.reset-before-deploy >> == true ]]; then
+            if [[ << parameters.upgrade_global_domain_prepare >> == true ]]; then
+              export GLOBAL_DOMAIN_PREPARE_FOR_UPGRADE="true"
+            fi
+            export GLOBAL_DOMAIN_ACTIVE_ID=<< parameters.upgrade_global_domain_active_id >>
+            if [[ << parameters.upgrade_global_domain_upgrade_id >> -ne 0 ]]; then
+              export GLOBAL_DOMAIN_PREPARE_FOR_UPGRADE="true"
+              export GLOBAL_DOMAIN_UPGRADE_ID=<< parameters.upgrade_global_domain_upgrade_id >>
+              if [[ << parameters.upgrade_global_domain_legacy_id >> -ne 0 ]]; then
+                export GLOBAL_DOMAIN_LEGACY_ID=<< parameters.upgrade_global_domain_legacy_id >>
+              fi
+              cncluster ci_apply --skip-reset
+            elif [[ << parameters.upgrade_global_domain_active_id >> -ne 0 ]]; then
+              cncluster ci_apply --skip-reset
+            elif [[ << pipeline.parameters.reset-before-deploy >> == true ]]; then
               cncluster ci_apply
             else
               cncluster ci_apply --skip-reset

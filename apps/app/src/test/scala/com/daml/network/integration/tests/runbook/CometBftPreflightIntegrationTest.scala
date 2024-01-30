@@ -2,6 +2,7 @@ package com.daml.network.integration.tests.runbook
 
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
+import com.daml.network.integration.auth.PreflightAuthUtil
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
@@ -17,7 +18,7 @@ import scala.util.Using
   */
 class CometBftPreflightIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
-    with PreflightIntegrationTestUtil {
+    with PreflightAuthUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -51,17 +52,7 @@ class CometBftPreflightIntegrationTest
   "Sv4 prunes its CometBFT stack" in { implicit env =>
     val RetainBlock = 10000 // check parameter configured in CometBft helm chart
 
-    val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com")
-
-    val token = eventuallySucceeds() {
-      getAuth0ClientCredential(
-        "CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN",
-        "https://canton.network.global",
-        auth0,
-      )(noTracingLogger)
-    }
-
-    val sv4 = svcl("sv4").copy(token = Some(token))
+    val sv4 = svclWithToken("sv4")
 
     eventuallySucceeds() {
       val status = parse(

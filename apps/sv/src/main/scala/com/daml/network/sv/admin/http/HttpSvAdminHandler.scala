@@ -14,18 +14,19 @@ import com.daml.network.environment.{
   SequencerAdminConnection,
   TopologyAdminConnection,
 }
-import com.daml.network.util.{Codec, JsonUtil, TemplateJsonDecoder}
 import com.daml.network.http.v0.{definitions, sv_admin as v0}
+import com.daml.network.http.v0.sv_admin.SvAdminResource
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, PageLimit}
 import com.daml.network.store.db.AcsJdbcTypes
-import com.daml.network.sv.DomainMigrationDump.{Dar, DomainMigrationDumpNodeIdentities}
+import com.daml.network.sv.{DomainMigrationDump, LocalDomainNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
-import com.daml.network.sv.{DomainMigrationDump, LocalDomainNode, SvApp}
+import com.daml.network.sv.DomainMigrationDump.{Dar, DomainMigrationDumpNodeIdentities}
+import com.daml.network.util.{BackupDump, Codec, JsonUtil, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.Hash
@@ -37,12 +38,14 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import slick.jdbc.PostgresProfile
 
+import java.nio.file.Path
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 class HttpSvAdminHandler(
     config: SvAppBackendConfig,
+    optDomainMigrationDumpConfig: Option[Path],
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     cometBftClient: Option[CometBftClient],
@@ -537,55 +540,14 @@ class HttpSvAdminHandler(
 
   override def getDomainMigrationDump(
       respond: v0.SvAdminResource.GetDomainMigrationDumpResponse.type
-  )()(
-      tuser: TracedUser
-  ): Future[v0.SvAdminResource.GetDomainMigrationDumpResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.pauseGlobalDomain") { _ => _ =>
+  )()(tuser: TracedUser): Future[v0.SvAdminResource.GetDomainMigrationDumpResponse] = {
+    val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.getDomainMigrationDump") { implicit tc => _ =>
       localDomainNode match {
         case Some(domainNode) =>
-          def newNodeIdentitiesStore(adminConnection: TopologyAdminConnection) =
-            new NodeIdentitiesStore(
-              adminConnection,
-              None,
-              clock,
-              loggerFactory,
-            )
-          for {
-            participantIdentities <- newNodeIdentitiesStore(participantAdminConnection)
-              .getNodeIdentitiesDump()
-            sequencerIdentities <- newNodeIdentitiesStore(domainNode.sequencerAdminConnection)
-              .getNodeIdentitiesDump()
-            mediatorIdentities <- newNodeIdentitiesStore(domainNode.mediatorAdminConnection)
-              .getNodeIdentitiesDump()
-            globalDomain <- svcStore.getSvcRules().map(_.domain)
-            topologySnapshot <- domainNode.sequencerAdminConnection.getTopologySnapshot(
-              globalDomain
-            )
-            acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
-              Set(svcStore.key.svParty, svcStore.key.svcParty)
-            )
-            darDescriptions <- participantAdminConnection.listDars()
-            dars <- darDescriptions.traverse { dar =>
-              val hash = Hash.tryFromHexString(dar.hash)
-              participantAdminConnection.lookupDar(hash).map(_.map(Dar(hash, _)))
-            }
-          } yield v0.SvAdminResource.GetDomainMigrationDumpResponse.OK(
-            DomainMigrationDump(
-              svcStore.key.svParty,
-              svcStore.key.svcParty,
-              config.domains.global.alias,
-              globalDomain,
-              DomainMigrationDumpNodeIdentities(
-                participantIdentities,
-                sequencerIdentities,
-                mediatorIdentities,
-              ),
-              topologySnapshot,
-              acsSnapshot,
-              dars.flatten,
-            ).toHttp
-          )
+          internalGetDomainMigrationDump(domainNode).map { response =>
+            v0.SvAdminResource.GetDomainMigrationDumpResponse.OK(response.toHttp)
+          }
         case None =>
           Future.failed(
             HttpErrorHandler.internalServerError(
@@ -593,7 +555,53 @@ class HttpSvAdminHandler(
             )
           )
       }
-    }
+    }(traceContext, tracer)
+  }
+
+  private def internalGetDomainMigrationDump(
+      domainNode: LocalDomainNode
+  )(implicit tc: TraceContext) = {
+    def newNodeIdentitiesStore(adminConnection: TopologyAdminConnection) =
+      new NodeIdentitiesStore(
+        adminConnection,
+        None,
+        clock,
+        loggerFactory,
+      )
+
+    for {
+      participantIdentities <- newNodeIdentitiesStore(participantAdminConnection)
+        .getNodeIdentitiesDump()
+      sequencerIdentities <- newNodeIdentitiesStore(domainNode.sequencerAdminConnection)
+        .getNodeIdentitiesDump()
+      mediatorIdentities <- newNodeIdentitiesStore(domainNode.mediatorAdminConnection)
+        .getNodeIdentitiesDump()
+      globalDomain <- svcStore.getSvcRules().map(_.domain)
+      topologySnapshot <- domainNode.sequencerAdminConnection.getTopologySnapshot(
+        globalDomain
+      )
+      acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
+        Set(svcStore.key.svParty, svcStore.key.svcParty)
+      )
+      darDescriptions <- participantAdminConnection.listDars()
+      dars <- darDescriptions.traverse { dar =>
+        val hash = Hash.tryFromHexString(dar.hash)
+        participantAdminConnection.lookupDar(hash).map(_.map(Dar(hash, _)))
+      }
+    } yield DomainMigrationDump(
+      svcStore.key.svParty,
+      svcStore.key.svcParty,
+      config.domains.global.alias,
+      globalDomain,
+      DomainMigrationDumpNodeIdentities(
+        participantIdentities,
+        sequencerIdentities,
+        mediatorIdentities,
+      ),
+      topologySnapshot = topologySnapshot,
+      acsSnapshot = acsSnapshot,
+      dars.flatten,
+    )
   }
 
   private def withClientOrNotFound[T](
@@ -633,4 +641,37 @@ class HttpSvAdminHandler(
         signedBy = id.namespace.fingerprint,
       )
   } yield result
+
+  override def triggerDomainMigrationDump(
+      respond: SvAdminResource.TriggerDomainMigrationDumpResponse.type
+  )()(extracted: TracedUser): Future[SvAdminResource.TriggerDomainMigrationDumpResponse] = {
+    withSpan(s"$workflowId.triggerDomainMigrationDump") { implicit tc => _ =>
+      localDomainNode match {
+        case Some(domainNode) =>
+          optDomainMigrationDumpConfig match {
+            case Some(dumpPath) =>
+              internalGetDomainMigrationDump(domainNode).map { dump =>
+                val path = BackupDump.writeToPath(
+                  dumpPath,
+                  dump.toJson.noSpaces,
+                )
+                logger.info(s"Wrote domain migration dump at path $path")
+                SvAdminResource.TriggerDomainMigrationDumpResponseOK
+              }
+            case None =>
+              Future.failed(
+                HttpErrorHandler.internalServerError(
+                  s"Could not trigger DomainMigrationDump because dump path is not configured"
+                )
+              )
+          }
+        case None =>
+          Future.failed(
+            HttpErrorHandler.internalServerError(
+              s"Could not trigger DomainMigrationDump because domain node is not configured"
+            )
+          )
+      }
+    }(extracted.traceContext, tracer)
+  }
 }

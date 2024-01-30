@@ -1416,6 +1416,20 @@ jobs:
       send_deployment_notification:
         type: boolean
         default: true
+      upgrade_global_domain_prepare:
+        type: boolean
+        default: false
+        description: "If true, it will set the env GLOBAL_DOMAIN_PREPARE_FOR_UPGRADE to true, and the deployment will attach the required PVC for the global domain migration dump to the sv app"
+      upgrade_global_domain_active_id:
+        type: integer
+        default: 0
+      upgrade_global_domain_upgrade_id:
+        type: integer
+        default: 0
+      upgrade_global_domain_legacy_id:
+        type: integer
+        default: 0
+
     steps:
       - checkout_with_retry
       - record_job_start_time
@@ -1471,7 +1485,20 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            if [[ << pipeline.parameters.reset-before-deploy >> == true ]]; then
+            if [[ << parameters.upgrade_global_domain_prepare >> == true ]]; then
+              export GLOBAL_DOMAIN_PREPARE_FOR_UPGRADE="true"
+            fi
+            export GLOBAL_DOMAIN_ACTIVE_ID=<< parameters.upgrade_global_domain_active_id >>
+            if [[ << parameters.upgrade_global_domain_upgrade_id >> -ne 0 ]]; then
+              export GLOBAL_DOMAIN_PREPARE_FOR_UPGRADE="true"
+              export GLOBAL_DOMAIN_UPGRADE_ID=<< parameters.upgrade_global_domain_upgrade_id >>
+              if [[ << parameters.upgrade_global_domain_legacy_id >> -ne 0 ]]; then
+                export GLOBAL_DOMAIN_LEGACY_ID=<< parameters.upgrade_global_domain_legacy_id >>
+              fi
+              cncluster ci_apply --skip-reset
+            elif [[ << parameters.upgrade_global_domain_active_id >> -ne 0 ]]; then
+              cncluster ci_apply --skip-reset
+            elif [[ << pipeline.parameters.reset-before-deploy >> == true ]]; then
               cncluster ci_apply
             else
               cncluster ci_apply --skip-reset
@@ -2698,6 +2725,7 @@ workflows:
         cluster: "cimain"
         send_deployment_notification: false
         update_deployment_branch: false  # No need to create a deployment branch for cimain
+        upgrade_global_domain_prepare: true
         requires:
            - docker_images_push
            - wait_for_previous_pipeline
@@ -2771,6 +2799,35 @@ workflows:
           - backup_cluster
           - preflight_check
 
+    - preflight_check:
+        name: "trigger_global_domain_upgrade_dump"
+        cluster: "cimain"
+        <<: *main-branch-only
+        context:
+          - artifactory
+          - canton-network-vpn
+          - datadog
+          - slack-context
+        test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+        requires:
+          - preflight_check
+          - preflight_sv_check
+          - preflight_validator_check
+    - deploy_cluster:
+        <<: *main-branch-only
+        name: "upgrade cluster"
+        context:
+          - artifactory
+          - datadog
+          - slack-context
+        cluster: "cimain"
+        send_deployment_notification: false
+        update_deployment_branch: false  # No need to create a deployment branch for cimain
+        upgrade_global_domain_upgrade_id: 1
+        requires:
+          - trigger_global_domain_upgrade_dump
+          - docker_images_push
+          - wait_for_previous_pipeline
 
   deploy_cidaily_and_cidaily_testnet:
     when:
@@ -3670,9 +3727,14 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
+          upgrade_global_domain_prepare: true
           requires:
             - deployment_test
             - docker_images_push
+      - hold:
+          name: sv_runbook_hold
+          <<: *main-branch-never
+          type: approval
       - deploy_sv_runbook:
           <<: *main-branch-never
           context:
@@ -3682,6 +3744,7 @@ workflows:
           cluster: "scratchneta"
           requires:
             - deploy_cluster
+            - sv_runbook_hold
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -3691,6 +3754,7 @@ workflows:
           cluster: "scratchneta"
           requires:
             - deploy_cluster
+            - sv_runbook_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -3699,6 +3763,7 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchneta"
+          wait_for_sv: false
           requires:
             - hold
       - preflight_sv_check:
@@ -3710,7 +3775,7 @@ workflows:
             - slack-context
           cluster: "scratchneta"
           requires:
-            - hold
+            - sv_runbook_hold
       - preflight_validator_check:
           <<: *main-branch-never
           context:
@@ -3720,7 +3785,11 @@ workflows:
             - slack-context
           cluster: "scratchneta"
           requires:
-            - hold
+            - sv_runbook_hold
+      - hold:
+          name: back_up_hold
+          <<: *main-branch-never
+          type: approval
       - backup_cluster:
           <<: *main-branch-never
           cluster: "scratchneta"
@@ -3730,6 +3799,7 @@ workflows:
             - slack-context
           requires:
             - deploy_cluster
+            - back_up_hold
       - restore_node:
           <<: *main-branch-never
           cluster: "scratchneta"
@@ -3741,6 +3811,69 @@ workflows:
           requires:
             - backup_cluster
             - preflight_check
+      - hold:
+          name: hard_domain_migration_hold
+          <<: *main-branch-never
+          type: approval
+      - preflight_check:
+          name: "trigger_global_domain_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchneta"
+          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+          parallelism: 1
+          wait_for_sv: false
+          requires:
+            - preflight_check
+            - hard_domain_migration_hold
+      - deploy_cluster:
+          name: "deploy_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchneta"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          upgrade_global_domain_upgrade_id: 1
+          requires:
+            - trigger_global_domain_migration
+      - deploy_cluster:
+          name: "switch_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchneta"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          upgrade_global_domain_active_id: 1
+          requires:
+            - deploy_global_domain_upgrade
+      - preflight_check:
+          name: "preflight_check_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchneta"
+          wait_for_sv: false
+          requires:
+            - switch_global_domain_upgrade
+      - hold:
+          name: "reset_hold"
+          <<: *main-branch-never
+          type: approval
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchneta"
@@ -3749,9 +3882,8 @@ workflows:
             - datadog
           requires:
             - preflight_check
-            - preflight_sv_check
             - preflight_validator_check
-            - restore_node
+            - reset_hold
 
   deploy_scratchnetb:
     when:
@@ -3787,9 +3919,14 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
+          upgrade_global_domain_prepare: true
           requires:
             - deployment_test
             - docker_images_push
+      - hold:
+          name: sv_runbook_hold
+          <<: *main-branch-never
+          type: approval
       - deploy_sv_runbook:
           <<: *main-branch-never
           context:
@@ -3799,6 +3936,7 @@ workflows:
           cluster: "scratchnetb"
           requires:
             - deploy_cluster
+            - sv_runbook_hold
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -3808,6 +3946,7 @@ workflows:
           cluster: "scratchnetb"
           requires:
             - deploy_cluster
+            - sv_runbook_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -3816,6 +3955,7 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetb"
+          wait_for_sv: false
           requires:
             - hold
       - preflight_sv_check:
@@ -3827,7 +3967,7 @@ workflows:
             - slack-context
           cluster: "scratchnetb"
           requires:
-            - hold
+            - sv_runbook_hold
       - preflight_validator_check:
           <<: *main-branch-never
           context:
@@ -3837,7 +3977,11 @@ workflows:
             - slack-context
           cluster: "scratchnetb"
           requires:
-            - hold
+            - sv_runbook_hold
+      - hold:
+          name: back_up_hold
+          <<: *main-branch-never
+          type: approval
       - backup_cluster:
           <<: *main-branch-never
           cluster: "scratchnetb"
@@ -3847,6 +3991,7 @@ workflows:
             - slack-context
           requires:
             - deploy_cluster
+            - back_up_hold
       - restore_node:
           <<: *main-branch-never
           cluster: "scratchnetb"
@@ -3858,6 +4003,69 @@ workflows:
           requires:
             - backup_cluster
             - preflight_check
+      - hold:
+          name: hard_domain_migration_hold
+          <<: *main-branch-never
+          type: approval
+      - preflight_check:
+          name: "trigger_global_domain_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetb"
+          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+          parallelism: 1
+          wait_for_sv: false
+          requires:
+            - preflight_check
+            - hard_domain_migration_hold
+      - deploy_cluster:
+          name: "deploy_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetb"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          upgrade_global_domain_upgrade_id: 1
+          requires:
+            - trigger_global_domain_migration
+      - deploy_cluster:
+          name: "switch_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetb"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          upgrade_global_domain_active_id: 1
+          requires:
+            - deploy_global_domain_upgrade
+      - preflight_check:
+          name: "preflight_check_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetb"
+          wait_for_sv: false
+          requires:
+            - switch_global_domain_upgrade
+      - hold:
+          name: "reset_hold"
+          <<: *main-branch-never
+          type: approval
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetb"
@@ -3866,9 +4074,8 @@ workflows:
             - datadog
           requires:
             - preflight_check
-            - preflight_sv_check
             - preflight_validator_check
-            - restore_node
+            - reset_hold
 
   deploy_scratchnetc:
     when:
@@ -3904,9 +4111,14 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
+          upgrade_global_domain_prepare: true
           requires:
             - deployment_test
             - docker_images_push
+      - hold:
+          name: sv_runbook_hold
+          <<: *main-branch-never
+          type: approval
       - deploy_sv_runbook:
           <<: *main-branch-never
           context:
@@ -3916,6 +4128,7 @@ workflows:
           cluster: "scratchnetc"
           requires:
             - deploy_cluster
+            - sv_runbook_hold
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -3925,6 +4138,7 @@ workflows:
           cluster: "scratchnetc"
           requires:
             - deploy_cluster
+            - sv_runbook_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -3933,6 +4147,7 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetc"
+          wait_for_sv: false
           requires:
             - hold
       - preflight_sv_check:
@@ -3944,7 +4159,7 @@ workflows:
             - slack-context
           cluster: "scratchnetc"
           requires:
-            - hold
+            - sv_runbook_hold
       - preflight_validator_check:
           <<: *main-branch-never
           context:
@@ -3954,7 +4169,11 @@ workflows:
             - slack-context
           cluster: "scratchnetc"
           requires:
-            - hold
+            - sv_runbook_hold
+      - hold:
+          name: back_up_hold
+          <<: *main-branch-never
+          type: approval
       - backup_cluster:
           <<: *main-branch-never
           cluster: "scratchnetc"
@@ -3964,6 +4183,7 @@ workflows:
             - slack-context
           requires:
             - deploy_cluster
+            - back_up_hold
       - restore_node:
           <<: *main-branch-never
           cluster: "scratchnetc"
@@ -3975,6 +4195,69 @@ workflows:
           requires:
             - backup_cluster
             - preflight_check
+      - hold:
+          name: hard_domain_migration_hold
+          <<: *main-branch-never
+          type: approval
+      - preflight_check:
+          name: "trigger_global_domain_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetc"
+          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+          parallelism: 1
+          wait_for_sv: false
+          requires:
+            - preflight_check
+            - hard_domain_migration_hold
+      - deploy_cluster:
+          name: "deploy_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetc"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          upgrade_global_domain_upgrade_id: 1
+          requires:
+            - trigger_global_domain_migration
+      - deploy_cluster:
+          name: "switch_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetc"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          upgrade_global_domain_active_id: 1
+          requires:
+            - deploy_global_domain_upgrade
+      - preflight_check:
+          name: "preflight_check_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetc"
+          wait_for_sv: false
+          requires:
+            - switch_global_domain_upgrade
+      - hold:
+          name: "reset_hold"
+          <<: *main-branch-never
+          type: approval
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetc"
@@ -3983,9 +4266,8 @@ workflows:
             - datadog
           requires:
             - preflight_check
-            - preflight_sv_check
             - preflight_validator_check
-            - restore_node
+            - reset_hold
 
   deploy_scratchnetd:
     when:
@@ -4021,9 +4303,14 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
+          upgrade_global_domain_prepare: true
           requires:
             - deployment_test
             - docker_images_push
+      - hold:
+          name: sv_runbook_hold
+          <<: *main-branch-never
+          type: approval
       - deploy_sv_runbook:
           <<: *main-branch-never
           context:
@@ -4033,6 +4320,7 @@ workflows:
           cluster: "scratchnetd"
           requires:
             - deploy_cluster
+            - sv_runbook_hold
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -4042,6 +4330,7 @@ workflows:
           cluster: "scratchnetd"
           requires:
             - deploy_cluster
+            - sv_runbook_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -4050,6 +4339,7 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnetd"
+          wait_for_sv: false
           requires:
             - hold
       - preflight_sv_check:
@@ -4061,7 +4351,7 @@ workflows:
             - slack-context
           cluster: "scratchnetd"
           requires:
-            - hold
+            - sv_runbook_hold
       - preflight_validator_check:
           <<: *main-branch-never
           context:
@@ -4071,7 +4361,11 @@ workflows:
             - slack-context
           cluster: "scratchnetd"
           requires:
-            - hold
+            - sv_runbook_hold
+      - hold:
+          name: back_up_hold
+          <<: *main-branch-never
+          type: approval
       - backup_cluster:
           <<: *main-branch-never
           cluster: "scratchnetd"
@@ -4081,6 +4375,7 @@ workflows:
             - slack-context
           requires:
             - deploy_cluster
+            - back_up_hold
       - restore_node:
           <<: *main-branch-never
           cluster: "scratchnetd"
@@ -4092,6 +4387,69 @@ workflows:
           requires:
             - backup_cluster
             - preflight_check
+      - hold:
+          name: hard_domain_migration_hold
+          <<: *main-branch-never
+          type: approval
+      - preflight_check:
+          name: "trigger_global_domain_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetd"
+          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+          parallelism: 1
+          wait_for_sv: false
+          requires:
+            - preflight_check
+            - hard_domain_migration_hold
+      - deploy_cluster:
+          name: "deploy_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetd"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          upgrade_global_domain_upgrade_id: 1
+          requires:
+            - trigger_global_domain_migration
+      - deploy_cluster:
+          name: "switch_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnetd"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          upgrade_global_domain_active_id: 1
+          requires:
+            - deploy_global_domain_upgrade
+      - preflight_check:
+          name: "preflight_check_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnetd"
+          wait_for_sv: false
+          requires:
+            - switch_global_domain_upgrade
+      - hold:
+          name: "reset_hold"
+          <<: *main-branch-never
+          type: approval
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetd"
@@ -4100,9 +4458,8 @@ workflows:
             - datadog
           requires:
             - preflight_check
-            - preflight_sv_check
             - preflight_validator_check
-            - restore_node
+            - reset_hold
 
   deploy_scratchnete:
     when:
@@ -4138,9 +4495,14 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
+          upgrade_global_domain_prepare: true
           requires:
             - deployment_test
             - docker_images_push
+      - hold:
+          name: sv_runbook_hold
+          <<: *main-branch-never
+          type: approval
       - deploy_sv_runbook:
           <<: *main-branch-never
           context:
@@ -4150,6 +4512,7 @@ workflows:
           cluster: "scratchnete"
           requires:
             - deploy_cluster
+            - sv_runbook_hold
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -4159,6 +4522,7 @@ workflows:
           cluster: "scratchnete"
           requires:
             - deploy_cluster
+            - sv_runbook_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -4167,6 +4531,7 @@ workflows:
             - datadog
             - slack-context
           cluster: "scratchnete"
+          wait_for_sv: false
           requires:
             - hold
       - preflight_sv_check:
@@ -4178,7 +4543,7 @@ workflows:
             - slack-context
           cluster: "scratchnete"
           requires:
-            - hold
+            - sv_runbook_hold
       - preflight_validator_check:
           <<: *main-branch-never
           context:
@@ -4188,7 +4553,11 @@ workflows:
             - slack-context
           cluster: "scratchnete"
           requires:
-            - hold
+            - sv_runbook_hold
+      - hold:
+          name: back_up_hold
+          <<: *main-branch-never
+          type: approval
       - backup_cluster:
           <<: *main-branch-never
           cluster: "scratchnete"
@@ -4198,6 +4567,7 @@ workflows:
             - slack-context
           requires:
             - deploy_cluster
+            - back_up_hold
       - restore_node:
           <<: *main-branch-never
           cluster: "scratchnete"
@@ -4209,6 +4579,69 @@ workflows:
           requires:
             - backup_cluster
             - preflight_check
+      - hold:
+          name: hard_domain_migration_hold
+          <<: *main-branch-never
+          type: approval
+      - preflight_check:
+          name: "trigger_global_domain_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnete"
+          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+          parallelism: 1
+          wait_for_sv: false
+          requires:
+            - preflight_check
+            - hard_domain_migration_hold
+      - deploy_cluster:
+          name: "deploy_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnete"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          upgrade_global_domain_upgrade_id: 1
+          requires:
+            - trigger_global_domain_migration
+      - deploy_cluster:
+          name: "switch_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - datadog
+            - slack-context
+          cluster: "scratchnete"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          upgrade_global_domain_active_id: 1
+          requires:
+            - deploy_global_domain_upgrade
+      - preflight_check:
+          name: "preflight_check_global_domain_upgrade"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - datadog
+            - slack-context
+          cluster: "scratchnete"
+          wait_for_sv: false
+          requires:
+            - switch_global_domain_upgrade
+      - hold:
+          name: "reset_hold"
+          <<: *main-branch-never
+          type: approval
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnete"
@@ -4217,6 +4650,5 @@ workflows:
             - datadog
           requires:
             - preflight_check
-            - preflight_sv_check
             - preflight_validator_check
-            - restore_node
+            - reset_hold

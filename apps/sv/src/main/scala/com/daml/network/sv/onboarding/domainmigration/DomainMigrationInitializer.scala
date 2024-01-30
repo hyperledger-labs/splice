@@ -1,5 +1,6 @@
 package com.daml.network.sv.onboarding.domainmigration
 
+import cats.syntax.either.*
 import com.daml.network.environment.{
   CNLedgerClient,
   ParticipantAdminConnection,
@@ -7,52 +8,54 @@ import com.daml.network.environment.{
   RetryProvider,
 }
 import com.daml.network.http.v0.definitions as http
+import com.daml.network.identities.NodeIdentitiesDump
+import com.daml.network.setup.NodeInitializer
 import com.daml.network.sv.{DomainMigrationDump, LocalDomainNode}
+import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.automation.SvSvcAutomationService.{
   LocalSequencerClientConfig,
   LocalSequencerClientContext,
 }
-import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SequencerPruningConfig, SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.{SetupUtil, SvcPartyHosting}
-import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
+import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
+  loadDomainMigrationDump,
+  DomainNodeInitializer,
+  DomainTopologyTransactions,
+}
+import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
+import com.daml.network.sv.DomainMigrationDump.DomainMigrationDumpNodeIdentities
 import com.daml.network.util.{TemplateJsonDecoder, UploadablePackage}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.processing.SequencedTime
+import com.digitalasset.canton.topology.store.{
+  StoredTopologyTransactionsX,
+  StoredTopologyTransactionX,
+  TopologyStoreId,
+}
+import com.digitalasset.canton.topology.store.StoredTopologyTransactionX.GenericStoredTopologyTransactionX
+import com.digitalasset.canton.topology.transaction.{TopologyChangeOpX, TopologyMappingX}
+import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
+import java.io.FileNotFoundException
 import java.nio.file.Path
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.math.Ordered.orderingToOrdered
-import cats.syntax.either.*
-import com.daml.network.setup.NodeInitializer
-import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
-  DomainNodeIdentities,
-  DomainTopologyTransactions,
-}
-import com.daml.network.sv.DomainMigrationDump.DomainMigrationDumpNodeIdentities
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.sequencing.SequencerConnections
-import com.digitalasset.canton.topology.processing.SequencedTime
-import com.digitalasset.canton.topology.store.StoredTopologyTransactionX.GenericStoredTopologyTransactionX
-import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionX,
-  StoredTopologyTransactionsX,
-  TopologyStoreId,
-}
-import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code
-import com.digitalasset.canton.topology.transaction.{TopologyChangeOpX, TopologyMappingX}
-import com.digitalasset.canton.util.MonadUtil
-import io.grpc.Status
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 
 /** Container for the methods required by the SvApp to initialize the SV node of upgraded domain. */
 class DomainMigrationInitializer(
@@ -79,7 +82,6 @@ class DomainMigrationInitializer(
     this.getClass.getSimpleName,
     loggerFactory,
   )
-
   def migrateDomain(): Future[
     (
         DomainId,
@@ -90,13 +92,13 @@ class DomainMigrationInitializer(
         SvSvcAutomationService,
     )
   ] = {
+    val migrationDump = loadDomainMigrationDump(domainMigrationConfig.dumpFilePath)
+    val storeKey = SvStore.Key(migrationDump.svPartyId, migrationDump.svcPartyId)
+    val svcPartyHosting = newSvcPartyHosting(
+      storeKey,
+      participantAdminConnection,
+    )
     for {
-      migrationDump <- loadDomainMigrationDump(domainMigrationConfig.dumpFilePath)
-      storeKey = SvStore.Key(migrationDump.svPartyId, migrationDump.svcPartyId)
-      svcPartyHosting = newSvcPartyHosting(
-        storeKey,
-        participantAdminConnection,
-      )
       _ <- migrateToNewDomainNode(migrationDump, svcPartyHosting)
       _ <- SetupUtil.setupSvParty(
         readOnlyConnection,
@@ -144,27 +146,6 @@ class DomainMigrationInitializer(
     )
   }
 
-  private def loadDomainMigrationDump(path: Path): Future[DomainMigrationDump] = Future {
-    val jsonString: String = better.files.File(path).contentAsString
-    (
-      for {
-        httpMigrationDump <- io.circe.parser
-          .decode[http.GetDomainMigrationDumpResponse](
-            jsonString
-          )
-          .leftMap(_.getMessage)
-        migrationDump <- DomainMigrationDump.fromHttp(httpMigrationDump)
-      } yield migrationDump
-    )
-      .fold(
-        err =>
-          throw new IllegalArgumentException(
-            s"Failed to parse domain migration dump file: $err"
-          ),
-        result => result,
-      )
-  }
-
   private def migrateToNewDomainNode(
       domainMigrationDump: DomainMigrationDump,
       svcPartyHosting: SvcPartyHosting,
@@ -172,6 +153,68 @@ class DomainMigrationInitializer(
     val domainTopologyTransactions = DomainTopologyTransactions(
       domainMigrationDump.topologySnapshot.result
     )
+    val domainAlias = domainMigrationDump.domainAlias
+    def importDarsAndAcs() = {
+
+      val dars = domainMigrationDump.dars.map { dar =>
+        UploadablePackage.fromByteString(dar.hash.toHexString, dar.content)
+      }
+      for {
+        _ <- retryProvider.waitUntil(
+          RetryFor.Automation,
+          "participant caught up with the domain state topology",
+          participantAdminConnection
+            .getDomainParametersState(
+              domainMigrationDump.domainId
+            )
+            .map { domainParameters =>
+              if (
+                domainParameters.base.serial < domainTopologyTransactions.lastDomainStateParametersState.transaction.transaction.serial
+              ) {
+                throw Status.FAILED_PRECONDITION
+                  .withDescription(
+                    s"Domain state topology is not yet up to date with the dump. Dump state is ${domainTopologyTransactions.lastDomainStateParametersState.transaction.transaction} and current state is $domainParameters"
+                  )
+                  .asRuntimeException()
+              }
+            },
+          loggerFactory.getTracedLogger(getClass),
+        )
+        _ <- participantAdminConnection
+          .ensureDomainParameters(
+            domainMigrationDump.domainId,
+            // TODO(#8761) hard code for now
+            _.tryUpdate(maxRatePerParticipant =
+              DynamicDomainParameters.defaultMaxRatePerParticipant
+            ),
+            signedBy = domainMigrationDump.nodeIdentities.participant.id.uid.namespace.fingerprint,
+          )
+        _ = logger.info("resumed domain")
+        _ <- participantAdminConnection.uploadDarFiles(
+          dars,
+          RetryFor.WaitingOnInitDependency,
+        )
+        _ = logger.info("uploaded all dars to the participant.")
+
+        _ <- participantAdminConnection.disconnectFromAllDomains()
+        _ = logger.info("Disconnected from all domains")
+
+        _ <- participantAdminConnection.uploadAcsSnapshot(domainMigrationDump.acsSnapshot)
+        _ = logger.info("Acs snapshot is restored")
+
+        _ <- participantAdminConnection.reconnectDomain(domainAlias)
+        _ <- participantAdminConnection.modifyDomainConnectionConfig(
+          domainAlias,
+          c =>
+            Some(
+              c.copy(
+                initializeFromTrustedDomain = false
+              )
+            ),
+        )
+        _ = logger.info("domain is reconnected")
+      } yield ()
+    }
     for {
       _ <- initializeDomainNode(
         domainMigrationDump.domainId,
@@ -179,14 +222,31 @@ class DomainMigrationInitializer(
         domainTopologyTransactions,
       )
       _ = logger.info("Registering and connecting to new domain")
-      _ <- participantAdminConnection.registerDomain(
-        DomainConnectionConfig(
-          domainMigrationDump.domainAlias,
-          domainId = Some(domainMigrationDump.domainId),
-          sequencerConnections = SequencerConnections.single(localDomainNode.sequencerConnection),
-          initializeFromTrustedDomain = true,
+      _ <- participantAdminConnection
+        .lookupDomainConnectionConfig(
+          domainAlias
         )
-      )
+        .flatMap {
+          case Some(config) if config.initializeFromTrustedDomain =>
+            participantAdminConnection.reconnectAllDomains().flatMap { _ =>
+              importDarsAndAcs()
+            }
+          case None =>
+            participantAdminConnection
+              .ensureDomainRegistered(
+                DomainConnectionConfig(
+                  domainAlias,
+                  domainId = Some(domainMigrationDump.domainId),
+                  sequencerConnections =
+                    SequencerConnections.single(localDomainNode.sequencerConnection),
+                  initializeFromTrustedDomain = true,
+                ),
+                RetryFor.ClientCalls,
+              )
+              .flatMap(_ => importDarsAndAcs())
+          case Some(_) => Future.unit
+        }
+
       _ <- svcPartyHosting.waitForSvcPartyToParticipantAuthorization(
         domainMigrationDump.domainId,
         ParticipantId(domainMigrationDump.nodeIdentities.participant.id.uid),
@@ -194,54 +254,6 @@ class DomainMigrationInitializer(
       _ = logger.info(
         s"SVC party hosting is replicated on the new global domain"
       )
-
-      _ <- retryProvider.waitUntil(
-        RetryFor.Automation,
-        "participant caught up with the domain state topology",
-        participantAdminConnection
-          .getDomainParametersState(
-            domainMigrationDump.domainId
-          )
-          .map { domainParameters =>
-            if (
-              domainParameters.base.serial < domainTopologyTransactions.lastDomainStateParametersState.transaction.transaction.serial
-            ) {
-              throw Status.FAILED_PRECONDITION
-                .withDescription(
-                  s"Domain state topology is not yet up to date with the dump. Dump state is ${domainTopologyTransactions.lastDomainStateParametersState.transaction.transaction} and current state is $domainParameters"
-                )
-                .asRuntimeException()
-            }
-          },
-        loggerFactory.getTracedLogger(getClass),
-      )
-
-      _ <- participantAdminConnection
-        .ensureDomainParameters(
-          domainMigrationDump.domainId,
-          // TODO(#8761) hard code for now
-          _.tryUpdate(maxRatePerParticipant = NonNegativeInt.tryCreate(1000000)),
-          signedBy = domainMigrationDump.nodeIdentities.participant.id.uid.namespace.fingerprint,
-        )
-      _ = logger.info("resumed domain")
-
-      dars = domainMigrationDump.dars.map { dar =>
-        UploadablePackage.fromByteString(dar.hash.toHexString, dar.content)
-      }
-      _ <- participantAdminConnection.uploadDarFiles(
-        dars,
-        RetryFor.WaitingOnInitDependency,
-      )
-      _ = logger.info("uploaded all dars to the participant.")
-
-      _ <- participantAdminConnection.disconnectFromAllDomains()
-      _ = logger.info("Disconnected from all domains")
-
-      _ <- participantAdminConnection.uploadAcsSnapshot(domainMigrationDump.acsSnapshot)
-      _ = logger.info("Acs snapshot is restored")
-
-      _ <- participantAdminConnection.reconnectDomain(domainMigrationDump.domainAlias)
-      _ = logger.info("domain is reconnected")
 
     } yield {}
   }
@@ -251,50 +263,18 @@ class DomainMigrationInitializer(
       nodeIdentities: DomainMigrationDumpNodeIdentities,
       domainTopologyTransactions: DomainTopologyTransactions,
   ): Future[Unit] = {
-    val domainNodeIdentities: DomainNodeIdentities = DomainNodeIdentities(
+    val domainNodeInitiaizer = DomainNodeInitializer(
       localDomainNode,
       clock,
       loggerFactory,
       retryProvider,
     )
     logger.info(s"Init new domain nodes from snapshot $domainTopologyTransactions")
-    val sequencerIdentities = nodeIdentities.sequencer
     for {
-      _ <- domainNodeIdentities.sequencerInitializer.initializeFromDump(sequencerIdentities)
-      _ = logger.info(
-        s"Restoring sequencer topology with sequencer transactions ${domainTopologyTransactions.sequencerInitTopologyTransactions}"
-      )
-      _ <- localDomainNode.sequencerAdminConnection
-        .initialize(
-          StoredTopologyTransactionsX(
-            domainTopologyTransactions.sequencerInitTopologyTransactions
-          ),
-          localDomainNode.staticDomainParameters,
-          None,
-        )
-      _ <- retryProvider.waitUntil(
-        RetryFor.ClientCalls,
-        "sequencer is initialized",
-        localDomainNode.sequencerAdminConnection.isNodeInitialized().map { initialized =>
-          if (!initialized) {
-            throw Status.FAILED_PRECONDITION
-              .withDescription("Sequencer is not initialized")
-              .asRuntimeException()
-          }
-        },
-        loggerFactory.getTracedLogger(getClass),
-      )
-      _ <- retryProvider.waitUntil(
-        RetryFor.ClientCalls,
-        "sequencer is initialized with restored id",
-        localDomainNode.sequencerAdminConnection.getSequencerId.map { id =>
-          if (id != sequencerIdentities.id) {
-            throw Status.FAILED_PRECONDITION
-              .withDescription("Sequencer is not initialized with dump id")
-              .asRuntimeException()
-          }
-        },
-        loggerFactory.getTracedLogger(getClass),
+      _ <- initializeSequencer(
+        domainNodeInitiaizer,
+        nodeIdentities.sequencer,
+        domainTopologyTransactions.sequencerInitTopologyTransactions,
       )
       _ = logger.info(
         s"Adding topology transactions after sequencer initialization ${domainTopologyTransactions.topologyTransactionsToSubmit}"
@@ -307,26 +287,10 @@ class DomainMigrationInitializer(
               Seq(transactions.transaction),
             )
       )
-      mediatorIdentities = nodeIdentities.mediator
-      _ <-
-        domainNodeIdentities.mediatorInitializer.initializeFromDump(mediatorIdentities)
-      _ <- localDomainNode.mediatorAdminConnection
-        .initialize(
-          domainId,
-          localDomainNode.staticDomainParameters,
-          localDomainNode.sequencerConnection,
-        )
-      _ <- retryProvider.waitUntil(
-        RetryFor.ClientCalls,
-        "mediator is initialized as expected",
-        localDomainNode.mediatorAdminConnection.getMediatorId.map { id =>
-          if (id != mediatorIdentities.id) {
-            throw Status.FAILED_PRECONDITION
-              .withDescription("Mediator is not initialized with dump id")
-              .asRuntimeException()
-          }
-        },
-        loggerFactory.getTracedLogger(getClass),
+      _ <- initializeMediator(
+        domainId,
+        domainNodeInitiaizer,
+        nodeIdentities.mediator,
       )
       _ <- retryProvider.waitUntil(
         RetryFor.ClientCalls,
@@ -350,6 +314,102 @@ class DomainMigrationInitializer(
     } yield {}
   }
 
+  private def initializeSequencer(
+      domainNodeInitializer: DomainNodeInitializer,
+      identity: NodeIdentitiesDump,
+      sequencerInitTopologyTransactions: Seq[
+        StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]
+      ],
+  ) = {
+    domainNodeInitializer.domainNode.sequencerAdminConnection
+      .isNodeInitialized()
+      .flatMap { isInitialized =>
+        if (isInitialized) {
+          logger.info(s"Sequencer is already initialized with id ${identity.id}")
+          Future.unit
+        } else {
+          logger.info(s"Sequencer is not initialized, initializing from dump")
+          for {
+            _ <- domainNodeInitializer.sequencerInitializer.initializeFromDump(identity)
+            _ = logger.info(
+              s"Restoring sequencer topology with sequencer transactions $sequencerInitTopologyTransactions"
+            )
+            _ <- localDomainNode.sequencerAdminConnection
+              .initialize(
+                StoredTopologyTransactionsX(
+                  sequencerInitTopologyTransactions
+                ),
+                localDomainNode.staticDomainParameters,
+                None,
+              )
+            _ <- retryProvider.waitUntil(
+              RetryFor.ClientCalls,
+              "sequencer is initialized",
+              localDomainNode.sequencerAdminConnection.isNodeInitialized().map { initialized =>
+                if (!initialized) {
+                  throw Status.FAILED_PRECONDITION
+                    .withDescription("Sequencer is not initialized")
+                    .asRuntimeException()
+                }
+              },
+              loggerFactory.getTracedLogger(getClass),
+            )
+          } yield {}
+        }
+      }
+      .flatMap { _ =>
+        retryProvider.waitUntil(
+          RetryFor.ClientCalls,
+          "sequencer is initialized with restored id",
+          localDomainNode.sequencerAdminConnection.getSequencerId.map { id =>
+            if (id != identity.id) {
+              throw Status.FAILED_PRECONDITION
+                .withDescription("Sequencer is not initialized with dump id")
+                .asRuntimeException()
+            }
+          },
+          loggerFactory.getTracedLogger(getClass),
+        )
+      }
+  }
+
+  private def initializeMediator(
+      domainId: DomainId,
+      domainNodeInitiaizer: DomainNodeInitializer,
+      identity: NodeIdentitiesDump,
+  ) = {
+    for {
+      isMediatorInitialized <- domainNodeInitiaizer.domainNode.mediatorAdminConnection
+        .isNodeInitialized()
+      _ <-
+        if (isMediatorInitialized) {
+          logger.info(s"Mediator is already initialized with id ${identity.id}")
+          Future.unit
+        } else
+          domainNodeInitiaizer.mediatorInitializer
+            .initializeFromDump(identity)
+            .flatMap(_ =>
+              localDomainNode.mediatorAdminConnection
+                .initialize(
+                  domainId,
+                  localDomainNode.staticDomainParameters,
+                  localDomainNode.sequencerConnection,
+                )
+            )
+      _ <- retryProvider.waitUntil(
+        RetryFor.ClientCalls,
+        "mediator is initialized as expected",
+        localDomainNode.mediatorAdminConnection.getMediatorId.map { id =>
+          if (id != identity.id) {
+            throw Status.INVALID_ARGUMENT
+              .withDescription("Mediator is not initialized with dump id")
+              .asRuntimeException()
+          }
+        },
+        loggerFactory.getTracedLogger(getClass),
+      )
+    } yield {}
+  }
   private def newSvStore(key: SvStore.Key) = SvSvStore(
     key,
     storage,
@@ -430,7 +490,30 @@ class DomainMigrationInitializer(
 }
 
 object DomainMigrationInitializer {
-  case class DomainNodeIdentities(
+  def loadDomainMigrationDump(
+      path: Path
+  ): DomainMigrationDump = {
+    val dumpFile = better.files.File(path)
+    if (!dumpFile.exists) {
+      throw new FileNotFoundException(s"Failed to find domain migration dump file at $path")
+    }
+    val jsonString: String = dumpFile.contentAsString
+    io.circe.parser
+      .decode[http.GetDomainMigrationDumpResponse](
+        jsonString
+      )
+      .leftMap(_.getMessage)
+      .flatMap(DomainMigrationDump.fromHttp)
+      .fold(
+        err =>
+          throw new IllegalArgumentException(
+            s"Failed to parse domain migration dump file: $err"
+          ),
+        result => result,
+      )
+  }
+
+  case class DomainNodeInitializer(
       domainNode: LocalDomainNode,
       clock: Clock,
       logger: NamedLoggerFactory,
@@ -454,7 +537,17 @@ object DomainMigrationInitializer {
       transactions: Seq[StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]]
   ) {
 
-    private val sortedTransactions = transactions.sorted
+    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
+    private val transactionsSortedAndDeduplicatedBySignatures = transactions
+      .groupBy(transaction =>
+        transaction.transaction.mapping -> transaction.transaction.transaction.serial
+      )
+      .view
+      // keep just the entry with the most signatures, ensuring it will be accepted
+      .mapValues(_.maxBy(_.transaction.signatures.size))
+      .values
+      .toSeq
+      .sorted
 
     private val sequencerInitTransactions = Seq(
       // TODO(#8761) reduce the number of identity we import just to the nodes we actually need (sequencer most likely)
@@ -468,7 +561,7 @@ object DomainMigrationInitializer {
     )
 
     val (sequencerInitTopologyTransactions, topologyTransactionsToSubmit) =
-      sortedTransactions
+      transactionsSortedAndDeduplicatedBySignatures
         .map { transaction =>
           if (sequencerInitTransactions.contains(transaction.mapping.code)) {
             // reset sequenced time to ensure it's included in all the init calls
@@ -499,7 +592,7 @@ object DomainMigrationInitializer {
 
     val lastDomainStateParametersState
         : StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX] =
-      sortedTransactions.reverse
+      transactionsSortedAndDeduplicatedBySignatures.reverse
         .collectFirst {
           case transaction
               if transaction.mapping.code == TopologyMappingX.Code.DomainParametersStateX =>
@@ -507,7 +600,7 @@ object DomainMigrationInitializer {
         }
         .getOrElse(
           throw new IllegalArgumentException(
-            s"Failed to find last topology transaction in $sortedTransactions"
+            s"Failed to find last topology transaction in $transactionsSortedAndDeduplicatedBySignatures"
           )
         )
   }

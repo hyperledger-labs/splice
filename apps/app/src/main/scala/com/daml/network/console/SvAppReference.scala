@@ -1,8 +1,8 @@
 package com.daml.network.console
 
-import org.apache.pekko.actor.ActorSystem
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
+import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
@@ -10,12 +10,11 @@ import com.daml.network.codegen.java.cn.svcrules.{
   VoteRequest,
   VoteResult,
 }
-import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
 import com.daml.network.http.v0.definitions
-import com.daml.network.sv.{DomainMigrationDump, SvApp, SvAppBootstrap}
+import com.daml.network.sv.{SvApp, SvAppBootstrap}
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
 import com.daml.network.sv.automation.{LeaderBasedAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.automation.singlesv.RestartLeaderBasedAutomationTrigger
@@ -24,6 +23,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import org.apache.pekko.actor.ActorSystem
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -118,6 +118,18 @@ abstract class SvAppReference(
   def getAcsStoreDump(): definitions.GetAcsStoreDumpResponse =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetAcsStoreDump())
+    }
+
+  @Help.Summary("Pause the global domain")
+  def pauseGlobalDomain(): Unit =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAdminAppClient.PauseGlobalDomain())
+    }
+
+  @Help.Summary("Dump all the required data for domain migration to the configured location")
+  def triggerGlobalDomainMigrationDump(): Unit =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAdminAppClient.TriggerDomainMigrationDump())
     }
 }
 
@@ -356,18 +368,6 @@ class SvAppBackendReference(
   def mediatorNodeStatus(): NodeStatus[CNNodeStatus] =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetMediatorNodeStatus())
-    }
-
-  @Help.Summary("Set DomainRatePerParticipant to zero")
-  def pauseGlobalDomain(): Unit =
-    consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.PauseGlobalDomain())
-    }
-
-  @Help.Summary("Get data dump for domain migrartion")
-  def getDomainMigrationDump(): DomainMigrationDump =
-    consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.GetDomainMigrationDump())
     }
 
   /** Remote participant this sv app is configured to interact with. */

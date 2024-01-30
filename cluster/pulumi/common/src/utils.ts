@@ -9,7 +9,7 @@ import { load } from 'js-yaml';
 
 export const config = new pulumi.Config();
 
-export const HELM_CHART_TIMEOUT_SEC = 480;
+export const HELM_CHART_TIMEOUT_SEC = Number(process.env.HELM_CHART_TIMEOUT_SEC) || 480;
 
 export const REPO_ROOT = requireEnv('REPO_ROOT', 'root directory of the repo');
 export const CLUSTER_BASENAME = requireEnv('GCP_CLUSTER_BASENAME');

@@ -175,6 +175,7 @@ case class SvAppBackendConfig(
     // Migrate the SV party from an existing participant with the same namespace.
     migrateSvParty: Option[MigrateSvPartyConfig] = None,
     acsStoreDump: Option[BackupDumpConfig] = None,
+    domainMigrationDumpPath: Option[Path] = None,
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(6),
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
 ) extends CNNodeBackendConfig {

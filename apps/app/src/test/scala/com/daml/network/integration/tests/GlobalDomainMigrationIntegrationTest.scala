@@ -1,12 +1,13 @@
 package com.daml.network.integration.tests
 
+import better.files.File.apply
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.sv.automation.singlesv.SvRewardTrigger
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
 import com.daml.network.codegen.java.cn.svcrules.SvcRules_AddMember
-import com.daml.network.config.{CNNodeConfigTransforms, ParticipantBootstrapDumpConfig}
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.{ScanAppBackendReference, SvAppBackendReference}
 import com.daml.network.environment.{
   CNNodeEnvironmentImpl,
@@ -19,11 +20,13 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.UpgradeDomainNode
+import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.{
+  migrationDumpDir,
+  UpgradeDomainNode,
+}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
-import com.daml.network.sv.DomainMigrationDump
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.ProcessTestUtil
@@ -66,16 +69,20 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
           CNNodeConfigTransforms.updateAllSvAppConfigs((name, c) =>
             if (name.endsWith("Local")) {
               c.copy(
-                participantBootstrappingDump = Some(
-                  ParticipantBootstrapDumpConfig.File(
-                    migrationParticipantIdentitiesFilePath(name).path
-                  )
-                ),
                 onboarding = Some(
-                  DomainMigration(c.onboarding.value.name, migrationDumpFilePath(name).path)
-                ),
+                  DomainMigration(
+                    c.onboarding.value.name,
+                    (migrationDumpDir(
+                      name.stripSuffix("Local")
+                    ) / "domain_migration_dump.json").path,
+                  )
+                )
               )
-            } else c
+            } else
+              c.copy(
+                domainMigrationDumpPath =
+                  Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
+              )
           )(conf),
         // TODO(#9014) Consider keeping this running and instead
         // making the test check history instead of balance once our
@@ -173,11 +180,9 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
             domainDynamicParams.mediatorReactionTimeout.duration.toMillis + domainDynamicParams.participantResponseTimeout.duration.toMillis
           )
           majorityUpgradeNodes.foreach { node =>
-            val dump = node.oldBackend.getDomainMigrationDump()
-            writeMigrationDump(s"${node.oldBackend.name}Local", dump)
+            node.oldBackend.triggerGlobalDomainMigrationDump()
           }
 
-          // TODO(#8761) restart the apps with onboarding type none
           startAllSync(
             sv2LocalBackend,
             sv3LocalBackend,
@@ -208,8 +213,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
 
           withClueAndLog("migrate the late joining node") {
             // sv1 is the founder so specifically join it later to validate our replay
-            val dump = upgradeDomainNode1.oldBackend.getDomainMigrationDump()
-            writeMigrationDump(s"${upgradeDomainNode1.oldBackend.name}Local", dump)
+            upgradeDomainNode1.oldBackend.triggerGlobalDomainMigrationDump()
             sv1LocalBackend.startSync()
 
             eventuallySucceeds() {
@@ -222,7 +226,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
                 .mapping
                 .owners shouldBe Set(sv1Party.uid.namespace)
             }
-            withClue("domain is unpaused on the new node") {
+            withClueAndLog("domain is unpaused on the new node") {
               eventuallySucceeds() {
                 upgradeDomainNode1.newParticipantConnection
                   .getDomainParametersState(
@@ -236,7 +240,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
             }
           }
 
-          withClue("domain is unchanged on the old nodes") {
+          withClueAndLog("domain is unchanged on the old nodes") {
             eventuallySucceeds() {
               sv1Backend.appState.participantAdminConnection
                 .getDecentralizedNamespaceDefinition(
@@ -309,6 +313,17 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
                 sv1LocalBackend.listVotes(Vector(onlyReq.contractId.contractId)) should have size 1
               },
           )
+
+          withClueAndLog("apps can be restarted") {
+            withClueAndLog("sv1 restarts with dump onboarding type") {
+              sv1LocalBackend.stop()
+              sv1LocalBackend.startSync()
+            }
+            withClueAndLog("sv1 restarts without any onboarding type") {
+              sv1LocalBackend.stop()
+              svb("sv1LocalOnboarded").startSync()
+            }
+          }
         }
       }
     }
@@ -366,33 +381,6 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
     scan.listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
   }
 
-  private def writeMigrationDump(
-      nodeName: String,
-      domainMigrationDump: DomainMigrationDump,
-  ): Unit = {
-    val participantIdDumpFile = migrationParticipantIdentitiesFilePath(nodeName)
-    if (participantIdDumpFile.exists) participantIdDumpFile.clear()
-    else participantIdDumpFile.createFile()
-
-    participantIdDumpFile.write(domainMigrationDump.nodeIdentities.participant.toJson.spaces2)
-    val dumpFile = migrationDumpFilePath(nodeName)
-    if (dumpFile.exists) dumpFile.clear()
-    else dumpFile.createFile()
-    dumpFile.write(domainMigrationDump.toJson.spaces2)
-  }
-
-  private def migrationDumpFilePath(nodeName: String) = {
-    import better.files.File
-    val filename = s"${nodeName}_migration_dump.json"
-    File(GlobalDomainMigrationIntegrationTest.migrationDumpDir) / filename
-  }
-
-  private def migrationParticipantIdentitiesFilePath(nodeName: String) = {
-    import better.files.File
-    val filename = s"${nodeName}_participant_identities_dump.json"
-    File(GlobalDomainMigrationIntegrationTest.migrationDumpDir) / filename
-  }
-
   private def checkMigrateDomainOnNodes(
       nodes: Seq[UpgradeDomainNode]
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
@@ -447,7 +435,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
         }
       }
     }
-    withClue("domain is unpaused on the new nodes") {
+    withClueAndLog("domain is unpaused on the new nodes") {
       eventuallySucceeds() {
         nodes.foreach(
           _.newParticipantConnection
@@ -472,9 +460,13 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
 
   // Not using temp-files so test-generated outputs are easy to inspect.
-  val migrationDumpDir: Path = testDumpDir.resolve("domain-migration-dump")
-  if (!migrationDumpDir.toFile.exists())
-    migrationDumpDir.toFile.mkdirs()
+  def migrationDumpDir(node: String): Path = {
+    val migrationDumpDir = testDumpDir.resolve(s"domain-migration-dump/$node")
+    if (!migrationDumpDir.toFile.exists()) {
+      migrationDumpDir.toFile.mkdirs()
+    }
+    migrationDumpDir
+  }
 
   case class UpgradeDomainNode(
       newParticipantConnection: ParticipantAdminConnection,

@@ -9,8 +9,9 @@ import { installCometBftNode } from './cometbft';
 import { initDatabase, Postgres } from './postgres';
 
 export type GlobalDomainUpgradeConfig = {
+  prepareForUpgrade: boolean;
   legacyGlobalDomainId?: DomainIndex;
-  activeGlobalDomainId?: DomainIndex;
+  activeGlobalDomainId: DomainIndex;
   upgradeGlobalDomainId?: DomainIndex;
 };
 
@@ -18,7 +19,7 @@ export const DefaultGlobalDomainId = 0;
 
 export function installDomainSpecificComponent<T>(
   globalDomainUpgradeConfig: GlobalDomainUpgradeConfig,
-  component: (id: DomainIndex, isDefault: boolean) => T
+  component: (id: DomainIndex, isActive: boolean) => T
 ): T {
   if (globalDomainUpgradeConfig.upgradeGlobalDomainId) {
     component(globalDomainUpgradeConfig.upgradeGlobalDomainId, false);
@@ -26,10 +27,7 @@ export function installDomainSpecificComponent<T>(
   if (globalDomainUpgradeConfig.legacyGlobalDomainId) {
     component(globalDomainUpgradeConfig.legacyGlobalDomainId, false);
   }
-  if (
-    globalDomainUpgradeConfig.activeGlobalDomainId == undefined ||
-    globalDomainUpgradeConfig.activeGlobalDomainId == DefaultGlobalDomainId
-  ) {
+  if (globalDomainUpgradeConfig.activeGlobalDomainId == DefaultGlobalDomainId) {
     return component(DefaultGlobalDomainId, true);
   } else {
     return component(globalDomainUpgradeConfig.activeGlobalDomainId, true);
@@ -47,6 +45,7 @@ export class GlobalDomainNode extends ComponentResource {
     syncSource?: Release;
   };
   cometbftRpcService: Service;
+  active: boolean;
 
   constructor(
     domainId: DomainIndex,
@@ -58,12 +57,14 @@ export class GlobalDomainNode extends ComponentResource {
       onboardingName: string;
       syncSource?: Release;
     },
-    disableAutoInit: boolean
+    disableAutoInit: boolean,
+    active: boolean
   ) {
     super('canton:network:domain:global', `${xns.logicalName}-global-domain-${domainId}`);
     this.id = domainId;
     this.cometbft = cometbft;
     this.name = 'global-domain-' + domainId.toString();
+    this.active = active;
 
     const sanitizedName = this.name.replaceAll('-', '_');
 

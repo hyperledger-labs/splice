@@ -3,11 +3,10 @@
 
 package com.daml.network.setup
 
-import com.daml.network.config.{CNParticipantClientConfig, ParticipantBootstrapDumpConfig}
+import com.daml.network.config.ParticipantBootstrapDumpConfig
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.identities.NodeIdentitiesDump
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{Identifier, ParticipantId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -19,22 +18,14 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 
 object ParticipantInitializer {
   def ensureParticipantInitializedWithExpectedId(
-      participantClientConfig: CNParticipantClientConfig,
+      participantAdminConnection: ParticipantAdminConnection,
       dumpConfig: Option[ParticipantBootstrapDumpConfig],
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
-      clock: Clock,
   )(implicit
       ec: ExecutionContextExecutor,
       tc: TraceContext,
   ): Future[Unit] = {
-
-    val participantAdminConnection = new ParticipantAdminConnection(
-      participantClientConfig.adminApi,
-      loggerFactory,
-      retryProvider,
-      clock,
-    )
     val participantInitializer = new ParticipantInitializer(
       dumpConfig,
       loggerFactory,
@@ -43,7 +34,6 @@ object ParticipantInitializer {
     )
     participantInitializer
       .ensureInitializedWithExpectedId()
-      .andThen(_ => participantAdminConnection.close())
   }
 }
 

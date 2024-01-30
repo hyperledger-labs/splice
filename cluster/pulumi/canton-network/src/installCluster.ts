@@ -2,26 +2,26 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
   BackupConfig,
+  bootstrapDataBucketSpec,
   BootstrappingDumpConfig,
-  ValidatorTopupConfig,
+  CnInput,
   domainFeesConfig,
   envFlag,
-  InfrastructureOutputs,
-  REPO_ROOT,
   infraStack,
-  bootstrapDataBucketSpec,
+  InfrastructureOutputs,
+  installCNHelmChartByNamespaceName,
   isDevNet,
   loadYamlFromFile,
-  svKeyFromSecret,
-  SvIdKey,
-  CnInput,
+  REPO_ROOT,
   sequencerPruningConfig,
+  SvIdKey,
+  svKeyFromSecret,
+  ValidatorTopupConfig,
 } from 'cn-pulumi-common';
 
 import { installDocs } from './docs';
 import { configureForwardAll } from './gateway';
 import { DefaultGlobalDomainId, DomainIndex, GlobalDomainUpgradeConfig } from './globalDomainNode';
-import { installClusterIngress } from './ingress';
 import { installSplitwell } from './splitwell';
 import { installSvNode, SvOnboarding } from './sv';
 import { installValidator1 } from './validator1';
@@ -64,13 +64,11 @@ const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
   : undefined;
 
 const globalDomainUpgradeConfig: GlobalDomainUpgradeConfig = {
+  prepareForUpgrade: process.env.GLOBAL_DOMAIN_PREPARE_FOR_UPGRADE === 'true',
   legacyGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_LEGACY_ID),
-  activeGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_ACTIVE_ID),
+  activeGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_ACTIVE_ID) || DefaultGlobalDomainId,
   upgradeGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_UPGRADE_ID),
 };
-const svActiveDomain: DomainIndex = globalDomainUpgradeConfig.activeGlobalDomainId
-  ? globalDomainUpgradeConfig.activeGlobalDomainId
-  : DefaultGlobalDomainId;
 
 const sv2Key = svKeyFromSecret('sv2');
 const sv3Key = svKeyFromSecret('sv3');
@@ -107,7 +105,7 @@ const approvedSvIdentities = singleSv
 function joinViaSv1(sv1: pulumi.Resource, keys: CnInput<SvIdKey>): SvOnboarding {
   return {
     type: 'join-with-key',
-    sponsorApiUrl: `http://sv-app-${svActiveDomain}.sv-1:5014`,
+    sponsorApiUrl: `http://sv-app-${globalDomainUpgradeConfig.activeGlobalDomainId}.sv-1:5014`,
     sponsorRelease: sv1,
     keys,
   };
@@ -253,39 +251,51 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     );
   }
 
-  const validator = await installValidator1(
-    auth0Client,
-    sv1,
-    'validator1',
-    validator1Onboarding.secret,
-    'auth0|63e3d75ff4114d87a2c1e4f5',
-    splitPostgresInstances,
-    svActiveDomain,
-    backupConfig,
-    bootstrappingDumpConfig,
-    // x10 validator1's traffic targetThroughput for load tester -- see #9064
-    { ...topupConfig, targetThroughput: topupConfig.targetThroughput * 10 }
-  );
+  // TODO(#8761) install the validator once the upgrade supports it
+  const installNonSvComponents =
+    globalDomainUpgradeConfig.activeGlobalDomainId == DefaultGlobalDomainId &&
+    globalDomainUpgradeConfig.upgradeGlobalDomainId == undefined;
+  const validator = installNonSvComponents
+    ? await installValidator1(
+        auth0Client,
+        sv1,
+        'validator1',
+        validator1Onboarding.secret,
+        'auth0|63e3d75ff4114d87a2c1e4f5',
+        splitPostgresInstances,
+        globalDomainUpgradeConfig.activeGlobalDomainId,
+        backupConfig,
+        bootstrappingDumpConfig,
+        // x10 validator1's traffic targetThroughput for load tester -- see #9064
+        { ...topupConfig, targetThroughput: topupConfig.targetThroughput * 10 }
+      )
+    : undefined;
 
-  const splitwell = await installSplitwell(
-    auth0Client,
-    sv1,
-    'auth0|63e12e0415ad881ffe914e61',
-    splitwellOnboarding.secret,
-    splitPostgresInstances,
-    svActiveDomain,
-    backupConfig,
-    bootstrappingDumpConfig,
-    topupConfig
-  );
+  // TODO(#8761) install splitwell once the upgrade supports it
+  const splitwell = installNonSvComponents
+    ? await installSplitwell(
+        auth0Client,
+        sv1,
+        'auth0|63e12e0415ad881ffe914e61',
+        splitwellOnboarding.secret,
+        splitPostgresInstances,
+        globalDomainUpgradeConfig.activeGlobalDomainId,
+        backupConfig,
+        bootstrappingDumpConfig,
+        topupConfig
+      )
+    : undefined;
 
   const docs = installDocs();
 
-  installClusterIngress(
+  installCNHelmChartByNamespaceName(
+    'cluster-ingress',
     infraStack.requireOutput(InfrastructureOutputs.INGRESS_NAMESPACE) as pulumi.Output<string>,
-    validator,
-    splitwell,
-    docs
+    'cluster-ingress',
+    'cn-cluster-ingress-full',
+    {},
+    [],
+    { dependsOn: [validator, splitwell, docs].flatMap(value => (value ? [value] : [])) }
   );
 }
 

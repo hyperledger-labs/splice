@@ -151,6 +151,7 @@ case class CNNodeEnvironmentDefinition(
                       svs.local
                         // remove SV apps that end with local, as they are usually not yet started
                         .filterNot(_.name.endsWith("Local"))
+                        .filterNot(_.name.endsWith("Onboarded"))
                         .map(_.participantClientWithAdminToken)
                         .find(_.id.uid.namespace == owner)
                         .foreach(proposeDecentralizedNamespaceReset)
