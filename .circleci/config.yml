@@ -158,7 +158,7 @@ commands:
         name: Make Nix cache key
         command: |
           set -euo pipefail
-          git ls-files nix/ | grep -v '[.]md$' | LANG=C sort | xargs sha256sum -b > /tmp/nix-cache-key
+          git ls-files nix/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
           sudo mkdir /nix
           sudo chown $USER /nix
     - restore_cache:
@@ -243,7 +243,7 @@ commands:
       - run:
           name:
           command: |
-            find . -wholename '*/openapi/*.yaml' | LANG=C sort | xargs sha256sum > openapi-cache-key.txt
+            find . -wholename '*/openapi/*.yaml' | LC_ALL=C sort | xargs sha256sum > openapi-cache-key.txt
       - restore_cache:
           name: Downloading archive with compiled classes from cache
           keys:
@@ -382,7 +382,7 @@ commands:
       - run:
           name:
           command: |
-            find . -wholename '*/openapi/*.yaml' | LANG=C sort | xargs sha256sum > openapi-cache-key.txt
+            find . -wholename '*/openapi/*.yaml' | LC_ALL=C sort | xargs sha256sum > openapi-cache-key.txt
       - restore_cache:
           name: Restoring frontend build artifacts from cache
           keys:
@@ -419,7 +419,7 @@ commands:
       - run:
           name: Compute openapi cache key
           command: |
-            find . -wholename '*/openapi/*.yaml' | LANG=C sort | xargs sha256sum > openapi-cache-key.txt
+            find . -wholename '*/openapi/*.yaml' | LC_ALL=C sort | xargs sha256sum > openapi-cache-key.txt
       - restore_cache:
           name: Restore npm install cache
           keys:
